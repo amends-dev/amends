@@ -134,7 +134,7 @@ export class TaskService extends Context.Service<
      */
     readonly create: (
       input: Task.CreateInput,
-    ) => Effect.Effect<Task.Record, CreateError, Actor.Actor>;
+    ) => Effect.Effect<Task.Task, CreateError, Actor.Actor>;
     /**
      * Change a task in one way, under current group audience and `task.update` on the thread. The
      * change names the value it replaces: the same value again records nothing, and a task that
@@ -143,9 +143,9 @@ export class TaskService extends Context.Service<
      */
     readonly update: (
       input: Task.UpdateInput,
-    ) => Effect.Effect<Task.Record, UpdateError, Actor.Actor>;
+    ) => Effect.Effect<Task.Task, UpdateError, Actor.Actor>;
     /** The thread's task, under current group audience and `thread.read`; a thread without one is `NotFound`. */
-    readonly get: (threadId: Thread.Id) => Effect.Effect<Task.Record, ReadError, Actor.Actor>;
+    readonly get: (threadId: Thread.Id) => Effect.Effect<Task.Task, ReadError, Actor.Actor>;
     /**
      * One page of a group's tasks the actor can read, newest created first, of one status when the
      * options name one: each thread with its task, latest activity, and the actor's position and
@@ -186,7 +186,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
       );
 
   /** The thread's task, which it must have. */
-  const requireTask = Effect.fnUntraced(function* (thread: Thread.Record) {
+  const requireTask = Effect.fnUntraced(function* (thread: Thread.Thread) {
     const found = yield* taskStore.get(thread.id);
     if (Option.isNone(found)) return yield* new NotFound({ threadId: thread.id });
     return found.value;
@@ -197,7 +197,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
    * the assignee is an agent, since assigning one directs it.
    */
   const requireAssignable = Effect.fnUntraced(function* (
-    thread: Thread.Record,
+    thread: Thread.Thread,
     memberId: Member.Id,
   ) {
     const eligible = yield* threadQuery.eligibleMembers(thread.groupId, [memberId]);
@@ -301,7 +301,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
     const page = Effect.fnUntraced(function* (
       before: Task.ListCursor | undefined,
     ): Effect.fn.Return<
-      ReadonlyArray<{ readonly task: Task.Record; readonly thread: Thread.Record }>,
+      ReadonlyArray<{ readonly task: Task.Task; readonly thread: Thread.Thread }>,
       TaskStore.Failure | ThreadStore.Failure
     > {
       const tasks = yield* taskStore.listByGroup(groupId, {

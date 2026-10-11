@@ -22,7 +22,7 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary, keyOf } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Notification.Record));
+const rows = Rows.make(Schema.fromJsonString(Notification.Notification));
 
 /** Whose inbox a notification is in: a membership, a contact, or triage. */
 const inboxKey = (recipient: Notification.Recipient) =>
@@ -35,7 +35,7 @@ const inboxKey = (recipient: Notification.Recipient) =>
         : recipient.memberId,
   );
 /** One notification per source entry and recipient identity. */
-const sourceKey = ({ source, recipient }: Notification.Record) =>
+const sourceKey = ({ source, recipient }: Notification.Notification) =>
   keyOf(
     source.logId,
     source.entryId,
@@ -43,19 +43,19 @@ const sourceKey = ({ source, recipient }: Notification.Record) =>
     Notification.Recipient.isAnyOf(["Triage"])(recipient) ? "" : recipient.id,
   );
 /** Recorded time, then ID in binary order. */
-const byRecorded = (left: Notification.Record, right: Notification.Record) =>
+const byRecorded = (left: Notification.Notification, right: Notification.Notification) =>
   DateTime.toEpochMillis(left.recordedAt) - DateTime.toEpochMillis(right.recordedAt) ||
   compareBinary(left.id, right.id);
-const isAfter = (record: Notification.Record, cursor: NotificationStore.Cursor) =>
+const isAfter = (record: Notification.Notification, cursor: NotificationStore.Cursor) =>
   byRecorded(record, Object.assign({}, record, cursor)) > 0;
-const isBefore = (record: Notification.Record, cursor: NotificationStore.Cursor) =>
+const isBefore = (record: Notification.Notification, cursor: NotificationStore.Cursor) =>
   byRecorded(record, Object.assign({}, record, cursor)) < 0;
 
 /**
  * A record as stored: one projected as Pending reads as Seen, with its first time, once its human
  * recipient has seen it, as when projections are rebuilt after they saw it.
  */
-const withSeen = (space: MemoryDatabase.Space, record: Notification.Record) => {
+const withSeen = (space: MemoryDatabase.Space, record: Notification.Notification) => {
   const seen = space.notificationsSeen.get(record.id);
   return seen === undefined ||
     !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
@@ -116,7 +116,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
 
   /** Write every record or none: an ID or source already recorded conflicts. */
   const insert = Effect.fnUntraced(function* (
-    records: ReadonlyArray<Notification.Record>,
+    records: ReadonlyArray<Notification.Notification>,
     operation: string,
   ) {
     if (records.length === 0) return;
@@ -241,7 +241,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       yield* exclusive((space) =>
         Effect.gen(function* () {
           // Check every notification before recording any of them; one seen before keeps its time.
-          const pending: Array<Notification.Record> = [];
+          const pending: Array<Notification.Notification> = [];
           for (const id of new Set(ids)) {
             const found = yield* rows
               .get(space.records.of("notifications"), id)
@@ -289,7 +289,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
             (!Predicate.isTagged(first, "Agent") || first.memberId === recipient.memberId)
         : (recipient: Notification.Recipient) =>
             Notification.Recipient.isAnyOf(["Contact"])(recipient);
-      const accepted: Array<Notification.Record> = [];
+      const accepted: Array<Notification.Notification> = [];
       for (const id of new Set(ids)) {
         const found = yield* rows
           .get(space.records.of("notifications"), id)

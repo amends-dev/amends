@@ -19,7 +19,7 @@ import * as ChannelId from "./ChannelId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const ChannelBinding = Schema.Struct({
   threadId: ThreadId.Id,
   workspaceId: WorkspaceId.Id,
   channelId: ChannelId.Id,
@@ -37,4 +37,4 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface ChannelBinding extends Schema.Schema.Type<typeof ChannelBinding> {}

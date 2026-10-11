@@ -54,21 +54,21 @@ export class ChannelQuery extends Context.Service<
     /** The channel, which must exist and not be removed; otherwise it is `NotFound`. */
     readonly requireActive: (
       channelId: Channel.Id,
-    ) => Effect.Effect<Channel.Record, ChannelStore.Failure | NotFound>;
+    ) => Effect.Effect<Channel.Channel, ChannelStore.Failure | NotFound>;
     /** The integration of a connection, which must be installed and give channels. */
     readonly integrationOf: (
-      connection: Connection.Record,
+      connection: Connection.Connection,
     ) => Effect.Effect<Integration.Integration, Unavailable>;
     /**
      * The channel's connection as its integration takes it, with its key, for whoever reaches the
      * system on the channel's behalf outside core, as the delivery job does.
      */
     readonly access: (
-      channel: Channel.Record,
+      channel: Channel.Channel,
     ) => Effect.Effect<Connection.Access, Error | Unavailable>;
     /** The channel's transport, made by its integration from that access. */
     readonly transport: (
-      channel: Channel.Record,
+      channel: Channel.Channel,
     ) => Effect.Effect<ChannelTransport.ChannelTransport, Error | Unavailable>;
   }
 >()("@amends-dev/core/channel/ChannelQuery") {}
@@ -93,7 +93,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
   });
 
   const integrationOf = Effect.fn("ChannelQuery.integrationOf")(function* (
-    connection: Connection.Record,
+    connection: Connection.Connection,
   ) {
     const integration = yield* Effect.option(integrations.find(connection.integration));
     if (Option.isNone(integration))
@@ -108,7 +108,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
   });
 
   /** The channel's connection, which must not have been removed, with its integration. */
-  const resolve = Effect.fnUntraced(function* (channel: Channel.Record) {
+  const resolve = Effect.fnUntraced(function* (channel: Channel.Channel) {
     const found = yield* connectionStore.get(channel.connectionId);
     if (Option.isNone(found) || found.value.status !== "active")
       return yield* new Unavailable({ description: "The channel's connection was removed." });
@@ -118,7 +118,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
 
   /** The connection's key, for a connection that authenticates with one. */
   const credentialOf = Effect.fnUntraced(function* (
-    record: Connection.Record,
+    record: Connection.Connection,
   ): Effect.fn.Return<
     ConnectionContract.Credential | null,
     ConnectionCredentialStore.Failure | Unavailable
@@ -137,13 +137,13 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
     return credential.value;
   });
 
-  const access = Effect.fn("ChannelQuery.access")(function* (channel: Channel.Record) {
+  const access = Effect.fn("ChannelQuery.access")(function* (channel: Channel.Channel) {
     const { record } = yield* resolve(channel);
     const credential = yield* credentialOf(record);
     return { connection: Connection.connectionOf(record), credential } satisfies Connection.Access;
   });
 
-  const transport = Effect.fn("ChannelQuery.transport")(function* (channel: Channel.Record) {
+  const transport = Effect.fn("ChannelQuery.transport")(function* (channel: Channel.Channel) {
     const { record, integration } = yield* resolve(channel);
     const credential = yield* credentialOf(record);
     return yield* integration

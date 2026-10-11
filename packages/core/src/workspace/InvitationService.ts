@@ -115,7 +115,7 @@ export class InvitationService extends Context.Service<
     readonly issue: (
       request: Invitation.IssueInput,
       options?: Request.Options,
-    ) => Effect.Effect<Invitation.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<Invitation.Invitation, Error, Actor.Actor>;
     /**
      * Accept an invitation as the person it names, with the name the workspace will call them.
      * Trusted ingress supplies the authenticated recipient; no membership is required yet. A
@@ -128,18 +128,20 @@ export class InvitationService extends Context.Service<
       id: Invitation.Id,
       recipient: Identity.HumanId,
       name: Member.Name,
-    ) => Effect.Effect<Member.Record, Error>;
+    ) => Effect.Effect<Member.Member, Error>;
     /**
      * Revoke a pending invitation, expired or not, under the same authority issuing it needs.
      * Revoking again returns it unchanged; an accepted invitation is `Unavailable`, since removal
      * is what ends that membership.
      */
-    readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Record, Error, Actor.Actor>;
+    readonly revoke: (
+      id: Invitation.Id,
+    ) => Effect.Effect<Invitation.Invitation, Error, Actor.Actor>;
     /**
      * Every invitation in the workspace in issue order, whatever its state; requires
      * `invitation.manage`.
      */
-    readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Error, Actor.Actor>;
+    readonly list: Effect.Effect<ReadonlyArray<Invitation.Invitation>, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/workspace/invitation-application/Service") {}
 
@@ -224,7 +226,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       yield* journal
         .publish(InvitationFacts.Issued, details)
         .pipe(Publication.withOccurredAt(issuedAt));
-      return { details, state: { _tag: "Pending" } } satisfies Invitation.Record;
+      return { details, state: { _tag: "Pending" } } satisfies Invitation.Invitation;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -308,7 +310,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       yield* journal
         .publish(InvitationFacts.Revoked, { workspaceId, invitationId: id, ...state })
         .pipe(Publication.withOccurredAt(state.revokedAt));
-      return { details: invitation.details, state } satisfies Invitation.Record;
+      return { details: invitation.details, state } satisfies Invitation.Invitation;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

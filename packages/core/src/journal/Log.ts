@@ -79,7 +79,7 @@ export interface Entry<A> extends StoredEntry.Metadata {
 export interface Batch<A> {
   readonly logId: Id;
   readonly position: Position;
-  readonly commit: Commit.Record;
+  readonly commit: Commit.Commit;
   readonly entries: ReadonlyArray<Entry<A>>;
 }
 

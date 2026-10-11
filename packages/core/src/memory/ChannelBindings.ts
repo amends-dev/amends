@@ -13,7 +13,7 @@ import * as Binding from "./Binding.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(ChannelBinding.Record));
+const rows = Rows.make(Schema.fromJsonString(ChannelBinding.ChannelBinding));
 
 /**
  * Channel bindings over the current workspace transaction, keyed by thread.

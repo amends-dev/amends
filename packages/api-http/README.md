@@ -40,7 +40,7 @@ the host's sign-in for one.
 - `workspaces`: `POST /workspaces` accepts `Workspace.CreateInput`
   (`{ "name": "Design studio", "memberName": "Alice" }`) and creates a workspace owned by the
   authenticated human, with the creator's membership named `memberName`. Both names are required,
-  non-empty, and trimmed; the returned `Workspace.Record` includes the workspace's.
+  non-empty, and trimmed; the returned `Workspace.Workspace` includes the workspace's.
   `GET /workspaces/:workspaceId/settings` returns metadata and action/role flags;
   `GET …/member-management` adds access and removal flags to readable members. `PUT …/name` accepts
   `{ name, expectedName }` and returns the renamed workspace (409 `WorkspaceSettings.Changed` when

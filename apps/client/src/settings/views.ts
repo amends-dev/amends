@@ -60,7 +60,7 @@ const workspaceRoles = (entry: Entry) =>
     (assignment) =>
       assignment.status === "active" &&
       Assignment.Source.isAnyOf(["Role"])(assignment.source) &&
-      Scope.Value.isAnyOf(["Workspace"])(assignment.source.scope),
+      Scope.Scope.isAnyOf(["Workspace"])(assignment.source.scope),
   ) ?? [];
 const statusOf = (
   invitation: SettingsData["invitations"][number],
@@ -110,7 +110,7 @@ export function useWorkspaceSettings(
   const addresses = createMemo(
     () => new Map((data()?.accounts ?? []).map((account) => [account.id as string, account.email])),
   );
-  const person = (member: Member.Record): SettingsPerson => ({
+  const person = (member: Member.Member): SettingsPerson => ({
     id: member.id,
     name: memberName(member),
     agent: Identity.MemberReference.isAnyOf(["Agent"])(member.identity),
@@ -153,7 +153,7 @@ export function useWorkspaceSettings(
               ? (current.roles.find((choice) => choice.role.id === source.roleId)?.role.name ??
                 source.roleId)
               : source.grant.permission,
-            scope: Scope.Value.isAnyOf(["Workspace"])(scope)
+            scope: Scope.Scope.isAnyOf(["Workspace"])(scope)
               ? ("workspace" as const)
               : ("target" as const),
             active: status === "active",

@@ -35,17 +35,17 @@ import { make, type Fixture } from "../../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
-const alice = Actor.Value.make({
+const alice = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") }),
 });
-const agent = Actor.Value.make({
+const agent = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("agent"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("agent") }),
 });
-const bob = Member.Record.make({
+const bob = Member.Member.make({
   id: Member.Id.make("bob"),
   workspaceId,
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
@@ -53,15 +53,15 @@ const bob = Member.Record.make({
   status: "active",
 });
 const missingId = Member.Id.make("missing");
-const bobScope = Scope.Value.cases.Target.make({
+const bobScope = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: bob.id }),
 });
 const assignment = (
   id: string,
-  scope: Scope.Value = bobScope,
+  scope: Scope.Scope = bobScope,
   permission = MemberPermissions.Read,
 ) =>
-  Assignment.Record.make({
+  Assignment.Assignment.make({
     id: Assignment.Id.make(id),
     workspaceId,
     memberId: alice.memberId,
@@ -170,7 +170,7 @@ const run = <A, E>(
     | Actor.Actor
     | Crypto.Crypto
   >,
-  actor: Actor.Value = alice,
+  actor: Actor.Actor["Service"] = alice,
   overrides: Partial<MemberStore.MemberStore["Service"]> = {},
   workspaceOverrides: Partial<WorkspaceStore.WorkspaceStore["Service"]> = {},
 ) =>
@@ -179,7 +179,7 @@ const run = <A, E>(
     Effect.provideService(Actor.Actor, actor),
     Effect.provideService(Crypto.Crypto, testCrypto),
   );
-const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Record> = []) =>
+const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Assignment> = []) =>
   fixture.store.transaction(
     Effect.gen(function* () {
       const members = fixture.members;
@@ -254,7 +254,7 @@ it.effect(
       expect(lookedUp).toEqual([alice.memberId, alice.memberId]);
       yield* fixture.store.transaction(
         fixture.assignments.insert(
-          assignment("read-workspace", Scope.Value.cases.Workspace.make({ workspaceId })),
+          assignment("read-workspace", Scope.Scope.cases.Workspace.make({ workspaceId })),
         ),
       );
       expect(yield* run(fixture, get(missingId).pipe(Effect.flip))).toMatchObject({
@@ -364,7 +364,7 @@ it.effect("member reads refuse an actor from another workspace", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
-    const foreignActor = Actor.Value.make({
+    const foreignActor = Actor.Actor.of({
       workspaceId: foreignWorkspaceId,
       memberId: alice.memberId,
       identity: alice.identity,
@@ -413,7 +413,7 @@ it.effect(
         status: "removed",
       });
       expect(yield* fixture.members.get(bob.id)).toEqual(Option.some(removed));
-      const staleActor = Actor.Value.make({
+      const staleActor = Actor.Actor.of({
         workspaceId,
         memberId: bob.id,
         identity: bob.identity,
@@ -448,7 +448,7 @@ it.effect(
         });
       }
       expect(yield* fixture.snapshot).toEqual(before);
-      const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
+      const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId });
       const ownerGrant = assignment("remove-workspace", workspaceScope, MemberPermissions.Remove);
       yield* fixture.store.transaction(
         Effect.gen(function* () {
@@ -568,7 +568,7 @@ it.effect(
       yield* fixture.store.transaction(
         Effect.gen(function* () {
           yield* fixture.assignments.insert(
-            assignment("read-all", Scope.Value.cases.Workspace.make({ workspaceId })),
+            assignment("read-all", Scope.Scope.cases.Workspace.make({ workspaceId })),
           );
           yield* fixture.members.markRemoved(bob.id);
         }),

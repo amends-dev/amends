@@ -35,12 +35,12 @@ const roleAssignmentId = Assignment.Id.make("role-assignment");
 const directAssignmentId = Assignment.Id.make("direct-assignment");
 const roleSource = Assignment.Source.cases.Role.make({
   roleId,
-  scope: Scope.Value.cases.Workspace.make({ workspaceId }),
+  scope: Scope.Scope.cases.Workspace.make({ workspaceId }),
 });
 const directSource = Assignment.Source.cases.Direct.make({
   grant: Grant.make(
     MemberPermissions.Read,
-    Scope.Value.cases.Target.make({
+    Scope.Scope.cases.Target.make({
       target: Target.Reference.cases.Member.make({
         workspaceId,
         memberId: Member.Id.make("subject"),
@@ -498,7 +498,7 @@ it.effect(
             memberId: Member.Id.make("subject"),
           });
           const localDirect = Assignment.Source.cases.Direct.make({
-            grant: Grant.make(MemberPermissions.Read, Scope.Value.cases.Target.make({ target })),
+            grant: Grant.make(MemberPermissions.Read, Scope.Scope.cases.Target.make({ target })),
           });
           yield* fixture.store.transaction(
             Effect.gen(function* () {
@@ -534,7 +534,7 @@ it.effect(
                 status: "active",
                 source: Assignment.Source.cases.Role.make({
                   roleId,
-                  scope: Scope.Value.cases.Workspace.make({ workspaceId: foreign }),
+                  scope: Scope.Scope.cases.Workspace.make({ workspaceId: foreign }),
                 }),
               });
             }),
@@ -553,7 +553,7 @@ it.effect(
           if (
             Option.isNone(direct) ||
             !Assignment.Source.isAnyOf(["Direct"])(direct.value.source) ||
-            !Scope.Value.isAnyOf(["Target"])(direct.value.source.grant.scope)
+            !Scope.Scope.isAnyOf(["Target"])(direct.value.source.grant.scope)
           )
             throw new Error("Missing direct target");
           Reflect.set(direct.value.source.grant.scope.target, "workspaceId", foreign);

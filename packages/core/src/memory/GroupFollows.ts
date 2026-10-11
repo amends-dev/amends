@@ -14,7 +14,7 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(GroupFollow.Record));
+const rows = Rows.make(Schema.fromJsonString(GroupFollow.GroupFollow));
 
 /**
  * Group follows, active and ended; one active follow per group admission.

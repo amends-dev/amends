@@ -53,7 +53,7 @@ const message = (
   id: string,
   author: ThreadMessage.Author,
   content: ThreadMessage.Content,
-): ThreadMessage.Record => ({
+): ThreadMessage.ThreadMessage => ({
   id: ThreadMessage.Id.make(id),
   workspaceId,
   threadId,
@@ -97,7 +97,7 @@ const turnCreated = (): Thread.TimelineItem =>
   ({
     activity: activity("turn.created", { turnId: "t", memberId: reviewer, retryOf: null }),
   }) as never;
-const task = (fields: Partial<Task.Record> = {}): Task.Record => ({
+const task = (fields: Partial<Task.Task> = {}): Task.Task => ({
   threadId,
   workspaceId,
   groupId: Group.GeneralId,

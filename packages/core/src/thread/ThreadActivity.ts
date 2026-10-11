@@ -66,13 +66,13 @@ export const Common = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const ThreadActivity = Schema.Struct({
   ...Common.fields,
   kind: Kind,
   /** The version of its kind's details it was recorded with; a kind whose details change takes the next. */
   version: Schema.Int.check(Schema.isGreaterThan(0)),
   /** What the activity is about, such as a message, participation, turn, or task. */
-  subject: Subject.Value,
+  subject: Subject.Subject,
   /** A workspace holds at most one activity with a key; null leaves the activity repeatable. */
   occurrence: Schema.NullOr(Schema.NonEmptyString),
   /** Whether it counts as the thread's and its group's latest activity for readers. */
@@ -85,7 +85,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface ThreadActivity extends Schema.Schema.Type<typeof ThreadActivity> {}
 
 /**
  * One participant an activity selected to be told of it, as selected when the activity was

@@ -14,7 +14,7 @@ import * as DeliveryStore from "./DeliveryStore.ts";
 /** Change the stored delivery a fact names, as `changes` says. */
 const update = Effect.fnUntraced(function* (
   deliveryId: Delivery.Id,
-  changes: Partial<Delivery.Record>,
+  changes: Partial<Delivery.Delivery>,
 ) {
   const deliveryStore = yield* DeliveryStore.DeliveryStore;
   const found = yield* deliveryStore.get(deliveryId);

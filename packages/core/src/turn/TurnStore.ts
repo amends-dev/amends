@@ -54,12 +54,12 @@ export class TurnStore extends Context.Service<
   TurnStore,
   {
     /** The turn, if stored. */
-    readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Record>, Failure>;
+    readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Turn>, Failure>;
     /** The agent's active turn on the thread: queued, running, or cancelling. */
     readonly findActive: (
       memberId: MemberId.Id,
       threadId: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<Turn.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<Turn.Turn>, Failure>;
     /**
      * The agent's most recent turn on the thread, active or finished: by creation, then by how far
      * its accepted input reaches, which a later turn always extends.
@@ -67,23 +67,23 @@ export class TurnStore extends Context.Service<
     readonly findLatest: (
       memberId: MemberId.Id,
       threadId: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<Turn.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<Turn.Turn>, Failure>;
     /** Every active turn in the workspace, oldest first, at most `limit`. */
-    readonly listActive: (limit: number) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
+    readonly listActive: (limit: number) => Effect.Effect<ReadonlyArray<Turn.Turn>, Failure>;
     /** The agent's active turns, one at most per thread, oldest first. */
     readonly listActiveByMember: (
       memberId: MemberId.Id,
-    ) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Turn.Turn>, Failure>;
     /**
      * Reject reused IDs and a second active turn for the same agent
      * and thread. Never upsert.
      */
     readonly insert: (
-      record: Turn.Record,
+      record: Turn.Turn,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** Replace a stored turn; a missing record conflicts. */
     readonly update: (
-      record: Turn.Record,
+      record: Turn.Turn,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/turn/store/Service") {}
@@ -119,7 +119,7 @@ export const make = (
       Effect.flatMap(read("listActive", Schema.Natural, limit), driver.listActive),
     listActiveByMember: (memberId) =>
       Effect.flatMap(read("listActiveByMember", MemberId.Id, memberId), driver.listActiveByMember),
-    insert: (record) => Effect.flatMap(write("insert", Turn.Record, record), driver.insert),
-    update: (record) => Effect.flatMap(write("update", Turn.Record, record), driver.update),
+    insert: (record) => Effect.flatMap(write("insert", Turn.Turn, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Turn.Turn, record), driver.update),
   };
 };

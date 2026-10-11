@@ -166,7 +166,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
     // workspace's write order; the reader's other sessions hear of it as a signal.
     yield* readStateCommand.markThreadRead(reader, thread, position.readThrough);
     yield* signalHub.publish(
-      Signal.Value.cases.ThreadRead.make({
+      Signal.Signal.cases.ThreadRead.make({
         workspaceId,
         memberId: reader.memberId,
         threadId: thread.id,
@@ -202,7 +202,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
       readAt,
     });
     yield* signalHub.publish(
-      Signal.Value.cases.GroupRead.make({
+      Signal.Signal.cases.GroupRead.make({
         workspaceId,
         memberId: reader.memberId,
         groupId: request.groupId,

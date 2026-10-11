@@ -27,7 +27,7 @@ export const Created = Fact.make("channel.created", {
   subject: (payload) => Subject.make("channel", payload.id),
   occurrence: (payload) => [payload.id],
   audience: workspace,
-  payload: Channel.Record,
+  payload: Channel.Channel,
 });
 
 /**
@@ -68,7 +68,7 @@ export const Bound = Fact.make("channel.bound", {
   subject: (payload) => Subject.make("channel-binding", payload.threadId),
   occurrence: (payload) => [payload.threadId],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: ChannelBinding.Record,
+  payload: ChannelBinding.ChannelBinding,
 });
 
 /**
@@ -82,7 +82,7 @@ export const ContactCreated = Fact.make("channel.contact.created", {
   subject: (payload) => Subject.make("contact", payload.id),
   occurrence: (payload) => [payload.id],
   audience: workspace,
-  payload: Contact.Record,
+  payload: Contact.Contact,
 });
 
 /**

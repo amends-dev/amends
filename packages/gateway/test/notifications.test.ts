@@ -31,7 +31,7 @@ import { withStorage } from "./fixture.ts";
 /** Notification storage: isolation, paging, batches, staged reads, and gateway reads. */
 
 /** Inbox items for these notifications, whose sources here are entries no log holds. */
-const inboxOf = (...records: ReadonlyArray<Notification.Record>) =>
+const inboxOf = (...records: ReadonlyArray<Notification.Notification>) =>
   records.map((notification) => ({ notification }));
 
 const { core, initialized, runGateway } = Support;
@@ -56,8 +56,8 @@ describe("notifications", () => {
   const recordedAt = DateTime.makeUnsafe("2026-09-19T12:00:00.123Z");
   const record = (
     id: string,
-    overrides: Partial<Notification.Record> = {},
-  ): Notification.Record => ({
+    overrides: Partial<Notification.Notification> = {},
+  ): Notification.Notification => ({
     id: Notification.Id.make(id),
     workspaceId,
     source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make(`source-${id}`) },
@@ -536,7 +536,7 @@ describe("notifications", () => {
           Effect.gen(function* () {
             const bound = yield* boundTo(workspaceId);
             yield* initialized(bound);
-            const corrupt: ReadonlyArray<(value: Notification.Record) => void> = [
+            const corrupt: ReadonlyArray<(value: Notification.Notification) => void> = [
               (value) => Reflect.set(value, "id", ""),
               (value) => Reflect.set(value, "workspaceId", otherWorkspaceId),
               (value) => Reflect.set(value.source, "logId", ""),
@@ -802,7 +802,7 @@ describe("notifications", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId);
           const workspace = yield* initialized(bound, humanIdentity.id);
-          const actor = Actor.Value.make({
+          const actor = Actor.Actor.of({
             workspaceId,
             memberId: workspace.ownerMemberId,
             identity: humanIdentity,

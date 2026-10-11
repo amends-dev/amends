@@ -106,7 +106,7 @@ export type State = typeof State.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({ details: Issuance, state: State }).annotate({
+export const Invitation = Schema.Struct({ details: Issuance, state: State }).annotate({
   identifier: "WorkspaceInvitation",
 });
 
@@ -114,4 +114,4 @@ export const Record = Schema.Struct({ details: Issuance, state: State }).annotat
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Invitation extends Schema.Schema.Type<typeof Invitation> {}

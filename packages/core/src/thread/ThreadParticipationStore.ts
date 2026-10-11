@@ -56,7 +56,7 @@ export class ThreadParticipationStore extends Context.Service<
   {
     readonly get: (
       id: ThreadParticipation.Id,
-    ) => Effect.Effect<Option.Option<ThreadParticipation.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<ThreadParticipation.ThreadParticipation>, Failure>;
     /**
      * Find several participations, active or ended, in one read. Absent IDs are omitted and each
      * found record appears once; order is unspecified, so callers index results by ID. An empty
@@ -64,14 +64,14 @@ export class ThreadParticipationStore extends Context.Service<
      */
     readonly getMany: (
       ids: ReadonlyArray<ThreadParticipation.Id>,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, Failure>;
     /**
      * Every participation the thread has had, active or ended, in stable ID order. A history read
      * for inspection; operations use the bounded reads below.
      */
     readonly listByThread: (
       id: ThreadId.Id,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, Failure>;
     /**
      * A page of the thread's active participations in binary participation-ID order, after the
      * exclusive cursor.
@@ -79,7 +79,7 @@ export class ThreadParticipationStore extends Context.Service<
     readonly pageActiveByThread: (
       id: ThreadId.Id,
       options: ThreadParticipation.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, Failure>;
     /**
      * The thread's active participations of these participants, in one read. Each found record
      * appears once; order is unspecified, so callers index results by participant. An empty
@@ -88,7 +88,7 @@ export class ThreadParticipationStore extends Context.Service<
     readonly findActive: (
       id: ThreadId.Id,
       participants: ReadonlyArray<ThreadParticipation.Reference>,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, Failure>;
     /**
      * End every active participation held through this group admission at `endedAt`, however many
      * there are, in one write; ended ones keep their time. A departure from the group ends them all.
@@ -108,7 +108,7 @@ export class ThreadParticipationStore extends Context.Service<
      * given, checked when the participant is admitted. Preserve historical values on replay.
      */
     readonly insert: (
-      record: ThreadParticipation.Record,
+      record: ThreadParticipation.ThreadParticipation,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/thread/ThreadParticipationStore") {}
@@ -159,7 +159,7 @@ export const make = (
       );
     }),
     insert: (record) =>
-      write("insert", ThreadParticipation.Record, record).pipe(
+      write("insert", ThreadParticipation.ThreadParticipation, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active" && record.endedAt === null,
           () => new Conflict({ operation: "insert", message: "Expected an active participation" }),

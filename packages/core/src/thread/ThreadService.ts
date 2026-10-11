@@ -208,12 +208,12 @@ export class ThreadService extends Context.Service<
      */
     readonly rename: (
       input: Thread.RenameInput,
-    ) => Effect.Effect<Thread.Record, RenameError, Actor.Actor>;
+    ) => Effect.Effect<Thread.Thread, RenameError, Actor.Actor>;
     /**
      * The thread, under current group audience and `thread.read`. Reading creates no participation
      * and marks nothing seen.
      */
-    readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Record, ReadError, Actor.Actor>;
+    readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Thread, ReadError, Actor.Actor>;
     /**
      * One page of a group's threads the actor can read, newest latest activity first, each with the
      * actor's read position and unread state. Requires current group membership; `thread.read` is
@@ -399,7 +399,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
    * Who a thread in a direct group starts with: every member who can take part, and those who can,
    * for authorizing them.
    */
-  const directStarters = Effect.fnUntraced(function* (group: Group.DirectRecord) {
+  const directStarters = Effect.fnUntraced(function* (group: Group.Direct) {
     const eligible = yield* threadQuery.eligibleMembers(group.id, group.memberIds);
     return { starters: [...eligible.keys()].sort(), eligible };
   });
@@ -565,7 +565,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
                 })
                 .pipe(Publication.withOccurredAt(occurredAt));
               return {
-                value: Object.assign({}, thread, { title: request.title }) satisfies Thread.Record,
+                value: Object.assign({}, thread, { title: request.title }) satisfies Thread.Thread,
                 kind: ThreadTitleActivity.Renamed,
                 details: { title: request.title, previous: thread.title },
                 recipients,

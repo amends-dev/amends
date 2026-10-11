@@ -8,7 +8,11 @@
  *
  * @since 0.1.0
  */
-import { Connection, Integration, ModelCatalog } from "@amends-dev/connection";
+import {
+  Connection as ConnectionContract,
+  Integration,
+  ModelCatalog,
+} from "@amends-dev/connection";
 import { Schema } from "effect";
 import * as Text from "../text/Text.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";
@@ -21,13 +25,13 @@ import * as MemberId from "../workspace/MemberId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Connection.ConnectionId;
+export const Id = ConnectionContract.ConnectionId;
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = Connection.ConnectionId;
+export type Id = ConnectionContract.ConnectionId;
 
 /**
  * A connection's name as recorded; names chosen now are `NewName`.
@@ -124,7 +128,7 @@ export type Status = typeof Status.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Connection = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
 
@@ -134,7 +138,7 @@ export const Record = Schema.Struct({
   settings: Settings,
 
   /** How the connection authenticates; one that authenticates with a key always has one. */
-  auth: Connection.AuthMethod,
+  auth: ConnectionContract.AuthMethod,
   status: Status,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
@@ -144,7 +148,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Connection extends Schema.Schema.Type<typeof Connection> {}
 
 /**
  * The record with the given fields replaced: what a rename, a configuration, or a removal makes of
@@ -153,7 +157,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Connection, changes: Partial<Connection>): Connection =>
   Object.assign({}, record, changes);
 
 /**
@@ -167,7 +171,7 @@ export const CreateInput = Schema.Struct({
   integration: Schema.NonEmptyString,
   name: NewName,
   settings: NewSettings,
-  auth: Connection.AuthMethod,
+  auth: ConnectionContract.AuthMethod,
   apiKey: Schema.optionalKey(ApiKey),
 }).check(
   Schema.makeFilter(
@@ -306,7 +310,7 @@ export const View = Schema.Struct({
   name: Name,
   integration: Schema.NonEmptyString,
   settings: Settings,
-  auth: Connection.AuthMethod,
+  auth: ConnectionContract.AuthMethod,
   readiness: Readiness,
 
   /** Whether the reader may rename it, change its settings and key, check it, and remove it. */
@@ -329,8 +333,8 @@ export interface View extends Schema.Schema.Type<typeof View> {}
  * @since 0.1.0
  */
 export const Access = Schema.Struct({
-  connection: Connection.Connection,
-  credential: Schema.NullOr(Connection.Credential),
+  connection: ConnectionContract.Connection,
+  credential: Schema.NullOr(ConnectionContract.Credential),
 });
 
 /**
@@ -346,7 +350,7 @@ export interface Access extends Schema.Schema.Type<typeof Access> {}
  * @category utils
  * @since 0.1.0
  */
-export const connectionOf = (record: Record): Connection.Connection => ({
+export const connectionOf = (record: Connection): ConnectionContract.Connection => ({
   id: record.id,
   integration: record.integration,
   name: record.name,
@@ -360,7 +364,7 @@ export const connectionOf = (record: Record): Connection.Connection => ({
  * @category utils
  * @since 0.1.0
  */
-export const view = (record: Record, readiness: Readiness, manageable: boolean): View => ({
+export const view = (record: Connection, readiness: Readiness, manageable: boolean): View => ({
   id: record.id,
   name: record.name,
   integration: record.integration,
@@ -387,7 +391,7 @@ export const IntegrationView = Schema.Struct({
   docs: Schema.optionalKey(Schema.String),
 
   /** How a connection can authenticate, in the order to offer them. */
-  auth: Schema.NonEmptyArray(Connection.AuthMethod),
+  auth: Schema.NonEmptyArray(ConnectionContract.AuthMethod),
   provides: Schema.Array(Integration.Capability),
 
   /** Whether the agent of the harnesses a connection gives works only in a sandbox. */

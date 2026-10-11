@@ -69,7 +69,7 @@ import { withStorage } from "./fixture.ts";
 const { core, initialized, runGateway } = Support;
 describe("threads", () => {
   /** Narrow a stored participation to its member participant for assertions. */
-  const memberParticipant = (record: ThreadParticipation.Record) => {
+  const memberParticipant = (record: ThreadParticipation.ThreadParticipation) => {
     if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
       throw new Error("Expected a member participant");
     return record.participant;
@@ -83,10 +83,13 @@ describe("threads", () => {
   const agentIdentity = Identity.MemberReference.cases.Agent.make({
     id: Identity.AgentId.make("agent"),
   });
-  const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Value) =>
+  const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     program.pipe(Effect.provideService(Actor.Actor, actor));
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-    asActor(program, actor).pipe(Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    program: Effect.Effect<A, E, R>,
+  ) => asActor(program, actor).pipe(Effect.provide(core(bound)));
   const publish = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -144,7 +147,7 @@ describe("threads", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -158,15 +161,15 @@ describe("threads", () => {
       owner,
       group,
       hidden,
-      human: Actor.Value.make({ workspaceId, memberId: humanId, identity: humanIdentity }),
-      agent: Actor.Value.make({ workspaceId, memberId: agentId, identity: agentIdentity }),
+      human: Actor.Actor.of({ workspaceId, memberId: humanId, identity: humanIdentity }),
+      agent: Actor.Actor.of({ workspaceId, memberId: agentId, identity: agentIdentity }),
     };
   });
   const notifications = (bound: Bound, memberId: Member.Id, identity: Identity.MemberReference) =>
     listOldestFirst(bound.notifications, Notification.ofMember(memberId, identity), {
       limit: 100,
     });
-  const sorted = (values: ReadonlyArray<ThreadParticipation.Record>) =>
+  const sorted = (values: ReadonlyArray<ThreadParticipation.ThreadParticipation>) =>
     values.toSorted((a, b) => (a.id < b.id ? -1 : 1));
   /** Mentioning every member of the fixture group, the author included, enrolls and notifies them all. */
   const everyone = (ownerId: Member.Id) => [ownerId, humanId, agentId];
@@ -1063,7 +1066,7 @@ describe("threads", () => {
           });
 
           // Participants: a reused ID.
-          const joined: ThreadParticipation.Record = {
+          const joined: ThreadParticipation.ThreadParticipation = {
             id: ThreadParticipation.Id.make("joined"),
             workspaceId,
             threadId: second.thread.id,
@@ -1161,13 +1164,13 @@ describe("threads", () => {
         storage,
         Effect.gen(function* () {
           const { bound, owner, group, human } = yield* prepare();
-          const other = Actor.Value.make({
+          const other = Actor.Actor.of({
             workspaceId,
             memberId: otherId,
             identity: { _tag: "Human", id: Identity.HumanId.make("other") },
           });
           const rename = (
-            by: Actor.Value,
+            by: Actor.Actor["Service"],
             threadId: Thread.Id,
             title: string,
             expectedTitle: string | null = null,

@@ -30,17 +30,17 @@ import * as SignalHub from "../../src/signal/SignalHub.ts";
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
 const logId = Log.Id.make("journal");
-const alice = Actor.Value.make({
+const alice = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice-member"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") }),
 });
-const agent = Actor.Value.make({
+const agent = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("agent-member"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") }),
 });
-const bob = Actor.Value.make({
+const bob = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("bob-member"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
@@ -50,7 +50,7 @@ const record = (
   id: string,
   recipient: Notification.Recipient = Notification.ofMember(alice.memberId, alice.identity),
   recordWorkspaceId = workspaceId,
-): Notification.Record => ({
+): Notification.Notification => ({
   id: Notification.Id.make(id),
   workspaceId: recordWorkspaceId,
   source: { logId, entryId: Entry.Id.make(`source-${id}`) },
@@ -161,7 +161,7 @@ const run = <A, E>(
     Effect.provideService(Actor.Actor, actor),
   );
 /** A page of the inbox as the actor reads it: their notifications, without sources here. */
-const inboxOf = (...records: ReadonlyArray<Notification.Record>) =>
+const inboxOf = (...records: ReadonlyArray<Notification.Notification>) =>
   records.map((notification) => ({ notification }));
 
 it.effect(
@@ -261,9 +261,9 @@ it.effect(
       yield* fixture.store.transaction(fixture.members.markRemoved(bob.memberId));
       for (const actor of [
         bob,
-        Actor.Value.make({ ...alice, memberId: Member.Id.make("missing") }),
-        Actor.Value.make({ ...alice, identity: agent.identity }),
-        Actor.Value.make({ ...alice, workspaceId: otherWorkspaceId }),
+        Actor.Actor.of({ ...alice, memberId: Member.Id.make("missing") }),
+        Actor.Actor.of({ ...alice, identity: agent.identity }),
+        Actor.Actor.of({ ...alice, workspaceId: otherWorkspaceId }),
       ]) {
         yield* run(
           fixture,

@@ -22,7 +22,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               Member.Id.make("recipient-member"),
               Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("recipient") }),
             );
-            const value: Notification.Record = {
+            const value: Notification.Notification = {
               id: Notification.Id.make("malformed"),
               workspaceId,
               source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("source") },

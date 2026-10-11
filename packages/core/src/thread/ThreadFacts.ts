@@ -20,7 +20,7 @@ export const Created = Fact.make("thread.created", {
   version: 2,
   subject: (payload) => Subject.make("thread", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Thread.Record,
+  payload: Thread.Thread,
 });
 
 /**

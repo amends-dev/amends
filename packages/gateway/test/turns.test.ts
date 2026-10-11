@@ -56,7 +56,7 @@ const execute = <A, E>(
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(gateway.inWorkspace(id, Effect.flatMap(TurnExecution.TurnExecution, step))),
   );
-const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
+const timelineOf = (id: Workspace.Id, threadId: Turn.Turn["threadId"]) =>
   as(
     id,
     alice,
@@ -70,7 +70,7 @@ const turnOf = (id: Workspace.Id, turnId: Turn.Id) =>
 /** Append to the participation's session log after its latest entry, as a turn's job does. */
 const appendToLog = (
   id: Workspace.Id,
-  participationId: Turn.Record["participationId"],
+  participationId: Turn.Turn["participationId"],
   entries: readonly [SessionLog.Entry, ...Array<SessionLog.Entry>],
 ) =>
   Effect.flatMap(boundTo(id), (bound) =>
@@ -84,7 +84,7 @@ const logPrompt = (id: Workspace.Id, ready: Ready) =>
     { _tag: "Prompted", turnId: ready.turn.id, prompt: ready.prompt, messages: ready.messages },
   ]);
 /** Log a step the turn took, as its job does while running it. */
-const logStep = (id: Workspace.Id, turn: Turn.Record, stepId: string, step: StreamPart.Step) =>
+const logStep = (id: Workspace.Id, turn: Turn.Turn, stepId: string, step: StreamPart.Step) =>
   appendToLog(id, turn.participationId, [{ _tag: "Step", turnId: turn.id, id: stepId, step }]);
 /**
  * Follow a turn's log, as alice unless another reader is named, for the enclosing scope: each
@@ -226,7 +226,7 @@ const revokeRoles = (id: Workspace.Id, memberId: Member.Id) =>
       yield* Operations.revokeAssignment(id, alice, memberId, assignment.id);
   });
 /** A post's result with the activity that placed its message, read through the workspace's stores. */
-const withPlace = <A extends { readonly message: ThreadMessage.Record }>(
+const withPlace = <A extends { readonly message: ThreadMessage.ThreadMessage }>(
   id: Workspace.Id,
   result: A,
 ) => Effect.flatMap(boundTo(id), (bound) => placedIn(bound)(result));
@@ -240,7 +240,7 @@ const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Member.Id
   ).pipe(Effect.flatMap((started) => withPlace(id, started)));
 const reply = (
   id: Workspace.Id,
-  threadId: Turn.Record["threadId"],
+  threadId: Turn.Turn["threadId"],
   text: string,
   mentions: ReadonlyArray<Member.Id> = [],
 ) =>
@@ -256,7 +256,7 @@ const unfollow = (
   id: Workspace.Id,
   identity: Identity.MemberReference,
   memberId: Member.Id,
-  threadId: Turn.Record["threadId"],
+  threadId: Turn.Turn["threadId"],
 ) =>
   Effect.gen(function* () {
     const participants = yield* as(
@@ -345,7 +345,7 @@ const idle = TurnExecution.Start.cases.Idle.make({});
  * Run the agent's job in the thread as far as core takes it: accept its work into a turn and start
  * the turn, or nothing when no work waits.
  */
-const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record["threadId"]) =>
+const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Turn["threadId"]) =>
   execute(id, (turnExecution) =>
     Effect.flatMap(turnExecution.accept(memberId, threadId), (accepted) =>
       Option.match(accepted, {
@@ -355,7 +355,7 @@ const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record["th
     ),
   );
 /** Run the agent's job in the thread, as its turn job does, expecting a turn ready to run. */
-const startReady = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record["threadId"]) =>
+const startReady = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Turn["threadId"]) =>
   runJob(id, memberId, threadId).pipe(
     Effect.filterOrElse(
       (started): started is Ready => started._tag === "Ready",

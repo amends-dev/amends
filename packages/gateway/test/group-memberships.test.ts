@@ -71,8 +71,11 @@ describe("group memberships", () => {
     Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name, memberIds }),
     );
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    effect: Effect.Effect<A, E, R>,
+  ) => effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -83,7 +86,7 @@ describe("group memberships", () => {
    * The admissions of the human and the agent the tests admit, leaving out the owner and the
    * manager, who belong to every prepared group because only its members manage a group.
    */
-  const admitted = (records: ReadonlyArray<GroupMembership.Record>) =>
+  const admitted = (records: ReadonlyArray<GroupMembership.GroupMembership>) =>
     records.filter((record) => record.memberId === humanId || record.memberId === agentId);
   const seedMembers = (bound: Bound) =>
     publish(
@@ -109,7 +112,7 @@ describe("group memberships", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -124,7 +127,7 @@ describe("group memberships", () => {
       owner,
       group,
       otherGroup,
-      manager: Actor.Value.make({ workspaceId, memberId: managerId, identity: managerIdentity }),
+      manager: Actor.Actor.of({ workspaceId, memberId: managerId, identity: managerIdentity }),
     };
   });
   const grant = (bound: Bound, groupId: Group.Id) =>
@@ -146,14 +149,14 @@ describe("group memberships", () => {
       ),
     );
 
-  const remove = (membership: GroupMembership.Record) =>
+  const remove = (membership: GroupMembership.GroupMembership) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.remove({
         groupId: membership.groupId,
         membershipId: membership.id,
       }),
     );
-  const leave = (membership: GroupMembership.Record) =>
+  const leave = (membership: GroupMembership.GroupMembership) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.leave({
         groupId: membership.groupId,
@@ -163,7 +166,7 @@ describe("group memberships", () => {
   const removeWorkspaceMember = (id: Member.Id) =>
     Effect.flatMap(MemberService.MemberService, (memberService) => memberService.remove(id));
   const memberActor = (memberId: Member.Id) =>
-    Actor.Value.make({
+    Actor.Actor.of({
       workspaceId,
       memberId,
       identity:
@@ -379,7 +382,7 @@ describe("group memberships", () => {
             const { bound, group, owner } = yield* prepare();
             const foreign = yield* boundTo(otherWorkspaceId);
             const otherWorkspace = yield* initialized(foreign);
-            const foreignOwner = Actor.Value.make({
+            const foreignOwner = Actor.Actor.of({
               workspaceId: otherWorkspaceId,
               memberId: otherWorkspace.ownerMemberId,
               identity: { _tag: "Human", id: otherWorkspace.createdBy },
@@ -442,7 +445,7 @@ describe("group memberships", () => {
               Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.createTeam({ name, memberIds: [humanId], visibility }),
               );
-            const flags = (actor: Actor.Value, groupId: Group.Id) =>
+            const flags = (actor: Actor.Actor["Service"], groupId: Group.Id) =>
               run(
                 bound,
                 actor,
@@ -597,7 +600,7 @@ describe("group memberships", () => {
               memberIds: Group.directMembers([managerId, owner.memberId]),
               createdBy: owner.memberId,
               createdAt: group.createdAt,
-            } satisfies Group.Record;
+            } satisfies Group.Group;
             yield* bound.store.transaction(bound.groups.insert(direct));
             for (const id of [group.id, direct.id, Group.Id.make("missing")])
               expect(yield* Effect.flip(run(bound, human, join(id)))).toMatchObject({
@@ -1166,7 +1169,7 @@ describe("group memberships", () => {
             expect(fresh.id).not.toBe(old.id);
             const foreign = yield* boundTo(otherWorkspaceId);
             const foreignWorkspace = yield* initialized(foreign);
-            const foreignActor = Actor.Value.make({
+            const foreignActor = Actor.Actor.of({
               workspaceId: otherWorkspaceId,
               memberId: foreignWorkspace.ownerMemberId,
               identity: { _tag: "Human", id: foreignWorkspace.createdBy },
@@ -1556,7 +1559,7 @@ describe("group memberships", () => {
         const readyTwo = yield* Deferred.make<void>();
         const attempt = (
           operation: typeof remove,
-          actor: Actor.Value,
+          actor: Actor.Actor["Service"],
           ready: Deferred.Deferred<void>,
         ) =>
           Effect.scoped(

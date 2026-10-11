@@ -16,13 +16,13 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Turn.Record));
+const rows = Rows.make(Schema.fromJsonString(Turn.Turn));
 
 /**
  * Creation time, then how far each accepted input, which a later turn of the same agent on a
  * thread always reaches beyond, then ID in binary order.
  */
-const byCreated = (left: Turn.Record, right: Turn.Record) =>
+const byCreated = (left: Turn.Turn, right: Turn.Turn) =>
   DateTime.toEpochMillis(left.createdAt) - DateTime.toEpochMillis(right.createdAt) ||
   left.acceptedThroughSequence - right.acceptedThroughSequence ||
   compareBinary(left.id, right.id);
@@ -40,7 +40,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       return yield* rows.all((yield* read).records.of("turns"));
     }).pipe(Effect.mapError(storeFailure(TurnStore, operation)));
   /** An agent has at most one active turn on a thread. */
-  const secondActive = (records: ReadonlyArray<Turn.Record>, record: Turn.Record) =>
+  const secondActive = (records: ReadonlyArray<Turn.Turn>, record: Turn.Turn) =>
     Turn.active(record.status) &&
     records.some(
       (other) =>

@@ -156,7 +156,7 @@ export type State = typeof State.Type;
 
 /**
  * Only people see their notifications; only an agent's are accepted by a turn, and only a
- * contact's by a delivery. `Record` holds every notification to this.
+ * contact's by a delivery. `Notification` holds every notification to this.
  *
  * @category utils
  * @since 0.1.0
@@ -176,7 +176,7 @@ export const fitsRecipient = (recipient: Recipient, state: State) =>
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Notification = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   source: Source,
@@ -198,7 +198,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Notification extends Schema.Schema.Type<typeof Notification> {}
 
 /**
  * The notification that recorded thread activity generates for one selected recipient: pending,
@@ -222,7 +222,7 @@ export const fromActivity = (
     readonly recipient: Recipient;
     readonly requestsWork: boolean;
   },
-): Record => ({
+): Notification => ({
   id: Id.make(JSON.stringify([entry.logId, entry.id, selected.participationId])),
   workspaceId: activity.workspaceId,
   source: { logId: entry.logId, entryId: entry.id },

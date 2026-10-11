@@ -122,7 +122,7 @@ notifications to their recipient, and
 [signals](../packages/core/README.md#signals) carry the reader's read-state changes to their other
 sessions, so a client can keep both current.
 
-A roster returns `GroupMembership.Record` values: admission IDs, workspace-member references,
+A roster returns `GroupMembership.GroupMembership` values: admission IDs, workspace-member references,
 and admission times, for active admissions whose workspace member is still active. It needs no
 `member.read` grant and returns no member profiles, identities, or ended admissions.
 
@@ -145,7 +145,7 @@ membership there; missing and foreign references share the not-found outcomes. A
 admission returns `GroupMembershipService.AlreadyMember` without recording anything. The other
 outcomes are `GroupNotFound`, `MemberNotFound`, and `InactiveMember`.
 
-A successful addition returns a fresh `GroupMembership.Record` with its own admission time. It
+A successful addition returns a fresh `GroupMembership.GroupMembership` with its own admission time. It
 neither invokes an agent nor enrolls anyone in an existing thread. Concurrent additions cannot
 create competing active admissions: the later one sees `AlreadyMember` or a storage conflict,
 without an automatic retry.

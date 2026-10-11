@@ -14,7 +14,7 @@ import * as ConnectionStore from "./ConnectionStore.ts";
 /** Change the stored connection a fact names, as `changes` says. */
 const update = Effect.fnUntraced(function* (
   connectionId: Connection.Id,
-  changes: Partial<Connection.Record>,
+  changes: Partial<Connection.Connection>,
 ) {
   const connectionStore = yield* ConnectionStore.ConnectionStore;
   const found = yield* connectionStore.get(connectionId);

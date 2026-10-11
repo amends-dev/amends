@@ -250,7 +250,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     );
     return turn;
   });
-  const directAgentRequirement = (turn: Turn.Record) =>
+  const directAgentRequirement = (turn: Turn.Turn) =>
     Requirement.make(AgentPermissions.Use, {
       _tag: "Member",
       workspaceId,
@@ -258,7 +258,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     });
 
   /** Why the turn can't be retried now, or undefined when it can. */
-  const whyNotRetryable = Effect.fnUntraced(function* (turn: Turn.Record) {
+  const whyNotRetryable = Effect.fnUntraced(function* (turn: Turn.Turn) {
     if (Turn.active(turn.status)) return "active" as const;
     if (turn.status === "completed") return "completed" as const;
     if (Option.isSome(yield* turnStore.findActive(turn.memberId, turn.threadId)))
@@ -272,7 +272,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
   });
 
   /** The turns as the reader sees them, with what they may do with each now. */
-  const toViews = Effect.fnUntraced(function* (list: ReadonlyArray<Turn.Record>) {
+  const toViews = Effect.fnUntraced(function* (list: ReadonlyArray<Turn.Turn>) {
     const directed = yield* authorization.permitted(list.map(directAgentRequirement));
     return yield* Effect.forEach(list, (turn, index) =>
       Effect.gen(function* () {
@@ -285,8 +285,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       }),
     );
   });
-  const toView = (turn: Turn.Record) =>
-    Effect.map(toViews([turn]), (views) => views[0] as Turn.View);
+  const toView = (turn: Turn.Turn) => Effect.map(toViews([turn]), (views) => views[0] as Turn.View);
 
   const get = Effect.fn("TurnService.get")(function* (turnId: Turn.Id) {
     const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
@@ -397,8 +396,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
     ).pipe(Stream.mapError(toLogUnavailable));
     const draftedInputs = live.pipe(
       Stream.filter(
-        (signal): signal is Extract<Signal.Value, { readonly _tag: "TurnDraft" }> =>
-          Signal.Value.isAnyOf(["TurnDraft"])(signal) && signal.turnId === turn.id,
+        (signal): signal is Extract<Signal.Signal, { readonly _tag: "TurnDraft" }> =>
+          Signal.Signal.isAnyOf(["TurnDraft"])(signal) && signal.turnId === turn.id,
       ),
       Stream.map((signal): Input =>
         Input.Drafted({

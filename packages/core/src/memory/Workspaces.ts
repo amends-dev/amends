@@ -13,7 +13,7 @@ import * as Binding from "./Binding.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Workspace.Record));
+const rows = Rows.make(Schema.fromJsonString(Workspace.Workspace));
 
 /**
  * Workspace metadata, with ownership changes guarded by the previous owner.

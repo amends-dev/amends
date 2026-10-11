@@ -18,11 +18,11 @@ import { threadMessages } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
-const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
+const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.ThreadMessage));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      ...ThreadMessage.Record.fields,
+      ...ThreadMessage.ThreadMessage.fields,
       publishedAt: Schema.DateTimeUtcFromDate,
       content: Schema.TaggedUnion({
         Text: {

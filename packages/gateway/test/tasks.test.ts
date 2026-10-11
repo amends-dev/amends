@@ -48,9 +48,12 @@ describe("tasks", () => {
       ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
       : { _tag: "Human", id: Identity.HumanId.make(id) };
   const actorFor = (memberId: Member.Id) =>
-    Actor.Value.make({ workspaceId, memberId, identity: identityFor(memberId) });
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
+    Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) });
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    effect: Effect.Effect<A, E, R>,
+  ) => effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -143,7 +146,7 @@ describe("tasks", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },

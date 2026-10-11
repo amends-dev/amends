@@ -15,7 +15,7 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Task.Record));
+const rows = Rows.make(Schema.fromJsonString(Task.Task));
 
 /** Newest creation first, then thread ID in descending binary order. */
 const newestFirst = (

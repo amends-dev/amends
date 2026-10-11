@@ -21,7 +21,7 @@ import { groupFollows } from "./internal/schema.ts";
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      ...GroupFollow.Record.fields,
+      ...GroupFollow.GroupFollow.fields,
       followedAt: Schema.DateTimeUtcFromDate,
       endedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
     }),

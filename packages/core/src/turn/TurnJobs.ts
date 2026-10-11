@@ -132,7 +132,7 @@ const decodeGroupRemoval = Schema.decodeUnknownSync(
 );
 
 /** Each agent the activity asks for work runs it in the activity's thread. */
-const runRequestedWork = Effect.fnUntraced(function* (event: Event.Record) {
+const runRequestedWork = Effect.fnUntraced(function* (event: Event.Event) {
   const turnJobs = yield* TurnJobs;
   const { activity, recipients } = decodeRecorded(event.payload);
   for (const { recipient, requestsWork } of recipients)
@@ -148,7 +148,7 @@ const runRequestedWork = Effect.fnUntraced(function* (event: Event.Record) {
  * A turn that ended, or one created to run a turn again, has its job run: the work that waited for
  * the turn, or the new turn.
  */
-const runWaitingWork = Effect.fnUntraced(function* (event: Event.Record) {
+const runWaitingWork = Effect.fnUntraced(function* (event: Event.Event) {
   const { memberId, threadId } = decodeEnded(event.payload);
   yield* (yield* TurnJobs).requestRun({
     workspaceId: event.provenance.workspaceId,
@@ -158,7 +158,7 @@ const runWaitingWork = Effect.fnUntraced(function* (event: Event.Record) {
 });
 
 /** A turn asked to stop has its job stop it. */
-const stopCancelledTurn = Effect.fnUntraced(function* (event: Event.Record) {
+const stopCancelledTurn = Effect.fnUntraced(function* (event: Event.Event) {
   const { memberId, threadId, turnId } = decodeCancelRequested(event.payload);
   yield* (yield* TurnJobs).requestStop({
     workspaceId: event.provenance.workspaceId,
@@ -169,7 +169,7 @@ const stopCancelledTurn = Effect.fnUntraced(function* (event: Event.Record) {
 });
 
 /** A member that stopped taking part in a thread has its turn there stopped. */
-const stopTurnOfEndedParticipation = Effect.fnUntraced(function* (event: Event.Record) {
+const stopTurnOfEndedParticipation = Effect.fnUntraced(function* (event: Event.Event) {
   const { memberId, threadId, participationId } = decodeParticipationEnded(event.payload);
   const turnStore = yield* TurnStore.TurnStore;
   const active = yield* Effect.mapError(turnStore.findActive(memberId, threadId), toStoreFailure);
@@ -186,7 +186,7 @@ const stopTurnOfEndedParticipation = Effect.fnUntraced(function* (event: Event.R
  * A member that left a group, or was removed from it or the workspace, has its turns in the
  * group's threads stopped, since leaving ended its participation in each. A person has none.
  */
-const stopTurnsInLeftGroup = Effect.fnUntraced(function* (event: Event.Record) {
+const stopTurnsInLeftGroup = Effect.fnUntraced(function* (event: Event.Event) {
   const { memberId, groupId } = decodeGroupRemoval(event.payload);
   const turnStore = yield* TurnStore.TurnStore;
   const turnJobs = yield* TurnJobs;

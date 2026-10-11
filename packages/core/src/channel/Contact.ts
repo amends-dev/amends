@@ -71,7 +71,7 @@ export const nameOf = (sender: string): Name => {
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Contact = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   channelId: ChannelId.Id,
@@ -85,7 +85,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Contact extends Schema.Schema.Type<typeof Contact> {}
 
 /**
  * The record with some fields changed.
@@ -93,7 +93,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Contact, changes: Partial<Contact>): Contact =>
   Object.assign({}, record, changes);
 
 /**

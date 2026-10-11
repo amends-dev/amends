@@ -76,7 +76,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
       if (Option.isSome(yield* workspaceStore.get))
         return yield* new AlreadyInitialized({ workspaceId });
       const ownerMemberId = Member.Id.make(yield* crypto.randomUUIDv4);
-      const record = Workspace.Record.make({
+      const record = Workspace.Workspace.make({
         id: workspaceId,
         name,
         createdBy,

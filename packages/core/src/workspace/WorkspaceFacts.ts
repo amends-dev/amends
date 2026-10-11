@@ -38,7 +38,7 @@ export const Initialized = Fact.make("workspace.initialized", {
   audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("workspace", payload.id),
   version: 1,
-  payload: Workspace.Record,
+  payload: Workspace.Workspace,
   occurrence: (payload) => [payload.id],
 });
 

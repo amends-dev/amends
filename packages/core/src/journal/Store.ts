@@ -103,7 +103,7 @@ export interface ReadFactsOptions extends Schema.Schema.Type<typeof ReadFactsOpt
 export const Batch = Schema.Struct({
   logId: LogEntry.LogId,
   position: LogEntry.Position,
-  commit: Commit.Record,
+  commit: Commit.Commit,
   entries: Schema.NonEmptyArray(Entry),
 });
 

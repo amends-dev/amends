@@ -93,7 +93,7 @@ Generic execution logs still have no fact header.
 
 ## Fact subjects and filtered reads
 
-Every fact declares a pure `subject(payload)` function returning a `Subject.Value`.
+Every fact declares a pure `subject(payload)` function returning a `Subject.Subject`.
 Use `Subject.make("thread", threadId)` to construct a `kind:id` key. The namespace
 starts with a lowercase letter and contains only lowercase letters, digits, or
 hyphens; IDs are nonempty and may contain colons. Thus different entity kinds

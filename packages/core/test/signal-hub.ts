@@ -4,7 +4,7 @@ import * as SignalHub from "../src/signal/SignalHub.ts";
 
 /** Signals within one test process: subscribers receive what is published after they register. */
 export const make = Effect.fnUntraced(function* () {
-  const pubsub = yield* PubSub.unbounded<Signal.Value>();
+  const pubsub = yield* PubSub.unbounded<Signal.Signal>();
   return SignalHub.SignalHub.of({
     publish: (signal) => PubSub.publish(pubsub, signal).pipe(Effect.asVoid),
     subscribe: Effect.map(PubSub.subscribe(pubsub), Stream.fromSubscription),

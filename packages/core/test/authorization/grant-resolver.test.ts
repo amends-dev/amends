@@ -29,11 +29,11 @@ const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
 const memberId = Member.Id.make("recipient");
 const roleId = Role.Id.make("manager");
-const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
-const memberScope = Scope.Value.cases.Target.make({
+const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId });
+const memberScope = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: Member.Id.make("subject") }),
 });
-const workspaceTargetScope = Scope.Value.cases.Target.make({
+const workspaceTargetScope = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Workspace.make({ workspaceId }),
 });
 const ManageWorkspace = Permission.make("test.workspace.manage", {
@@ -46,12 +46,12 @@ const role = {
   name: "Manager",
   permissions: [MemberPermissions.Read.name, MemberPermissions.Remove.name],
 };
-const roleSource = (scope: Scope.Value = workspaceScope, id = roleId) =>
+const roleSource = (scope: Scope.Scope = workspaceScope, id = roleId) =>
   Assignment.Source.cases.Role.make({ roleId: id, scope });
-const directSource = (permission: Permission.Name, scope: Scope.Value) =>
+const directSource = (permission: Permission.Name, scope: Scope.Scope) =>
   Assignment.Source.cases.Direct.make({ grant: { permission, scope } });
 const assigned = (id: string, source: Assignment.Source) =>
-  Assignment.Record.make({
+  Assignment.Assignment.make({
     id: Assignment.Id.make(id),
     workspaceId,
     memberId,
@@ -86,8 +86,8 @@ const run = <A, E>(
 ) => program.pipe(Effect.provide(configured(fixture, overrides)));
 const seed = (
   fixture: Fixture,
-  roles: ReadonlyArray<Role.Record>,
-  assignments: ReadonlyArray<Assignment.Record>,
+  roles: ReadonlyArray<Role.Role>,
+  assignments: ReadonlyArray<Assignment.Assignment>,
 ) =>
   fixture.store.transaction(
     Effect.gen(function* () {
@@ -152,7 +152,7 @@ it.effect("resolution expands role and direct assignments at their individual sc
       grants.filter(
         (grant) =>
           grant.permission === MemberPermissions.Read.name &&
-          Scope.Value.isAnyOf(["Workspace"])(grant.scope),
+          Scope.Scope.isAnyOf(["Workspace"])(grant.scope),
       ),
     ).toHaveLength(2);
   }),
@@ -325,9 +325,9 @@ it.effect("a direct grant scoped to another workspace authorizes nothing here", 
       status: "active",
       source: directSource(
         MemberPermissions.Read.name,
-        Scope.Value.cases.Workspace.make({ workspaceId: foreignWorkspaceId }),
+        Scope.Scope.cases.Workspace.make({ workspaceId: foreignWorkspaceId }),
       ),
-    } satisfies Assignment.Record;
+    } satisfies Assignment.Assignment;
     const grants = yield* run(fixture, resolve, {
       assignments: { listActiveByMember: () => Effect.succeed([wrongScope]) },
     });

@@ -38,8 +38,11 @@ describe("thread starts", () => {
   const humanId = Member.Id.make("human");
   const otherId = Member.Id.make("other");
   const contactId = Identity.ContactId.make("customer");
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-    program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    program: Effect.Effect<A, E, R>,
+  ) => program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -62,7 +65,7 @@ describe("thread starts", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -201,7 +204,7 @@ describe("thread starts", () => {
             ]),
           );
           // The same members, in any order and including the author, reuse the group.
-          const human = Actor.Value.make({
+          const human = Actor.Actor.of({
             workspaceId,
             memberId: humanId,
             identity: { _tag: "Human", id: Identity.HumanId.make(humanId) },
@@ -477,7 +480,7 @@ describe("thread starts", () => {
               ),
             );
             const as = (memberId: Member.Id) =>
-              Actor.Value.make({
+              Actor.Actor.of({
                 workspaceId,
                 memberId,
                 identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },

@@ -51,8 +51,8 @@ it("an action can target its workspace while other actions in the group keep the
     Requirement.make(created, target);
   }).toThrow("Schema validation failed");
 
-  const exactWorkspace = Scope.Value.cases.Target.make({ target: workspace });
-  const exactMember = Scope.Value.cases.Target.make({ target });
+  const exactWorkspace = Scope.Scope.cases.Target.make({ target: workspace });
+  const exactMember = Scope.Scope.cases.Target.make({ target });
   expect(Grant.make(created, exactWorkspace)).toEqual({
     permission: created.name,
     scope: exactWorkspace,

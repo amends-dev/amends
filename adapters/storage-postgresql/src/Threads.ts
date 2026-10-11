@@ -18,9 +18,9 @@ import { threads } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
-const validate = Schema.decodeEffect(Schema.toType(Thread.Record));
+const validate = Schema.decodeEffect(Schema.toType(Thread.Thread));
 const decode = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Thread.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
+  Schema.Array(Schema.Struct({ ...Thread.Thread.fields, createdAt: Schema.DateTimeUtcFromDate })),
 );
 type Row = typeof threads.$inferSelect;
 /** Each creator kind reads only its own column; the table constraint rejects mixed rows. */
@@ -39,7 +39,7 @@ const toRecord = ({
       : { _tag: createdByKind, contactId: createdByContactId },
 });
 const creatorColumns = (
-  creator: Thread.Record["createdBy"],
+  creator: Thread.Thread["createdBy"],
 ): Pick<
   typeof threads.$inferInsert,
   "createdByKind" | "createdByMemberId" | "createdByContactId"

@@ -10,7 +10,7 @@ import { Effect, Layer, Option, Schema } from "effect";
 import * as SignInStorage from "../SignInStorage.ts";
 
 const codes = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SignInStorage.PendingCode)));
-const sessions = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SignInStorage.SessionRecord)));
+const sessions = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SignInStorage.Session)));
 
 /**
  * Sign-in codes and sessions in two tables beside every workspace's state. A change to an

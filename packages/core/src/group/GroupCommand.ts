@@ -72,7 +72,7 @@ export type EstablishError =
  * @since 0.1.0
  */
 export interface Established {
-  readonly group: Group.DirectRecord;
+  readonly group: Group.Direct;
   /** This call created the group, rather than finding it. */
   readonly created: boolean;
 }
@@ -85,7 +85,7 @@ export interface Established {
  * @since 0.1.0
  */
 export interface Admitted {
-  readonly membership: GroupMembership.Record;
+  readonly membership: GroupMembership.GroupMembership;
   /** The fact that admitted the member, for what it causes. */
   readonly event: Event.Type<typeof GroupMembershipFacts.Added>;
 }
@@ -159,7 +159,7 @@ export const make = Effect.fn("GroupCommand.make")(function* () {
       memberId,
       admittedAt,
       status: "active",
-    } satisfies GroupMembership.Record;
+    } satisfies GroupMembership.GroupMembership;
     const event = yield* journal
       .publish(GroupMembershipFacts.Added, membership)
       .pipe(Publication.withOccurredAt(admittedAt));
@@ -193,7 +193,7 @@ export const make = Effect.fn("GroupCommand.make")(function* () {
     );
     for (const memberId of requested)
       if (found.get(memberId)?.status !== "active") return yield* new Unavailable({ memberId });
-    const group: Group.DirectRecord = {
+    const group: Group.Direct = {
       id: Group.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       kind: "Direct",

@@ -204,7 +204,10 @@ describe("gateway", () => {
                 name: "Bob workspace",
                 memberName: "bob",
               });
-              const getMember = (workspace: Workspace.Record, identity: Identity.MemberReference) =>
+              const getMember = (
+                workspace: Workspace.Workspace,
+                identity: Identity.MemberReference,
+              ) =>
                 gateway.asMember(
                   workspace.id,
                   identity,

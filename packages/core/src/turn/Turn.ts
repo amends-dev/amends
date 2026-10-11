@@ -120,7 +120,7 @@ export interface Retry extends Schema.Schema.Type<typeof Retry> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Turn = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   groupId: GroupId.Id,
@@ -156,7 +156,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Turn extends Schema.Schema.Type<typeof Turn> {}
 
 /**
  * The record with `changes` applied, as a new record; the one given is left as it is.
@@ -164,7 +164,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Turn, changes: Partial<Turn>): Turn =>
   Object.assign({}, record, changes);
 
 /**
@@ -175,10 +175,10 @@ export const change = (record: Record, changes: Partial<Record>): Record =>
  */
 export const queued = (
   turn: Omit<
-    Record,
+    Turn,
     "status" | "selection" | "messageIds" | "failure" | "cancelReason" | "startedAt" | "finishedAt"
   >,
-): Record => ({
+): Turn => ({
   ...turn,
   status: "queued",
   selection: null,
@@ -236,7 +236,7 @@ export type NotRetryableReason = typeof NotRetryableReason.Type;
  * @since 0.1.0
  */
 export const View = Schema.Struct({
-  ...Struct.omit(Record.fields, ["logAfter"]),
+  ...Struct.omit(Turn.fields, ["logAfter"]),
   stoppable: Schema.Boolean,
   retryable: Schema.Boolean,
 });

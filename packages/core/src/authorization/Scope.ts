@@ -1,5 +1,5 @@
 /**
- * What a grant covers: a whole workspace, or one exact target in it. `Grant.Value` carries a scope,
+ * What a grant covers: a whole workspace, or one exact target in it. `Grant.Grant` carries a scope,
  * a role assignment in `Assignment.Source` records one, and `covers` is how `Grant.anyCovers`
  * decides whether a grant reaches a requirement's target. A scope names resources only: the
  * permission, its target kind, and the member's current grants are `Authorization`'s concern.
@@ -16,7 +16,7 @@ import * as Target from "./Target.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Value = Schema.TaggedUnion({
+export const Scope = Schema.TaggedUnion({
   Workspace: { workspaceId: Workspace.Id },
   Target: { target: Target.Reference },
 });
@@ -25,7 +25,7 @@ export const Value = Schema.TaggedUnion({
  * @category schemas
  * @since 0.1.0
  */
-export type Value = typeof Value.Type;
+export type Scope = typeof Scope.Type;
 
 const equivalentTarget = Schema.toEquivalence(Target.Reference);
 
@@ -37,8 +37,8 @@ const equivalentTarget = Schema.toEquivalence(Target.Reference);
  * @category utils
  * @since 0.1.0
  */
-export const covers = (scope: Value, target: Target.Reference): boolean =>
-  Value.match(scope, {
+export const covers = (scope: Scope, target: Target.Reference): boolean =>
+  Scope.match(scope, {
     Workspace: ({ workspaceId }) => workspaceId === target.workspaceId,
     Target: ({ target: exact }) => equivalentTarget(exact, target),
   });

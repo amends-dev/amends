@@ -120,7 +120,7 @@ export class AssignmentService extends Context.Service<
      */
     readonly assign: (
       input: Assignment.AssignInput,
-    ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<Assignment.Assignment, Error, Actor.Actor>;
     /**
      * End one of a member's assignments, under `assignment.manage` and the delegation rules for the
      * member and, for a role assignment, its role. Another member's assignment is `NotFound`; one
@@ -129,7 +129,7 @@ export class AssignmentService extends Context.Service<
     readonly revoke: (
       memberId: Member.Id,
       assignmentId: Assignment.Id,
-    ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<Assignment.Assignment, Error, Actor.Actor>;
     /**
      * Replace a member's workspace roles with one, under `assignment.manage` and the delegation
      * rules for the member, the new role, and each role replaced. The roles must be the ones the
@@ -137,7 +137,7 @@ export class AssignmentService extends Context.Service<
      */
     readonly change: (
       input: Assignment.ChangeInput,
-    ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<Assignment.Assignment, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/authorization/assignment/service/Service") {}
 
@@ -180,7 +180,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   const permissions = Effect.gen(function* () {
     const covered = yield* authorization.permitted(
       workspaceWide.map((permission) =>
-        Requirement.Value.make({
+        Requirement.Requirement.make({
           permission: { name: permission.name, targetKind: permission.targetKind },
           target: { _tag: "Workspace", workspaceId },
         }),
@@ -236,9 +236,9 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       canManage: record.status === "active" && (yield* isAllowedBy(authorizeRecipient(memberId))),
     });
   });
-  const isWorkspaceRole = (record: Assignment.Record) =>
+  const isWorkspaceRole = (record: Assignment.Assignment) =>
     Assignment.Source.isAnyOf(["Role"])(record.source) &&
-    Scope.Value.isAnyOf(["Workspace"])(record.source.scope);
+    Scope.Scope.isAnyOf(["Workspace"])(record.source.scope);
   const assign = Effect.fn("AssignmentService.assign")(
     function* (input: Assignment.AssignInput) {
       const request = yield* Schema.decodeEffect(Assignment.AssignInput)(input);

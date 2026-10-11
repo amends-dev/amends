@@ -116,7 +116,7 @@ export class NotificationService extends Context.Service<
     /** Record that the acting person saw their notification; source access is independent. */
     readonly markSeen: (
       notificationId: Notification.Id,
-    ) => Effect.Effect<Notification.Record, MarkSeenError, Actor.Actor>;
+    ) => Effect.Effect<Notification.Notification, MarkSeenError, Actor.Actor>;
     /**
      * Record that the acting person saw every notification still pending for them up to and
      * including `through`, in inbox order, so what arrives after the newest they saw stays pending.
@@ -142,7 +142,7 @@ const compareIds = (left: string, right: string) => {
   return a.length - b.length;
 };
 /** Whether a notification comes at or before a cursor in inbox order. */
-const isAtOrBefore = (record: Notification.Record, cursor: NotificationStore.Cursor) => {
+const isAtOrBefore = (record: Notification.Notification, cursor: NotificationStore.Cursor) => {
   const byTime =
     DateTime.toEpochMillis(record.recordedAt) - DateTime.toEpochMillis(cursor.recordedAt);
   return byTime < 0 || (byTime === 0 && compareIds(record.id, cursor.id) <= 0);
@@ -196,7 +196,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
    * when they have lost access to it, or its source is not thread activity; access is current,
    * whatever the notification's state.
    */
-  const findSource = Effect.fnUntraced(function* (notification: Notification.Record) {
+  const findSource = Effect.fnUntraced(function* (notification: Notification.Notification) {
     if (
       notification.source.logId !== journal.log.id ||
       !Notification.Recipient.isAnyOf(["Human", "Agent"])(notification.recipient)
@@ -262,7 +262,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       return yield* Effect.die("A seen notification still reads as unseen");
     // The recipient's other sessions hear of it as a signal.
     yield* signalHub.publish(
-      Signal.Value.cases.NotificationsSeen.make({
+      Signal.Signal.cases.NotificationsSeen.make({
         workspaceId,
         memberId: (yield* Actor.Actor).memberId,
         notificationIds: [notification.id],
@@ -290,7 +290,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
         const notificationIds = [first, ...rest] as const;
         yield* notificationStore.markSeen(notificationIds, yield* DateTime.now);
         yield* signalHub.publish(
-          Signal.Value.cases.NotificationsSeen.make({ workspaceId, memberId, notificationIds }),
+          Signal.Signal.cases.NotificationsSeen.make({ workspaceId, memberId, notificationIds }),
         );
       }
       return { page, due: due.length };

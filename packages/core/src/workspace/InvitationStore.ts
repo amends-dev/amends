@@ -54,16 +54,18 @@ export class InvitationStore extends Context.Service<
   InvitationStore,
   {
     /** Return an isolated record from the current transaction or committed state. */
-    readonly get: (id: Invitation.Id) => Effect.Effect<Option.Option<Invitation.Record>, Failure>;
+    readonly get: (
+      id: Invitation.Id,
+    ) => Effect.Effect<Option.Option<Invitation.Invitation>, Failure>;
     /** All Pending invitations for this human in this workspace, including expired ones. */
     readonly listPendingByRecipient: (
       recipientId: Identity.HumanId,
-    ) => Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Invitation.Invitation>, Failure>;
     /** Every invitation in this workspace in issue order, whatever its state. */
-    readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
+    readonly list: Effect.Effect<ReadonlyArray<Invitation.Invitation>, Failure>;
     /** Insert a pending invitation; a duplicate ID conflicts. Never upsert. */
     readonly insert: (
-      record: Invitation.Record,
+      record: Invitation.Invitation,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Move a pending invitation to its terminal state. A missing or settled invitation conflicts;
@@ -101,7 +103,7 @@ export const make = (
       ),
     list: driver.list,
     insert: (record) =>
-      write("insert", Invitation.Record, record).pipe(
+      write("insert", Invitation.Invitation, record).pipe(
         Effect.filterOrFail(
           (record) =>
             record.details.workspaceId === workspaceId &&

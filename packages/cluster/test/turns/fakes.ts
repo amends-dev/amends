@@ -26,7 +26,7 @@ export const job: TurnJobs.Job = {
 };
 export const participationId = ThreadParticipation.Id.make("participation-1");
 const at = DateTime.makeUnsafe("2026-10-07T12:00:00.000Z");
-export const turn: Turn.Record = {
+export const turn: Turn.Turn = {
   id: Turn.Id.make("turn-1"),
   workspaceId,
   groupId: Group.Id.make("group-1"),

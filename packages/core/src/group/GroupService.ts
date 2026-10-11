@@ -151,7 +151,7 @@ export class GroupService extends Context.Service<
     readonly createTeam: (
       input: Group.CreateTeamInput,
       options?: Request.Options,
-    ) => Effect.Effect<Group.Record, CreateError, Actor.Actor>;
+    ) => Effect.Effect<Group.Group, CreateError, Actor.Actor>;
     /**
      * Require group.rename on the group and membership of it, then give a team group a new name.
      * No workspace role reaches a group from outside it: to a non-member, a group is NotFound, as a
@@ -161,9 +161,9 @@ export class GroupService extends Context.Service<
      */
     readonly rename: (
       input: Group.RenameInput,
-    ) => Effect.Effect<Group.Record, RenameError, Actor.Actor>;
+    ) => Effect.Effect<Group.Group, RenameError, Actor.Actor>;
     /** Require group.read and current audience membership; no transaction or publication. */
-    readonly get: (groupId: Group.Id) => Effect.Effect<Group.Record, ReadError, Actor.Actor>;
+    readonly get: (groupId: Group.Id) => Effect.Effect<Group.Group, ReadError, Actor.Actor>;
     /**
      * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
      * its latest activity, when the actor last read it, whether it has new activity for them,
@@ -238,7 +238,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
         if (member.status !== "active") return yield* new InactiveMember({ memberId });
       }
       const createdAt = yield* DateTime.now;
-      const group: Group.Record = {
+      const group: Group.Group = {
         id: groupId,
         workspaceId,
         kind: "Team",
@@ -308,8 +308,8 @@ export const make = Effect.fn("GroupService.make")(function* () {
    * List items for one page of the actor's admissions, keyed by group, in a fixed number of reads.
    */
   const buildListItems = Effect.fnUntraced(function* (
-    actor: Actor.Value,
-    admissions: ReadonlyMap<Group.Id, GroupMembership.Record>,
+    actor: Actor.Actor["Service"],
+    admissions: ReadonlyMap<Group.Id, GroupMembership.GroupMembership>,
   ) {
     const memberId = actor.memberId;
     // One grant resolution and one read per kind of record for the page.

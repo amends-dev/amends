@@ -21,7 +21,10 @@ import { groupMemberships } from "./internal/schema.ts";
 
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...GroupMembership.Record.fields, admittedAt: Schema.DateTimeUtcFromDate }),
+    Schema.Struct({
+      ...GroupMembership.GroupMembership.fields,
+      admittedAt: Schema.DateTimeUtcFromDate,
+    }),
   ),
 );
 

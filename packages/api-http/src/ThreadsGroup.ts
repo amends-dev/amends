@@ -41,8 +41,8 @@ const opening = Schema.Struct({
 const started = Thread.Started.pipe(HttpApiSchema.status(201)).annotate({
   identifier: "StartedThread",
 });
-const record = Thread.Record.annotate({ identifier: "Thread" });
-const messageRecord = ThreadMessage.Record.annotate({ identifier: "Message" });
+const record = Thread.Thread.annotate({ identifier: "Thread" });
+const messageRecord = ThreadMessage.ThreadMessage.annotate({ identifier: "Message" });
 const participant = ThreadParticipation.Summary.annotate({ identifier: "ThreadParticipant" });
 const reading = ThreadActivityStore.ReadOptions.fields;
 

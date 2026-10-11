@@ -13,7 +13,7 @@ import * as Support from "../Support.ts";
 import { alice, type Bound, forWorkspace, otherWorkspaceId, workspaceId } from "../Support.ts";
 
 const memberActor = (name: string) =>
-  Actor.Value.make({
+  Actor.Actor.of({
     workspaceId,
     memberId: Member.Id.make(name),
     identity: { _tag: "Human", id: Identity.HumanId.make(name) },
@@ -32,13 +32,13 @@ const buffer = <A, E>(stream: Stream.Stream<A, E>) =>
     );
     return Queue.take(queue).pipe(Effect.timeout("10 seconds"));
   });
-const sameSignal = Schema.toEquivalence(Signal.Value);
+const sameSignal = Schema.toEquivalence(Signal.Signal);
 /** The values taken before the marker, which the caller published after what it expects. */
 const until = Effect.fnUntraced(function* <E>(
-  next: Effect.Effect<Signal.Value, E>,
-  marker: Signal.Value,
+  next: Effect.Effect<Signal.Signal, E>,
+  marker: Signal.Signal,
 ) {
-  const received: Array<Signal.Value> = [];
+  const received: Array<Signal.Signal> = [];
   for (;;) {
     const signal = yield* next;
     if (sameSignal(signal, marker)) return received;
@@ -54,7 +54,7 @@ const signalsOf = <E>(next: Effect.Effect<ChangeFeed.Message, E>) =>
   );
 /** A marker only the member receives: their own read time for a group nobody reads. */
 const markerFor = (memberId: Member.Id) =>
-  Signal.Value.cases.GroupRead.make({
+  Signal.Signal.cases.GroupRead.make({
     workspaceId,
     memberId,
     groupId: Group.Id.make("marker"),
@@ -79,7 +79,7 @@ export const signals = (fixture: Fixture) => {
       const second = yield* storage.connect();
       const here: Bound = yield* forWorkspace(first, workspaceId);
       const workspace = yield* initialized(here);
-      const owner = Actor.Value.make({
+      const owner = Actor.Actor.of({
         workspaceId,
         memberId: workspace.ownerMemberId,
         identity: alice,
@@ -91,7 +91,7 @@ export const signals = (fixture: Fixture) => {
       };
       const as =
         (host: keyof typeof cores) =>
-        <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
+        <A, E, R>(actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
           program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(cores[host]));
       const group = yield* as("first")(
         owner,
@@ -113,7 +113,10 @@ export const signals = (fixture: Fixture) => {
         ),
       );
       /** Subscribe to the change feed as a member on a host, after its opening Ready. */
-      const feed = Effect.fnUntraced(function* (host: keyof typeof cores, actor: Actor.Value) {
+      const feed = Effect.fnUntraced(function* (
+        host: keyof typeof cores,
+        actor: Actor.Actor["Service"],
+      ) {
         const next = yield* as(host)(
           actor,
           Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) =>
@@ -142,7 +145,7 @@ export const signals = (fixture: Fixture) => {
             const first = yield* storage.connect();
             const second = yield* storage.connect();
             const signal = (n: number) =>
-              Signal.Value.cases.ThreadRead.make({
+              Signal.Signal.cases.ThreadRead.make({
                 workspaceId,
                 memberId: reader.memberId,
                 threadId: Thread.Id.make("thread"),
@@ -158,7 +161,7 @@ export const signals = (fixture: Fixture) => {
             const elsewhere = yield* subscribe(second, otherWorkspaceId);
             yield* (yield* hubOf(first)).publish(signal(1));
             yield* (yield* hubOf(second)).publish(signal(2));
-            const marker = Signal.Value.cases.GroupRead.make({
+            const marker = Signal.Signal.cases.GroupRead.make({
               workspaceId: otherWorkspaceId,
               memberId: reader.memberId,
               groupId: Group.Id.make("marker"),
@@ -202,7 +205,7 @@ export const signals = (fixture: Fixture) => {
             threadId,
             memberId: owner.memberId,
           });
-          if (!Signal.Value.isAnyOf(["Typing"])(typing))
+          if (!Signal.Signal.isAnyOf(["Typing"])(typing))
             return yield* Effect.die("Expected typing");
           expect(DateTime.isGreaterThan(typing.until, before)).toBe(true);
           // Outside the group, or without permission to read the thread, it never arrives.
@@ -221,7 +224,7 @@ export const signals = (fixture: Fixture) => {
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { threadId, as } = yield* world(storage);
-          const typing = (actor: Actor.Value, thread = threadId) =>
+          const typing = (actor: Actor.Actor["Service"], thread = threadId) =>
             as("first")(
               actor,
               Effect.flip(

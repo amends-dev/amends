@@ -81,7 +81,7 @@ const decodeRecorded = Schema.decodeUnknownSync(
 );
 
 /** Activity that tells a contact something has the thread's job deliver it. */
-const deliverToContacts = Effect.fnUntraced(function* (event: Event.Record) {
+const deliverToContacts = Effect.fnUntraced(function* (event: Event.Event) {
   const { activity, recipients } = decodeRecorded(event.payload);
   if (!recipients.some(({ recipient }) => Notification.Recipient.isAnyOf(["Contact"])(recipient)))
     return;

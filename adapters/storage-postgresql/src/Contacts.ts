@@ -17,9 +17,9 @@ import { inIds } from "./internal/id-list.ts";
 import { contacts } from "./internal/schema.ts";
 
 const decodeRows = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Contact.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
+  Schema.Array(Schema.Struct({ ...Contact.Contact.fields, createdAt: Schema.DateTimeUtcFromDate })),
 );
-const toRow = (record: Contact.Record): typeof contacts.$inferInsert => ({
+const toRow = (record: Contact.Contact): typeof contacts.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   channelId: record.channelId,

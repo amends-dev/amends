@@ -20,7 +20,7 @@ import { compareBinary } from "./Rows.ts";
  * @category utils
  * @since 0.1.0
  */
-export const rows = Rows.make(Schema.fromJsonString(Invitation.Record));
+export const rows = Rows.make(Schema.fromJsonString(Invitation.Invitation));
 
 /**
  * Issue order: issue time, then ID in binary order. `list` returns a workspace's invitations in
@@ -29,7 +29,7 @@ export const rows = Rows.make(Schema.fromJsonString(Invitation.Record));
  * @category utils
  * @since 0.1.0
  */
-export const byIssue = (left: Invitation.Record, right: Invitation.Record) =>
+export const byIssue = (left: Invitation.Invitation, right: Invitation.Invitation) =>
   DateTime.toEpochMillis(left.details.issuedAt) - DateTime.toEpochMillis(right.details.issuedAt) ||
   compareBinary(left.details.id, right.details.id);
 

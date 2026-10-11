@@ -56,7 +56,7 @@ export class MemberStore extends Context.Service<
   MemberStore,
   {
     /** Find an active or removed membership in this workspace; None if absent. */
-    readonly get: (memberId: Member.Id) => Effect.Effect<Option.Option<Member.Record>, Failure>;
+    readonly get: (memberId: Member.Id) => Effect.Effect<Option.Option<Member.Member>, Failure>;
 
     /**
      * Find several active or removed memberships in one read. Absent IDs are omitted and each found
@@ -65,22 +65,22 @@ export class MemberStore extends Context.Service<
      */
     readonly getMany: (
       memberIds: ReadonlyArray<Member.Id>,
-    ) => Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Member.Member>, Failure>;
 
     /** Match both the identity kind and ID, returning only an active membership. */
     readonly findActive: (
       identity: Identity.MemberReference,
-    ) => Effect.Effect<Option.Option<Member.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<Member.Member>, Failure>;
 
     /** Every membership in this workspace, active and removed, in a stable order. */
-    readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
+    readonly list: Effect.Effect<ReadonlyArray<Member.Member>, Failure>;
 
     /**
      * Insert an active membership. Fail with Conflict for a reused member ID, including removed
      * memberships, or an identity with an existing active membership. Never upsert.
      */
     readonly insert: (
-      record: Member.Record,
+      record: Member.Member,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
     /**
@@ -124,7 +124,7 @@ export const make = (
       Effect.flatMap(read("findActive", Identity.MemberReference, identity), driver.findActive),
     list: driver.list,
     insert: (record) =>
-      write("insert", Member.Record, record).pipe(
+      write("insert", Member.Member, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active",
           () => new Conflict({ operation: "insert", message: "Expected an active member" }),

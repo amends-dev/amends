@@ -52,19 +52,19 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadStore.Confli
 export class ThreadStore extends Context.Service<
   ThreadStore,
   {
-    readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Record>, Failure>;
+    readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Thread>, Failure>;
     /**
      * Several threads in one read. Absent IDs are omitted and each found thread appears once; order
      * is unspecified, so callers index results by ID. An empty request reads nothing.
      */
     readonly getMany: (
       ids: ReadonlyArray<Thread.Id>,
-    ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
     /**
      * Every thread of a group in stable ID order. A history read for inspection; operations read
      * pages.
      */
-    readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
     /**
      * A group's threads with recorded activity, newest latest activity first, then ID in descending
      * binary order, after the exclusive `before` cursor and up to `limit`.
@@ -72,7 +72,7 @@ export class ThreadStore extends Context.Service<
     readonly listByLatest: (
       id: GroupId.Id,
       options: Thread.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
     /**
      * A group's threads, newest start first, then ID in descending binary order, after the exclusive
      * `before` cursor and up to `limit`.
@@ -80,13 +80,13 @@ export class ThreadStore extends Context.Service<
     readonly listByStart: (
       id: GroupId.Id,
       options: Thread.OpeningOptions,
-    ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
     /**
      * Reject reused IDs. The group and creator are recorded as
      * given, checked when the thread starts. Preserve historical values on replay.
      */
     readonly insert: (
-      record: Thread.Record,
+      record: Thread.Thread,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Projection write that sets a thread's title. A missing thread conflicts;
@@ -141,7 +141,7 @@ export const make = (
         yield* read("listByStart", Thread.OpeningOptions, options),
       );
     }),
-    insert: (record) => Effect.flatMap(write("insert", Thread.Record, record), driver.insert),
+    insert: (record) => Effect.flatMap(write("insert", Thread.Thread, record), driver.insert),
     rename: (renamed) => Effect.flatMap(write("rename", Thread.Renamed, renamed), driver.rename),
     getLatest: (ids) =>
       Effect.flatMap(read("getLatest", Schema.Array(Thread.Id), ids), driver.getLatest),

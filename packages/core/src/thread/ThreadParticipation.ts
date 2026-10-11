@@ -88,7 +88,7 @@ export const keyOf = (participant: Participant | Reference): string =>
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const ThreadParticipation = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
@@ -109,7 +109,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface ThreadParticipation extends Schema.Schema.Type<typeof ThreadParticipation> {}
 
 /**
  * A participation as it begins: active and not ended. What `ThreadParticipationFacts.Added`
@@ -119,7 +119,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @since 0.1.0
  */
 export const Admission = Schema.Struct({
-  ...Record.fields,
+  ...ThreadParticipation.fields,
   status: Schema.Literal("active"),
   endedAt: Schema.Null,
 });
@@ -195,8 +195,8 @@ export const Summary = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
   participant: Reference,
-  joinedAt: Record.fields.joinedAt,
-  joinedAtSequence: Record.fields.joinedAtSequence,
+  joinedAt: ThreadParticipation.fields.joinedAt,
+  joinedAtSequence: ThreadParticipation.fields.joinedAtSequence,
 });
 
 /**
@@ -211,7 +211,7 @@ export interface Summary extends Schema.Schema.Type<typeof Summary> {}
  * @category utils
  * @since 0.1.0
  */
-export const toSummary = (record: Record): Summary => ({
+export const toSummary = (record: ThreadParticipation): Summary => ({
   id: record.id,
   workspaceId: record.workspaceId,
   threadId: record.threadId,

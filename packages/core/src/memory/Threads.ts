@@ -15,7 +15,7 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Thread.Record));
+const rows = Rows.make(Schema.fromJsonString(Thread.Thread));
 const latestRows = Rows.make(Schema.fromJsonString(Thread.Latest));
 
 /** Newest time first, then ID in descending binary order. */

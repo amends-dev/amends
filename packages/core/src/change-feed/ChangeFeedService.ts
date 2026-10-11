@@ -58,7 +58,7 @@ export class ChangeFeedService extends Context.Service<
 /** What one reader may see: their delivery scopes and resolved grants. */
 interface Access {
   readonly scopes: ReadonlySet<Audience.Scope>;
-  readonly grants: ReadonlyArray<Grant.Value>;
+  readonly grants: ReadonlyArray<Grant.Grant>;
 }
 
 /**
@@ -68,8 +68,8 @@ interface Access {
 const reaches = (
   access: Access,
   reach: {
-    readonly audience: Audience.Value;
-    readonly requirement: Requirement.Value | undefined;
+    readonly audience: Audience.Audience;
+    readonly requirement: Requirement.Requirement | undefined;
     readonly exempt?: Audience.Scope | undefined;
   },
 ) =>
@@ -82,7 +82,7 @@ const isVisibleTo = (access: Access) => (prepared: ChangeFeedEvents.Prepared) =>
   reaches(access, prepared);
 
 /** Whether a fact changes this reader's access, so it must be reloaded before filtering. */
-const changesAccessOf = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prepared) =>
+const changesAccessOf = (actor: Actor.Actor["Service"]) => (prepared: ChangeFeedEvents.Prepared) =>
   prepared.access !== undefined &&
   (prepared.access.memberId === undefined || prepared.access.memberId === actor.memberId);
 
@@ -101,7 +101,7 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
   const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
   const { workspaceId } = yield* Store.Store;
 
-  const resolveAccess = Effect.fnUntraced(function* (actor: Actor.Value) {
+  const resolveAccess = Effect.fnUntraced(function* (actor: Actor.Actor["Service"]) {
     const admissions = yield* groupMembershipStore.listActiveByMember(actor.memberId);
     const grants = yield* grantResolver.resolve(actor.memberId);
     const scopes = new Set<Audience.Scope>([

@@ -49,7 +49,7 @@ export type Status = typeof Status.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const GroupFollow = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   groupId: GroupId.Id,
@@ -65,7 +65,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface GroupFollow extends Schema.Schema.Type<typeof GroupFollow> {}
 
 /**
  * Follow or unfollow a team group for oneself, or for an agent member one may use.

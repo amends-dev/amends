@@ -86,25 +86,25 @@ export class ThreadActivityStore extends Context.Service<
   {
     readonly get: (
       id: ThreadActivity.Id,
-    ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, Failure>;
     /**
      * A thread's whole timeline in sequence order. A history read for inspection; operations read
      * pages.
      */
     readonly listByThread: (
       id: ThreadId.Id,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, Failure>;
     /** Latest activity in this thread, using the caller's transaction when present. */
     readonly latest: (
       id: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, Failure>;
     /**
      * The first activity of several threads in one read. Absent IDs are omitted and each thread
      * appears once; order is unspecified.
      */
     readonly getFirst: (
       ids: ReadonlyArray<ThreadId.Id>,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, Failure>;
     /**
      * At most limit activities of the requested range, from its requested end, in ascending
      * sequence order. No shared snapshot across pages.
@@ -112,14 +112,14 @@ export class ThreadActivityStore extends Context.Service<
     readonly readPage: (
       id: ThreadId.Id,
       options: ReadOptions,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, Failure>;
     /**
      * Reject reused IDs, a position other than the thread's next, and a
      * second activity with one occurrence key. The subject is recorded as given, checked when the
      * activity is recorded. Preserve historical values on replay.
      */
     readonly insert: (
-      record: ThreadActivity.Record,
+      record: ThreadActivity.ThreadActivity,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/thread/ThreadActivityStore") {}
@@ -151,6 +151,6 @@ export const make = (
       );
     }),
     insert: (record) =>
-      Effect.flatMap(write("insert", ThreadActivity.Record, record), driver.insert),
+      Effect.flatMap(write("insert", ThreadActivity.ThreadActivity, record), driver.insert),
   };
 };

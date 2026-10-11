@@ -45,9 +45,12 @@ describe("group follows", () => {
       ? { _tag: "Agent", id: Identity.AgentId.make(memberId) }
       : { _tag: "Human", id: Identity.HumanId.make(memberId) };
   const actorFor = (memberId: Member.Id) =>
-    Actor.Value.make({ workspaceId, memberId, identity: identityOf(memberId) });
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-    program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
+    Actor.Actor.of({ workspaceId, memberId, identity: identityOf(memberId) });
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    program: Effect.Effect<A, E, R>,
+  ) => program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -84,7 +87,7 @@ describe("group follows", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -323,7 +326,7 @@ describe("group follows", () => {
               yield* bound.groupMemberships.findActive(team.id, plainId),
             );
             const followedAt = DateTime.makeUnsafe("2026-09-23T12:00:00.000Z");
-            const record = (id: string, changes: Partial<GroupFollow.Record> = {}) =>
+            const record = (id: string, changes: Partial<GroupFollow.GroupFollow> = {}) =>
               Object.assign(
                 {
                   id: GroupFollow.Id.make(id),

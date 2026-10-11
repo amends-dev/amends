@@ -39,7 +39,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
     HttpApiEndpoint.put("rename", "/:workspaceId/name", {
       params: { workspaceId: Workspace.Id },
       payload: WorkspaceSettings.RenameInput,
-      success: Workspace.Record,
+      success: Workspace.Workspace,
       error: [
         ...ApiErrors.member,
         ...ApiErrors.assignment,
@@ -64,7 +64,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
     HttpApiEndpoint.post("create", "/", {
       headers: ApiErrors.requestKey,
       payload: Workspace.CreateInput,
-      success: Workspace.Record.pipe(HttpApiSchema.status(201)).annotate({
+      success: Workspace.Workspace.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedWorkspace",
       }),
       error: [
@@ -82,7 +82,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
     HttpApiEndpoint.post("transferOwnership", "/:workspaceId/ownership", {
       params: { workspaceId: Workspace.Id },
       payload: Ownership.TransferInput,
-      success: Workspace.Record,
+      success: Workspace.Workspace,
       error: [
         ApiErrors.HumanRequired,
         ...ApiErrors.member,

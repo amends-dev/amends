@@ -51,16 +51,16 @@ export class ChannelStore extends Context.Service<
   ChannelStore,
   {
     /** The channel, removed or not. */
-    readonly get: (id: Channel.Id) => Effect.Effect<Option.Option<Channel.Record>, Failure>;
+    readonly get: (id: Channel.Id) => Effect.Effect<Option.Option<Channel.Channel>, Failure>;
     /** The workspace's channels that are not removed, in no particular order. */
-    readonly listActive: Effect.Effect<ReadonlyArray<Channel.Record>, Failure>;
+    readonly listActive: Effect.Effect<ReadonlyArray<Channel.Channel>, Failure>;
     /** Reject a reused id. Never upsert. */
     readonly insert: (
-      record: Channel.Record,
+      record: Channel.Channel,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** Replace a stored channel; a missing record conflicts. */
     readonly update: (
-      record: Channel.Record,
+      record: Channel.Channel,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/channel/ChannelStore") {}
@@ -81,7 +81,7 @@ export const make = (
   return {
     get: (id) => Effect.flatMap(read("get", Channel.Id, id), driver.get),
     listActive: driver.listActive,
-    insert: (record) => Effect.flatMap(write("insert", Channel.Record, record), driver.insert),
-    update: (record) => Effect.flatMap(write("update", Channel.Record, record), driver.update),
+    insert: (record) => Effect.flatMap(write("insert", Channel.Channel, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Channel.Channel, record), driver.update),
   };
 };

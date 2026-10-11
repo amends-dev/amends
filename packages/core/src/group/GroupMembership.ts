@@ -48,7 +48,7 @@ export type Status = typeof Status.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const GroupMembership = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   groupId: GroupId.Id,
@@ -61,7 +61,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface GroupMembership extends Schema.Schema.Type<typeof GroupMembership> {}
 
 /**
  * A page of a group's current admissions in admission-ID order, after the exclusive cursor.

@@ -50,7 +50,7 @@ const toEncodedRecord = (row: InvitationRow) => {
             },
   };
 };
-const decode = Schema.decodeUnknownEffect(Schema.Array(Invitation.Record));
+const decode = Schema.decodeUnknownEffect(Schema.Array(Invitation.Invitation));
 
 /**
  * Read the invitations `where` selects, in `order`, decoded as records. The store scopes it to its

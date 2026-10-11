@@ -53,11 +53,11 @@ export class Conflict extends Schema.TaggedError<Conflict>()("DeliveryStore.Conf
 export class DeliveryStore extends Context.Service<
   DeliveryStore,
   {
-    readonly get: (id: Delivery.Id) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
+    readonly get: (id: Delivery.Id) => Effect.Effect<Option.Option<Delivery.Delivery>, Failure>;
     /** The thread's deliveries not yet sent or failed, by their messages' positions, then by id. */
     readonly listRequestedByThread: (
       threadId: ThreadId.Id,
-    ) => Effect.Effect<ReadonlyArray<Delivery.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, Failure>;
     /**
      * The delivery that posted the message the external system knows as `externalMessageId` in a
      * conversation on a channel, if one did: what tells a post of our own, received back, from a
@@ -67,14 +67,14 @@ export class DeliveryStore extends Context.Service<
       channelId: ChannelId.Id,
       conversationId: ChannelTransport.ExternalId,
       externalMessageId: ChannelTransport.ExternalId,
-    ) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<Delivery.Delivery>, Failure>;
     /** Reject a reused id. Never upsert. */
     readonly insert: (
-      record: Delivery.Record,
+      record: Delivery.Delivery,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** Replace a stored delivery; a missing record conflicts. */
     readonly update: (
-      record: Delivery.Record,
+      record: Delivery.Delivery,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/channel/DeliveryStore") {}
@@ -108,7 +108,7 @@ export const make = (
         );
       },
     ),
-    insert: (record) => Effect.flatMap(write("insert", Delivery.Record, record), driver.insert),
-    update: (record) => Effect.flatMap(write("update", Delivery.Record, record), driver.update),
+    insert: (record) => Effect.flatMap(write("insert", Delivery.Delivery, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Delivery.Delivery, record), driver.update),
   };
 };

@@ -26,7 +26,7 @@ export const Created = Fact.make("connection.created", {
   version: 1,
   subject: (payload) => Subject.make("connection", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Connection.Record,
+  payload: Connection.Connection,
 });
 
 /**

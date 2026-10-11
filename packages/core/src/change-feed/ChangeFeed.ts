@@ -91,11 +91,11 @@ export const Message = Schema.TaggedUnion({
     cursor: Cursor,
     commitId: Commit.Id,
     events: Schema.Array(Event),
-    notifications: Schema.Array(Notification.Record),
+    notifications: Schema.Array(Notification.Notification),
   },
   Signal: {
     workspaceId: WorkspaceId.Id,
-    signal: Signal.Value,
+    signal: Signal.Signal,
   },
 }).annotate({ identifier: "ChangeFeedMessage" });
 /**

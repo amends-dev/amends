@@ -22,12 +22,12 @@ import { make } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const groupId = Group.Id.make("group");
-const actor = Actor.Value.make({
+const actor = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice-member"),
   identity: { _tag: "Human", id: Identity.HumanId.make("alice") },
 });
-const thread = (id: string): Thread.Record => ({
+const thread = (id: string): Thread.Thread => ({
   id: Thread.Id.make(id),
   workspaceId,
   groupId,
@@ -48,13 +48,13 @@ const unused = <I, S extends object>(key: Context.Key<I, S>) =>
 /** The operation over fake access and authorization, recording what it publishes. */
 const run = <A, E>(
   use: (
-    published: ReadonlyArray<Signal.Value>,
+    published: ReadonlyArray<Signal.Signal>,
   ) => Effect.Effect<A, E, ThreadMessageService.ThreadMessageService | Actor.Actor>,
   options: { readonly deny?: boolean } = {},
 ) =>
   Effect.gen(function* () {
-    const published: Array<Signal.Value> = [];
-    const requirements: Array<Requirement.Value> = [];
+    const published: Array<Signal.Signal> = [];
+    const requirements: Array<Requirement.Requirement> = [];
     const unexpected = () => Effect.die("Typing reads nothing but thread access");
     const threadQuery = ThreadQuery.ThreadQuery.of({
       requireAccess: (threadId) =>
@@ -126,7 +126,7 @@ it.effect(
           const now = yield* DateTime.now;
           yield* typing("open");
           expect(published).toEqual([
-            Signal.Value.cases.Typing.make({
+            Signal.Signal.cases.Typing.make({
               workspaceId,
               groupId,
               threadId: Thread.Id.make("open"),
@@ -149,7 +149,7 @@ it.effect("repeats within two seconds are dropped per thread, and later ones go 
       yield* TestClock.adjust("1 second");
       yield* typing("open");
       yield* typing("other");
-      expect(published.map((s) => Signal.Value.isAnyOf(["Typing"])(s) && s.threadId)).toEqual([
+      expect(published.map((s) => Signal.Signal.isAnyOf(["Typing"])(s) && s.threadId)).toEqual([
         "open",
         "other",
       ]);

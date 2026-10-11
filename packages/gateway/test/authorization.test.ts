@@ -55,7 +55,7 @@ describe("authorization", () => {
             expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual(
               [],
             );
-            const actor = Actor.Value.make({
+            const actor = Actor.Actor.of({
               workspaceId,
               memberId: workspace.ownerMemberId,
               identity: alice,

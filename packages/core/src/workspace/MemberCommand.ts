@@ -68,7 +68,7 @@ export class MemberCommand extends Context.Service<
      */
     readonly add: (
       member: NewMember,
-    ) => Effect.Effect<Member.Record, Error, Store.Transaction | Publication.Publication>;
+    ) => Effect.Effect<Member.Member, Error, Store.Transaction | Publication.Publication>;
   }
 >()("@amends-dev/core/workspace/member/command/Service") {}
 
@@ -86,7 +86,7 @@ export const make = Effect.fn("MemberCommand.make")(function* () {
   const { workspaceId } = yield* Store.Store;
 
   const add = Effect.fn("MemberCommand.add")(function* (member: NewMember) {
-    const added: Member.Record = {
+    const added: Member.Member = {
       id: Member.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       identity: member.identity,

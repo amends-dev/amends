@@ -72,7 +72,7 @@ import { withStorage } from "./fixture.ts";
 /** Thread discovery, metadata, timeline pages, and participant summaries. */
 
 /** A message's text, which a deleted message no longer has. */
-const textOf = (message: ThreadMessage.Record) =>
+const textOf = (message: ThreadMessage.ThreadMessage) =>
   ThreadMessage.Content.isAnyOf(["Text"])(message.content) ? message.content.text : null;
 
 const { core, initialized, runGateway } = Support;
@@ -88,11 +88,14 @@ describe("thread reads", () => {
       ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
       : { _tag: "Human", id: Identity.HumanId.make(id) };
   const actorFor = (memberId: Member.Id, workspace = workspaceId) =>
-    Actor.Value.make({ workspaceId: workspace, memberId, identity: identityFor(memberId) });
-  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Value) =>
+    Actor.Actor.of({ workspaceId: workspace, memberId, identity: identityFor(memberId) });
+  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor));
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    asActor(effect, actor).pipe(Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    effect: Effect.Effect<A, E, R>,
+  ) => asActor(effect, actor).pipe(Effect.provide(core(bound)));
   const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -178,7 +181,7 @@ describe("thread reads", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -212,14 +215,14 @@ describe("thread reads", () => {
     };
   });
   /** Seed nonmonotonic timestamps and canonical activity to isolate pagination behavior. */
-  const append = (bound: Bound, thread: Thread.Record, sequence: number) =>
+  const append = (bound: Bound, thread: Thread.Thread, sequence: number) =>
     publish(
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.gen(function* () {
             const time = DateTime.makeUnsafe(10_000 - sequence * 1000);
-            const message: ThreadMessage.Record = {
+            const message: ThreadMessage.ThreadMessage = {
               id: ThreadMessage.Id.make(`${thread.id}-message-${sequence}`),
               workspaceId: thread.workspaceId,
               threadId: thread.id,
@@ -728,7 +731,7 @@ describe("thread reads", () => {
             const outer = Effect.flatMap(Journal.Journal, (journal) =>
               journal.commit(
                 Effect.gen(function* () {
-                  const message: ThreadMessage.Record = {
+                  const message: ThreadMessage.ThreadMessage = {
                     id: ThreadMessage.Id.make("staged-message"),
                     workspaceId,
                     threadId: first.thread.id,
@@ -818,7 +821,7 @@ describe("thread reads", () => {
               ),
             );
             yield* grant(bound, memberId, ThreadPermissions.Read);
-            const visitor = Actor.Value.make({ workspaceId, memberId, identity });
+            const visitor = Actor.Actor.of({ workspaceId, memberId, identity });
             expect(yield* Effect.flip(run(bound, visitor, get(first.thread.id)))).toMatchObject({
               _tag: "ThreadService.NotFound",
             });
@@ -873,7 +876,7 @@ describe("thread reads", () => {
             expect(
               yield* Effect.flip(run(bound, actorFor(agentId), get(first.thread.id))),
             ).toMatchObject({ _tag: "Authorization.InvalidActor" });
-            const impostor = Actor.Value.make({
+            const impostor = Actor.Actor.of({
               workspaceId,
               memberId: owner.memberId,
               identity: readerIdentity,
@@ -1398,7 +1401,10 @@ describe("thread reads", () => {
             // Timelines read it through the resolver its owning domain registers.
             const resolver = Effect.succeed({
               kinds: [Noted, Pinged],
-              resolve: (_thread: Thread.Record, listed: ReadonlyArray<ThreadActivity.Record>) =>
+              resolve: (
+                _thread: Thread.Thread,
+                listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
+              ) =>
                 Effect.forEach(listed, (activity) =>
                   Effect.gen(function* () {
                     const decoded =

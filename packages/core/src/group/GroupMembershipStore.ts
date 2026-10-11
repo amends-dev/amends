@@ -57,7 +57,7 @@ export class GroupMembershipStore extends Context.Service<
     /** The admission, active or ended, if stored. */
     readonly get: (
       id: GroupMembership.Id,
-    ) => Effect.Effect<Option.Option<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<GroupMembership.GroupMembership>, Failure>;
     /**
      * Find several admissions, active or ended, in one read. Absent IDs are omitted and each found
      * record appears once; order is unspecified, so callers index results by ID. An empty request
@@ -65,12 +65,12 @@ export class GroupMembershipStore extends Context.Service<
      */
     readonly getMany: (
       ids: ReadonlyArray<GroupMembership.Id>,
-    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, Failure>;
     /** The member's active admission to the group, if any: at most one is active at a time. */
     readonly findActive: (
       groupId: GroupId.Id,
       memberId: MemberId.Id,
-    ) => Effect.Effect<Option.Option<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<GroupMembership.GroupMembership>, Failure>;
     /**
      * The group's active admissions of these members, in one read. Each found record appears once;
      * order is unspecified, so callers index results by member. An empty request reads nothing.
@@ -78,7 +78,7 @@ export class GroupMembershipStore extends Context.Service<
     readonly findActiveMany: (
       groupId: GroupId.Id,
       memberIds: ReadonlyArray<MemberId.Id>,
-    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, Failure>;
     /**
      * How many active admissions each of several groups has, and whether this member holds one, in
      * one read. Groups without any are omitted; order is unspecified. An empty request reads
@@ -94,31 +94,31 @@ export class GroupMembershipStore extends Context.Service<
      */
     readonly listByGroup: (
       groupId: GroupId.Id,
-    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, Failure>;
     /** A page of a group's active admissions in binary admission-ID order, after the cursor. */
     readonly pageActiveByGroup: (
       groupId: GroupId.Id,
       options: GroupMembership.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, Failure>;
     /** A page of a member's active admissions in binary group-ID order, after the group cursor. */
     readonly pageActiveByMember: (
       memberId: MemberId.Id,
       options: GroupMembership.ByMemberOptions,
-    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, Failure>;
     /**
      * A member's active admissions, in stable admission-ID order, which `MemberService.remove`
      * ends when the member is removed from the workspace. Internal only.
      */
     readonly listActiveByMember: (
       memberId: MemberId.Id,
-    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, Failure>;
     /**
      * Insert an active admission. Reject reused admission IDs and duplicate active group/member
      * pairs. The group and member are recorded as given: the
      * application checks that they exist and the member is current.
      */
     readonly insert: (
-      record: GroupMembership.Record,
+      record: GroupMembership.GroupMembership,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * End the specified active admission, preserving its other fields. Reject missing or ended
@@ -189,7 +189,7 @@ export const make = (
     listActiveByMember: (memberId) =>
       Effect.flatMap(read("listActiveByMember", MemberId.Id, memberId), driver.listActiveByMember),
     insert: (record) =>
-      write("insert", GroupMembership.Record, record).pipe(
+      write("insert", GroupMembership.GroupMembership, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active",
           () => new Conflict({ operation: "insert", message: "Expected an active admission" }),

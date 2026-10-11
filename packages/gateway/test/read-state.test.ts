@@ -46,9 +46,12 @@ describe("read state", () => {
       ? { _tag: "Agent", id: Identity.AgentId.make(memberId) }
       : { _tag: "Human", id: Identity.HumanId.make(memberId) };
   const actorFor = (memberId: Member.Id) =>
-    Actor.Value.make({ workspaceId, memberId, identity: identityOf(memberId) });
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-    program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
+    Actor.Actor.of({ workspaceId, memberId, identity: identityOf(memberId) });
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    program: Effect.Effect<A, E, R>,
+  ) => program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -90,7 +93,7 @@ describe("read state", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -389,7 +392,7 @@ describe("read state", () => {
         Effect.gen(function* () {
           const { bound, owner, team } = yield* prepare();
           const human = actorFor(humanId);
-          const listed = (actor: Actor.Value, options: Thread.ListOptions) =>
+          const listed = (actor: Actor.Actor["Service"], options: Thread.ListOptions) =>
             run(
               bound,
               actor,
@@ -493,7 +496,7 @@ describe("read state", () => {
           Effect.gen(function* () {
             const { bound, owner, team } = yield* prepare();
             const human = actorFor(humanId);
-            const stream = (actor: Actor.Value, options: Thread.OpeningOptions) =>
+            const stream = (actor: Actor.Actor["Service"], options: Thread.OpeningOptions) =>
               run(
                 bound,
                 actor,
@@ -635,7 +638,7 @@ describe("read state", () => {
         Effect.gen(function* () {
           const { bound, owner, team } = yield* prepare();
           const human = actorFor(humanId);
-          const mine = (actor: Actor.Value) =>
+          const mine = (actor: Actor.Actor["Service"]) =>
             run(
               bound,
               actor,

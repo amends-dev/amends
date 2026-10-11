@@ -45,7 +45,7 @@ export const Created = Fact.make("turn.created", {
   subject: (payload) => Subject.make("turn", payload.id),
   occurrence: (payload) => [payload.id],
   payload: Schema.Struct({
-    ...Turn.Record.fields,
+    ...Turn.Turn.fields,
     notificationIds: Turn.Acceptance.fields.notificationIds,
   }),
 });
@@ -62,7 +62,7 @@ export const Retried = Fact.make("turn.retried", {
   audience,
   subject: (payload) => Subject.make("turn", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Schema.Struct(Turn.Record.fields),
+  payload: Schema.Struct(Turn.Turn.fields),
 });
 
 /**

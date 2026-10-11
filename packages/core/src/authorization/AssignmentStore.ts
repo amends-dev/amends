@@ -68,24 +68,24 @@ export class AssignmentStore extends Context.Service<
     /** Find an active or revoked assignment in this workspace; None if absent. */
     readonly get: (
       assignmentId: Assignment.Id,
-    ) => Effect.Effect<Option.Option<Assignment.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<Assignment.Assignment>, Failure>;
 
     /** All active role and direct grant assignments for this member in this workspace. */
     readonly listActiveByMember: (
       memberId: Member.Id,
-    ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, Failure>;
 
     /** All active Role-source assignments referencing this role in this workspace. */
     readonly listActiveByRole: (
       roleId: Role.Id,
-    ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, Failure>;
 
     /**
      * Insert an active assignment. Fail with Conflict for a reused assignment ID, including
      * revoked IDs. Overlapping grants remain separate assignments. Never upsert.
      */
     readonly insert: (
-      record: Assignment.Record,
+      record: Assignment.Assignment,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
     /**
@@ -119,7 +119,7 @@ export const make = (
     listActiveByRole: (roleId) =>
       Effect.flatMap(read("listActiveByRole", Role.Id, roleId), driver.listActiveByRole),
     insert: (record) =>
-      write("insert", Assignment.Record, record).pipe(
+      write("insert", Assignment.Assignment, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active",
           () => new Conflict({ operation: "insert", message: "Expected an active assignment" }),

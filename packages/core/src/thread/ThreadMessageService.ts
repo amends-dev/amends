@@ -171,7 +171,7 @@ export class ThreadMessageService extends Context.Service<
     readonly publish: (
       input: ThreadMessage.PublishInput,
       options?: Request.Options,
-    ) => Effect.Effect<ThreadMessage.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<ThreadMessage.ThreadMessage, Error, Actor.Actor>;
     /**
      * Replace the text and mentions of a message the actor wrote, at its next revision, under
      * `thread.publish` on its thread. The same text and mentions again record nothing; otherwise a
@@ -181,7 +181,7 @@ export class ThreadMessageService extends Context.Service<
      */
     readonly edit: (
       input: ThreadMessage.EditInput,
-    ) => Effect.Effect<ThreadMessage.Record, EditError, Actor.Actor>;
+    ) => Effect.Effect<ThreadMessage.ThreadMessage, EditError, Actor.Actor>;
     /**
      * Delete a message: its own author's under `thread.publish` on the thread, anyone's under
      * `thread.moderate` on the thread's group. Its text is gone, its place in the thread stays, and
@@ -189,7 +189,7 @@ export class ThreadMessageService extends Context.Service<
      */
     readonly delete: (
       messageId: ThreadMessage.Id,
-    ) => Effect.Effect<ThreadMessage.Record, DeleteError, Actor.Actor>;
+    ) => Effect.Effect<ThreadMessage.ThreadMessage, DeleteError, Actor.Actor>;
     /**
      * Tell the thread's readers that the acting member is composing a message there, for the next
      * few seconds. Requires current group access and `thread.publish`, as publishing does. Repeats
@@ -208,7 +208,7 @@ export class ThreadMessageService extends Context.Service<
 const selectedFor = (
   authorId: Member.Id,
   mentions: ReadonlyArray<Member.Id>,
-  current: ReadonlyArray<ThreadParticipation.Record>,
+  current: ReadonlyArray<ThreadParticipation.ThreadParticipation>,
 ): ReadonlyArray<ThreadParticipation.Reference> => {
   const author: ThreadParticipation.Reference = { _tag: "Member", memberId: authorId };
   const addressed: ReadonlyArray<ThreadParticipation.Reference> =
@@ -292,7 +292,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   });
 
   /** Whether the actor wrote the message; only a member writes through the service. */
-  const wroteBy = (message: ThreadMessage.Record, actor: Actor.Value) =>
+  const wroteBy = (message: ThreadMessage.ThreadMessage, actor: Actor.Actor["Service"]) =>
     ThreadMessage.Author.isAnyOf(["Member"])(message.author) &&
     message.author.memberId === actor.memberId;
 
@@ -490,7 +490,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
         if (at - time >= Duration.toMillis(typingFor)) lastTyping.delete(entry);
     lastTyping.set(key, at);
     yield* signalHub.publish(
-      Signal.Value.cases.Typing.make({
+      Signal.Signal.cases.Typing.make({
         workspaceId,
         groupId: thread.groupId,
         threadId: thread.id,

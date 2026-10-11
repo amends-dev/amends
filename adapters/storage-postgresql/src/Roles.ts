@@ -18,7 +18,7 @@ import { storeError, storeFailure } from "./internal/errors.ts";
 import { builtinRoleRevisions, roles } from "./internal/schema.ts";
 
 /** The table's columns already have the record's names; decoding checks brands and uniqueness. */
-const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Record));
+const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Role));
 
 /**
  * Builds the role store for the binding's workspace: this module's driver inside

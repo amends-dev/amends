@@ -53,7 +53,7 @@ export class TaskStore extends Context.Service<
   TaskStore,
   {
     /** The thread's task, if it has one. */
-    readonly get: (threadId: ThreadId.Id) => Effect.Effect<Option.Option<Task.Record>, Failure>;
+    readonly get: (threadId: ThreadId.Id) => Effect.Effect<Option.Option<Task.Task>, Failure>;
     /**
      * Several threads' tasks in one read. Threads without one are omitted and each task appears
      * once; order is unspecified, so callers index results by thread. An empty request reads
@@ -61,7 +61,7 @@ export class TaskStore extends Context.Service<
      */
     readonly getMany: (
       threadIds: ReadonlyArray<ThreadId.Id>,
-    ) => Effect.Effect<ReadonlyArray<Task.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Task.Task>, Failure>;
     /**
      * A page of a group's tasks by creation, newest first, after the exclusive cursor, of one status
      * when the options name one.
@@ -69,10 +69,10 @@ export class TaskStore extends Context.Service<
     readonly listByGroup: (
       groupId: GroupId.Id,
       options: Task.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<Task.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Task.Task>, Failure>;
     /** Reject a thread that has a task. */
     readonly insert: (
-      record: Task.Record,
+      record: Task.Task,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Apply one change to a thread's task. A thread without a task, or a task whose value is not
@@ -108,7 +108,7 @@ export const make = (
         yield* read("listByGroup", Task.ListOptions, options),
       );
     }),
-    insert: (record) => Effect.flatMap(write("insert", Task.Record, record), driver.insert),
+    insert: (record) => Effect.flatMap(write("insert", Task.Task, record), driver.insert),
     apply: Effect.fn("TaskStore.apply")(function* (threadId, change) {
       return yield* driver.apply(
         yield* write("apply", ThreadId.Id, threadId),

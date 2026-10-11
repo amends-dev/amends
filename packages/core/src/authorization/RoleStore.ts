@@ -63,13 +63,13 @@ export class RoleStore extends Context.Service<
   RoleStore,
   {
     /** Find a role in this workspace; None if absent. */
-    readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Record>, Failure>;
+    readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Role>, Failure>;
 
     /**
      * Insert a role. Fail with Conflict for a reused role ID. Never upsert.
      */
     readonly insert: (
-      record: Role.Record,
+      record: Role.Role,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
     /**
@@ -77,7 +77,7 @@ export class RoleStore extends Context.Service<
      */
     readonly rename: (
       roleId: Role.Id,
-      name: Role.Record["name"],
+      name: Role.Role["name"],
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
     /**
@@ -86,7 +86,7 @@ export class RoleStore extends Context.Service<
      */
     readonly setPermissions: (
       roleId: Role.Id,
-      permissions: Role.Record["permissions"],
+      permissions: Role.Role["permissions"],
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
     /** The built-in bundle revision the workspace's roles hold; None before one is recorded. */
@@ -117,17 +117,17 @@ export const make = (
   const write = StoreInput.write(Conflict, workspaceId);
   return {
     get: (roleId) => Effect.flatMap(read("get", Role.Id, roleId), driver.get),
-    insert: (record) => Effect.flatMap(write("insert", Role.Record, record), driver.insert),
+    insert: (record) => Effect.flatMap(write("insert", Role.Role, record), driver.insert),
     rename: Effect.fn("RoleStore.rename")(function* (roleId, name) {
       return yield* driver.rename(
         yield* write("rename", Role.Id, roleId),
-        yield* write("rename", Role.Record.fields.name, name),
+        yield* write("rename", Role.Role.fields.name, name),
       );
     }),
     setPermissions: Effect.fn("RoleStore.setPermissions")(function* (roleId, permissions) {
       return yield* driver.setPermissions(
         yield* write("setPermissions", Role.Id, roleId),
-        yield* write("setPermissions", Role.Record.fields.permissions, permissions),
+        yield* write("setPermissions", Role.Role.fields.permissions, permissions),
       );
     }),
     builtinRevision: driver.builtinRevision,

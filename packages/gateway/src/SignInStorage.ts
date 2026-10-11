@@ -43,7 +43,7 @@ export type PendingCode = typeof PendingCode.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const SessionRecord = Schema.Struct({
+export const Session = Schema.Struct({
   humanId: Identity.HumanId,
   createdAt: Schema.DateTimeUtc,
   expiresAt: Schema.DateTimeUtc,
@@ -52,7 +52,7 @@ export const SessionRecord = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export type SessionRecord = typeof SessionRecord.Type;
+export type Session = typeof Session.Type;
 
 /**
  * Where email sign-in keeps the codes it sent and the sessions it began, across every host over
@@ -74,9 +74,9 @@ export class SignInStorage extends Context.Service<
       decide: (current: Option.Option<PendingCode>) => readonly [A, Option.Option<PendingCode>],
     ) => Effect.Effect<A>;
     /** Store a session a sign-in began, under its token's digest. */
-    readonly insertSession: (digest: string, session: SessionRecord) => Effect.Effect<void>;
+    readonly insertSession: (digest: string, session: Session) => Effect.Effect<void>;
     /** The session stored under a token's digest, ended or not: its reader checks `expiresAt`. */
-    readonly findSession: (digest: string) => Effect.Effect<Option.Option<SessionRecord>>;
+    readonly findSession: (digest: string) => Effect.Effect<Option.Option<Session>>;
     /** Move a session's end, as using it does; a session that is gone stays gone. */
     readonly extendSession: (digest: string, expiresAt: DateTime.Utc) => Effect.Effect<void>;
     /** Remove the session under a token's digest, as revoking it does; a missing one stays gone. */

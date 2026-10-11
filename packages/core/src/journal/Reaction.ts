@@ -22,7 +22,5 @@ export interface Definition<R = never> {
   /** The name of the fact it reacts to, at any version. */
   readonly fact: string;
   /** Does what the published event asks for, with the publishing commit's transaction. */
-  readonly react: (
-    event: Event.Record,
-  ) => Effect.Effect<void, Store.Failure, R | Store.Transaction>;
+  readonly react: (event: Event.Event) => Effect.Effect<void, Store.Failure, R | Store.Transaction>;
 }

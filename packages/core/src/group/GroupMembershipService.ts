@@ -161,7 +161,7 @@ export class GroupMembershipService extends Context.Service<
      */
     readonly add: (
       input: GroupMembership.AddInput,
-    ) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<GroupMembership.GroupMembership, Error, Actor.Actor>;
     /**
      * End this team-group admission, requiring group.membership.manage on its group and membership
      * of it. Any member may remove others from a private group; removing someone else from a public
@@ -169,20 +169,22 @@ export class GroupMembershipService extends Context.Service<
      */
     readonly remove: (
       input: GroupMembership.RemoveInput,
-    ) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<GroupMembership.GroupMembership, Error, Actor.Actor>;
     /**
      * Join a public team group as the actor, under group.join on it. Private and direct groups are
      * GroupNotFound like missing ones, so joining discloses nothing about them. Joining again
      * returns the actor's current admission and records nothing.
      */
-    readonly join: (groupId: Group.Id) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    readonly join: (
+      groupId: Group.Id,
+    ) => Effect.Effect<GroupMembership.GroupMembership, Error, Actor.Actor>;
     /**
      * End only the actor's own team-group admission; active workspace membership is sufficient.
      * Nobody leaves the general group.
      */
     readonly leave: (
       input: GroupMembership.LeaveInput,
-    ) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<GroupMembership.GroupMembership, Error, Actor.Actor>;
     /**
      * A page of current admissions of active workspace members, in admission-ID order; require
      * group.read and audience membership.
@@ -190,7 +192,7 @@ export class GroupMembershipService extends Context.Service<
     readonly listCurrent: (
       groupId: Group.Id,
       options: GroupMembership.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Actor>;
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, ReadError, Actor.Actor>;
   }
 >()("@amends-dev/core/group/membership/service/Service") {}
 
@@ -297,7 +299,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
 
   /** End an active admission for the given reason, returning it as removed. */
   const endMembership = Effect.fnUntraced(function* (
-    membership: GroupMembership.Record,
+    membership: GroupMembership.GroupMembership,
     reason: "removed" | "left",
   ) {
     if (membership.status === "removed")
@@ -368,7 +370,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
   ) {
     const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input);
     yield* requireGroup(groupId);
-    const active: Array<GroupMembership.Record> = [];
+    const active: Array<GroupMembership.GroupMembership> = [];
     let after = options.after;
     while (active.length < options.limit) {
       const page = yield* groupMembershipStore.pageActiveByGroup(

@@ -50,24 +50,27 @@ import { withStorage } from "./fixture.ts";
 
 const { core, initialized, runGateway } = Support;
 describe("marking notifications seen", () => {
-  const human: Actor.Value = {
+  const human: Actor.Actor["Service"] = {
     workspaceId,
     memberId: Member.Id.make("human"),
     identity: { _tag: "Human", id: Identity.HumanId.make("recipient") },
   };
-  const agent: Actor.Value = {
+  const agent: Actor.Actor["Service"] = {
     workspaceId,
     memberId: Member.Id.make("agent"),
     identity: { _tag: "Agent", id: Identity.AgentId.make("recipient") },
   };
   /** Writes the opening message, so the others, including the owner, receive it. */
-  const writer: Actor.Value = {
+  const writer: Actor.Actor["Service"] = {
     workspaceId,
     memberId: Member.Id.make("writer"),
     identity: { _tag: "Human", id: Identity.HumanId.make("writer") },
   };
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    effect: Effect.Effect<A, E, R>,
+  ) => effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Publication.Publication, testProvenance()),
@@ -86,7 +89,7 @@ describe("marking notifications seen", () => {
       ),
     );
   /** A member's inbox, as their membership. */
-  const notes = (bound: Bound, member: Actor.Value) =>
+  const notes = (bound: Bound, member: Actor.Actor["Service"]) =>
     listOldestFirst(bound.notifications, Notification.ofMember(member.memberId, member.identity), {
       limit: 100,
     });
@@ -99,7 +102,7 @@ describe("marking notifications seen", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner: Actor.Value = {
+    const owner: Actor.Actor["Service"] = {
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -240,7 +243,7 @@ describe("marking notifications seen", () => {
           Effect.gen(function* () {
             const p = yield* prepare();
             const service =
-              (actor: Actor.Value) =>
+              (actor: Actor.Actor["Service"]) =>
               <A, E>(
                 use: (
                   s: NotificationService.NotificationService["Service"],

@@ -261,10 +261,10 @@ In core:
 
 0. The thread feature takes the layout and documentation above, with no change of behavior: a
    move and a documentation pass, checked by core's tests and every dependent's typecheck.
-1. `Thread.Record` and `thread.created` gain `title` and `origin`; the fact takes version 2.
+1. `Thread.Thread` and `thread.created` gain `title` and `origin`; the fact takes version 2.
    `thread.renamed` fact, projection, activity kind, and `thread.rename` permission.
 2. The opening union in the thread command is removed; `create` takes the opening message.
-3. `ThreadMessage.Record` takes `via` and `content`; the message store gains an update for edits
+3. `ThreadMessage.ThreadMessage` takes `via` and `content`; the message store gains an update for edits
    and deletions and a reply count; `thread.message.edited` and `thread.message.deleted` facts,
    projections, kinds, and operations; `thread.moderate` permission.
 4. `ThreadActivityKind` gains `version`, recorded on the activity.

@@ -18,7 +18,7 @@ import { testProvenance } from "../publication.ts";
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Log.Id.make("workspace-one/journal");
 
-const created: Agent.Record = {
+const created: Agent.Agent = {
   id: Agent.Id.make("agent-one"),
   workspaceId,
   memberId: Member.Id.make("member-agent"),
@@ -32,7 +32,7 @@ const created: Agent.Record = {
 
 /** Agents in memory, refusing a reused id and a missing one as storage does. */
 const agentsInMemory = () => {
-  const records = new Map<string, Agent.Record>();
+  const records = new Map<string, Agent.Agent>();
   const conflict = (operation: string, message: string) =>
     Effect.fail(new AgentStore.Conflict({ operation, message }));
   return AgentStore.AgentStore.of({

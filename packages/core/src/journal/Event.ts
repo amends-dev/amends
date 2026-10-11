@@ -1,7 +1,7 @@
 /**
  * A fact event: a fact as the journal recorded it, with the subject, name, version, and provenance
  * it was published with, and the metadata of its log entry. `Header` is what storage keeps beside
- * the encoded payload, `Envelope` the entry as the journal's log reads and writes it, and `Record`
+ * the encoded payload, `Envelope` the entry as the journal's log reads and writes it, and `Event`
  * and `Type` the decoded event that projections, reactions, and readers receive. `decode` turns an
  * envelope into an event with the fact's versioned definition.
  *
@@ -93,7 +93,7 @@ export interface Provenance extends Schema.Schema.Type<typeof Provenance> {}
  * @since 0.1.0
  */
 export const Header = Schema.Struct({
-  subject: Subject.Value,
+  subject: Subject.Subject,
   name: Schema.String,
   version: Schema.Finite,
   provenance: Provenance,
@@ -189,7 +189,7 @@ export type CommitId = typeof CommitId.Type;
  */
 export const Metadata = Schema.Struct({
   ...Entry.Metadata.fields,
-  subject: Subject.Value,
+  subject: Subject.Subject,
   provenance: Provenance,
 });
 
@@ -206,7 +206,7 @@ export interface Metadata extends Schema.Schema.Type<typeof Metadata> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Event = Schema.Struct({
   ...Metadata.fields,
   name: Schema.String,
   version: Schema.Finite,
@@ -217,7 +217,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Event extends Schema.Schema.Type<typeof Event> {}
 
 /**
  * The decoded event of fact `F`: event metadata with `F`'s literal name and version and its
@@ -236,7 +236,7 @@ export type Type<F extends Fact.Definition> = ReturnType<
  * @category constructors
  * @since 0.1.0
  */
-export const makeReference = (event: Record): Reference => ({
+export const makeReference = (event: Event): Reference => ({
   workspaceId: event.provenance.workspaceId,
   logId: event.logId,
   commitId: event.commitId,

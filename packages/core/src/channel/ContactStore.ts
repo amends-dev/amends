@@ -50,21 +50,21 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ContactStore.Confl
 export class ContactStore extends Context.Service<
   ContactStore,
   {
-    readonly get: (id: Contact.Id) => Effect.Effect<Option.Option<Contact.Record>, Failure>;
+    readonly get: (id: Contact.Id) => Effect.Effect<Option.Option<Contact.Contact>, Failure>;
     /**
      * Several contacts in one read. Absent ids are omitted and each contact appears once; order is
      * unspecified, so callers index results by id. An empty request reads nothing.
      */
     readonly getMany: (
       ids: ReadonlyArray<Contact.Id>,
-    ) => Effect.Effect<ReadonlyArray<Contact.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Contact.Contact>, Failure>;
     /** Reject a reused id. Never upsert. */
     readonly insert: (
-      record: Contact.Record,
+      record: Contact.Contact,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** Replace a stored contact; a missing record conflicts. */
     readonly update: (
-      record: Contact.Record,
+      record: Contact.Contact,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/channel/ContactStore") {}
@@ -86,7 +86,7 @@ export const make = (
     get: (id) => Effect.flatMap(read("get", Contact.Id, id), driver.get),
     getMany: (ids) =>
       Effect.flatMap(read("getMany", Schema.Array(Contact.Id), ids), driver.getMany),
-    insert: (record) => Effect.flatMap(write("insert", Contact.Record, record), driver.insert),
-    update: (record) => Effect.flatMap(write("update", Contact.Record, record), driver.update),
+    insert: (record) => Effect.flatMap(write("insert", Contact.Contact, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Contact.Contact, record), driver.update),
   };
 };

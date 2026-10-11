@@ -53,7 +53,7 @@ export class GroupQuery extends Context.Service<
      */
     readonly requireAudience: (
       groupId: GroupId.Id,
-    ) => Effect.Effect<GroupMembership.Record, AudienceError, Actor.Actor>;
+    ) => Effect.Effect<GroupMembership.GroupMembership, AudienceError, Actor.Actor>;
   }
 >()("@amends-dev/core/group/query/Service") {}
 

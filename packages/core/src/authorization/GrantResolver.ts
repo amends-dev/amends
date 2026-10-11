@@ -45,7 +45,7 @@ export class GrantResolver extends Context.Service<
      * grants nothing, since no requirement can name it. Overlapping grants may repeat.
      * Actor identity, active membership, and action requirements are checked by authorization.
      */
-    readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Value>, Error>;
+    readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Grant>, Error>;
   }
 >()("@amends-dev/core/authorization/grant-resolver/Service") {}
 
@@ -65,7 +65,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
 
   /** A retired permission grants nothing, rather than failing every grant its holder has. */
-  const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Value) {
+  const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Scope) {
     const permission = yield* permissionCatalog.get(name).pipe(
       Effect.asSome,
       Effect.catchTag("PermissionCatalog.Unknown", () => Effect.succeedNone),
@@ -80,7 +80,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   });
 
   const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: Member.Id) {
-    const grants: Array<Grant.Value> = [];
+    const grants: Array<Grant.Grant> = [];
     for (const assignment of yield* assignmentStore.listActiveByMember(memberId)) {
       const source = assignment.source;
       if (Assignment.Source.isAnyOf(["Direct"])(source)) {

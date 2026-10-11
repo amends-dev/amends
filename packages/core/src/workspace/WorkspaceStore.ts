@@ -59,10 +59,10 @@ export class WorkspaceStore extends Context.Service<
       change: WorkspaceSettings.NameChange,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** Read the current transaction, or committed state when called outside one. */
-    readonly get: Effect.Effect<Option.Option<Workspace.Record>, Failure>;
+    readonly get: Effect.Effect<Option.Option<Workspace.Workspace>, Failure>;
     /** Insert once; duplicate creation conflicts. Never overwrite ownership. */
     readonly insert: (
-      record: Workspace.Record,
+      record: Workspace.Workspace,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Change only `ownerMemberId`, when the current owner matches `previousOwnerMemberId`. An
@@ -92,7 +92,7 @@ export const make = (
       Effect.flatMap(write("rename", WorkspaceSettings.NameChange, change), driver.rename),
     get: driver.get,
     insert: (record) =>
-      write("insert", Workspace.Record, record).pipe(
+      write("insert", Workspace.Workspace, record).pipe(
         Effect.filterOrFail(
           (record) => record.id === workspaceId,
           () =>

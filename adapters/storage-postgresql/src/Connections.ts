@@ -18,10 +18,10 @@ import { connections } from "./internal/schema.ts";
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...Connection.Record.fields, createdAt: Schema.DateTimeUtcFromDate }),
+    Schema.Struct({ ...Connection.Connection.fields, createdAt: Schema.DateTimeUtcFromDate }),
   ),
 );
-const toRow = (record: Connection.Record): typeof connections.$inferInsert => ({
+const toRow = (record: Connection.Connection): typeof connections.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   integration: record.integration,

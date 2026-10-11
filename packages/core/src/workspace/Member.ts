@@ -76,7 +76,7 @@ export const NewName = Name.check(Text.isName);
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Member = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   identity: Identity.MemberReference,
@@ -88,7 +88,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Member extends Schema.Schema.Type<typeof Member> {}
 
 /**
  * The audience scope of one membership alone: a fact or signal addressed to it, such as a member's

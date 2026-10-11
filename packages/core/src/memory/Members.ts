@@ -15,9 +15,9 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Member.Record));
+const rows = Rows.make(Schema.fromJsonString(Member.Member));
 
-const isActive = (member: Member.Record, identity: Identity.MemberReference) =>
+const isActive = (member: Member.Member, identity: Identity.MemberReference) =>
   member.status === "active" &&
   Identity.MemberReference.isAnyOf([identity._tag])(member.identity) &&
   member.identity.id === identity.id;

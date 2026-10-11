@@ -176,7 +176,7 @@ export const decideRedeem = (
  * @since 0.1.0
  */
 export const renewalOf = (
-  session: SignInStorage.SessionRecord,
+  session: SignInStorage.Session,
   now: DateTime.Utc,
   policy: Policy,
 ): Option.Option<DateTime.Utc> => {

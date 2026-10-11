@@ -20,13 +20,13 @@ import { channelDeliveries } from "./internal/schema.ts";
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      ...Delivery.Record.fields,
+      ...Delivery.Delivery.fields,
       requestedAt: Schema.DateTimeUtcFromDate,
       finishedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
     }),
   ),
 );
-const toRow = (record: Delivery.Record): typeof channelDeliveries.$inferInsert => ({
+const toRow = (record: Delivery.Delivery): typeof channelDeliveries.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   channelId: record.channelId,

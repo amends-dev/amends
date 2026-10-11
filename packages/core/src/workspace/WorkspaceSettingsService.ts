@@ -90,7 +90,7 @@ export class WorkspaceSettingsService extends Context.Service<
      */
     readonly rename: (
       input: WorkspaceSettings.RenameInput,
-    ) => Effect.Effect<Workspace.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<Workspace.Workspace, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/workspace/settings/Service") {}
 /**

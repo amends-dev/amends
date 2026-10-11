@@ -62,14 +62,14 @@ export interface Change extends Schema.Schema.Type<typeof Change> {}
  * @since 0.1.0
  */
 export const View = Schema.Struct({
-  workspace: Workspace.Record,
-  owner: Member.Record,
+  workspace: Workspace.Workspace,
+  owner: Member.Member,
   /** The current Owner assignment, which a transfer gives back as `expectedOwnerAssignmentId`. */
   ownerAssignmentId: Assignment.Id,
   /** Whether the actor is the owner, a person, and holds `workspace.transfer-ownership`. */
   canTransfer: Schema.Boolean,
   /** The other active human members, when the actor may transfer; empty otherwise. */
-  candidates: Schema.Array(Member.Record),
+  candidates: Schema.Array(Member.Member),
 }).annotate({ identifier: "WorkspaceOwnership" });
 
 /**

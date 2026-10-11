@@ -66,7 +66,7 @@ import * as SignalHub from "../../src/signal/SignalHub.ts";
 const workspaceId = Workspace.Id.make("workspace-one");
 const at = DateTime.makeUnsafe("2026-09-20T12:00:00.123Z");
 const alice: Identity.MemberReference = { _tag: "Human", id: Identity.HumanId.make("alice") };
-const actor = Actor.Value.make({
+const actor = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice-member"),
   identity: alice,
@@ -126,14 +126,14 @@ const workspaceGrant = (permission: Permission.Definition) =>
   Assignment.Source.cases.Direct.make({
     grant: {
       permission: permission.name,
-      scope: GrantScope.Value.cases.Workspace.make({ workspaceId }),
+      scope: GrantScope.Scope.cases.Workspace.make({ workspaceId }),
     },
   });
 const threadGrant = (id: Thread.Id) =>
   Assignment.Source.cases.Direct.make({
     grant: {
       permission: ThreadPermissions.Read.name,
-      scope: GrantScope.Value.cases.Target.make({
+      scope: GrantScope.Scope.cases.Target.make({
         target: { _tag: "Thread", workspaceId, threadId: id },
       }),
     },
@@ -305,10 +305,10 @@ const committed = (message: ChangeFeed.Message) => {
     throw new Error(`Expected a commit, got ${message._tag}`);
   return message;
 };
-const signal = (value: Signal.Value) =>
+const signal = (value: Signal.Signal) =>
   Effect.flatMap(SignalHub.SignalHub, (signalHub) => signalHub.publish(value));
 const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
-  Signal.Value.cases.Typing.make({
+  Signal.Signal.cases.Typing.make({
     workspaceId,
     groupId: group,
     threadId: thread,
@@ -316,15 +316,15 @@ const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
     until: at,
   });
 const groupRead = (memberId: Member.Id, group = groupId) =>
-  Signal.Value.cases.GroupRead.make({ workspaceId, memberId, groupId: group, readAt: at });
-const sameSignal = Schema.toEquivalence(Signal.Value);
+  Signal.Signal.cases.GroupRead.make({ workspaceId, memberId, groupId: group, readAt: at });
+const sameSignal = Schema.toEquivalence(Signal.Signal);
 /** The signals delivered before a marker the reader is known to receive. */
 const signalsUntil = Effect.fnUntraced(function* (
   next: Effect.Effect<ChangeFeed.Message>,
-  marker: Signal.Value,
+  marker: Signal.Signal,
 ) {
   yield* signal(marker);
-  const received: Array<Signal.Value> = [];
+  const received: Array<Signal.Signal> = [];
   for (;;) {
     const message = yield* next;
     if (!ChangeFeed.Message.isAnyOf(["Signal"])(message))
@@ -722,13 +722,13 @@ it.effect(
           admitted.add(groupId);
           const feed = yield* listen();
           yield* feed.next;
-          const readThread = Signal.Value.cases.ThreadRead.make({
+          const readThread = Signal.Signal.cases.ThreadRead.make({
             workspaceId,
             memberId: actor.memberId,
             threadId,
             readThrough: 3,
           });
-          const seen = Signal.Value.cases.NotificationsSeen.make({
+          const seen = Signal.Signal.cases.NotificationsSeen.make({
             workspaceId,
             memberId: bobMember,
             notificationIds: [Notification.Id.make("notification")],
@@ -889,7 +889,7 @@ it.effect("an exact member-read grant shows that member's changes, and not other
         Assignment.Source.cases.Direct.make({
           grant: {
             permission: MemberPermissions.Read.name,
-            scope: GrantScope.Value.cases.Target.make({
+            scope: GrantScope.Scope.cases.Target.make({
               target: { _tag: "Member", workspaceId, memberId: bobMember },
             }),
           },

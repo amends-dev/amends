@@ -145,11 +145,11 @@ export class ChannelService extends Context.Service<
     readonly create: (
       input: Channel.CreateInput,
       options?: Request.Options,
-    ) => Effect.Effect<Channel.Record, CreateError, Actor.Actor>;
+    ) => Effect.Effect<Channel.Channel, CreateError, Actor.Actor>;
     /** The workspace's channels the actor may read, by name. */
-    readonly list: Effect.Effect<ReadonlyArray<Channel.Record>, ReadError, Actor.Actor>;
+    readonly list: Effect.Effect<ReadonlyArray<Channel.Channel>, ReadError, Actor.Actor>;
     /** One channel, under `channel.read`; one the actor may not read, or removed, is `NotFound`. */
-    readonly get: (channelId: Channel.Id) => Effect.Effect<Channel.Record, ReadError, Actor.Actor>;
+    readonly get: (channelId: Channel.Id) => Effect.Effect<Channel.Channel, ReadError, Actor.Actor>;
     /**
      * Send the channel's conversations to come to another group, under `channel.manage`, which the
      * actor must belong to and be able to start threads in. Bound threads stay where they are.
@@ -157,7 +157,7 @@ export class ChannelService extends Context.Service<
      */
     readonly redirect: (
       input: Channel.RedirectInput,
-    ) => Effect.Effect<Channel.Record, RedirectError, Actor.Actor>;
+    ) => Effect.Effect<Channel.Channel, RedirectError, Actor.Actor>;
     /** Stop the channel's use under `channel.manage`; its record and its threads' bindings remain. */
     readonly remove: (channelId: Channel.Id) => Effect.Effect<void, Error, Actor.Actor>;
     /**
@@ -166,12 +166,12 @@ export class ChannelService extends Context.Service<
      */
     readonly getBinding: (
       threadId: Thread.Id,
-    ) => Effect.Effect<ChannelBinding.Record, BindingError, Actor.Actor>;
+    ) => Effect.Effect<ChannelBinding.ChannelBinding, BindingError, Actor.Actor>;
   }
 >()("@amends-dev/core/channel/ChannelService") {}
 
 /** Channels by name, and by id among channels of one name. */
-const byName = (left: Channel.Record, right: Channel.Record) =>
+const byName = (left: Channel.Channel, right: Channel.Channel) =>
   left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1);
 
 /**
@@ -258,7 +258,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
         return yield* channelQuery.requireActive(channelId);
       yield* requireDestination(request.groupId);
       yield* requireUsableConnection(request.connectionId);
-      const created: Channel.Record = {
+      const created: Channel.Channel = {
         id: channelId,
         workspaceId,
         connectionId: request.connectionId,

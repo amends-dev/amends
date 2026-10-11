@@ -20,7 +20,7 @@ import * as ApiErrors from "./ApiErrors.ts";
 const workspace = { workspaceId: Workspace.Id };
 const channel = { workspaceId: Workspace.Id, channelId: Channel.Id };
 const thread = { workspaceId: Workspace.Id, threadId: Thread.Id };
-const record = Channel.Record.annotate({ identifier: "Channel" });
+const record = Channel.Channel.annotate({ identifier: "Channel" });
 /** The body an external system sends, and the answer it is given, as text: the transport reads it. */
 const text = Schema.String.pipe(HttpApiSchema.asText());
 
@@ -66,7 +66,7 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
     }),
     HttpApiEndpoint.get("binding", "/threads/:threadId/channel", {
       params: thread,
-      success: ChannelBinding.Record.annotate({ identifier: "ChannelBinding" }),
+      success: ChannelBinding.ChannelBinding.annotate({ identifier: "ChannelBinding" }),
       error: [...ApiErrors.member, ...ApiErrors.channelBinding],
     }),
   )

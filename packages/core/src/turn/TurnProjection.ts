@@ -13,7 +13,7 @@ import * as Turn from "./Turn.ts";
 /** Change the stored turn a fact names, as `changes` says of it as it stands. */
 const update = Effect.fnUntraced(function* (
   turnId: Turn.Id,
-  changes: (turn: Turn.Record) => Partial<Turn.Record>,
+  changes: (turn: Turn.Turn) => Partial<Turn.Turn>,
 ) {
   const turnStore = yield* TurnStore.TurnStore;
   const found = yield* turnStore.get(turnId);

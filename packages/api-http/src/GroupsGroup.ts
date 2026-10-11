@@ -19,8 +19,8 @@ import { limit } from "./internal/paging.ts";
 
 const group = { workspaceId: Workspace.Id, groupId: Group.Id };
 const admission = { ...group, membershipId: GroupMembership.Id };
-const record = Group.Record.annotate({ identifier: "Group" });
-const membership = GroupMembership.Record.annotate({ identifier: "GroupMembership" });
+const record = Group.Group.annotate({ identifier: "Group" });
+const membership = GroupMembership.GroupMembership.annotate({ identifier: "GroupMembership" });
 const follower = Schema.Struct({ memberId: GroupFollow.Input.fields.memberId });
 
 /**
@@ -59,7 +59,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
       payload: Group.CreateTeamInput,
-      success: Group.Record.pipe(HttpApiSchema.status(201)).annotate({
+      success: Group.Group.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedGroup",
       }),
       error: [...ApiErrors.member, ...ApiErrors.group],
@@ -70,7 +70,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
         name: Group.RenameInput.fields.name,
         expectedName: Group.RenameInput.fields.expectedName,
       }),
-      success: Group.Record,
+      success: Group.Group,
       error: [
         ...ApiErrors.member,
         ...ApiErrors.group,
@@ -97,7 +97,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
     HttpApiEndpoint.post("addMember", "/:groupId/members", {
       params: group,
       payload: Schema.Struct({ memberId: GroupMembership.AddInput.fields.memberId }),
-      success: GroupMembership.Record.pipe(HttpApiSchema.status(201)).annotate({
+      success: GroupMembership.GroupMembership.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "AddedGroupMembership",
       }),
       error: [...ApiErrors.member, ...ApiErrors.groupMembership],

@@ -20,7 +20,7 @@ import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
 const decodeRows = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Task.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
+  Schema.Array(Schema.Struct({ ...Task.Task.fields, createdAt: Schema.DateTimeUtcFromDate })),
 );
 type Row = typeof tasks.$inferSelect;
 type Insert = typeof tasks.$inferInsert;
@@ -33,7 +33,7 @@ const toRecord = ({ createdByKind, createdByMemberId, createdByContactId, ...row
       : { _tag: createdByKind, contactId: createdByContactId },
 });
 const creatorColumns = (
-  creator: Task.Record["createdBy"],
+  creator: Task.Task["createdBy"],
 ): Pick<Insert, "createdByKind" | "createdByMemberId" | "createdByContactId"> =>
   ThreadMessage.Author.isAnyOf(["Member"])(creator)
     ? { createdByKind: "Member", createdByMemberId: creator.memberId, createdByContactId: null }

@@ -50,9 +50,9 @@ const activitySchema = <const Name extends string, const Version extends number,
     ...ThreadActivity.Common.fields,
     kind: Schema.Literal(name),
     version: Schema.Literal(version),
-    subject: Subject.Value,
-    occurrence: ThreadActivity.Record.fields.occurrence,
-    newActivity: ThreadActivity.Record.fields.newActivity,
+    subject: Subject.Subject,
+    occurrence: ThreadActivity.ThreadActivity.fields.occurrence,
+    newActivity: ThreadActivity.ThreadActivity.fields.newActivity,
     details,
   });
 
@@ -79,7 +79,7 @@ export interface Definition<
   /** The activity with its details decoded, as timelines and handlers read it. */
   readonly Activity: ReturnType<typeof activitySchema<Name, Version, D>>;
   /** Pure: what the activity is about, given its details and the thread it is in. */
-  subject(details: D["Type"], threadId: ThreadId.Id): Subject.Value;
+  subject(details: D["Type"], threadId: ThreadId.Id): Subject.Subject;
   /** Pure: the activity's identity within the workspace, or null to leave it repeatable. */
   occurrence(details: D["Type"], threadId: ThreadId.Id): ReadonlyArray<string> | null;
 }
@@ -105,7 +105,7 @@ export const make = <const Name extends string, const Version extends number, D 
   options: {
     readonly version: Version;
     readonly details: D;
-    readonly subject?: (details: NoInfer<D["Type"]>) => Subject.Value;
+    readonly subject?: (details: NoInfer<D["Type"]>) => Subject.Subject;
     readonly occurrence?: (details: NoInfer<D["Type"]>) => ReadonlyArray<string> | null;
     readonly newActivity: boolean;
   },
@@ -135,7 +135,7 @@ export const make = <const Name extends string, const Version extends number, D 
  * @since 0.1.0
  */
 export interface Prepared extends Pick<
-  ThreadActivity.Record,
+  ThreadActivity.ThreadActivity,
   "kind" | "version" | "subject" | "occurrence" | "newActivity" | "details"
 > {}
 
@@ -173,7 +173,7 @@ export const prepare = Effect.fn("ThreadActivityKind.prepare")(function* <K exte
  */
 export const is =
   <K extends Definition>(kind: K) =>
-  (activity: ThreadActivity.Record): boolean =>
+  (activity: ThreadActivity.ThreadActivity): boolean =>
     activity.kind === kind.name;
 
 /**
@@ -197,7 +197,7 @@ export class Mismatch extends Schema.TaggedError<Mismatch>()("ThreadActivityKind
  */
 export const decode = Effect.fn("ThreadActivityKind.decode")(function* <K extends Definition>(
   kind: K,
-  activity: ThreadActivity.Record,
+  activity: ThreadActivity.ThreadActivity,
 ) {
   if (activity.kind !== kind.name || activity.version !== kind.version)
     return yield* new Mismatch({ kind: kind.name, version: kind.version, activityId: activity.id });
@@ -216,7 +216,7 @@ export const makeRecordUnsafe = <K extends Definition>(
   kind: K,
   common: (typeof ThreadActivity.Common)["Type"],
   details: K["details"]["Type"],
-): ThreadActivity.Record =>
+): ThreadActivity.ThreadActivity =>
   Effect.runSync(
     Effect.map(prepare(kind, details, common.threadId), (prepared) => ({
       ...common,

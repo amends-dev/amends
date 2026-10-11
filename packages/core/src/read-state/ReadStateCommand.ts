@@ -43,7 +43,7 @@ export class ReadStateCommand extends Context.Service<
      */
     readonly markThreadRead: (
       reader: ReadState.Reader,
-      thread: Thread.Record,
+      thread: Thread.Thread,
       throughSequence: number,
     ) => Effect.Effect<void, Error>;
   }
@@ -62,7 +62,7 @@ export const make = Effect.fn("ReadStateCommand.make")(function* () {
 
   const markThreadRead = Effect.fn("ReadStateCommand.markThreadRead")(function* (
     reader: ReadState.Reader,
-    thread: Thread.Record,
+    thread: Thread.Thread,
     throughSequence: number,
   ) {
     const seen = yield* notificationStore.listPendingByThread(reader, thread.id, throughSequence);

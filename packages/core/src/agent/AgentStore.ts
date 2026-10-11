@@ -53,16 +53,16 @@ export class AgentStore extends Context.Service<
   AgentStore,
   {
     /** The agent, whether or not its membership ended. */
-    readonly get: (id: Agent.Id) => Effect.Effect<Option.Option<Agent.Record>, Failure>;
+    readonly get: (id: Agent.Id) => Effect.Effect<Option.Option<Agent.Agent>, Failure>;
     /** The workspace's agents, those whose membership ended included, in no particular order. */
-    readonly list: Effect.Effect<ReadonlyArray<Agent.Record>, Failure>;
+    readonly list: Effect.Effect<ReadonlyArray<Agent.Agent>, Failure>;
     /** Reject a reused ID. Never upsert. */
     readonly insert: (
-      record: Agent.Record,
+      record: Agent.Agent,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** Replace a stored agent; a missing record conflicts. */
     readonly update: (
-      record: Agent.Record,
+      record: Agent.Agent,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/agent/store/Service") {}
@@ -83,7 +83,7 @@ export const make = (
   return {
     get: (id) => Effect.flatMap(read("get", Agent.Id, id), driver.get),
     list: driver.list,
-    insert: (record) => Effect.flatMap(write("insert", Agent.Record, record), driver.insert),
-    update: (record) => Effect.flatMap(write("update", Agent.Record, record), driver.update),
+    insert: (record) => Effect.flatMap(write("insert", Agent.Agent, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Agent.Agent, record), driver.update),
   };
 };

@@ -80,7 +80,7 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
     });
 
   /** Ready, post, and record one delivery; a retryable failure to post fails the run. */
-  const deliverOne = Effect.fnUntraced(function* (delivery: Delivery.Record) {
+  const deliverOne = Effect.fnUntraced(function* (delivery: Delivery.Delivery) {
     const start = yield* deliveryExecution((deliveryExecution) =>
       deliveryExecution.start(delivery.id),
     );

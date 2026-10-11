@@ -86,7 +86,7 @@ export class Records implements Iterable<Table> {
  */
 export interface Space {
   /** Every commit to the workspace's logs by ID, with its entry count. */
-  readonly commits: Map<string, Commit.Record>;
+  readonly commits: Map<string, Commit.Commit>;
   /** Each log's batches in position order. */
   readonly logs: Map<string, ReadonlyArray<Batch>>;
   /** Keyed append slices by log and key. */

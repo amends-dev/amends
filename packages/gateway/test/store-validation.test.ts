@@ -20,9 +20,9 @@ describe("store validation", () => {
     kind: "Workspace" | "TargetWorkspace" | "TargetMember" | "TargetThread" | "TargetGroup",
     id: Workspace.Id,
     memberId: Member.Id,
-  ): Scope.Value => {
-    if (kind === "Workspace") return Scope.Value.cases.Workspace.make({ workspaceId: id });
-    return Scope.Value.cases.Target.make({
+  ): Scope.Scope => {
+    if (kind === "Workspace") return Scope.Scope.cases.Workspace.make({ workspaceId: id });
+    return Scope.Scope.cases.Target.make({
       target:
         kind === "TargetGroup"
           ? Target.Reference.cases.Group.make({
@@ -39,14 +39,14 @@ describe("store validation", () => {
               : Target.Reference.cases.Workspace.make({ workspaceId: id }),
     });
   };
-  const source = (kind: "Role" | "Direct", scope: Scope.Value): Assignment.Source =>
+  const source = (kind: "Role" | "Direct", scope: Scope.Scope): Assignment.Source =>
     kind === "Role"
       ? Assignment.Source.cases.Role.make({ roleId, scope })
-      : Assignment.Source.cases.Direct.make({ grant: Grant.Value.make({ permission, scope }) });
+      : Assignment.Source.cases.Direct.make({ grant: Grant.Grant.make({ permission, scope }) });
   const seed = (bound: Bound) =>
     Effect.gen(function* () {
       const workspace = yield* initialized(bound);
-      const role = Role.Record.make({
+      const role = Role.Role.make({
         id: roleId,
         workspaceId,
         name: "Readers",
@@ -116,7 +116,7 @@ describe("store validation", () => {
           Effect.gen(function* () {
             const bound = yield* boundTo(workspaceId);
             const { workspace } = yield* seed(bound);
-            const record: Assignment.Record = {
+            const record: Assignment.Assignment = {
               id: Assignment.Id.make("contract-assignment"),
               workspaceId,
               memberId: workspace.ownerMemberId,
@@ -126,7 +126,7 @@ describe("store validation", () => {
                 localScope(scopeKind, otherWorkspaceId, workspace.ownerMemberId),
               ),
             };
-            const valid: Assignment.Record = {
+            const valid: Assignment.Assignment = {
               id: record.id,
               workspaceId: record.workspaceId,
               memberId: record.memberId,
@@ -159,7 +159,7 @@ describe("store validation", () => {
             const bound = yield* boundTo(workspaceId);
             const { workspace } = yield* seed(bound);
             const issuedAt = DateTime.makeUnsafe("2026-09-18T12:00:00Z");
-            const record: Invitation.Record = {
+            const record: Invitation.Invitation = {
               details: {
                 id: Invitation.Id.make("contract-invitation"),
                 workspaceId,
@@ -171,7 +171,7 @@ describe("store validation", () => {
               },
               state: { _tag: "Pending" },
             };
-            const valid: Invitation.Record = {
+            const valid: Invitation.Invitation = {
               state: record.state,
               details: {
                 ...record.details,
@@ -252,7 +252,7 @@ describe("store validation", () => {
         storage,
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId);
-          const record: Workspace.Record = {
+          const record: Workspace.Workspace = {
             id: workspaceId,
             name: "Design & Engineering",
             createdBy: Identity.HumanId.make("owner"),
@@ -292,7 +292,7 @@ describe("store validation", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId);
           yield* initialized(bound);
-          const invalid: Member.Record = {
+          const invalid: Member.Member = {
             id: Member.Id.make("contact-member"),
             workspaceId,
             status: "active",

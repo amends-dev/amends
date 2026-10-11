@@ -85,7 +85,7 @@ export class TurnCommand extends Context.Service<
       threadId: ThreadId.Id,
       kind: K,
       details: K["details"]["Type"],
-      cause: Event.Record,
+      cause: Event.Event,
     ) => Effect.Effect<void, RecordError, Store.Transaction | Publication.Publication>;
     /**
      * End a turn in the caller's commit, everywhere it is told: its fact in the journal, which lets
@@ -93,7 +93,7 @@ export class TurnCommand extends Context.Service<
      * this way.
      */
     readonly endTurn: (
-      turn: Turn.Record,
+      turn: Turn.Turn,
       ending: Ending,
     ) => Effect.Effect<void, EndError, Store.Transaction | Publication.Publication>;
     /**
@@ -102,9 +102,9 @@ export class TurnCommand extends Context.Service<
      * it has stopped. Returns the turn as it now stands. Callers give an active turn not yet asked.
      */
     readonly requestStop: (
-      turn: Turn.Record,
+      turn: Turn.Turn,
       reason: Turn.CancelReason,
-    ) => Effect.Effect<Turn.Record, EndError, Store.Transaction | Publication.Publication>;
+    ) => Effect.Effect<Turn.Turn, EndError, Store.Transaction | Publication.Publication>;
   }
 >()("@amends-dev/core/turn/command/Service") {}
 
@@ -133,7 +133,7 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
   );
 
   /** Publish the fact that ends `turn` as `ending` says, at `finishedAt`. */
-  const publishEnding = (turn: Turn.Record, ending: Ending, finishedAt: DateTime.Utc) => {
+  const publishEnding = (turn: Turn.Turn, ending: Ending, finishedAt: DateTime.Utc) => {
     const where = {
       workspaceId: turn.workspaceId,
       groupId: turn.groupId,

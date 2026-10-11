@@ -28,7 +28,7 @@ export const Created = Fact.make("channel.delivery.created", {
   occurrence: (payload) => [payload.id],
   audience,
   payload: Schema.Struct({
-    ...Delivery.Record.fields,
+    ...Delivery.Delivery.fields,
     notificationIds: Schema.NonEmptyArray(Notification.Id),
   }),
 });

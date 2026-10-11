@@ -42,7 +42,7 @@ export const appendNotice = (workspaceId: Workspace.Id, logId: string): string =
 export const sessionLogKey = (participationId: string): string =>
   JSON.stringify(["session-log", participationId]);
 
-const signalCodec = Schema.toCodecJson(Signal.Value);
+const signalCodec = Schema.toCodecJson(Signal.Signal);
 const encodeSignal = Schema.encodeEffect(signalCodec);
 const decodeSignal = Schema.decodeUnknownEffect(signalCodec);
 
@@ -89,14 +89,14 @@ export interface PostgresNotices {
    */
   readonly notifyAppend: (workspaceId: Workspace.Id, logId: string) => Effect.Effect<void>;
   /** Publish a signal to its workspace's subscribers in every pool, best effort. */
-  readonly publishSignal: (signal: Signal.Value) => Effect.Effect<void>;
+  readonly publishSignal: (signal: Signal.Signal) => Effect.Effect<void>;
   /**
    * A workspace's signals from every pool, from now until the scope closes; a subscriber that
    * falls behind misses the oldest. Keeps the pool listening.
    */
   readonly subscribeSignals: (
     workspaceId: Workspace.Id,
-  ) => Effect.Effect<Stream.Stream<Signal.Value>, never, Scope.Scope>;
+  ) => Effect.Effect<Stream.Stream<Signal.Signal>, never, Scope.Scope>;
 }
 
 /**
@@ -185,7 +185,7 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
     return appended;
   };
 
-  const publishSignal = (signal: Signal.Value) =>
+  const publishSignal = (signal: Signal.Signal) =>
     encodeSignal(signal).pipe(
       Effect.flatMap((encoded) =>
         client.notify(channel, JSON.stringify(["signal", signal.workspaceId, encoded])),

@@ -54,26 +54,28 @@ export class GroupFollowStore extends Context.Service<
   GroupFollowStore,
   {
     /** The follow, active or ended, if stored. */
-    readonly get: (id: GroupFollow.Id) => Effect.Effect<Option.Option<GroupFollow.Record>, Failure>;
+    readonly get: (
+      id: GroupFollow.Id,
+    ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, Failure>;
     /** The active follow of one group admission; None when that admission follows nothing. */
     readonly findActive: (
       groupMembershipId: GroupMembership.Id,
-    ) => Effect.Effect<Option.Option<GroupFollow.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, Failure>;
     /** The active follows of several admissions in one read; admissions without one are omitted. */
     readonly findActiveMany: (
       groupMembershipIds: ReadonlyArray<GroupMembership.Id>,
-    ) => Effect.Effect<ReadonlyArray<GroupFollow.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, Failure>;
     /** Active follows of a group, in stable ID order, which `ThreadQuery.followers` reads. */
     readonly listActiveByGroup: (
       groupId: GroupId.Id,
-    ) => Effect.Effect<ReadonlyArray<GroupFollow.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, Failure>;
     /**
      * Insert an active follow. Reject reused IDs and a second active follow for one admission. The
      * admission is recorded as given: the application checks that it is current and belongs to the
      * group and member.
      */
     readonly insert: (
-      record: GroupFollow.Record,
+      record: GroupFollow.GroupFollow,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** End exactly the addressed active follow; mismatched or ended follows conflict. */
     readonly end: (
@@ -108,7 +110,7 @@ export const make = (
     listActiveByGroup: (groupId) =>
       Effect.flatMap(read("listActiveByGroup", GroupId.Id, groupId), driver.listActiveByGroup),
     insert: (record) =>
-      write("insert", GroupFollow.Record, record).pipe(
+      write("insert", GroupFollow.GroupFollow, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active" && record.endedAt === null,
           () => new Conflict({ operation: "insert", message: "Expected an active follow" }),

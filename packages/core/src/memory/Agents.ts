@@ -13,7 +13,7 @@ import type * as MemoryDatabase from "./MemoryDatabase.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Agent.Record));
+const rows = Rows.make(Schema.fromJsonString(Agent.Agent));
 
 /**
  * Agent records over the current workspace transaction.
@@ -26,7 +26,7 @@ export const make = Effect.fn("Agents.make")(function* () {
   /** Fails when another agent than `record` has its membership, as PostgreSQL's unique index does. */
   const requireOwnMembership = (
     operation: string,
-    record: Agent.Record,
+    record: Agent.Agent,
     space: MemoryDatabase.Space,
   ) =>
     Effect.gen(function* () {

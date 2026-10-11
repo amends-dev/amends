@@ -55,7 +55,7 @@ export interface NameChange extends Schema.Schema.Type<typeof NameChange> {}
  * @since 0.1.0
  */
 export const View = Schema.Struct({
-  workspace: Workspace.Record,
+  workspace: Workspace.Workspace,
   /** Whether the actor holds `workspace.rename`. */
   canRename: Schema.Boolean,
   /** Whether the actor holds `invitation.manage`, which listing invitations needs. */
@@ -80,7 +80,7 @@ export interface View extends Schema.Schema.Type<typeof View> {}
  * @since 0.1.0
  */
 export const MemberEntry = Schema.Struct({
-  member: Member.Record,
+  member: Member.Member,
   /**
    * The member's assignments and whether the actor may change them; null when the actor may not
    * read them.

@@ -58,8 +58,8 @@ const target = (
  * @category utils
  * @since 0.1.0
  */
-export const encode = (scope: Scope.Value): Columns =>
-  Scope.Value.match(scope, {
+export const encode = (scope: Scope.Scope): Columns =>
+  Scope.Scope.match(scope, {
     Workspace: (): Columns =>
       Object.assign({ scopeKind: "Workspace" as const, targetKind: null }, none),
     Target: (value): Columns =>

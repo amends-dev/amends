@@ -32,7 +32,7 @@ export interface Definition<
   /** What the fact records, encoded to bytes by `Codec.make`. */
   readonly payload: PayloadSchema;
   /** Pure, deterministic entity identity, derived from the validated payload. */
-  subject(payload: PayloadSchema["Type"]): Subject.Value;
+  subject(payload: PayloadSchema["Type"]): Subject.Subject;
   /** Pure, deterministic identity of this occurrence; null leaves this payload repeatable. */
   occurrence?(payload: PayloadSchema["Type"]): ReadonlyArray<string> | null;
   /**
@@ -67,7 +67,7 @@ export const make = <
   options: {
     readonly version: Version;
     readonly payload: PayloadSchema;
-    readonly subject: (payload: NoInfer<PayloadSchema["Type"]>) => Subject.Value;
+    readonly subject: (payload: NoInfer<PayloadSchema["Type"]>) => Subject.Subject;
     readonly occurrence?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<string> | null;
     readonly audience?: (payload: NoInfer<PayloadSchema["Type"]>) => ReadonlyArray<Audience.Scope>;
   },
@@ -101,7 +101,7 @@ export const makeOccurrenceKey = Effect.fn("Fact.makeOccurrenceKey")(function* <
 
 /**
  * The subject `fact` declares for `payload`, after checking the payload against the fact's schema
- * and the subject against `Subject.Value`.
+ * and the subject against `Subject.Subject`.
  *
  * @category constructors
  * @since 0.1.0
@@ -111,12 +111,12 @@ export const makeSubject = Effect.fn("Fact.makeSubject")(function* <F extends De
   payload: Payload<NoInfer<F>>,
 ) {
   const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
-  return yield* Schema.decodeEffect(Subject.Value)(fact.subject(validated));
+  return yield* Schema.decodeEffect(Subject.Subject)(fact.subject(validated));
 });
 
 /**
  * The audience `fact` declares for `payload`, after checking the payload against the fact's schema
- * and the scopes against `Audience.Value`, which requires them distinct. A fact that declares none
+ * and the scopes against `Audience.Audience`, which requires them distinct. A fact that declares none
  * is internal: `Audience.internal`.
  *
  * @category constructors
@@ -128,5 +128,5 @@ export const makeAudience = Effect.fn("Fact.makeAudience")(function* <F extends 
 ) {
   if (fact.audience === undefined) return Audience.internal;
   const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
-  return yield* Schema.decodeEffect(Audience.Value)(fact.audience(validated));
+  return yield* Schema.decodeEffect(Audience.Audience)(fact.audience(validated));
 });

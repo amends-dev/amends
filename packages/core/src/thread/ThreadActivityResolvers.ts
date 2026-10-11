@@ -50,8 +50,8 @@ export type Error = Failure;
 export interface Resolver {
   readonly kinds: ReadonlyArray<ThreadActivityKind.Definition>;
   readonly resolve: (
-    thread: Thread.Record,
-    activities: ReadonlyArray<ThreadActivity.Record>,
+    thread: Thread.Thread,
+    activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Failure>;
 }
 
@@ -68,8 +68,8 @@ export class ThreadActivityResolvers extends Context.Service<
   {
     /** Resolve a thread's activities of any registered kinds, in their order. */
     readonly resolve: (
-      thread: Thread.Record,
-      activities: ReadonlyArray<ThreadActivity.Record>,
+      thread: Thread.Thread,
+      activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
     ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Error>;
   }
 >()("@amends-dev/core/thread/ThreadActivityResolvers") {}
@@ -90,10 +90,10 @@ export const make = Effect.fn("ThreadActivityResolvers.make")(function* (
       byKind.set(kind.name, resolver);
     }
   const resolve = Effect.fn("ThreadActivityResolvers.resolve")(function* (
-    thread: Thread.Record,
-    activities: ReadonlyArray<ThreadActivity.Record>,
+    thread: Thread.Thread,
+    activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
-    const batches = new Map<Resolver, Array<ThreadActivity.Record>>();
+    const batches = new Map<Resolver, Array<ThreadActivity.ThreadActivity>>();
     for (const activity of activities) {
       const resolver = byKind.get(activity.kind);
       if (resolver === undefined) return yield* Effect.die(new Unknown({ kind: activity.kind }));

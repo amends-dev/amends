@@ -170,7 +170,7 @@ export type Content = typeof Content.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const ThreadMessage = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
@@ -185,7 +185,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface ThreadMessage extends Schema.Schema.Type<typeof ThreadMessage> {}
 
 /**
  * The content a message is published with: its text and mentions at revision 1.

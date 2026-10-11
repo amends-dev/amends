@@ -1,6 +1,6 @@
 /**
  * What a signal is: something happening now, told to the readers connected at the time and never
- * stored. `Value` is the kinds a workspace publishes through its `SignalHub`, and
+ * stored. `Signal` is the kinds a workspace publishes through its `SignalHub`, and
  * `changeFeedReachOf` says whom each reaches on the change feed, which `ChangeFeedService` checks
  * before it forwards one.
  *
@@ -27,7 +27,7 @@ import * as MemberId from "../workspace/MemberId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Value = Schema.TaggedUnion({
+export const Signal = Schema.TaggedUnion({
   /** A member is composing a message in a thread; readers show it until `until`. */
   Typing: {
     workspaceId: WorkspaceId.Id,
@@ -77,7 +77,7 @@ export const Value = Schema.TaggedUnion({
  * @category schemas
  * @since 0.1.0
  */
-export type Value = typeof Value.Type;
+export type Signal = typeof Signal.Type;
 
 /**
  * Who may receive a signal: its scopes, and any read permission a reader also needs.
@@ -86,8 +86,8 @@ export type Value = typeof Value.Type;
  * @since 0.1.0
  */
 export interface Reach {
-  readonly audience: Audience.Value;
-  readonly requirement: Requirement.Value | undefined;
+  readonly audience: Audience.Audience;
+  readonly requirement: Requirement.Requirement | undefined;
 }
 
 /** Readers of a thread: its group's audience, who may read the thread. */
@@ -112,8 +112,8 @@ const threadReaders = (signal: {
  * @category utils
  * @since 0.1.0
  */
-export const changeFeedReachOf = (signal: Value): Reach | undefined =>
-  Value.match(signal, {
+export const changeFeedReachOf = (signal: Signal): Reach | undefined =>
+  Signal.match(signal, {
     Typing: threadReaders,
     TurnDraft: () => undefined,
     ThreadRead: ({ memberId }): Reach => ({

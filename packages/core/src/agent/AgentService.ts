@@ -188,7 +188,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     Target.Reference.cases.Connection.make({ workspaceId, connectionId });
 
   /** Whether the agent can run as it is set up, as the host's integrations find its connections. */
-  const readinessOf = (record: Agent.Record, connections: AgentReadiness.Connections) =>
+  const readinessOf = (record: Agent.Agent, connections: AgentReadiness.Connections) =>
     Effect.map(
       AgentReadiness.issuesOf(record, connections, integrations),
       AgentReadiness.readinessOf,
@@ -221,7 +221,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
   });
 
   /** The agent as the actor sees it, including whether they may configure and direct it. */
-  const viewForActor = Effect.fnUntraced(function* (record: Agent.Record, name: Member.Name) {
+  const viewForActor = Effect.fnUntraced(function* (record: Agent.Agent, name: Member.Name) {
     const [configurable = false, usable = false] = yield* authorization.permitted([
       Requirement.make(AgentPermissions.Configure, memberTarget(record.memberId)),
       Requirement.make(AgentPermissions.Use, memberTarget(record.memberId)),
@@ -262,7 +262,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     const records = yield* agentStore.list;
     const members = yield* memberStore.getMany(records.map((record) => record.memberId));
     const membersById = new Map(members.map((member) => [member.id, member]));
-    const active: Array<{ readonly record: Agent.Record; readonly name: Member.Name }> = [];
+    const active: Array<{ readonly record: Agent.Agent; readonly name: Member.Name }> = [];
     for (const record of records) {
       const member = membersById.get(record.memberId);
       if (member?.status === "active") active.push({ record, name: member.name });
@@ -329,7 +329,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
         roleId: request.roleId,
         joinedAt,
       });
-      const created: Agent.Record = {
+      const created: Agent.Agent = {
         id: agentId,
         workspaceId,
         memberId: member.id,

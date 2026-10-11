@@ -17,10 +17,10 @@ import * as Binding from "./Binding.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
 import { channelBindings } from "./internal/schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(ChannelBinding.Record));
+const validateRecord = Schema.decodeEffect(Schema.toType(ChannelBinding.ChannelBinding));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...ChannelBinding.Record.fields, boundAt: Schema.DateTimeUtcFromDate }),
+    Schema.Struct({ ...ChannelBinding.ChannelBinding.fields, boundAt: Schema.DateTimeUtcFromDate }),
   ),
 );
 type Row = typeof channelBindings.$inferSelect;

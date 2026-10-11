@@ -95,16 +95,16 @@ export class Delegation extends Context.Service<
      * a workspace-wide grant; one it does not declare is kept and grants nothing. Any other role
      * is `UnsupportedRole`.
      */
-    readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error>;
+    readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Role, Error>;
     /** The member's active assignments, by role and direct grant alike. */
     readonly assignmentsFor: (
       memberId: Member.Id,
-    ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Error>;
+    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, Error>;
     /**
      * The role the actor may give, under `assignment.manage` on the workspace. Owner is never given
      * here, and only the current owner gives Administrator.
      */
-    readonly requireGrant: (roleId: Role.Id) => Effect.Effect<Role.Record, Error, Actor.Actor>;
+    readonly requireGrant: (roleId: Role.Id) => Effect.Effect<Role.Role, Error, Actor.Actor>;
     /**
      * That the actor may change this member's roles, by `recipientDenial`. The caller checks the
      * operation's own permission; the owner is always protected.
@@ -154,7 +154,7 @@ export const recipientNeedsAssignments = (recipient: Recipient) =>
  */
 export const recipientDenial = (
   recipient: Recipient,
-  assignments: ReadonlyArray<Assignment.Record>,
+  assignments: ReadonlyArray<Assignment.Assignment>,
 ): OwnerProtected | Denied | undefined => {
   if (recipient.memberId === recipient.ownerId)
     return new OwnerProtected({ workspaceId: recipient.workspaceId });

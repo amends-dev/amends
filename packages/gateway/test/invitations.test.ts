@@ -303,7 +303,7 @@ describe("invitations", () => {
           });
           const memberId = Member.Id.make("joined");
           const settledAt = DateTime.add(issuedAt, { minutes: 5 });
-          const pending = (id: string, roleId = BuiltinRoles.MemberId): Invitation.Record => ({
+          const pending = (id: string, roleId = BuiltinRoles.MemberId): Invitation.Invitation => ({
             details: details(id, roleId),
             state: { _tag: "Pending" },
           });

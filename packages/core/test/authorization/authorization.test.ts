@@ -35,41 +35,41 @@ import { make, type Fixture } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
-const alice = Actor.Value.make({
+const alice = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") }),
 });
-const bob = Actor.Value.make({
+const bob = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("bob"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
 });
-const charlie = Actor.Value.make({
+const charlie = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("charlie"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("charlie") }),
 });
-const agent = Actor.Value.make({
+const agent = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("agent"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") }),
 });
-const membership = (actor: Actor.Value) =>
-  Member.Record.make({
+const membership = (actor: Actor.Actor["Service"]) =>
+  Member.Member.make({
     id: actor.memberId,
     workspaceId: actor.workspaceId,
     identity: actor.identity,
     name: Member.Name.make(actor.identity.id),
     status: "active",
   });
-const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
+const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId });
 const bobTarget = Target.Reference.cases.Member.make({ workspaceId, memberId: bob.memberId });
 const charlieTarget = Target.Reference.cases.Member.make({
   workspaceId,
   memberId: charlie.memberId,
 });
-const bobScope = Scope.Value.cases.Target.make({ target: bobTarget });
+const bobScope = Scope.Scope.cases.Target.make({ target: bobTarget });
 const readBob = Requirement.make(MemberPermissions.Read, bobTarget);
 const removeBob = Requirement.make(MemberPermissions.Remove, bobTarget);
 const readCharlie = Requirement.make(MemberPermissions.Read, charlieTarget);
@@ -84,9 +84,9 @@ const direct = (
   id: string,
   recipient: Member.Id,
   permission: Permission.Definition,
-  scope: Scope.Value = workspaceScope,
+  scope: Scope.Scope = workspaceScope,
 ) =>
-  Assignment.Record.make({
+  Assignment.Assignment.make({
     id: Assignment.Id.make(id),
     workspaceId,
     memberId: recipient,
@@ -117,14 +117,14 @@ const configured = (fixture: Fixture, overrides: Overrides = {}) =>
     Layer.provide(dependencies(fixture, overrides)),
   );
 const check = Effect.fn("AuthorizationTest.check")(function* (
-  requirements: ReadonlyArray<Requirement.Value>,
+  requirements: ReadonlyArray<Requirement.Requirement>,
 ) {
   yield* (yield* Authorization.Authorization).require(requirements);
 });
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<A, E, Authorization.Authorization | Actor.Actor>,
-  actor: Actor.Value = alice,
+  actor: Actor.Actor["Service"] = alice,
   overrides: Overrides = {},
 ) =>
   program.pipe(
@@ -133,9 +133,9 @@ const run = <A, E>(
   );
 const seed = (
   fixture: Fixture,
-  actors: ReadonlyArray<Actor.Value>,
-  assignments: ReadonlyArray<Assignment.Record> = [],
-  roles: ReadonlyArray<Role.Record> = [],
+  actors: ReadonlyArray<Actor.Actor["Service"]>,
+  assignments: ReadonlyArray<Assignment.Assignment> = [],
+  roles: ReadonlyArray<Role.Role> = [],
 ) =>
   fixture.store.transaction(
     Effect.gen(function* () {
@@ -227,7 +227,7 @@ it.effect("authorization requires a matching permission and scope for the actual
           "create",
           alice.memberId,
           Create,
-          Scope.Value.cases.Target.make({ target: workspaceTarget }),
+          Scope.Scope.cases.Target.make({ target: workspaceTarget }),
         ),
       ],
     );
@@ -246,7 +246,7 @@ it.effect("every requirement must be satisfied across role and direct assignment
       fixture,
       [alice],
       [
-        Assignment.Record.make({
+        Assignment.Assignment.make({
           id: Assignment.Id.make("role"),
           workspaceId,
           memberId: alice.memberId,
@@ -285,7 +285,7 @@ it.effect("permitted reports each requirement in order without failing on denial
         direct("remove-bob", alice.memberId, MemberPermissions.Remove, bobScope),
       ],
     );
-    const permitted = (requirements: ReadonlyArray<Requirement.Value>) =>
+    const permitted = (requirements: ReadonlyArray<Requirement.Requirement>) =>
       Effect.flatMap(Authorization.Authorization, (authorization) =>
         authorization.permitted(requirements),
       );
@@ -379,7 +379,7 @@ it.effect("acting identity must match both the membership's identity kind and ID
       agent.identity,
     ];
     for (const identity of wrongIdentities) {
-      const mismatched = Actor.Value.make({ workspaceId, memberId: alice.memberId, identity });
+      const mismatched = Actor.Actor.of({ workspaceId, memberId: alice.memberId, identity });
       expect(yield* run(fixture, Effect.flip(check([removeBob])), mismatched)).toMatchObject({
         _tag: "Authorization.InvalidActor",
         reason: "identity-mismatch",
@@ -397,7 +397,7 @@ it.effect("an actor or a target from another workspace is refused", () =>
       expectedWorkspaceId: workspaceId,
       actualWorkspaceId: foreignWorkspaceId,
     };
-    const foreignActor = Actor.Value.make({
+    const foreignActor = Actor.Actor.of({
       workspaceId: foreignWorkspaceId,
       memberId: alice.memberId,
       identity: alice.identity,
@@ -433,7 +433,7 @@ it.effect("requirements are validated against canonical permission definitions",
       builtinTier: "administrator",
     });
     const wrongKind = Requirement.make(wrongDefinition, workspaceTarget);
-    const malformed: Requirement.Value = {
+    const malformed: Requirement.Requirement = {
       permission: MemberPermissions.Remove,
       target: workspaceTarget,
     };
@@ -454,7 +454,7 @@ it.effect(
         fixture,
         [alice, bob, charlie],
         [
-          Assignment.Record.make({
+          Assignment.Assignment.make({
             id: assignmentId,
             workspaceId,
             memberId: alice.memberId,
@@ -604,7 +604,7 @@ it.effect(
         [alice],
         [
           direct("read", alice.memberId, MemberPermissions.Read),
-          Assignment.Record.make({
+          Assignment.Assignment.make({
             id: Assignment.Id.make("by-role"),
             workspaceId,
             memberId: alice.memberId,

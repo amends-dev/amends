@@ -12,7 +12,7 @@ import * as Binding from "./Binding.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Assignment.Record));
+const rows = Rows.make(Schema.fromJsonString(Assignment.Assignment));
 
 /**
  * Access assigned to memberships, by role or directly; revoked rows keep their source.
@@ -22,7 +22,7 @@ const rows = Rows.make(Schema.fromJsonString(Assignment.Record));
  */
 export const make = Effect.fn("Assignments.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
-  const select = (operation: string, predicate: (record: Assignment.Record) => boolean) =>
+  const select = (operation: string, predicate: (record: Assignment.Assignment) => boolean) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("assignments"))).pipe(
       Effect.map((records) => records.filter(predicate)),
       Effect.mapError(storeFailure(AssignmentStore, operation)),

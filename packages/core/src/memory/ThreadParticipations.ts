@@ -21,9 +21,11 @@ import { compareBinary } from "./Rows.ts";
  * @category utils
  * @since 0.1.0
  */
-export const rows = Rows.make(Schema.fromJsonString(ThreadParticipation.Record));
-const byId = (left: ThreadParticipation.Record, right: ThreadParticipation.Record) =>
-  compareBinary(left.id, right.id);
+export const rows = Rows.make(Schema.fromJsonString(ThreadParticipation.ThreadParticipation));
+const byId = (
+  left: ThreadParticipation.ThreadParticipation,
+  right: ThreadParticipation.ThreadParticipation,
+) => compareBinary(left.id, right.id);
 
 /**
  * Participations over the current workspace transaction, which `ThreadParticipationProjection`

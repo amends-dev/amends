@@ -33,7 +33,7 @@ const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
         : { _tag: "Direct", grant: { permission: row.permission, scope } },
   };
 };
-const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Record));
+const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Assignment));
 
 /**
  * Builds the assignment store for the binding's workspace: this module's driver inside

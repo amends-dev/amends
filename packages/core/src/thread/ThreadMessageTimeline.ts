@@ -23,7 +23,7 @@ import * as ThreadMessageStore from "./ThreadMessageStore.ts";
  */
 export const PublishedItem = Schema.Struct({
   activity: ThreadMessageActivity.Published.Activity,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
 });
 
 /**
@@ -40,7 +40,7 @@ export interface PublishedItem extends Schema.Schema.Type<typeof PublishedItem> 
  */
 export const EditedItem = Schema.Struct({
   activity: ThreadMessageActivity.Edited.Activity,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
 });
 
 /**
@@ -57,7 +57,7 @@ export interface EditedItem extends Schema.Schema.Type<typeof EditedItem> {}
  */
 export const DeletedItem = Schema.Struct({
   activity: ThreadMessageActivity.Deleted.Activity,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
 });
 
 /**
@@ -81,7 +81,7 @@ declare module "./ThreadActivityKind.ts" {
 }
 
 const decode = (
-  activity: ThreadActivity.Record,
+  activity: ThreadActivity.ThreadActivity,
 ): Effect.Effect<
   ThreadMessageActivity.Published | ThreadMessageActivity.Edited | ThreadMessageActivity.Deleted,
   ThreadActivityKind.Mismatch | Schema.SchemaError
@@ -101,8 +101,8 @@ const decode = (
 export const resolver = Effect.gen(function* () {
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
   const resolve = Effect.fn("ThreadMessageTimeline.resolve")(function* (
-    _thread: Thread.Record,
-    listed: ReadonlyArray<ThreadActivity.Record>,
+    _thread: Thread.Thread,
+    listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
     const activities = yield* Effect.orDie(Effect.forEach(listed, (activity) => decode(activity)));
     const rows = yield* threadMessageStore

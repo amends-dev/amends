@@ -192,23 +192,23 @@ export const journal = (fixture: Fixture) => {
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const workspace = yield* initialized(bound);
-            const owner = Actor.Value.make({
+            const owner = Actor.Actor.of({
               workspaceId,
               memberId: workspace.ownerMemberId,
               identity: alice,
             });
-            const human = Actor.Value.make({
+            const human = Actor.Actor.of({
               workspaceId,
               memberId: Member.Id.make("human"),
               identity: bob,
             });
-            const agent = Actor.Value.make({
+            const agent = Actor.Actor.of({
               workspaceId,
               memberId: Member.Id.make("agent"),
               identity: { _tag: "Agent", id: Identity.AgentId.make("agent") },
             });
             yield* seed(bound, [human, agent], [human, agent]);
-            const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
+            const as = <A, E, R>(actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
               program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
             // History that every projection records something from.
             const group = yield* as(

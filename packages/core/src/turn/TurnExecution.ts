@@ -140,7 +140,7 @@ export type CloseError =
 export const Start = Schema.TaggedUnion({
   Idle: {},
   Ready: {
-    turn: Turn.Record,
+    turn: Turn.Turn,
     runnable: AgentQuery.Runnable,
     /**
      * The prompt: the thread as it stands, then what told the agent since it was last prompted,
@@ -203,7 +203,7 @@ export class TurnExecution extends Context.Service<
     readonly accept: (
       memberId: Member.Id,
       threadId: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<Turn.Record>, AcceptError>;
+    ) => Effect.Effect<Option.Option<Turn.Turn>, AcceptError>;
     /**
      * Start the turn: one asked to stop, or whose participation ended, ends as it stands; one that
      * cannot run on what `AgentQuery` selects for it, kept when it runs again, fails; and one with
@@ -331,7 +331,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   /** Run `step` with the turn as stored, in its own commit, as the turn's agent. */
   const asTurnAgent = <A, E, R>(
     turnId: Turn.Id,
-    step: (turn: Turn.Record) => Effect.Effect<A, E, R>,
+    step: (turn: Turn.Turn) => Effect.Effect<A, E, R>,
   ) =>
     Effect.flatMap(requireTurn(turnId), (turn) =>
       attributed(
@@ -342,16 +342,16 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     ).pipe(Effect.provideService(Crypto.Crypto, crypto), journal.commit);
 
   /** Why the turn was asked to stop; `requested` when the record predates the request. */
-  const reasonAskedToStop = (turn: Turn.Record) => turn.cancelReason ?? "requested";
+  const reasonAskedToStop = (turn: Turn.Turn) => turn.cancelReason ?? "requested";
 
   /** Whether the participation the turn's input came through has ended. */
-  const hasDeparted = Effect.fnUntraced(function* (turn: Turn.Record) {
+  const hasDeparted = Effect.fnUntraced(function* (turn: Turn.Turn) {
     const participation = yield* threadParticipationStore.get(turn.participationId);
     return Option.isNone(participation) || participation.value.status !== "active";
   });
 
   /** The participation the turn's input came through, which outlasts it. */
-  const requireParticipation = Effect.fnUntraced(function* (turn: Turn.Record) {
+  const requireParticipation = Effect.fnUntraced(function* (turn: Turn.Turn) {
     const participation = yield* threadParticipationStore.get(turn.participationId);
     if (Option.isNone(participation)) return yield* Effect.die("A turn's participation is missing");
     return participation.value;
@@ -360,7 +360,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   // TODO: Keep a turn `suspendTurn` left unfinished, which the next run continues, once the turn
   // job suspends turns; the session log has its prompt and the steps it finished.
   /** Keep what the agent's next turn in the thread resumes the session from. */
-  const saveSession = (turn: Turn.Record, resume: SessionStateStore.Resume) =>
+  const saveSession = (turn: Turn.Turn, resume: SessionStateStore.Resume) =>
     turn.selection === null
       ? Effect.die("A turn that ran a session has no selection")
       : sessionStateStore.set(turn.participationId, {
@@ -452,7 +452,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
    * the timeline.
    */
   const readTold = Effect.fnUntraced(function* (
-    turn: Turn.Record,
+    turn: Turn.Turn,
     range: { readonly after: number; readonly through: number },
   ) {
     if (range.through < 1 || range.after >= range.through) return [];
@@ -564,14 +564,14 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   /** End `turn` as it stands, so its job has nothing to run: `Idle`. */
-  const endAsIdle = (turn: Turn.Record, ending: TurnCommand.Ending) =>
+  const endAsIdle = (turn: Turn.Turn, ending: TurnCommand.Ending) =>
     Effect.as(turnCommand.endTurn(turn, ending), Start.cases.Idle.make({}));
 
   /**
    * End `turn` stopped for `cancelReason`, keeping what its session resumes from, if it ran one.
    */
   const endStopped = Effect.fnUntraced(function* (
-    turn: Turn.Record,
+    turn: Turn.Turn,
     cancelReason: Turn.CancelReason,
     resume: SessionStateStore.Resume | undefined,
   ) {
@@ -580,7 +580,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   /** What `turn` runs on: its selection once started, and otherwise what is selected now. */
-  const selectionOf = Effect.fnUntraced(function* (turn: Turn.Record) {
+  const selectionOf = Effect.fnUntraced(function* (turn: Turn.Turn) {
     if (turn.selection !== null) return turn.selection;
     const saved = yield* sessionStateStore.get(turn.participationId);
     return yield* agentQuery.select(
@@ -612,7 +612,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
    * or end it at once when it has nothing to tell the agent. Starting a queued turn records it.
    */
   const readyTurn = Effect.fnUntraced(function* (
-    turn: Turn.Record,
+    turn: Turn.Turn,
     selection: Agent.Selection,
     runnable: AgentQuery.Runnable,
   ) {
@@ -750,7 +750,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
    * The participants the agent's reply in the turn's thread goes to, or why it cannot post there
    * now.
    */
-  const readReplyParticipants = Effect.fnUntraced(function* (turn: Turn.Record) {
+  const readReplyParticipants = Effect.fnUntraced(function* (turn: Turn.Turn) {
     const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
       Effect.asSome,
       Effect.catchTags({
@@ -779,7 +779,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   /** End `turn` failed for `reason`, as closing reports it. */
-  const closeFailed = (turn: Turn.Record, reason: string) =>
+  const closeFailed = (turn: Turn.Turn, reason: string) =>
     Effect.as(
       turnCommand.endTurn(turn, { outcome: "failed", reason }),
       Closing.cases.Failed.make({ reason }),

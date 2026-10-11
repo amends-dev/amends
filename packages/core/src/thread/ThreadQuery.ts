@@ -48,8 +48,8 @@ export class NotFound extends Schema.TaggedError<NotFound>()("ThreadQuery.NotFou
  * @since 0.1.0
  */
 export interface Eligible {
-  readonly admission: GroupMembership.Record;
-  readonly member: Member.Record;
+  readonly admission: GroupMembership.GroupMembership;
+  readonly member: Member.Member;
 }
 
 /**
@@ -123,7 +123,7 @@ export interface ListOptions<R, Cursor, E> {
   readonly first: Cursor | undefined;
   /** At most `limit` rows after the cursor, in the page's order. */
   readonly list: (before: Cursor | undefined) => Effect.Effect<ReadonlyArray<R>, E>;
-  readonly threadOf: (row: R) => Thread.Record;
+  readonly threadOf: (row: R) => Thread.Thread;
   /** The cursor after a listed row, given the row's thread's latest activity. */
   readonly cursorOf: (row: R, latest: Thread.Latest) => Cursor;
 }
@@ -145,12 +145,12 @@ export class ThreadQuery extends Context.Service<
      */
     readonly requireAccess: (
       threadId: Thread.Id,
-    ) => Effect.Effect<Thread.Record, AccessError, Actor.Actor>;
+    ) => Effect.Effect<Thread.Thread, AccessError, Actor.Actor>;
 
     /** The thread, under its audience and `thread.read`, as every read of its conversation needs. */
     readonly requireReadable: (
       threadId: Thread.Id,
-    ) => Effect.Effect<Thread.Record, AccessError, Actor.Actor>;
+    ) => Effect.Effect<Thread.Thread, AccessError, Actor.Actor>;
     /**
      * Those of the given members with a current admission to the group and active workspace
      * membership, with both records. Reads only the members asked about.
@@ -171,24 +171,24 @@ export class ThreadQuery extends Context.Service<
      * group admission. Read in pages; a reply that addresses everyone needs them all.
      */
     readonly currentParticipants: (
-      thread: Thread.Record,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, ParticipantsError>;
+      thread: Thread.Thread,
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, ParticipantsError>;
     /**
      * A page of current participants in participation-ID order after the cursor. Stored
      * participants that have lapsed are skipped, and reading continues to fill the page.
      */
     readonly pageParticipants: (
-      thread: Thread.Record,
+      thread: Thread.Thread,
       options: ThreadParticipation.ListOptions,
     ) => Effect.Effect<
-      ReadonlyArray<ThreadParticipation.Record>,
+      ReadonlyArray<ThreadParticipation.ThreadParticipation>,
       ParticipantsError | Schema.SchemaError
     >;
     /** The current participations of these participants, reading only them. */
     readonly findParticipants: (
-      thread: Thread.Record,
+      thread: Thread.Thread,
       participants: ReadonlyArray<ThreadParticipation.Reference>,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, ParticipantsError>;
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, ParticipantsError>;
     /**
      * Fill a page with a group's threads the actor can read, from the rows `options.list` gives in
      * the page's order, reading further when grants skip some: each thread with its task, if any,
@@ -296,7 +296,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
    * access, and members need their admission and workspace membership to be active.
    */
   const keepCurrent = Effect.fnUntraced(function* (
-    rows: ReadonlyArray<ThreadParticipation.Record>,
+    rows: ReadonlyArray<ThreadParticipation.ThreadParticipation>,
   ) {
     const members = rows.flatMap(({ participant }) =>
       ThreadParticipation.Participant.isAnyOf(["Member"])(participant) ? [participant] : [],
@@ -315,7 +315,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
 
   /** Read one page of stored active participations: those current, and the cursor after it. */
   const readParticipationPage = Effect.fnUntraced(function* (
-    thread: Thread.Record,
+    thread: Thread.Thread,
     options: ThreadParticipation.ListOptions,
   ) {
     const rows = yield* threadParticipationStore.pageActiveByThread(thread.id, options);
@@ -329,9 +329,9 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   /** Store pages a whole-thread read takes at a time. */
   const pageSize = 500;
   const currentParticipants = Effect.fn("ThreadQuery.currentParticipants")(function* (
-    thread: Thread.Record,
+    thread: Thread.Thread,
   ) {
-    const result: Array<ThreadParticipation.Record> = [];
+    const result: Array<ThreadParticipation.ThreadParticipation> = [];
     let after: ThreadParticipation.Id | undefined;
     do {
       const read = yield* readParticipationPage(
@@ -345,13 +345,13 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   });
 
   const pageParticipants = Effect.fn("ThreadQuery.pageParticipants")(function* (
-    thread: Thread.Record,
+    thread: Thread.Thread,
     request: ThreadParticipation.ListOptions,
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.ListOptions))(
       request,
     );
-    const result: Array<ThreadParticipation.Record> = [];
+    const result: Array<ThreadParticipation.ThreadParticipation> = [];
     let after = options.after;
     do {
       const read = yield* readParticipationPage(
@@ -366,7 +366,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   });
 
   const findParticipants = Effect.fn("ThreadQuery.findParticipants")(function* (
-    thread: Thread.Record,
+    thread: Thread.Thread,
     references: ReadonlyArray<ThreadParticipation.Reference>,
   ) {
     if (references.length === 0) return [];

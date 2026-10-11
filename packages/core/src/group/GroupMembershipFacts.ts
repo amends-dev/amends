@@ -25,7 +25,10 @@ export const Added = Fact.make("group.membership.added", {
   version: 1,
   subject: (payload) => Subject.make("group-membership", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Schema.Struct({ ...GroupMembership.Record.fields, status: Schema.Literal("active") }),
+  payload: Schema.Struct({
+    ...GroupMembership.GroupMembership.fields,
+    status: Schema.Literal("active"),
+  }),
 });
 
 /**

@@ -17,7 +17,7 @@ import * as ContactStore from "./ContactStore.ts";
 /** Change the stored channel a fact names, as `changes` says. */
 const updateChannel = Effect.fnUntraced(function* (
   channelId: Channel.Id,
-  changes: Partial<Channel.Record>,
+  changes: Partial<Channel.Channel>,
 ) {
   const channelStore = yield* ChannelStore.ChannelStore;
   const found = yield* channelStore.get(channelId);

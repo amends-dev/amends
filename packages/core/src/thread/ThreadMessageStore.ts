@@ -71,14 +71,14 @@ export class ThreadMessageStore extends Context.Service<
   {
     readonly get: (
       id: ThreadMessage.Id,
-    ) => Effect.Effect<Option.Option<ThreadMessage.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<ThreadMessage.ThreadMessage>, Failure>;
     /**
      * Find several messages in one read. Absent IDs are omitted and each found record appears once;
      * order is unspecified, so callers index results by ID. An empty request reads nothing.
      */
     readonly getMany: (
       ids: ReadonlyArray<ThreadMessage.Id>,
-    ) => Effect.Effect<ReadonlyArray<ThreadMessage.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadMessage.ThreadMessage>, Failure>;
     /**
      * How many messages whose content remains each of several threads holds, in one read. Threads
      * with none, and absent IDs, are omitted; order is unspecified.
@@ -91,7 +91,7 @@ export class ThreadMessageStore extends Context.Service<
      * given: publication checks that they take part. Preserve historical values on replay.
      */
     readonly insert: (
-      record: ThreadMessage.Record,
+      record: ThreadMessage.ThreadMessage,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Projection write that replaces a message's text and mentions at the edit's revision, the
@@ -131,7 +131,7 @@ export const make = (
     countByThread: (ids) =>
       Effect.flatMap(read("countByThread", Schema.Array(ThreadId.Id), ids), driver.countByThread),
     insert: (record) =>
-      Effect.flatMap(write("insert", ThreadMessage.Record, record), driver.insert),
+      Effect.flatMap(write("insert", ThreadMessage.ThreadMessage, record), driver.insert),
     edit: (edited) => Effect.flatMap(write("edit", ThreadMessage.Edited, edited), driver.edit),
     delete: (deleted) =>
       Effect.flatMap(write("delete", ThreadMessage.Deleted, deleted), driver.delete),

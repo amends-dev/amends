@@ -47,7 +47,7 @@ describe("group reads", () => {
     id: Identity.HumanId.make("reader"),
   });
   const actorFor = (memberId: Member.Id, ws = workspaceId) =>
-    Actor.Value.make({
+    Actor.Actor.of({
       workspaceId: ws,
       memberId,
       identity:
@@ -55,10 +55,13 @@ describe("group reads", () => {
           ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
           : { _tag: "Human", id: Identity.HumanId.make(memberId) },
     });
-  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Value) =>
+  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor));
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    asActor(effect, actor).pipe(Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    effect: Effect.Effect<A, E, R>,
+  ) => asActor(effect, actor).pipe(Effect.provide(core(bound)));
   const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -97,7 +100,7 @@ describe("group reads", () => {
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.add({ groupId, memberId }),
     );
-  const leave = (membership: GroupMembership.Record) =>
+  const leave = (membership: GroupMembership.GroupMembership) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.leave({
         groupId: membership.groupId,
@@ -155,7 +158,7 @@ describe("group reads", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -282,7 +285,7 @@ describe("group reads", () => {
               memberIds: Group.directMembers([otherId, agentId]),
               createdBy: otherId,
               createdAt: hidden.createdAt,
-            } satisfies Group.Record;
+            } satisfies Group.Group;
             yield* bound.store.transaction(bound.groups.insert(direct));
             const [admission] = yield* bound.groupMemberships.listActiveByMember(otherId);
             const before = yield* history(bound);
@@ -685,7 +688,7 @@ describe("group reads", () => {
           const { bound, owner, reader, first, second } = yield* prepare();
           for (const groupId of [first.id, second.id])
             yield* grant(bound, readerId, GroupPermissions.Read, groupId);
-          const manageable = (actor: Actor.Value) =>
+          const manageable = (actor: Actor.Actor["Service"]) =>
             run(
               bound,
               actor,
@@ -781,7 +784,7 @@ describe("group reads", () => {
               expect(
                 yield* Effect.flip(groupMembershipService.listCurrent(first.id, { limit: 100 })),
               ).toMatchObject({ _tag: "Authorization.Denied" });
-              const impostor = Actor.Value.make({
+              const impostor = Actor.Actor.of({
                 workspaceId,
                 memberId: readerId,
                 identity: { _tag: "Human", id: Identity.HumanId.make("impostor") },

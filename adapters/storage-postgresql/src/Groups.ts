@@ -20,12 +20,12 @@ import { inIds } from "./internal/id-list.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
 import { groups } from "./internal/schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
+const validateRecord = Schema.decodeEffect(Schema.toType(Group.Group));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Union([
-      Schema.Struct({ ...Group.TeamRecord.fields, createdAt: Schema.DateTimeUtcFromDate }),
-      Schema.Struct({ ...Group.DirectRecord.fields, createdAt: Schema.DateTimeUtcFromDate }),
+      Schema.Struct({ ...Group.Team.fields, createdAt: Schema.DateTimeUtcFromDate }),
+      Schema.Struct({ ...Group.Direct.fields, createdAt: Schema.DateTimeUtcFromDate }),
     ]),
   ),
 );
@@ -53,7 +53,7 @@ const toRecord = ({
       ? { ...common, memberIds }
       : undefined
     : { ...common, visibility, name };
-const toRow = (record: Group.Record): typeof groups.$inferInsert => ({
+const toRow = (record: Group.Group): typeof groups.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   kind: record.kind,

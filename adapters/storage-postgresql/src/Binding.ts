@@ -140,7 +140,7 @@ export interface TransactionState {
   readonly owner: PostgresDatabase.PostgresDatabase["Service"];
   readonly workspaceId: Workspace.Id;
   /** The commit the transaction records, timed once the writer's turn has come. */
-  readonly commit: Commit.Record;
+  readonly commit: Commit.Commit;
   /** False once the program ends, after which a handle to the transaction is expired. */
   active: boolean;
   /** Writes the transaction staged in memory, run after its program and before COMMIT. */

@@ -27,22 +27,22 @@ export class MembersGroup extends HttpApiGroup.make("members")
     HttpApiEndpoint.put("rename", "/me/name", {
       params: { workspaceId: Workspace.Id },
       payload: Schema.Struct({ name: Member.NewName }),
-      success: Member.Record,
+      success: Member.Member,
       error: [...ApiErrors.member, ApiErrors.MemberNotFound],
     }),
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
-      success: Schema.Array(Member.Record),
+      success: Schema.Array(Member.Member),
       error: [...ApiErrors.member, ApiErrors.MemberNotFound],
     }),
     HttpApiEndpoint.get("get", "/:memberId", {
       params,
-      success: Member.Record,
+      success: Member.Member,
       error: [...ApiErrors.member, ApiErrors.MemberNotFound],
     }),
     HttpApiEndpoint.delete("remove", "/:memberId", {
       params,
-      success: Member.Record,
+      success: Member.Member,
       error: [
         ...ApiErrors.member,
         ApiErrors.MemberNotFound,

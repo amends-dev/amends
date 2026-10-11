@@ -27,8 +27,8 @@ export const Created = Fact.make("workspace.role.created", {
   payload: Schema.Struct({
     roleId: Role.Id,
     workspaceId: Workspace.Id,
-    name: Role.Record.fields.name,
-    permissions: Role.Record.fields.permissions,
+    name: Role.Role.fields.name,
+    permissions: Role.Role.fields.permissions,
   }),
   occurrence: (payload) => [payload.roleId],
 });
@@ -46,7 +46,7 @@ export const Renamed = Fact.make("workspace.role.renamed", {
   payload: Schema.Struct({
     roleId: Role.Id,
     workspaceId: Workspace.Id,
-    name: Role.Record.fields.name,
+    name: Role.Role.fields.name,
   }),
 });
 
@@ -63,7 +63,7 @@ export const PermissionsChanged = Fact.make("workspace.role.permissions-changed"
   payload: Schema.Struct({
     roleId: Role.Id,
     workspaceId: Workspace.Id,
-    permissions: Role.Record.fields.permissions,
+    permissions: Role.Role.fields.permissions,
   }),
 });
 

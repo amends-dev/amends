@@ -80,7 +80,7 @@ export const makeForActor = Effect.fn("Publication.makeForActor")(function* (
  * @since 0.1.0
  */
 export const makeCausedBy = Effect.fn("Publication.makeCausedBy")(function* (
-  event: Event.Record,
+  event: Event.Event,
   performedBy: Performer.Reference = event.provenance.performedBy,
   occurredAt?: DateTime.Utc,
 ) {
@@ -118,7 +118,7 @@ export const withActor = Effect.fn("Publication.withActor")(function* <A, E, R>(
  * @category utils
  * @since 0.1.0
  */
-export const withCause = (event: Event.Record, occurredAt?: DateTime.Utc) =>
+export const withCause = (event: Event.Event, occurredAt?: DateTime.Utc) =>
   Effect.fn("Publication.withCause")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
     const current = yield* Publication;
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))({

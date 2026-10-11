@@ -13,7 +13,7 @@ import { BearerAuthentication, ChangeFeedHandlers } from "../src/index.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const workspaceId = Workspace.Id.make("workspace-one");
-const actor = Actor.Value.make({
+const actor = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("member-one"),
   identity: alice,

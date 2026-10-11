@@ -56,18 +56,18 @@ export class ChannelBindingStore extends Context.Service<
     /** The thread's binding, if it came through a channel. */
     readonly get: (
       threadId: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<ChannelBinding.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, Failure>;
     /** The binding of an external conversation on a channel, if the conversation has a thread. */
     readonly findByConversation: (
       channelId: ChannelId.Id,
       conversationId: ChannelTransport.ExternalId,
-    ) => Effect.Effect<Option.Option<ChannelBinding.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, Failure>;
     /**
      * Reject a thread bound already, and a conversation bound to
      * another thread of the channel.
      */
     readonly insert: (
-      record: ChannelBinding.Record,
+      record: ChannelBinding.ChannelBinding,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/channel/ChannelBindingStore") {}
@@ -96,6 +96,6 @@ export const make = (
       },
     ),
     insert: (record) =>
-      Effect.flatMap(write("insert", ChannelBinding.Record, record), driver.insert),
+      Effect.flatMap(write("insert", ChannelBinding.ChannelBinding, record), driver.insert),
   };
 };

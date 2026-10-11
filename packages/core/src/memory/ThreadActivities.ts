@@ -13,8 +13,8 @@ import * as Binding from "./Binding.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(ThreadActivity.Record));
-const bySequence = (left: ThreadActivity.Record, right: ThreadActivity.Record) =>
+const rows = Rows.make(Schema.fromJsonString(ThreadActivity.ThreadActivity));
+const bySequence = (left: ThreadActivity.ThreadActivity, right: ThreadActivity.ThreadActivity) =>
   left.sequence - right.sequence;
 
 /**

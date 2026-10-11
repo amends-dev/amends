@@ -126,7 +126,7 @@ export interface Sandbox extends Schema.Schema.Type<typeof Sandbox> {}
 /**
  * The harness, model, and sandbox a turn runs on: an agent's setup, with its harness chosen when it
  * is on `Auto`. A turn that runs again runs on the selection it started with. `AgentQuery.select`
- * makes it, and `Turn.Record` keeps it.
+ * makes it, and `Turn.Turn` keeps it.
  *
  * @category schemas
  * @since 0.1.0
@@ -151,7 +151,7 @@ export interface Selection extends Schema.Schema.Type<typeof Selection> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Agent = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
 
@@ -170,7 +170,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Agent extends Schema.Schema.Type<typeof Agent> {}
 
 /**
  * The record with some fields changed, as a new record; the one given is left as it is.
@@ -178,7 +178,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Agent, changes: Partial<Agent>): Agent =>
   Object.assign({}, record, changes);
 
 /**
@@ -370,7 +370,7 @@ export interface View extends Schema.Schema.Type<typeof View> {}
  * @since 0.1.0
  */
 export const view = (
-  record: Record,
+  record: Agent,
   name: Member.Name,
   readiness: Readiness,
   access: { readonly configurable: boolean; readonly usable: boolean },

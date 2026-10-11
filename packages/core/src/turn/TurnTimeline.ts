@@ -92,8 +92,8 @@ declare module "../thread/ThreadActivityKind.ts" {
 export const resolver = Effect.succeed({
   kinds: [TurnActivity.Created, TurnActivity.Started, TurnActivity.Stopping, TurnActivity.Ended],
   resolve: Effect.fn("TurnTimeline.resolve")(function* (
-    _thread: Thread.Record,
-    listed: ReadonlyArray<ThreadActivity.Record>,
+    _thread: Thread.Thread,
+    listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
     return yield* Effect.orDie(
       Effect.forEach(listed, (activity) =>

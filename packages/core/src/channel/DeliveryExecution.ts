@@ -50,7 +50,7 @@ import * as DeliveryStore from "./DeliveryStore.ts";
 export const Start = Schema.TaggedUnion({
   Idle: {},
   Ready: {
-    delivery: Delivery.Record,
+    delivery: Delivery.Delivery,
     /** The external conversation the thread is bound to, as the transport needs it. */
     conversation: ChannelTransport.Conversation,
     /** The message's text, and what its author is called. */
@@ -152,7 +152,7 @@ export class DeliveryExecution extends Context.Service<
      */
     readonly accept: (
       threadId: Thread.Id,
-    ) => Effect.Effect<ReadonlyArray<Delivery.Record>, AcceptError>;
+    ) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, AcceptError>;
     /**
      * Ready the delivery: `Ready` with what to post and how to reach the system, or `Idle` for a
      * delivery no longer requested, or one failed here and now because its message was deleted
@@ -243,9 +243,9 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
    * point to, in the caller's commit. A message delivered already is accepted again into nothing.
    */
   const acceptPending = Effect.fnUntraced(function* (
-    thread: Thread.Record,
-    binding: ChannelBinding.Record,
-    channel: Channel.Record,
+    thread: Thread.Thread,
+    binding: ChannelBinding.ChannelBinding,
+    channel: Channel.Channel,
   ) {
     const participants = yield* threadQuery.currentParticipants(thread);
     const pending: Array<{ readonly id: Notification.Id; readonly sequence: number }> = [];
@@ -329,7 +329,7 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
 
   /** Publish the fact that fails `delivery` for `reason`, after `attempts` tries. */
   const publishFailed = Effect.fnUntraced(function* (
-    delivery: Delivery.Record,
+    delivery: Delivery.Delivery,
     reason: string,
     attempts: number,
   ) {

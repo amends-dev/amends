@@ -15,7 +15,7 @@ const pending: SignInStorage.PendingCode = {
   windowStartedAt: at(0),
   sendsInWindow: 1,
 };
-const session: SignInStorage.SessionRecord = {
+const session: SignInStorage.Session = {
   humanId: Identity.HumanId.make("human-ada"),
   createdAt: at(0),
   expiresAt: at(3600),

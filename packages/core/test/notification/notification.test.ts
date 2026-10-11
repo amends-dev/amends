@@ -18,14 +18,14 @@ it.effect("a Seen notification keeps its time through the codec, and only a pers
       ...wire,
       state: { _tag: "Seen", seenAt: "2026-09-21T12:00:00.123Z" },
     };
-    const record = yield* Schema.decodeUnknownEffect(Notification.Record)(encoded);
-    const codec = Codec.makeForSchema(Notification.Record);
+    const record = yield* Schema.decodeUnknownEffect(Notification.Notification)(encoded);
+    const codec = Codec.makeForSchema(Notification.Notification);
     expect(
-      yield* Schema.encodeEffect(Notification.Record)(
+      yield* Schema.encodeEffect(Notification.Notification)(
         yield* codec.decode(yield* codec.encode(record)),
       ),
     ).toEqual(encoded);
-    const decode = Schema.decodeUnknownOption(Notification.Record);
+    const decode = Schema.decodeUnknownOption(Notification.Notification);
     for (const invalid of [
       ...["Agent", "Contact", "Triage"].map((kind) => ({
         ...encoded,
@@ -49,18 +49,18 @@ it.effect.each(["Human", "Agent", "Contact"] as const)(
             ? { _tag: kind, id: "recipient-one" }
             : { ...wire.recipient, _tag: kind },
       };
-      const codec = Codec.makeForSchema(Notification.Record);
+      const codec = Codec.makeForSchema(Notification.Notification);
       yield* Effect.gen(function* () {
-        const record = yield* Schema.decodeEffect(Notification.Record)(encoded);
+        const record = yield* Schema.decodeEffect(Notification.Notification)(encoded);
         expect(DateTime.formatIso(record.recordedAt)).toBe(wire.recordedAt);
         const restored = yield* codec.decode(yield* codec.encode(record));
-        expect(yield* Schema.encodeEffect(Notification.Record)(restored)).toEqual(encoded);
+        expect(yield* Schema.encodeEffect(Notification.Notification)(restored)).toEqual(encoded);
       });
       // People and agents are notified as a membership, which their recipient must name.
       if (kind !== "Contact")
         expect(
           Option.isNone(
-            Schema.decodeUnknownOption(Notification.Record)({
+            Schema.decodeUnknownOption(Notification.Notification)({
               ...encoded,
               recipient: { _tag: kind, id: "recipient-one" },
             }),
@@ -69,7 +69,7 @@ it.effect.each(["Human", "Agent", "Contact"] as const)(
     }),
 );
 it("notification decoding rejects malformed references and unsupported recipient or lifecycle states", () => {
-  const decode = Schema.decodeUnknownOption(Notification.Record);
+  const decode = Schema.decodeUnknownOption(Notification.Notification);
   for (const invalid of [
     { ...wire, id: "" },
     { ...wire, workspaceId: "" },

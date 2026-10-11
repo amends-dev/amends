@@ -12,7 +12,7 @@ import * as Binding from "./Binding.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Contact.Record));
+const rows = Rows.make(Schema.fromJsonString(Contact.Contact));
 
 /**
  * Contact records over the current workspace transaction.

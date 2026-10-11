@@ -223,7 +223,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/turns",
   ]);
   // Reading a thread settles notifications from it.
-  const signal = Schema.decodeSync(Signal.Value);
+  const signal = Schema.decodeSync(Signal.Signal);
   const recipient = { workspaceId: "one", memberId: "alice" };
   const at = "2026-10-02T12:00:00.000Z";
   expect(

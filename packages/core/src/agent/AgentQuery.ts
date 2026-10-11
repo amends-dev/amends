@@ -161,7 +161,7 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
    * one chosen among those it can run on, which fails when there is none.
    */
   const harnessFor = Effect.fnUntraced(function* (
-    record: Agent.Record,
+    record: Agent.Agent,
     connections: AgentReadiness.Connections,
     previous: Agent.Selection | undefined,
   ) {

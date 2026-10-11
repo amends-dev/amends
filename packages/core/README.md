@@ -231,7 +231,7 @@ mentions pages the thread's active participants, the people it notifies. See
 
 ### Activity kinds
 
-An activity has one shape for every kind, `ThreadActivity.Record`: its position, a dotted `kind`
+An activity has one shape for every kind, `ThreadActivity.ThreadActivity`: its position, a dotted `kind`
 such as `message.published` and the `version` of its details, its `subject`, an `occurrence` key,
 `newActivity`, and the kind's `details` as encoded JSON. Storage, facts, and the change feed carry
 that shape, so a new kind or version changes none of them and needs no migration. Every kind is
@@ -271,7 +271,7 @@ and its item schema to the second. Reading a kind without a resolver is a defect
 
 ## Tasks
 
-`@amends-dev/core/task` builds on threads. `Task.Record` is a row keyed by its thread, with a
+`@amends-dev/core/task` builds on threads. `Task.Task` is a row keyed by its thread, with a
 status, priority, and assignee. `TaskService` (`create`, `update`, `get`, `listInGroup`) is the
 operations, and `TaskCommand` the writes that create a task with its thread or in an existing
 conversation and change it one way at a time, at the thread's next position, telling and admitting
@@ -280,7 +280,7 @@ group's thread lists carry each thread's task. See [tasks](../../docs/thread-wor
 
 ## Notifications
 
-`@amends-dev/core/notification` holds `Notification.Record`, the `NotificationStore` contract,
+`@amends-dev/core/notification` holds `Notification.Notification`, the `NotificationStore` contract,
 `NotificationService`, and the projection that generates notifications. A notification references a
 source log entry and a human, agent, contact, or triage recipient (one triage recipient per
 workspace), and is `Pending`; `Discarded` when its agent participation ends or its person leaves the
@@ -342,7 +342,7 @@ integrations as `Integrations`.
 ## Agents
 
 `@amends-dev/core/agent` holds a workspace's agents. An agent is a workspace member that works:
-`Agent.Record` keeps its instructions; its `harness`, the harnesses of one of the workspace's
+`Agent.Agent` keeps its instructions; its `harness`, the harnesses of one of the workspace's
 connections, or `Auto`, for amends to choose among them; its `model`, one a connection offers, by
 id, with an `effort`; and its `sandbox`, the sandboxes of a connection, or none. Its name, role, and
 departure are its membership's. `AgentFacts.Created` records an agent in the commit that adds its
@@ -376,7 +376,7 @@ thread, and stopping or retrying its [turns](#turns).
 
 ## Turns
 
-`@amends-dev/core/turn` holds agents' turns in threads. A `Turn.Record` is one harness turn of one
+`@amends-dev/core/turn` holds agents' turns in threads. A `Turn.Turn` is one harness turn of one
 agent in one thread: `queued` until its job starts it, `running`, `cancelling` once asked to stop,
 then `completed`, `failed`, or `cancelled`, never reopening. An agent has at most one active turn
 per thread, which the stores enforce, and work that arrives while it is active waits for the next. A
@@ -465,11 +465,11 @@ no one and are not new activity; the replies are. A client folds a turn's items 
 
 `@amends-dev/core/channel` is a connection's external conversations as threads in one group, as
 [threads](../../docs/threads.md#channels) fixes it and
-[channels](../../docs/thread-workflows.md#channels) describes. `Channel.Record` names the
+[channels](../../docs/thread-workflows.md#channels) describes. `Channel.Channel` names the
 connection, the group new conversations open in, and whether they open tasks;
-`ChannelBinding.Record` is a bound thread's conversation, keyed by the thread, as the connection's
-[transport](../channel/README.md) identifies it; `Contact.Record` is a person heard from through a
-channel, named as the system names them; and `Delivery.Record` is one message's delivery to a
+`ChannelBinding.ChannelBinding` is a bound thread's conversation, keyed by the thread, as the connection's
+[transport](../channel/README.md) identifies it; `Contact.Contact` is a person heard from through a
+channel, named as the system names them; and `Delivery.Delivery` is one message's delivery to a
 conversation, `requested`, `sent`, or `failed`.
 
 `ChannelService` (`create`, `list`, `get`, `redirect`, `remove`, `getBinding`) is the operations,
@@ -546,7 +546,7 @@ contract reuses these message schemas.
 
 ## Signals
 
-`@amends-dev/core/signal` holds what is happening now and is never stored: `Signal.Value` is
+`@amends-dev/core/signal` holds what is happening now and is never stored: `Signal.Signal` is
 `Typing`, `ThreadRead`, `GroupRead`, `NotificationsSeen`, or `TurnDraft`. `Signal.changeFeedReachOf`
 gives each its audience on the change feed: typing reaches the thread's group with `thread.read`,
 the three read-state signals only the member whose state changed, so their other sessions stay
@@ -648,22 +648,21 @@ without re-evaluating authority or time; services coordinate authorization, stor
 A workflow may use another feature's models, facts, or stores when it owns their coordination, as
 removing a member revokes pending invitations and ends group admissions in the same commit.
 
-Inside core, import the owning leaf module directly; each leaf establishes its namespace with a
-self-export, and public barrels relay those names. The domain `index.ts` files define the public
-surface. Reserve `Schema.suspend` for schemas that need deferred construction, such as recursive
+Inside core, import the owning leaf module directly, with `import * as`; public barrels give each
+module its namespace with `export * as`. The domain `index.ts` files define the public surface. Reserve `Schema.suspend` for schemas that need deferred construction, such as recursive
 data; ID leaves break model cycles.
 
 ### Schema and type names
 
 Name an exported schema for its domain meaning and role, read with its module qualifier:
-`Member.Record`, `Identity.Reference`, `Permission.Definition`. Ordinary records use `Schema.Struct`
-and a same-name interface; unions and scalar schemas use a same-name type. Typed errors keep tagged
-error schemas.
+`Member.Member`, `Identity.Reference`, `Permission.Definition`. A module's main type takes the
+module's name, as Effect's `Entity.Entity` does: the complete record with its identity, such as
+`Member.Member` or `Event.Event`, or the value a focused module is about, such as `Grant.Grant`.
+Ordinary records use `Schema.Struct` and a same-name interface; unions and scalar schemas use a
+same-name type. Typed errors keep tagged error schemas.
 
 | Name                 | Meaning and examples                                                                                                                                            |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Record`             | A complete domain record with its identity: `Member.Record`, `Event.Record`.                                                                                    |
-| `Value`              | The primary value object of a focused module: `Actor.Value`, `Grant.Value`.                                                                                     |
 | `Reference`          | Enough to identify an entity or target: `Identity.Reference`, `Target.Reference`.                                                                               |
 | `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.                                                                             |
 | `<Operation>Input`   | Data supplied to one operation: `Invitation.IssueInput`, `Store.AppendInput`.                                                                                   |

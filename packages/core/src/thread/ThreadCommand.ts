@@ -110,7 +110,7 @@ export interface MessageInput extends Schema.Schema.Type<typeof MessageInput> {}
  * @since 0.1.0
  */
 export interface MessagePublished {
-  readonly message: ThreadMessage.Record;
+  readonly message: ThreadMessage.ThreadMessage;
   readonly activity: ThreadMessageActivity.Published;
 }
 
@@ -121,7 +121,7 @@ export interface MessagePublished {
  * @since 0.1.0
  */
 export interface EditInput {
-  readonly message: ThreadMessage.Record;
+  readonly message: ThreadMessage.ThreadMessage;
   readonly text: ThreadMessage.Text;
   readonly mentions: ReadonlyArray<Member.Id>;
   readonly occurredAt: DateTime.Utc;
@@ -134,7 +134,7 @@ export interface EditInput {
  * @since 0.1.0
  */
 export interface MessageEdited {
-  readonly message: ThreadMessage.Record;
+  readonly message: ThreadMessage.ThreadMessage;
   readonly activity: ThreadMessageActivity.Edited;
 }
 
@@ -145,7 +145,7 @@ export interface MessageEdited {
  * @since 0.1.0
  */
 export interface DeleteInput {
-  readonly message: ThreadMessage.Record;
+  readonly message: ThreadMessage.ThreadMessage;
   readonly occurredAt: DateTime.Utc;
 }
 
@@ -156,7 +156,7 @@ export interface DeleteInput {
  * @since 0.1.0
  */
 export interface MessageDeleted {
-  readonly message: ThreadMessage.Record;
+  readonly message: ThreadMessage.ThreadMessage;
   readonly activity: ThreadMessageActivity.Deleted;
 }
 
@@ -172,8 +172,8 @@ export const CreateInput = Schema.Struct({
   /** The caller names the thread, so a keyed request can name the same one on its retry. */
   threadId: Thread.Id,
   groupId: Group.Id,
-  title: Thread.Record.fields.title,
-  origin: Thread.Record.fields.origin,
+  title: Thread.Thread.fields.title,
+  origin: Thread.Thread.fields.origin,
   /** Everyone who takes part from the first activity; group membership enrolls no one else. */
   participants: Schema.Array(ThreadParticipation.Reference),
   /** The opening message, whose author is the thread's creator. */
@@ -201,8 +201,8 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @since 0.1.0
  */
 export interface Created {
-  readonly thread: Thread.Record;
-  readonly message: ThreadMessage.Record;
+  readonly thread: Thread.Thread;
+  readonly message: ThreadMessage.ThreadMessage;
   readonly activity: ThreadMessageActivity.Published;
 }
 
@@ -214,7 +214,7 @@ export interface Created {
  * @since 0.1.0
  */
 export interface Admitted {
-  readonly participants: ReadonlyArray<ThreadParticipation.Record>;
+  readonly participants: ReadonlyArray<ThreadParticipation.ThreadParticipation>;
   readonly added: ReadonlyArray<Event.Type<typeof ThreadParticipationFacts.Added>>;
 }
 
@@ -225,7 +225,7 @@ export interface Admitted {
  * @since 0.1.0
  */
 export interface ActivityContext {
-  readonly thread: Thread.Record;
+  readonly thread: Thread.Thread;
   readonly sequence: number;
   readonly admitted: Admitted;
 }
@@ -243,7 +243,7 @@ export interface ActivityStep<A, K extends ThreadActivityKind.Definition> {
   readonly details: K["details"]["Type"];
   readonly recipients: ReadonlyArray<ThreadActivity.Recipient>;
   /** The fact the activity reports; the activity records it as its cause. */
-  readonly cause: Event.Record;
+  readonly cause: Event.Event;
 }
 
 /**
@@ -254,7 +254,7 @@ export interface ActivityStep<A, K extends ThreadActivityKind.Definition> {
  * @since 0.1.0
  */
 export interface ActivityInput<A, K extends ThreadActivityKind.Definition, E, R> {
-  readonly thread: Thread.Record;
+  readonly thread: Thread.Thread;
   readonly occurredAt: DateTime.Utc;
   /** Record only at this position, failing with PositionChanged if activity took it first. */
   readonly expectedSequence?: number;
@@ -352,7 +352,7 @@ const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.
 const recipientsOf = (
   author: ThreadMessage.Author,
   mentions: ReadonlyArray<Member.Id>,
-  participants: ReadonlyArray<ThreadParticipation.Record>,
+  participants: ReadonlyArray<ThreadParticipation.ThreadParticipation>,
 ): ReadonlyArray<ThreadActivity.Recipient> => {
   const authorKey = ThreadParticipation.keyOf(authorAsParticipant(author));
   const writer = participants.find(
@@ -427,7 +427,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
    * triage take part without one. Current participants are reused.
    */
   const admitParticipants = Effect.fn("ThreadCommand.admitParticipants")(function* (
-    thread: Thread.Record,
+    thread: Thread.Thread,
     requested: ReadonlyArray<ThreadParticipation.Reference>,
     sequence: number,
     occurredAt: DateTime.Utc,
@@ -448,7 +448,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
         : [],
     );
     const candidates = yield* threadQuery.eligibleMembers(thread.groupId, joining);
-    const result: Array<ThreadParticipation.Record> = [];
+    const result: Array<ThreadParticipation.ThreadParticipation> = [];
     const added: Array<Event.Type<typeof ThreadParticipationFacts.Added>> = [];
     for (const reference of requested) {
       const previous = existing.get(ThreadParticipation.keyOf(reference));
@@ -482,7 +482,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   const recordActivity = Effect.fn("ThreadCommand.recordActivity")(function* <
     K extends ThreadActivityKind.Definition,
   >(input: {
-    readonly thread: Thread.Record;
+    readonly thread: Thread.Thread;
     readonly sequence: number;
     readonly occurredAt: DateTime.Utc;
     readonly kind: K;
@@ -491,7 +491,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   }) {
     yield* Store.Transaction;
     const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details, input.thread.id);
-    const activity: ThreadActivity.Record = {
+    const activity: ThreadActivity.ThreadActivity = {
       ...prepared,
       id: ThreadActivity.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
@@ -536,7 +536,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   /** The thread a message belongs to, which a message cannot outlive. */
   const threadOf = Effect.fnUntraced(function* (message: {
     readonly threadId: Thread.Id;
-  }): Effect.fn.Return<Thread.Record, ThreadStore.Failure> {
+  }): Effect.fn.Return<Thread.Thread, ThreadStore.Failure> {
     const found = yield* threadStore.get(message.threadId);
     if (Option.isNone(found)) return yield* Effect.die("A message's thread is missing");
     return found.value;
@@ -560,7 +560,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       admit: input.participants,
       step: ({ admitted }) =>
         Effect.gen(function* () {
-          const message: ThreadMessage.Record = {
+          const message: ThreadMessage.ThreadMessage = {
             id: input.messageId,
             workspaceId,
             threadId: thread.id,
@@ -592,8 +592,8 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
 
   /** The task whose description a message is: the thread's task, when the message opened the thread. */
   const describedTask = Effect.fnUntraced(function* (
-    thread: Thread.Record,
-    message: ThreadMessage.Record,
+    thread: Thread.Thread,
+    message: ThreadMessage.ThreadMessage,
   ) {
     const task = yield* taskStore.get(thread.id);
     if (Option.isNone(task)) return undefined;
@@ -646,7 +646,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
             })
             .pipe(Publication.withOccurredAt(input.occurredAt));
           return {
-            value: Object.assign({}, message, { content }) satisfies ThreadMessage.Record,
+            value: Object.assign({}, message, { content }) satisfies ThreadMessage.ThreadMessage,
             kind: ThreadMessageActivity.Edited,
             details: { messageId: message.id, revision },
             recipients:
@@ -689,7 +689,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
             })
             .pipe(Publication.withOccurredAt(input.occurredAt));
           return {
-            value: Object.assign({}, message, { content }) satisfies ThreadMessage.Record,
+            value: Object.assign({}, message, { content }) satisfies ThreadMessage.ThreadMessage,
             kind: ThreadMessageActivity.Deleted,
             details: { messageId: message.id },
             recipients: [],
@@ -705,7 +705,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
 
   const create = Effect.fn("ThreadCommand.create")(function* (input: CreateInput) {
     const { message, occurredAt } = input;
-    const thread: Thread.Record = {
+    const thread: Thread.Thread = {
       id: input.threadId,
       workspaceId,
       groupId: input.groupId,

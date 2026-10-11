@@ -52,7 +52,7 @@ export type Status = typeof Status.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Delivery = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   channelId: ChannelId.Id,
@@ -79,7 +79,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Delivery extends Schema.Schema.Type<typeof Delivery> {}
 
 /**
  * The record with some fields changed.
@@ -87,7 +87,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Delivery, changes: Partial<Delivery>): Delivery =>
   Object.assign({}, record, changes);
 
 /**
@@ -97,8 +97,8 @@ export const change = (record: Record, changes: Partial<Record>): Record =>
  * @since 0.1.0
  */
 export const requested = (
-  delivery: Omit<Record, "status" | "externalMessageId" | "attempts" | "failure" | "finishedAt">,
-): Record => ({
+  delivery: Omit<Delivery, "status" | "externalMessageId" | "attempts" | "failure" | "finishedAt">,
+): Delivery => ({
   ...delivery,
   status: "requested",
   externalMessageId: null,

@@ -47,7 +47,7 @@ import { useTyping } from "./typing.ts";
  * What people in a workspace call a member. Someone no longer in the workspace reads as "Former
  * member".
  */
-export const memberName = (member: Member.Record | undefined) =>
+export const memberName = (member: Member.Member | undefined) =>
   member === undefined ? "Former member" : member.name;
 
 /**
@@ -91,7 +91,7 @@ export function usePeople(workspaceId: string) {
   const members = useMembers(workspaceId);
   const self = useWorkspace(() => workspaceId);
   const selfId = () => self()?.member.id as string | undefined;
-  const authorOf = (author: Thread.Record["createdBy"]): MessageAuthor => {
+  const authorOf = (author: Thread.Thread["createdBy"]): MessageAuthor => {
     if (ThreadMessage.Author.isAnyOf(["Contact"])(author)) return { name: "Contact", agent: false };
     const member = members.member(author.memberId);
     return {
@@ -540,7 +540,7 @@ export function useMentionCandidates(
 export function useGroupPeople(
   workspaceId: string,
   members: {
-    readonly roster: Accessor<ReadonlyArray<GroupMembership.Record> | undefined>;
+    readonly roster: Accessor<ReadonlyArray<GroupMembership.GroupMembership> | undefined>;
     readonly membersRemovable: Accessor<boolean>;
     /** The workspace's general group, which nobody is removed from. */
     readonly general?: Accessor<boolean>;

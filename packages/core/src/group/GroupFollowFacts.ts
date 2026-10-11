@@ -24,7 +24,7 @@ export const Started = Fact.make("group.follow.started", {
   subject: (payload) => Subject.make("group-follow", payload.id),
   occurrence: (payload) => [payload.id],
   payload: Schema.Struct({
-    ...GroupFollow.Record.fields,
+    ...GroupFollow.GroupFollow.fields,
     status: Schema.Literal("active"),
     endedAt: Schema.Null,
   }),

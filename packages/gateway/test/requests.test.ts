@@ -21,7 +21,7 @@ import {
 } from "./support.ts";
 
 const memberActor = (name: string) =>
-  Actor.Value.make({
+  Actor.Actor.of({
     workspaceId,
     memberId: Member.Id.make(name),
     identity: { _tag: "Human", id: Identity.HumanId.make(name) },
@@ -39,15 +39,18 @@ const world = (storage: Storage) =>
     const host = yield* storage.connect();
     const bound = yield* forWorkspace(host, workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: alice,
     });
     yield* seed(bound, [other], [other]);
     const services = yield* Layer.build(core(bound));
-    const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>, on = services) =>
-      program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(on));
+    const as = <A, E, R>(
+      actor: Actor.Actor["Service"],
+      program: Effect.Effect<A, E, R>,
+      on = services,
+    ) => program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(on));
     const group = yield* as(
       owner,
       Effect.flatMap(GroupService.GroupService, (groupService) =>

@@ -69,7 +69,7 @@ const connection = (
   id: string,
   integration: string,
   settings: Connection.Settings = {},
-): Connection.Record => ({
+): Connection.Connection => ({
   id: Connection.Id.make(id),
   workspaceId: Workspace.Id.make("workspace-one"),
   integration,

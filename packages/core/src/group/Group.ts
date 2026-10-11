@@ -70,7 +70,7 @@ export type Visibility = typeof Visibility.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const TeamRecord = Schema.Struct({
+export const Team = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   kind: Schema.Literal("Team"),
@@ -84,7 +84,7 @@ export const TeamRecord = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface TeamRecord extends Schema.Schema.Type<typeof TeamRecord> {}
+export interface Team extends Schema.Schema.Type<typeof Team> {}
 
 /**
  * Every workspace has one general group, a public team group created with the workspace under
@@ -137,7 +137,7 @@ export const DirectMembers = Schema.Array(MemberId.Id).check(
  * @category schemas
  * @since 0.1.0
  */
-export const DirectRecord = Schema.Struct({
+export const Direct = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   kind: Schema.Literal("Direct"),
@@ -156,7 +156,7 @@ export const DirectRecord = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface DirectRecord extends Schema.Schema.Type<typeof DirectRecord> {}
+export interface Direct extends Schema.Schema.Type<typeof Direct> {}
 
 /**
  * A group: a team, whose membership is managed, or a direct group, whose members are fixed. What
@@ -165,13 +165,13 @@ export interface DirectRecord extends Schema.Schema.Type<typeof DirectRecord> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Union([TeamRecord, DirectRecord]);
+export const Group = Schema.Union([Team, Direct]);
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Record = typeof Record.Type;
+export type Group = typeof Group.Type;
 
 /**
  * Order a direct group's requested members canonically, removing repeats.
@@ -237,7 +237,7 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  * @since 0.1.0
  */
 export const ListItem = Schema.Struct({
-  group: Record,
+  group: Group,
   latestActivityAt: Schema.NullOr(Latest.fields.occurredAt),
   readAt: Schema.NullOr(Latest.fields.occurredAt),
   newActivity: Schema.Boolean,
@@ -309,7 +309,7 @@ export const hasNewActivity = (
  * @since 0.1.0
  */
 export const listItem = (
-  group: Record,
+  group: Group,
   admittedAt: DateTime.Utc,
   activity: Activity,
   grants: Grants,
@@ -384,7 +384,7 @@ export interface CreateTeamInput extends Schema.Schema.Type<typeof CreateTeamInp
  * @since 0.1.0
  */
 export const PublicItem = Schema.Struct({
-  group: TeamRecord,
+  group: Team,
   members: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   joined: Schema.Boolean,
 });

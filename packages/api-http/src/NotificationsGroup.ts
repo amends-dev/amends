@@ -14,7 +14,7 @@ import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
-const record = Notification.Record.annotate({ identifier: "Notification" });
+const record = Notification.Notification.annotate({ identifier: "Notification" });
 
 const params = { workspaceId: Workspace.Id, notificationId: Notification.Id };
 const cursor = Schema.fromJsonString(NotificationStore.Cursor);

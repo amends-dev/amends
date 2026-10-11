@@ -152,7 +152,7 @@ it.effect("participation domain facts publish without touching notifications", (
 it.effect("notifications rebuild from recorded activity alone", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const inserted: Array<Notification.Record> = [];
+    const inserted: Array<Notification.Notification> = [];
     const discarded: Array<ThreadParticipation.Id> = [];
     const notifications: NotificationStore.NotificationStore["Service"] = {
       ...refusing,

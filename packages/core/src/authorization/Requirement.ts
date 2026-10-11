@@ -19,7 +19,7 @@ import * as Target from "./Target.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Value = Schema.Struct({
+export const Requirement = Schema.Struct({
   permission: Permission.Reference,
   target: Target.Reference,
 }).check(
@@ -36,7 +36,7 @@ export const Value = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Value extends Schema.Schema.Type<typeof Value> {}
+export interface Requirement extends Schema.Schema.Type<typeof Requirement> {}
 
 /**
  * Construct a requirement for a target of the permission's declared kind.
@@ -47,8 +47,8 @@ export interface Value extends Schema.Schema.Type<typeof Value> {}
 export const make = <K extends Target.Kind>(
   permission: Permission.Definition<K>,
   target: Target.Of<NoInfer<K>>,
-): Value =>
-  Value.make({
+): Requirement =>
+  Requirement.make({
     permission: { name: permission.name, targetKind: permission.targetKind },
     target,
   });

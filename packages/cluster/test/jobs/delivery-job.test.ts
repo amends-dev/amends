@@ -71,7 +71,7 @@ type Ending =
 
 interface FakeWorkspaceOptions {
   /** The deliveries accepting gives, requested; each is readied until it ends. */
-  readonly deliveries?: ReadonlyArray<Delivery.Record>;
+  readonly deliveries?: ReadonlyArray<Delivery.Delivery>;
   /** Whether the workspace was ever created. True by default. */
   readonly created?: boolean;
 }

@@ -133,7 +133,7 @@ const planning = (connections: Connections): Agent.CreateInput => ({
 });
 
 /** Agents by id, as a test compares stored ones, which storage keeps in no particular order. */
-const byId = (left: Agent.Record, right: Agent.Record) => (left.id < right.id ? -1 : 1);
+const byId = (left: Agent.Agent, right: Agent.Agent) => (left.id < right.id ? -1 : 1);
 const storedAgents = (bound: Bound) =>
   Effect.map(bound.agents.list, (records) => records.toSorted(byId));
 
@@ -160,7 +160,7 @@ type Operation = (
 const { core, gateway, runGateway } = Support;
 let directGrants = 0;
 /** Give the member each of `grants` directly, which no operation does. */
-const grant = (bound: Bound, memberId: Member.Id, grants: ReadonlyArray<Grant.Value>) =>
+const grant = (bound: Bound, memberId: Member.Id, grants: ReadonlyArray<Grant.Grant>) =>
   Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
       Effect.forEach(

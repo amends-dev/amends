@@ -41,7 +41,7 @@ export interface Input {
  */
 export interface Context {
   readonly title: Thread.Title | null;
-  readonly task: Task.Record | undefined;
+  readonly task: Task.Task | undefined;
 }
 
 /**
@@ -96,7 +96,7 @@ const statusWord = (status: Task.Status) => (status === "todo" ? "to do" : statu
 
 /** A task's state in one phrase: its status, its priority unless none, and who holds it. */
 const stateOf = (
-  task: Pick<Task.Record, "status" | "priority" | "assignee">,
+  task: Pick<Task.Task, "status" | "priority" | "assignee">,
   options: Options,
 ): string =>
   [

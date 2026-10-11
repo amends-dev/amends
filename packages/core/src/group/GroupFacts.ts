@@ -25,7 +25,7 @@ export const Created = Fact.make("group.created", {
   version: 1,
   subject: (payload) => Subject.make("group", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Group.Record,
+  payload: Group.Group,
 });
 
 /**

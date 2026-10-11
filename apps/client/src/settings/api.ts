@@ -29,7 +29,7 @@ export interface SettingsData {
   readonly settings: WorkspaceSettings.View;
   readonly ownership: Ownership.View;
   readonly members: ReadonlyArray<WorkspaceSettings.MemberEntry>;
-  readonly invitations: ReadonlyArray<Invitation.Record>;
+  readonly invitations: ReadonlyArray<Invitation.Invitation>;
   readonly accounts: ReadonlyArray<Accounts.Account>;
 }
 /** A change the reader makes in settings. */

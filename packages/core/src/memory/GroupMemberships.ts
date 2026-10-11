@@ -14,8 +14,8 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(GroupMembership.Record));
-const byId = (left: GroupMembership.Record, right: GroupMembership.Record) =>
+const rows = Rows.make(Schema.fromJsonString(GroupMembership.GroupMembership));
+const byId = (left: GroupMembership.GroupMembership, right: GroupMembership.GroupMembership) =>
   compareBinary(left.id, right.id);
 
 /**

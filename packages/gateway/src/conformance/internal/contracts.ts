@@ -41,9 +41,9 @@ export const contracts = (fixture: Fixture) => {
       kind: "Workspace" | "TargetWorkspace" | "TargetMember" | "TargetThread" | "TargetGroup",
       id: Workspace.Id,
       memberId: Member.Id,
-    ): Scope.Value => {
-      if (kind === "Workspace") return Scope.Value.cases.Workspace.make({ workspaceId: id });
-      return Scope.Value.cases.Target.make({
+    ): Scope.Scope => {
+      if (kind === "Workspace") return Scope.Scope.cases.Workspace.make({ workspaceId: id });
+      return Scope.Scope.cases.Target.make({
         target:
           kind === "TargetGroup"
             ? Target.Reference.cases.Group.make({
@@ -60,14 +60,14 @@ export const contracts = (fixture: Fixture) => {
                 : Target.Reference.cases.Workspace.make({ workspaceId: id }),
       });
     };
-    const source = (kind: "Role" | "Direct", scope: Scope.Value): Assignment.Source =>
+    const source = (kind: "Role" | "Direct", scope: Scope.Scope): Assignment.Source =>
       kind === "Role"
         ? Assignment.Source.cases.Role.make({ roleId, scope })
-        : Assignment.Source.cases.Direct.make({ grant: Grant.Value.make({ permission, scope }) });
+        : Assignment.Source.cases.Direct.make({ grant: Grant.Grant.make({ permission, scope }) });
     const seed = (bound: Bound) =>
       Effect.gen(function* () {
         const workspace = yield* initialized(bound);
-        const role = Role.Record.make({
+        const role = Role.Role.make({
           id: roleId,
           workspaceId,
           name: "Readers",
@@ -83,7 +83,7 @@ export const contracts = (fixture: Fixture) => {
           Effect.gen(function* () {
             const bound = yield* boundTo(workspaceId);
             const { workspace, role } = yield* seed(bound);
-            const record: Assignment.Record = {
+            const record: Assignment.Assignment = {
               id: Assignment.Id.make("rolled-back"),
               workspaceId,
               memberId: workspace.ownerMemberId,
@@ -194,7 +194,7 @@ export const contracts = (fixture: Fixture) => {
               const member = (
                 id: string,
                 identity: Identity.MemberReference = bob,
-              ): Member.Record => ({
+              ): Member.Member => ({
                 id: Member.Id.make(id),
                 workspaceId,
                 identity,
@@ -202,7 +202,7 @@ export const contracts = (fixture: Fixture) => {
                 status: "active",
               });
               // Each refused write gets its own transaction: a database may abort the rest of one.
-              const refused = (record: Member.Record) =>
+              const refused = (record: Member.Member) =>
                 Effect.flip(bound.store.transaction(bound.members.insert(record)));
               yield* bound.store.transaction(bound.members.insert(member("bob-first")));
               for (const record of [
@@ -275,7 +275,7 @@ export const contracts = (fixture: Fixture) => {
                   bound.store.transaction(bound.roles.rename(Role.Id.make("missing"), "Missing")),
                 ),
               ).toMatchObject({ _tag: "RoleStore.Conflict", operation: "rename" });
-              const assignment: Assignment.Record = {
+              const assignment: Assignment.Assignment = {
                 id: Assignment.Id.make("reused"),
                 workspaceId,
                 memberId: workspace.ownerMemberId,
@@ -385,18 +385,18 @@ export const contracts = (fixture: Fixture) => {
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const workspace = yield* initialized(bound);
-            const owner = Actor.Value.make({
+            const owner = Actor.Actor.of({
               workspaceId,
               memberId: workspace.ownerMemberId,
               identity: alice,
             });
-            const human = Actor.Value.make({
+            const human = Actor.Actor.of({
               workspaceId,
               memberId: Member.Id.make("human"),
               identity: bob,
             });
             yield* Support.seed(bound, [human], [human]);
-            const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
+            const as = <A, E, R>(actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
               program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
             const group = yield* as(
               owner,
@@ -454,7 +454,7 @@ export const contracts = (fixture: Fixture) => {
               followedAt: admission.admittedAt,
               status: "active",
               endedAt: null,
-            } satisfies GroupFollow.Record;
+            } satisfies GroupFollow.GroupFollow;
             yield* write(bound.groupFollows.insert(follow));
             for (const duplicate of [
               follow,

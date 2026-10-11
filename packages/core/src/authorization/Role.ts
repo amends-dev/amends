@@ -31,7 +31,7 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Role = Schema.Struct({
   id: Id,
   workspaceId: Workspace.Id,
   name: Schema.NonEmptyString,
@@ -43,4 +43,4 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Role extends Schema.Schema.Type<typeof Role> {}

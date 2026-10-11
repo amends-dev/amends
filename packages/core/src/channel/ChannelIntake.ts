@@ -199,7 +199,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     ).pipe(journal.commit);
 
   /** The thread a binding names, which a binding cannot outlive. */
-  const threadOf = Effect.fnUntraced(function* (binding: ChannelBinding.Record) {
+  const threadOf = Effect.fnUntraced(function* (binding: ChannelBinding.ChannelBinding) {
     const found = yield* threadStore.get(binding.threadId);
     if (Option.isNone(found)) return yield* Effect.die("A bound thread is missing");
     return found.value;
@@ -213,7 +213,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
 
   /** The contact the sender is on the channel, created when first heard from, renamed when called otherwise. */
   const resolveContact = Effect.fnUntraced(function* (
-    channel: Channel.Record,
+    channel: Channel.Channel,
     contactId: Contact.Id,
     sender: ChannelTransport.Sender,
     occurredAt: DateTime.Utc,
@@ -221,7 +221,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     const name = Contact.nameOf(sender.name);
     const found = yield* contactStore.get(contactId);
     if (Option.isNone(found)) {
-      const record: Contact.Record = {
+      const record: Contact.Contact = {
         id: contactId,
         workspaceId,
         channelId: channel.id,
@@ -239,8 +239,8 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
 
   /** Open a thread for a conversation the channel has not heard before, bound to it. */
   const open = Effect.fnUntraced(function* (
-    channel: Channel.Record,
-    contact: Contact.Record,
+    channel: Channel.Channel,
+    contact: Contact.Contact,
     event: Extract<ChannelTransport.Event, { readonly _tag: "MessageReceived" }>,
     text: ThreadMessage.Text,
     messageId: ThreadMessage.Id,
@@ -305,9 +305,9 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
 
   /** Publish the contact's message in the thread its conversation is bound to. */
   const reply = Effect.fnUntraced(function* (
-    channel: Channel.Record,
-    contact: Contact.Record,
-    binding: ChannelBinding.Record,
+    channel: Channel.Channel,
+    contact: Contact.Contact,
+    binding: ChannelBinding.ChannelBinding,
     event: Extract<ChannelTransport.Event, { readonly _tag: "MessageReceived" }>,
     text: ThreadMessage.Text,
     messageId: ThreadMessage.Id,
@@ -343,7 +343,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
 
   /** The contact's own message with text, as intake took it in; anything else is unknown. */
   const ownMessage = Effect.fnUntraced(function* (
-    contact: Contact.Record,
+    contact: Contact.Contact,
     messageId: ThreadMessage.Id,
   ) {
     const found = yield* threadMessageStore.get(messageId);
@@ -358,7 +358,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
   });
 
   const edit = Effect.fnUntraced(function* (
-    contact: Contact.Record,
+    contact: Contact.Contact,
     text: ThreadMessage.Text,
     messageId: ThreadMessage.Id,
     occurredAt: DateTime.Utc,
@@ -378,7 +378,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
   });
 
   const remove = Effect.fnUntraced(function* (
-    contact: Contact.Record,
+    contact: Contact.Contact,
     messageId: ThreadMessage.Id,
     occurredAt: DateTime.Utc,
   ) {
@@ -397,7 +397,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
    */
   const intakeEvent = Effect.fn("ChannelIntake.intakeEvent")(
     function* (
-      channel: Channel.Record,
+      channel: Channel.Channel,
       self: ChannelTransport.ExternalId | undefined,
       event: ChannelTransport.Event,
     ) {
@@ -454,7 +454,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
   );
 
   /** The channel's transport, or why its system cannot be reached. */
-  const transportOf = (channel: Channel.Record) =>
+  const transportOf = (channel: Channel.Channel) =>
     channelQuery
       .transport(channel)
       .pipe(

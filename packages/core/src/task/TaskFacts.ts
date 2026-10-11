@@ -21,7 +21,7 @@ export const Created = Fact.make("task.created", {
   subject: (payload) => Subject.make("task", payload.threadId),
   occurrence: (payload) => [payload.threadId],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: Task.Record,
+  payload: Task.Task,
 });
 
 /**

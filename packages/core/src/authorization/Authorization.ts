@@ -86,7 +86,7 @@ export class Authorization extends Context.Service<
      * the application operation.
      */
     readonly require: (
-      requirements: ReadonlyArray<Requirement.Value>,
+      requirements: ReadonlyArray<Requirement.Requirement>,
     ) => Effect.Effect<void, Error, Actor.Actor>;
     /**
      * The same actor check, then whether a current grant covers each requirement, in order, from
@@ -94,7 +94,7 @@ export class Authorization extends Context.Service<
      * first; an invalid actor still fails.
      */
     readonly permitted: (
-      requirements: ReadonlyArray<Requirement.Value>,
+      requirements: ReadonlyArray<Requirement.Requirement>,
     ) => Effect.Effect<ReadonlyArray<boolean>, Exclude<Error, Denied>, Actor.Actor>;
   }
 >()("@amends-dev/core/authorization/authorization/Service") {}
@@ -130,7 +130,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
 
   /** Validate the actor, and that each requirement names a declared permission in this workspace. */
   const validateRequirements = Effect.fnUntraced(function* (
-    requirements: ReadonlyArray<Requirement.Value>,
+    requirements: ReadonlyArray<Requirement.Requirement>,
   ) {
     const actor = yield* Actor.Actor;
     yield* requireWorkspace(workspaceId, actor.workspaceId);
@@ -159,7 +159,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   });
 
   const requirePermissions = Effect.fn("Authorization.require")(function* (
-    requirements: ReadonlyArray<Requirement.Value>,
+    requirements: ReadonlyArray<Requirement.Requirement>,
   ) {
     const { actor, checked } = yield* validateRequirements(requirements);
     if (checked.length === 0) return;
@@ -169,7 +169,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
         return yield* new Denied({ memberId: actor.memberId, requirement });
   });
   const permitted = Effect.fn("Authorization.permitted")(function* (
-    requirements: ReadonlyArray<Requirement.Value>,
+    requirements: ReadonlyArray<Requirement.Requirement>,
   ) {
     const { actor, checked } = yield* validateRequirements(requirements);
     if (checked.length === 0) return [];
@@ -198,8 +198,8 @@ export const layer = Layer.effect(Authorization, make());
  */
 export const requireVisible = Effect.fnUntraced(function* <E>(
   authorization: Authorization["Service"],
-  read: Requirement.Value,
-  action: Requirement.Value,
+  read: Requirement.Requirement,
+  action: Requirement.Requirement,
   hidden: () => E,
 ) {
   const [readable = false, permitted = false] = yield* authorization.permitted([read, action]);

@@ -145,7 +145,7 @@ const pageSize = 500;
 /** Every entry of the participation's log, oldest first, read a page at a time. */
 const readLog = Effect.fnUntraced(function* (
   workspace: TurnWorkspace.TurnWorkspace,
-  participationId: Turn.Record["participationId"],
+  participationId: Turn.Turn["participationId"],
 ) {
   const recorded: Array<SessionLog.Recorded> = [];
   for (;;) {

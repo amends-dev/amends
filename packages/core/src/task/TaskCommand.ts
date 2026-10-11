@@ -53,8 +53,8 @@ export type Error = ThreadCommand.Error | TurnCommand.EndError | TurnStore.Failu
  * @category options
  * @since 0.1.0
  */
-export interface CreateInput extends Pick<Task.Record, "status" | "priority" | "assignee"> {
-  readonly thread: Thread.Record;
+export interface CreateInput extends Pick<Task.Task, "status" | "priority" | "assignee"> {
+  readonly thread: Thread.Thread;
   readonly createdBy: ThreadMessage.Author;
   readonly by: ThreadParticipation.Reference | undefined;
   readonly occurredAt: DateTime.Utc;
@@ -67,7 +67,7 @@ export interface CreateInput extends Pick<Task.Record, "status" | "priority" | "
  * @since 0.1.0
  */
 export interface Created {
-  readonly task: Task.Record;
+  readonly task: Task.Task;
   readonly activity: TaskActivity.Created;
 }
 
@@ -78,7 +78,7 @@ export interface Created {
  * @since 0.1.0
  */
 export interface UpdateInput {
-  readonly task: Task.Record;
+  readonly task: Task.Task;
   readonly change: Task.Change;
   readonly by: ThreadParticipation.Reference | undefined;
   readonly occurredAt: DateTime.Utc;
@@ -91,7 +91,7 @@ export interface UpdateInput {
  * @since 0.1.0
  */
 export interface Updated {
-  readonly task: Task.Record;
+  readonly task: Task.Task;
   readonly activity: TaskActivity.Updated;
 }
 
@@ -133,7 +133,7 @@ const member = (memberId: Member.Id): ThreadParticipation.Reference => ({
 
 /** Who takes part through a task in this state: triage while it is in triage, and its assignee. */
 const participantsOf = (
-  task: Pick<Task.Record, "status" | "assignee">,
+  task: Pick<Task.Task, "status" | "assignee">,
 ): ReadonlyArray<ThreadParticipation.Reference> => [
   ...(task.status === "triage" ? [{ _tag: "Triage" } as const] : []),
   ...(task.assignee === null ? [] : [member(task.assignee)]),
@@ -143,7 +143,7 @@ const participantsOf = (
  * Whom a change brings into the thread: the new assignee, triage as the task enters triage, and
  * the assignee as work resumes.
  */
-const admittedBy = (change: Task.Change, next: Task.Record) =>
+const admittedBy = (change: Task.Change, next: Task.Task) =>
   Task.Change.match(change, {
     Assignee: ({ to }) => (to === null ? [] : [member(to)]),
     Status: ({ to }) =>
@@ -156,7 +156,7 @@ const admittedBy = (change: Task.Change, next: Task.Record) =>
   });
 
 /** Whom a change asks for work: the assignee while the task is being worked; a priority informs alone. */
-const askedBy = (change: Task.Change, next: Task.Record): Member.Id | null =>
+const askedBy = (change: Task.Change, next: Task.Task): Member.Id | null =>
   Task.Change.isAnyOf(["Priority"])(change) ? null : Task.asked(next);
 
 /** Whether a change reaches every participant, rather than those it admits alone. */
@@ -165,7 +165,7 @@ const reachesEveryone = (change: Task.Change) =>
   !(Task.Change.isAnyOf(["Status"])(change) && change.to === "triage");
 
 /** The agent a change takes off the task: the former assignee, or the assignee as work stops. */
-const leftBy = (task: Task.Record, change: Task.Change): Member.Id | null =>
+const leftBy = (task: Task.Task, change: Task.Change): Member.Id | null =>
   Task.Change.match(change, {
     Assignee: ({ from }) => from,
     Status: ({ to }) =>
@@ -189,7 +189,7 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
   const { workspaceId } = yield* Store.Store;
 
   /** The thread a task belongs to, which a task cannot outlive. */
-  const threadOf = Effect.fnUntraced(function* (task: Task.Record) {
+  const threadOf = Effect.fnUntraced(function* (task: Task.Task) {
     const found = yield* threadStore.get(task.threadId);
     if (Option.isNone(found)) return yield* Effect.die("A task's thread is missing");
     return found.value;
@@ -198,7 +198,7 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
   const create = Effect.fn("TaskCommand.create")(function* (input: CreateInput) {
     yield* Store.Transaction;
     const { thread } = input;
-    const task: Task.Record = {
+    const task: Task.Task = {
       threadId: thread.id,
       workspaceId,
       groupId: thread.groupId,
@@ -238,7 +238,7 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
   });
 
   /** Ask the agent's active turn in the thread, if it has one, to stop. */
-  const stopTurnOf = Effect.fnUntraced(function* (memberId: Member.Id, thread: Thread.Record) {
+  const stopTurnOf = Effect.fnUntraced(function* (memberId: Member.Id, thread: Thread.Thread) {
     const active = yield* turnStore.findActive(memberId, thread.id);
     if (Option.isSome(active) && active.value.status !== "cancelling")
       yield* turnCommand.requestStop(active.value, "task-changed");

@@ -30,7 +30,7 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Commit = Schema.Struct({
   id: Id,
   /** Total entries appended across every log in this commit. */
   entryCount: Schema.Natural,
@@ -41,4 +41,4 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Commit extends Schema.Schema.Type<typeof Commit> {}

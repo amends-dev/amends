@@ -53,16 +53,18 @@ export class ConnectionStore extends Context.Service<
   ConnectionStore,
   {
     /** The connection, removed or not. */
-    readonly get: (id: Connection.Id) => Effect.Effect<Option.Option<Connection.Record>, Failure>;
+    readonly get: (
+      id: Connection.Id,
+    ) => Effect.Effect<Option.Option<Connection.Connection>, Failure>;
     /** The workspace's connections that are not removed, in no particular order. */
-    readonly listActive: Effect.Effect<ReadonlyArray<Connection.Record>, Failure>;
+    readonly listActive: Effect.Effect<ReadonlyArray<Connection.Connection>, Failure>;
     /** Reject a reused ID. Never upsert. */
     readonly insert: (
-      record: Connection.Record,
+      record: Connection.Connection,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /** Replace a stored connection; a missing record conflicts. */
     readonly update: (
-      record: Connection.Record,
+      record: Connection.Connection,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
 >()("@amends-dev/core/connection/store/Service") {}
@@ -83,7 +85,9 @@ export const make = (
   return {
     get: (id) => Effect.flatMap(read("get", Connection.Id, id), driver.get),
     listActive: driver.listActive,
-    insert: (record) => Effect.flatMap(write("insert", Connection.Record, record), driver.insert),
-    update: (record) => Effect.flatMap(write("update", Connection.Record, record), driver.update),
+    insert: (record) =>
+      Effect.flatMap(write("insert", Connection.Connection, record), driver.insert),
+    update: (record) =>
+      Effect.flatMap(write("update", Connection.Connection, record), driver.update),
   };
 };

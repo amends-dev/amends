@@ -25,9 +25,9 @@ export class SignalHub extends Context.Service<
      * Offer a signal to the workspace's current subscribers, best effort: it never fails the caller,
      * and a subscriber too slow to keep up, or disconnected, misses it.
      */
-    readonly publish: (signal: Signal.Value) => Effect.Effect<void>;
+    readonly publish: (signal: Signal.Signal) => Effect.Effect<void>;
     /** The signals published after this registers, until the scope closes. */
-    readonly subscribe: Effect.Effect<Stream.Stream<Signal.Value>, never, Scope.Scope>;
+    readonly subscribe: Effect.Effect<Stream.Stream<Signal.Signal>, never, Scope.Scope>;
   }
 >()("@amends-dev/core/signal/hub/Service") {}
 
@@ -46,10 +46,10 @@ const capacity = 256;
 export const makeLocal = Effect.gen(function* () {
   const workspaces = yield* RcMap.make({
     lookup: (_workspaceId: WorkspaceId.Id) =>
-      Effect.acquireRelease(PubSub.sliding<Signal.Value>(capacity), PubSub.shutdown),
+      Effect.acquireRelease(PubSub.sliding<Signal.Signal>(capacity), PubSub.shutdown),
   });
   /** Offer a signal to its workspace's subscribers in this process. */
-  const publish = (signal: Signal.Value) =>
+  const publish = (signal: Signal.Signal) =>
     Effect.scoped(
       Effect.flatMap(RcMap.getOption(workspaces, signal.workspaceId), (pubsub) =>
         Option.isSome(pubsub) ? Effect.asVoid(PubSub.publish(pubsub.value, signal)) : Effect.void,

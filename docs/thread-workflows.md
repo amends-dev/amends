@@ -442,7 +442,7 @@ discarded agent notifications both show their source.
 ## Marking a notification seen
 
 `NotificationService.markSeen(notificationId)` records that the acting human saw their
-notification and returns the updated `Notification.Record`. It requires active workspace
+notification and returns the updated `Notification.Notification`. It requires active workspace
 membership and ownership, but no action grant or thread access: a person can clear an old
 notification after leaving its group or losing `thread.read`. It does not resolve the source,
 rejoin participation, or mark the conversation read.

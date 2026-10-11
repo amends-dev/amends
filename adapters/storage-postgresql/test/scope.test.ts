@@ -7,21 +7,21 @@ import { Member, Workspace } from "@amends-dev/core/workspace";
 import * as ScopeColumns from "../src/ScopeColumns.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
-const decode = Schema.decodeUnknownOption(Scope.Value);
+const decode = Schema.decodeUnknownOption(Scope.Scope);
 
 it("scope columns preserve every target variant without broadening exact grants", () => {
   const scopes = [
-    Scope.Value.cases.Workspace.make({ workspaceId }),
+    Scope.Scope.cases.Workspace.make({ workspaceId }),
     ...[
       Target.Reference.cases.Workspace.make({ workspaceId }),
       Target.Reference.cases.Member.make({ workspaceId, memberId: Member.Id.make("same") }),
       Target.Reference.cases.Thread.make({ workspaceId, threadId: ThreadId.Id.make("same") }),
       Target.Reference.cases.Group.make({ workspaceId, groupId: Group.Id.make("same") }),
-    ].map((target) => Scope.Value.cases.Target.make({ target })),
+    ].map((target) => Scope.Scope.cases.Target.make({ target })),
   ];
   for (const scope of scopes)
     expect(
-      Schema.decodeUnknownSync(Scope.Value)(
+      Schema.decodeUnknownSync(Scope.Scope)(
         ScopeColumns.decode(workspaceId, ScopeColumns.encode(scope)),
       ),
     ).toEqual(scope);
@@ -29,7 +29,7 @@ it("scope columns preserve every target variant without broadening exact grants"
 
 it("unknown, incomplete, and contradictory scope columns fail decoding", () => {
   const valid = ScopeColumns.encode(
-    Scope.Value.cases.Target.make({
+    Scope.Scope.cases.Target.make({
       target: Target.Reference.cases.Thread.make({
         workspaceId,
         threadId: ThreadId.Id.make("thread"),

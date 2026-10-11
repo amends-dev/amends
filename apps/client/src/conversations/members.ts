@@ -9,7 +9,7 @@ import { useGroupRoster, useGroups } from "./reads.ts";
 
 export interface GroupMembersController {
   /** The group's current admissions, live while mounted, once loaded. */
-  readonly roster: Accessor<ReadonlyArray<GroupMembership.Record> | undefined>;
+  readonly roster: Accessor<ReadonlyArray<GroupMembership.GroupMembership> | undefined>;
   /** Why the latest roster read failed, such as the reader no longer belonging to the group. */
   readonly rosterFailure: Accessor<WorkspaceFailure | undefined>;
   /** The reader may add people: a team group they belong to and may manage. */
@@ -20,7 +20,7 @@ export interface GroupMembersController {
    */
   readonly membersRemovable: Accessor<boolean>;
   /** The reader's own admission, which leaving ends; direct groups cannot be left. */
-  readonly own: Accessor<GroupMembership.Record | undefined>;
+  readonly own: Accessor<GroupMembership.GroupMembership | undefined>;
   /** The reader may leave: a team group they belong to, other than the general group. */
   readonly leavable: Accessor<boolean>;
   /** The workspace's general group: everyone joins it with the workspace, and nobody leaves it. */

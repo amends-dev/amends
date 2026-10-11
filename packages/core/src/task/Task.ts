@@ -72,7 +72,7 @@ export const asked = (task: { readonly status: Status; readonly assignee: Member
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Task = Schema.Struct({
   threadId: ThreadId.Id,
   workspaceId: WorkspaceId.Id,
   /** The thread's group, which is the assignee pool, copied so tasks list by group. */
@@ -90,7 +90,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Task extends Schema.Schema.Type<typeof Task> {}
 
 /**
  * One change to a task: its status, assignee, or priority, with the value it replaces, so a later
@@ -118,7 +118,7 @@ export type Change = typeof Change.Type;
  * @category utils
  * @since 0.1.0
  */
-export const valueOf = (task: Record, change: Change): Change["from"] => {
+export const valueOf = (task: Task, change: Change): Change["from"] => {
   switch (change._tag) {
     case "Status":
       return task.status;
@@ -135,11 +135,11 @@ export const valueOf = (task: Record, change: Change): Change["from"] => {
  * @category utils
  * @since 0.1.0
  */
-export const apply = (task: Record, change: Change): Record =>
+export const apply = (task: Task, change: Change): Task =>
   Change.match(change, {
-    Status: ({ to }): Record => Object.assign({}, task, { status: to }),
-    Assignee: ({ to }): Record => Object.assign({}, task, { assignee: to }),
-    Priority: ({ to }): Record => Object.assign({}, task, { priority: to }),
+    Status: ({ to }): Task => Object.assign({}, task, { status: to }),
+    Assignee: ({ to }): Task => Object.assign({}, task, { assignee: to }),
+    Priority: ({ to }): Task => Object.assign({}, task, { priority: to }),
   });
 
 /**
@@ -167,7 +167,7 @@ export interface Options extends Schema.Schema.Type<typeof Options> {}
  * @category utils
  * @since 0.1.0
  */
-export const initial = (options: Options): Pick<Record, "status" | "priority" | "assignee"> => ({
+export const initial = (options: Options): Pick<Task, "status" | "priority" | "assignee"> => ({
   status: options.status ?? (options.assignee === undefined ? "triage" : "todo"),
   priority: options.priority ?? "none",
   assignee: options.assignee ?? null,
@@ -229,7 +229,7 @@ export interface Updated extends Schema.Schema.Type<typeof Updated> {}
  * @since 0.1.0
  */
 export const ListCursor = Schema.Struct({
-  createdAt: Record.fields.createdAt,
+  createdAt: Task.fields.createdAt,
   threadId: ThreadId.Id,
 });
 
@@ -266,7 +266,7 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  * @since 0.1.0
  */
 export const recipients = (
-  participants: ReadonlyArray<ThreadParticipation.Record>,
+  participants: ReadonlyArray<ThreadParticipation.ThreadParticipation>,
   by: ThreadParticipation.Reference | undefined,
   asked: MemberId.Id | null,
 ): ReadonlyArray<ThreadActivity.Recipient> => {

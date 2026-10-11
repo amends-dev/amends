@@ -36,7 +36,7 @@ const watch = (options?: ChangeFeed.WatchOptions) =>
   );
 const human = (name: string) => Identity.HumanId.make(name);
 const memberActor = (name: string) =>
-  Actor.Value.make({
+  Actor.Actor.of({
     workspaceId,
     memberId: Member.Id.make(name),
     identity: { _tag: "Human", id: human(name) },
@@ -67,7 +67,7 @@ describe("change feed", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId);
           const workspace = yield* initialized(bound);
-          const owner = Actor.Value.make({
+          const owner = Actor.Actor.of({
             workspaceId,
             memberId: workspace.ownerMemberId,
             identity: alice,
@@ -78,7 +78,7 @@ describe("change feed", () => {
           yield* seed(bound, [reader, outsider, unpermitted], [reader, outsider]);
           // One core for the workspace, as one runtime serves every subscriber in a process.
           const services = yield* Layer.build(core(bound));
-          const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
+          const as = <A, E, R>(actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
             program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(services));
           const feeds = yield* Effect.forEach([reader, outsider, unpermitted], (actor) =>
             as(actor, listen(watch())),
@@ -134,7 +134,7 @@ describe("change feed", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId);
           const workspace = yield* initialized(bound);
-          const owner = Actor.Value.make({
+          const owner = Actor.Actor.of({
             workspaceId,
             memberId: workspace.ownerMemberId,
             identity: alice,
@@ -143,7 +143,7 @@ describe("change feed", () => {
           const bystander = memberActor("bystander");
           yield* seed(bound, [mentioned, bystander], [mentioned, bystander]);
           const services = yield* Layer.build(core(bound));
-          const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
+          const as = <A, E, R>(actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
             program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(services));
           const group = yield* as(
             owner,

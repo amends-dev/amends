@@ -99,7 +99,7 @@ const recordedBeforeRevisions = (bound: Bound) =>
           memberId: ownerMemberId,
           source: Assignment.Source.cases.Role.make({
             roleId: BuiltinRoles.OwnerId,
-            scope: Scope.Value.cases.Workspace.make({ workspaceId }),
+            scope: Scope.Scope.cases.Workspace.make({ workspaceId }),
           }),
         });
       }),

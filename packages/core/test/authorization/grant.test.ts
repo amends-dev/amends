@@ -9,11 +9,11 @@ import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-1");
-const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
-const exactWorkspace = Scope.Value.cases.Target.make({
+const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId });
+const exactWorkspace = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Workspace.make({ workspaceId }),
 });
-const exactMember = Scope.Value.cases.Target.make({
+const exactMember = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: Member.Id.make("member-1") }),
 });
 const ManageWorkspace = Permission.make("test.workspace.manage", {

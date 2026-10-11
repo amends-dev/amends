@@ -47,18 +47,18 @@ export class AssignmentsGroup extends HttpApiGroup.make("assignments")
     HttpApiEndpoint.post("assign", "/assignments", {
       params,
       payload: Assignment.AssignInput,
-      success: Assignment.Record,
+      success: Assignment.Assignment,
       error,
     }),
     HttpApiEndpoint.put("change", "/assignments", {
       params,
       payload: Assignment.ChangeInput,
-      success: Assignment.Record,
+      success: Assignment.Assignment,
       error,
     }),
     HttpApiEndpoint.delete("revoke", "/members/:memberId/assignments/:assignmentId", {
       params: { ...member, assignmentId: Assignment.Id },
-      success: Assignment.Record,
+      success: Assignment.Assignment,
       error,
     }),
   )

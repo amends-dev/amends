@@ -40,8 +40,8 @@ it.effect("requirements retain their encoded contract without tier metadata", ()
       target: { _tag: "Member", workspaceId, memberId },
     } as const;
     const requirement = Requirement.make(MemberPermissions.Read, member);
-    expect(yield* Schema.encodeEffect(Requirement.Value)(requirement)).toEqual(encoded);
-    expect(yield* Schema.decodeEffect(Requirement.Value)(encoded)).toEqual(requirement);
+    expect(yield* Schema.encodeEffect(Requirement.Requirement)(requirement)).toEqual(encoded);
+    expect(yield* Schema.decodeEffect(Requirement.Requirement)(encoded)).toEqual(requirement);
   }),
 );
 it("requirement construction rejects the wrong target kind in types and at runtime", () => {
@@ -60,7 +60,7 @@ it("requirement construction rejects the wrong target kind in types and at runti
 });
 it.effect("schema decoding and effectful construction also reject mismatched requirements", () =>
   Effect.gen(function* () {
-    const decode = Schema.decodeUnknownEffect(Requirement.Value);
+    const decode = Schema.decodeUnknownEffect(Requirement.Requirement);
     const valid = Requirement.make(MemberPermissions.Remove, member);
     expect(yield* decode(valid)).toEqual(valid);
     for (const input of [
@@ -68,7 +68,7 @@ it.effect("schema decoding and effectful construction also reject mismatched req
       { permission: ManageWorkspace, target: member },
     ]) {
       const error = yield* decode(input).pipe(Effect.flip);
-      const issue = yield* Requirement.Value.makeEffect(input).pipe(Effect.flip);
+      const issue = yield* Requirement.Requirement.makeEffect(input).pipe(Effect.flip);
       expect(error._tag).toBe("SchemaError");
       for (const message of [error.message, SchemaIssue.makeFormatterDefault()(issue)]) {
         expect(message).toContain(`requires a ${input.permission.targetKind} target`);

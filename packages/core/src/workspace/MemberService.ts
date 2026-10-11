@@ -107,14 +107,14 @@ export class MemberService extends Context.Service<
      * lookup read current state without opening a transaction, and use an existing commit when
      * there is one. Only authorized callers can receive `NotFound`.
      */
-    readonly get: (memberId: Member.Id) => Effect.Effect<Member.Record, Error, Actor.Actor>;
+    readonly get: (memberId: Member.Id) => Effect.Effect<Member.Member, Error, Actor.Actor>;
     /**
      * List the memberships the actor may read, active and removed. Active membership is required;
      * each record is then included only when `member.read` covers it, so a workspace-scoped grant
      * sees everyone and an exact grant sees that member. One grant resolution decides them all.
      * This does not open a transaction or promise a shared snapshot.
      */
-    readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Error, Actor.Actor>;
+    readonly list: Effect.Effect<ReadonlyArray<Member.Member>, Error, Actor.Actor>;
     /**
      * Remove a member, under `member.remove` on them and the delegation rules: the current owner is
      * `OwnerProtected`, and a member removed already is `AlreadyRemoved`. One commit publishes the
@@ -124,12 +124,12 @@ export class MemberService extends Context.Service<
      */
     readonly remove: (
       memberId: Member.Id,
-    ) => Effect.Effect<Member.Record, RemoveError, Actor.Actor>;
+    ) => Effect.Effect<Member.Member, RemoveError, Actor.Actor>;
     /**
      * Choose what people in the workspace call the acting member. Anyone active may name
      * themselves, and only themselves; the same name again records nothing.
      */
-    readonly rename: (name: Member.Name) => Effect.Effect<Member.Record, RenameError, Actor.Actor>;
+    readonly rename: (name: Member.Name) => Effect.Effect<Member.Member, RenameError, Actor.Actor>;
   }
 >()("@amends-dev/core/workspace/member-application/Service") {}
 
@@ -244,7 +244,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
             });
         }).pipe(Publication.withCause(removed, revokedAt));
       }
-      return Object.assign({}, member, { status: "removed" as const }) satisfies Member.Record;
+      return Object.assign({}, member, { status: "removed" as const }) satisfies Member.Member;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -258,7 +258,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
       const member = yield* requireMember((yield* Actor.Actor).memberId);
       if (member.name === name) return member;
       yield* journal.publish(MemberFacts.Renamed, { workspaceId, memberId: member.id, name });
-      return Object.assign({}, member, { name }) satisfies Member.Record;
+      return Object.assign({}, member, { name }) satisfies Member.Member;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

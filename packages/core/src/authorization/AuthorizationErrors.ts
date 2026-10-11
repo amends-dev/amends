@@ -16,7 +16,7 @@ import * as Requirement from "./Requirement.ts";
  */
 export class Denied extends Schema.TaggedError<Denied>()("Authorization.Denied", {
   memberId: Member.Id,
-  requirement: Requirement.Value,
+  requirement: Requirement.Requirement,
 }) {}
 
 /**

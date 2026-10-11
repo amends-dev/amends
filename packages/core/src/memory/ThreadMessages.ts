@@ -13,8 +13,8 @@ import * as Binding from "./Binding.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(ThreadMessage.Record));
-const hasText = (record: ThreadMessage.Record) =>
+const rows = Rows.make(Schema.fromJsonString(ThreadMessage.ThreadMessage));
+const hasText = (record: ThreadMessage.ThreadMessage) =>
   ThreadMessage.Content.isAnyOf(["Text"])(record.content);
 
 /**

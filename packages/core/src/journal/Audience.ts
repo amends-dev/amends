@@ -56,13 +56,13 @@ export const make = (kind: string, id: string): Scope =>
  * @category schemas
  * @since 0.1.0
  */
-export const Value = Schema.UniqueArray(Scope);
+export const Audience = Schema.UniqueArray(Scope);
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Value = typeof Value.Type;
+export type Audience = typeof Audience.Type;
 
 /**
  * The empty audience: nothing outside the fact's projections learns of it. `Fact.makeAudience`
@@ -71,4 +71,4 @@ export type Value = typeof Value.Type;
  * @category constructors
  * @since 0.1.0
  */
-export const internal: Value = [];
+export const internal: Audience = [];

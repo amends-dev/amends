@@ -19,16 +19,16 @@ import * as Scope from "./Scope.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Value = Schema.Struct({
+export const Grant = Schema.Struct({
   permission: Permission.Name,
-  scope: Scope.Value,
+  scope: Scope.Scope,
 });
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export interface Value extends Schema.Schema.Type<typeof Value> {}
+export interface Grant extends Schema.Schema.Type<typeof Grant> {}
 
 /**
  * Construct a schema that validates permission names and scopes against a trusted domain
@@ -39,13 +39,13 @@ export interface Value extends Schema.Schema.Type<typeof Value> {}
  */
 export const makeSchema = (permission: Permission.Definition) => {
   const definition = Permission.Definition.make(permission);
-  return Value.check(
+  return Grant.check(
     Schema.makeFilter(({ permission: name, scope }) => {
       if (name !== definition.name) {
         return { path: ["permission"], issue: `Expected permission ${definition.name}` };
       }
       if (
-        Scope.Value.isAnyOf(["Target"])(scope) &&
+        Scope.Scope.isAnyOf(["Target"])(scope) &&
         !Target.Reference.isAnyOf([definition.targetKind])(scope.target)
       ) {
         return {
@@ -64,7 +64,7 @@ export const makeSchema = (permission: Permission.Definition) => {
  * @category constructors
  * @since 0.1.0
  */
-export const make = (permission: Permission.Definition, scope: Scope.Value): Value =>
+export const make = (permission: Permission.Definition, scope: Scope.Scope): Grant =>
   makeSchema(permission).make({ permission: permission.name, scope });
 
 /**
@@ -74,7 +74,7 @@ export const make = (permission: Permission.Definition, scope: Scope.Value): Val
  * @category utils
  * @since 0.1.0
  */
-export const anyCovers = (grants: ReadonlyArray<Value>, requirement: Requirement.Value) =>
+export const anyCovers = (grants: ReadonlyArray<Grant>, requirement: Requirement.Requirement) =>
   grants.some(
     (grant) =>
       grant.permission === requirement.permission.name &&

@@ -65,7 +65,7 @@ const record = (
   workspaceId: Workspace.Id,
   id: string,
   recipient: Notification.Recipient,
-): Notification.Record => ({
+): Notification.Notification => ({
   id: Notification.Id.make(id),
   workspaceId,
   source: { logId: Entry.LogId.make("fixture"), entryId: Entry.Id.make(id) },

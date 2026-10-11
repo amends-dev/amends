@@ -103,7 +103,7 @@ projection tables directly.
 - `SignInStorage.SignInStorage` keeps email sign-in's pending codes and sessions across every host
   over the storage: `modifyCode` replaces an address's `SignInStorage.PendingCode` with what a pure
   decision makes of it, one change to an address at a time, and sessions, each a
-  `SignInStorage.SessionRecord` named by its token's digest, are inserted, found, extended, and
+  `SignInStorage.Session` named by its token's digest, are inserted, found, extended, and
   deleted. Storage adapters implement it.
 - `EmailSender.EmailSender` hands an `EmailSender.Message` to the host's email provider, failing
   with `EmailSender.Undelivered`.

@@ -16,9 +16,9 @@ import { storeError, storeFailure } from "./internal/errors.ts";
 import { channels } from "./internal/schema.ts";
 
 const decodeRows = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Channel.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
+  Schema.Array(Schema.Struct({ ...Channel.Channel.fields, createdAt: Schema.DateTimeUtcFromDate })),
 );
-const toRow = (record: Channel.Record): typeof channels.$inferInsert => ({
+const toRow = (record: Channel.Channel): typeof channels.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   connectionId: record.connectionId,

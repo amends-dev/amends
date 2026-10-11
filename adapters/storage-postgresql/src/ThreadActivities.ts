@@ -19,10 +19,13 @@ import { threadActivities } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
-const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
+const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.ThreadActivity));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...ThreadActivity.Record.fields, occurredAt: Schema.DateTimeUtcFromDate }),
+    Schema.Struct({
+      ...ThreadActivity.ThreadActivity.fields,
+      occurredAt: Schema.DateTimeUtcFromDate,
+    }),
   ),
 );
 const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =>

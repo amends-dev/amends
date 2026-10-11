@@ -20,7 +20,7 @@ import { limit } from "./internal/paging.ts";
 
 const thread = { workspaceId: Workspace.Id, threadId: Thread.Id };
 const inGroup = { workspaceId: Workspace.Id, groupId: Group.Id };
-const record = Task.Record.annotate({ identifier: "Task" });
+const record = Task.Task.annotate({ identifier: "Task" });
 
 /**
  * Tasks: the work a thread tracks, with a status, priority, and assignee. A task is created with

@@ -45,7 +45,7 @@ describe("groups", () => {
   const memberIdentity = Identity.MemberReference.cases.Human.make({
     id: Identity.HumanId.make("group-human"),
   });
-  const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Value) =>
+  const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     program.pipe(Effect.provideService(Actor.Actor, actor));
   const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
     Effect.flatMap(GroupService.GroupService, (groupService) =>
@@ -54,7 +54,7 @@ describe("groups", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -85,7 +85,7 @@ describe("groups", () => {
       bound,
       workspace,
       owner,
-      actor: Actor.Value.make({ workspaceId, memberId, identity: memberIdentity }),
+      actor: Actor.Actor.of({ workspaceId, memberId, identity: memberIdentity }),
     };
   });
   const publish = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
@@ -161,7 +161,7 @@ describe("groups", () => {
         storage,
         Effect.gen(function* () {
           const { bound, actor, owner } = yield* prepare();
-          const call = (who: Actor.Value) =>
+          const call = (who: Actor.Actor["Service"]) =>
             asActor(create([memberId]), who).pipe(Effect.provide(core(bound)));
           const before = yield* history(bound);
           expect(yield* Effect.flip(call(actor))).toMatchObject({
@@ -292,7 +292,7 @@ describe("groups", () => {
           Effect.gen(function* () {
             const { bound, owner } = yield* prepare();
             const before = yield* history(bound);
-            const observed = yield* Ref.make(Option.none<Group.Record>());
+            const observed = yield* Ref.make(Option.none<Group.Group>());
             const failure = new GroupMembershipStore.Failure({
               operation: "insert",
               cause: "injected second admission failure",
@@ -358,7 +358,7 @@ describe("groups", () => {
         Effect.gen(function* () {
           const { bound, owner } = yield* prepare();
           const before = yield* history(bound);
-          const observed = yield* Ref.make(Option.none<Group.Record>());
+          const observed = yield* Ref.make(Option.none<Group.Group>());
           const cancelled = asActor(
             Effect.gen(function* () {
               const journal = yield* Journal.Journal;
@@ -474,7 +474,7 @@ describe("groups", () => {
             name: "Stored",
             createdBy: owner.memberId,
             createdAt: DateTime.makeUnsafe("2026-09-21T12:00:00.123Z"),
-          } satisfies Group.Record;
+          } satisfies Group.Group;
           const admission = {
             id: GroupMembership.Id.make("admission"),
             workspaceId,
@@ -482,7 +482,7 @@ describe("groups", () => {
             memberId,
             status: "active",
             admittedAt: group.createdAt,
-          } satisfies GroupMembership.Record;
+          } satisfies GroupMembership.GroupMembership;
           yield* bound.store.transaction(
             Effect.gen(function* () {
               for (const invalid of [
@@ -545,7 +545,7 @@ describe("groups", () => {
             memberIds: Group.directMembers([memberId, owner.memberId]),
             createdBy: owner.memberId,
             createdAt,
-          } satisfies Group.Record;
+          } satisfies Group.Group;
           const admissions = direct.memberIds.map((id) => ({
             id: GroupMembership.Id.make(`direct-${id}`),
             workspaceId,
@@ -597,7 +597,7 @@ describe("groups", () => {
             program: (
               service: GroupMembershipService.GroupMembershipService["Service"],
             ) => Effect.Effect<unknown, unknown, Actor.Actor>,
-            as: Actor.Value,
+            as: Actor.Actor["Service"],
           ) =>
             asActor(
               Effect.flatMap(GroupMembershipService.GroupMembershipService, program),
@@ -641,7 +641,7 @@ describe("groups", () => {
             Effect.provide(core(bound)),
           );
           const rename = (
-            by: Actor.Value,
+            by: Actor.Actor["Service"],
             groupId: Group.Id,
             name: string,
             expectedName: string = "Engineering",
@@ -697,7 +697,7 @@ describe("groups", () => {
             memberIds: Group.directMembers([memberId, owner.memberId]),
             createdBy: owner.memberId,
             createdAt: group.createdAt,
-          } satisfies Group.Record;
+          } satisfies Group.Group;
           yield* bound.store.transaction(
             Effect.all([
               bound.groups.insert(direct),

@@ -24,11 +24,11 @@ import { inIds } from "./internal/id-list.ts";
 import { insertChunked } from "./internal/parameters.ts";
 import { notificationSeen, notifications } from "./internal/schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
+const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Notification));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      ...Notification.Record.fields,
+      ...Notification.Notification.fields,
       recordedAt: Schema.DateTimeUtcFromDate,
       state: Schema.Union([
         Notification.State.cases.Pending,
@@ -168,7 +168,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
 
   /** Write the records in as few statements as fit. */
   const insert = Effect.fnUntraced(function* (
-    records: ReadonlyArray<Notification.Record>,
+    records: ReadonlyArray<Notification.Notification>,
     operation: string,
   ) {
     const rows: Array<PgInsertValue<typeof notifications>> = [];

@@ -52,7 +52,7 @@ import { withStorage } from "./fixture.ts";
 const { core, initialized, runGateway } = Support;
 describe("notification sources", () => {
   /** Narrow a stored participation to its member participant for assertions. */
-  const memberParticipant = (record: ThreadParticipation.Record) => {
+  const memberParticipant = (record: ThreadParticipation.ThreadParticipation) => {
     if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
       throw new Error("Expected a member participant");
     return record.participant;
@@ -66,11 +66,14 @@ describe("notification sources", () => {
       ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
       : { _tag: "Human", id: Identity.HumanId.make(id) };
   const actorFor = (memberId: Member.Id) =>
-    Actor.Value.make({ workspaceId, memberId, identity: identityFor(memberId) });
-  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Value) =>
+    Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) });
+  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor));
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    asActor(effect, actor).pipe(Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    effect: Effect.Effect<A, E, R>,
+  ) => asActor(effect, actor).pipe(Effect.provide(core(bound)));
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -145,7 +148,7 @@ describe("notification sources", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -177,7 +180,7 @@ describe("notification sources", () => {
     if (!note) return yield* Effect.die("Missing notification");
     return note;
   });
-  const withNote = (bound: Bound, note: Notification.Record): Bound => ({
+  const withNote = (bound: Bound, note: Notification.Notification): Bound => ({
     ...bound,
     context: Context.add(bound.context, NotificationStore.NotificationStore, {
       ...bound.notifications,

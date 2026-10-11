@@ -25,7 +25,7 @@ export const Created = Fact.make("agent.created", {
   version: 1,
   subject: (payload) => Subject.make("agent", payload.id),
   occurrence: (payload) => [payload.id],
-  payload: Agent.Record,
+  payload: Agent.Agent,
 });
 
 /**

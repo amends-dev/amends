@@ -75,7 +75,7 @@ import { withStorage } from "./fixture.ts";
 const { core, initialized, runGateway } = Support;
 describe("thread replies", () => {
   /** Narrow a stored participation to its member participant for assertions. */
-  const memberParticipant = (record: ThreadParticipation.Record) => {
+  const memberParticipant = (record: ThreadParticipation.ThreadParticipation) => {
     if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
       throw new Error("Expected a member participant");
     return record.participant;
@@ -89,11 +89,14 @@ describe("thread replies", () => {
       ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
       : { _tag: "Human", id: Identity.HumanId.make(id) };
   const actorFor = (memberId: Member.Id) =>
-    Actor.Value.make({ workspaceId, memberId, identity: identityFor(memberId) });
-  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Value) =>
+    Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) });
+  const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor));
-  const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    asActor(effect, actor).pipe(Effect.provide(core(bound)));
+  const run = <A, E, R>(
+    bound: Bound,
+    actor: Actor.Actor["Service"],
+    effect: Effect.Effect<A, E, R>,
+  ) => asActor(effect, actor).pipe(Effect.provide(core(bound)));
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
@@ -173,7 +176,7 @@ describe("thread replies", () => {
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId);
     const workspace = yield* initialized(bound);
-    const owner = Actor.Value.make({
+    const owner = Actor.Actor.of({
       workspaceId,
       memberId: workspace.ownerMemberId,
       identity: { _tag: "Human", id: workspace.createdBy },
@@ -513,7 +516,7 @@ describe("thread replies", () => {
               );
             const foreign = yield* boundTo(otherWorkspaceId);
             const foreignWorkspace = yield* initialized(foreign);
-            const foreignOwner = Actor.Value.make({
+            const foreignOwner = Actor.Actor.of({
               workspaceId: otherWorkspaceId,
               memberId: foreignWorkspace.ownerMemberId,
               identity: { _tag: "Human", id: foreignWorkspace.createdBy },
@@ -1110,7 +1113,7 @@ describe("thread replies", () => {
           Effect.gen(function* () {
             const bound = yield* boundTo(workspaceId);
             const workspace = yield* initialized(bound);
-            const owner = Actor.Value.make({
+            const owner = Actor.Actor.of({
               workspaceId,
               memberId: workspace.ownerMemberId,
               identity: { _tag: "Human", id: workspace.createdBy },
@@ -1228,7 +1231,7 @@ describe("thread replies", () => {
             const replied = yield* run(bound, human, reply(first.thread.id, [], "Draft"));
             const messageId = replied.message.id;
             const edit = (
-              by: Actor.Value,
+              by: Actor.Actor["Service"],
               id: ThreadMessage.Id,
               text: string,
               mentions: ReadonlyArray<Member.Id>,
@@ -1241,7 +1244,7 @@ describe("thread replies", () => {
                   threadMessageService.edit({ messageId: id, text, mentions, expectedRevision }),
                 ),
               );
-            const remove = (by: Actor.Value, id: ThreadMessage.Id) =>
+            const remove = (by: Actor.Actor["Service"], id: ThreadMessage.Id) =>
               run(
                 bound,
                 by,

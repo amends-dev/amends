@@ -78,15 +78,15 @@ export function usePublicGroups(workspaceId: string): Read<ReadonlyArray<Group.P
 export function useGroupRoster(
   workspaceId: string,
   groupId: string,
-): Read<ReadonlyArray<GroupMembership.Record>> {
+): Read<ReadonlyArray<GroupMembership.GroupMembership>> {
   const read = rosterRead(useApiClient(), workspaceId, groupId);
   return read ? connect(read) : unread;
 }
 export interface Members {
   /** A workspace member by ID, current or removed, once the members have loaded. */
-  readonly member: (memberId: string) => Member.Record | undefined;
+  readonly member: (memberId: string) => Member.Member | undefined;
   /** Every member, current or removed, once loaded. */
-  readonly all: Accessor<ReadonlyArray<Member.Record> | undefined>;
+  readonly all: Accessor<ReadonlyArray<Member.Member> | undefined>;
 }
 /** The workspace's members, to name who wrote what and choose whom to include. */
 export function useMembers(workspaceId: string): Members {
@@ -178,7 +178,7 @@ export function useGroupStream(workspaceId: string, groupId: string): PagedView<
 }
 
 /** One thread's record, live while mounted: its title as renamed, its group, and who started it. */
-export function useThread(workspaceId: string, threadId: string): Read<Thread.Record> {
+export function useThread(workspaceId: string, threadId: string): Read<Thread.Thread> {
   const read = threadRead(useApiClient(), workspaceId, threadId);
   return read ? connect(read) : unread;
 }

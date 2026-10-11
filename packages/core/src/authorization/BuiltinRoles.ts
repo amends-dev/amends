@@ -92,10 +92,10 @@ const declarations = Schema.Array(Permission.Definition);
 export const make = (
   workspaceId: Workspace.Id,
   permissions: ReadonlyArray<Permission.Definition>,
-): ReadonlyArray<Role.Record> => {
+): ReadonlyArray<Role.Role> => {
   const checked = declarations.make(permissions);
   return roles.map(({ id, name, tier }) =>
-    Role.Record.make({
+    Role.Role.make({
       id,
       workspaceId,
       name,

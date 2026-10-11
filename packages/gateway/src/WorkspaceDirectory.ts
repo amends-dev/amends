@@ -19,8 +19,8 @@ import type { Effect } from "effect";
  * @since 0.1.0
  */
 export const Membership = Schema.Struct({
-  workspace: Workspace.Record,
-  member: Member.Record,
+  workspace: Workspace.Workspace,
+  member: Member.Member,
   /** The workspace's active human and agent memberships, encoded as `people`. */
   activeMemberCount: Schema.Natural,
 })
@@ -39,7 +39,7 @@ export interface Membership extends Schema.Schema.Type<typeof Membership> {}
  * @category schemas
  * @since 0.1.0
  */
-export const PendingInvitation = Invitation.Record.pipe(
+export const PendingInvitation = Invitation.Invitation.pipe(
   Schema.fieldsAssign({ workspaceName: Schema.optionalKey(Workspace.Name) }),
 );
 

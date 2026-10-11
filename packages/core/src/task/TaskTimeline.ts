@@ -59,8 +59,8 @@ declare module "../thread/ThreadActivityKind.ts" {
 export const resolver = Effect.succeed({
   kinds: [TaskActivity.Created, TaskActivity.Updated],
   resolve: Effect.fn("TaskTimeline.resolve")(function* (
-    _thread: Thread.Record,
-    listed: ReadonlyArray<ThreadActivity.Record>,
+    _thread: Thread.Thread,
+    listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
     return yield* Effect.orDie(
       Effect.forEach(

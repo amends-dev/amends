@@ -28,7 +28,7 @@ import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
  * @since 0.1.0
  */
 export const Cursor = Schema.Struct({
-  recordedAt: Notification.Record.fields.recordedAt,
+  recordedAt: Notification.Notification.fields.recordedAt,
   id: Notification.Id,
 });
 
@@ -156,7 +156,7 @@ export class NotificationStore extends Context.Service<
     /** Find a notification in this workspace; None if absent. */
     readonly get: (
       id: Notification.Id,
-    ) => Effect.Effect<Option.Option<Notification.Record>, Failure>;
+    ) => Effect.Effect<Option.Option<Notification.Notification>, Failure>;
 
     /**
      * The recipient's pending notifications, matching their kind and ID: at most limit records
@@ -166,7 +166,7 @@ export class NotificationStore extends Context.Service<
     readonly listPendingByRecipient: (
       recipient: Notification.Recipient,
       options: ReadOptions,
-    ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
 
     /**
      * The recipient's newest notifications first: at most limit records before the exclusive
@@ -176,13 +176,13 @@ export class NotificationStore extends Context.Service<
     readonly listLatestByRecipient: (
       recipient: Notification.Recipient,
       options: LatestOptions,
-    ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
 
     /** Same ordering and pagination, restricted to Pending records. */
     readonly listLatestPendingByRecipient: (
       recipient: Notification.Recipient,
       options: LatestOptions,
-    ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
 
     /**
      * Every notification of the recipient from one thread's activity in a range of timeline
@@ -193,7 +193,7 @@ export class NotificationStore extends Context.Service<
       recipient: Notification.Recipient,
       threadId: ThreadId.Id,
       range: ThreadRange,
-    ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
     /**
      * The recipient's pending notifications from one thread's activity at or before a timeline
      * position, ordered by that position, then ID in binary lexical order.
@@ -202,7 +202,7 @@ export class NotificationStore extends Context.Service<
       recipient: Notification.Recipient,
       threadId: ThreadId.Id,
       throughSequence: number,
-    ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
 
     /** How many pending notifications the recipient has, from anywhere. */
     readonly countPendingByRecipient: (
@@ -225,7 +225,7 @@ export class NotificationStore extends Context.Service<
      * or expired transaction handles.
      */
     readonly insert: (
-      record: Notification.Record,
+      record: Notification.Notification,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Insert several records in one projection write, with insert's conflicts,
@@ -233,7 +233,7 @@ export class NotificationStore extends Context.Service<
      * An empty request writes nothing.
      */
     readonly insertMany: (
-      records: ReadonlyArray<Notification.Record>,
+      records: ReadonlyArray<Notification.Notification>,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Record that their human recipients have seen these notifications, outside the journal. Each
@@ -277,7 +277,7 @@ export class NotificationStore extends Context.Service<
 >()("@amends-dev/core/notification/store/Service") {}
 
 /** Seen and Accepted are recorded with markSeen and accept, never inserted. */
-const unsettled = (record: Notification.Record) =>
+const unsettled = (record: Notification.Notification) =>
   !Notification.State.isAnyOf(["Seen", "Accepted"])(record.state);
 const settled = (operation: string) => () =>
   new Conflict({ operation, message: "Seen and Accepted are recorded with markSeen and accept" });
@@ -354,12 +354,12 @@ export const make = (
       },
     ),
     insert: (record) =>
-      write("insert", Notification.Record, record).pipe(
+      write("insert", Notification.Notification, record).pipe(
         Effect.filterOrFail(unsettled, settled("insert")),
         Effect.flatMap(driver.insert),
       ),
     insertMany: (records) =>
-      write("insertMany", Schema.Array(Notification.Record), records).pipe(
+      write("insertMany", Schema.Array(Notification.Notification), records).pipe(
         Effect.filterOrFail((records) => records.every(unsettled), settled("insertMany")),
         Effect.flatMap(driver.insertMany),
       ),

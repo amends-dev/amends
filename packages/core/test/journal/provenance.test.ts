@@ -50,7 +50,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const actor = Actor.Value.make({
+          const actor = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("agent-membership"),
             identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("agent") }),
@@ -221,7 +221,7 @@ it.effect("replay preserves recorded attribution without a current publication c
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const seen: Event.Record[] = [];
+        const seen: Event.Event[] = [];
         const projection = Projection.make("provenance", { version: 1 }).on(Changed, (event) =>
           Effect.sync(() => {
             seen.push(event);
@@ -278,12 +278,12 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const alice = Actor.Value.make({
+          const alice = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("alice"),
             identity: { _tag: "Human", id: Identity.HumanId.make("alice") },
           });
-          const bob = Actor.Value.make({
+          const bob = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("bob"),
             identity: { _tag: "Agent", id: Identity.AgentId.make("bob") },
@@ -291,8 +291,8 @@ it.effect(
           const aliceReady = yield* Deferred.make<void>();
           const bobReady = yield* Deferred.make<void>();
           const operation = (
-            actor: Actor.Value,
-            other: Actor.Value,
+            actor: Actor.Actor["Service"],
+            other: Actor.Actor["Service"],
             ready: Deferred.Deferred<void>,
             otherReady: Deferred.Deferred<void>,
           ) =>
@@ -346,7 +346,7 @@ it.effect(
           const parent = yield* journal
             .publish(Changed, 1)
             .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
-          const actor = Actor.Value.make({
+          const actor = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("worker"),
             identity: { _tag: "Agent", id: Identity.AgentId.make("worker") },

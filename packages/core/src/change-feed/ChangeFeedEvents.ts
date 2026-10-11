@@ -75,7 +75,7 @@ export const Access = Data.taggedEnum<Access>();
  */
 export interface Addressed {
   readonly scope: Audience.Scope;
-  readonly record: Notification.Record;
+  readonly record: Notification.Notification;
 }
 
 /**
@@ -86,9 +86,9 @@ export interface Addressed {
  */
 export interface Prepared {
   readonly event: ChangeFeed.Event;
-  readonly audience: Audience.Value;
+  readonly audience: Audience.Audience;
   /** The read permission a reader also needs, beyond holding one of the audience's scopes. */
-  readonly requirement: Requirement.Value | undefined;
+  readonly requirement: Requirement.Requirement | undefined;
   /** A scope whose holder needs no read permission: the member the fact is about. */
   readonly exempt: Audience.Scope | undefined;
   readonly access: Access | undefined;
@@ -129,7 +129,7 @@ const registerFact = <F extends Standalone, View extends Schema.Constraint = F["
     readonly requirement?: (
       payload: Fact.Payload<F>,
       workspaceId: WorkspaceId.Id,
-    ) => Requirement.Value;
+    ) => Requirement.Requirement;
     readonly view?: {
       readonly schema: View;
       readonly from: (payload: Fact.Payload<F>) => View["Type"];

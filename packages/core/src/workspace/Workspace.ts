@@ -76,7 +76,7 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Workspace = Schema.Struct({
   id: Id,
   name: Name,
   createdBy: Identity.HumanId,
@@ -87,4 +87,4 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Workspace extends Schema.Schema.Type<typeof Workspace> {}

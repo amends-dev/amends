@@ -12,9 +12,9 @@ import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import * as WorkspaceDirectory from "../WorkspaceDirectory.ts";
 
-const workspaces = Rows.make(Schema.fromJsonString(Workspace.Record));
-const members = Rows.make(Schema.fromJsonString(Member.Record));
-const invitations = Rows.make(Schema.fromJsonString(Invitation.Record));
+const workspaces = Rows.make(Schema.fromJsonString(Workspace.Workspace));
+const members = Rows.make(Schema.fromJsonString(Member.Member));
+const invitations = Rows.make(Schema.fromJsonString(Invitation.Invitation));
 
 /**
  * One identity's workspaces, read from committed records across every workspace in storage.

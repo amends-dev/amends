@@ -90,7 +90,7 @@ const connection = (
   integration: string,
   createdAt: string,
   auth: ConnectionContract.AuthMethod = "none",
-): Connection.Record => ({
+): Connection.Connection => ({
   id: Connection.Id.make(id),
   workspaceId,
   integration,
@@ -111,7 +111,7 @@ const boxes = connection("conn-boxes", "boxes", "2026-10-06T12:00:00.000Z");
 const agentMemberId = Member.Id.make("member-agent");
 const agentId = Agent.Id.make("agent-one");
 
-const agent = (fields: Partial<Agent.Record> = {}): Agent.Record => ({
+const agent = (fields: Partial<Agent.Agent> = {}): Agent.Agent => ({
   id: agentId,
   workspaceId,
   memberId: agentMemberId,
@@ -125,16 +125,16 @@ const agent = (fields: Partial<Agent.Record> = {}): Agent.Record => ({
 });
 
 interface World {
-  readonly agent?: Agent.Record;
-  readonly members?: ReadonlyArray<Member.Record>;
-  readonly connections?: ReadonlyArray<Connection.Record>;
+  readonly agent?: Agent.Agent;
+  readonly members?: ReadonlyArray<Member.Member>;
+  readonly connections?: ReadonlyArray<Connection.Connection>;
   readonly keys?: ReadonlyMap<Connection.Id, string>;
   /** Why this host keeps no credentials, when it keeps none. */
   readonly credentialsUnavailable?: string;
 }
 
 /** The agent's membership, active unless `status` says otherwise. */
-const agentMember = (status: Member.Status = "active"): Member.Record => ({
+const agentMember = (status: Member.Status = "active"): Member.Member => ({
   id: agentMemberId,
   workspaceId,
   identity: { _tag: "Agent", id: agentId },
@@ -252,7 +252,7 @@ describe("what an agent runs a turn on", () => {
 
   it.effect("is not found for a person, or an agent whose membership ended", () =>
     Effect.gen(function* () {
-      const person: Member.Record = {
+      const person: Member.Member = {
         id: Member.Id.make("member-person"),
         workspaceId,
         identity: { _tag: "Human", id: Identity.HumanId.make("alice") },

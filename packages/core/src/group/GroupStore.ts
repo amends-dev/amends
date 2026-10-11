@@ -53,29 +53,29 @@ export class GroupStore extends Context.Service<
   GroupStore,
   {
     /** The group, if stored. */
-    readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
+    readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Group>, Failure>;
     /**
      * Find several groups in one read. Absent IDs are omitted and each found record appears once;
      * order is unspecified, so callers index results by ID. An empty request reads nothing.
      */
     readonly getMany: (
       ids: ReadonlyArray<Group.Id>,
-    ) => Effect.Effect<ReadonlyArray<Group.Record>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Group.Group>, Failure>;
     /** A page of the workspace's public team groups in binary group-ID order, after the cursor. */
     readonly pagePublic: (
       options: Group.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<Group.TeamRecord>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Group.Team>, Failure>;
     /** The direct group with exactly these members, in any order. */
     readonly findDirect: (
       memberIds: ReadonlyArray<MemberId.Id>,
-    ) => Effect.Effect<Option.Option<Group.DirectRecord>, Failure>;
+    ) => Effect.Effect<Option.Option<Group.Direct>, Failure>;
     /**
      * Reject reused IDs and a second direct group for the same member set.
      * The creator is recorded as given: references to other read models are checked when facts are
      * published, so this one rebuilds alone. Never upsert.
      */
     readonly insert: (
-      record: Group.Record,
+      record: Group.Group,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
     /**
      * Projection write that sets a team group's name. A missing or direct group conflicts;
@@ -124,7 +124,7 @@ export const make = (
         read("findDirect", Group.DirectMembers, Group.directMembers(memberIds)),
         driver.findDirect,
       ),
-    insert: (record) => Effect.flatMap(write("insert", Group.Record, record), driver.insert),
+    insert: (record) => Effect.flatMap(write("insert", Group.Group, record), driver.insert),
     rename: (renamed) => Effect.flatMap(write("rename", Group.Renamed, renamed), driver.rename),
     getLatest: (ids) =>
       Effect.flatMap(read("getLatest", Schema.Array(Group.Id), ids), driver.getLatest),

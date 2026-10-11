@@ -49,11 +49,11 @@ export class AssignmentCommand extends Context.Service<
     readonly assignRole: (
       memberId: Member.Id,
       roleId: Role.Id,
-    ) => Effect.Effect<Assignment.Record, Error, Store.Transaction | Publication.Publication>;
+    ) => Effect.Effect<Assignment.Assignment, Error, Store.Transaction | Publication.Publication>;
     /** End an assignment, returning it as revoked. The caller owns authorization and delegation. */
     readonly revokeAssignment: (
-      assignment: Assignment.Record,
-    ) => Effect.Effect<Assignment.Record, Error, Store.Transaction | Publication.Publication>;
+      assignment: Assignment.Assignment,
+    ) => Effect.Effect<Assignment.Assignment, Error, Store.Transaction | Publication.Publication>;
   }
 >()("@amends-dev/core/authorization/assignment/command/Service") {}
 
@@ -72,7 +72,7 @@ export const make = Effect.fn("AssignmentCommand.make")(function* () {
     memberId: Member.Id,
     roleId: Role.Id,
   ) {
-    const assignment = Assignment.Record.make({
+    const assignment = Assignment.Assignment.make({
       id: Assignment.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       memberId,
@@ -92,14 +92,16 @@ export const make = Effect.fn("AssignmentCommand.make")(function* () {
   });
 
   const revokeAssignment = Effect.fn("AssignmentCommand.revokeAssignment")(function* (
-    assignment: Assignment.Record,
+    assignment: Assignment.Assignment,
   ) {
     yield* journal.publish(AssignmentFacts.Revoked, {
       workspaceId,
       assignmentId: assignment.id,
       memberId: assignment.memberId,
     });
-    return Assignment.Record.make(Object.assign({}, assignment, { status: "revoked" as const }));
+    return Assignment.Assignment.make(
+      Object.assign({}, assignment, { status: "revoked" as const }),
+    );
   });
 
   return AssignmentCommand.of({ assignRole, revokeAssignment });

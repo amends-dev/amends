@@ -20,7 +20,7 @@ import { agents } from "./internal/schema.ts";
 type Row = typeof agents.$inferSelect;
 
 const decodeRecord = Schema.decodeUnknownEffect(
-  Schema.Struct({ ...Agent.Record.fields, createdAt: Schema.DateTimeUtcFromDate }),
+  Schema.Struct({ ...Agent.Agent.fields, createdAt: Schema.DateTimeUtcFromDate }),
 );
 
 /** The record a row stores, before its fields are checked. */
@@ -46,7 +46,7 @@ const recordOf = (row: Row) => ({
 const decodeRows = (rows: ReadonlyArray<Row>) =>
   Effect.forEach(rows, (row) => decodeRecord(recordOf(row)));
 
-const toRow = (record: Agent.Record): typeof agents.$inferInsert => ({
+const toRow = (record: Agent.Agent): typeof agents.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   memberId: record.memberId,

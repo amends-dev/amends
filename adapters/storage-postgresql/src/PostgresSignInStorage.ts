@@ -21,7 +21,7 @@ const PendingCodeRow = Schema.Struct({
 });
 const decodePendingCode = Schema.decodeUnknownEffect(PendingCodeRow);
 const SessionRow = Schema.Struct({
-  ...SignInStorage.SessionRecord.fields,
+  ...SignInStorage.Session.fields,
   createdAt: Schema.DateTimeUtcFromDate,
   expiresAt: Schema.DateTimeUtcFromDate,
 });

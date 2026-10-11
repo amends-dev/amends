@@ -19,12 +19,12 @@ import * as Binding from "./Binding.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
 import { turns } from "./internal/schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Turn.Record));
+const validateRecord = Schema.decodeEffect(Schema.toType(Turn.Turn));
 const Instant = Schema.NullOr(Schema.DateTimeUtcFromDate);
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      ...Turn.Record.fields,
+      ...Turn.Turn.fields,
       createdAt: Schema.DateTimeUtcFromDate,
       startedAt: Instant,
       finishedAt: Instant,
@@ -63,7 +63,7 @@ const decode = (rows: ReadonlyArray<Row>) =>
     Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))),
   );
 const instant = (value: DateTime.Utc | null) => (value === null ? null : DateTime.toDate(value));
-const toRow = ({ selection, retry, ...record }: Turn.Record): typeof turns.$inferInsert => ({
+const toRow = ({ selection, retry, ...record }: Turn.Turn): typeof turns.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   groupId: record.groupId,

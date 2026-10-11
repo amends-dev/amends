@@ -261,7 +261,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     new InvalidConnection({ description: error.reason.description });
 
   /** Fails unless the integration this host installs takes `record`, as it describes it. */
-  const requireValid = Effect.fnUntraced(function* (record: Connection.Record) {
+  const requireValid = Effect.fnUntraced(function* (record: Connection.Connection) {
     const integration = yield* requireIntegration(record.integration);
     yield* Effect.mapError(
       integration.validate(Connection.connectionOf(record)),
@@ -271,7 +271,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
 
   /** How ready the connection is, as the integration this host installs now finds it. */
   const readinessOf = Effect.fnUntraced(function* (
-    record: Connection.Record,
+    record: Connection.Connection,
   ): Effect.fn.Return<Connection.Readiness> {
     const integration = yield* Effect.option(integrations.find(record.integration));
     if (Option.isNone(integration)) return { _tag: "Uninstalled" };
@@ -284,11 +284,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     });
   });
 
-  const viewOf = (record: Connection.Record, manageable: boolean) =>
+  const viewOf = (record: Connection.Connection, manageable: boolean) =>
     Effect.map(readinessOf(record), (readiness) => Connection.view(record, readiness, manageable));
 
   /** The connection as the actor sees it, including whether they may manage it. */
-  const viewForActor = Effect.fnUntraced(function* (record: Connection.Record) {
+  const viewForActor = Effect.fnUntraced(function* (record: Connection.Connection) {
     const [manageable = false] = yield* authorization.permitted([
       Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id)),
     ]);
@@ -330,7 +330,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       );
 
   /** The connection's key, read for using it, or nothing for one that authenticates with none. */
-  const credentialOf = Effect.fnUntraced(function* (record: Connection.Record) {
+  const credentialOf = Effect.fnUntraced(function* (record: Connection.Connection) {
     if (record.auth !== "apiKey") return undefined;
     const credential = yield* connectionCredentialStore
       .get(record.id)
@@ -402,7 +402,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         Option.isSome(yield* connectionStore.get(connectionId))
       )
         return yield* viewForActor(yield* requireActiveConnection(connectionId));
-      const created: Connection.Record = {
+      const created: Connection.Connection = {
         id: connectionId,
         workspaceId,
         integration: request.integration,

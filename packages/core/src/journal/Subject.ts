@@ -18,7 +18,7 @@ const Kind = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*$/));
  * @category schemas
  * @since 0.1.0
  */
-export const Value = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*:.+$/s)).pipe(
+export const Subject = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*:.+$/s)).pipe(
   Schema.brand("FactSubject"),
 );
 
@@ -26,7 +26,7 @@ export const Value = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]*:.+$/
  * @category schemas
  * @since 0.1.0
  */
-export type Value = typeof Value.Type;
+export type Subject = typeof Subject.Type;
 
 /**
  * The subject of the entity `id` of `kind`, such as `Subject.make("thread", threadId)`. The kind
@@ -36,5 +36,5 @@ export type Value = typeof Value.Type;
  * @category constructors
  * @since 0.1.0
  */
-export const make = (kind: string, id: string): Value =>
-  Value.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`);
+export const make = (kind: string, id: string): Subject =>
+  Subject.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`);

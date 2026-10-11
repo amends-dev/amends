@@ -52,14 +52,14 @@ const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("a
 const bob = Identity.HumanId.make("bob");
 const workspaceId = Workspace.Id.make("workspace-one");
 const memberId = Member.Id.make("member-one");
-const member: Member.Record = {
+const member: Member.Member = {
   id: memberId,
   workspaceId,
   identity: alice,
   name: Member.Name.make("alice"),
   status: "active",
 };
-const workspace: Workspace.Record = {
+const workspace: Workspace.Workspace = {
   id: workspaceId,
   createdBy: alice.id,
   name: "Test workspace",
@@ -81,8 +81,12 @@ const denied = new Authorization.Denied({
     Target.Reference.cases.Member.make({ workspaceId, memberId }),
   ),
 });
-const actor = Actor.Value.make({ workspaceId, memberId, identity: alice });
-const pending = ({ recipientId, roleId, expiresAt }: Invitation.IssueInput): Invitation.Record => ({
+const actor = Actor.Actor.of({ workspaceId, memberId, identity: alice });
+const pending = ({
+  recipientId,
+  roleId,
+  expiresAt,
+}: Invitation.IssueInput): Invitation.Invitation => ({
   details: {
     recipientId,
     roleId,
@@ -94,7 +98,7 @@ const pending = ({ recipientId, roleId, expiresAt }: Invitation.IssueInput): Inv
   },
   state: { _tag: "Pending" },
 });
-const notification: Notification.Record = {
+const notification: Notification.Notification = {
   id: Notification.Id.make("pending"),
   workspaceId,
   source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("entry-one") },
@@ -103,7 +107,7 @@ const notification: Notification.Record = {
   state: { _tag: "Pending" },
 };
 const groupId = Group.Id.make("group-one");
-const team: Group.TeamRecord = {
+const team: Group.Team = {
   id: groupId,
   workspaceId,
   kind: "Team",

@@ -26,7 +26,7 @@ const recordColumns = {
   name: members.name,
   status: members.status,
 };
-const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
+const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Member));
 
 /**
  * Builds the membership store for the binding's workspace: this module's driver inside

@@ -155,7 +155,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const bound = yield* (yield* views()).forWorkspace(workspaceId);
           const workspace = yield* initialized(bound);
-          const owner = Actor.Value.make({
+          const owner = Actor.Actor.of({
             workspaceId,
             memberId: workspace.ownerMemberId,
             identity: { _tag: "Human", id: workspace.createdBy },

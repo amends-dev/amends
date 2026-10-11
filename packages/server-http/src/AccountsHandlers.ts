@@ -52,8 +52,8 @@ export const layer = HttpApiBuilder.group(
 
 /** The people a workspace names: its human members and its invitations' recipients, once each. */
 const humanIdsOf = (
-  members: ReadonlyArray<Member.Record>,
-  invitations: ReadonlyArray<Invitation.Record>,
+  members: ReadonlyArray<Member.Member>,
+  invitations: ReadonlyArray<Invitation.Invitation>,
 ) => [
   ...new Set([
     ...members.flatMap(({ identity }) =>

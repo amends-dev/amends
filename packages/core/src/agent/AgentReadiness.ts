@@ -23,7 +23,7 @@ import type * as Agent from "./Agent.ts";
  * @category models
  * @since 0.1.0
  */
-export type Setup = Pick<Agent.Record, "harness" | "model" | "sandbox">;
+export type Setup = Pick<Agent.Agent, "harness" | "model" | "sandbox">;
 
 /**
  * The workspace's connections that are not removed, which a setup names by id.
@@ -31,7 +31,7 @@ export type Setup = Pick<Agent.Record, "harness" | "model" | "sandbox">;
  * @category models
  * @since 0.1.0
  */
-export type Connections = ReadonlyArray<Connection.Record>;
+export type Connections = ReadonlyArray<Connection.Connection>;
 
 /**
  * A connection a setup names, by the part it gives.
@@ -187,9 +187,9 @@ const refusalOf = Effect.fnUntraced(function* (
 });
 
 /** Connections as they were created, and by id among those created at once. */
-const oldestFirst: Order.Order<Connection.Record> = Order.combine(
-  Order.mapInput(DateTime.Order, (record: Connection.Record) => record.createdAt),
-  Order.mapInput(Order.String, (record: Connection.Record) => record.id),
+const oldestFirst: Order.Order<Connection.Connection> = Order.combine(
+  Order.mapInput(DateTime.Order, (record: Connection.Connection) => record.createdAt),
+  Order.mapInput(Order.String, (record: Connection.Connection) => record.id),
 );
 
 /**

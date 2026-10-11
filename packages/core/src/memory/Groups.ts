@@ -15,10 +15,10 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Group.Record));
+const rows = Rows.make(Schema.fromJsonString(Group.Group));
 const latestRows = Rows.make(Schema.fromJsonString(Group.Latest));
 /** Only a direct group has a member-set key. */
-const keyOf = (record: Group.Record) =>
+const keyOf = (record: Group.Group) =>
   record.kind === "Direct" ? Group.directKey(record.memberIds) : undefined;
 
 /**

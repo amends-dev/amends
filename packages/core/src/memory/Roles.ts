@@ -13,7 +13,7 @@ import * as Binding from "./Binding.ts";
 import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 
-const rows = Rows.make(Schema.fromJsonString(Role.Record));
+const rows = Rows.make(Schema.fromJsonString(Role.Role));
 const revisions = Rows.make(Schema.fromJsonString(BuiltinRoles.Revision));
 /** The workspace's one built-in revision row. */
 const revisionKey = "builtin";
@@ -30,7 +30,7 @@ export const make = Effect.fn("Roles.make")(function* () {
   const edit = Effect.fn("Roles.edit")(function* (
     operation: string,
     id: Role.Id,
-    change: (role: Role.Record) => Role.Record,
+    change: (role: Role.Role) => Role.Role,
   ) {
     const space = yield* write.pipe(Effect.mapError(storeFailure(RoleStore, operation)));
     const current = yield* rows

@@ -23,7 +23,7 @@ const recordColumns = {
   createdBy: workspaces.createdBy,
   ownerMemberId: workspaces.ownerMemberId,
 };
-const decode = Schema.decodeUnknownEffect(Schema.Array(Workspace.Record));
+const decode = Schema.decodeUnknownEffect(Schema.Array(Workspace.Workspace));
 
 /**
  * Builds the workspace store for the binding's workspace: this module's driver inside

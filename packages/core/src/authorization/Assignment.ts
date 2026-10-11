@@ -49,8 +49,8 @@ export type Status = typeof Status.Type;
  * @since 0.1.0
  */
 export const Source = Schema.TaggedUnion({
-  Role: { roleId: Role.Id, scope: Scope.Value },
-  Direct: { grant: Grant.Value },
+  Role: { roleId: Role.Id, scope: Scope.Scope },
+  Direct: { grant: Grant.Grant },
 });
 
 /**
@@ -71,7 +71,7 @@ export const SourceInWorkspace = Schema.makeFilter(
       Role: ({ scope }) => scope,
       Direct: ({ grant }) => grant.scope,
     });
-    const scopeWorkspaceId = Scope.Value.match(scope, {
+    const scopeWorkspaceId = Scope.Scope.match(scope, {
       Workspace: ({ workspaceId }) => workspaceId,
       Target: ({ target }) => target.workspaceId,
     });
@@ -89,7 +89,7 @@ export const SourceInWorkspace = Schema.makeFilter(
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Assignment = Schema.Struct({
   id: Id,
   workspaceId: Workspace.Id,
   memberId: Member.Id,
@@ -101,7 +101,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Assignment extends Schema.Schema.Type<typeof Assignment> {}
 
 /**
  * What assigns a role: the member and the built-in role, which `AssignmentService.assign` gives
@@ -143,7 +143,7 @@ export interface ChangeInput extends Schema.Schema.Type<typeof ChangeInput> {}
  * @category schemas
  * @since 0.1.0
  */
-export const RoleChoice = Schema.Struct({ role: Role.Record, assignable: Schema.Boolean });
+export const RoleChoice = Schema.Struct({ role: Role.Role, assignable: Schema.Boolean });
 
 /**
  * @category schemas
@@ -159,7 +159,7 @@ export interface RoleChoice extends Schema.Schema.Type<typeof RoleChoice> {}
  * @since 0.1.0
  */
 export const Access = Schema.Struct({
-  assignments: Schema.Array(Record),
+  assignments: Schema.Array(Assignment),
   roles: Schema.Array(RoleChoice),
   /** Whether the actor may assign, change, or revoke this member's roles. */
   canManage: Schema.Boolean,

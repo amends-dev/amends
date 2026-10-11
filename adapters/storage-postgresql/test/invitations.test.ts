@@ -14,7 +14,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const bound = yield* (yield* views()).forWorkspace(workspaceId);
           const workspace = yield* initialized(bound);
           const issuedAt = yield* DateTime.now;
-          const pending = (id: string): Invitation.Record => ({
+          const pending = (id: string): Invitation.Invitation => ({
             details: {
               id: Invitation.Id.make(id),
               workspaceId,

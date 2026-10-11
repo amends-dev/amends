@@ -304,8 +304,8 @@ export const initialized = (bound: Bound, creator = alice.id) =>
  */
 export const seed = (
   bound: Bound,
-  members: ReadonlyArray<Actor.Value>,
-  viewers: ReadonlyArray<Actor.Value>,
+  members: ReadonlyArray<Actor.Actor["Service"]>,
+  viewers: ReadonlyArray<Actor.Actor["Service"]>,
 ) =>
   Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
@@ -350,7 +350,7 @@ export const runGateway = <A, E, R>(storage: Storage, program: Effect.Effect<A, 
  * @category utils
  * @since 0.1.0
  */
-export const publishedMessage = (activity: ThreadActivity.Record) =>
+export const publishedMessage = (activity: ThreadActivity.ThreadActivity) =>
   ThreadActivityKind.is(ThreadMessageActivity.Published)(activity)
     ? Schema.decodeUnknownSync(ThreadMessageActivity.Published.details)(activity.details).messageId
     : undefined;
@@ -363,7 +363,7 @@ export const publishedMessage = (activity: ThreadActivity.Record) =>
  * @since 0.1.0
  */
 export const placed = Effect.fnUntraced(function* <
-  A extends { readonly message: ThreadMessage.Record },
+  A extends { readonly message: ThreadMessage.ThreadMessage },
 >(result: A) {
   const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
   const found = (yield* threadActivityStore.listByThread(result.message.threadId)).find(
@@ -384,7 +384,7 @@ export const placed = Effect.fnUntraced(function* <
  */
 export const placedIn =
   (bound: Bound) =>
-  <A extends { readonly message: ThreadMessage.Record }>(result: A) =>
+  <A extends { readonly message: ThreadMessage.ThreadMessage }>(result: A) =>
     placed(result).pipe(
       Effect.provideService(ThreadActivityStore.ThreadActivityStore, bound.activities),
     );

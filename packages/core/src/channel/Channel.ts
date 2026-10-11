@@ -73,7 +73,7 @@ export type Status = typeof Status.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Channel = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   /** The connection whose transport receives the channel's events and posts its replies. */
@@ -92,7 +92,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Channel extends Schema.Schema.Type<typeof Channel> {}
 
 /**
  * The record with some fields changed.
@@ -100,7 +100,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Channel, changes: Partial<Channel>): Channel =>
   Object.assign({}, record, changes);
 
 /**

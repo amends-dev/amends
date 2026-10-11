@@ -59,7 +59,7 @@ declare module "./ThreadActivityKind.ts" {
 }
 
 const decode = (
-  activity: ThreadActivity.Record,
+  activity: ThreadActivity.ThreadActivity,
 ): Effect.Effect<
   ThreadParticipationActivity.Followed | ThreadParticipationActivity.Ended,
   ThreadActivityKind.Mismatch | Schema.SchemaError
@@ -77,8 +77,8 @@ const decode = (
 export const resolver = Effect.gen(function* () {
   const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
   const resolve = Effect.fn("ThreadParticipationTimeline.resolve")(function* (
-    _thread: Thread.Record,
-    listed: ReadonlyArray<ThreadActivity.Record>,
+    _thread: Thread.Thread,
+    listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
     const activities = yield* Effect.orDie(Effect.forEach(listed, (activity) => decode(activity)));
     const rows = yield* threadParticipationStore

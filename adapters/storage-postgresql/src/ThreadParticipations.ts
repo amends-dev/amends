@@ -19,11 +19,11 @@ import { threadParticipations } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
-const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
+const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.ThreadParticipation));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      ...ThreadParticipation.Record.fields,
+      ...ThreadParticipation.ThreadParticipation.fields,
       joinedAt: Schema.DateTimeUtcFromDate,
       endedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
     }),

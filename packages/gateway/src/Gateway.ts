@@ -47,7 +47,7 @@ export class Gateway extends Context.Service<
       input: Workspace.CreateInput,
       options?: Request.Options,
     ) => Effect.Effect<
-      Workspace.Record,
+      Workspace.Workspace,
       GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
     >;
     /**
@@ -152,7 +152,7 @@ export type Options = WorkspaceRuntime.Options;
 
 /** Whether membership is known, refused, or must be resolved after preparation. */
 type Admission = Data.TaggedEnum<{
-  Member: { readonly member: Member.Record };
+  Member: { readonly member: Member.Member };
   Refused: {};
   Prepare: {};
 }>;
@@ -257,14 +257,14 @@ export const make = Effect.fn("Gateway.make")(function* (
     workspaceId: Workspace.Id,
     identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
-    admittedMember: Option.Option<Member.Record>,
+    admittedMember: Option.Option<Member.Member>,
   ) {
     // Without an answer from the admission check, the prepared workspace's read models decide.
     const membership = Option.isSome(admittedMember)
       ? admittedMember
       : yield* Effect.orDie((yield* MemberStore.MemberStore).findActive(identity));
     if (Option.isNone(membership)) return yield* new GatewayErrors.NotMember({ workspaceId });
-    const actor = Actor.Value.make({ workspaceId, memberId: membership.value.id, identity });
+    const actor = Actor.Actor.of({ workspaceId, memberId: membership.value.id, identity });
     return yield* toPublicErrors(
       workspaceId,
       reloadWhenStale(workspaceId, Effect.provideService(program, Actor.Actor, actor)),
@@ -343,7 +343,7 @@ export const make = Effect.fn("Gateway.make")(function* (
       return yield* new GatewayErrors.NotMember({ workspaceId });
     const admittedMember = Admission.$is("Member")(admission)
       ? Option.some(admission.member)
-      : Option.none<Member.Record>();
+      : Option.none<Member.Member>();
     return yield* runInWorkspace(
       workspaceId,
       withActor(workspaceId, identity, operation, admittedMember),

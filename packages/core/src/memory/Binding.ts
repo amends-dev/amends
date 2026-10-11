@@ -33,7 +33,7 @@ export interface TransactionState {
   readonly connection: MemoryConnection.MemoryConnection["Service"];
   readonly workspaceId: Workspace.Id;
   /** The commit it records, with the count of entries appended so far. */
-  readonly commit: Commit.Record;
+  readonly commit: Commit.Commit;
   /** Its snapshot of the workspace, which its writes change and a commit makes committed. */
   readonly space: MemoryDatabase.Space;
   /** Logs this transaction holds against their other writers, released when it ends. */

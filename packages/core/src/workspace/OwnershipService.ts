@@ -110,7 +110,7 @@ export class OwnershipService extends Context.Service<
      */
     readonly transfer: (
       input: Ownership.TransferInput,
-    ) => Effect.Effect<Workspace.Record, Error, Actor.Actor>;
+    ) => Effect.Effect<Workspace.Workspace, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/workspace/ownership-application/Service") {}
 
@@ -222,7 +222,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
           const source = assignment.source;
           if (
             Assignment.Source.isAnyOf(["Role"])(source) &&
-            Scope.Value.isAnyOf(["Workspace"])(source.scope) &&
+            Scope.Scope.isAnyOf(["Workspace"])(source.scope) &&
             builtins.includes(source.roleId)
           )
             yield* assignmentCommand.revokeAssignment(assignment);

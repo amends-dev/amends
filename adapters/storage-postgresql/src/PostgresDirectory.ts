@@ -18,8 +18,8 @@ import * as Invitations from "./Invitations.ts";
 import { invitations, members, workspaces } from "./internal/schema.ts";
 
 const Membership = Schema.Struct({
-  workspace: Workspace.Record,
-  member: Member.Record,
+  workspace: Workspace.Workspace,
+  member: Member.Member,
   activeMemberCount: Schema.Natural,
 });
 
