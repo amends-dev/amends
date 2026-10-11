@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `RoleStore.RoleStore`, over two tables: `roles`, each named bundle of
+ * permissions as a text array, and `builtin_role_revisions`, the built-in bundle revision the
+ * workspace's roles hold. `RoleStore.make` checks every input before the driver sees it, so the
+ * driver keeps only what storage keeps: the primary key refuses a reused ID as the store's
+ * `Conflict`, an edit that finds no role conflicts, and recording a revision is an upsert that
+ * only moves it forward, conflicting otherwise. Every statement is scoped to the binding's
+ * workspace and runs under its `guard`, which lets a read join the caller's transaction and
+ * requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Role, RoleStore } from "@amends-dev/core/authorization";
 import { and, eq, lt } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
@@ -9,9 +21,11 @@ import { builtinRoleRevisions, roles } from "./internal/schema.ts";
 const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Record));
 
 /**
- * Named permission bundles; edits keep the role's identity.
+ * Builds the role store for the binding's workspace: this module's driver inside
+ * `RoleStore.make`, which checks every input first.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Roles.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -97,8 +111,9 @@ export const make = Effect.fn("Roles.make")(function* () {
 });
 
 /**
- * Provide RoleStore.RoleStore using its constructor and the caller's dependencies.
+ * Provides `RoleStore.RoleStore` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(RoleStore.RoleStore, make());

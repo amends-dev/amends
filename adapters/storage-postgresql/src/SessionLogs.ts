@@ -1,3 +1,16 @@
+/**
+ * The PostgreSQL driver for `SessionLogStore.SessionLogStore`, over the `session_log_entries`
+ * table: each participation's session log, keyed by position, with each entry's kind and turn in
+ * columns and the rest of it in `details` as JSON. The log takes part in no commit, so its
+ * statements run apart from any transaction the caller is in, each on its own, and rebuilds keep
+ * it. `SessionLogStore.make` checks every input before the driver sees it, so the driver keeps
+ * only what storage keeps: an append checks the log's latest position, the key refuses a position
+ * taken meanwhile, each as the store's `Conflict`, and it then notifies readers waiting through
+ * `PostgresNotices`, in every process. Every statement is scoped to the binding's workspace and
+ * runs under its `guard`.
+ *
+ * @since 0.1.0
+ */
 import { Store } from "@amends-dev/core/journal";
 import { SessionLog, SessionLogStore } from "@amends-dev/core/turn";
 import { and, asc, eq, gt, max } from "drizzle-orm";
@@ -42,6 +55,7 @@ const recordedOf = ({ position, recordedAt, kind, turnId, details }: Row) => ({
  * commit the caller is in, each on its own, since the log takes part in none.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("SessionLogs.make")(function* () {
   const { workspaceId, database, guard, pollInterval } = yield* Binding.Binding;
@@ -135,5 +149,10 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
   return SessionLogStore.make(workspaceId, driver);
 });
 
-/** Provide session logs over the caller's binding. @category layers */
+/**
+ * Provides `SessionLogStore.SessionLogStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(SessionLogStore.SessionLogStore, make());

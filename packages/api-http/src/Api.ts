@@ -1,3 +1,11 @@
+/**
+ * The whole HTTP contract: every endpoint group under one `HttpApi`, with the title its OpenAPI
+ * document carries. `@amends-dev/server-http` registers handlers for each group against it, typed
+ * clients derive from it, and a running host serves its OpenAPI document at `/openapi.json`. A new
+ * group is declared in its own module and added here.
+ *
+ * @since 0.1.0
+ */
 import { HttpApi, OpenApi } from "effect/http-api";
 import { AccountsGroup } from "./AccountsGroup.ts";
 import { InvitationsGroup } from "./InvitationsGroup.ts";
@@ -16,7 +24,12 @@ import { TasksGroup } from "./TasksGroup.ts";
 import { ThreadsGroup } from "./ThreadsGroup.ts";
 import { TurnsGroup } from "./TurnsGroup.ts";
 
-/** The public HTTP contract. Servers implement its groups; clients are generated from it. */
+/**
+ * The public HTTP contract. Servers implement its groups; clients are generated from it.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export class Api extends HttpApi.make("amends")
   .add(SessionGroup)
   .add(MeGroup)

@@ -1,3 +1,12 @@
+/**
+ * Implements `GroupsGroup`. Each handler enters the workspace as the principal's membership through
+ * `Gateway.asMember` and calls one core operation: `GroupService` for listing, creating, renaming,
+ * and reading groups, `GroupMembershipService` for rosters, joining, and leaving,
+ * `GroupFollowService` for following, and `ReadStateService.markGroupRead`. `Routes` composes its
+ * `layer` with the other groups'.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import { ReadStateService } from "@amends-dev/core/read-state";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
@@ -9,6 +18,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * Register group handlers, capturing the gateway and reading the principal per request.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

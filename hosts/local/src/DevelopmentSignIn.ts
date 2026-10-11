@@ -1,3 +1,11 @@
+/**
+ * Development sign-in: six-digit codes kept in the process's memory and delivered by logging them,
+ * and a session whose token is the account's human ID, which `DevelopmentSessionTokens` trusts.
+ * Restarting the process discards pending codes. Nothing verifies that the person controls the
+ * address, so tests and scripts use it to sign in as anyone.
+ *
+ * @since 0.1.0
+ */
 import { Accounts, SignIn } from "@amends-dev/gateway";
 import { Crypto, DateTime, Duration, Effect, Exit, Layer, Schema } from "effect";
 
@@ -7,25 +15,49 @@ interface PendingCode {
   delivered: boolean;
 }
 
-/** How a code reaches the person; development logs it where the server runs. */
+/**
+ * How a code reaches the person; development logs it where the server runs.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type DeliverCode = (email: Accounts.Email, code: SignIn.Code) => Effect.Effect<void>;
 
+/**
+ * Deliver a code by logging it, with its address, where the server runs: what `make` and `layer`
+ * deliver with when given nothing else.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const logCode: DeliverCode = (email, code) =>
   Effect.logInfo(`Sign-in code for ${email}: ${code}`);
 
-/** Codes expire ten minutes after issuance. */
+/**
+ * Codes expire ten minutes after issuance.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const codeLifetime = Duration.minutes(10);
 
-/** Development offers email codes alone. */
+/**
+ * The sign-in methods development offers: email codes alone, with no providers.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const methods: SignIn.Methods = { emailCode: true, providers: [] };
 
 /**
- * Development sign-in. Codes live in memory and expire after ten minutes; the
- * session token is the human ID of the address's account, which development
- * session tokens trust. Nothing here verifies that the person controls the
- * address.
+ * Make development sign-in, delivering codes with `deliver`. Codes live in memory and expire after
+ * ten minutes; a code works once, after its delivery succeeds, and a new request replaces the
+ * address's pending one. The session token is the human ID of the address's account, which the
+ * host finds or creates, and which development session tokens trust. Nothing here verifies that
+ * the person controls the address.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("DevelopmentSignIn.make")(function* (
   deliver: DeliverCode = logCode,
@@ -84,5 +116,6 @@ export const make = Effect.fn("DevelopmentSignIn.make")(function* (
  * Provide development sign-in with fresh pending codes for each acquisition.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (deliver?: DeliverCode) => Layer.effect(SignIn.SignIn, make(deliver));

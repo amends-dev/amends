@@ -1,3 +1,13 @@
+/**
+ * One follower of the workspace journal for a runtime, shared by every reader: it tails the
+ * journal from its head, prepares each commit once through `ChangeFeedEvents`, and fans the
+ * deliveries out to its subscribers. A subscriber resuming from a cursor replays the commits
+ * after it when they are few enough, and otherwise starts again at the head with a reset.
+ * `ChangeFeedService` subscribes for each reader of the change feed, and readers following a
+ * turn's log share the follower too.
+ *
+ * @since 0.1.0
+ */
 import {
   Cause,
   Context,
@@ -22,7 +32,12 @@ import type * as Log from "../journal/Log.ts";
 import * as ChangeFeed from "./ChangeFeed.ts";
 import * as ChangeFeedEvents from "./ChangeFeedEvents.ts";
 
-/** One committed batch of the journal, with the events the feed may deliver from it. */
+/**
+ * One committed batch of the journal, with the events the feed may deliver from it.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Delivery {
   readonly position: Entry.Position;
   readonly commitId: Commit.Id;
@@ -30,6 +45,13 @@ export interface Delivery {
   readonly events: ReadonlyArray<ChangeFeedEvents.Prepared>;
 }
 
+/**
+ * What a subscriber receives: where delivery starts, whether it must refresh first, and every
+ * later commit.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Subscription {
   /** Where delivery starts: the resumed cursor, or the head for a reset. None is an empty journal. */
   readonly from: Option.Option<Entry.Position>;
@@ -42,6 +64,12 @@ export interface Subscription {
   readonly deliveries: Stream.Stream<Delivery, ChangeFeed.Unavailable>;
 }
 
+/**
+ * The runtime's shared follower of the workspace journal, which each reader subscribes to.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class ChangeFeedSource extends Context.Service<
   ChangeFeedSource,
   {
@@ -57,6 +85,13 @@ export class ChangeFeedSource extends Context.Service<
   }
 >()("@amends-dev/core/change-feed/source/Service") {}
 
+/**
+ * How much the follower buffers for each subscriber, how far back a subscriber may resume, and
+ * how it pages the log.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const Options = Schema.Struct({
   /** Deliveries buffered for each subscriber; a slower subscriber catches up from the log. */
   capacity: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -65,6 +100,10 @@ export const Options = Schema.Struct({
   /** Batches read at a time. */
   pageSize: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options extends Schema.Schema.Type<typeof Options> {}
 
 /** A delivered fact this host cannot read, and why. */
@@ -119,6 +158,7 @@ const isReadable = (delivery: Prepared) => delivery.unreadable.length === 0;
  * backoff, so its subscribers see a delay rather than an end.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("ChangeFeedSource.make")(function* (
   input: Options = { capacity: 256, replayLimit: 500, pageSize: 100 },
@@ -297,8 +337,9 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
 });
 
 /**
- * Provide the shared journal follower for one workspace runtime.
+ * The shared journal follower for one workspace runtime, over the journal.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (options?: Options) => Layer.effect(ChangeFeedSource, make(options));

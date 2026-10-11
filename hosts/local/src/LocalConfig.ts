@@ -1,8 +1,24 @@
+/**
+ * What the local host reads at start: every `AMENDS_*` setting, from the environment, validated
+ * before any resource is acquired, so a missing or invalid setting fails startup before a
+ * connection opens. The database URL and the credential key stay redacted, in errors too. The entry
+ * point passes what `load` returns to `LocalHost.layer`, `LocalServer.layer`, and the
+ * authentication `AMENDS_SIGN_IN` names.
+ *
+ * @since 0.1.0
+ */
 import { Config, Duration, Effect, Option, Result, Schema } from "effect";
 import { Base64 } from "effect/encoding";
 import type { Redacted } from "effect";
 
+/**
+ * The host's settings, read from their `AMENDS_*` environment variables with defaults applied.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
+  /** The port the server listens on, on the loopback interface; `0` selects a free one. */
   readonly port: number;
   /** The PostgreSQL database the host stores every workspace in. */
   readonly databaseUrl: Redacted.Redacted<string>;
@@ -109,7 +125,13 @@ const signIn = Config.schema(Schema.Literals(["email", "development"]), "AMENDS_
   Config.withDefault("email" as const),
 );
 
-/** Read and validate startup options without opening a database or server. */
+/**
+ * Read and validate startup options without opening a database or server, failing with a
+ * `Config.ConfigError` that names the setting missing or invalid.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return<
   Options,
   Config.ConfigError

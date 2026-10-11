@@ -28,9 +28,35 @@ import {
   ThreadNotFound,
 } from "./ThreadParticipationErrors.ts";
 export {
+  /**
+   * The actor's participation had already ended.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   AlreadyEnded,
+  /**
+   * Everyone in a direct conversation takes part in all of its threads, so none is unfollowed.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   FixedParticipation,
+  /**
+   * The participation is missing, in another thread, or another member's; the three are not told
+   * apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
+  /**
+   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
+   * told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   ThreadNotFound,
 } from "./ThreadParticipationErrors.ts";
 

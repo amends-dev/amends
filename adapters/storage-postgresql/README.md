@@ -29,19 +29,20 @@ queries, and journal transactions all share it.
 
 ## Schema
 
-`src/internal/schema.ts` gives every record field its own column, except a few whose shape varies by kind,
-stored as JSON: an activity's details, a session log entry's details, a connection's settings, a
-channel binding's conversation, and what a harness's agent returned of its session. Each table leads
-its primary key with `workspace_id`, and each reference between tables carries the workspace, so a
-join that starts scoped stays scoped. Projection tables have no foreign keys to one another: each
-read model rebuilds alone, in any order, and core checks references when it publishes the facts they
-come from. The log's own tables keep theirs. Three tables span workspaces: `accounts`, the host's
-people, a human ID for each lowercase address, which is unique; `sign_in_codes`, each address's
-pending code digest with its expiry, failed tries, and sends in the current window; and
+`src/internal/schema.ts` gives every record field its own column, except a few whose shape varies by
+kind, stored as JSON: an activity's details, a session log entry's details, a connection's settings,
+a channel binding's conversation, and what a harness's agent returned of its session. Each table
+leads its primary key with `workspace_id`, and each reference between tables carries the workspace,
+so a join that starts scoped stays scoped. Projection tables have no foreign keys to one another:
+each read model rebuilds alone, in any order, and core checks references when it publishes the facts
+they come from. The log's own tables keep theirs. Three tables span workspaces: `accounts`, the
+host's people, a human ID for each lowercase address, which is unique; `sign_in_codes`, each
+address's pending code digest with its expiry, failed tries, and sends in the current window; and
 `sign_in_sessions`, each session by its token's digest, with its account's human ID, start, and end.
 `PostgresSignInStorage.modifyCode` reads, decides, and writes an address's code in one transaction
-holding an advisory lock keyed by the address, so changes to it take turns across processes. Tagged unions become a discriminator column
-plus the columns each case needs, with a check constraint that they agree.
+holding an advisory lock keyed by the address, so changes to it take turns across processes. Tagged
+unions become a discriminator column plus the columns each case needs, with a check constraint that
+they agree.
 
 `drizzle/` holds one generated baseline for a fresh database, which `PostgresDatabase.make` applies
 once. There are no upgrade migrations, backfills, or legacy formats; see [Development](#development)
@@ -190,13 +191,13 @@ an advisory lock keyed by workspace and log. `Store.append` opens a commit that 
 lock, so execution output does not wait for the workspace's writers.
 
 A process's writers to one workspace, or its standalone appends to one log, first queue in memory
-(`turns.ts`), so only the one at the front takes a pooled connection and waits for PostgreSQL's
-lock. A busy workspace therefore holds at most one connection per process while its writers wait.
-Waiting in that queue, for a free connection, and for the lock share one budget, `lockTimeout` (five
-seconds by default); a writer still waiting when it runs out fails with a store conflict saying what
-it waited for, without retrying. Lock timeouts, serialization failures, and deadlocks at the
-transaction boundary map to the same conflict. A commit's `recordedAt` is taken once the writer
-holds its lock, so commit times follow commit order.
+(`PostgresTurns.ts`), so only the one at the front takes a pooled connection and waits for
+PostgreSQL's lock. A busy workspace therefore holds at most one connection per process while its
+writers wait. Waiting in that queue, for a free connection, and for the lock share one budget,
+`lockTimeout` (five seconds by default); a writer still waiting when it runs out fails with a store
+conflict saying what it waited for, without retrying. Lock timeouts, serialization failures, and
+deadlocks at the transaction boundary map to the same conflict. A commit's `recordedAt` is taken
+once the writer holds its lock, so commit times follow commit order.
 
 Once it holds the lock, a transaction sets its own session limits, which end with it:
 `statement_timeout` from `statementTimeout` (ten seconds by default, at least `lockTimeout`), and
@@ -208,10 +209,10 @@ Every duration must be finite and at least a millisecond, since PostgreSQL reads
 
 Reads outside a transaction see committed state, each on a pooled connection of its own, and take no
 lock, so they proceed while writers hold the workspace. A process's statements for one workspace
-outside its transactions use at most `readConnections` connections at once (three by default, queued
-in `reads.ts`), so a burst of reads for one busy workspace leaves the rest of the pool to the
-others. Separate queries may observe concurrent changes; reads inside a transaction see its staged
-state.
+outside its transactions use at most `readConnections` connections at once
+(three by default, queued in `PostgresReads.ts`), so a burst of reads for one busy workspace leaves
+the rest of the pool to the others. Separate queries may observe concurrent changes; reads inside a
+transaction see its staged state.
 
 A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the workspace
 and log once `COMMIT` succeeds, as a statement of its own on the commit's connection, so a
@@ -254,22 +255,24 @@ returns to the pool, or by PostgreSQL when the process dies.
 ## Layout
 
 One module per store, each exporting `make` and a `layer` for the core store it implements, such as
-`members.ts`, `threads.ts`, `turn-records.ts`, `session-logs.ts`, and `deliveries.ts`. They share
-`binding.ts`, one workspace's view of the database: its identity, the transaction boundary, and the
-guard each statement runs under. `workspace-storage.ts` composes every store over a binding for one
-workspace (`layerWorkspace`), its private `layerStores` registers each store, and `storage.ts` is
-the adapter: every gateway contract it implements, in one layer. `database.ts` prepares the
-SQL client, `directory.ts` reads across workspaces, `schema.ts` holds the tables, `notices.ts` is
-the pool's notification listener that `signal-hub.ts` binds to each workspace, `turns.ts` and
-`reads.ts` are the writer queue and read cap above, `credential-key.ts` seals credentials,
-`accounts.ts` and `sign-in-storage.ts` keep the host's accounts and sign-in, and
-`cluster-storage.ts` is the upkeep of Cluster's tables. Bindings and raw tables stay internal.
+`Members.ts`, `Threads.ts`, `TurnRecords.ts`, `SessionLogs.ts`, and `Deliveries.ts`. They share
+`Binding.ts`, one workspace's view of the database: its identity, the transaction boundary, and the
+guard each statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a binding
+for one workspace (`layerWorkspace`), its private `layerStores` registers each store, and
+`PostgresStorage.ts` is the adapter: every gateway contract it implements, in one layer.
+`PostgresDatabase.ts` prepares the SQL client, `PostgresDirectory.ts` reads across workspaces,
+`internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener
+that `PostgresSignalHub.ts` binds to each workspace, `PostgresTurns.ts` and `PostgresReads.ts` are
+the writer queue and read cap above, `CredentialKey.ts` seals credentials, `PostgresAccounts.ts`
+and `PostgresSignInStorage.ts` keep the host's accounts and sign-in, and
+`PostgresClusterStorage.ts` is the upkeep of Cluster's tables. Bindings and raw tables stay
+internal.
 Follow the [adapter conventions](../README.md).
 
 ## Development
 
-To change the schema, edit `src/internal/schema.ts`, remove the generated baseline in `drizzle/`, generate a
-new one, commit it, and reset development databases:
+To change the schema, edit `src/internal/schema.ts`, remove the generated baseline in `drizzle/`,
+generate a new one, commit it, and reset development databases:
 
 ```sh
 bun run --filter @amends-dev/storage-postgresql generate --name=workspace_storage

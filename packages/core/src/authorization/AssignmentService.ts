@@ -1,3 +1,11 @@
+/**
+ * The operations on assignments an actor calls: what they may do across the workspace, the roles on
+ * offer, a member's access, and giving, changing, and revoking a member's built-in roles. Each
+ * write authorizes the actor under `assignment.manage` and the `Delegation` rules, publishes
+ * through `AssignmentCommand`, and runs inside one journal commit; reads run outside any.
+ *
+ * @since 0.1.0
+ */
 import * as Scope from "./Scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -20,8 +28,45 @@ import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
 import { Changed, InactiveMember, MemberNotFound, NotFound } from "./AssignmentErrors.ts";
-export { Changed, InactiveMember, MemberNotFound, NotFound } from "./AssignmentErrors.ts";
+export {
+  /**
+   * The member's workspace role assignments are no longer the ones the caller expected: someone
+   * changed them meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Changed,
+  /**
+   * The member has been removed; roles are given to and taken from active members only.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  InactiveMember,
+  /**
+   * No member with this ID is recorded in the workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  MemberNotFound,
+  /**
+   * No assignment with this ID is recorded for the member.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+} from "./AssignmentErrors.ts";
 
+/**
+ * What the assignment operations can fail with: the outcomes in `AssignmentErrors`, delegation's,
+ * and the failures of what they depend on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Delegation.Error
   | MemberStore.Failure
@@ -32,8 +77,22 @@ export type Error =
   | InactiveMember
   | NotFound
   | Changed;
-/** Reading one's own permissions needs only active membership. */
+
+/**
+ * What `permissions` can fail with: authorization's failures but never `Denied`, since reading
+ * one's own permissions needs only active membership.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type PermissionsError = Exclude<Authorization.Error, Authorization.Denied>;
+
+/**
+ * The assignment operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class AssignmentService extends Context.Service<
   AssignmentService,
   {
@@ -47,22 +106,48 @@ export class AssignmentService extends Context.Service<
       PermissionsError,
       Actor.Actor
     >;
+    /** The three built-in roles, each with whether the actor may give it, under active membership. */
     readonly roles: Effect.Effect<ReadonlyArray<Assignment.RoleChoice>, Error, Actor.Actor>;
+    /**
+     * A member's access, under `assignment.read` on them: their active assignments, the roles on
+     * offer, and whether the actor may change them.
+     */
     readonly list: (memberId: Member.Id) => Effect.Effect<Assignment.Access, Error, Actor.Actor>;
+    /**
+     * Give a member a built-in role across the workspace, under `assignment.manage` and the
+     * delegation rules for the member and the role. A role they already hold is returned as it is,
+     * and other roles they hold stay.
+     */
     readonly assign: (
       input: Assignment.AssignInput,
     ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+    /**
+     * End one of a member's assignments, under `assignment.manage` and the delegation rules for the
+     * member and, for a role assignment, its role. Another member's assignment is `NotFound`; one
+     * already revoked is returned as it is.
+     */
     readonly revoke: (
       memberId: Member.Id,
       assignmentId: Assignment.Id,
     ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+    /**
+     * Replace a member's workspace roles with one, under `assignment.manage` and the delegation
+     * rules for the member, the new role, and each role replaced. The roles must be the ones the
+     * caller saw, or the change is `Changed`; a member holding that role alone is left as they are.
+     */
     readonly change: (
       input: Assignment.ChangeInput,
     ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/authorization/assignment/service/Service") {}
 
-/** @category constructors */
+/**
+ * Capture the stores, authorization, delegation, and the command; the workspace-wide permissions
+ * are taken from the catalog once.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.Return<
   AssignmentService["Service"],
   never,
@@ -226,5 +311,11 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   });
 });
 
-/** @category layers */
+/**
+ * Provide the assignment operations over the stores, authorization, delegation, the command, and
+ * the journal.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(AssignmentService, make());

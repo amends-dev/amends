@@ -1,3 +1,14 @@
+/**
+ * Turn jobs: one for each agent in each thread, which runs the agent's work there, one turn at a
+ * time, through `TurnExecution`, and stops its turn when asked. Core declares, as journal
+ * reactions, which facts request a job, in the commit that publishes them: activity that asks the
+ * agent for work, and a turn's end or retry, request a run; a request to stop a turn, the end of
+ * the agent's participation, and its leaving the thread's group request a stop. Hosts supply the
+ * service, shared by every workspace, and deliver each request to whatever runs turn jobs, as
+ * Cluster's `TurnJob` does; a host that runs none accepts requests and runs nothing.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Layer, Schema } from "effect";
 import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
 import type * as Event from "../journal/Event.ts";
@@ -13,12 +24,22 @@ import * as TurnFacts from "./TurnFacts.ts";
 import * as TurnStore from "./TurnStore.ts";
 import type * as Turn from "./Turn.ts";
 
-/** An agent's turn job: the work of one agent in one thread, named by its membership. */
+/**
+ * An agent's turn job: the work of one agent in one thread, named by its membership.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Job = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   memberId: MemberId.Id,
   threadId: ThreadId.Id,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Job extends Schema.Schema.Type<typeof Job> {}
 
 /**
@@ -28,6 +49,9 @@ export interface Job extends Schema.Schema.Type<typeof Job> {}
  * a turn and runs it, one turn at a time, and stops the turn when asked. Hosts supply it and
  * deliver each request to whatever runs turn jobs; a host that runs none accepts requests and
  * runs nothing, so work waits in agents' inboxes.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class TurnJobs extends Context.Service<
   TurnJobs,
@@ -51,13 +75,21 @@ export class TurnJobs extends Context.Service<
 /**
  * For a host that runs no turn jobs: requests are accepted and nothing runs, so work waits in
  * agents' inboxes until something runs it.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const noRunner: TurnJobs["Service"] = TurnJobs.of({
   requestRun: () => Effect.void,
   requestStop: () => Effect.void,
 });
 
-/** @category layers */
+/**
+ * Turn jobs for a host that runs none: `noRunner` as a layer.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layerNoRunner = Layer.succeed(TurnJobs, noRunner);
 
 /** A turn store failure, as the commit a reaction runs in fails with it. */
@@ -169,7 +201,15 @@ const stopTurnsInLeftGroup = Effect.fnUntraced(function* (event: Event.Record) {
       });
 });
 
-/** The facts that change an agent's work in a thread request its job, in the commit that publishes them. */
+/**
+ * The facts that change an agent's work in a thread request its job, in the commit that publishes
+ * them: recorded activity that asks an agent for work, and a turn's retry or end, request a run;
+ * a stop request, an ended participation, and a removal from a group request a stop of the turn
+ * they concern.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const reactions: ReadonlyArray<Reaction.Definition<TurnJobs | TurnStore.TurnStore>> = [
   { fact: ThreadActivityFacts.Recorded.name, react: runRequestedWork },
   { fact: TurnFacts.Retried.name, react: runWaitingWork },

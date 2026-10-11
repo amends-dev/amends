@@ -3,14 +3,30 @@
  * begins, telling their clients to reconnect, so a shutdown waits only for ordinary requests to
  * finish. A host provides it and completes it before its HTTP server stops, which otherwise waits
  * for every open response.
+ *
+ * @since 0.1.0
  */
 import { Context, Deferred, Effect, Layer } from "effect";
 
+/**
+ * The signal that the server has begun to shut down: a `Deferred` that completes as draining
+ * begins. `Streams` ends each open stream with its `unavailable` error when it completes; without
+ * it, streams end only on their own.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Draining extends Context.Service<Draining, Deferred.Deferred<void>>()(
   "@amends-dev/server-http/draining/Service",
 ) {}
 
-/** @category layers */
+/**
+ * Provides `Draining`, not yet complete. A host provides this one instance both to its routes and
+ * to `layerOnRelease`, which completes it.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(Draining, Deferred.make<void>());
 
 /**
@@ -18,6 +34,7 @@ export const layer = Layer.effect(Draining, Deferred.make<void>());
  * released first, as shutdown begins.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerOnRelease = Layer.effectDiscard(
   Effect.flatMap(Draining, (draining) =>

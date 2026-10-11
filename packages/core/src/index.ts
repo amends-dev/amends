@@ -1,3 +1,12 @@
+/**
+ * One workspace's core, composed from its domains: the application operations an actor calls,
+ * what jobs and hosts call outside requests, the journal they all commit through, and
+ * authorization over the permission catalog. Hosts bind storage to a workspace and supply
+ * cryptography, and a gateway resolves the acting member and runs the operations; `HostServices`,
+ * `Operations`, and `JobServices` name what each side provides and may call.
+ *
+ * @since 0.1.0
+ */
 import * as AgentPermissions from "./agent/AgentPermissions.ts";
 import * as AgentProjection from "./agent/AgentProjection.ts";
 import * as AgentService from "./agent/AgentService.ts";
@@ -44,11 +53,6 @@ import * as ChannelService from "./channel/ChannelService.ts";
 import * as DeliveryExecution from "./channel/DeliveryExecution.ts";
 import * as DeliveryJobs from "./channel/DeliveryJobs.ts";
 import * as DeliveryProjection from "./channel/DeliveryProjection.ts";
-/**
- * Compose one workspace's core from its domains. Hosts bind storage to a
- * workspace and supply cryptography; a gateway resolves the acting member and
- * runs the application operations.
- */
 import { Layer } from "effect";
 import * as ChangeFeedService from "./change-feed/ChangeFeedService.ts";
 import * as ChangeFeedSource from "./change-feed/ChangeFeedSource.ts";
@@ -92,6 +96,9 @@ import * as WorkspaceSettingsPermissions from "./workspace/WorkspaceSettingsPerm
 /**
  * Projections registered for journal publication, applied in this order. Each derives its records
  * from facts and its own store alone, so any order rebuilds the same read models.
+ *
+ * @category projections
+ * @since 0.1.0
  */
 export const projections = [
   WorkspaceProjection.definition,
@@ -118,6 +125,9 @@ export const projections = [
 /**
  * Permissions the domains declare; requirements and grants must name one of these. Their tiers
  * make the built-in role bundles, pinned by revision.
+ *
+ * @category permissions
+ * @since 0.1.0
  */
 export const permissions = [
   WorkspaceSettingsPermissions.Rename,
@@ -170,6 +180,9 @@ const activityResolvers = [
 /**
  * The workspace journal's log. A workspace that was never created has no batch in it, which
  * hosts can check without booting the workspace.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const journalLog = Log.Id.make("journal");
 
@@ -285,6 +298,7 @@ const jobServices = Layer.mergeAll(
  * authorization, and the permission catalog.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.mergeAll(operations, jobServices).pipe(
   Layer.provideMerge(Layer.mergeAll(journal, authorization)),
@@ -298,6 +312,7 @@ export const layer = Layer.mergeAll(operations, jobServices).pipe(
  * checking.
  *
  * @category models
+ * @since 0.1.0
  */
 export type HostServices = Layer.Services<typeof layer>;
 
@@ -307,6 +322,7 @@ export type HostServices = Layer.Services<typeof layer>;
  * permission checks each operation performs.
  *
  * @category models
+ * @since 0.1.0
  */
 export type Operations = Layer.Success<typeof operations>;
 
@@ -317,5 +333,6 @@ export type Operations = Layer.Success<typeof operations>;
  * channels received, never a protocol's handlers for an actor.
  *
  * @category models
+ * @since 0.1.0
  */
 export type JobServices = Layer.Success<typeof jobServices> | SessionLogStore.SessionLogStore;

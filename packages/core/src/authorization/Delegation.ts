@@ -1,3 +1,15 @@
+/**
+ * The rules for who may give, change, or take away a member's roles, which assigning, inviting,
+ * creating an agent, transferring ownership, and removing a member share: `AssignmentService`,
+ * `InvitationService`, `AgentService`, `OwnershipService`, and `MemberService` call them. Only the
+ * three built-in roles are delegated. Giving a role needs `assignment.manage`; Administrator is
+ * the owner's alone to give, and Owner is given by ownership transfer only. The owner is never a
+ * recipient, and a member holding a direct grant or any role but Member is changed by the owner
+ * alone, rather than guessing their authority. `recipientDenial` is the recipient rule as a pure
+ * function, for a screen deciding many members at once.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import * as Actor from "../identity/Actor.ts";
 import * as Member from "../workspace/Member.ts";
@@ -15,8 +27,47 @@ import * as Role from "./Role.ts";
 import * as RoleStore from "./RoleStore.ts";
 import { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./DelegationErrors.ts";
 import * as Store from "../journal/Store.ts";
-export { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./DelegationErrors.ts";
+export {
+  /**
+   * The actor may not delegate this: only the owner gives Administrator (`administrator-role`), and
+   * only the owner changes a member who holds a direct grant or a role other than Member
+   * (`protected-member`).
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Denied,
+  /**
+   * The owner is out of reach: Owner is given by ownership transfer alone, and the owner's own
+   * roles are changed by no one.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  OwnerProtected,
+  /**
+   * The built-in role is not recorded in this workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  RoleNotFound,
+  /**
+   * The role is not one of the three built-in ones; no other role is delegated.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  UnsupportedRole,
+} from "./DelegationErrors.ts";
 
+/**
+ * What a delegation check can fail with: the outcomes in `DelegationErrors`, authorization's, and
+ * the failures of the stores and catalog it reads.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Authorization.Error
   | WorkspaceStore.Failure
@@ -28,26 +79,52 @@ export type Error =
   | OwnerProtected
   | UnsupportedRole
   | RoleNotFound;
+
 /**
- * Read screens check current policy; write operations check it inside their commit.
+ * The delegation rules, bound to one workspace. Read screens check current policy to show what the
+ * actor may do; write operations check it inside their commit.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class Delegation extends Context.Service<
   Delegation,
   {
+    /**
+     * A built-in role as recorded, with each of its permissions this host declares checked to fit
+     * a workspace-wide grant; one it does not declare is kept and grants nothing. Any other role
+     * is `UnsupportedRole`.
+     */
     readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error>;
+    /** The member's active assignments, by role and direct grant alike. */
     readonly assignmentsFor: (
       memberId: Member.Id,
     ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Error>;
-    /** Requires assignment.manage. Only current ownership allows delegating Administrator. */
+    /**
+     * The role the actor may give, under `assignment.manage` on the workspace. Owner is never given
+     * here, and only the current owner gives Administrator.
+     */
     readonly requireGrant: (roleId: Role.Id) => Effect.Effect<Role.Record, Error, Actor.Actor>;
-    /** Operation permissions are checked by the caller. Owners are always protected. */
+    /**
+     * That the actor may change this member's roles, by `recipientDenial`. The caller checks the
+     * operation's own permission; the owner is always protected.
+     */
     readonly requireRecipient: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Actor>;
-    /** Authorized non-owners may leave without gaining authority to change their own roles. */
+    /**
+     * That the actor may remove this member: as `requireRecipient`, except that a member other
+     * than the owner may remove themself whatever roles they hold, without thereby gaining
+     * authority over their own roles.
+     */
     readonly requireRemoval: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/authorization/delegation/Service") {}
 
-/** One member an actor would change the roles of, or remove when `selfRemoval` is set. */
+/**
+ * One member an actor would change the roles of, or remove when `selfRemoval` is set.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Recipient {
   readonly workspaceId: Workspace.Id;
   readonly memberId: Member.Id;
@@ -55,7 +132,13 @@ export interface Recipient {
   readonly actorId: Member.Id;
   readonly selfRemoval: boolean;
 }
-/** Whether the rule depends on the recipient's assignments, so callers read them only then. */
+
+/**
+ * Whether the rule depends on the recipient's assignments, so callers read them only then.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const recipientNeedsAssignments = (recipient: Recipient) =>
   recipient.memberId !== recipient.ownerId &&
   recipient.actorId !== recipient.ownerId &&
@@ -63,8 +146,11 @@ export const recipientNeedsAssignments = (recipient: Recipient) =>
 /**
  * The delegation rule `requireRecipient` enforces, for callers deciding many members at once.
  * The owner is never a recipient. The owner may act on anyone else, and a member may leave.
- * Otherwise only Viewer-only or unassigned members are ordinary recipients: direct grants and
- * unfamiliar roles require the owner, rather than guessing their authority.
+ * Otherwise only members holding the Member role alone, or nothing, are ordinary recipients:
+ * direct grants and other roles require the owner, rather than guessing their authority.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const recipientDenial = (
   recipient: Recipient,
@@ -81,7 +167,13 @@ export const recipientDenial = (
     : undefined;
 };
 
-/** @category constructors */
+/**
+ * Capture the stores, authorization, and the catalog; read the owner, the actor, and assignments
+ * per call.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   Delegation["Service"],
   never,
@@ -175,5 +267,11 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   });
 });
 
-/** @category layers */
+/**
+ * Provide the delegation rules over the workspace stores, authorization, and the permission
+ * catalog.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(Delegation, make());

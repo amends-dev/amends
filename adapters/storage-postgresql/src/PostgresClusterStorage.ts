@@ -1,13 +1,21 @@
 /**
  * Upkeep of the tables Effect Cluster's SQL message storage keeps in this database, with its
  * default `cluster` prefix. Cluster never removes a message or its reply, so the host prunes
- * the ones it has handled.
+ * the ones it has handled with `prune`, and holds its runner address with `claimAddress` so that
+ * no two processes over the database run Cluster at one address.
+ *
+ * @since 0.1.0
  */
 import { DateTime, Effect, Schema } from "effect";
 import { Snowflake } from "effect/cluster";
 import * as PostgresDatabase from "./PostgresDatabase.ts";
 
-/** Another live process runs jobs at this runner address. */
+/**
+ * Another live process runs jobs at this runner address.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class AddressTaken extends Schema.TaggedError<AddressTaken>()(
   "PostgresClusterStorage.AddressTaken",
   { address: Schema.String },
@@ -22,6 +30,9 @@ export class AddressTaken extends Schema.TaggedError<AddressTaken>()(
  * kept for them, and return how many messages went. A message's ID carries when it was stored.
  * Messages not yet handled stay, however old, as do other entity types' messages. Each statement
  * removes at most `batch` messages (a thousand by default), so each stays short.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const prune = Effect.fn("PostgresClusterStorage.prune")(function* (
   entityTypes: ReadonlyArray<string>,
@@ -54,7 +65,10 @@ export const prune = Effect.fn("PostgresClusterStorage.prune")(function* (
  * two would share Cluster's machine ID, and the first to stop would remove the other's
  * registration. The claim is a session lock on a connection it keeps, released when the scope
  * closes or, if the process dies, when PostgreSQL ends its session, so a restart after a crash
- * can take the address at once.
+ * can take the address at once. Fails with `AddressTaken` while another process holds it.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(function* (
   address: string,

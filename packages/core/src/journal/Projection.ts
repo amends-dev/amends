@@ -1,3 +1,14 @@
+/**
+ * A projection keeps a read model from a log's facts: a named, versioned definition whose
+ * handlers, one for each fact version it subscribes to, write its domain store. A live projection
+ * runs inside each publication, in the publishing commit; one that is not live is rebuilt from
+ * the log by its `Runner`, in checkpointed batches, until it has caught up and goes live. Domains
+ * declare theirs with `make` and `.on(...)` in a `*Projection` module, and `Journal.layer`
+ * registers them. Handlers must be safe to replay: they perform no external actions and append
+ * nothing.
+ *
+ * @since 0.1.0
+ */
 import { Array, Context, Effect, Option, Schema } from "effect";
 import * as Checkpoint from "./Checkpoint.ts";
 import * as Entry from "./Entry.ts";
@@ -7,10 +18,23 @@ import type * as Log from "./Log.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
 
-/** The decoded event supplied to a handler for this fact. */
+/**
+ * The decoded event supplied to a handler for this fact.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Input<F extends Fact.Definition> = Event.Type<F>;
 
+/**
+ * One fact version a projection handles: its definition, with the decoder and handler that
+ * `Definition.on` built for it.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Subscription<E, R> {
+  /** The fact, at the version this subscription handles. */
   readonly fact: Fact.Definition;
   /** Validates a decoded event and applies it within the current transaction. */
   readonly apply: (
@@ -22,7 +46,12 @@ export interface Subscription<E, R> {
   ) => Effect.Effect<unknown, Schema.SchemaError | Event.FactMismatch, R>;
 }
 
-/** A versioned read-model definition with subscriptions in registration order. */
+/**
+ * A versioned read-model definition with subscriptions in registration order.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Definition<
   Name extends string = string,
   Version extends number = number,
@@ -30,8 +59,17 @@ export interface Definition<
   R = never,
 > {
   readonly name: Name;
+  /**
+   * Its read model's interpretation, apart from fact versions. A new version rebuilds from the
+   * log's beginning, with progress of its own, into a store the domain and host supply.
+   */
   readonly version: Version;
   readonly subscriptions: ReadonlyArray<Subscription<E, R>>;
+  /**
+   * Adds `handle` for `fact` at its version and returns a new definition. Register every
+   * historical version of a fact the projection needs; an unregistered version of a subscribed
+   * name fails with `UnsupportedFactVersion`.
+   */
   readonly on: <F extends Fact.Definition, E2, R2>(
     fact: F,
     handle: (event: Input<NoInfer<F>>) => Effect.Effect<void, E2, R2>,
@@ -85,6 +123,7 @@ const makeDefinition = <Name extends string, Version extends number, E, R>(
  * they must remain safe to replay without external actions or new publications.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = <const Name extends string, const Version extends number>(
   name: Name,
@@ -92,25 +131,68 @@ export const make = <const Name extends string, const Version extends number>(
 ): Definition<Name, Version> =>
   makeDefinition<Name, Version, never, never>(name, options.version, []);
 
+/**
+ * A registered projection is not live on the journal's log, so a commit that published would
+ * leave it behind; the publication rolls back. `journal.replay` rebuilds it, and then the command
+ * can be retried.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Behind extends Schema.TaggedError<Behind>()("Projection.Behind", {
   key: Checkpoint.Key,
 }) {}
-/** A version live on the log that this journal does not run, so its commits would skip it. */
+
+/**
+ * A version live on the log that this journal does not run, so its commits would skip it.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Unregistered extends Schema.TaggedError<Unregistered>()("Projection.Unregistered", {
   key: Checkpoint.Key,
 }) {}
+
+/**
+ * A projection's progress cannot be followed: its checkpoint names no entry of the log or splits a
+ * committed batch, or the log returned an empty batch or lacks its head batch.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidCheckpoint extends Schema.TaggedError<InvalidCheckpoint>()(
   "Projection.InvalidCheckpoint",
   { key: Checkpoint.Key, message: Schema.String },
 ) {}
+
+/**
+ * A projection subscribes to a fact's name, but not at the version an entry records.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnsupportedFactVersion extends Schema.TaggedError<UnsupportedFactVersion>()(
   "Projection.UnsupportedFactVersion",
   { key: Checkpoint.Key, name: Schema.String, version: Schema.Finite },
 ) {}
+
+/**
+ * A journal was given the same projection version twice.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Duplicate extends Schema.TaggedError<Duplicate>()("Projection.Duplicate", {
   key: Checkpoint.Key,
 }) {}
-/** An expected decoder or handler failure, preserving its original error. */
+
+/**
+ * An expected decoder or handler failure, preserving its original error in `cause`, with the
+ * projection, the entry it failed at, and the phase, `decode` or `apply`.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("Projection.Failure", {
   key: Checkpoint.Key,
   cursor: Checkpoint.Cursor,
@@ -118,6 +200,13 @@ export class Failure extends Schema.TaggedError<Failure>()("Projection.Failure",
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * What applying, rebuilding, or registering a projection can fail with, including the commit's
+ * own errors.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Transaction.Error
   | Schema.SchemaError
@@ -128,11 +217,25 @@ export type Error =
   | UnsupportedFactVersion
   | Failure;
 
-/** Whether a live version is this key's projection at this key's version. */
+/**
+ * Whether a live version is this key's projection at this key's version.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const isVersion = (key: Checkpoint.Key) => (live: Checkpoint.LiveVersion) =>
   live.name === key.name && live.version === key.version;
 
+/**
+ * Runs one projection on one log: applies each new event in the publishing commit while the
+ * projection is live, and rebuilds it from the log while it is not. `makeRunner` builds one, and
+ * `Journal` builds one for each registered projection.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Runner {
+  /** The log, name, and version its progress is kept under. */
   readonly key: Checkpoint.Key;
   /** Whether this projection handles facts of this name, at any version. */
   readonly subscribes: (name: string) => boolean;
@@ -170,6 +273,9 @@ const toCursor = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
  * Replace a log's live versions in the current transaction. A version leaving the set was live,
  * so it applied every commit through the log's head: its progress moves to the head's last
  * entry, and rebuilding it later applies only the commits it missed, never earlier ones again.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const replaceLive = Effect.fnUntraced(function* (
   checkpoint: Checkpoint.Checkpoint["Service"],
@@ -204,6 +310,7 @@ export const replaceLive = Effect.fnUntraced(function* (
  * scope. A new version needs a fresh target or a domain-managed migration.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(options: {
   readonly definition: Definition<string, number, E, R>;

@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `WorkspaceStore` from `../workspace/WorkspaceStore.ts`, over the
+ * workspace's `Binding`: the bound workspace's one record, keyed by its ID. It keeps what the
+ * contract leaves to storage: a second insert conflicts, and a rename or ownership transfer is a
+ * conditional write that conflicts unless the stored name or owner is still the one the change
+ * replaces. `WorkspaceStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Workspace, WorkspaceStore } from "../workspace/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -10,6 +19,7 @@ const rows = Rows.make(Schema.fromJsonString(Workspace.Record));
  * Workspace metadata, with ownership changes guarded by the previous owner.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Workspaces.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
@@ -66,8 +76,9 @@ export const make = Effect.fn("Workspaces.make")(function* () {
 });
 
 /**
- * Provide WorkspaceStore.WorkspaceStore using its constructor and the caller's dependencies.
+ * Provide workspace storage over the caller's binding.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(WorkspaceStore.WorkspaceStore, make());

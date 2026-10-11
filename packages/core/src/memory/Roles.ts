@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `RoleStore` from `../authorization/RoleStore.ts`, over the
+ * workspace's `Binding`: roles, and the revision of the built-in roles the workspace was last
+ * given, as one row. It keeps what the contract leaves to storage: a reused ID conflicts, renaming
+ * or setting permissions of a missing role conflicts, and a built-in revision no later than the
+ * recorded one conflicts. `RoleStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { BuiltinRoles, Role, RoleStore } from "../authorization/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -13,6 +22,7 @@ const revisionKey = "builtin";
  * Named permission bundles; edits keep the role's identity.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Roles.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
@@ -79,8 +89,9 @@ export const make = Effect.fn("Roles.make")(function* () {
 });
 
 /**
- * Provide RoleStore.RoleStore using its constructor and the caller's dependencies.
+ * Provide role storage over the caller's binding.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(RoleStore.RoleStore, make());

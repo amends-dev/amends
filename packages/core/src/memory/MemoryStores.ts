@@ -1,3 +1,11 @@
+/**
+ * Every store core requires, and the signal hub, merged over one workspace binding. `layer` is
+ * what a host builds for each workspace it opens: the gateway's memory workspace storage builds
+ * it over the host's `MemoryConnection`, and core's tests build it the same way. Adding a store
+ * adds a line to `layerStores`.
+ *
+ * @since 0.1.0
+ */
 import type { Workspace } from "../workspace/index.ts";
 import { Layer } from "effect";
 import * as Agents from "./Agents.ts";
@@ -71,6 +79,7 @@ const layerStores = Layer.mergeAll(
  * close at once.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (workspaceId: Workspace.Id) =>
   layerStores.pipe(Layer.provide(Binding.layer(workspaceId)));

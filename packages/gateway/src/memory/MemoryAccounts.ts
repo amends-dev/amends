@@ -1,3 +1,11 @@
+/**
+ * The host's accounts in process memory, the reference implementation of `Accounts.Accounts`: a
+ * table of addresses by human ID in `MemoryDatabase`, beside every workspace's state, so every
+ * host over the same database sees one account per address. New human IDs are random UUIDs from
+ * the host's cryptography.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "@amends-dev/core/identity";
 import { MemoryDatabase } from "@amends-dev/core/memory";
 import { Crypto, Effect, Layer } from "effect";
@@ -8,6 +16,7 @@ import * as Accounts from "../Accounts.ts";
  * ID.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("MemoryAccounts.make")(function* () {
   const accounts = MemoryDatabase.table(yield* MemoryDatabase.MemoryDatabase, "accounts");
@@ -36,8 +45,9 @@ export const make = Effect.fn("MemoryAccounts.make")(function* () {
 });
 
 /**
- * Provide Accounts.Accounts using its constructor and the caller's dependencies.
+ * Provide `Accounts.Accounts` over the `MemoryDatabase` and `Crypto.Crypto` beneath it.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Accounts.Accounts, make());

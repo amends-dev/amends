@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `TurnStore.TurnStore`, over the `turns` table: one row per turn, with
+ * the harness, model, and sandbox it started on as columns, set all together or not at all, and
+ * its retry as a pair of columns. `TurnStore.make` checks every input before the driver sees it, so
+ * the driver keeps only what storage keeps: the primary key refuses a reused ID and
+ * `active_turn_by_agent_thread` a second active turn for one agent and thread, each as the store's
+ * `Conflict`, and an update that finds no row conflicts. Every statement is scoped to the
+ * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
+ * and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Thread } from "@amends-dev/core/thread";
 import { Turn, TurnStore } from "@amends-dev/core/turn";
 import { Member } from "@amends-dev/core/workspace";
@@ -78,7 +90,13 @@ const toRow = ({ selection, retry, ...record }: Turn.Record): typeof turns.$infe
 });
 const activeStatuses = ["queued", "running", "cancelling"] as const;
 
-/** Turn records in the workspace's database. @category constructors */
+/**
+ * Builds the turn store for the binding's workspace: this module's driver inside
+ * `TurnStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("TurnRecords.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -177,5 +195,10 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
   return TurnStore.make(workspaceId, driver);
 });
 
-/** Provide turn storage over the caller's binding. @category layers */
+/**
+ * Provides `TurnStore.TurnStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(TurnStore.TurnStore, make());

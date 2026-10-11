@@ -1,3 +1,14 @@
+/**
+ * The writes to groups that operations share, run inside the caller's commit: admitting a member
+ * to a group, ending an admission, and establishing the direct group for a set of members.
+ * `GroupService` admits a new team's members through it, `GroupMembershipService` admits and
+ * removes through it, `MemberService` ends every admission of a member removed from the workspace,
+ * and `ThreadService` establishes a direct group before starting its first thread there. The
+ * caller owns authorization and the commit; this service checks neither. Internal: not among
+ * `Core.Operations`.
+ *
+ * @since 0.1.0
+ */
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { DateTime, PlatformError } from "effect";
 import type * as Event from "../journal/Event.ts";
@@ -14,15 +25,39 @@ import * as GroupStore from "./GroupStore.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipFacts from "./GroupMembershipFacts.ts";
 
-/** A requested member is missing or no longer active in this workspace. */
+/**
+ * A requested member is missing or no longer active in this workspace.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Unavailable extends Schema.TaggedError<Unavailable>()("GroupCommand.Unavailable", {
   memberId: Member.Id,
 }) {}
 
+/**
+ * What admitting a member can fail with: publishing the admission.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type AdmitError = PlatformError.PlatformError | Log.WriteError | Projection.Error;
 
+/**
+ * What ending an admission can fail with: publishing the departure.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RemoveError = Log.WriteError | Projection.Error;
 
+/**
+ * What establishing a direct group can fail with: a member who cannot be in one, and the reads
+ * and admissions creating one depends on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type EstablishError =
   | Unavailable
   | GroupStore.Failure
@@ -30,12 +65,25 @@ export type EstablishError =
   | Schema.SchemaError
   | AdmitError;
 
+/**
+ * The direct group for a set of members, and whether this call created it or found it.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Established {
   readonly group: Group.DirectRecord;
   /** This call created the group, rather than finding it. */
   readonly created: boolean;
 }
 
+/**
+ * A new admission and the fact that recorded it, so a caller can name it as the cause of what
+ * follows.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Admitted {
   readonly membership: GroupMembership.Record;
   /** The fact that admitted the member, for what it causes. */
@@ -44,6 +92,11 @@ export interface Admitted {
 
 /**
  * @effect-expect-leaking Transaction
+ *
+ * The shared writes of groups. Internal: not among `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class GroupCommand extends Context.Service<
   GroupCommand,
@@ -79,7 +132,13 @@ export class GroupCommand extends Context.Service<
   }
 >()("@amends-dev/core/group/command/Service") {}
 
-/** Capture domain dependencies without capturing actor or transaction authority. @category constructors */
+/**
+ * Capture the group and member stores and the journal, but no actor or transaction: every write
+ * runs in the caller's.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupCommand.make")(function* () {
   const groupStore = yield* GroupStore.GroupStore;
   const memberStore = yield* MemberStore.MemberStore;
@@ -155,5 +214,10 @@ export const make = Effect.fn("GroupCommand.make")(function* () {
   return GroupCommand.of({ admitMember, removeMembership, establishDirect });
 });
 
-/** Internal writes shared by group, thread, and member operations: callers own authorization and the commit. @category layers */
+/**
+ * Provide the shared writes over the group and member stores and the journal.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupCommand, make());

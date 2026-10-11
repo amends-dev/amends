@@ -1,3 +1,11 @@
+/**
+ * Implements `AgentsGroup`. Each handler enters the workspace as the principal's membership through
+ * `Gateway.asMember` and calls one `AgentService` operation, merging the path's agent ID, the body,
+ * and the `Idempotency-Key` header into its input. `Routes` composes its `layer` with the other
+ * groups'.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import { AgentService } from "@amends-dev/core/agent";
 import type { Actor } from "@amends-dev/core/identity";
@@ -10,6 +18,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * Register the handlers of agents, capturing the gateway and reading the principal per request.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

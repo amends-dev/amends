@@ -1,3 +1,10 @@
+/**
+ * The operations on following an actor calls: following a team group and unfollowing it, for
+ * oneself or for an agent one may use. Following one thread is `ThreadParticipationService`.
+ * Each operation authorizes the actor itself and writes inside one journal commit.
+ *
+ * @since 0.1.0
+ */
 import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -26,12 +33,43 @@ import {
   NotFollowable,
 } from "./GroupFollowErrors.ts";
 export {
+  /**
+   * Only an agent can be made to follow by another member; people follow for themselves.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   AgentRequired,
+  /**
+   * Missing, foreign, and groups the actor does not belong to share this outcome.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   GroupNotFound,
+  /**
+   * The named member is missing, inactive, or not a current member of the group.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   MemberUnavailable,
+  /**
+   * A direct group's members already take part in all of its threads.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFollowable,
 } from "./GroupFollowErrors.ts";
 
+/**
+ * What following and unfollowing can fail with: the outcomes in `GroupFollowErrors`, and the
+ * failures of what they depend on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Authorization.Error
   | GroupStore.Failure
@@ -47,13 +85,19 @@ export type Error =
   | MemberUnavailable
   | AgentRequired;
 
+/**
+ * The follow operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class GroupFollowService extends Context.Service<
   GroupFollowService,
   {
     /**
-     * Follow a team group, so that threads started there afterwards admit the member. Members follow
-     * for themselves under `group.follow`; making an agent member follow needs `agent.use` for it.
-     * The actor must belong to the group. Following again while following changes nothing.
+     * Follow a team group, so that threads started there afterwards admit the member. Members
+     * follow for themselves under `group.follow`; making an agent member follow needs `agent.use`
+     * for it. The actor must belong to the group. Following again while following changes nothing.
      */
     readonly follow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Actor>;
     /**
@@ -65,7 +109,13 @@ export class GroupFollowService extends Context.Service<
   }
 >()("@amends-dev/core/group/follow/service/Service") {}
 
-/** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
+/**
+ * Capture the stores, the shared group read, the journal, and authorization; resolve authority
+ * inside each commit.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupFollowService.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const groupQuery = yield* GroupQuery.GroupQuery;
@@ -171,5 +221,11 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
   return GroupFollowService.of({ follow, unfollow });
 });
 
-/** @category layers */
+/**
+ * Provide the follow operations over the stores, the shared group read, the journal, and
+ * authorization.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupFollowService, make());

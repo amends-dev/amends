@@ -139,7 +139,7 @@ the
 
 ### Permissions and built-in roles
 
-Declare a permission beside its owning feature and register it in `core.ts`. Every declaration
+Declare a permission beside its owning feature and register it in `index.ts`. Every declaration
 chooses its `builtinTier`, `member`, `administrator`, or `owner`; groups supply a name prefix and a
 default target kind, but never a tier:
 
@@ -496,9 +496,9 @@ stored fails the commit, and neither replay nor a retried publication asks again
   carries what the thread's contacts were told to the conversation, through `DeliveryExecution`.
   Activity that tells a contact something requests it.
 
-`TurnJobs.TurnJobs` and `DeliveryJobs.DeliveryJobs` are host services, shared by every workspace, which
-deliver each request to whatever runs the jobs; each one's `layerNoRunner` accepts requests and runs
-nothing. A host's jobs reach `JobServices` through the gateway's `inWorkspace`.
+`TurnJobs.TurnJobs` and `DeliveryJobs.DeliveryJobs` are host services, shared by every workspace,
+which deliver each request to whatever runs the jobs; each one's `layerNoRunner` accepts requests
+and runs nothing. A host's jobs reach `JobServices` through the gateway's `inWorkspace`.
 [Cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` run them, as the local host does.
 
 ## Change feed
@@ -526,16 +526,16 @@ its view. `Ready`'s cursor is null only for an empty journal.
 
 A reader sees an event when they hold a scope in its fact's
 [audience](../../docs/journal.md#fact-audiences), the workspace, their membership or identity, or a
-group they belong to, and any read permission the registry in `src/change-feed/ChangeFeedEvents.ts` names for
-it: `invitation.manage` for invitations, `member.read` and `assignment.read` for membership and
-access changes, `group.read` for group facts, and `thread.read` for thread facts. A registration can
-name the member a fact concerns, who sees it without the permission. Their membership, admissions,
-and grants are read after the subscription registers and reloaded before filtering a commit that
-changes them, so a commit that admits the reader delivers what it admits. The commit that removes
-the reader from the workspace is delivered, then the stream ends. Registry views give some facts
-their public shape: activity omits its recipients, and participation omits routing identities and
-admissions. A core test checks that the registry holds every fact that declares an audience, at each
-version, and no other.
+group they belong to, and any read permission the registry in `src/change-feed/ChangeFeedEvents.ts`
+names for it: `invitation.manage` for invitations, `member.read` and `assignment.read` for
+membership and access changes, `group.read` for group facts, and `thread.read` for thread facts. A
+registration can name the member a fact concerns, who sees it without the permission. Their
+membership, admissions, and grants are read after the subscription registers and reloaded before
+filtering a commit that changes them, so a commit that admits the reader delivers what it admits.
+The commit that removes the reader from the workspace is delivered, then the stream ends. Registry
+views give some facts their public shape: activity omits its recipients, and participation omits
+routing identities and admissions. A core test checks that the registry holds every fact that
+declares an audience, at each version, and no other.
 
 Recorded thread activity also carries the notifications it creates: each recipient's arrives in the
 same `Committed` message, exactly as the inbox lists it, and nobody else sees it. A commit with
@@ -690,8 +690,8 @@ implementation exports `make`, which constructs it, and `layer`, which provides 
 inside the Effect, so evaluating one twice builds two implementations, and return `Service.of(...)`.
 Actor identity and the active transaction are resolved during each operation, never at construction.
 Contracts implemented elsewhere, such as stores, `SignalHub.SignalHub`, `Actor.Actor`,
-`Publication.Publication`, and `Store.Transaction`, have no `make` or `layer` here. `core.ts` composes
-the layers and implements nothing itself.
+`Publication.Publication`, and `Store.Transaction`, have no `make` or `layer` here. `index.ts`
+composes the layers and implements nothing itself.
 
 ```ts
 import { Log, Transaction } from "@amends-dev/core/journal";

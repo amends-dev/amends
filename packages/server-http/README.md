@@ -15,16 +15,16 @@ the endpoints only a person may call.
 
 ## Use
 
-A host supplies `Gateway.Gateway`, `Accounts.Accounts`, `SignIn.SignIn`, `SessionTokens.SessionTokens`,
-`WorkspaceDirectory.WorkspaceDirectory`, and its platform's HTTP services, then mounts the routes with
-`HttpRouter.serve` or `HttpRouter.toWebHandler`:
+A host supplies `Gateway.Gateway`, `Accounts.Accounts`, `SignIn.SignIn`,
+`SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, and its platform's HTTP
+services, then mounts the routes with `HttpRouter.serve` or `HttpRouter.toWebHandler`:
 
 - `Routes.layer` registers every group, with the OpenAPI document at `/openapi.json`.
 - `Routes.layerDocs` serves interactive documentation at `/docs`.
 - `Routes.layerHandlers` is the group layers and authentication alone, for tests.
-- `BearerAuthentication.make()` builds the contract's `Authentication` from `SessionTokens.SessionTokens`,
-  and `BearerAuthentication.layer` provides it. Each request resolves its own bearer token and
-  supplies its own `Principal` and `Credential`.
+- `BearerAuthentication.make()` builds the contract's `Authentication` from
+  `SessionTokens.SessionTokens`, and `BearerAuthentication.layer` provides it. Each request resolves
+  its own bearer token and supplies its own `Principal` and `Credential`.
 
 ## Handlers
 

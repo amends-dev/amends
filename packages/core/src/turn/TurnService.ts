@@ -1,3 +1,13 @@
+/**
+ * The operations on turns an actor calls: reading a thread's turns as `Turn.View`s and the
+ * workspace's active ones, following a turn's session log as it grows, asking an active turn to
+ * stop, and retrying a failed or stopped one. A turn in a thread outside the reader's audience is
+ * `NotFound`; reading needs `thread.read` on the thread, and stopping or retrying needs directing
+ * the turn's agent. Running turns is `TurnExecution`'s, for each agent's turn job; this service
+ * only asks, through the commits it makes.
+ *
+ * @since 0.1.0
+ */
 import {
   Context,
   Crypto,
@@ -38,8 +48,38 @@ import * as SessionLog from "./SessionLog.ts";
 import * as SessionLogStore from "./SessionLogStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
-export { NotActive, NotFound, NotRetryable } from "./TurnErrors.ts";
+export {
+  /**
+   * The turn has already finished, or is not in the state the operation needs.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotActive,
+  /**
+   * Missing turns, and turns in threads the reader cannot open, share this outcome.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+  /**
+   * The turn cannot be retried now, for `reason`: it is still active, it completed, a later turn of
+   * its agent superseded it, or its agent no longer takes part in the thread.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotRetryable,
+} from "./TurnErrors.ts";
 
+/**
+ * What reading a turn can fail with: `NotFound`, a denied `thread.read`, and the failures of what
+ * a read depends on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError =
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | Exclude<Authorization.Error, Authorization.Denied>
@@ -47,17 +87,61 @@ export type ReadError =
   | ThreadParticipationStore.Failure
   | Schema.SchemaError
   | NotFound;
+
+/**
+ * What listing active turns can fail with: `ReadError` but `NotFound`, since turns the reader may
+ * not read are left out.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ActiveError = Exclude<ReadError, NotFound>;
+
+/**
+ * What opening a turn's log can fail with: `ReadError`, the session log store's failures, and
+ * `Turn.LogUnavailable`.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type WatchError = ReadError | SessionLogStore.Failure | Turn.LogUnavailable;
+
+/**
+ * What stopping or retrying a turn can fail with beyond its own outcome: `ReadError`, and the
+ * failures of the commit that records the change.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ChangeError =
   | ReadError
   | PlatformError.PlatformError
   | SessionLogStore.Failure
   | Projection.Error
   | TurnCommand.EndError;
+
+/**
+ * What `cancel` can fail with: `ChangeError`, or `NotActive` for a turn that already ended.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type CancelError = ChangeError | NotActive;
+
+/**
+ * What `retry` can fail with: `ChangeError`, or `NotRetryable` with the reason.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RetryError = ChangeError | NotRetryable;
 
+/**
+ * The turn operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class TurnService extends Context.Service<
   TurnService,
   {
@@ -125,7 +209,13 @@ const endsTurn = (delivery: Source.Delivery, turnId: Turn.Id) =>
       event.payload.turnId === turnId,
   );
 
-/** @category constructors */
+/**
+ * The service over the turn and participation stores, the session log store, the thread query,
+ * authorization, the turn command, the journal, the signal hub, and the change feed.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("TurnService.make")(function* () {
   const turnStore = yield* TurnStore.TurnStore;
   const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
@@ -431,5 +521,10 @@ export const make = Effect.fn("TurnService.make")(function* () {
   return TurnService.of({ get, listActive, watchLog, cancel, retry });
 });
 
-/** @category layers */
+/**
+ * The turn operations, built by `make` from the workspace's services.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(TurnService, make());

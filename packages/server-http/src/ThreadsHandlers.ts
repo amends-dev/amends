@@ -1,3 +1,12 @@
+/**
+ * Implements `ThreadsGroup`. Each handler enters the workspace as the principal's membership
+ * through `Gateway.asMember` and calls one core operation: `ThreadService` for listing, starting,
+ * reading, and renaming threads, `ThreadMessageService` for replying, editing, deleting, and
+ * typing, `ThreadParticipationService` for following, and `ReadStateService.markThreadRead`. It
+ * merges the path's IDs, the body, and the `Idempotency-Key` header into the operation's input.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import { ReadStateService } from "@amends-dev/core/read-state";
 import {
@@ -13,6 +22,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * Register thread handlers, capturing the gateway and reading the principal per request.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

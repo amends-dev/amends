@@ -1,3 +1,11 @@
+/**
+ * The memory implementation of `ChannelStore` from `../channel/ChannelStore.ts`, over the
+ * workspace's `Binding`. It keeps what the contract leaves to storage: a reused ID conflicts, and
+ * so does an update of a missing channel. `ChannelStore.make` checks every input before this
+ * driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Channel, ChannelStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -6,7 +14,12 @@ import * as Rows from "./Rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Channel.Record));
 
-/** Channel records over the current workspace transaction. @category constructors */
+/**
+ * Channel records over the current workspace transaction.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Channels.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const driver: ChannelStore.ChannelStore["Service"] = {
@@ -51,5 +64,10 @@ export const make = Effect.fn("Channels.make")(function* () {
   return ChannelStore.make(workspaceId, driver);
 });
 
-/** Provide channel storage over the caller's binding. @category layers */
+/**
+ * Provide channel storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ChannelStore.ChannelStore, make());

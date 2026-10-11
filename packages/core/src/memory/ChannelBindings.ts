@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `ChannelBindingStore` from `../channel/ChannelBindingStore.ts`, over
+ * the workspace's `Binding`. Bindings are keyed by thread. It keeps what the contract leaves to
+ * storage: a thread binds to one conversation and a channel's conversation to one thread, so a
+ * second binding of either conflicts. `ChannelBindingStore.make` checks every input before this
+ * driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { ChannelBinding, ChannelBindingStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -6,7 +15,12 @@ import * as Rows from "./Rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(ChannelBinding.Record));
 
-/** Channel bindings over the current workspace transaction, keyed by thread. @category constructors */
+/**
+ * Channel bindings over the current workspace transaction, keyed by thread.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ChannelBindings.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const driver: ChannelBindingStore.ChannelBindingStore["Service"] = {
@@ -53,5 +67,10 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
   return ChannelBindingStore.make(workspaceId, driver);
 });
 
-/** Provide channel binding storage over the caller's binding. @category layers */
+/**
+ * Provide channel binding storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ChannelBindingStore.ChannelBindingStore, make());

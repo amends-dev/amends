@@ -1,3 +1,13 @@
+/**
+ * The storage contract for logs, which every storage adapter implements for one workspace. `Store`
+ * appends to and reads the workspace's logs, opens native transactions, and waits for appends;
+ * `Transaction` is the handle a native transaction provides, through which a commit's log appends,
+ * projection store writes, and checkpoint writes enlist in one commit. The coordinator in
+ * `Transaction.Transaction` runs commits over this contract, and `Log` reads and writes through
+ * it; `make` checks every input before an adapter's driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import * as Commit from "./Commit.ts";
@@ -7,21 +17,62 @@ import * as Occurrence from "./Occurrence.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as StoreInput from "./StoreInput.ts";
 
-/** Domain journals provide a fact header; generic logs provide only payload bytes. */
+/**
+ * What an entry stores. Domain journals provide a fact header, `Event.Header`, beside the encoded
+ * payload; generic logs provide only payload bytes.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Content = Schema.Struct({
   payload: Schema.Uint8Array,
   fact: Schema.optionalKey(Event.Header),
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Content extends Schema.Schema.Type<typeof Content> {}
 
-/** Complete persisted entry, with queryable metadata beside the payload. */
+/**
+ * Complete persisted entry, with queryable metadata beside the payload: its content, where it is,
+ * and which commit recorded it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Entry = Schema.Struct({ ...LogEntry.Metadata.fields, ...Content.fields });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Entry extends Schema.Schema.Type<typeof Entry> {}
 
+/**
+ * An entry's place in its log: its batch's position and its index in that batch. Fact reads page
+ * by it, exclusively, so a page can end inside a commit.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Cursor = Schema.Struct({ position: LogEntry.Position, index: Schema.Natural });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Cursor extends Schema.Schema.Type<typeof Cursor> {}
 
-/** Entry pagination is independent of the complete-batch replay cursor. */
+/**
+ * A page of fact entries: those matching a name, a subject, or both, and a version only with a
+ * name, after the exclusive `after` cursor and at most `limit`. Entry pagination is independent of
+ * the complete-batch replay cursor.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const ReadFactsOptions = Schema.Struct({
   name: Schema.optionalKey(Event.Header.fields.name),
   subject: Schema.optionalKey(Event.Header.fields.subject),
@@ -37,34 +88,93 @@ export const ReadFactsOptions = Schema.Struct({
     return undefined;
   }),
 );
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface ReadFactsOptions extends Schema.Schema.Type<typeof ReadFactsOptions> {}
 
-/** All entries written to one log by one commit. */
+/**
+ * All entries written to one log by one commit.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Batch = Schema.Struct({
   logId: LogEntry.LogId,
   position: LogEntry.Position,
   commit: Commit.Record,
   entries: Schema.NonEmptyArray(Entry),
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Batch extends Schema.Schema.Type<typeof Batch> {}
 
+/**
+ * A page of complete batches: those after the exclusive `after` position, or from the log's
+ * beginning, and at most `limit`.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const ReadOptions = Schema.Struct({
   after: Schema.optionalKey(LogEntry.Position),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
-/** Identifies one append occurrence within a workspace and log, across retries. */
+/**
+ * Identifies one append occurrence within a workspace and log, across retries; `Occurrence.Key`.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const IdempotencyKey = Occurrence.Key;
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type IdempotencyKey = typeof IdempotencyKey.Type;
 
+/**
+ * How an append is conditioned: on the log's current position, and on whether a key already
+ * names it.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const AppendOptions = Schema.Struct({
   /** None requires an empty log; Some requires the specified current position. */
   expectedAfter: Schema.optionalKey(Schema.Option(LogEntry.Position)),
+  /**
+   * Names the append: a retry with the same content returns the original entries, and different
+   * content conflicts.
+   */
   idempotencyKey: Schema.optionalKey(IdempotencyKey),
 });
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface AppendOptions extends Schema.Schema.Type<typeof AppendOptions> {}
 
+/**
+ * One append as storage receives it: the log, the entries' contents in order, and the append's
+ * options. A keyed append holds at least one entry.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const AppendInput = Schema.Struct({
   logId: LogEntry.LogId,
   entries: Schema.Array(Content),
@@ -76,9 +186,20 @@ export const AppendInput = Schema.Struct({
       : "A keyed append must contain at least one entry",
   ),
 );
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface AppendInput extends Schema.Schema.Type<typeof AppendInput> {}
 
-/** A durable key binds the exact slice written by one append, not its entire commit. */
+/**
+ * A durable key binds the exact slice written by one append, not its entire commit: storage keeps
+ * the key with its commit, the first index and count of its slice, and the entries, which a retry
+ * returns.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const AppendReceipt = Schema.Struct({
   logId: LogEntry.LogId,
   key: IdempotencyKey,
@@ -104,9 +225,18 @@ export const AppendReceipt = Schema.Struct({
     return undefined;
   }),
 );
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface AppendReceipt extends Schema.Schema.Type<typeof AppendReceipt> {}
 
-/** Compare encoded append intent byte for byte, preserving payload order. */
+/**
+ * Compare encoded append intent byte for byte, preserving payload order.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const samePayloads = (
   left: ReadonlyArray<Uint8Array>,
   right: ReadonlyArray<Uint8Array>,
@@ -122,7 +252,15 @@ export const samePayloads = (
   });
 
 const sameHeader = Schema.toEquivalence(Schema.UndefinedOr(Event.Header));
-/** Native retries compare the complete content, including structured attribution. */
+
+/**
+ * Native retries compare the complete content, including structured attribution: payloads byte
+ * for byte, and fact headers by value. Storage adapters check a keyed retry against its original
+ * append with it.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const sameContents = (
   left: ReadonlyArray<Content>,
   right: ReadonlyArray<Content>,
@@ -132,25 +270,54 @@ export const sameContents = (
     right.map((entry) => entry.payload),
   ) && left.every((entry, index) => sameHeader(entry.fact, right[index]?.fact));
 
+/**
+ * Storage failed while reading or writing a log, a checkpoint, or a transaction.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("JournalStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * A write disagreed with what is stored or with the workspace: a malformed or foreign input, an
+ * expected position that has moved, an idempotency key recorded with other content, or
+ * contention that storage reports rather than waits out.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("JournalStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
+/**
+ * Storage could not confirm whether a commit took effect. `commitId` names it for reconciliation;
+ * retrying the same keyed intent reuses a first attempt that committed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class CommitUncertain extends Schema.TaggedError<CommitUncertain>()(
   "JournalStore.CommitUncertain",
   { commitId: Commit.Id, cause: Schema.Defect() },
 ) {}
 
-/** Host-owned write handle shared by all logs and participating projection stores. */
+/**
+ * Host-owned write handle shared by all logs and participating projection stores: the handle of
+ * one native transaction, which `Store.transaction` provides to its program. Every log append,
+ * projection store write, and checkpoint write requires it and enlists in its commit.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Transaction extends Context.Service<
   Transaction,
   {
+    /** The commit's ID, which its entries record. */
     readonly id: Commit.Id;
     /**
      * Append in request order, assigning unique ids, timestamps, and log positions.
@@ -223,11 +390,15 @@ export class Store extends Context.Service<
       request: AppendInput,
     ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict | CommitUncertain>;
 
-    /** Reads use the current transaction when present, otherwise committed state. */
+    /**
+     * One entry of the log by ID, or None. Reads use the current transaction when present,
+     * otherwise committed state.
+     */
     readonly getEntry: (
       logId: LogEntry.LogId,
       entryId: LogEntry.Id,
     ) => Effect.Effect<Option.Option<Entry>, Failure>;
+    /** The batch commit `commitId` appended to the log, or None when it did not touch the log. */
     readonly get: (
       logId: LogEntry.LogId,
       commitId: Commit.Id,
@@ -250,7 +421,10 @@ export class Store extends Context.Service<
       options: ReadOptions,
     ) => Effect.Effect<ReadonlyArray<Batch>, Failure>;
 
-    /** Filter in storage and page individual facts by (position, index), across versions by default. */
+    /**
+     * Filter in storage and page individual facts by (position, index), across versions by
+     * default.
+     */
     readonly readFacts: (
       logId: LogEntry.LogId,
       options: ReadFactsOptions,
@@ -275,6 +449,9 @@ export class Store extends Context.Service<
 /**
  * Run what a committed transaction's `afterCommit` collected, in order, logging each failure
  * rather than passing it on: the commit already happened. For storage adapters.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const runAfterCommit = (effects: ReadonlyArray<Effect.Effect<void>>) =>
   Effect.forEach(

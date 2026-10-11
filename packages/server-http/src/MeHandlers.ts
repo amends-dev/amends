@@ -1,3 +1,12 @@
+/**
+ * Implements `MeGroup` over the host's services alone, entering no workspace: `Accounts.findByIds`
+ * for the principal's account, `WorkspaceDirectory.list` for its memberships and pending
+ * invitations, and `SessionTokens.revoke` for the request's `Credential` on signing out. An agent
+ * asking for its account gets `ApiErrors.HumanRequired`, and a session no account holds
+ * `Unauthorized`.
+ *
+ * @since 0.1.0
+ */
 import { Api, ApiErrors, Credential, Principal, Unauthorized } from "@amends-dev/api-http";
 import { Identity } from "@amends-dev/core/identity";
 import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway";
@@ -9,6 +18,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * reading the principal per request.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

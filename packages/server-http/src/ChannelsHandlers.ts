@@ -1,3 +1,12 @@
+/**
+ * Implements `ChannelsGroup` and `ChannelEventsGroup`. The channel handlers enter the workspace as
+ * the principal's membership through `Gateway.asMember` and call one `ChannelService` operation
+ * each. The events handler has no principal: it enters through `Gateway.inWorkspace` and hands the
+ * request's headers and its body, as text, to `ChannelIntake.receive`, answering with the text the
+ * channel's transport says to give, or nothing. `layer` registers both groups.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
 import type { Actor } from "@amends-dev/core/identity";
@@ -11,6 +20,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * Register channel handlers, capturing the gateway and reading the principal per request.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerChannels = HttpApiBuilder.group(
   Api,
@@ -58,6 +68,7 @@ export const layerChannels = HttpApiBuilder.group(
  * go to intake as they came, as no member, and the answer is what the transport says to give.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerEvents = HttpApiBuilder.group(
   Api,
@@ -83,5 +94,10 @@ export const layerEvents = HttpApiBuilder.group(
   }),
 );
 
-/** Both channel groups' handlers. @category layers */
+/**
+ * Both channel groups' handlers, `layerChannels` and `layerEvents`, as `Routes` registers them.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.merge(layerChannels, layerEvents);

@@ -1,3 +1,19 @@
+/**
+ * The journal: the log a workspace records its facts in, and the projections that keep its read
+ * models in step with them. A program publishes with `journal.publish(fact, payload)`, inside
+ * `journal.commit` or in a commit of its own. Publication reads the operation's provenance from
+ * `Publication.Publication`, encodes the payload with the fact's codec, derives its subject and
+ * occurrence key, and appends the event through `Log`, whose append joins the commit's
+ * `Store.Transaction`. In that same transaction it decodes the event once and runs the handlers of
+ * each live projection subscribed to the fact, which write their domain stores, then the fact's
+ * reactions; the commit makes the entry and the projected stores visible together, or rolls both
+ * back.
+ *
+ * `layer` builds the journal from a log ID, its projections, and its reactions, over `Log.layer`,
+ * and `replay` makes the registered projections live before a host accepts publications.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import * as Checkpoint from "./Checkpoint.ts";
 import * as Codec from "./Codec.ts";
@@ -10,16 +26,78 @@ import type * as Reaction from "./Reaction.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
 
-export { Envelope, FactMismatch, decode, storageCodec } from "./Event.ts";
+/**
+ * `Event.Envelope`, `Event.FactMismatch`, `Event.decode`, and `Event.storageCodec`, re-exported
+ * for readers of the journal's log.
+ *
+ * @since 0.1.0
+ */
+export {
+  /**
+   * A fact event as the journal's log reads and writes it: the header, and the payload's encoded
+   * bytes. Only the payload is stored as binary, through `storageCodec`.
+   *
+   * @category schemas
+   * @since 0.1.0
+   */
+  Envelope,
+  /**
+   * A fact event does not match the definition it is read or published with: it records another
+   * name or version, or a subject other than the one the definition derives, or two definitions
+   * registered under one name and version differ in payload schema, subject, or occurrence rule.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  FactMismatch,
+  /**
+   * Decodes a journal entry as an event of `fact`, its matching versioned definition. Fails with
+   * `FactMismatch` when the entry records another name or version, or a subject other than the one
+   * `fact` derives from the decoded payload. The event's provenance is frozen.
+   *
+   * @category utils
+   * @since 0.1.0
+   */
+  decode,
+  /**
+   * The journal log's entry codec: the header goes to storage as `Store.Content.fact` and the
+   * payload bytes as they are, preserving the envelope's typed metadata without encoding a second
+   * binary wrapper. Each direction copies the bytes.
+   *
+   * @category utils
+   * @since 0.1.0
+   */
+  storageCodec,
+} from "./Event.ts";
 
+/**
+ * The journal of one log, through which every domain publishes its facts. Domains obtain it with
+ * `yield* Journal.Journal`; `make` builds it and `layer` provides it, and its shape stays the same
+ * whatever projections are registered.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Journal extends Context.Service<
   Journal,
   {
+    /**
+     * The journal's log, read-only: its batches, entries, keyed appends, streams, and live tails
+     * of fact envelopes. Facts are written only through `publish`.
+     */
     readonly log: Log.Reader<typeof Event.Envelope>;
-    /** Read matching envelopes by fact name and/or subject, ordered by position and entry index. */
+    /**
+     * Read matching envelopes by fact name and/or subject, ordered by position and entry index,
+     * after the exclusive `after` cursor and up to `limit`. Decode them with `Event.decode`.
+     */
     readonly read: (
       options: Store.ReadFactsOptions,
     ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>;
+    /**
+     * Runs `program` as one commit, or as part of the current one: its publications, appends to
+     * other logs, and projection writes become visible together or not at all. A write that fails
+     * inside it fails the whole commit, with `Transaction.Aborted` when the program caught it.
+     */
     readonly commit: Transaction.Transaction["Service"]["run"];
     /**
      * Make exactly the registered projections live before accepting publications: rebuild any
@@ -30,9 +108,15 @@ export class Journal extends Context.Service<
      */
     readonly replay: Effect.Effect<void, Projection.Error>;
     /**
-     * Stamp trusted operation attribution and derive a key from the fact's occurrence rule.
-     * Explicit keys are allowed only when no key is derived. Matching retries return the
-     * original event without applying projections; conflicting content aborts.
+     * Records `payload` as `fact` and returns its event. It stamps trusted operation attribution
+     * from `Publication.Publication`, appends the event to the journal's log, and applies the live
+     * projections subscribed to the fact and then its reactions, in the current commit or one of
+     * its own. A cause the attribution names must be a recorded event with the same workspace and
+     * correlation. The key comes from the fact's occurrence rule; explicit keys are allowed only
+     * when no key is derived. Matching retries return the original event without applying
+     * projections or reactions; conflicting content aborts. A commit's first publication fails
+     * with `Projection.Behind` or `Projection.Unregistered` unless the projections live on the log
+     * are exactly the registered ones.
      */
     readonly publish: <F extends Fact.Definition>(
       fact: F,
@@ -47,12 +131,23 @@ export class Journal extends Context.Service<
   }
 >()("@amends-dev/core/journal/Service") {}
 
+/**
+ * What a journal is built from: the log it records facts in, the projections every commit
+ * applies, and the reactions it runs.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options<
   Requirements extends ReadonlyArray<unknown> = readonly [],
   ReactionRequirements = never,
 > {
+  /** The log it records facts in, such as core's `journalLog`. */
   readonly logId: Log.Id;
-  /** Infer each projection's requirements separately, then combine them at construction. */
+  /**
+   * The projections every commit applies, in registration order. Each one's requirements are
+   * inferred separately, then combined at construction.
+   */
   readonly projections: {
     readonly [Index in keyof Requirements]: Projection.Definition<
       string,
@@ -66,11 +161,14 @@ export interface Options<
 }
 
 /**
- * Construct a domain journal from a log and its projections. Definitions sharing a fact
- * name and version must share its payload schema, subject function, and occurrence function. Projection
- * dependencies are supplied here; the resulting service interface is independent of registration.
+ * Construct a domain journal from a log and its projections, over `Log.Log`,
+ * `Transaction.Transaction`, and `Checkpoint.Checkpoint`. Definitions sharing a fact name and
+ * version must share its payload schema, subject function, and occurrence function, and each
+ * projection version is registered once. Projection and reaction dependencies are supplied here;
+ * the resulting service interface is independent of registration.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Journal.make")(function* <
   const Requirements extends ReadonlyArray<unknown>,
@@ -315,9 +413,11 @@ export const make = Effect.fn("Journal.make")(function* <
 });
 
 /**
- * Provide the configured journal over the caller's log, transaction, and projection dependencies.
+ * Provide the configured journal over the caller's log, transaction, and projection dependencies,
+ * such as `Log.layer` and the host's stores.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = <
   const Requirements extends ReadonlyArray<unknown>,

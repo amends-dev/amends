@@ -1,3 +1,10 @@
+/**
+ * Development session tokens: a bearer token is the human ID it asserts, as development sign-in
+ * gives it for a session, and nothing is stored, so signing out cannot revoke one. They are built
+ * synchronously and need no services.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "@amends-dev/core/identity";
 import { SessionTokens } from "@amends-dev/gateway";
 import { Effect, Layer, Redacted, Schema } from "effect";
@@ -7,6 +14,7 @@ import { Effect, Layer, Redacted, Schema } from "effect";
  * token cannot be revoked: signing out forgets it in the client alone.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = (): SessionTokens.SessionTokens["Service"] =>
   SessionTokens.SessionTokens.of({
@@ -19,8 +27,10 @@ export const make = (): SessionTokens.SessionTokens["Service"] =>
   });
 
 /**
- * Provide the development session tokens through their constructor.
+ * Provide the development session tokens as `SessionTokens.SessionTokens`, trusting any bearer
+ * token that is a well-formed human ID.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.sync(SessionTokens.SessionTokens, make);

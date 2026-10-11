@@ -1,3 +1,16 @@
+/**
+ * The PostgreSQL driver for `ThreadActivityStore.ThreadActivityStore`, over the
+ * `thread_activities` table: every kind of activity in one shape, its position, kind, subject, and
+ * occurrence key in columns and the kind's details as JSON, so a new kind needs no migration.
+ * `ThreadActivityStore.make` checks every input before the driver sees it, so the driver keeps
+ * only what storage keeps: an insert conflicts unless it takes the thread's next position, and the
+ * primary key refuses a reused ID and `thread_activity_occurrence` a second activity with one
+ * occurrence key, each as the store's `Conflict`. Every statement is scoped to the binding's
+ * workspace and runs under its `guard`, which lets a read join the caller's transaction and
+ * requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { ThreadActivity, ThreadActivityStore } from "@amends-dev/core/thread";
 
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -16,7 +29,13 @@ const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =
   decode(rows).pipe(
     Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
   );
-/** Workspace-bound thread-activities projection storage. @category constructors */
+/**
+ * Builds the activity store for the binding's workspace: this module's driver inside
+ * `ThreadActivityStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -125,5 +144,10 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
   };
   return ThreadActivityStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provides `ThreadActivityStore.ThreadActivityStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ThreadActivityStore.ThreadActivityStore, make());

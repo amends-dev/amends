@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `ThreadActivityStore` from `../thread/ThreadActivityStore.ts`, over
+ * the workspace's `Binding`: each thread's timeline. It keeps what the contract leaves to storage:
+ * an activity conflicts unless its sequence follows the thread's last, so each timeline stays
+ * contiguous from 1, and a reused ID, or a second activity for one occurrence, conflicts.
+ * `ThreadActivityStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Thread, ThreadActivity, ThreadActivityStore } from "../thread/index.ts";
 import { Array, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -8,7 +17,13 @@ const rows = Rows.make(Schema.fromJsonString(ThreadActivity.Record));
 const bySequence = (left: ThreadActivity.Record, right: ThreadActivity.Record) =>
   left.sequence - right.sequence;
 
-/** Workspace-bound thread-activities projection storage. @category constructors */
+/**
+ * Each thread's activity over the current workspace transaction, which
+ * `ThreadActivityProjection` writes.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const inThread = Effect.fnUntraced(function* (threadId: Thread.Id) {
@@ -89,5 +104,10 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
   };
   return ThreadActivityStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provide activity storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ThreadActivityStore.ThreadActivityStore, make());

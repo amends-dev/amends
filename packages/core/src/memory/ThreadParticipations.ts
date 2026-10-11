@@ -1,3 +1,13 @@
+/**
+ * The memory implementation of `ThreadParticipationStore` from
+ * `../thread/ThreadParticipationStore.ts`, over the workspace's `Binding`. It keeps what the
+ * contract leaves to storage: a reused ID conflicts, and so does a second active participation of
+ * one participant in one thread; ending conflicts unless the participation is stored, active, and
+ * in the thread named. An ended participation keeps its row. `ThreadParticipationStore.make`
+ * checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { ThreadParticipation, ThreadParticipationStore } from "../thread/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -5,11 +15,23 @@ import { storeFailure } from "./internal/errors.ts";
 import * as Rows from "./Rows.ts";
 import { compareBinary } from "./Rows.ts";
 
+/**
+ * How participation records are stored: the JSON of each record's encoded form, keyed by its ID.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const rows = Rows.make(Schema.fromJsonString(ThreadParticipation.Record));
 const byId = (left: ThreadParticipation.Record, right: ThreadParticipation.Record) =>
   compareBinary(left.id, right.id);
 
-/** Workspace-bound thread-participations projection storage. @category constructors */
+/**
+ * Participations over the current workspace transaction, which `ThreadParticipationProjection`
+ * writes.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("threadParticipations")));
@@ -128,5 +150,10 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
   };
   return ThreadParticipationStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provide participation storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ThreadParticipationStore.ThreadParticipationStore, make());

@@ -1,3 +1,14 @@
+/**
+ * What a turn's job asks of the workspace, as no actor: accepting an agent's waiting work into a
+ * turn, starting the turn with what the agent runs on and is told, showing readers drafts of the
+ * step being written, and ending the turn by closing, failing, or confirming it stopped. It is
+ * one of core's `JobServices`, which Cluster's `TurnRunner` calls through the gateway for each
+ * turn job. It holds nothing in memory and runs no harness: the job runs the agent and writes the
+ * participation's session log (`SessionLogStore`), and each change here is its own commit,
+ * attributed to the turn's agent.
+ *
+ * @since 0.1.0
+ */
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Prompt } from "effect/ai";
@@ -42,6 +53,13 @@ import * as SessionStateStore from "./SessionStateStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
 
+/**
+ * What every execution operation can fail with: the turn's outcomes in `TurnErrors`, and the
+ * failures of the stores and commit each one writes through.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | TurnStore.Failure
   | Schema.SchemaError
@@ -51,12 +69,28 @@ export type Error =
   | NotFound
   | NotActive
   | TurnCommand.EndError;
+
+/**
+ * What `accept` can fail with: `Error`, and the failures of reading the agent's notifications,
+ * its membership, the thread's access, and the session log's head.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type AcceptError =
   | Error
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
   | NotificationStore.Failure
   | MemberStore.Failure
   | SessionLogStore.Failure;
+
+/**
+ * What `start` can fail with: `Error`, and the failures of reading what the agent is told and of
+ * building what it runs on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type StartError =
   | Error
   | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
@@ -66,6 +100,14 @@ export type StartError =
   | TaskStore.Failure
   | ThreadParticipationStore.Failure
   | AgentQuery.BuildError;
+
+/**
+ * What `joinedConversation` can fail with: `Error`, and the failures of reading the thread's
+ * messages and what their authors are called.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError =
   | Error
   | MemberStore.Failure
@@ -73,6 +115,14 @@ export type ReadError =
   | ThreadParticipationStore.Failure
   | ThreadActivityStore.Failure
   | ThreadMessageStore.Failure;
+
+/**
+ * What `close` can fail with: `Error`, and the failures of checking the agent's access and
+ * posting its reply.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type CloseError =
   | Error
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
@@ -83,6 +133,9 @@ export type CloseError =
  * What a turn's job runs: nothing, since the turn ended as it stood or is not active; or the turn,
  * ready to run on what the agent is set up with now, with what the agent is told and the session
  * it resumes, if any.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Start = Schema.TaggedUnion({
   Idle: {},
@@ -101,17 +154,30 @@ export const Start = Schema.TaggedUnion({
     resume: Schema.NullOr(SessionStateStore.Resume),
   },
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Start = typeof Start.Type;
 
 /**
  * How closing went: the turn completed, posting the agent's answer if it had one; it stopped as
  * it was asked to; or the agent could no longer post where it worked, which failed it.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Closing = Schema.TaggedUnion({
   Closed: { messageIds: Schema.Array(ThreadMessage.Id) },
   Stopped: {},
   Failed: { reason: Schema.String },
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Closing = typeof Closing.Type;
 
 /**
@@ -121,6 +187,9 @@ export type Closing = typeof Closing.Type;
  * the participation's session log; nothing here runs a harness, writes the log, or holds a turn
  * in memory. Each change is its own commit, attributed to the turn's agent. The job is trusted: it
  * runs what the agent accepted, and closing checks the agent's own access before posting for it.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class TurnExecution extends Context.Service<
   TurnExecution,
@@ -200,7 +269,13 @@ const describeIssue = (issue: Agent.Issue): string => {
   }
 };
 
-/** @category constructors */
+/**
+ * The execution over the workspace's stores, the turn and thread commands, `AgentQuery`, the
+ * journal, and the signal hub.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("TurnExecution.make")(function* () {
   const turnStore = yield* TurnStore.TurnStore;
   const sessionStateStore = yield* SessionStateStore.SessionStateStore;
@@ -791,5 +866,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 });
 
-/** Internal service for turn jobs: callers are trusted to run what agents accepted. @category layers */
+/**
+ * Internal service for turn jobs: callers are trusted to run what agents accepted.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(TurnExecution, make());

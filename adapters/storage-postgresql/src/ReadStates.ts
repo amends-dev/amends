@@ -1,3 +1,14 @@
+/**
+ * The PostgreSQL driver for `ReadStateStore.ReadStateStore`, over `thread_read_positions` and
+ * `group_read_times`: private read state, outside the journal, referencing no projection rows, so
+ * rebuilds keep it. `ReadStateStore.make` checks every input before the driver sees it, so the
+ * driver keeps only what storage keeps: each advance is one upsert that keeps the later of the
+ * stored and requested value with `greatest`. Every statement is scoped to the binding's workspace
+ * and runs under its `guard`; a write joins the caller's transaction when there is one and
+ * otherwise commits on its own, without the workspace's lock.
+ *
+ * @since 0.1.0
+ */
 import { ReadState, ReadStateStore } from "@amends-dev/core/read-state";
 import { and, eq, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Schema } from "effect";
@@ -19,6 +30,7 @@ const decodeGroups = Schema.decodeUnknownEffect(
  * workspace lock that orders journal commits.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("ReadStates.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -95,5 +107,10 @@ export const make = Effect.fn("ReadStates.make")(function* () {
   return ReadStateStore.make(workspaceId, driver);
 });
 
-/** Provide read-state storage over the caller's binding. @category layers */
+/**
+ * Provides `ReadStateStore.ReadStateStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ReadStateStore.ReadStateStore, make());

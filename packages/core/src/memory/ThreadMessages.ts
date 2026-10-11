@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `ThreadMessageStore` from `../thread/ThreadMessageStore.ts`, over
+ * the workspace's `Binding`. It keeps what the contract leaves to storage: a reused ID conflicts;
+ * an edit conflicts unless the message is stored, still has text, and the edit is its next
+ * revision; and deleting conflicts unless the message is stored and still has text. A deleted
+ * message keeps its row. `ThreadMessageStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Thread, ThreadMessage, ThreadMessageStore } from "../thread/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -8,7 +17,12 @@ const rows = Rows.make(Schema.fromJsonString(ThreadMessage.Record));
 const hasText = (record: ThreadMessage.Record) =>
   ThreadMessage.Content.isAnyOf(["Text"])(record.content);
 
-/** Workspace-bound thread-messages projection storage. @category constructors */
+/**
+ * Messages over the current workspace transaction, which `ThreadMessageProjection` writes.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ThreadMessages.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const driver: ThreadMessageStore.ThreadMessageStore["Service"] = {
@@ -93,5 +107,10 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
   };
   return ThreadMessageStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provide message storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ThreadMessageStore.ThreadMessageStore, make());

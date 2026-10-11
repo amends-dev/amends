@@ -1,3 +1,17 @@
+/**
+ * The PostgreSQL driver for `Store.Store`, the journal's storage of the workspace's logs, over
+ * `commits`, `log_batches`, `log_entries`, and `log_append_keys`. A transaction stages its appends
+ * in memory and writes them just before `COMMIT`, or earlier when it reads a log's batches, head,
+ * or facts, in as few inserts as the parameter limit allows. Appending to a log, or looking up one
+ * of its keys, holds the log's advisory lock until the transaction ends; a standalone append is a
+ * commit of its own that holds only its log. `JournalEntry` maps entries to their columns.
+ * `Store.make` checks every input before the driver sees it, so the driver keeps only what storage
+ * keeps: a key reused with different content, a log that moved past `expectedAfter`, and
+ * contention, each a `Store.Conflict`. A commit that appended notifies once it commits, waking
+ * `waitForAppend` in every process; the binding's poll interval covers a lost notice.
+ *
+ * @since 0.1.0
+ */
 import { Commit, Entry, Store } from "@amends-dev/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
@@ -54,9 +68,11 @@ const copyReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
   Object.assign({}, receipt, { entries: receipt.entries.map(copyEntry) });
 
 /**
- * The workspace's logs: appends inside a transaction, reads of committed batches, and waiting.
+ * Builds the journal store for the binding's workspace: appends inside a transaction, reads of
+ * committed batches, and waiting, inside `Store.make`, which checks every input first.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Journal.make")(function* () {
   const { workspaceId, database, guard, transaction, pollInterval } = yield* Binding.Binding;
@@ -560,8 +576,9 @@ export const make = Effect.fn("Journal.make")(function* () {
 });
 
 /**
- * Provide Store.Store using its constructor and the caller's dependencies.
+ * Provides `Store.Store` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Store.Store, make());

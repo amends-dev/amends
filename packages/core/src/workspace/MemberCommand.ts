@@ -1,3 +1,11 @@
+/**
+ * The write to memberships that operations share, run inside the caller's commit: adding a member.
+ * Accepting an invitation and creating an agent both go through `add`; initialization adds the
+ * creator itself, before this service exists. The caller owns authorization, delegation, and the
+ * commit; this service checks none of them.
+ *
+ * @since 0.1.0
+ */
 import { Context, Crypto, type DateTime, Effect, Layer, Option } from "effect";
 import * as AssignmentCommand from "../authorization/AssignmentCommand.ts";
 import type * as Role from "../authorization/Role.ts";
@@ -12,10 +20,23 @@ import * as Store from "../journal/Store.ts";
 import * as MemberFacts from "./MemberFacts.ts";
 import * as Member from "./Member.ts";
 
+/**
+ * What adding a member can fail with: the failures of assigning its role and of reading the
+ * general group.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error = AssignmentCommand.Error | GroupStore.Failure;
 
-/** A member to add: who they are, what they are called, the role they start with, and when. */
+/**
+ * A member to add: who they are, what they are called, the role they start with, and when.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface NewMember {
+  /** The human or agent admitted; one identity holds at most one active membership. */
   readonly identity: Identity.MemberReference;
 
   /** What people in the workspace call them. */
@@ -30,6 +51,12 @@ export interface NewMember {
 
 /**
  * @effect-expect-leaking Transaction
+ *
+ * The write that admits a member, shared by `InvitationService.accept` and `AgentService.create`.
+ * Internal: not among `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class MemberCommand extends Context.Service<
   MemberCommand,
@@ -45,7 +72,12 @@ export class MemberCommand extends Context.Service<
   }
 >()("@amends-dev/core/workspace/member/command/Service") {}
 
-/** @category constructors */
+/**
+ * Capture bound services; `add` publishes in the caller's commit.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("MemberCommand.make")(function* () {
   const assignmentCommand = yield* AssignmentCommand.AssignmentCommand;
   const groupStore = yield* GroupStore.GroupStore;
@@ -84,5 +116,10 @@ export const make = Effect.fn("MemberCommand.make")(function* () {
   return MemberCommand.of({ add });
 });
 
-/** Internal writes shared by accepting invitations and creating agents. @category layers */
+/**
+ * Provide the member write over the assignment writes, the group store, and the journal.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(MemberCommand, make());

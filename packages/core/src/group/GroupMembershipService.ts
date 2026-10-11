@@ -1,3 +1,12 @@
+/**
+ * The operations on group membership an actor calls: adding a member to a team group, removing
+ * one, joining a public group, leaving a team group, and listing a group's current admissions.
+ * Creating a group with its first members is `GroupService.createTeam`, and a direct group's
+ * members are fixed when it is established. Each operation authorizes the actor itself, writes
+ * inside one journal commit through `GroupCommand`, and reads outside any.
+ *
+ * @since 0.1.0
+ */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
@@ -32,16 +41,75 @@ import {
 } from "./GroupMembershipErrors.ts";
 
 export {
+  /**
+   * The member to add already holds an active admission to the group; nothing is recorded.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   AlreadyMember,
+  /**
+   * The admission has already ended; repeating a departure records nothing.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   AlreadyRemoved,
+  /**
+   * A direct group's members never change; including someone else needs another direct group.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   FixedMembership,
+  /**
+   * Everyone in the workspace belongs to its general group: nobody leaves it or is removed from it.
+   * Leaving the workspace ends the admission.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   GeneralMembership,
+  /**
+   * The group is missing, or the actor is not in it; for joining, also one that cannot be joined, a
+   * private or direct group. None are told apart, so nothing discloses a group to someone outside
+   * it.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   GroupNotFound,
+  /**
+   * The member to add is no longer active in the workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   InactiveMember,
+  /**
+   * The member to add is not in the workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   MemberNotFound,
+  /**
+   * The admission is missing, is in another group than the one named, or, when leaving, is another
+   * member's; none are told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
 } from "./GroupMembershipErrors.ts";
 
+/**
+ * What changing membership can fail with: the outcomes in `GroupMembershipErrors`, and the
+ * failures of what a change depends on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | GroupCommand.RemoveError
   | Authorization.Error
@@ -61,6 +129,12 @@ export type Error =
   | FixedMembership
   | GeneralMembership;
 
+/**
+ * What listing admissions can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError =
   | Authorization.Error
   | GroupStore.Failure
@@ -69,6 +143,12 @@ export type ReadError =
   | Schema.SchemaError
   | GroupNotFound;
 
+/**
+ * The membership operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class GroupMembershipService extends Context.Service<
   GroupMembershipService,
   {
@@ -76,8 +156,8 @@ export class GroupMembershipService extends Context.Service<
      * Require group.membership.manage on this group and membership of it, validate its active
      * workspace member, and publish a fresh admission in one commit. An active admission is
      * rejected without another fact. No workspace role reaches a group from outside it: to a
-     * non-member, a group is GroupNotFound, as a missing one is. Adding, removing, and leaving apply
-     * to team groups; direct groups reject them as fixed.
+     * non-member, a group is GroupNotFound, as a missing one is. Adding, removing, and leaving
+     * apply to team groups; direct groups reject them as fixed.
      */
     readonly add: (
       input: GroupMembership.AddInput,
@@ -114,7 +194,13 @@ export class GroupMembershipService extends Context.Service<
   }
 >()("@amends-dev/core/group/membership/service/Service") {}
 
-/** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
+/**
+ * Capture the stores, the shared group read and writes, the journal, and authorization; resolve
+ * authority inside each commit.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupMembershipService.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const groupStore = yield* GroupStore.GroupStore;
@@ -126,7 +212,9 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Store;
 
-  /** Management needs the grant and membership of the group; to anyone outside it, it is missing. */
+  /**
+   * Management needs the grant and membership of the group; to anyone outside it, it is missing.
+   */
   const requireManagement = Effect.fnUntraced(function* (groupId: Group.Id) {
     yield* authorization.require([
       Requirement.make(
@@ -271,7 +359,9 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     journal.commit,
   );
 
-  /** Fill a page with admissions whose workspace member is still active, reading further as needed. */
+  /**
+   * Fill a page with admissions whose workspace member is still active, reading further as needed.
+   */
   const pageCurrentMemberships = Effect.fnUntraced(function* (
     groupId: Group.Id,
     input: GroupMembership.ListOptions,
@@ -324,5 +414,11 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
   });
 });
 
-/** Provide membership operations over the workspace's existing stores and journal. @category layers */
+/**
+ * Provide the membership operations over the stores, the shared group read and writes, the
+ * journal, and authorization.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupMembershipService, make());

@@ -5,11 +5,19 @@
  *
  * Only what a type can say is kept: the shape of the input, which properties are required, the
  * values an enum allows, and the descriptions, as comments. A schema that is cyclic, or nested
- * deeper than `maxDepth`, ends in `unknown`, as does any keyword this does not read.
+ * more than six levels deep, ends in `unknown`, as does any keyword this does not read.
+ * `CodeMode.toolkit` shows them to the model in the description of `execute`.
+ *
+ * @since 0.1.0
  */
 import type { Schema } from "effect";
 
-/** A tool as these declarations take it. */
+/**
+ * A tool as `declare` takes it: its name, what it does, and its input's JSON Schema.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Declared {
   readonly name: string;
   readonly description?: string;
@@ -21,7 +29,14 @@ export interface Declared {
 /** How deep an input may nest before its type ends in `unknown`, to keep what a model reads short. */
 const maxDepth = 6;
 
-/** The declaration of `tools`, as the type of the object the code reads them from. */
+/**
+ * The declaration of `tools`, as the type of the object the code reads them from. Each tool is a
+ * method that takes its input and answers with `Promise<unknown>`, and whose input is optional
+ * when its schema requires nothing.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const declare = (tools: ReadonlyArray<Declared>): string =>
   [
     "declare const tools: {",

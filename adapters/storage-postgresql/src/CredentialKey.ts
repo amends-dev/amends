@@ -1,24 +1,47 @@
 /**
  * Sealing connections' credentials with the host's credential key: AES-256-GCM with a random
  * nonce per secret, and the row's identity as additional data, so a sealed value opens only as the
- * credential it was stored as.
+ * credential it was stored as. `PostgresWorkspaceStorage.make` imports the key from the host's
+ * `credentialKey` option once, failing the host's start on a malformed one, and provides it to
+ * every workspace's `ConnectionCredentials` store as `CredentialKey`.
+ *
+ * @since 0.1.0
  */
 import { Context, Data, Effect, Layer, Redacted, Result } from "effect";
 import { Base64 } from "effect/encoding";
 import type { Option } from "effect";
 
-/** The key is malformed, or a secret failed to seal or open. */
+/**
+ * The key is malformed, or a secret failed to seal or open.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Data.TaggedError("CredentialKey.Failure")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
 
+/**
+ * The imported key, which seals a secret and opens it again. A sealed value is text: a version
+ * tag, the nonce, and the ciphertext.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Cipher {
+  /** Seal `secret`, bound to `binding`: only the same binding opens it. */
   readonly seal: (secret: string, binding: string) => Effect.Effect<string, Failure>;
+  /** Open what `seal` returned for the same binding; anything else fails. */
   readonly open: (sealed: string, binding: string) => Effect.Effect<string, Failure>;
 }
 
-/** The host's credential key, when it configured one. */
+/**
+ * The host's credential key, when it configured one; none means the host stores no credentials.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class CredentialKey extends Context.Service<CredentialKey, Option.Option<Cipher>>()(
   "@amends-dev/storage-postgresql/credential-key/Service",
 ) {}
@@ -40,6 +63,7 @@ const bytes = (base64: string) =>
  * Import a base64-encoded 32-byte key, failing for anything else.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = (key: Redacted.Redacted<string>): Effect.Effect<Cipher, Failure> =>
   Effect.tryPromise({
@@ -83,5 +107,10 @@ export const make = (key: Redacted.Redacted<string>): Effect.Effect<Cipher, Fail
     })),
   );
 
-/** @category layers */
+/**
+ * Provides `CredentialKey` with the key the host imported, or none.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = (key: Option.Option<Cipher>) => Layer.succeed(CredentialKey, key);

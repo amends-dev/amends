@@ -1,3 +1,14 @@
+/**
+ * The memory implementation of the journal's storage contract, `Store.Store` from
+ * `../journal/Store.ts`: appends inside a transaction, reads of committed batches, and waiting
+ * for appends. It keeps what the contract leaves to storage: each commit's entries as one batch
+ * per log, the slice each idempotency key wrote, the position an append expected, and the log
+ * locks that order writers across hosts. A read sees committed state outside a transaction and
+ * the transaction's snapshot inside one. `Store.make` checks every input before this driver sees
+ * it.
+ *
+ * @since 0.1.0
+ */
 import { Commit, Entry, Store } from "../journal/index.ts";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -21,6 +32,7 @@ const isAfter = (entry: Store.Cursor, cursor: Store.Cursor) =>
  * The workspace's logs: appends inside a transaction, reads of committed batches, and waiting.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Journal.make")(function* () {
   const { workspaceId, connection, read, transaction } = yield* Binding.Binding;
@@ -275,8 +287,9 @@ export const make = Effect.fn("Journal.make")(function* () {
 });
 
 /**
- * Provide Store.Store using its constructor and the caller's dependencies.
+ * The journal store over the caller's `Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Store.Store, make());

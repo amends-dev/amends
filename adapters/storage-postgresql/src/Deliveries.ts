@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `DeliveryStore.DeliveryStore`, over the `channel_deliveries` table: one
+ * row per delivery of a message to a conversation, with a check that each status holds its own
+ * columns. A thread's requested deliveries read through a partial index by sequence, and an echo is
+ * recognized through the index by channel, conversation, and external message ID.
+ * `DeliveryStore.make` checks every input before the driver sees it, so the driver keeps only what
+ * storage keeps: the primary key refuses a reused ID as the store's `Conflict`, and an update that
+ * finds no row conflicts. Every statement is scoped to the binding's workspace and runs under its
+ * `guard`, which lets a read join the caller's transaction and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Delivery, DeliveryStore } from "@amends-dev/core/channel";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -31,7 +43,13 @@ const toRow = (record: Delivery.Record): typeof channelDeliveries.$inferInsert =
   finishedAt: record.finishedAt === null ? null : DateTime.toDate(record.finishedAt),
 });
 
-/** Delivery records in the workspace's database. @category constructors */
+/**
+ * Builds the delivery store for the binding's workspace: this module's driver inside
+ * `DeliveryStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Deliveries.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -111,5 +129,10 @@ export const make = Effect.fn("Deliveries.make")(function* () {
   return DeliveryStore.make(workspaceId, driver);
 });
 
-/** Provide delivery storage over the caller's binding. @category layers */
+/**
+ * Provides `DeliveryStore.DeliveryStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(DeliveryStore.DeliveryStore, make());

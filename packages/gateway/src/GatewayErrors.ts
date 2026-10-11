@@ -1,3 +1,12 @@
+/**
+ * The outcomes a program run through the gateway may fail with: core's domain errors, which pass
+ * through unchanged, and the gateway's own, such as `NotMember`. Every other failure becomes a
+ * defect. `PublicError` lists them all, so an error core adds reaches callers only once it is
+ * listed here. The HTTP contract imports this module from `@amends-dev/gateway/GatewayErrors`,
+ * which does not load the gateway itself.
+ *
+ * @since 0.1.0
+ */
 import {
   ThreadService,
   ThreadMessageService,
@@ -28,30 +37,58 @@ import { TaskService } from "@amends-dev/core/task";
 import { Turn, TurnService } from "@amends-dev/core/turn";
 import { Schema } from "effect";
 
+/**
+ * The identity has no active membership of the workspace. `asMember` answers the same for a
+ * workspace that does not exist, without loading it.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
   workspaceId: Workspace.Id,
 }) {}
 
-/** No workspace was ever created under this ID. */
+/**
+ * No workspace was ever created under this ID.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class WorkspaceNotFound extends Schema.TaggedError<WorkspaceNotFound>()(
   "Gateway.WorkspaceNotFound",
   { workspaceId: Workspace.Id },
 ) {}
 
-/** Storage contention; the operation did not apply and may be retried. */
+/**
+ * Storage contention; the operation did not apply and may be retried.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("Gateway.Conflict", {
   workspaceId: Workspace.Id,
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
-/** The commit's outcome is unknown; reconcile stored state before repeating. */
+/**
+ * The commit's outcome is unknown; reconcile stored state before repeating.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Uncertain extends Schema.TaggedError<Uncertain>()("Gateway.Uncertain", {
   workspaceId: Workspace.Id,
   commitId: Commit.Id,
 }) {}
 
-/** Core rejected the operation's input, such as invitation grants for the wrong workspace or target kind. */
+/**
+ * Core rejected the operation's input, such as invitation grants for the wrong workspace or target
+ * kind.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.InvalidInput", {
   message: Schema.String,
 }) {}
@@ -60,6 +97,9 @@ export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.In
  * Domain outcomes a caller can act on. Storage, transaction, projection, and
  * consistency failures reveal nothing actionable and become defects that keep
  * their original cause for host logging.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const PublicError = Schema.Union([
   WorkspaceSettingsService.Changed,
@@ -159,7 +199,17 @@ export const PublicError = Schema.Union([
   ChannelIntake.Rejected,
   ChannelIntake.Unavailable,
 ]);
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type PublicError = typeof PublicError.Type;
 
-/** The public outcomes of a core program whose error type is E. */
+/**
+ * The public outcomes of a core program whose error type is `E`: the public errors among `E`,
+ * and the storage outcomes and invalid input the gateway adds to every program.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type PublicErrorOf<E> = Extract<E, PublicError> | Conflict | Uncertain | InvalidInput;

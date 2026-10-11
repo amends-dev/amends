@@ -1,3 +1,12 @@
+/**
+ * The operations on invitations: issuing, revoking, and listing them, which an actor calls, and
+ * accepting one, which a person who is not yet a member calls through the gateway with their
+ * authenticated human ID. Acceptance adds the member through `MemberCommand`, under the authority
+ * of the member who issued the invitation, rechecked when it is accepted. Each write runs inside
+ * one journal commit.
+ *
+ * @since 0.1.0
+ */
 import * as Request from "../request/Request.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -28,13 +37,51 @@ import {
   Unavailable,
 } from "./InvitationErrors.ts";
 export {
+  /**
+   * The person has an active membership already, so they can neither be invited nor accept.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   AlreadyMember,
+  /**
+   * The expiry given is not after now.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   InvalidExpiry,
+  /**
+   * No invitation has this ID in the workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
+  /**
+   * The authenticated person is not whom the invitation names; only the named recipient may accept.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotRecipient,
+  /**
+   * The invitation cannot be accepted or revoked now: it has expired, was revoked, or was accepted
+   * already, as `reason` says.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Unavailable,
 } from "./InvitationErrors.ts";
 
+/**
+ * What the invitation operations can fail with: the outcomes in `InvitationErrors`, and the
+ * failures of what they depend on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Authorization.Error
   | Delegation.Error
@@ -51,26 +98,47 @@ export type Error =
   | InvalidExpiry;
 
 /**
- * What a keyed issuance created, so that a retry returns it.
+ * The invitation operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class InvitationService extends Context.Service<
   InvitationService,
   {
+    /**
+     * Invite a person who is not an active member, under `invitation.manage` and the authority to
+     * delegate the role (`Delegation.requireGrant`); the expiry must be after now. A keyed issuance
+     * derives the invitation's ID from the issuer and key, so a retry returns the invitation its
+     * first attempt issued, as it stands now.
+     */
     readonly issue: (
       request: Invitation.IssueInput,
       options?: Request.Options,
     ) => Effect.Effect<Invitation.Record, Error, Actor.Actor>;
     /**
-     * Trusted ingress supplies the authenticated recipient; no membership is required yet. The
-     * recipient says what people in the workspace call them.
+     * Accept an invitation as the person it names, with the name the workspace will call them.
+     * Trusted ingress supplies the authenticated recipient; no membership is required yet. A
+     * pending, unexpired invitation to someone not already a member is accepted when its inviter is
+     * still a member with the authority to issue it; then one commit adds the member with the
+     * invitation's role and general-group admission, and records the acceptance. Accepting again
+     * returns the member it made, even one removed since, and grants nothing.
      */
     readonly accept: (
       id: Invitation.Id,
       recipient: Identity.HumanId,
       name: Member.Name,
     ) => Effect.Effect<Member.Record, Error>;
+    /**
+     * Revoke a pending invitation, expired or not, under the same authority issuing it needs.
+     * Revoking again returns it unchanged; an accepted invitation is `Unavailable`, since removal
+     * is what ends that membership.
+     */
     readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Record, Error, Actor.Actor>;
-    /** Every invitation in the workspace in issue order; requires invitation.manage. */
+    /**
+     * Every invitation in the workspace in issue order, whatever its state; requires
+     * `invitation.manage`.
+     */
     readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/workspace/invitation-application/Service") {}
@@ -79,6 +147,7 @@ export class InvitationService extends Context.Service<
  * Construct invitation operations from workspace services; read the actor during protected calls.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.Return<
   InvitationService["Service"],
@@ -258,5 +327,6 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
  * Provide invitation operations over the caller's workspace services and cryptography.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(InvitationService, make());

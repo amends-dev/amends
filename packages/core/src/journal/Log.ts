@@ -1,3 +1,15 @@
+/**
+ * Typed, append-only logs over host storage. `open` gives a handle on one log ID, typed by a
+ * schema, that appends values and reads them back by commit, entry, or key, pages complete
+ * batches, and streams or tails them; opening touches no storage, and a log exists from its first
+ * append. Inside a commit, an append joins the commit's `Store.Transaction` as one of its steps;
+ * outside one, it is a commit of its own through `Store.append`, which waits only for the log's
+ * other writers. `Journal` writes its facts through a log of `Event.Envelope`s, and other logs hold
+ * entries of their own schema; `layer` provides the logs with the transaction coordinator they
+ * share with the journal.
+ *
+ * @since 0.1.0
+ */
 import { Array, Context, Effect, Layer, Option, Schema, Stream } from "effect";
 import * as Codec from "./Codec.ts";
 import * as Commit from "./Commit.ts";
@@ -5,36 +17,131 @@ import * as StoredEntry from "./Entry.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
 
+/**
+ * Names a log within a workspace, `Entry.LogId`.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Id = StoredEntry.LogId;
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Id = StoredEntry.LogId;
+
+/**
+ * A commit's position within one log, `Entry.Position`.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Position = StoredEntry.Position;
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Position = StoredEntry.Position;
+
+/**
+ * Identifies one append within a workspace and log across retries, `Store.IdempotencyKey`.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const IdempotencyKey = Store.IdempotencyKey;
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type IdempotencyKey = Store.IdempotencyKey;
 
-/** A log entry with its payload decoded by the log's schema. */
+/**
+ * A log entry with its payload decoded by the log's schema.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Entry<A> extends StoredEntry.Metadata {
   readonly payload: A;
 }
+
+/**
+ * The entries one commit appended to one log, decoded, with the log's position for that commit and
+ * the commit's record.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Batch<A> {
   readonly logId: Id;
   readonly position: Position;
   readonly commit: Commit.Record;
   readonly entries: ReadonlyArray<Entry<A>>;
 }
+
+/**
+ * Storage's answer to an append did not hold the appended entry.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()("Log.InvalidResponse", {
   message: Schema.String,
 }) {}
+
+/**
+ * What an append can fail with: the commit's errors, a value or option its schema rejects, or
+ * storage returning entries that do not match the request.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type WriteError = Transaction.Error | Schema.SchemaError | InvalidResponse;
+
+/**
+ * What a read can fail with: storage failed, or what it returned does not match the request or
+ * does not decode.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError = Store.Failure | Schema.SchemaError;
+
+/**
+ * A tail was consumed inside a transaction, where it could see entries that never commit and
+ * would hold the transaction open while it waits.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class TailInTransaction extends Schema.TaggedError<TailInTransaction>()(
   "Log.TailInTransaction",
   {},
 ) {}
+
+/**
+ * What a tail can fail with: a read's errors, or being consumed inside a transaction.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type TailError = ReadError | TailInTransaction;
 
+/**
+ * A typed handle on one log, from `Log.open`: its appends, reads, and streams, with `S` encoding
+ * and decoding its values.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Handle<S extends Schema.Constraint> {
+  /** The log's ID. */
   readonly id: Id;
+  /** The schema of the log's values. */
   readonly schema: S;
   /** Read the original append slice for a durable key, including own staged writes. */
   readonly getAppend: (
@@ -44,10 +151,20 @@ export interface Handle<S extends Schema.Constraint> {
     ReadError,
     S["DecodingServices"]
   >;
+  /**
+   * Appends `value` and returns its entry. Inside a commit it joins the commit; outside one it is
+   * a commit of its own that waits only for this log's other writers. `options` can require the
+   * log's current position, and name the append with a key so that a retry with the same content
+   * returns the original entry.
+   */
   readonly append: (
     value: S["Type"],
     options?: Store.AppendOptions,
   ) => Effect.Effect<Entry<S["Type"]>, WriteError, S["EncodingServices"] | S["DecodingServices"]>;
+  /**
+   * Appends `values` as one slice of this log's batch in the commit, as `append` appends one. A
+   * keyed append holds at least one value.
+   */
   readonly appendAll: (
     values: ReadonlyArray<S["Type"]>,
     options?: Store.AppendOptions,
@@ -56,9 +173,16 @@ export interface Handle<S extends Schema.Constraint> {
     WriteError,
     S["EncodingServices"] | S["DecodingServices"]
   >;
+  /**
+   * Fact entries matching a name, a subject, or both, after the exclusive `{ position, index }`
+   * cursor and up to `limit`; `Journal.read` reads the journal's log with it.
+   */
   readonly readFacts: (
     options: Store.ReadFactsOptions,
   ) => Effect.Effect<ReadonlyArray<Entry<S["Type"]>>, ReadError, S["DecodingServices"]>;
+  /**
+   * The batch commit `commitId` appended to this log, or None when that commit did not touch it.
+   */
   readonly get: (
     commitId: Commit.Id,
   ) => Effect.Effect<Option.Option<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>;
@@ -66,6 +190,10 @@ export interface Handle<S extends Schema.Constraint> {
   readonly getEntry: (
     entryId: StoredEntry.Id,
   ) => Effect.Effect<Option.Option<Entry<S["Type"]>>, ReadError, S["DecodingServices"]>;
+  /**
+   * Complete batches after the exclusive `after` position, in position order and at most `limit`;
+   * a batch is never split across pages.
+   */
   readonly read: (
     options: Store.ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>;
@@ -89,21 +217,38 @@ export interface Handle<S extends Schema.Constraint> {
   ) => Stream.Stream<Batch<S["Type"]>, TailError, S["DecodingServices"]>;
 }
 
-/** Domain journals expose their underlying log through this read-only view. */
+/**
+ * Domain journals expose their underlying log through this read-only view: a handle's reads
+ * without its writes, as `Journal.log`.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Reader<S extends Schema.Constraint> = Pick<
   Handle<S>,
   "id" | "schema" | "get" | "getEntry" | "getAppend" | "read" | "head" | "stream" | "tail"
 >;
 
+/**
+ * The service that opens typed logs and runs commits over them. `make` builds it, and `layer`
+ * provides it with the transaction coordinator it shares with `Journal`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Log extends Context.Service<
   Log,
   {
-    /** Opens a typed handle. Empty logs are created lazily by their first append. */
+    /**
+     * Opens a typed handle. Empty logs are created lazily by their first append. `storageCodec`
+     * defaults to `Codec.makeEntryCodec(schema)`; the journal passes `Event.storageCodec`.
+     */
     readonly open: <S extends Schema.Constraint>(options: {
       readonly id: Id;
       readonly schema: S;
       readonly storageCodec?: Codec.EntryCodec<S>;
     }) => Handle<S>;
+    /** Runs `program` as one commit, or as part of the current one, as `Journal.commit` does. */
     readonly commit: Transaction.Transaction["Service"]["run"];
   }
 >()("@amends-dev/core/journal/log/Service") {}
@@ -135,9 +280,11 @@ const validateAppend = Schema.decodeEffect(Store.AppendOptions);
 const validateCommitId = Schema.decodeEffect(Commit.Id);
 
 /**
- * Construct typed logs over host storage and the supplied transaction coordinator.
+ * Construct typed logs over host storage and the supplied transaction coordinator, which the
+ * journal must share for their writes to join one commit.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
   Log["Service"],
@@ -436,8 +583,11 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
 });
 
 /**
- * Provide typed logs and their shared transaction coordinator over host storage.
+ * Provide typed logs and their shared transaction coordinator over host storage, `Store.Store`:
+ * both `Log.Log` and `Transaction.Transaction`, so that a journal built over them shares commit
+ * ownership.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Log, make()).pipe(Layer.provideMerge(Transaction.layer));

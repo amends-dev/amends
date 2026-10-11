@@ -1,3 +1,10 @@
+/**
+ * Email sign-in's storage in process memory, the reference implementation of
+ * `SignInStorage.SignInStorage`: pending codes and sessions in two tables of `MemoryDatabase`,
+ * shared by every host over the same database.
+ *
+ * @since 0.1.0
+ */
 import { MemoryDatabase, Rows } from "@amends-dev/core/memory";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as SignInStorage from "../SignInStorage.ts";
@@ -10,6 +17,7 @@ const sessions = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SignInStorag
  * address's code holds the address's lock, so changes to it apply one at a time across every host.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("MemorySignInStorage.make")(function* () {
   const database = yield* MemoryDatabase.MemoryDatabase;
@@ -44,8 +52,9 @@ export const make = Effect.fn("MemorySignInStorage.make")(function* () {
 });
 
 /**
- * Provide SignInStorage.SignInStorage using its constructor and the caller's dependencies.
+ * Provide `SignInStorage.SignInStorage` over the `MemoryDatabase` beneath it.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(SignInStorage.SignInStorage, make());

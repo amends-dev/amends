@@ -1,11 +1,20 @@
 /**
  * Turns among one process's writers to the same workspace, or to the same log for standalone
  * appends. They wait for each other here, in memory, so a queue of writers to one workspace holds
- * one pooled connection while PostgreSQL makes it wait for the lock, rather than one each.
+ * one pooled connection while PostgreSQL makes it wait for the lock, rather than one each. The
+ * binding's transactions take their turns here, within the host's `lockTimeout`.
+ *
+ * @since 0.1.0
  */
 import { Effect, Semaphore } from "effect";
 import type { Duration } from "effect";
 
+/**
+ * The writer queue of one pool, keyed by workspace, or by workspace and log.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface PostgresTurns {
   /**
    * Run the effect in its turn among this process's writers with the same key, failing with
@@ -25,7 +34,12 @@ interface Lane {
   users: number;
 }
 
-/** @category constructors */
+/**
+ * A writer queue with no writers waiting; `PostgresDatabase.make` makes one for each pool.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = (): PostgresTurns => {
   // A lane lives while it has writers, so keys never accumulate.
   const lanes = new Map<string, Lane>();

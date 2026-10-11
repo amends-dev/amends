@@ -1,3 +1,10 @@
+/**
+ * The storage contract for invitations, which every storage adapter implements and
+ * `InvitationProjection` writes. Reads honor the caller's transaction when there is one; writes
+ * require it. The store checks what it is given and authorizes nobody: operations do that.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import * as Identity from "../identity/Identity.ts";
@@ -7,21 +14,41 @@ import * as Invitation from "./Invitation.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "./WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing invitations.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("InvitationStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused invitation ID, or
+ * settling one that is missing or settled already.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("InvitationStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
- * Workspace-bound read model. All writes share the journal's native transaction.
+ * The invitation store, bound to one workspace by the host.
+ *
+ * What a storage adapter implements for invitations. Its writes share the journal's native
+ * transaction.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class InvitationStore extends Context.Service<
   InvitationStore,
@@ -38,7 +65,10 @@ export class InvitationStore extends Context.Service<
     readonly insert: (
       record: Invitation.Record,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-    /** Transition Pending to a terminal state; reject absent/terminal records and retain all intent. */
+    /**
+     * Move a pending invitation to its terminal state. A missing or settled invitation conflicts;
+     * the issuance is retained as it was.
+     */
     readonly settle: (
       id: Invitation.Id,
       state: Exclude<Invitation.State, { readonly _tag: "Pending" }>,

@@ -1,3 +1,12 @@
+/**
+ * The grants a member currently holds, resolved from their active assignments in
+ * `AssignmentStore`: a direct assignment is its grant, and a role assignment is each permission of
+ * the role in `RoleStore`, at the assignment's scope. `Authorization` resolves once per check. A
+ * recorded permission `PermissionCatalog` does not declare is skipped: no requirement can name
+ * it, so a retired one grants nothing and breaks nothing else its holder has.
+ *
+ * @since 0.1.0
+ */
 import * as Assignment from "./Assignment.ts";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import type * as Member from "../workspace/Member.ts";
@@ -11,8 +20,21 @@ import * as RoleStore from "./RoleStore.ts";
 
 import type * as Scope from "./Scope.ts";
 
+/**
+ * What resolving grants can fail with: the assignment and role stores.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error = AssignmentStore.Failure | RoleStore.Failure | Schema.SchemaError;
 
+/**
+ * The grant resolution, bound to one workspace. `Authorization` is its caller; operations check
+ * requirements through that rather than reading grants themselves.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class GrantResolver extends Context.Service<
   GrantResolver,
   {
@@ -31,6 +53,7 @@ export class GrantResolver extends Context.Service<
  * Construct a resolver from workspace stores and metadata; read assignments and roles per call.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Return<
   GrantResolver["Service"],
@@ -80,5 +103,6 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
  * Provide grant resolution over the caller's workspace stores and permission catalog.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(GrantResolver, make());

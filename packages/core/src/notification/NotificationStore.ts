@@ -1,3 +1,13 @@
+/**
+ * The storage contract for notifications, which every storage adapter implements and
+ * `NotificationProjection` writes. `NotificationService` reads inboxes through it and marks what a
+ * person saw; `ReadStateCommand` marks what reading a thread settles; `GroupService` counts what
+ * waits in each group; and `TurnExecution` and `DeliveryExecution` list what an agent or a contact
+ * was told in a thread. The store checks what it is given and authorizes nobody: operations do
+ * that.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { DateTime, Option } from "effect";
 import type * as Store from "../journal/Store.ts";
@@ -10,69 +20,135 @@ import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
-/** Exclusive keyset boundary for listing; not a journal position or live delivery cursor. */
+/**
+ * Where a page of a recipient's notifications ends, by recorded time and ID: an exclusive keyset
+ * boundary for reading the next page, not a journal position or a live delivery cursor.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Cursor = Schema.Struct({
   recordedAt: Notification.Record.fields.recordedAt,
   id: Notification.Id,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Cursor extends Schema.Schema.Type<typeof Cursor> {}
 
+/**
+ * Reading oldest first: up to `limit` notifications after an exclusive boundary, or from the first
+ * without one.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const ReadOptions = Schema.Struct({
   after: Schema.optionalKey(Cursor),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
-/** Reading newest first: the page before an exclusive boundary, or the newest page without one. */
+/**
+ * Reading newest first: the page before an exclusive boundary, or the newest page without one.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const LatestOptions = Schema.Struct({
   before: Schema.optionalKey(Cursor),
   limit: ReadOptions.fields.limit,
 });
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface LatestOptions extends Schema.Schema.Type<typeof LatestOptions> {}
 
-/** A recipient's pending notifications from one group's thread activity. */
+/**
+ * A recipient's pending notifications from one group's thread activity, as `countPendingByGroup`
+ * counts them.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const PendingCount = Schema.Struct({
   groupId: Notification.ThreadReference.fields.groupId,
   count: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface PendingCount extends Schema.Schema.Type<typeof PendingCount> {}
 
+/**
+ * Storage failed while reading or writing notifications.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("NotificationStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused ID or source and
+ * recipient, or a notification not in the state the write requires.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
- * Workspace-bound notification read model. Reads use the current transaction
- * when present, otherwise committed state, and return isolated records. These
- * internal reads do not authorize callers; application operations must do so.
- * Every storage adapter implements this contract.
+ * A range of one thread's timeline positions, after one and through another, as `listByThread`
+ * reads them.
  *
- * The journal settles notifications as Pending, Discarded, or Informational, an agent's as
- * Accepted when a turn takes them, and a contact's when a delivery does. A human recipient's Seen is private state, written by markSeen
- * outside the journal and kept when projections are rebuilt: a notification projected again as
- * Pending reads as Seen, with its first time, once its recipient has seen it.
- */
-/**
- * A range of one thread's timeline positions: after one, through another.
- *
- * @category schemas
+ * @category options
+ * @since 0.1.0
  */
 export const ThreadRange = Schema.Struct({
   afterSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   throughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface ThreadRange extends Schema.Schema.Type<typeof ThreadRange> {}
 
 /**
+ * The notification store, bound to one workspace by the host. Reads use the current transaction
+ * when present, otherwise committed state, and return isolated records. These reads do not
+ * authorize callers; operations must do so.
+ *
+ * The journal settles notifications as Pending, Discarded, or Informational, an agent's as
+ * Accepted when a turn takes them, and a contact's when a delivery does. A human recipient's Seen
+ * is private state, written by `markSeen` outside the journal and kept when projections are
+ * rebuilt: a notification projected again as Pending reads as Seen, with its first time, once its
+ * recipient has seen it.
+ *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class NotificationStore extends Context.Service<
   NotificationStore,
@@ -172,15 +248,18 @@ export class NotificationStore extends Context.Service<
     /**
      * Record that `by` accepted these pending notifications, in its commit: a turn, which takes
      * pending notifications of one agent in this workspace, or a delivery, which takes pending
-     * notifications of contacts. Anything else conflicts and writes nothing. An empty request writes
-     * nothing.
+     * notifications of contacts. Anything else conflicts and writes nothing. An empty request
+     * writes nothing.
      */
     readonly accept: (
       ids: ReadonlyArray<Notification.Id>,
       by: Notification.AcceptedBy,
       acceptedAt: DateTime.Utc,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-    /** Settle pending agent input for this ended participation, preserving source and recipient history. */
+    /**
+     * Settle pending agent input for this ended participation, preserving source and recipient
+     * history.
+     */
     readonly discardPendingForParticipation: (
       id: ThreadParticipationId.Id,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
@@ -205,7 +284,8 @@ const settled = (operation: string) => () =>
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
- * workspace, before the driver sees it.
+ * workspace, before the driver sees it. A record inserted as Seen or Accepted conflicts, since only
+ * `markSeen` and `accept` record those.
  *
  * @category constructors
  * @since 0.1.0

@@ -7,6 +7,8 @@
  * messages before it joined, as the conversation so far. Everything here is pure: the caller reads
  * the thread and names its people. What the agent is told is text alone, as Effect AI `Prompt`
  * messages, which its session log keeps as it was told.
+ *
+ * @since 0.1.0
  */
 import { Prompt } from "effect/ai";
 import type * as Identity from "../identity/Identity.ts";
@@ -17,7 +19,12 @@ import * as ThreadMessage from "../thread/ThreadMessage.ts";
 import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
 import type * as Member from "../workspace/Member.ts";
 
-/** A message of the thread as the agent is told it, for the conversation it joins. */
+/**
+ * A message of the thread as the agent is told it, for the conversation it joins.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Input {
   /** What the author is called, as the agent is told. */
   readonly author: string;
@@ -26,18 +33,36 @@ export interface Input {
   readonly text: string;
 }
 
-/** The thread as it stands when a turn starts: its title, and its task when it is one. */
+/**
+ * The thread as it stands when a turn starts: its title, and its task when it is one.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Context {
   readonly title: Thread.Title | null;
   readonly task: Task.Record | undefined;
 }
 
-/** What the thread's people are called, as the agent is told. */
+/**
+ * What the thread's people are called, as the agent is told; the caller reads the names of those
+ * `peopleOf` lists.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Names {
   readonly member: (memberId: Member.Id) => string;
   readonly contact: (contactId: Identity.ContactId) => string;
 }
 
+/**
+ * What a prompt is written with: who the agent is, what people are called, and who asked for the
+ * turn to run again, if anyone.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** The agent's own membership, which is "you". */
   readonly self: Member.Id;
@@ -85,6 +110,9 @@ const stateOf = (
 /**
  * The thread as it stands, in a sentence or two: its title, and its task's state when it is one.
  * Nothing for a thread that is neither titled nor a task; its opening message says what it is.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const contextOf = (context: Context, options: Options): string | undefined => {
   const texts = [
@@ -206,7 +234,12 @@ const isPublished = (
 ): item is ThreadActivityKind.Items["message.published"] =>
   item.activity.kind === "message.published";
 
-/** Everyone the items and the context name, for the caller to read what they are called. */
+/**
+ * Everyone the items and the context name, for the caller to read what they are called.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const peopleOf = (
   context: Context,
   items: ReadonlyArray<Thread.TimelineItem>,
@@ -219,6 +252,9 @@ export const peopleOf = (
  * A turn's prompt: one user message with the thread as it stands first, then a text for each item
  * that told the agent something, and one for who asked the turn to run again, when someone retried
  * it. Nothing when it has nothing to say; the context alone says nothing.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const promptOf = (
   context: Context,
@@ -238,7 +274,12 @@ export const promptOf = (
   return userMessageOf(header === undefined ? texts : [header, ...texts]);
 };
 
-/** How many of the thread's messages the items tell: those published that still have text. */
+/**
+ * How many of the thread's messages the items tell: those published that still have text.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const countMessages = (items: ReadonlyArray<Thread.TimelineItem>) =>
   items.filter(
     (item) => isPublished(item) && ThreadMessage.Content.isAnyOf(["Text"])(item.message.content),
@@ -252,6 +293,9 @@ const named = (input: Input) => `${input.author}: ${input.text}`;
  * messages as the user's, each named by its author, and its own, from an earlier time it took
  * part, as its answers. Consecutive messages of one side make one message, as models take a
  * conversation whose sides alternate.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const conversationOf = (messages: ReadonlyArray<Input>): ReadonlyArray<Prompt.Message> => {
   const conversation: Array<Prompt.Message> = [];

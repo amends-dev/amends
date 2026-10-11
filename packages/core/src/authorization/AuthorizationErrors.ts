@@ -1,12 +1,31 @@
+/**
+ * The outcomes `Authorization` reports that a caller can act on. They are schemas, so protocols
+ * carry them to clients; the service's `Error` type adds the failures of what it depends on.
+ *
+ * @since 0.1.0
+ */
 import { Schema } from "effect";
 import * as Member from "../workspace/Member.ts";
 import * as Requirement from "./Requirement.ts";
 
-/** The outcomes `Authorization` reports that a caller can act on; schemas only, for contracts. */
+/**
+ * No current grant of the member covers the requirement.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Denied extends Schema.TaggedError<Denied>()("Authorization.Denied", {
   memberId: Member.Id,
   requirement: Requirement.Value,
 }) {}
+
+/**
+ * The actor is not an active member of the workspace: the membership is missing or removed, or
+ * its identity is not the actor's.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidActor extends Schema.TaggedError<InvalidActor>()("Authorization.InvalidActor", {
   memberId: Member.Id,
   reason: Schema.Literals(["membership-missing", "membership-removed", "identity-mismatch"]),

@@ -1,3 +1,13 @@
+/**
+ * The PostgreSQL driver for `ChannelStore.ChannelStore`, over the `channels` table, one row per
+ * channel, removed ones included. `ChannelStore.make` checks every input before the driver sees
+ * it, so the driver keeps only what storage keeps: the primary key refuses a reused ID as the
+ * store's `Conflict`, and an update that finds no row conflicts. Every statement is scoped to the
+ * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
+ * and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Channel, ChannelStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -20,7 +30,13 @@ const toRow = (record: Channel.Record): typeof channels.$inferInsert => ({
   createdAt: DateTime.toDate(record.createdAt),
 });
 
-/** Channel records in the workspace's database. @category constructors */
+/**
+ * Builds the channel store for the binding's workspace: this module's driver inside
+ * `ChannelStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Channels.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -66,5 +82,10 @@ export const make = Effect.fn("Channels.make")(function* () {
   return ChannelStore.make(workspaceId, driver);
 });
 
-/** Provide channel storage over the caller's binding. @category layers */
+/**
+ * Provides `ChannelStore.ChannelStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ChannelStore.ChannelStore, make());

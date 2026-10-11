@@ -1,3 +1,12 @@
+/**
+ * The writes to turns that `TurnService` and `TurnExecution` share, run inside the caller's
+ * commit: recording a turn's change in its thread's timeline, ending a turn everywhere it is told,
+ * and asking one to stop. Every way a turn ends goes through `endTurn`, which publishes the
+ * turn's fact and records `turn.ended` in the same commit. The caller owns authorization and the
+ * commit; this service checks neither.
+ *
+ * @since 0.1.0
+ */
 import { Context, DateTime, Effect, Layer, Option } from "effect";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
@@ -16,24 +25,54 @@ import * as Turn from "./Turn.ts";
  * How a turn ended: completed with the reply it posted, if any, failed and why, or stopped and why
  * it was asked to. Callers name the stop's reason, since the record they hold may predate the
  * request.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export type Ending =
   | { readonly outcome: "completed"; readonly messageIds: ReadonlyArray<ThreadMessageId.Id> }
   | { readonly outcome: "failed"; readonly reason: string }
   | { readonly outcome: "cancelled"; readonly cancelReason: Turn.CancelReason };
 
-/** A turn's change, as its thread's timeline shows it. */
+/**
+ * A turn's change, as its thread's timeline shows it: one of `TurnActivity`'s kinds, which
+ * `recordActivity` records.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type ActivityKind =
   | typeof TurnActivity.Created
   | typeof TurnActivity.Started
   | typeof TurnActivity.Stopping
   | typeof TurnActivity.Ended;
 
+/**
+ * What recording a turn's activity can fail with: the thread command's failures, and the thread
+ * store's.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RecordError = ThreadCommand.Error | ThreadStore.Failure;
+
+/**
+ * What ending a turn, or asking it to stop, can fail with: `RecordError`, and a projection's
+ * failure on the fact published.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type EndError = Projection.Error | RecordError;
 
 /**
  * @effect-expect-leaking Transaction
+ *
+ * The turn command: the internal writes to turns that `TurnService` and `TurnExecution` share,
+ * each in the caller's commit.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class TurnCommand extends Context.Service<
   TurnCommand,
@@ -69,7 +108,12 @@ export class TurnCommand extends Context.Service<
   }
 >()("@amends-dev/core/turn/command/Service") {}
 
-/** @category constructors */
+/**
+ * The command over the thread store, the thread command, and the journal.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("TurnCommand.make")(function* () {
   const threadStore = yield* ThreadStore.ThreadStore;
   const threadCommand = yield* ThreadCommand.ThreadCommand;
@@ -160,5 +204,10 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
   return TurnCommand.of({ recordActivity, endTurn, requestStop });
 });
 
-/** Internal writes shared by turn operations and execution. @category layers */
+/**
+ * Internal writes shared by turn operations and execution.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(TurnCommand, make());

@@ -1,3 +1,11 @@
+/**
+ * Implements `TurnsGroup`. Each handler enters the workspace as the principal's membership through
+ * `Gateway.asMember` and calls one `TurnService` operation. Following a turn's log holds a place
+ * within the `Streams` limits and serves `TurnService.watchLog`'s stream through `Streams.serve`,
+ * with heartbeats, so a log and the change feed share one count of open streams.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import type { Actor } from "@amends-dev/core/identity";
 import { Turn, TurnService } from "@amends-dev/core/turn";
@@ -10,9 +18,10 @@ import * as Streams from "./Streams.ts";
 /**
  * Register turn handlers, capturing the gateway and reading the principal per request. Following
  * a turn's log is a stream held in the HTTP response scope, as change streams are: it counts
- * within the same limits, and ends with Turn.LogUnavailable when it cannot go on.
+ * within the same limits, and ends with `Turn.LogUnavailable` when it cannot go on.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

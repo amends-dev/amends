@@ -1,3 +1,12 @@
+/**
+ * The storage contract for roles, which every storage adapter implements and `RoleProjection`
+ * writes. It also keeps the built-in bundles' revision the workspace holds, which
+ * `BuiltinRoleUpgrade` compares with the host's. `GrantResolver` and `Delegation` read roles by
+ * ID. Reads honor the caller's transaction when there is one; writes require it. The store checks
+ * what it is given and authorizes nobody: operations do that.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import type * as Store from "../journal/Store.ts";
@@ -7,17 +16,32 @@ import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as BuiltinRoles from "./BuiltinRoles.ts";
 
+/**
+ * Storage failed while reading or writing roles.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("RoleStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused ID, a missing
+ * role, or a built-in revision not later than the recorded one.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("RoleStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
+ * The role store, bound to one workspace by the host.
+ *
  * Host-owned role read model for one workspace. Reads use the current host
  * transaction when present, including its staged writes; otherwise committed
  * state. Isolate stored inputs and returned records from caller mutation.
@@ -31,6 +55,9 @@ export class Conflict extends Schema.TaggedError<Conflict>()("RoleStore.Conflict
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class RoleStore extends Context.Service<
   RoleStore,
@@ -39,7 +66,7 @@ export class RoleStore extends Context.Service<
     readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Record>, Failure>;
 
     /**
-     * Fail with Conflict for a reused role ID. Never upsert.
+     * Insert a role. Fail with Conflict for a reused role ID. Never upsert.
      */
     readonly insert: (
       record: Role.Record,

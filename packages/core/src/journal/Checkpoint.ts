@@ -1,3 +1,13 @@
+/**
+ * The store a host implements for projection progress: how far each projection version being
+ * rebuilt has read its log, and which versions are live on each log, applied by every commit so
+ * that they need no progress of their own. `Projection.makeRunner` reads and writes it while
+ * rebuilding, and `Journal` reads the live versions once per commit, before its first
+ * publication. Writes enlist in the journal's `Store.Transaction`, beside the projection's own
+ * store writes.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import * as Commit from "./Commit.ts";
@@ -6,17 +16,31 @@ import * as Store from "./Store.ts";
 import * as StoreInput from "./StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
-/** Each projection version owns progress for one domain log. */
+/**
+ * Names one projection version's progress on one log: the log, the projection's name, and its
+ * version. Each projection version owns progress for one domain log.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Key = Schema.Struct({
   logId: Entry.LogId,
   name: Schema.NonEmptyString,
   version: Schema.Finite,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Key extends Schema.Schema.Type<typeof Key> {}
 
 /**
  * The last applied entry. The index tracks successive publications within an
  * open commit; durable checkpoints must end at the last entry of their batch.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Cursor = Schema.Struct({
   position: Entry.Position,
@@ -24,16 +48,36 @@ export const Cursor = Schema.Struct({
   index: Schema.Natural,
   entryId: Entry.Id,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Cursor extends Schema.Schema.Type<typeof Cursor> {}
 
-/** A projection version that every commit to its log applies. */
+/**
+ * A projection version that every commit to its log applies.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const LiveVersion = Schema.Struct({
   name: Key.fields.name,
   version: Key.fields.version,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface LiveVersion extends Schema.Schema.Type<typeof LiveVersion> {}
 
-/** A log's live projection versions: at most one version of each projection name. */
+/**
+ * A log's live projection versions: at most one version of each projection name.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const LiveVersions = Schema.Array(LiveVersion).check(
   Schema.makeFilter(
     (versions) =>
@@ -43,11 +87,17 @@ export const LiveVersions = Schema.Array(LiveVersion).check(
 );
 
 /**
- * Persistence is supplied by the host and shares the journal's native transaction.
+ * The checkpoint store, bound to one workspace by the host, which shares the journal's native
+ * transaction.
+ *
+ * What a storage adapter implements for projection progress.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class Checkpoint extends Context.Service<
   Checkpoint,

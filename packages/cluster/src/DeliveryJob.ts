@@ -5,6 +5,10 @@
  * thread's messages reach its conversation in order. Cluster keeps an entity on one runner at a
  * time and redelivers a request whose handling was cut short. A request that fails is tried again
  * where it is, as `JobRequests` says; then the delivery the job could not post is given up.
+ * `layerRequests` gives core's `DeliveryJobs.DeliveryJobs` to commits, and `layerWorker` handles
+ * each job's requests through its `DeliveryRunner`.
+ *
+ * @since 0.1.0
  */
 import { DeliveryJobs } from "@amends-dev/core/channel";
 import { Store } from "@amends-dev/core/journal";
@@ -16,7 +20,13 @@ import { Rpc } from "effect/rpc";
 import * as DeliveryRunner from "./DeliveryRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
 
-/** A request to deliver what the thread's contacts were told; Cluster keeps one per key. */
+/**
+ * A request to deliver what the thread's contacts were told, keyed by the commit that stored it;
+ * Cluster keeps one per key.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export class Deliver extends Schema.Class<Deliver>("amends/DeliveryJob/Deliver")({
   ...DeliveryJobs.Job.fields,
   key: Schema.String,
@@ -26,12 +36,24 @@ export class Deliver extends Schema.Class<Deliver>("amends/DeliveryJob/Deliver")
   }
 }
 
-/** One bound thread's deliveries; its requests survive the runner. */
+/**
+ * The `amends/DeliveryJob` entity: one bound thread's deliveries, addressed by `entityId`. Its
+ * `Deliver` requests are persisted, so they survive the runner.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export const entity = Entity.make("amends/DeliveryJob", [
   Rpc.make("Deliver", { payload: Deliver }).annotate(ClusterSchema.Persisted, true),
 ]);
 
-/** The entity of a job. */
+/**
+ * The ID of `job`'s entity: its workspace and thread as a JSON array, which the worker reads back
+ * into the job.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const entityId = (job: DeliveryJobs.Job) => JSON.stringify([job.workspaceId, job.threadId]);
 
 const decodeEntityId = Schema.decodeUnknownSync(
@@ -44,10 +66,12 @@ const jobOf = (entityId: string): DeliveryJobs.Job => {
 };
 
 /**
- * Requests stored by Cluster, in the commit's transaction when Cluster's message storage shares
- * the workspace storage's SQL client, and read again once the commit is done, as `TurnJob`'s are.
+ * Provides core's `DeliveryJobs.DeliveryJobs`, whose requests Cluster stores, each keyed by the
+ * commit that asks for it: in the commit's transaction when Cluster's message storage shares the
+ * workspace storage's SQL client, and read again once the commit is done, as `TurnJob`'s are.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerRequests = Layer.effect(
   DeliveryJobs.DeliveryJobs,
@@ -82,6 +106,7 @@ export const layerRequests = Layer.effect(
  * delivery never stays requested with nothing to post it, and the request is dropped otherwise.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerWorker = entity.toLayer(
   Effect.gen(function* () {
@@ -119,5 +144,11 @@ export const layerWorker = entity.toLayer(
   { concurrency: 1, maxIdleTime: "1 minute" },
 );
 
-/** Stored requests and the worker that handles them, over the host's Cluster. @category layers */
+/**
+ * Both `layerRequests` and `layerWorker`, over the host's Cluster: the requests commits store, and
+ * the worker that handles them.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.merge(layerWorker, layerRequests);

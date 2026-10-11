@@ -171,22 +171,22 @@ outcomes keep their tags, such as `MemberService.NotFound` with 404.
 Follow the [host conventions](../README.md). Importing any module but the entry point reads no
 configuration and starts nothing.
 
-| Module                             | Responsibility                                                                                                                                                                           |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                         |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                      |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                    |
-| `authentication/email.ts`          | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                 |
-| `config.ts`                        | `LocalConfig.load()`, validating every setting before any resource is acquired.                                                                                                          |
-| `harness-integrations.ts`          | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                    |
-| `sandbox-integrations.ts`          | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                      |
-| `host.ts`                          | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, and sign-in storage over PostgreSQL, with jobs and pruning; `layerDatabase`; `makeIntegrations`; and `deriveSecret`. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                             |
-| `index.ts`                         | Loads configuration, builds the host layer and the authentication `AMENDS_SIGN_IN` names, and launches through `BunRuntime.runMain`.                                                     |
+| Module                         | Responsibility                                                                                                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DevelopmentSignIn.ts`         | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                         |
+| `DevelopmentSessionTokens.ts`  | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                      |
+| `DevelopmentAuthentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                    |
+| `EmailAuthentication.ts`       | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                 |
+| `LocalConfig.ts`               | `LocalConfig.load()`, validating every setting before any resource is acquired.                                                                                                          |
+| `HarnessIntegrations.ts`       | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                    |
+| `SandboxIntegrations.ts`       | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                      |
+| `LocalHost.ts`                 | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, and sign-in storage over PostgreSQL, with jobs and pruning; `layerDatabase`; `makeIntegrations`; and `deriveSecret`. |
+| `LocalServer.ts`               | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                             |
+| `index.ts`                     | Loads configuration, builds the host layer and the authentication `AMENDS_SIGN_IN` names, and launches through `BunRuntime.runMain`.                                                     |
 
 Development sign-in requires `Crypto.Crypto` and the host's `Accounts.Accounts`, and email sign-in
-also its `SignInStorage.SignInStorage`; development session tokens are built synchronously. None needs
-HTTP services or sends codes when built. Database and server resources belong to their layer
+also its `SignInStorage.SignInStorage`; development session tokens are built synchronously. None
+needs HTTP services or sends codes when built. Database and server resources belong to their layer
 scopes. The gateway boots each workspace on first use and keeps it prepared while requests or
 streams use it and for five idle minutes afterwards; see the
 [gateway](../../packages/gateway/README.md#workspace-runtimes). See

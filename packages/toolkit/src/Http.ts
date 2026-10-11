@@ -7,6 +7,8 @@
  * credentials the API asks for, so no credential enters this package. What the model gives never
  * decides where a request goes: it fills the places the operation has for it, as the segments of the
  * path, the parameters of the query, the headers, and the body, which is JSON.
+ *
+ * @since 0.1.0
  */
 import { Effect, Result, Schema } from "effect";
 import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http";
@@ -25,12 +27,28 @@ import {
   type ToolSourceErrorReason,
 } from "./ToolSourceError.ts";
 
+/**
+ * The HTTP methods an operation's request may use.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Method = Schema.Literals(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Method = typeof Method.Type;
 
-/** A place in a request for a property of the tool's input. */
+/**
+ * A place in a request for a property of the tool's input.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Parameter = Schema.Struct({
+  /** Where the value goes: a segment of the path, a parameter of the query, or a header. */
   in: Schema.Literals(["path", "query", "header"]),
 
   /** What the request calls it: the name between braces in the path, or of the query or the header. */
@@ -40,29 +58,67 @@ export const Parameter = Schema.Struct({
   property: Schema.NonEmptyString,
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Parameter extends Schema.Schema.Type<typeof Parameter> {}
 
+/**
+ * The request an operation sends, with places in it for what the model gives: its method, its
+ * path, where each property of the input goes, and the property that holds the JSON body.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const RequestTemplate = Schema.Struct({
   method: Method,
 
   /** The path after the base URL, with a parameter's name between braces where its value goes. */
   path: Schema.String,
 
+  /** Where each property of the input goes, besides the body. */
   parameters: Schema.Array(Parameter),
 
   /** The property of the input that holds the body, which is sent as JSON, if the request has one. */
   body: Schema.optionalKey(Schema.NonEmptyString),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface RequestTemplate extends Schema.Schema.Type<typeof RequestTemplate> {}
 
+/**
+ * A tool that is one HTTP request: the definition the model is shown, and the request a call fills
+ * in and sends. It is data, so a catalog can store it, and `OpenApi.readOperations` reads the
+ * operations of an API from its document.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Operation = Schema.Struct({
+  /** The tool as the model is shown it, whose name the source runs it by. */
   definition: ToolDefinition,
+
+  /** The request a call fills in with its input and sends. */
   request: RequestTemplate,
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Operation extends Schema.Schema.Type<typeof Operation> {}
 
+/**
+ * What `make` takes: the source's name, where its requests go, the client that sends them with the
+ * API's credentials, and its operations.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** Names the source, as `ToolSource.name` says. */
   readonly name: string;
@@ -82,7 +138,15 @@ const maxFailureLength = 500;
 
 // TODO: Give a request that never answers, and an answer that never ends or is far too large to
 // read, a limit. Both need a decision about what a call may cost, which the source does not have yet.
-/** Makes a source of the operations of an HTTP API. */
+/**
+ * Makes a source of the operations of an HTTP API. A call answered 401 or 403 fails with
+ * `AuthenticationError`, 408, 429, or 5xx with `UnavailableError`, and any other 4xx with
+ * `CallFailedError`, holding the API's own words cut to 500 characters. A success is the body as
+ * JSON, as text, or `null` without one.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Http.make")(function* (options: Options) {
   const { name, client } = options;
   const baseUrl = options.baseUrl.replace(/\/+$/, "");

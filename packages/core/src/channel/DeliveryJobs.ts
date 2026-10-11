@@ -64,6 +64,8 @@ export const noRunner: DeliveryJobs["Service"] = DeliveryJobs.of({
 });
 
 /**
+ * `noRunner` as the workspace's delivery jobs, for a host that runs none.
+ *
  * @category layers
  * @since 0.1.0
  */

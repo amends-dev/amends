@@ -1,3 +1,13 @@
+/**
+ * The memory implementation of `SessionLogStore` from `../turn/SessionLogStore.ts`, over the
+ * workspace's `Binding`: each participation's session log, kept in `MemoryDatabase` beside the
+ * workspaces' state. An append takes part in no transaction: it is kept at once and wakes waiting
+ * readers. It keeps what the contract leaves to storage: an append conflicts unless the log ends
+ * where its writer read it to. `SessionLogStore.make` checks every input before this driver sees
+ * it.
+ *
+ * @since 0.1.0
+ */
 import { SessionLog, SessionLogStore } from "../turn/index.ts";
 import { Array, DateTime, Deferred, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -13,6 +23,7 @@ const rows = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SessionLog.Recor
  * append takes part in no transaction and is kept at once.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("SessionLogs.make")(function* () {
   const { workspaceId, connection } = yield* Binding.Binding;
@@ -57,5 +68,10 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
   return SessionLogStore.make(workspaceId, driver);
 });
 
-/** Provide session logs over the caller's binding. @category layers */
+/**
+ * Provide session logs over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(SessionLogStore.SessionLogStore, make());

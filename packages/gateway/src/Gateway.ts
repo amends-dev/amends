@@ -1,3 +1,12 @@
+/**
+ * How a host enters core. Core runs one workspace with a trusted actor, and its services are the
+ * operations; the gateway creates workspaces, prepares each one's core over `WorkspaceStorage`
+ * through `WorkspaceRuntime`, and resolves an authenticated identity into `Actor.Actor`, so those
+ * operations can run. Every protocol, such as server-http, and every host's jobs enter workspaces
+ * through it, and fail only with the outcomes `GatewayErrors` makes public.
+ *
+ * @since 0.1.0
+ */
 import * as Core from "@amends-dev/core";
 import { Authorization } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
@@ -19,7 +28,12 @@ import * as WorkspaceStorage from "./WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "./WorkspaceRuntime.ts";
 
 /**
- * Workspace bootstrap and entry; core's services are the operations.
+ * The gateway a host builds once, with `make` or `layer`: it creates workspaces and runs programs
+ * in them, as a member or without an actor. Core's services are the operations those programs
+ * call.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class Gateway extends Context.Service<
   Gateway,
@@ -49,11 +63,11 @@ export class Gateway extends Context.Service<
       program: Effect.Effect<A, E, R>,
     ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
     /**
-     * Run a program in a workspace without an actor, keeping the workspace prepared for the caller's
-     * scope: invitation acceptance, where the recipient is not yet a member, and a host's jobs, which
-     * call the services core gives them. Programs may require only core's operations and those
-     * services, never the journal or the stores commits write. A workspace that was never created
-     * returns WorkspaceNotFound without being prepared.
+     * Run a program in a workspace without an actor, keeping the workspace prepared for the
+     * caller's scope: invitation acceptance, where the recipient is not yet a member, and a host's
+     * jobs, which call the services core gives them. Programs may require only core's operations
+     * and those services, never the journal or the stores commits write. A workspace that was never
+     * created returns WorkspaceNotFound without being prepared.
      */
     readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
       workspaceId: Workspace.Id,
@@ -127,6 +141,13 @@ const toPublicErrors = <A, E, R>(
     return Effect.die(error);
   });
 
+/**
+ * What `make` and `layer` take: the integrations the host installs, and how long an unused
+ * workspace stays prepared.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export type Options = WorkspaceRuntime.Options;
 
 /** Whether membership is known, refused, or must be resolved after preparation. */
@@ -142,6 +163,7 @@ const Admission = Data.taggedEnum<Admission>();
  * from a trusted ingress; the gateway never accepts client-asserted actors or member IDs.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Gateway.make")(function* (
   options: Options = {},
@@ -205,7 +227,8 @@ export const make = Effect.fn("Gateway.make")(function* (
    * it, since a member already prepared it. Otherwise its stores answer without preparing it: the
    * identity's active membership, or a refusal when the workspace was never created, having no
    * history, or its live read models show no membership. Only a workspace whose read models
-   * await a rebuild is prepared first, so membership is resolved from what its preparation restores.
+   * await a rebuild is prepared first, so membership is resolved from what its preparation
+   * restores.
    */
   const checkAdmission = Effect.fn("Gateway.checkAdmission")(function* (
     workspaceId: Workspace.Id,
@@ -349,5 +372,6 @@ export const make = Effect.fn("Gateway.make")(function* (
  * Provide one gateway and its workspace runtimes for the host layer's lifetime.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (options?: Options) => Layer.effect(Gateway, make(options));

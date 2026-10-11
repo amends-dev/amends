@@ -1,3 +1,12 @@
+/**
+ * Where email sign-in keeps its pending codes and sessions, shared by every host over the same
+ * storage. `EmailSignIn` reads and writes it, deciding each change to a code with a pure function
+ * that `modifyCode` applies. Storage adapters implement it, `MemorySignInStorage` in process
+ * memory, and the `signInStorage` conformance suite checks that each applies one change to an
+ * address at a time across hosts.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { DateTime, Effect, Option } from "effect";
@@ -6,9 +15,14 @@ import type * as Accounts from "./Accounts.ts";
 /**
  * The code an address was last sent, and how many it was sent lately. The code itself is never
  * stored, only its digest under the host's code key.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const PendingCode = Schema.Struct({
+  /** The code's HMAC-SHA256 digest under the host's code key. */
   digest: Schema.NonEmptyString,
+  /** When the code stops working: its lifetime after sending, or the wrong try that voids it. */
   expiresAt: Schema.DateTimeUtc,
   failedAttempts: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   sentAt: Schema.DateTimeUtc,
@@ -16,22 +30,36 @@ export const PendingCode = Schema.Struct({
   windowStartedAt: Schema.DateTimeUtc,
   sendsInWindow: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
 });
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type PendingCode = typeof PendingCode.Type;
 
 /**
  * A signed-in session: whose it is, when it began, and when it ends unless used. The token that
  * presents it is never stored, only its digest, which names the session here.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const SessionRecord = Schema.Struct({
   humanId: Identity.HumanId,
   createdAt: Schema.DateTimeUtc,
   expiresAt: Schema.DateTimeUtc,
 });
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type SessionRecord = typeof SessionRecord.Type;
 
 /**
  * Where email sign-in keeps the codes it sent and the sessions it began, across every host over
  * the storage. Storage failures are defects.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class SignInStorage extends Context.Service<
   SignInStorage,
@@ -45,10 +73,13 @@ export class SignInStorage extends Context.Service<
       email: Accounts.Email,
       decide: (current: Option.Option<PendingCode>) => readonly [A, Option.Option<PendingCode>],
     ) => Effect.Effect<A>;
+    /** Store a session a sign-in began, under its token's digest. */
     readonly insertSession: (digest: string, session: SessionRecord) => Effect.Effect<void>;
+    /** The session stored under a token's digest, ended or not: its reader checks `expiresAt`. */
     readonly findSession: (digest: string) => Effect.Effect<Option.Option<SessionRecord>>;
     /** Move a session's end, as using it does; a session that is gone stays gone. */
     readonly extendSession: (digest: string, expiresAt: DateTime.Utc) => Effect.Effect<void>;
+    /** Remove the session under a token's digest, as revoking it does; a missing one stays gone. */
     readonly deleteSession: (digest: string) => Effect.Effect<void>;
   }
->()("@amends-dev/gateway/SignIn-storage/Service") {}
+>()("@amends-dev/gateway/sign-in-storage/Service") {}

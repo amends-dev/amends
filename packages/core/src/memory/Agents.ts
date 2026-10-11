@@ -1,3 +1,11 @@
+/**
+ * The memory implementation of `AgentStore` from `../agent/AgentStore.ts`, over the workspace's
+ * `Binding`. It keeps what the contract leaves to storage: a reused ID or an update of a missing
+ * agent conflicts, and so does a second agent for one membership, which PostgreSQL refuses with a
+ * unique index. `AgentStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Agent, AgentStore } from "../agent/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -7,7 +15,12 @@ import * as Rows from "./Rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Agent.Record));
 
-/** Agent records over the current workspace transaction. @category constructors */
+/**
+ * Agent records over the current workspace transaction.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Agents.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   /** Fails when another agent than `record` has its membership, as PostgreSQL's unique index does. */
@@ -69,5 +82,10 @@ export const make = Effect.fn("Agents.make")(function* () {
   return AgentStore.make(workspaceId, driver);
 });
 
-/** Provide agent storage over the caller's binding. @category layers */
+/**
+ * Provide agent storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(AgentStore.AgentStore, make());

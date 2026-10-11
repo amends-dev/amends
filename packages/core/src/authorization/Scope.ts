@@ -1,19 +1,41 @@
+/**
+ * What a grant covers: a whole workspace, or one exact target in it. `Grant.Value` carries a scope,
+ * a role assignment in `Assignment.Source` records one, and `covers` is how `Grant.anyCovers`
+ * decides whether a grant reaches a requirement's target. A scope names resources only: the
+ * permission, its target kind, and the member's current grants are `Authorization`'s concern.
+ *
+ * @since 0.1.0
+ */
 import { Schema } from "effect";
 import * as Workspace from "../workspace/Workspace.ts";
 import * as Target from "./Target.ts";
 
-/** The resources a grant covers: a whole workspace or one exact target. */
+/**
+ * The resources a grant covers: a whole workspace or one exact target.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Value = Schema.TaggedUnion({
   Workspace: { workspaceId: Workspace.Id },
   Target: { target: Target.Reference },
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Value = typeof Value.Type;
 
 const equivalentTarget = Schema.toEquivalence(Target.Reference);
 
 /**
- * Checks resource coverage within the same workspace. Authorization must also
- * check the permission, its target kind, and the acting member's current grants.
+ * Whether a scope reaches a target: a workspace scope covers every target in that workspace, and
+ * an exact scope only the same target. Authorization checks the permission, its target kind, and
+ * the acting member's current grants beside it.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const covers = (scope: Value, target: Target.Reference): boolean =>
   Value.match(scope, {

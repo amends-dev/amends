@@ -1,3 +1,14 @@
+/**
+ * The check every operation runs for the acting member: that the actor is a current, active member
+ * of this workspace, and that one of their grants covers each permission the operation requires on
+ * its target. `require` fails with `Denied` at the first uncovered requirement; `permitted` answers
+ * each one, for lists that keep only what the actor may see. The actor comes from `Actor.Actor` in
+ * context, their grants from `GrantResolver`, and permissions from `PermissionCatalog`. Whether a
+ * target exists, group membership, and business rules stay with the operation, which runs the
+ * check inside its commit when it writes.
+ *
+ * @since 0.1.0
+ */
 import * as Target from "./Target.ts";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import * as Actor from "../identity/Actor.ts";
@@ -12,13 +23,43 @@ import * as Requirement from "./Requirement.ts";
 
 import { Denied, InvalidActor } from "./AuthorizationErrors.ts";
 import * as Store from "../journal/Store.ts";
-export { Denied, InvalidActor } from "./AuthorizationErrors.ts";
+export {
+  /**
+   * No current grant of the member covers the requirement.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Denied,
+  /**
+   * The actor is not an active member of the workspace: the membership is missing or removed, or
+   * its identity is not the actor's.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  InvalidActor,
+} from "./AuthorizationErrors.ts";
 
+/**
+ * The actor, or a requirement's target, belongs to another workspace than the one this core is
+ * bound to.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
   "Authorization.WorkspaceMismatch",
   { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
 ) {}
 
+/**
+ * What a check can fail with: the outcomes in `AuthorizationErrors`, a workspace mismatch, and the
+ * failures of reading the member, their grants, and the catalog.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | MemberStore.Failure
   | GrantResolver.Error
@@ -27,6 +68,13 @@ export type Error =
   | InvalidActor
   | Denied;
 
+/**
+ * The authorization check, bound to one workspace. Every operation calls `require` with its
+ * requirements, and reads that page through items call `permitted`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Authorization extends Context.Service<
   Authorization,
   {
@@ -65,6 +113,7 @@ const requireWorkspace = Effect.fnUntraced(function* (
  * Construct authorization from workspace dependencies; read actor and transaction context per call.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Return<
   Authorization["Service"],
@@ -135,13 +184,17 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
  * Provide authorization over the caller's workspace services.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Authorization, make());
 
 /**
  * Require an action on a target the actor may read, in one grant resolution. A target they can't
  * read fails with `hidden`, so they learn nothing of it; one they can read but not act on is
- * denied.
+ * denied. The operations on agents, connections, and channels check this way.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const requireVisible = Effect.fnUntraced(function* <E>(
   authorization: Authorization["Service"],

@@ -34,10 +34,41 @@ import {
 import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
 export {
+  /**
+   * The thread is a task already; a thread has one.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   AlreadyTask,
+  /**
+   * The task no longer holds the value the change replaces: it changed meanwhile, and nothing was
+   * recorded.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Changed,
+  /**
+   * The group is missing, or the actor is not a member of it; the two are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   GroupNotFound,
+  /**
+   * The thread is missing, outside the actor's groups, or has no task; the three are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
+  /**
+   * The assignee cannot take part in the thread: missing, inactive, or outside its group.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   ParticipantUnavailable,
 } from "./TaskErrors.ts";
 

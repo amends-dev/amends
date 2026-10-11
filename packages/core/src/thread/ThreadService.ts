@@ -59,11 +59,49 @@ import {
 } from "./ThreadErrors.ts";
 import * as Notification from "../notification/Notification.ts";
 export {
+  /**
+   * The thread's title is no longer the one the renamer expected: someone renamed it meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Changed,
+  /**
+   * A direct group needs the author and at least one other member.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   DirectMembersRequired,
+  /**
+   * The group is missing, or the actor is not a member of it; the two are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   GroupNotFound,
+  /**
+   * An agent asked to start a thread; only people start them, and agents' messages come from
+   * their turns.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   HumanAuthorRequired,
+  /**
+   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
+   * told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
+  /**
+   * A member who was to take part cannot: they are missing, inactive, or not in the group.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   ParticipantUnavailable,
 } from "./ThreadErrors.ts";
 

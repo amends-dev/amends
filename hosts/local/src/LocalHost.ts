@@ -1,3 +1,12 @@
+/**
+ * The local host's composition: the gateway, the workspace directory, accounts, and sign-in's
+ * storage over one PostgreSQL database through the storage adapter, with turn and delivery jobs on
+ * Effect Cluster over the same connection pool, and the integrations workspaces connect to. The
+ * host implements no storage itself. `LocalServer` serves the HTTP API over `layer`, and the entry
+ * point builds it from `LocalConfig`.
+ *
+ * @since 0.1.0
+ */
 import { createHmac, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,7 +43,13 @@ import type { SqlClient } from "effect/sql";
 import * as HarnessIntegrations from "./HarnessIntegrations.ts";
 import * as SandboxIntegrations from "./SandboxIntegrations.ts";
 
-/** Gateway, directory, accounts, and sign-in storage owned by one host lifetime. */
+/**
+ * What `layer` provides for one host's lifetime: the gateway, the workspace directory, the
+ * accounts, and sign-in's storage, which `LocalServer.layer` serves the HTTP API over.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type HostLayer = Layer.Layer<
   | Gateway.Gateway
   | WorkspaceDirectory.WorkspaceDirectory
@@ -43,6 +58,13 @@ export type HostLayer = Layer.Layer<
   unknown
 >;
 
+/**
+ * What `layer` and `layerDatabase` take besides the database URL, each with its default.
+ * `LocalConfig.load` reads them from the environment.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** The most connections to open to the database, twenty by default. */
   readonly poolSize?: number | undefined;
@@ -81,6 +103,9 @@ export interface Options {
  * A secret for one purpose, such as opencode's bridge tokens: one made from the credential key,
  * which every host over the database shares, so that hosts agree on it; or, without a credential
  * key, this process's own.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const deriveSecret = (
   credentialKey: Redacted.Redacted<string> | undefined,
@@ -99,6 +124,7 @@ export const deriveSecret = (
  * and opencode's two, as harnesses. opencode's bridges take tokens derived from `credentialKey`.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
@@ -138,6 +164,7 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
  * claim another.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerDatabase = (url: Redacted.Redacted<string>, options: Options = {}) => {
   const host = options.runnerAddress?.host ?? "localhost";
@@ -163,13 +190,13 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 
 /**
  * The gateway, the workspace directory, the accounts, and sign-in's storage over one PostgreSQL
- * database, through
- * the storage adapter, with the turn jobs that run agents' turns and the delivery jobs that carry messages to
- * channels, both on the integrations the host installs, and handled job requests pruned after
- * seven days. The HTTP server resolves bearer tokens before
- * entering the gateway.
+ * database, through the storage adapter, with the turn jobs that run agents' turns and the delivery
+ * jobs that carry messages to channels, both on the integrations the host installs, and handled job
+ * requests pruned after seven days. The HTTP server resolves bearer tokens before entering the
+ * gateway.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer => {
   const sandboxDirectory = options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes");

@@ -1,3 +1,12 @@
+/**
+ * Brings a workspace's built-in roles to the host's revision of their bundles. The gateway runs
+ * `upgrade` each time it boots a workspace: one recorded at an earlier `BuiltinRoles.revision` is
+ * brought up to date with `RoleFacts` in one commit attributed to the `builtin-roles` system, and
+ * one at the same or a later revision is left alone, so an older host never reverts a newer one's
+ * bundles.
+ *
+ * @since 0.1.0
+ */
 import { Effect, Option } from "effect";
 import * as Performer from "../identity/Performer.ts";
 import * as Journal from "../journal/Journal.ts";
@@ -10,12 +19,22 @@ import * as BuiltinRoles from "./BuiltinRoles.ts";
 import * as RoleFacts from "./RoleFacts.ts";
 import * as RoleStore from "./RoleStore.ts";
 
-/** Who upgrades built-in roles: the product, not a member. */
+/**
+ * Who upgrades built-in roles: the product, not a member.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const performer = Performer.Reference.cases.System.make({
   id: Performer.SystemId.make("builtin-roles"),
 });
 
-/** The bundles to bring a workspace to; by default the current revision and catalog. */
+/**
+ * The bundles to bring a workspace to; by default the current revision and catalog.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Target {
   readonly revision: number;
   readonly definitions: ReadonlyArray<Permission.Definition>;
@@ -31,6 +50,9 @@ const haveSamePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<s
  * revision or a later one is left alone, so an older host never reverts a newer one's upgrade.
  * Hosts run this when they load a workspace; most find it current and open no transaction.
  * Returns whether it upgraded.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target?: Target) {
   const roleStore = yield* RoleStore.RoleStore;

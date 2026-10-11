@@ -6,6 +6,8 @@
  * models.dev names the AI SDK package that reaches each provider, and a model may name its own
  * package, base URL, and API. The catalog keeps the models whose package speaks a protocol amends
  * speaks, and the providers that have any.
+ *
+ * @since 0.1.0
  */
 import type { ModelEndpoint } from "@amends-dev/harness";
 import { Effect, Schema } from "effect";
@@ -82,12 +84,27 @@ const Provider = Schema.Struct({
 
 type Provider = typeof Provider.Type;
 
-/** What `api.json` holds: the providers, keyed by id. */
+/**
+ * What `api.json` holds: the providers, keyed by id, with only the fields a catalog keeps.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Document = Schema.Record(Schema.String, Provider);
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Document = typeof Document.Type;
 
-/** The catalog of what `document` holds, from models.dev's `api.json`. */
+/**
+ * The catalog of what `document` holds, from models.dev's `api.json`. It fails when a field the
+ * catalog keeps has changed shape.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const toCatalog = Effect.fn("ModelsDev.toCatalog")(function* (document: unknown) {
   const providers = yield* Schema.decodeUnknownEffect(Document)(document);
   return {

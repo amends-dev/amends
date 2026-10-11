@@ -1,3 +1,10 @@
+/**
+ * The storage contract for memberships, which every storage adapter implements and
+ * `MemberProjection` writes. Reads honor the caller's transaction when there is one; writes require
+ * it. The store checks what it is given and authorizes nobody: operations do that.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import * as Identity from "../identity/Identity.ts";
@@ -6,28 +13,44 @@ import * as Member from "./Member.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "./WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing memberships.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("MemberStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused member ID, a
+ * second active membership for one identity, or a membership that is missing or removed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("MemberStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
- * Host-owned membership read model for one workspace. Reads use the current host
- * transaction when present, including its staged writes; otherwise committed
- * state. Returned records must be isolated from caller mutation.
+ * The membership store, bound to one workspace by the host.
  *
- * Projection writes enlist in the same native transaction as journal entries and
- * checkpoints. Enforce constraints atomically across concurrent writers. Reject
- * expired or foreign transaction handles and never retry the program internally.
+ * What a storage adapter implements for memberships. Reads use the current transaction when there
+ * is one, including its staged writes, and committed state otherwise, and return records isolated
+ * from the caller's mutation. Projection writes enlist in the same native transaction as journal
+ * entries and checkpoints, enforce their constraints atomically across concurrent writers, reject
+ * expired or foreign transaction handles, and never retry internally.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class MemberStore extends Context.Service<
   MemberStore,

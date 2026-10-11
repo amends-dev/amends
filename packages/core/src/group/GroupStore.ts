@@ -1,3 +1,10 @@
+/**
+ * The storage contract for groups, which every storage adapter implements and `GroupProjection`
+ * writes. Reads honor the caller's transaction when there is one; writes require it. The store
+ * checks what it is given and authorizes nobody: operations do that.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import type * as Store from "../journal/Store.ts";
@@ -7,26 +14,45 @@ import * as Group from "./Group.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing groups.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("GroupStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused ID, a second
+ * direct group for one member set, a missing group, or a direct group renamed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("GroupStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
- * Internal projection storage. Reads honor an existing transaction; writes require one.
+ * The group store, bound to one workspace by the host.
+ *
+ * What a storage adapter implements for groups.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class GroupStore extends Context.Service<
   GroupStore,
   {
+    /** The group, if stored. */
     readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
     /**
      * Find several groups in one read. Absent IDs are omitted and each found record appears once;
@@ -66,8 +92,8 @@ export class GroupStore extends Context.Service<
       ids: ReadonlyArray<Group.Id>,
     ) => Effect.Effect<ReadonlyArray<Group.Latest>, Failure>;
     /**
-     * Projection write that advances a group's latest activity time. A time at or before the recorded
-     * one changes nothing; a missing group conflicts.
+     * Projection write that advances a group's latest activity time. A time at or before the
+     * recorded one changes nothing; a missing group conflicts.
      */
     readonly recordLatest: (
       latest: Group.Latest,

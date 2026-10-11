@@ -1,3 +1,13 @@
+/**
+ * The operations on connections an actor calls: listing the integrations the host installs,
+ * reading the workspace's connections and the models each offers, and creating, renaming,
+ * configuring, replacing the key of, checking, and removing one. A key goes to
+ * `ConnectionCredentialStore` in the commit that records it, and no view returns one. Each
+ * operation authorizes the actor itself; changes write inside one journal commit, and reads and
+ * `check` run outside any.
+ *
+ * @since 0.1.0
+ */
 import { type Connection as ConnectionContract, Integrations } from "@amends-dev/connection";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -26,30 +36,133 @@ import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
 export {
+  /**
+   * The connection's name is no longer the one expected: someone renamed it meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Changed,
+  /**
+   * This host keeps no credentials, so no connection that authenticates with a key can be used.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   CredentialsUnavailable,
+  /**
+   * The integration does not take the connection: its settings, how it authenticates, or, when
+   * checking one that authenticates with a key, a missing key. The description is the integration's,
+   * for the person who gave them.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   InvalidConnection,
+  /**
+   * The connection authenticates with nothing, so it takes no key.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Keyless,
+  /**
+   * The connection is missing, removed, or not readable by the actor; the three are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
+  /**
+   * This host does not install the integration, or no longer installs the one a connection names.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   UnknownIntegration,
 } from "./ConnectionErrors.ts";
 
+/**
+ * What reading connections can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError =
   | Authorization.Error
   | ConnectionStore.Failure
   | Schema.SchemaError
   | NotFound;
-/** What every change can meet besides reading. */
+
+/**
+ * What every change can fail with: reading's failures, and recording the change in the journal.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 /** Storing or reading a key can also meet a host that keeps no credentials. */
 type KeyError = ConnectionCredentialStore.Failure | CredentialsUnavailable;
+
+/**
+ * What creating a connection can fail with: an integration the host does not install or that does
+ * not take the connection, and storing its key.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type CreateError = Error | UnknownIntegration | InvalidConnection | KeyError;
+
+/**
+ * What configuring a connection can fail with: an integration the host no longer installs, or one
+ * that does not take the new settings.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ConfigureError = Error | UnknownIntegration | InvalidConnection;
+
+/**
+ * What replacing a connection's key can fail with: a connection that takes no key, and storing the
+ * new one.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReplaceKeyError = Error | Keyless | KeyError;
+
+/**
+ * What removing a connection can fail with: a change's failures, and deleting its key.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RemoveError = Error | ConnectionCredentialStore.Failure;
+
+/**
+ * What checking a connection can fail with: reading it, an integration the host no longer installs
+ * or that does not take the connection, and reading its key.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type CheckError = ReadError | UnknownIntegration | InvalidConnection | KeyError;
+
+/**
+ * What reading the models a connection offers can fail with: reading it, and an integration the
+ * host no longer installs.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ModelsError = ReadError | UnknownIntegration;
 
+/**
+ * The connection operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class ConnectionService extends Context.Service<
   ConnectionService,
   {
@@ -64,13 +177,17 @@ export class ConnectionService extends Context.Service<
     >;
     /** The workspace's connections the actor may read, by name. */
     readonly list: Effect.Effect<ReadonlyArray<Connection.View>, ReadError, Actor.Actor>;
+    /**
+     * The connection, under `connection.read`; a missing, removed, or unreadable one is
+     * `NotFound`.
+     */
     readonly get: (
       connectionId: Connection.Id,
     ) => Effect.Effect<Connection.View, ReadError, Actor.Actor>;
     /**
      * The models the connection offers an agent, to set an agent up with one: those its integration
-     * lists, and whether it also offers others by any id. A connection whose integration this host no
-     * longer installs offers nothing, and fails with UnknownIntegration.
+     * lists, and whether it also offers others by any id. A connection whose integration this host
+     * no longer installs offers nothing, and fails with `UnknownIntegration`.
      */
     readonly models: (
       connectionId: Connection.Id,
@@ -78,35 +195,51 @@ export class ConnectionService extends Context.Service<
     /**
      * Connect the workspace to an installed integration, with settings and a way of authenticating
      * the integration takes, and its key when it authenticates with one, stored in the same commit.
+     * Needs `connection.create` on the workspace. A retry with the same request key returns the
+     * connection its first attempt created, or `NotFound` once that connection is removed.
      */
     readonly create: (
       input: Connection.CreateInput,
       options?: Request.Options,
     ) => Effect.Effect<Connection.View, CreateError, Actor.Actor>;
+    /**
+     * Give a connection a new name, under `connection.manage`. The same name again records nothing;
+     * otherwise a name other than `expectedName` is `Changed`, and nothing is recorded.
+     */
     readonly rename: (
       input: Connection.RenameInput,
     ) => Effect.Effect<Connection.View, Error | Changed, Actor.Actor>;
-    /** Replace its settings, which its integration must take. */
+    /** Replace its settings, which its integration must take, under `connection.manage`. */
     readonly configure: (
       input: Connection.ConfigureInput,
     ) => Effect.Effect<Connection.View, ConfigureError, Actor.Actor>;
-    /** Store a new key for a connection that authenticates with one, in place of its key. */
+    /**
+     * Store a new key for a connection that authenticates with one, in place of its key, under
+     * `connection.manage`; a connection that authenticates with none is `Keyless`.
+     */
     readonly replaceKey: (
       input: Connection.ReplaceKeyInput,
     ) => Effect.Effect<Connection.View, ReplaceKeyError, Actor.Actor>;
     /**
      * Ask the connection's system whether the connection works, with its key, as its integration
-     * checks it. It changes nothing, and holds no commit open while the system answers.
+     * checks it. It changes nothing, and holds no commit open while the system answers. Needs
+     * `connection.manage`, since it sends the key.
      */
     readonly check: (
       connectionId: Connection.Id,
     ) => Effect.Effect<ConnectionContract.Health, CheckError, Actor.Actor>;
-    /** Stop its use and delete its key; its record remains. */
+    /** Stop its use and delete its key, under `connection.manage`; its record remains. */
     readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, RemoveError, Actor.Actor>;
   }
 >()("@amends-dev/core/connection/service/Service") {}
 
-/** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
+/**
+ * Builds the connection operations over the stores, the host's `Integrations`, the journal, and
+ * authorization; each operation resolves the actor's authority itself.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ConnectionService.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const connectionStore = yield* ConnectionStore.ConnectionStore;
@@ -390,5 +523,10 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   });
 });
 
-/** @category layers */
+/**
+ * Provide the connection operations over the stores, the host's integrations, and authorization.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ConnectionService, make());

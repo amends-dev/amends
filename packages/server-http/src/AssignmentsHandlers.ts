@@ -1,10 +1,22 @@
+/**
+ * Implements `AssignmentsGroup`. Each handler enters the workspace as the principal's membership
+ * through `Gateway.asMember` and calls one `AssignmentService` operation: `permissions`, `roles`,
+ * `list`, `assign`, `change`, or `revoke`. `Routes` composes its `layer` with the other groups'.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import { AssignmentService } from "@amends-dev/core/authorization";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
-/** @category layers */
+/**
+ * Register the assignment handlers, capturing the gateway and reading the principal per request.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = HttpApiBuilder.group(
   Api,
   "assignments",

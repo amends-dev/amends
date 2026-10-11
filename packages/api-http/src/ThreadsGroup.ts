@@ -1,3 +1,14 @@
+/**
+ * The `threads` endpoint group: conversations in a workspace's groups. Its endpoints call
+ * `ThreadService` (`listInGroup`, `listOpenings`, `startInGroup`, `startDirect`, `get`, `rename`,
+ * `readTimeline`, `listParticipants`), `ThreadMessageService` (`publish`, `edit`, `delete`,
+ * `typing`), `ThreadParticipationService` (`follow`, `unfollow`), and
+ * `ReadStateService.markThreadRead`. Every endpoint needs active membership, and reading a thread
+ * needs current membership of its group; only people write messages and keep read positions, so an
+ * agent principal gets 403 there. `ThreadsHandlers` in `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Group } from "@amends-dev/core/group";
 import {
   Thread,
@@ -41,6 +52,9 @@ const reading = ThreadActivityStore.ReadOptions.fields;
  * following, and read positions.
  * Reading a thread requires current membership of its group and creates no participation; missing
  * and unreadable threads answer alike.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class ThreadsGroup extends HttpApiGroup.make("threads")
   .add(

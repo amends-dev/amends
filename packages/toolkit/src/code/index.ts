@@ -15,6 +15,8 @@
  * A tool that needs approval cannot be called from code, which a session cannot ask a person about
  * in the middle of a run. It stays a tool of its own beside `execute`, and a session asks about its
  * calls as it does for any tool.
+ *
+ * @since 0.1.0
  */
 import { Duration, Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/ai";
@@ -22,7 +24,13 @@ import * as Presentation from "../Presentation.ts";
 import { Failure } from "../ToolSource.ts";
 import { declare } from "./Declarations.ts";
 
-/** Why code did not finish: it threw, or the runtime could not run it. */
+/**
+ * Why code did not finish: it threw, or the runtime could not run it. A `CodeRuntime` fails with
+ * it, and the model reads it as a `Failure` with what the code logged before.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class CodeError extends Schema.TaggedError<CodeError>(
   "@amends-dev/toolkit/CodeMode/CodeError",
 )("CodeError", {
@@ -37,7 +45,12 @@ export class CodeError extends Schema.TaggedError<CodeError>(
   }
 }
 
-/** One run of code, which a `CodeRuntime` carries out. */
+/**
+ * One run of code, which a `CodeRuntime` carries out.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Execution {
   /** The code, as the body of an async function, which `return`s what the run gives back. */
   readonly code: string;
@@ -52,7 +65,12 @@ export interface Execution {
   readonly call: (tool: string, input: Schema.JsonObject) => Effect.Effect<Schema.Json, Failure>;
 }
 
-/** What a run gave back. */
+/**
+ * What a run gave back, which is what the model reads of `execute` when the code finishes.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Outcome = Schema.Struct({
   /** What the code returned, which is `null` when it returned nothing. */
   result: Schema.Json,
@@ -61,9 +79,20 @@ export const Outcome = Schema.Struct({
   logs: Schema.Array(Schema.String),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Outcome extends Schema.Schema.Type<typeof Outcome> {}
 
-/** Runs code in an isolate that can reach nothing but the tools of the execution. */
+/**
+ * Runs code in an isolate that can reach nothing but the tools of the execution, which it gives
+ * the code as `tools`, beside `console`. An adapter that has such an isolate implements it; this
+ * package does not.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface CodeRuntime {
   /**
    * Runs the code, and ends the run when interrupted. It fails with `CodeError` when the code
@@ -72,6 +101,12 @@ export interface CodeRuntime {
   readonly run: (execution: Execution) => Effect.Effect<Outcome, CodeError>;
 }
 
+/**
+ * What `toolkit` takes besides the toolkit it presents and the runtime.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** How long a run may take, which its tool calls count in. A minute by default. */
   readonly timeout?: Duration.Input;
@@ -88,6 +123,9 @@ const executeName = "execute";
 /**
  * Makes the toolkit of `execute`, and the tools of `presented` that need approval, over `presented`
  * and the runtime that runs the code. Building contacts nothing.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const toolkit = Effect.fn("CodeMode.toolkit")(function* <
   Tools extends Record<string, Tool.Any>,

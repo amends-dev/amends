@@ -42,11 +42,11 @@ Both keep the workspace prepared for the caller's scope: an HTTP response's, whi
 until the client disconnects, or one the caller closes. Identities must come from a trusted ingress,
 never from client input.
 
-A host provides `WorkspaceStorage.WorkspaceStorage`, whose `forWorkspace` returns one workspace's stores and
-signal hub (`WorkspaceStorage.Bindings`), the storage part of core's `HostServices`. It also
-provides core's job services, which take every workspace's job requests, each naming its workspace;
-a host that runs no jobs provides each one's `layerNoRunner`, so requests are accepted and work
-waits.
+A host provides `WorkspaceStorage.WorkspaceStorage`, whose `forWorkspace` returns one workspace's
+stores and signal hub (`WorkspaceStorage.Bindings`), the storage part of core's `HostServices`. It
+also provides core's job services, which take every workspace's job requests, each naming its
+workspace; a host that runs no jobs provides each one's `layerNoRunner`, so requests are accepted
+and work waits.
 
 ## Workspace runtimes
 
@@ -82,9 +82,9 @@ projection tables directly.
 
 ## Host contracts
 
-- `WorkspaceStorage.WorkspaceStorage` binds one workspace's stores and its `SignalHub.SignalHub`, which
-  delivers [signals](../core/README.md#signals) between every process over the same storage, best
-  effort.
+- `WorkspaceStorage.WorkspaceStorage` binds one workspace's stores and its `SignalHub.SignalHub`,
+  which delivers [signals](../core/README.md#signals) between every process over the same storage,
+  best effort.
 - `Accounts.Accounts` holds the people a host knows across its workspaces: `findOrCreate` gives an
   address's `Accounts.Account`, its `id`, the human ID core names the person by, and its `email`,
   creating it the first time the address comes up; `findByIds` reads accounts back by ID. The ID is
@@ -95,22 +95,23 @@ projection tables directly.
   asked for lately, for the address or from the client's network address, and with
   `SignIn.Unavailable` when it could not send one; and `complete` exchanges the code for a
   `SignIn.Session`, a token the host's authentication accepts and the address's account.
-- `SessionTokens.SessionTokens` resolves a session token into an identity, and `revoke` stops honoring
-  one, as signing out does.
-- `WorkspaceDirectory.WorkspaceDirectory` is one identity's routing table, `WorkspaceDirectory.Listing`: its
-  memberships, ended ones included, each with its workspace's `activeMemberCount`, and its pending
-  invitations.
-- `SignInStorage.SignInStorage` keeps email sign-in's pending codes and sessions across every host over
-  the storage: `modifyCode` replaces an address's `SignInStorage.PendingCode` with what a pure
+- `SessionTokens.SessionTokens` resolves a session token into an identity, and `revoke` stops
+  honoring one, as signing out does.
+- `WorkspaceDirectory.WorkspaceDirectory` is one identity's routing table,
+  `WorkspaceDirectory.Listing`: its memberships, ended ones included, each with its workspace's
+  `activeMemberCount`, and its pending invitations.
+- `SignInStorage.SignInStorage` keeps email sign-in's pending codes and sessions across every host
+  over the storage: `modifyCode` replaces an address's `SignInStorage.PendingCode` with what a pure
   decision makes of it, one change to an address at a time, and sessions, each a
   `SignInStorage.SessionRecord` named by its token's digest, are inserted, found, extended, and
   deleted. Storage adapters implement it.
-- `EmailSender.EmailSender` hands an `EmailSender.Message` to the host's email provider, failing with
-  `EmailSender.Undelivered`.
+- `EmailSender.EmailSender` hands an `EmailSender.Message` to the host's email provider, failing
+  with `EmailSender.Undelivered`.
 
 These span workspaces or issue credentials, which core never does, so hosts implement them, apart
-from sign-in and session tokens, which [email sign-in](#email-sign-in) implements. The `./accounts`, `./sign-in`, and `./directory` exports carry
-their schemas for contracts. On the wire, a membership's `activeMemberCount` is `people`.
+from sign-in and session tokens, which [email sign-in](#email-sign-in) implements. The `./Accounts`,
+`./SignIn`, and `./WorkspaceDirectory` exports carry their schemas for contracts. On the wire, a
+membership's `activeMemberCount` is `people`.
 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces through
 `inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do.
@@ -180,11 +181,11 @@ runs the suites over a real database, and the gateway's tests over the [memory s
 
 ## Email sign-in
 
-`EmailSignIn.layer({ codeKey, policy? })` provides `SignIn.SignIn` and `SessionTokens.SessionTokens` over
-`SignInStorage.SignInStorage`, `Accounts.Accounts`, `EmailSender.EmailSender`, and `Crypto.Crypto`;
-`EmailSignIn.make` returns both. `codeKey` is a secret every host over the storage shares: codes are
-stored only as HMAC-SHA256 digests under it, and session tokens, 32 random bytes, only as SHA-256
-digests. `EmailSignIn.defaultPolicy`, which `policy` overrides in part:
+`EmailSignIn.layer({ codeKey, policy? })` provides `SignIn.SignIn` and `SessionTokens.SessionTokens`
+over `SignInStorage.SignInStorage`, `Accounts.Accounts`, `EmailSender.EmailSender`, and
+`Crypto.Crypto`; `EmailSignIn.make` returns both. `codeKey` is a secret every host over the storage
+shares: codes are stored only as HMAC-SHA256 digests under it, and session tokens, 32 random bytes,
+only as SHA-256 digests. `EmailSignIn.defaultPolicy`, which `policy` overrides in part:
 
 - a code works once, within ten minutes, and five wrong tries void it; a new code replaces the last;
 - an address is sent a code at most every thirty seconds and five in an hour, across every host;
@@ -219,7 +220,8 @@ error an HTTP route declares is public, so a new outcome fails the build until i
 
 The storage adapters map every failed `COMMIT` to `Uncertain`, including some definite failures; see
 [known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention). Import
-`GatewayErrors` from `@amends-dev/gateway/GatewayErrors` in contracts, to avoid loading the gateway itself.
+`GatewayErrors` from `@amends-dev/gateway/GatewayErrors` in contracts, to avoid loading the gateway
+itself.
 
 ## Development
 

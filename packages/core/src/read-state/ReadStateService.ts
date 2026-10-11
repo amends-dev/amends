@@ -1,3 +1,11 @@
+/**
+ * The operations on read state an actor calls: a person marking a thread read through a timeline
+ * position, or a group read now. Each authorizes the actor itself, writes private state outside the
+ * journal through `ReadStateStore` and `ReadStateCommand`, and publishes a `ThreadRead` or
+ * `GroupRead` signal to the person's other sessions. Agents keep no read state.
+ *
+ * @since 0.1.0
+ */
 import * as Identity from "../identity/Identity.ts";
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
@@ -18,8 +26,46 @@ import * as ReadStateCommand from "./ReadStateCommand.ts";
 import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./ReadStateErrors.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as Store from "../journal/Store.ts";
-export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./ReadStateErrors.ts";
+export {
+  /**
+   * The requested position is past the thread's latest recorded activity.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  BeyondTimeline,
+  /**
+   * The group is missing, or the actor is not a member of it; the two are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  GroupNotFound,
+  /**
+   * The acting member is an agent: only people keep read state, and agents' turns track their input
+   * progress.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  HumanRequired,
+  /**
+   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
+   * told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  ThreadNotFound,
+} from "./ReadStateErrors.ts";
 
+/**
+ * What marking a thread or a group read can fail with: the outcomes in `ReadStateErrors`, and the
+ * failures of what marking depends on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Authorization.Error
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
@@ -33,14 +79,21 @@ export type Error =
   | ThreadNotFound
   | GroupNotFound
   | BeyondTimeline;
+
+/**
+ * The read-state operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class ReadStateService extends Context.Service<
   ReadStateService,
   {
     /**
      * Record that the acting person has read a thread through a timeline position, under the
      * thread's current access and `thread.read`. The position only moves forward. Their pending
-     * notifications from that thread up to the position are marked seen in the same
-     * commit; with none, only the position is written, outside the workspace's write order.
+     * notifications from that thread up to the position are marked seen with it; both are private
+     * state, written outside the workspace's write order.
      */
     readonly markThreadRead: (
       input: ReadState.MarkThreadReadInput,
@@ -52,7 +105,13 @@ export class ReadStateService extends Context.Service<
   }
 >()("@amends-dev/core/read-state/service/Service") {}
 
-/** Capture workspace dependencies; resolve authority per operation. @category constructors */
+/**
+ * Builds the read-state operations over thread and group reads, the shared write, the store, and
+ * the signal hub; each operation resolves the actor's authority itself.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ReadStateService.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const threadQuery = yield* ThreadQuery.ThreadQuery;
@@ -154,5 +213,11 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
 
   return ReadStateService.of({ markThreadRead, markGroupRead });
 });
-/** @category layers */
+
+/**
+ * Provide the read-state operations over thread and group reads, the shared write, and the store.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ReadStateService, make());

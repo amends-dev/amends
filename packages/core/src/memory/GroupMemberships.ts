@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `GroupMembershipStore` from `../group/GroupMembershipStore.ts`, over
+ * the workspace's `Binding`: each group admission, active and removed. It keeps what the contract
+ * leaves to storage: a reused ID conflicts, and so does a second active admission of one member to
+ * one group; removing conflicts unless the admission is stored, active, and of the group and
+ * member named. `GroupMembershipStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Group, GroupMembership, GroupMembershipStore } from "../group/index.ts";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -9,7 +18,12 @@ const rows = Rows.make(Schema.fromJsonString(GroupMembership.Record));
 const byId = (left: GroupMembership.Record, right: GroupMembership.Record) =>
   compareBinary(left.id, right.id);
 
-/** Recorded group admissions; one active admission per group and workspace membership. @category constructors */
+/**
+ * Recorded group admissions; one active admission per group and workspace membership.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupMemberships.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("groupMemberships")));
@@ -52,9 +66,8 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "findActiveMany")),
     ),
     summarize: Effect.fn("GroupMemberships.summarize")(
-      function* (groupInput, memberInput) {
+      function* (groupInput, memberId) {
         const groupIds = new Set(groupInput);
-        const memberId = memberInput;
         if (groupIds.size === 0) return [];
         const summaries = new Map<Group.Id, Group.Summary>();
         for (const record of yield* all) {
@@ -165,5 +178,10 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
   return GroupMembershipStore.make(workspaceId, driver);
 });
 
-/** Provide group admission storage over the caller's binding. @category layers */
+/**
+ * Provide group admission storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupMembershipStore.GroupMembershipStore, make());

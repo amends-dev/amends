@@ -1,3 +1,12 @@
+/**
+ * The server's side of the contract's `Authentication`. Each request's bearer token is resolved
+ * through the host's `SessionTokens.resolve`, and the handler runs with the `Principal` it names
+ * and the `Credential` itself; a token the host rejects fails with `Unauthorized`, saying whether
+ * it was malformed, unknown, or expired. `Routes.layerHandlers` provides `layer` to every group's
+ * handlers.
+ *
+ * @since 0.1.0
+ */
 import { Authentication, Credential, Principal, Unauthorized } from "@amends-dev/api-http";
 import { SessionTokens } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
@@ -13,6 +22,7 @@ const messages: Record<SessionTokens.Rejected["reason"], string> = {
  * principals are resolved for each request, never during construction.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("BearerAuthentication.make")(function* () {
   const sessionTokens = yield* SessionTokens.SessionTokens;
@@ -34,5 +44,6 @@ export const make = Effect.fn("BearerAuthentication.make")(function* () {
  * Provide the HTTP contract's authentication over the host's session tokens.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Authentication, make());

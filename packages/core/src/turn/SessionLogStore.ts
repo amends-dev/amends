@@ -1,3 +1,12 @@
+/**
+ * The storage contract for session logs, which every storage adapter implements and a turn's job
+ * writes: one append-only log for each participation in the workspace, whose entries
+ * `SessionLog.Entry` describes. Logs take part in no commit, so a host may keep them apart from
+ * its other stores, in one built for appending, and nothing here needs a transaction. A log's
+ * first entry is at position 1, and each next one follows it.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Array } from "effect";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
@@ -5,38 +14,54 @@ import * as SessionLog from "./SessionLog.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing session logs.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("SessionLogStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
-/** The log holds an entry past where its writer read it to: someone else wrote there meanwhile. */
+/**
+ * The log holds an entry past where its writer read it to: someone else wrote there meanwhile.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("SessionLogStore.Conflict", {
   participationId: Schema.String,
   after: Schema.Int,
 }) {}
 
 /**
- * The host's storage for session logs: one append-only log for each participation in the
- * workspace. Logs take part in no commit, so a host may keep them apart from its other stores, in
- * one built for appending. A log's first entry is at position 1, and each next one follows it.
- */
-/**
  * A page of a log: its entries past `after`, at most `limit` of them.
  *
- * @category models
+ * @category options
  * @since 0.1.0
  */
 export const ReadOptions = Schema.Struct({
   after: Schema.Natural,
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
 /**
- * `make` builds the store over a driver of the same shape. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
+ * The session log store, bound to one workspace by the host: what a storage adapter implements
+ * for session logs.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input against its
+ * schema before the driver sees it, so a driver keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class SessionLogStore extends Context.Service<
   SessionLogStore,
@@ -67,8 +92,7 @@ export class SessionLogStore extends Context.Service<
 >()("@amends-dev/core/turn/session-log-store/Service") {}
 
 /**
- * The store over a driver: each input is checked against its schema, and a record against the
- * workspace, before the driver sees it.
+ * The store over a driver: each input is checked against its schema before the driver sees it.
  *
  * @category constructors
  * @since 0.1.0

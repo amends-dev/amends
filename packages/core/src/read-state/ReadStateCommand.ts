@@ -1,3 +1,12 @@
+/**
+ * The write to read state that operations share: marking a thread read through a position, which
+ * marks the reader's pending notifications from it seen and advances their read position.
+ * `ReadStateService` uses it, and so do `ThreadService` and `ThreadMessageService`, so that an
+ * author has read what they posted. It joins the caller's transaction when there is one, and the
+ * caller owns authorization.
+ *
+ * @since 0.1.0
+ */
 import { Context, DateTime, Effect, Layer } from "effect";
 import * as Store from "../journal/Store.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
@@ -5,11 +14,24 @@ import type * as Thread from "../thread/Thread.ts";
 import type * as ReadState from "./ReadState.ts";
 import * as ReadStateStore from "./ReadStateStore.ts";
 
+/**
+ * What the write can fail with: the notification and read-state stores' failures and conflicts.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | NotificationStore.Failure
   | NotificationStore.Conflict
   | ReadStateStore.Failure
   | ReadStateStore.Conflict;
+
+/**
+ * The write to read state that read-state, thread, and message operations share.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class ReadStateCommand extends Context.Service<
   ReadStateCommand,
   {
@@ -27,7 +49,12 @@ export class ReadStateCommand extends Context.Service<
   }
 >()("@amends-dev/core/read-state/command/Service") {}
 
-/** @category constructors */
+/**
+ * Builds the shared write over the notification and read-state stores.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ReadStateCommand.make")(function* () {
   const notificationStore = yield* NotificationStore.NotificationStore;
   const readStateStore = yield* ReadStateStore.ReadStateStore;
@@ -54,5 +81,11 @@ export const make = Effect.fn("ReadStateCommand.make")(function* () {
 
   return ReadStateCommand.of({ markThreadRead });
 });
-/** Internal write shared by read-state, thread, and message operations. @category layers */
+
+/**
+ * Provide the write that read-state, thread, and message operations share.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ReadStateCommand, make());

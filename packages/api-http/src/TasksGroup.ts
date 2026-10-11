@@ -1,3 +1,13 @@
+/**
+ * The `tasks` endpoint group: the work a thread tracks, keyed by the thread. Its endpoints call
+ * `TaskService`: `listInGroup`, `get`, `create`, and `update`. Every endpoint needs active
+ * membership of the workspace and of the thread's group; making a conversation a task needs
+ * `task.create` on the group, changing one `task.update`, and assigning an agent `agent.use` on
+ * it. A thread can also start as a task, through `ThreadsGroup`'s `start`. `TasksHandlers` in
+ * `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Group } from "@amends-dev/core/group";
 import { Task } from "@amends-dev/core/task";
 import { Thread } from "@amends-dev/core/thread";
@@ -17,6 +27,9 @@ const record = Task.Record.annotate({ identifier: "Task" });
  * its thread through the threads group's start, or in a conversation here; its title is the
  * thread's and its description the thread's opening message. Reading a task is reading its thread:
  * missing and unreadable ones, and threads without a task, answer alike.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class TasksGroup extends HttpApiGroup.make("tasks")
   .add(

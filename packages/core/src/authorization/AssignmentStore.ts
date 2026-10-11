@@ -1,3 +1,12 @@
+/**
+ * The storage contract for assignments, which every storage adapter implements and
+ * `AssignmentProjection` writes. `GrantResolver` reads a member's active assignments,
+ * `OwnershipService` the Owner role's, and `AssignmentService` one by ID. Reads honor the caller's
+ * transaction when there is one; writes require it. The store checks what it is given and
+ * authorizes nobody: operations do that.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import type * as Store from "../journal/Store.ts";
@@ -8,17 +17,32 @@ import * as Role from "./Role.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing assignments.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("AssignmentStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused ID, or a missing
+ * or already revoked assignment.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("AssignmentStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
+ * The assignment store, bound to one workspace by the host.
+ *
  * Host-owned assignment read model for one workspace. Reads use the current host
  * transaction when present, including its staged writes; otherwise committed
  * state. Isolate stored inputs and returned arrays and records from caller mutation.
@@ -34,6 +58,9 @@ export class Conflict extends Schema.TaggedError<Conflict>()("AssignmentStore.Co
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class AssignmentStore extends Context.Service<
   AssignmentStore,

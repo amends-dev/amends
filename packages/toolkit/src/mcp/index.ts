@@ -6,6 +6,8 @@
  *
  * How the server is spoken to, statelessly or with a session, is the transport's to settle. The
  * source adds what only tools have: the headers that mirror the parameters a tool marks.
+ *
+ * @since 0.1.0
  */
 import { Effect, Ref, Result, Schema } from "effect";
 import { McpSchema } from "effect/ai";
@@ -22,7 +24,16 @@ import { findBindings, headersOf, type Binding } from "./Headers.ts";
 import * as Transport from "./Transport.ts";
 import type { Options } from "./Transport.ts";
 
-export type { Options };
+export type {
+  /**
+   * What `http` takes: the source's name, the server's address, and the client that sends its
+   * requests with the server's credentials.
+   *
+   * @category options
+   * @since 0.1.0
+   */
+  Options,
+};
 
 const Tool = Schema.Struct({
   name: Schema.NonEmptyString,
@@ -58,7 +69,15 @@ const TextBlock = Schema.Struct({ type: Schema.Literal("text"), text: Schema.Str
 /** The most pages of tools a server may list before the source takes its cursors for a loop. */
 const maxToolPages = 100;
 
-/** Makes a source of the tools of the MCP server at `options.url`. */
+/**
+ * Makes a source of the tools of the MCP server at `options.url`. Making it contacts nothing: the
+ * server is first reached when the source lists or runs its tools. A tool that reports `isError`
+ * fails as `CallFailedError`, with what it said, and one that asks for input first as
+ * `UnsupportedError`.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const http = Effect.fn("Mcp.http")(function* (options: Options) {
   const { name } = options;
   const transport = yield* Transport.streamableHttp(options);

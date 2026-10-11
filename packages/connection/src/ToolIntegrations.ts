@@ -1,6 +1,6 @@
 /**
  * The integrations of tool sources: `mcp`, an MCP server reached over Streamable HTTP at the URL a
- * connection gives, and `openapi`, an HTTP API whose OpenAPI document, as JSON, is at the URL a
+ * connection gives, and `openApi`, an HTTP API whose OpenAPI document, as JSON, is at the URL a
  * connection gives. A connection authenticates with an API key or not at all. The key goes in the
  * `Authorization` header as a bearer token, or as it is in the header the connection names, on
  * every request to the server or the API, and on nothing else: an API's document is read without
@@ -8,6 +8,8 @@
  *
  * Checking a connection to an MCP server asks it which tools it has. Checking one to an API reads its
  * document, which the key plays no part in, so a wrong key shows when a tool first runs.
+ *
+ * @since 0.1.0
  */
 import { Http, Mcp, OpenApi, type ToolSourceError } from "@amends-dev/toolkit";
 import { Effect, Redacted, Schema } from "effect";
@@ -26,7 +28,12 @@ const keyHeader = Schema.optionalKey(Schema.NonEmptyString).annotate({
     "The header the API key goes in, as it is. Without one, it goes in Authorization as a bearer token.",
 });
 
-/** The integration of MCP servers, which reaches them over the host's client. */
+/**
+ * The integration of MCP servers, `mcp`, which reaches them over the host's client.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const mcp = Effect.map(HttpClient.HttpClient, (client) => {
   const sourceOf = ({
     connection,
@@ -60,7 +67,13 @@ export const mcp = Effect.map(HttpClient.HttpClient, (client) => {
   });
 });
 
-/** The integration of HTTP APIs with an OpenAPI document, which reaches them over the host's client. */
+/**
+ * The integration of HTTP APIs with an OpenAPI document, `openapi`, which reaches them over the
+ * host's client.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const openApi = Effect.map(HttpClient.HttpClient, (client) => {
   /** The API's operations, from its document, and the base URL its requests go to. */
   const apiOf = (settings: {
@@ -158,6 +171,9 @@ export const openApi = Effect.map(HttpClient.HttpClient, (client) => {
 /**
  * The address `url` names, which may be a path that follows the address of the document at `base`,
  * as a document may name its server.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const resolveUrl = (url: string, base: string) => {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url;

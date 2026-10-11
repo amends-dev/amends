@@ -11,6 +11,8 @@
  * `CallFailedError` are written for it, to say what to correct and what the tool said. The
  * description of any other reason may name an address or another internal, so the model reads only
  * its default message.
+ *
+ * @since 0.1.0
  */
 import { Schema } from "effect";
 
@@ -48,7 +50,12 @@ const withDefaults = <
     }
   };
 
-/** The source's credentials are missing, invalid, or not allowed to do this. */
+/**
+ * The source's credentials are missing, invalid, or not allowed to do this.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class AuthenticationError extends withDefaults(
   Schema.TaggedError<AuthenticationError>(
     "@amends-dev/toolkit/ToolSourceError/AuthenticationError",
@@ -59,7 +66,12 @@ export class AuthenticationError extends withDefaults(
   },
 ) {}
 
-/** The source has no tool of the name it was asked to run, such as one it has removed since. */
+/**
+ * The source has no tool of the name it was asked to run, such as one it has removed since.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NotFoundError extends withDefaults(
   Schema.TaggedError<NotFoundError>("@amends-dev/toolkit/ToolSourceError/NotFoundError")(
     "NotFoundError",
@@ -68,7 +80,12 @@ export class NotFoundError extends withDefaults(
   { message: "The source has no tool of this name", isRetryable: false },
 ) {}
 
-/** The input does not match the tool's parameters. Its description says what to correct. */
+/**
+ * The input does not match the tool's parameters. Its description says what to correct.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidInputError extends withDefaults(
   Schema.TaggedError<InvalidInputError>("@amends-dev/toolkit/ToolSourceError/InvalidInputError")(
     "InvalidInputError",
@@ -81,7 +98,12 @@ export class InvalidInputError extends withDefaults(
   },
 ) {}
 
-/** The tool ran and reported that it failed. Its description is what the tool said. */
+/**
+ * The tool ran and reported that it failed. Its description is what the tool said.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class CallFailedError extends withDefaults(
   Schema.TaggedError<CallFailedError>("@amends-dev/toolkit/ToolSourceError/CallFailedError")(
     "CallFailedError",
@@ -91,6 +113,13 @@ export class CallFailedError extends withDefaults(
 ) {}
 
 // TODO: Say when to try again, which a rate limit gives, once a caller retries by it.
+/**
+ * The source cannot answer now: it said that it is down or busy, or it could not be reached. The
+ * only reason worth trying again.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnavailableError extends withDefaults(
   Schema.TaggedError<UnavailableError>("@amends-dev/toolkit/ToolSourceError/UnavailableError")(
     "UnavailableError",
@@ -99,7 +128,12 @@ export class UnavailableError extends withDefaults(
   { message: "The source is temporarily unavailable", isRetryable: true },
 ) {}
 
-/** The source answered in a way its protocol does not allow, such as a result that is not JSON. */
+/**
+ * The source answered in a way its protocol does not allow, such as a result that is not JSON.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidResponseError extends withDefaults(
   Schema.TaggedError<InvalidResponseError>(
     "@amends-dev/toolkit/ToolSourceError/InvalidResponseError",
@@ -107,6 +141,13 @@ export class InvalidResponseError extends withDefaults(
   { message: "The source answered in a way its protocol does not allow", isRetryable: false },
 ) {}
 
+/**
+ * The source does not do what was asked, such as running a tool that asks for input first,
+ * returning an answer of a media type a tool cannot return, or speaking the server's protocol.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnsupportedError extends withDefaults(
   Schema.TaggedError<UnsupportedError>("@amends-dev/toolkit/ToolSourceError/UnsupportedError")(
     "UnsupportedError",
@@ -115,6 +156,13 @@ export class UnsupportedError extends withDefaults(
   { message: "The source does not support this operation", isRetryable: false },
 ) {}
 
+/**
+ * The source failed in a way no other reason names, such as a defect in its code or a request
+ * that could not be sent. The model reads only that the source failed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnknownError extends withDefaults(
   Schema.TaggedError<UnknownError>("@amends-dev/toolkit/ToolSourceError/UnknownError")(
     "UnknownError",
@@ -123,6 +171,12 @@ export class UnknownError extends withDefaults(
   { message: "The source failed", isRetryable: false },
 ) {}
 
+/**
+ * Why a tool source failed: one of the errors above, which `ToolSourceError.reason` holds.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export const ToolSourceErrorReason = Schema.Union([
   AuthenticationError,
   NotFoundError,
@@ -134,14 +188,29 @@ export const ToolSourceErrorReason = Schema.Union([
   UnknownError,
 ]);
 
+/**
+ * @category errors
+ * @since 0.1.0
+ */
 export type ToolSourceErrorReason = typeof ToolSourceErrorReason.Type;
 
+/**
+ * What every operation of a tool source fails with: the source that failed, by its name, and the
+ * reason. Only an `UnavailableError` is worth trying again, as `isRetryable` says.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class ToolSourceError extends Schema.TaggedError<ToolSourceError>(
   "@amends-dev/toolkit/ToolSourceError",
 )("ToolSourceError", {
   /** The source that failed, as its name gives it, such as `github`. */
   source: Schema.String,
+
+  /** Why the source failed. */
   reason: ToolSourceErrorReason,
+
+  /** The failure underneath, such as an HTTP client's error, which the model never reads. */
   cause: Schema.optional(Schema.Defect()),
 }) {
   get isRetryable(): boolean {

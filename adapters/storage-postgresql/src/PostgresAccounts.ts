@@ -1,3 +1,10 @@
+/**
+ * The gateway's `Accounts.Accounts` over the `accounts` table, one of the few tables kept across
+ * every workspace: a human ID for each lowercase address, which is unique. `PostgresStorage.layer`
+ * provides it beside workspace storage. Storage failures are defects, as the contract has them.
+ *
+ * @since 0.1.0
+ */
 import { Accounts } from "@amends-dev/gateway";
 import { inArray } from "drizzle-orm";
 import { Crypto, Effect, Layer, Schema } from "effect";
@@ -11,6 +18,7 @@ const decodeAccounts = Schema.decodeUnknownEffect(Schema.Array(Accounts.Account)
  * its account, and every later one, or a concurrent one, returns the row already there.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("PostgresAccounts.make")(function* () {
   const { db } = yield* PostgresDatabase.PostgresDatabase;
@@ -42,8 +50,10 @@ export const make = Effect.fn("PostgresAccounts.make")(function* () {
 });
 
 /**
- * Provide Accounts.Accounts using its constructor and the caller's dependencies.
+ * Provides `Accounts.Accounts` over the caller's `PostgresDatabase.PostgresDatabase`, with the
+ * `Crypto.Crypto` that issues human IDs.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Accounts.Accounts, make());

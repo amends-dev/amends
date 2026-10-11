@@ -1,3 +1,12 @@
+/**
+ * A turn's record: one harness turn of one agent in one thread, with where it stands, the work it
+ * accepted, what it runs on, and how it ended; the view a reader sees of it; the drafts a running
+ * turn shows; and the items and messages by which a reader follows its session log. `TurnStore`
+ * keeps the record, `TurnExecution` and `TurnCommand` change it, and `TurnService` serves the
+ * views and the log.
+ *
+ * @since 0.1.0
+ */
 import { Schema, Struct } from "effect";
 import * as Agent from "../agent/Agent.ts";
 import * as GroupId from "../group/GroupId.ts";
@@ -10,13 +19,27 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as MemberId from "../workspace/MemberId.ts";
 import * as TurnId from "./TurnId.ts";
 
+/**
+ * The identity of a turn, from `TurnId`.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Id = TurnId.Id;
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Id = TurnId.Id;
 
 /**
  * Where a turn stands. `queued` holds accepted work until its job starts it; `running` is
  * running; `cancelling` asked to stop and has not yet been confirmed stopped. The rest are
  * final: a finished turn never reopens.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Status = Schema.Literals([
   "queued",
@@ -26,9 +49,20 @@ export const Status = Schema.Literals([
   "failed",
   "cancelled",
 ]);
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Status = typeof Status.Type;
 
-/** An agent has at most one turn in these states on each thread. */
+/**
+ * Whether a turn in `status` is active: queued, running, or cancelling. An agent has at most one
+ * active turn on each thread.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const active = (status: Status) =>
   status === "queued" || status === "running" || status === "cancelling";
 
@@ -37,16 +71,44 @@ const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 /**
  * Why a turn was asked to stop: someone asked, its agent stopped taking part in the thread, or the
  * thread's task was taken from the agent or stopped asking for work.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const CancelReason = Schema.Literals(["requested", "participation-ended", "task-changed"]);
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type CancelReason = typeof CancelReason.Type;
 
-/** How a turn ended. */
+/**
+ * How a turn ended: its final status.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Outcome = Schema.Literals(["completed", "failed", "cancelled"]);
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Outcome = typeof Outcome.Type;
 
-/** A failed or stopped turn that a turn runs again, and the member who asked. */
+/**
+ * A failed or stopped turn that a turn runs again, and the member who asked.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Retry = Schema.Struct({ of: Id, by: MemberId.Id });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Retry extends Schema.Schema.Type<typeof Retry> {}
 
 /**
@@ -54,6 +116,9 @@ export interface Retry extends Schema.Schema.Type<typeof Retry> {}
  * session has not been given, through `acceptedThroughSequence`, and posts the agent's answer.
  * What the session was given before is its session log's to say, where the turn's own entries
  * follow `logAfter`.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Record = Schema.Struct({
   id: Id,
@@ -86,13 +151,28 @@ export const Record = Schema.Struct({
   startedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
   finishedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 
-/** The record with some fields changed. */
+/**
+ * The record with `changes` applied, as a new record; the one given is left as it is.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const change = (record: Record, changes: Partial<Record>): Record =>
   Object.assign({}, record, changes);
 
-/** A new turn, queued until its job starts it, which has run nothing and posted nothing yet. */
+/**
+ * A new turn, queued until its job starts it, which has run nothing and posted nothing yet.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const queued = (
   turn: Omit<
     Record,
@@ -109,38 +189,71 @@ export const queued = (
   finishedAt: null,
 });
 
-/** Accepting work: the notifications it settles, and how far the accepted input reaches. */
+/**
+ * Accepting work into a turn: the notifications it settles, and when. `TurnFacts.Created` carries
+ * the notifications with the turn's record.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Acceptance = Schema.Struct({
   notificationIds: Schema.NonEmptyArray(Notification.Id),
   acceptedAt: Schema.DateTimeUtcFromString,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Acceptance extends Schema.Schema.Type<typeof Acceptance> {}
 
-/** Why a turn cannot be retried: it has not ended, it replied, a later one followed, or its agent left. */
+/**
+ * Why a turn cannot be retried: it has not ended, it replied, a later one followed, or its agent
+ * left.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const NotRetryableReason = Schema.Literals([
   "active",
   "completed",
   "superseded",
   "departed",
 ]);
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type NotRetryableReason = typeof NotRetryableReason.Type;
 
 /**
  * A turn as a reader of its thread sees it, with what they may do with it now: ask it to stop,
  * while it is active and not already stopping, or retry it, once it failed or stopped and nothing
  * followed it. Both require directing its agent. Where its log begins is for following it alone.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const View = Schema.Struct({
   ...Struct.omit(Record.fields, ["logAfter"]),
   stoppable: Schema.Boolean,
   retryable: Schema.Boolean,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface View extends Schema.Schema.Type<typeof View> {}
 
 /**
  * More of a response a turn is writing, before it completes: `text` continues the response's part
  * at `offset` characters. The turn's job shows drafts to those following the turn's log, and the
  * completed response in the log replaces them.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Draft = Schema.Struct({
   responseId: Schema.NonEmptyString,
@@ -149,6 +262,11 @@ export const Draft = Schema.Struct({
   offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   text: Schema.String,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Draft extends Schema.Schema.Type<typeof Draft> {}
 
 /**
@@ -156,6 +274,9 @@ export interface Draft extends Schema.Schema.Type<typeof Draft> {}
  * reasoning. The agent was prompted with the thread's messages; a step of the turn wrote text,
  * verbatim, and is the reply when it answered the prompt rather than calling tools; or the turn's
  * run stopped short, and it ran again from its prompt.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const LogItem = Schema.TaggedUnion({
   InputTaken: { at: Schema.DateTimeUtcFromString, messages: Schema.Int },
@@ -174,13 +295,28 @@ export const LogItem = Schema.TaggedUnion({
     retryable: Schema.Boolean,
   },
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type LogItem = typeof LogItem.Type;
 
-/** An item of a turn's log at its place among the items: new there, or replacing what was. */
+/**
+ * An item of a turn's log at its place among the items: new there, or replacing what was.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const LogChange = Schema.Struct({
   index: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   item: LogItem,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface LogChange extends Schema.Schema.Type<typeof LogChange> {}
 
 /**
@@ -189,6 +325,9 @@ export interface LogChange extends Schema.Schema.Type<typeof LogChange> {}
  * `Drafted` carries more of the step being written before it finishes, at `offset` characters
  * into its part; a reader that misses some waits for the step. `Ended` follows the turn's end,
  * once every item is delivered, and the stream closes.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const LogMessage = Schema.TaggedUnion({
   Opened: { items: Schema.Array(LogItem) },
@@ -196,9 +335,19 @@ export const LogMessage = Schema.TaggedUnion({
   Drafted: Draft.fields,
   Ended: {},
 }).annotate({ identifier: "TurnLogMessage" });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type LogMessage = typeof LogMessage.Type;
 
-/** Following the log stopped short; the reader follows it again from the start. */
+/**
+ * Following the log stopped short; the reader follows it again from the start.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class LogUnavailable extends Schema.TaggedError<LogUnavailable>()(
   "Turn.LogUnavailable",
   {},

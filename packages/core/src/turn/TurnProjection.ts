@@ -1,3 +1,9 @@
+/**
+ * Keeps the turn read model, `TurnStore`: each turn as it was created or retried, and where it
+ * stands since, as its later facts in `TurnFacts` say.
+ *
+ * @since 0.1.0
+ */
 import { Effect, Option } from "effect";
 import * as Projection from "../journal/Projection.ts";
 import * as TurnFacts from "./TurnFacts.ts";
@@ -15,6 +21,15 @@ const update = Effect.fnUntraced(function* (
   yield* turnStore.update(Turn.change(found.value, changes(found.value)));
 });
 
+/**
+ * Inserts each created or retried turn, then changes the stored turn each later fact names: a
+ * start takes a queued turn to `running` with its selection, and leaves one already asked to stop
+ * as it is; a stop request marks it `cancelling` with the reason; and completion, failure, and
+ * cancellation finish it with its reply, its failure, or why it stopped.
+ *
+ * @category projections
+ * @since 0.1.0
+ */
 export const definition = Projection.make("turns", { version: 4 })
   .on(
     TurnFacts.Created,

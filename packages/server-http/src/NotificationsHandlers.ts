@@ -1,3 +1,11 @@
+/**
+ * Implements `NotificationsGroup`. Each handler enters the workspace as the principal's membership
+ * through `Gateway.asMember` and calls one `NotificationService` operation, wrapping the pending
+ * count and the number marked seen in the bodies the contract declares. `Routes` composes its
+ * `layer` with the other groups'.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import { NotificationService } from "@amends-dev/core/notification";
 import { Gateway } from "@amends-dev/gateway";
@@ -9,6 +17,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * principal and workspace membership per request.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

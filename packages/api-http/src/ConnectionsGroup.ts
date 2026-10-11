@@ -1,3 +1,14 @@
+/**
+ * The `connections` endpoint group: the workspace's connections to the integrations this host
+ * installs, and the integrations themselves. Its endpoints call `ConnectionService`:
+ * `integrations`, `list`, `create`, `get`, `models`, `rename`, `configure`, `replaceKey`, `check`,
+ * and `remove`. Every active member may read connections and integrations; the built-in
+ * administrator tier adds, changes, checks, and removes them. A key goes in with its connection or
+ * in place of its key and never comes back out: a connection reads as `Connection.View`.
+ * `ConnectionsHandlers` in `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Connection as ConnectionContract } from "@amends-dev/connection";
 import { Connection } from "@amends-dev/core/connection";
 import { Workspace } from "@amends-dev/core/workspace";
@@ -10,10 +21,12 @@ const connection = { workspaceId: Workspace.Id, connectionId: Connection.Id };
 const view = Connection.View.annotate({ identifier: "Connection" });
 
 /**
- * The workspace's connections to the integrations this host installs, which replace those of
- * `connections`, and the integrations themselves. Every member may read them; administrators add,
- * manage, and check them. A key goes in with its connection or in place of its key, and never
- * comes back out.
+ * The workspace's connections to the integrations this host installs, and the integrations
+ * themselves. Every member may read them; administrators add, manage, and check them. A key goes
+ * in with its connection or in place of its key, and never comes back out.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class ConnectionsGroup extends HttpApiGroup.make("connections")
   .add(

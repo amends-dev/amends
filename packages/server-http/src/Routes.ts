@@ -1,3 +1,13 @@
+/**
+ * Every handler module composed into the HTTP API a host serves. `layer` registers every group
+ * with the OpenAPI document at `/openapi.json`, `layerDocs` serves interactive documentation at
+ * `/docs`, and `layerHandlers` is the group layers and `BearerAuthentication` alone, for tests. A
+ * host provides `Gateway.Gateway`, `Accounts.Accounts`, `SignIn.SignIn`,
+ * `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, and its platform's HTTP
+ * services, then serves the routes with `HttpRouter.serve` or `HttpRouter.toWebHandler`.
+ *
+ * @since 0.1.0
+ */
 import { Api } from "@amends-dev/api-http";
 import { Layer } from "effect";
 import { HttpApiBuilder, HttpApiScalar } from "effect/http-api";
@@ -23,6 +33,7 @@ import * as TurnsHandlers from "./TurnsHandlers.ts";
  * Provide every group's handlers and authentication over the required host services.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerHandlers = Layer.mergeAll(
   SessionHandlers.layer,
@@ -44,20 +55,22 @@ export const layerHandlers = Layer.mergeAll(
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 
 /**
- * The API routes and its OpenAPI document. Hosts provide Gateway.Gateway,
- * Accounts.Accounts, SignIn.SignIn, SessionTokens.SessionTokens, WorkspaceDirectory.WorkspaceDirectory,
- * and their platform's HTTP services, then serve this through HttpRouter.serve or
- * HttpRouter.toWebHandler.
+ * The API routes and its OpenAPI document. Hosts provide `Gateway.Gateway`, `Accounts.Accounts`,
+ * `SignIn.SignIn`, `SessionTokens.SessionTokens`, `WorkspaceDirectory.WorkspaceDirectory`, and
+ * their platform's HTTP services, then serve this through `HttpRouter.serve` or
+ * `HttpRouter.toWebHandler`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
   Layer.provide(layerHandlers),
 );
 
 /**
- * Register interactive documentation for local development.
+ * Register interactive documentation of the API at `/docs`, for local development.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerDocs = HttpApiScalar.layer(Api, { path: "/docs" });

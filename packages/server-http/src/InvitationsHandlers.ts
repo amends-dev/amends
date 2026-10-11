@@ -1,3 +1,13 @@
+/**
+ * Implements `InvitationsGroup`. Listing, issuing, and revoking enter the workspace as the
+ * principal's membership through `Gateway.asMember` and call `InvitationService`; issuing first
+ * finds or creates the account of the address through the host's `Accounts.findOrCreate`, so the
+ * invitation records that account's human ID. Accepting refuses an agent with
+ * `ApiErrors.HumanRequired`, then enters through `Gateway.inWorkspace`, since the recipient is not
+ * yet a member, and calls `InvitationService.accept` with the person's human ID.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "@amends-dev/core/identity";
 import { Api, ApiErrors, Principal } from "@amends-dev/api-http";
 import { InvitationService } from "@amends-dev/core/workspace";
@@ -10,6 +20,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * invitation goes to the account of the address it names, which the host creates if it has none.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

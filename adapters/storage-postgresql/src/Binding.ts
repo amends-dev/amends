@@ -1,7 +1,13 @@
 /**
- * One workspace's view of the database: its identity, the transaction boundary
- * every commit runs inside, and the guard every store applies to its
- * statements. Store modules require this service and nothing else of each other.
+ * One workspace's view of the database: its identity, the transaction boundary every commit runs
+ * inside, and the guard every store applies to its statements. `PostgresWorkspaceStorage` builds
+ * one for each workspace over the shared `PostgresDatabase.PostgresDatabase`, and each store module
+ * requires this service and nothing else of the others. A transaction waits its turn behind this
+ * process's other writers to the workspace in `PostgresTurns`, then for a pooled connection and the
+ * workspace's advisory lock, all within `lockTimeout`; a standalone append waits for its log's
+ * writers instead. `Journal` builds the journal's transactions and standalone appends on it.
+ *
+ * @since 0.1.0
  */
 import { Commit, Store } from "@amends-dev/core/journal";
 import type { Entry } from "@amends-dev/core/journal";
@@ -23,6 +29,13 @@ import * as PostgresDatabase from "./PostgresDatabase.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import { isContention } from "./internal/errors.ts";
 
+/**
+ * The host's limits on a workspace's transactions and on its statements outside them, each with a
+ * default. `PostgresStorage.layer` takes them, and `settings` checks them when the host starts.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /**
    * How long a transaction waits for its turn to write before it reports contention: behind this
@@ -45,7 +58,8 @@ export interface Options {
   readonly transactionTimeout?: Duration.Input | undefined;
   /**
    * How often a waiting reader re-checks the log without a notification: the fallback when a
-   * notification is lost or `LISTEN` is unavailable, as behind a transaction-pooling proxy.
+   * notification is lost or `LISTEN` is unavailable, as behind a transaction-pooling proxy. Five
+   * seconds by default.
    */
   readonly pollInterval?: Duration.Input | undefined;
   /**
@@ -56,7 +70,12 @@ export interface Options {
   readonly readConnections?: number | undefined;
 }
 
-/** Options with their defaults, each a whole number of milliseconds. */
+/**
+ * The options with their defaults applied, each duration a whole number of milliseconds.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Settings {
   readonly lockTimeout: Duration.Duration;
   readonly statementTimeout: Duration.Duration;
@@ -66,8 +85,12 @@ export interface Settings {
 }
 
 /**
- * Apply the defaults and check the options. PostgreSQL reads a timeout of zero as none, so every
- * duration must be finite and at least a millisecond.
+ * Apply the defaults and check the options, dying on any out of range. PostgreSQL reads a timeout
+ * of zero as none, so every duration must be finite and at least a millisecond, and the statement
+ * timeout at least the lock timeout, since taking the lock is a statement.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const settings = (options: Options = {}): Effect.Effect<Settings> =>
   Effect.gen(function* () {
@@ -96,14 +119,29 @@ export const settings = (options: Options = {}): Effect.Effect<Settings> =>
     return resolved;
   });
 
-/** The native handle a session exposes to core. */
+/**
+ * The `Store.Transaction` handle a session gives its program: the commit's ID, its appends, and
+ * `afterCommit`. `Journal` builds one for each session the binding opens.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>;
 
-/** One open native transaction, closed when its program ends. */
+/**
+ * One open native transaction, closed when its program ends: what `CurrentTransaction` holds while
+ * the program runs, and what `Journal` stages its appends against.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface TransactionState {
+  /** The database the transaction runs on; a binding over another database refuses it. */
   readonly owner: PostgresDatabase.PostgresDatabase["Service"];
   readonly workspaceId: Workspace.Id;
+  /** The commit the transaction records, timed once the writer's turn has come. */
   readonly commit: Commit.Record;
+  /** False once the program ends, after which a handle to the transaction is expired. */
   active: boolean;
   /** Writes the transaction staged in memory, run after its program and before COMMIT. */
   beforeCommit: Effect.Effect<void, Store.Failure | Store.Conflict>;
@@ -117,7 +155,13 @@ export interface TransactionState {
   readonly afterCommit: Array<Effect.Effect<void>>;
 }
 
-/** Ask for `effect` to run once the session's transaction commits; a closed session's handle is expired. */
+/**
+ * Ask for `effect` to run once the session's transaction commits, as `Store.Transaction`'s
+ * `afterCommit` does; a closed session's handle is expired.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const afterCommit = (session: TransactionState, effect: Effect.Effect<void>) =>
   Effect.suspend(() => {
     if (!session.active)
@@ -131,21 +175,38 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
     return Effect.void;
   });
 
-/** The session a program runs under; statements check it against their own binding. */
+/**
+ * The session a program runs under; statements check it against their own binding.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
   "@amends-dev/storage-postgresql/binding/Current",
 ) {}
 
+/**
+ * One workspace's view of the database, which every store module in this adapter is built over.
+ * `make` builds it for a workspace, and `layer` provides it to the stores
+ * `PostgresWorkspaceStorage.layerWorkspace` merges.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Binding extends Context.Service<
   Binding,
   {
+    /** The workspace every statement through the binding is scoped to. */
     readonly workspaceId: Workspace.Id;
+    /** The connected database, shared by every workspace's binding in the process. */
     readonly database: PostgresDatabase.PostgresDatabase["Service"];
+    /** How often a reader waiting for an append checks again without a notification. */
     readonly pollInterval: Duration.Duration;
     /**
-     * Run a statement outside any transaction, or inside a live transaction of
-     * this workspace on this database; anything else is a foreign or expired
-     * handle. Writes additionally require a transaction.
+     * Run a statement outside any transaction, or inside a live transaction of this workspace on
+     * this database; anything else is a foreign or expired handle. Writes additionally require a
+     * transaction. Outside one, a statement takes its own pooled connection, within the
+     * workspace's `readConnections`.
      */
     readonly guard: <A, E, R>(
       program: Effect.Effect<A, E, R>,
@@ -179,9 +240,11 @@ const transactionError = (cause: SqlError.SqlError) =>
 const isCommitted = Schema.is(Schema.Struct({ command: Schema.Literal("COMMIT") }));
 
 /**
- * Construct one workspace binding over the caller's database; transactions are resolved per operation.
+ * Construct one workspace binding over the caller's database; transactions are resolved per
+ * operation. Dies on options `settings` refuses.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Binding.make")(function* (
   workspaceId: Workspace.Id,
@@ -395,9 +458,10 @@ export const make = Effect.fn("Binding.make")(function* (
 });
 
 /**
- * Provide Binding using its constructor and the caller's dependencies.
+ * Provides the binding for one workspace over the caller's `PostgresDatabase.PostgresDatabase`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (workspaceId: Workspace.Id, options: Options = {}) =>
   Layer.effect(Binding, make(workspaceId, options));

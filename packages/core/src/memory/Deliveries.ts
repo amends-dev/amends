@@ -1,3 +1,11 @@
+/**
+ * The memory implementation of `DeliveryStore` from `../channel/DeliveryStore.ts`, over the
+ * workspace's `Binding`. It keeps what the contract leaves to storage: a reused ID conflicts, and
+ * so does an update of a missing delivery. A thread's requested deliveries list in sequence order,
+ * then by ID. `DeliveryStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Delivery, DeliveryStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -7,7 +15,12 @@ import { compareBinary } from "./Rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Delivery.Record));
 
-/** Delivery records over the current workspace transaction. @category constructors */
+/**
+ * Delivery records over the current workspace transaction.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Deliveries.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const driver: DeliveryStore.DeliveryStore["Service"] = {
@@ -73,5 +86,10 @@ export const make = Effect.fn("Deliveries.make")(function* () {
   return DeliveryStore.make(workspaceId, driver);
 });
 
-/** Provide delivery storage over the caller's binding. @category layers */
+/**
+ * Provide delivery storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(DeliveryStore.DeliveryStore, make());

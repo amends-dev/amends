@@ -39,12 +39,57 @@ import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
 export {
+  /**
+   * The message's revision is no longer the one the editor expected: someone edited it meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Changed,
+  /**
+   * The message was deleted, so it has no text to edit.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Deleted,
+  /**
+   * An agent asked to publish; only people publish through the service, and agents' messages come
+   * from their turns.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   HumanAuthorRequired,
+  /**
+   * The message is missing, in another workspace, or in a thread outside the actor's groups; the
+   * three are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   MessageNotFound,
+  /**
+   * Someone other than the message's author asked to edit it; only the author edits a message.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotAuthor,
+  /**
+   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
+   * told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
+  /**
+   * A mentioned member cannot take part: they are missing, inactive, or not in the group.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   ParticipantUnavailable,
 } from "./ThreadMessageErrors.ts";
 

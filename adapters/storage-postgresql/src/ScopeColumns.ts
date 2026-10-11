@@ -1,8 +1,21 @@
+/**
+ * How an assignment's scope is stored in the `assignments` table: its kind, its target's kind, and
+ * one ID column for each kind of target, of which only the target's own is set, as the
+ * `assignments_scope_agrees` check requires. The scope's workspace is the row's, so it is not
+ * stored again. `Assignments` writes a scope with `encode` and reads it back with `decode`.
+ *
+ * @since 0.1.0
+ */
 import { Scope, Target } from "@amends-dev/core/authorization";
 import type { Workspace } from "@amends-dev/core/workspace";
 import type { scopeKinds, targetKinds } from "./internal/schema.ts";
 
-/** Columns encoding an assignment's scope without dropping variant information. */
+/**
+ * Columns encoding an assignment's scope without dropping variant information.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Columns {
   readonly scopeKind: (typeof scopeKinds)[number];
   readonly targetKind: (typeof targetKinds)[number] | null;
@@ -38,7 +51,13 @@ const target = (
 ): Omit<Columns, "scopeKind"> =>
   Object.assign({ targetKind }, none, id === undefined ? {} : { [id[0]]: id[1] });
 
-/** The scope's workspace is the row's, so only the shape and target survive. */
+/**
+ * The columns of a scope. The scope's workspace is the row's, so only the shape and target
+ * survive.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const encode = (scope: Scope.Value): Columns =>
   Scope.Value.match(scope, {
     Workspace: (): Columns =>
@@ -62,7 +81,13 @@ export const encode = (scope: Scope.Value): Columns =>
 const onlySet = (columns: Columns, kept?: TargetIdColumn) =>
   Object.values(targetIds).every(([column]) => column === kept || columns[column] === null);
 
-/** The encoded form of a scope, to be validated with the record it belongs to. */
+/**
+ * The encoded form of a scope, in the row's workspace, to be validated with the record it belongs
+ * to; columns that agree with no scope give `undefined`, which that validation refuses.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const decode = (workspaceId: Workspace.Id, columns: Columns): unknown => {
   if (columns.scopeKind === "Workspace")
     return columns.targetKind === null && onlySet(columns)

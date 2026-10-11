@@ -1,3 +1,10 @@
+/**
+ * Keeps the connection read model, `ConnectionStore`, from `ConnectionFacts`: each connection as it
+ * was created and since renamed, configured, or removed. Keys are not in the journal, so replacing
+ * one changes no record here.
+ *
+ * @since 0.1.0
+ */
 import { Effect, Option } from "effect";
 import * as Projection from "../journal/Projection.ts";
 import * as Connection from "./Connection.ts";
@@ -15,7 +22,13 @@ const update = Effect.fnUntraced(function* (
   yield* connectionStore.update(Connection.change(found.value, changes));
 });
 
-/** Connections' records; replacing a key changes none. */
+/**
+ * Inserts each created connection, and sets the name, settings, or status of each one renamed,
+ * configured, or removed. A replaced key changes no record.
+ *
+ * @category projections
+ * @since 0.1.0
+ */
 export const definition = Projection.make("connections", { version: 1 })
   .on(
     ConnectionFacts.Created,

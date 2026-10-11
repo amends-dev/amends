@@ -1,4 +1,10 @@
-/** What the suites share: identities, bound stores, and cores and gateways over a host. */
+/**
+ * What the conformance suites share, exported for an adapter's own tests and the gateway's: the
+ * identities and workspaces tests use, a workspace's bound stores by name, cores and gateways over
+ * a host, and fixture writes that no operation makes.
+ *
+ * @since 0.1.0
+ */
 import * as Core from "@amends-dev/core";
 import { ReadStateStore } from "@amends-dev/core/read-state";
 import {
@@ -65,16 +71,57 @@ import { Gateway, WorkspaceStorage } from "../index.ts";
 import { Clock, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { Host, Storage } from "./Fixture.ts";
 
+/**
+ * The human who creates the suites' workspaces, unless a test names another creator.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
+/**
+ * A second human, whom `request` invites unless a test names another recipient.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
+/**
+ * A third human, for tests that need someone besides `alice` and `bob`.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const charlie = Identity.Reference.cases.Human.make({
   id: Identity.HumanId.make("charlie"),
 });
+/**
+ * The workspace the suites write to, and the one `testProvenance` attributes writes to.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const workspaceId = Workspace.Id.make("workspace-one");
+/**
+ * A second workspace, for tests that one workspace's storage never shows another's.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const otherWorkspaceId = Workspace.Id.make("workspace-two");
+/**
+ * The journal's log ID, which core's `journalLog` also names, for reading its head directly.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const journalLog = Log.Id.make("journal");
 
-/** The bound stores by name, for direct assertions beside the context core receives. */
+/**
+ * The bound stores by name, for direct assertions beside the context core receives.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const bind = (
   context: Context.Context<
     | WorkspaceStorage.Bindings
@@ -113,11 +160,20 @@ export const bind = (
   sessionStates: Context.get(context, SessionStateStore.SessionStateStore),
   sessionLogs: Context.get(context, SessionLogStore.SessionLogStore),
 });
+/**
+ * A workspace's bound stores by name, with the context core receives, as `bind` returns them.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Bound = ReturnType<typeof bind>;
 
 /**
  * A recipient's notifications oldest first, as a suite reads all of them: the inbox's newest-first
  * page, reversed.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const listOldestFirst = (
   notificationStore: NotificationStore.NotificationStore["Service"],
@@ -147,13 +203,24 @@ const withHostServices = (
     ),
   );
 
-/** One workspace's stores and signals on a host. */
+/**
+ * One workspace's bound stores and signal hub on a host, with the host's cryptography, no
+ * integrations, and jobs that accept requests and run nothing.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
   Effect.flatMap(Context.get(host, WorkspaceStorage.WorkspaceStorage).forWorkspace(id), (context) =>
     withHostServices(context, Context.get(host, Crypto.Crypto)),
   );
 
-/** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
+/**
+ * One workspace's stores and signals on the host in context, as a gateway's caller has it.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
   const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage;
   const crypto = yield* Crypto.Crypto;
@@ -163,6 +230,9 @@ export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
 /**
  * The bound stores with each commit failing after its program completes, before it commits: a
  * failure after every projection has written, as a late write in the commit would cause.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
   Object.assign({}, bound, {
@@ -178,15 +248,30 @@ export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
     ),
   });
 
-/** Run a program on a new host over the storage, which stays open for the enclosing scope. */
+/**
+ * Run a program on a new host over the storage, which stays open for the enclosing scope.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const runHost = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(storage.connect(), (host) => Effect.provide(program, host));
 
-/** Core over one workspace's bound stores, with the host's cryptography, as a host runs it. */
+/**
+ * Core over one workspace's bound stores, with the host's cryptography, as a host runs it.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const core = (bound: Bound) =>
   Core.layer.pipe(Layer.provideMerge(Layer.succeedContext(bound.context)));
 
-/** A gateway over a host, installing what `options` say, and running no jobs. */
+/**
+ * A gateway over a host, installing what `options` say, and running no jobs.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const gateway = (host: Context.Context<Host>, options: Gateway.Options = {}) =>
   Gateway.layer(options).pipe(
     Layer.provideMerge(
@@ -198,14 +283,25 @@ export const gateway = (host: Context.Context<Host>, options: Gateway.Options = 
     ),
   );
 
-/** Initialize the bound workspace for its creator, as the gateway's bootstrap does. */
+/**
+ * Initialize the bound workspace for its creator, as the gateway's bootstrap does.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator, {
     name: "Test workspace",
     memberName: Member.Name.make(creator),
   }).pipe(Effect.provide(core(bound)));
 
-/** Add members, giving some the viewer role, as invitation acceptance would. */
+/**
+ * Add `members` without roles, and give each of `viewers` the built-in member role, in one commit
+ * as invitation acceptance would.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const seed = (
   bound: Bound,
   members: ReadonlyArray<Actor.Value>,
@@ -239,11 +335,21 @@ export const seed = (
     Effect.provide(core(bound)),
   );
 
-/** Run a program on a gateway over a new host, which stays open for the enclosing scope. */
+/**
+ * Run a program on a gateway over a new host, which stays open for the enclosing scope.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const runGateway = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host))));
 
-/** The message a timeline activity publishes, when it is a message publication. */
+/**
+ * The ID of the message a timeline activity publishes, or `undefined` for activity of another kind.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const publishedMessage = (activity: ThreadActivity.Record) =>
   ThreadActivityKind.is(ThreadMessageActivity.Published)(activity)
     ? Schema.decodeUnknownSync(ThreadMessageActivity.Published.details)(activity.details).messageId
@@ -252,6 +358,9 @@ export const publishedMessage = (activity: ThreadActivity.Record) =>
 /**
  * A post's result with the timeline activity that placed its message, read back from the store:
  * starts and replies return what they created, not where it landed in the timeline.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const placed = Effect.fnUntraced(function* <
   A extends { readonly message: ThreadMessage.Record },
@@ -267,7 +376,12 @@ export const placed = Effect.fnUntraced(function* <
   return Object.assign({}, result, { activity });
 });
 
-/** `placed`, reading a workspace binding's store, for a post made through the gateway. */
+/**
+ * `placed`, reading a workspace binding's store, for a post made through the gateway.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const placedIn =
   (bound: Bound) =>
   <A extends { readonly message: ThreadMessage.Record }>(result: A) =>
@@ -278,6 +392,9 @@ export const placedIn =
 /**
  * Core's internal thread reads and writes, for fixtures that write what no operation does. Provide
  * it over a workspace's core; timelines resolve as core registers them.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const threadInternals = ThreadCommand.layer.pipe(
   Layer.provideMerge(ThreadQuery.layer),
@@ -294,7 +411,12 @@ export const threadInternals = ThreadCommand.layer.pipe(
   ),
 );
 
-/** Attribution for low-level fixture writes outside application operations. */
+/**
+ * Attribution for low-level fixture writes outside application operations.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const testProvenance = (id = workspaceId): Event.Provenance => ({
   workspaceId: id,
   performedBy: { _tag: "System", id: Performer.SystemId.make("test-fixture") },
@@ -303,9 +425,20 @@ export const testProvenance = (id = workspaceId): Event.Provenance => ({
   occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
 });
 
+/**
+ * An hour from now, for an invitation's expiry that a test has not reached yet.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
 
-/** Run a program with the clock reading a fixed time; sleeping still uses the real clock. */
+/**
+ * Run a program with the clock reading a fixed time; sleeping still uses the real clock.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>) =>
   Effect.clockWith((clock) =>
     program.pipe(
@@ -321,6 +454,13 @@ export const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>)
     ),
   );
 
+/**
+ * What issuing an invitation takes: one that expires at `expiresAt`, to `bob` with the
+ * built-in member role unless a test names another recipient or role.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const request = (
   expiresAt: DateTime.Utc,
   recipientId = bob.id,
@@ -330,6 +470,9 @@ export const request = (
 /**
  * Replace what a store's by-ID reads return for one ID, in both single and batch reads;
  * `Option.none()` hides the record. Other IDs read through to the store.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const replacing = <Id, A, E>(
   store: {

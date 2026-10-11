@@ -2,6 +2,8 @@
  * The workspace, as a turn's run calls it: what core gives a host's jobs, with each call entering
  * the workspace through the gateway for itself, since a run holds the workspace only while a call
  * runs. The runner and the session log writer call these and know nothing of the gateway.
+ *
+ * @since 0.1.0
  */
 import type * as Core from "@amends-dev/core";
 import type { ThreadParticipation } from "@amends-dev/core/thread";
@@ -16,7 +18,14 @@ import type { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { type Array, Effect, type Scope } from "effect";
 
-/** @category constructors */
+/**
+ * Makes the workspace `workspaceId` as a turn's run calls it, over `Gateway.Gateway`'s
+ * `inWorkspace`: core's `TurnExecution` and the session log store, each method entering the
+ * workspace for its own call.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   const gateway = yield* Gateway.Gateway;
   /** Run `program` in the workspace, holding it only while `program` runs. */
@@ -82,4 +91,10 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   };
 });
 
+/**
+ * What `make` returns, which `TurnRunner` and `SessionLogWriter` call.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type TurnWorkspace = Effect.Success<ReturnType<typeof make>>;

@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `AssignmentStore.AssignmentStore`, over the `assignments` table: a
+ * role assignment fills `role_id`, a direct grant `permission`, and the scope takes the columns
+ * `ScopeColumns` gives it. `AssignmentStore.make` checks every input before the driver sees it, so
+ * the driver keeps only what storage keeps: the primary key refuses a reused ID, revoked ones
+ * included, as the store's `Conflict`, and revoking is a conditional update that conflicts unless
+ * it finds the assignment active. Revoked rows keep their source. Every statement is scoped to the
+ * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
+ * and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Assignment, AssignmentStore } from "@amends-dev/core/authorization";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
@@ -24,9 +36,11 @@ const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
 const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Record));
 
 /**
- * Access assigned to memberships, by role or directly; revoked rows keep their source.
+ * Builds the assignment store for the binding's workspace: this module's driver inside
+ * `AssignmentStore.make`, which checks every input first.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Assignments.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -94,8 +108,9 @@ export const make = Effect.fn("Assignments.make")(function* () {
 });
 
 /**
- * Provide AssignmentStore.AssignmentStore using its constructor and the caller's dependencies.
+ * Provides `AssignmentStore.AssignmentStore` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(AssignmentStore.AssignmentStore, make());

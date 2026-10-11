@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `AgentStore.AgentStore`, over the `agents` table: one row per agent,
+ * each part of its setup a column, where a null `harness_connection_id` is `Auto`, a null
+ * `model_effort` the model's default, and a null `sandbox_connection_id` no sandbox.
+ * `AgentStore.make` checks every input before the driver sees it, so the driver keeps only what
+ * storage keeps: the primary key refuses a reused ID and `agents_by_member` a second agent for one
+ * membership, each as the store's `Conflict`, and an update that finds no row conflicts. Every
+ * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read join
+ * the caller's transaction and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Agent, AgentStore } from "@amends-dev/core/agent";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -48,7 +60,13 @@ const toRow = (record: Agent.Record): typeof agents.$inferInsert => ({
   createdAt: DateTime.toDate(record.createdAt),
 });
 
-/** Agent records in the workspace's database. @category constructors */
+/**
+ * Builds the agent store for the binding's workspace: this module's driver inside
+ * `AgentStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Agents.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -91,5 +109,10 @@ export const make = Effect.fn("Agents.make")(function* () {
   return AgentStore.make(workspaceId, driver);
 });
 
-/** Provide agent storage over the caller's binding. @category layers */
+/**
+ * Provides `AgentStore.AgentStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(AgentStore.AgentStore, make());

@@ -1,3 +1,17 @@
+/**
+ * The memory implementation of `NotificationStore` from `../notification/NotificationStore.ts`,
+ * over the workspace's `Binding`. It keeps what the contract leaves to storage: an insert writes
+ * every record or none, and a reused ID, or a second notification for one source entry and
+ * recipient, conflicts. Marking seen conflicts unless each notification is stored, of a human
+ * recipient, and pending or already seen, and it runs through the binding's `exclusive`, so no
+ * commit lands between its check and its write. Accepting conflicts unless each notification is
+ * pending and of one agent, for a turn, or of contacts, for a delivery. A human recipient's first
+ * Seen is also kept beside the records, where rebuilding projections leaves it, and is applied
+ * again when the notification is projected anew. `NotificationStore.make` checks every input
+ * before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Store } from "../journal/index.ts";
 import { Group } from "../group/index.ts";
 import { Notification, NotificationStore } from "../notification/index.ts";
@@ -57,6 +71,7 @@ const withSeen = (space: MemoryDatabase.Space, record: Notification.Record) => {
  * recipient's Seen is also kept beside them, where rebuilding projections leaves it.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Notifications.make")(function* () {
   const { workspaceId, read, write, exclusive } = yield* Binding.Binding;
@@ -67,8 +82,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
     options: NotificationStore.ReadOptions,
   ) {
     const target = inboxKey(recipient);
-    const request = options;
-    const after = request.after;
+    const after = options.after;
     const records = yield* all;
     return records
       .filter(
@@ -78,7 +92,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           (after === undefined || isAfter(record, after)),
       )
       .toSorted(byRecorded)
-      .slice(0, request.limit);
+      .slice(0, options.limit);
   });
 
   const latest = Effect.fnUntraced(function* (
@@ -87,8 +101,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
     pendingOnly: boolean,
   ) {
     const target = inboxKey(recipient);
-    const request = options;
-    const before = request.before;
+    const before = options.before;
     const records = yield* all;
     return records
       .filter(
@@ -98,7 +111,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           (before === undefined || isBefore(record, before)),
       )
       .toSorted((left, right) => byRecorded(right, left))
-      .slice(0, request.limit);
+      .slice(0, options.limit);
   });
 
   /** Write every record or none: an ID or source already recorded conflicts. */
@@ -153,10 +166,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
       Effect.mapError(storeFailure(NotificationStore, "listLatestPendingByRecipient")),
     ),
     listByThread: Effect.fn("Notifications.listByThread")(
-      function* (recipient, threadInput, rangeInput) {
+      function* (recipient, threadId, range) {
         const target = inboxKey(recipient);
-        const threadId = threadInput;
-        const range = rangeInput;
         const records = yield* all;
         return records
           .filter(
@@ -176,10 +187,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
       Effect.mapError(storeFailure(NotificationStore, "listByThread")),
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
-      function* (recipient, threadInput, throughSequence) {
+      function* (recipient, threadId, throughSequence) {
         const target = inboxKey(recipient);
-        const threadId = threadInput;
-        const through = throughSequence;
         const records = yield* all;
         return records
           .filter(
@@ -188,7 +197,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
               Notification.State.isAnyOf(["Pending"])(record.state) &&
               record.thread !== undefined &&
               record.thread.threadId === threadId &&
-              record.thread.sequence <= through,
+              record.thread.sequence <= throughSequence,
           )
           .toSorted(
             (left, right) =>
@@ -270,7 +279,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         ),
       );
     }),
-    accept: Effect.fn("Notifications.accept")(function* (ids, by, acceptedInput) {
+    accept: Effect.fn("Notifications.accept")(function* (ids, by, acceptedAt) {
       if (ids.length === 0) return;
       const space = yield* write.pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
       // A turn takes pending notifications of one agent; a delivery takes those of contacts.
@@ -299,7 +308,6 @@ export const make = Effect.fn("Notifications.make")(function* () {
           });
         accepted.push(record);
       }
-      const acceptedAt = DateTime.toUtc(acceptedInput);
       for (const record of accepted) {
         const row = yield* rows
           .encode(
@@ -360,8 +368,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
 });
 
 /**
- * Provide NotificationStore.NotificationStore using its constructor and the caller's dependencies.
+ * Provide notification storage over the caller's binding.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(NotificationStore.NotificationStore, make());

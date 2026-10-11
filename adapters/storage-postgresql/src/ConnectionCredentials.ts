@@ -1,3 +1,17 @@
+/**
+ * The PostgreSQL driver for `ConnectionCredentialStore.ConnectionCredentialStore`, over the
+ * `connection_credentials` table: each connection's credential, sealed with the host's
+ * `CredentialKey.CredentialKey` and bound to its workspace and connection, so a sealed value opens
+ * only as the credential it was stored as. The table lies outside the read models, so rebuilding
+ * projections keeps it, and a write joins the commit that records the connection.
+ * `ConnectionCredentialStore.make` checks every input before the driver sees it; `set` replaces a
+ * connection's credential in place, and `remove` leaves one already gone so. Without a key,
+ * setting or reading a credential is `Unavailable`. Every statement is scoped to the binding's
+ * workspace and runs under its `guard`, which lets a read join the caller's transaction and
+ * requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Connection } from "@amends-dev/connection";
 import { ConnectionCredentialStore } from "@amends-dev/core/connection";
 import { and, eq } from "drizzle-orm";
@@ -16,10 +30,12 @@ const encodeCredential = Schema.encodeEffect(CredentialJson);
 const decodeCredential = Schema.decodeEffect(CredentialJson);
 
 /**
- * Each connection's credential sealed with the host's credential key, in the workspace's database;
- * writes join the commit that records them. Without a key, storing or reading one is `Unavailable`.
+ * Builds the credential store for the binding's workspace: this module's driver inside
+ * `ConnectionCredentialStore.make`, which checks every input first. Without a key, storing or
+ * reading a credential is `Unavailable`.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("ConnectionCredentials.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -74,5 +90,11 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
   return ConnectionCredentialStore.make(driver);
 });
 
-/** Provide credential storage over the caller's binding and credential key. @category layers */
+/**
+ * Provides `ConnectionCredentialStore.ConnectionCredentialStore` over the caller's
+ * `Binding.Binding` and `CredentialKey.CredentialKey`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ConnectionCredentialStore.ConnectionCredentialStore, make());

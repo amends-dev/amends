@@ -1,3 +1,13 @@
+/**
+ * The operation a reader watches a workspace through: one stream that opens with `Ready`, then
+ * carries each commit the reader may see with the notifications it created for them, and the
+ * signals happening meanwhile. It subscribes to the runtime's shared `ChangeFeedSource` and the
+ * workspace's `SignalHub`, works out what the actor may see from their group admissions and
+ * grants, reloads that whenever a delivered fact changes it, and ends the stream after the fact
+ * that removes them from the workspace.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect";
 import type { Scope } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
@@ -18,6 +28,12 @@ import * as ChangeFeedSource from "./ChangeFeedSource.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 
+/**
+ * The change feed for the acting member.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class ChangeFeedService extends Context.Service<
   ChangeFeedService,
   {
@@ -70,7 +86,13 @@ const changesAccessOf = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prep
   prepared.access !== undefined &&
   (prepared.access.memberId === undefined || prepared.access.memberId === actor.memberId);
 
-/** Capture the shared source and the reader's policy; authenticate the actor per subscription. @category constructors */
+/**
+ * Builds the service over the shared source, the signal hub, authorization, and the stores it
+ * reads access from. The actor is read per subscription, as `watch` runs, not here.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ChangeFeedService.make")(function* () {
   const changeFeedSource = yield* ChangeFeedSource.ChangeFeedSource;
   const signalHub = yield* SignalHub.SignalHub;
@@ -164,5 +186,11 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
   return ChangeFeedService.of({ watch });
 });
 
-/** Provide the workspace change-feed application. @category layers */
+/**
+ * `ChangeFeedService` from `make`, over the source, the signal hub, authorization, the grant
+ * resolver, and the stores.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ChangeFeedService, make());

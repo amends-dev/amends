@@ -1,3 +1,14 @@
+/**
+ * The bearer authentication every workspace endpoint requires, as middleware the contract declares
+ * and both sides implement: a server, as `BearerAuthentication` in `@amends-dev/server-http` does,
+ * by resolving the credential to an identity, and a client by attaching one. For each request it
+ * provides `Principal`, the authenticated human or agent a handler passes into the gateway, and
+ * `Credential`, the token presented, for signing out. A request whose credential the host does not
+ * accept fails with `Unauthorized`. The contract says nothing about how credentials are issued;
+ * `SessionGroup` asks the host's sign-in for one.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { Redacted } from "effect";
@@ -7,6 +18,7 @@ import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
  * The authenticated human or agent, supplied by middleware for each request.
  *
  * @category services
+ * @since 0.1.0
  */
 export class Principal extends Context.Service<Principal, Identity.MemberReference>()(
   "@amends-dev/api-http/authentication/Principal",
@@ -17,11 +29,19 @@ export class Principal extends Context.Service<Principal, Identity.MemberReferen
  * endpoint that acts on the credential itself, as signing out does.
  *
  * @category services
+ * @since 0.1.0
  */
 export class Credential extends Context.Service<Credential, Redacted.Redacted<string>>()(
   "@amends-dev/api-http/authentication/Credential",
 ) {}
 
+/**
+ * The request's credential authenticates nobody the host honors: a missing, malformed, unknown,
+ * or expired token, or a session no account holds; 401, with why.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Api.Unauthorized",
   { message: Schema.String },
@@ -34,6 +54,7 @@ export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
  * says nothing about how tokens are issued.
  *
  * @category services
+ * @since 0.1.0
  */
 export class Authentication extends HttpApiMiddleware.Service<
   Authentication,

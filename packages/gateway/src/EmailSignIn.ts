@@ -4,7 +4,7 @@
  * code key, tokens as SHA-256 digests. Limits on codes per address hold across every host over the
  * storage; the limit on codes per client holds within one process.
  *
- * @since 0.0.0
+ * @since 0.1.0
  */
 import { Identity } from "@amends-dev/core/identity";
 import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Redacted } from "effect";
@@ -15,7 +15,12 @@ import * as SessionTokens from "./SessionTokens.ts";
 import * as SignIn from "./SignIn.ts";
 import * as SignInStorage from "./SignInStorage.ts";
 
-/** How long codes and sessions last, and how many codes may be sent. */
+/**
+ * How long codes and sessions last, and how many codes may be sent.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Policy {
   /** How long a code works once sent. */
   readonly codeLifetime: Duration.Duration;
@@ -37,6 +42,15 @@ export interface Policy {
   readonly sessionRenewal: Duration.Duration;
 }
 
+/**
+ * The policy where `Options.policy` sets nothing: a code works once, within ten minutes, and five
+ * wrong tries void it; an address is sent a code at most every thirty seconds and five in an hour,
+ * and a client may ask for twenty in an hour; a session ends after thirty days unused and ninety
+ * at most, and using it moves its end at most once a day.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export const defaultPolicy: Policy = {
   codeLifetime: Duration.minutes(10),
   maximumFailedAttempts: 5,
@@ -49,18 +63,36 @@ export const defaultPolicy: Policy = {
   sessionRenewal: Duration.days(1),
 };
 
+/**
+ * What `make` and `layer` take: the secret every host over the storage shares, and how the policy
+ * differs from `defaultPolicy`.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** The secret code digests are made with, so that stored digests do not reveal codes. */
   readonly codeKey: Redacted.Redacted<Uint8Array>;
+  /** The parts of `defaultPolicy` this host changes. */
   readonly policy?: Partial<Policy> | undefined;
 }
 
-/** Email codes alone; identity providers come with their sign-in. */
+/**
+ * The ways email sign-in offers: email codes alone, since identity providers come with their own
+ * sign-in.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const methods: SignIn.Methods = { emailCode: true, providers: [] };
 
 /**
  * Whether the address may be sent another code now, and its pending code once it is: not within
- * `resendAfter` of the last, nor past `sendsPerAddress` in the window.
+ * `resendAfter` of the last, nor past `sendsPerAddress` in the window. `start` applies it through
+ * `SignInStorage.modifyCode`.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const decideSend = (
   current: Option.Option<SignInStorage.PendingCode>,
@@ -94,6 +126,9 @@ export const decideSend = (
 /**
  * The address's pending code once a send of the code with `digest` failed: as it was before that
  * send, unless another send has replaced it since.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const withdrawUnsent = (
   current: Option.Option<SignInStorage.PendingCode>,
@@ -105,7 +140,11 @@ export const withdrawUnsent = (
 /**
  * What a code entered for the address comes to: accepted, which removes the pending code, or the
  * reason it is not. A wrong code counts against the pending code, which stops working at
- * `maximumFailedAttempts` but stays, so the address's sends are still counted.
+ * `maximumFailedAttempts` but stays, so the address's sends are still counted. `complete` applies
+ * it through `SignInStorage.modifyCode`.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const decideRedeem = (
   current: Option.Option<SignInStorage.PendingCode>,
@@ -130,7 +169,11 @@ export const decideRedeem = (
 
 /**
  * When using a session now moves its end to, if it does: `sessionIdle` from now, never past
- * `sessionMaximum` from its start, and at most once each `sessionRenewal`.
+ * `sessionMaximum` from its start, and at most once each `sessionRenewal`. Resolving a token
+ * applies it.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const renewalOf = (
   session: SignInStorage.SessionRecord,
@@ -182,9 +225,12 @@ const hmacSha256 = Effect.fnUntraced(function* (
 });
 
 /**
- * Construct email sign-in and its session tokens.
+ * Construct email sign-in and its session tokens: `SignIn.SignIn` and `SessionTokens.SessionTokens`
+ * over the host's sign-in storage, accounts, email sender, and cryptography. Each call counts the
+ * codes clients ask for afresh, within this process.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
   const policy: Policy = { ...defaultPolicy, ...options.policy };
@@ -308,10 +354,11 @@ export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
 });
 
 /**
- * Provide SignIn.SignIn and SessionTokens.SessionTokens over the host's sign-in storage, accounts,
- * email sender, and cryptography.
+ * Provide `SignIn.SignIn` and `SessionTokens.SessionTokens` over the host's sign-in storage,
+ * accounts, email sender, and cryptography.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (options: Options) =>
   Layer.effectContext(

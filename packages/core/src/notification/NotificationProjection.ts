@@ -1,3 +1,12 @@
+/**
+ * Keeps the notification read model, `NotificationStore`, from the journal: it generates the
+ * notifications each recorded thread activity selected recipients for, and settles them as
+ * participations end, members leave groups, turns accept agents' notifications, and deliveries
+ * accept contacts'. A person's `Seen` is private state outside the journal, which this projection
+ * never writes.
+ *
+ * @since 0.1.0
+ */
 import { Effect } from "effect";
 import * as DeliveryFacts from "../channel/DeliveryFacts.ts";
 import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
@@ -15,6 +24,9 @@ import * as NotificationStore from "./NotificationStore.ts";
  * recorded facts and this read model's own notifications, so it rebuilds without reading other
  * read models: recipients were selected when the activity was recorded. A turn accepting an
  * agent's notifications settles them as accepted into it, and a delivery a contact's.
+ *
+ * @category projections
+ * @since 0.1.0
  */
 export const definition = Projection.make("notifications", { version: 4 })
   .on(

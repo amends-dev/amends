@@ -1,3 +1,16 @@
+/**
+ * The PostgreSQL driver for `Checkpoint.Checkpoint`, over two tables: `checkpoints`, the progress
+ * of each projection version through a log while it is rebuilt, and `live_projections`, the
+ * versions each log's commits apply. A checkpoint is written with the projection's rows, in the
+ * same transaction; live commits write neither table. `Checkpoint.make` checks every input before
+ * the driver sees it, so the driver keeps only what storage keeps: `set` replaces a key's cursor in
+ * one upsert, and `setLive` replaces a log's live versions. Writers to the workspace take turns on
+ * its lock, so a read followed by `set` cannot interleave with another runner's. Every statement
+ * is scoped to the binding's workspace and runs under its `guard`, which lets a read join the
+ * caller's transaction and requires one for a write; failures are the journal store's.
+ *
+ * @since 0.1.0
+ */
 import { Checkpoint, Store } from "@amends-dev/core/journal";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
@@ -6,10 +19,11 @@ import { storeError, storeFailure } from "./internal/errors.ts";
 import { checkpoints, liveProjections } from "./internal/schema.ts";
 
 /**
- * Each projection version's progress through one log while it is rebuilt, written with the
- * projection's rows, and the versions that are live.
+ * Builds the checkpoint store for the binding's workspace: this module's driver inside
+ * `Checkpoint.make`, which checks every input first.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Checkpoints.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -105,8 +119,9 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
 });
 
 /**
- * Provide Checkpoint.Checkpoint using its constructor and the caller's dependencies.
+ * Provides `Checkpoint.Checkpoint` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Checkpoint.Checkpoint, make());

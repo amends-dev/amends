@@ -36,7 +36,39 @@ import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelPermissions from "./ChannelPermissions.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import * as ChannelStore from "./ChannelStore.ts";
-export { ConnectionUnavailable, GroupNotFound, NotBound, NotFound } from "./ChannelErrors.ts";
+export {
+  /**
+   * The connection is missing or removed, the actor may not read and use it, or its integration
+   * gives no channels; the actor cannot tell these apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  ConnectionUnavailable,
+  /**
+   * The destination group is missing, or the actor is not a member of it; the two are not told
+   * apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  GroupNotFound,
+  /**
+   * The thread is missing, outside the actor's groups, or did not come through a channel; the three
+   * are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotBound,
+  /**
+   * The channel is missing or removed, or the actor may not read it; the three are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+} from "./ChannelErrors.ts";
 
 /**
  * What reading channels can fail with.

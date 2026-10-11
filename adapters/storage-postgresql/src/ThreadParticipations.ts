@@ -1,3 +1,17 @@
+/**
+ * The PostgreSQL driver for `ThreadParticipationStore.ThreadParticipationStore`, over the
+ * `thread_participations` table: a participant is a member, a contact, or triage, stored as a kind
+ * column beside that kind's own columns. `ThreadParticipationStore.make` checks every input before
+ * the driver sees it, so the driver keeps only what storage keeps: the primary key refuses a reused
+ * ID and `active_thread_participation` a second active participation for one participant in a
+ * thread, each as the store's `Conflict`, and ending one is a conditional update that conflicts
+ * unless it finds exactly the addressed participation active. A departure from a group ends every
+ * participation of the admission in one statement. Every statement is scoped to the binding's
+ * workspace and runs under its `guard`, which lets a read join the caller's transaction and
+ * requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { ThreadParticipation, ThreadParticipationStore } from "@amends-dev/core/thread";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, eq, sql } from "drizzle-orm";
@@ -70,7 +84,13 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
   decode(rows.map(toRecord)).pipe(
     Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
   );
-/** Workspace-bound thread-participations projection storage. @category constructors */
+/**
+ * Builds the participation store for the binding's workspace: this module's driver inside
+ * `ThreadParticipationStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -214,5 +234,10 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
   };
   return ThreadParticipationStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provides `ThreadParticipationStore.ThreadParticipationStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ThreadParticipationStore.ThreadParticipationStore, make());

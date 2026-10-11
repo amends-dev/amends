@@ -1,3 +1,12 @@
+/**
+ * The `notifications` endpoint group: the caller's own inbox in a workspace. Its endpoints call
+ * `NotificationService`: `inbox`, `countPending`, `markSeenThrough`, and `markSeen`. Any active
+ * member, person or agent, reads their own inbox and its count, and no caller selects another
+ * recipient; only a person marks notifications seen. `NotificationsHandlers` in
+ * `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Notification, NotificationInbox, NotificationStore } from "@amends-dev/core/notification";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
@@ -15,6 +24,9 @@ const cursor = Schema.fromJsonString(NotificationStore.Cursor);
  * notification's source while they may read it, counting what is pending, and marking
  * notifications seen. Reading neither
  * marks a notification seen nor grants access to its source.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class NotificationsGroup extends HttpApiGroup.make("notifications")
   .add(

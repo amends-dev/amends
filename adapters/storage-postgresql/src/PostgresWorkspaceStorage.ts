@@ -1,3 +1,13 @@
+/**
+ * The gateway's `WorkspaceStorage.WorkspaceStorage` over one pool. `forWorkspace` builds a
+ * workspace's views on demand: every store core requires and the workspace's signal hub, merged by
+ * `layerWorkspace` over one `Binding.Binding`. The views acquire nothing of their own, so building
+ * them is inexpensive, and adding a store adds a line to the private register beside
+ * `layerWorkspace`. `make` checks the host's options and imports its credential key once, so
+ * invalid ones stop the host starting.
+ *
+ * @since 0.1.0
+ */
 import * as Threads from "./Threads.ts";
 import * as ThreadParticipations from "./ThreadParticipations.ts";
 import * as ThreadMessages from "./ThreadMessages.ts";
@@ -34,6 +44,12 @@ import * as Notifications from "./Notifications.ts";
 import * as Roles from "./Roles.ts";
 import * as Workspaces from "./Workspaces.ts";
 
+/**
+ * The binding's limits, and the host's credential key.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options extends Binding.Options {
   /**
    * The key that seals connections' credentials at rest: 32 bytes, encoded as base64. Without
@@ -80,9 +96,11 @@ const layerStores = Layer.mergeAll(
 );
 
 /**
- * Provide the stores bound to one workspace over the caller's database.
+ * Provide the stores bound to one workspace, and its signal hub, over the caller's database, with
+ * the credential key `make` imported, or none.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerWorkspace = (
   workspaceId: Workspace.Id,
@@ -100,6 +118,7 @@ export const layerWorkspace = (
  * resources, so the scope that builds them can close at once.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("PostgresWorkspaceStorage.make")(function* (options: Options = {}) {
   // Invalid options stop the host starting, rather than its first workspace.
@@ -124,6 +143,7 @@ export const make = Effect.fn("PostgresWorkspaceStorage.make")(function* (option
  * Expose the workspace views to the gateway as its workspace storage contract.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (options: Options = {}) =>
   Layer.effect(WorkspaceStorage.WorkspaceStorage, make(options));

@@ -1,7 +1,10 @@
 /**
  * Starting the session of the agent a turn runs, built from the connections core gives as
  * `AgentQuery.Runnable` with the integrations the host installs: its harness, on its model, and
- * the sandbox the session works in, if the agent has one.
+ * the sandbox the session works in, if the agent has one. `TurnRunner` calls `startSession` as each
+ * run of a turn begins.
+ *
+ * @since 0.1.0
  */
 import { Integrations } from "@amends-dev/connection";
 import type { AgentQuery } from "@amends-dev/core/agent";
@@ -11,7 +14,13 @@ import { Sandbox } from "@amends-dev/sandbox";
 import { Effect } from "effect";
 import type * as SessionLogWriter from "./SessionLogWriter.ts";
 
-/** The session a turn's agent started, and the agent, which what the session resumes from names. */
+/**
+ * The session a turn's agent started, and the agent's id, which what the session resumes from
+ * names.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Started {
   readonly session: Session.Session;
   readonly agent: string;
@@ -26,7 +35,11 @@ const credentialOf = (access: Connection.Access) => access.credential ?? undefin
  * Start the session `sessionId` of the agent `runnable` describes, from what `opening` says it
  * starts from: build the agent's harness on its model, resume the sandbox named for the session
  * when the agent has one, and create the session, anew with the conversation so far or from what
- * an earlier one left.
+ * an earlier one left. It fails with the `ConnectionError`, `SandboxError`, or `HarnessError` of
+ * what it could not build or reach, for which `TurnRunner` fails the turn.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const startSession = Effect.fn("TurnAgent.startSession")(function* (
   runnable: AgentQuery.Runnable,

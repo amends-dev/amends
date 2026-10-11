@@ -1,3 +1,12 @@
+/**
+ * The `members` endpoint group: a workspace's memberships. Its endpoints call `MemberService`:
+ * `list`, `get`, `rename`, and `remove`. Every endpoint needs active membership; core lists and
+ * reads only the members `member.read` lets the caller see, the caller renames only their own
+ * membership, and removing a member follows the delegation rules and never reaches the owner.
+ * `MembersHandlers` in `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
@@ -9,6 +18,9 @@ const params = { workspaceId: Workspace.Id, memberId: Member.Id };
 /**
  * Membership reads and removal, authorized by core for the principal's membership, and the
  * caller choosing what people in the workspace call them.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class MembersGroup extends HttpApiGroup.make("members")
   .add(

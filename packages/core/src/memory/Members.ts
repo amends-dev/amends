@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `MemberStore` from `../workspace/MemberStore.ts`, over the
+ * workspace's `Binding`: memberships, active and removed. It keeps what the contract leaves to
+ * storage: a reused ID conflicts, and so does a second active membership for one identity;
+ * renaming and removing conflict unless the membership is stored and active.
+ * `MemberStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "../identity/index.ts";
 import { Member, MemberStore } from "../workspace/index.ts";
 import { Array, Effect, Layer, Schema, Option } from "effect";
@@ -17,6 +26,7 @@ const isActive = (member: Member.Record, identity: Identity.MemberReference) =>
  * Memberships, active and removed; one active membership per identity.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Members.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
@@ -96,8 +106,9 @@ export const make = Effect.fn("Members.make")(function* () {
 });
 
 /**
- * Provide MemberStore.MemberStore using its constructor and the caller's dependencies.
+ * Provide membership storage over the caller's binding.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(MemberStore.MemberStore, make());

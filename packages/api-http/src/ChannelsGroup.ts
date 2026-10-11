@@ -1,3 +1,13 @@
+/**
+ * The `channels` and `channelEvents` endpoint groups: a connection's external conversations as
+ * threads in one group, and what their systems send. `ChannelsGroup` calls `ChannelService`:
+ * `list`, `create`, `get`, `redirect`, `remove`, and `getBinding`, for active members, with
+ * `channel.create` and `channel.manage` deciding who changes them. `ChannelEventsGroup` has no
+ * principal: it hands each request to `ChannelIntake.receive`, whose transport verifies it as the
+ * external system signed it. `ChannelsHandlers` in `@amends-dev/server-http` implements both.
+ *
+ * @since 0.1.0
+ */
 import { Channel, ChannelBinding } from "@amends-dev/core/channel";
 import { Group } from "@amends-dev/core/group";
 import { Thread } from "@amends-dev/core/thread";
@@ -20,6 +30,9 @@ const text = Schema.String.pipe(HttpApiSchema.asText());
  * into a group they belong to, lists and reads the channels they may read, redirects one's new
  * conversations to another group, or removes it. A thread that came through a channel has a
  * binding, the conversation it came from.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class ChannelsGroup extends HttpApiGroup.make("channels")
   .add(
@@ -64,6 +77,9 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
  * What external systems send a channel. No session authenticates these requests: the channel's
  * transport verifies each as its system signs it, and rejects what it cannot. The answer is what
  * the transport says the system expects, or nothing.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class ChannelEventsGroup extends HttpApiGroup.make("channelEvents").add(
   HttpApiEndpoint.post("receive", "/workspaces/:workspaceId/channels/:channelId/events", {

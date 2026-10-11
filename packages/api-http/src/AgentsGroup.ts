@@ -1,3 +1,12 @@
+/**
+ * The `agents` endpoint group: the workspace's agents, each a member working on the harness,
+ * model, and sandbox its connections give. Its endpoints call `AgentService`: `list`, `create`,
+ * `get`, `configure`, and `rename`. Every active member may read agents; the built-in
+ * administrator tier adds, configures, and renames them, and the delegation rules decide the role
+ * a new agent joins with. `AgentsHandlers` in `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Agent } from "@amends-dev/core/agent";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
@@ -11,10 +20,12 @@ const view = Agent.View.annotate({ identifier: "Agent" });
 const setup = [ApiErrors.AgentConnectionUnavailable, ApiErrors.AgentIncomplete] as const;
 
 /**
- * The workspace's agents, which replace those of `agents`, each a member working on the harness,
- * model, and sandbox its connections give. Every member may read them; administrators add,
- * configure, and rename them. An agent's role and removal are its membership's, through `members`
- * and `assignments`.
+ * The workspace's agents, each a member working on the harness, model, and sandbox its
+ * connections give. Every member may read them; administrators add, configure, and rename them.
+ * An agent's role and removal are its membership's, through `members` and `assignments`.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class AgentsGroup extends HttpApiGroup.make("agents")
   .add(

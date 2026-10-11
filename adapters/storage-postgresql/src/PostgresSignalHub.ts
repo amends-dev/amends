@@ -1,3 +1,12 @@
+/**
+ * Each workspace's `SignalHub.SignalHub`, relayed between every process over the same database
+ * through `PostgresNotices`: `publish` sends the JSON-encoded signal with `NOTIFY` outside any
+ * transaction, and every pool's listener, the sender's included, offers it to that workspace's
+ * subscribers. Nothing is stored, a signal over PostgreSQL's 8,000-byte notification limit is not
+ * delivered, and behind a transaction-pooling proxy signals are unavailable.
+ *
+ * @since 0.1.0
+ */
 import { SignalHub } from "@amends-dev/core/signal";
 import { Effect, Layer } from "effect";
 import * as Binding from "./Binding.ts";
@@ -9,6 +18,7 @@ import * as Binding from "./Binding.ts";
  * are missed.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("PostgresSignalHub.make")(function* () {
   const { workspaceId, database } = yield* Binding.Binding;
@@ -19,8 +29,9 @@ export const make = Effect.fn("PostgresSignalHub.make")(function* () {
 });
 
 /**
- * Provide SignalHub.SignalHub using its constructor and the caller's dependencies.
+ * Provides `SignalHub.SignalHub` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(SignalHub.SignalHub, make());

@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `ThreadStore` from `../thread/ThreadStore.ts`, over the workspace's
+ * `Binding`: thread records, and each thread's latest content activity as a row of its own. It
+ * keeps what the contract leaves to storage: a reused ID conflicts; renaming or recording latest
+ * activity conflicts for a missing thread; and a latest position at or before the recorded one
+ * changes nothing. `ThreadStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Group } from "../group/index.ts";
 import { Thread, ThreadStore } from "../thread/index.ts";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -15,7 +24,12 @@ const newestFirst = (
   right: { readonly at: number; readonly id: string },
 ) => right.at - left.at || compareBinary(right.id, left.id);
 
-/** Workspace-bound threads projection storage. @category constructors */
+/**
+ * Threads over the current workspace transaction, which `ThreadProjection` writes.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Threads.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const inGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
@@ -144,5 +158,10 @@ export const make = Effect.fn("Threads.make")(function* () {
   };
   return ThreadStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provide thread storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ThreadStore.ThreadStore, make());

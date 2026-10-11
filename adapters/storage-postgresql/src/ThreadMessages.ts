@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `ThreadMessageStore.ThreadMessageStore`, over the `thread_messages`
+ * table: a message's author, how it came about, and its content each as a kind column beside that
+ * kind's own columns, which the table's checks keep from mixing. `ThreadMessageStore.make` checks
+ * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
+ * key refuses a reused ID as the store's `Conflict`, and an edit or deletion is a conditional
+ * update that conflicts unless the message still has text, at the revision before for an edit.
+ * Every statement is scoped to the binding's workspace and runs under its `guard`, which lets a
+ * read join the caller's transaction and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread";
 
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -104,7 +116,13 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
   decode(rows.map(toRecord)).pipe(
     Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
   );
-/** Workspace-bound thread-messages projection storage. @category constructors */
+/**
+ * Builds the message store for the binding's workspace: this module's driver inside
+ * `ThreadMessageStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("ThreadMessages.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -224,5 +242,10 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
   };
   return ThreadMessageStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provides `ThreadMessageStore.ThreadMessageStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ThreadMessageStore.ThreadMessageStore, make());

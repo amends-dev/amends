@@ -1,3 +1,12 @@
+/**
+ * The operations on groups an actor calls: creating a team group, renaming one, and reading one
+ * group, the actor's own groups as a sidebar lists them, and the workspace's public groups.
+ * Membership is `GroupMembershipService`, following is `GroupFollowService`, and a direct group is
+ * established by `ThreadService.startDirect`. Each operation authorizes the actor itself, writes
+ * inside one journal commit, and reads outside any.
+ *
+ * @since 0.1.0
+ */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Order, Schema } from "effect";
 import * as Request from "../request/Request.ts";
 import type { PlatformError } from "effect";
@@ -26,8 +35,53 @@ import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
 import { Changed, InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./GroupErrors.ts";
 import * as Notification from "../notification/Notification.ts";
-export { Changed, InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./GroupErrors.ts";
+export {
+  /**
+   * The group's name is no longer the one the renamer expected: someone renamed it meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Changed,
+  /**
+   * A member listed for a new team group is no longer active in the workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  InactiveMember,
+  /**
+   * A member listed for a new team group is not in the workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  MemberNotFound,
+  /**
+   * Missing groups and groups outside the caller's audience share this outcome, so nothing discloses
+   * a group to someone outside it.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+  /**
+   * A direct group is named by its members, so it has no name to change.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotRenamable,
+} from "./GroupErrors.ts";
 
+/**
+ * What changing a group can fail with, which `CreateError` and `RenameError` extend:
+ * authorization, the member reads and journal writes a change depends on, and the member outcomes
+ * in `GroupErrors`.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Authorization.Error
   | MemberStore.Failure
@@ -38,9 +92,22 @@ export type Error =
   | MemberNotFound
   | InactiveMember;
 
-/** A retried creation reads back the group its first attempt created. */
+/**
+ * What creating a team group can fail with. A retried creation reads back the group its first
+ * attempt created, so it can also fail as that read does.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type CreateError = Error | GroupStore.Failure | NotFound;
 
+/**
+ * What renaming a team group can fail with: the outcomes in `GroupErrors`, and the failures of
+ * what a rename depends on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RenameError =
   | Error
   | GroupStore.Failure
@@ -49,6 +116,12 @@ export type RenameError =
   | NotRenamable
   | Changed;
 
+/**
+ * What reading groups can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError =
   | Authorization.Error
   | GroupStore.Failure
@@ -59,13 +132,21 @@ export type ReadError =
   | Schema.SchemaError
   | NotFound;
 
+/**
+ * The group operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class GroupService extends Context.Service<
   GroupService,
   {
     /**
-     * Require group.create in this workspace, then create a private team and its explicit
-     * initial admissions in one commit. No extra membership-management grant is required
-     * for the initial audience. New invocations create new groups; this is not a retry receipt.
+     * Require group.create in this workspace, then create a team group, private unless the input
+     * says otherwise, and its explicit initial admissions in one commit. No extra
+     * membership-management grant is required for the initial audience. A keyed request names its
+     * group, so a retry returns the group its first attempt created; an unkeyed one creates a new
+     * group each time.
      */
     readonly createTeam: (
       input: Group.CreateTeamInput,
@@ -74,20 +155,20 @@ export class GroupService extends Context.Service<
     /**
      * Require group.rename on the group and membership of it, then give a team group a new name.
      * No workspace role reaches a group from outside it: to a non-member, a group is NotFound, as a
-     * missing or foreign one is. A direct group, named by its members, is NotRenamable. The same name
-     * again records nothing; otherwise a name other than `expectedName` is Changed, and nothing is
-     * recorded.
+     * missing or foreign one is. A direct group, named by its members, is NotRenamable. The same
+     * name again records nothing; otherwise a name other than `expectedName` is Changed, and
+     * nothing is recorded.
      */
     readonly rename: (
       input: Group.RenameInput,
     ) => Effect.Effect<Group.Record, RenameError, Actor.Actor>;
     /** Require group.read and current audience membership; no transaction or publication. */
     readonly get: (groupId: Group.Id) => Effect.Effect<Group.Record, ReadError, Actor.Actor>;
-    /** Current readable groups only, ordered by group ID. Honors an existing transaction. */
     /**
      * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
-     * its latest activity, when the actor last read it, whether it has new activity for them, and
-     * whether they follow it. Each page reads a fixed number of times, however large.
+     * its latest activity, when the actor last read it, whether it has new activity for them,
+     * whether they follow it, their pending notifications from it, and what their grants let them
+     * do to it. Each page reads a fixed number of times, however large.
      */
     readonly listMine: (
       options: Group.ListOptions,
@@ -103,7 +184,13 @@ export class GroupService extends Context.Service<
   }
 >()("@amends-dev/core/group/service/Service") {}
 
-/** Capture workspace dependencies; resolve authority and member eligibility inside each commit. @category constructors */
+/**
+ * Capture the stores, the shared reads and writes, the journal, and authorization; resolve
+ * authority and member eligibility inside each commit.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupService.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const memberStore = yield* MemberStore.MemberStore;
@@ -217,7 +304,9 @@ export const make = Effect.fn("GroupService.make")(function* () {
     journal.commit,
   );
 
-  /** List items for one page of the actor's admissions, keyed by group, in a fixed number of reads. */
+  /**
+   * List items for one page of the actor's admissions, keyed by group, in a fixed number of reads.
+   */
   const buildListItems = Effect.fnUntraced(function* (
     actor: Actor.Value,
     admissions: ReadonlyMap<Group.Id, GroupMembership.Record>,
@@ -362,5 +451,11 @@ export const make = Effect.fn("GroupService.make")(function* () {
   });
 });
 
-/** Provide group creation and authorized reads over the workspace's services. @category layers */
+/**
+ * Provide the group operations over the stores, the shared reads and writes, the journal, and
+ * authorization.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupService, make());

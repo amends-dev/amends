@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `GroupFollowStore` from `../group/GroupFollowStore.ts`, over the
+ * workspace's `Binding`. It keeps what the contract leaves to storage: a reused ID conflicts, and
+ * so does a second active follow for one group admission; ending a follow conflicts unless it is
+ * stored, active, and of the group and member named. An ended follow keeps its row.
+ * `GroupFollowStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { GroupFollow, GroupFollowStore } from "../group/index.ts";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -7,7 +16,12 @@ import { compareBinary } from "./Rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(GroupFollow.Record));
 
-/** Group follows, active and ended; one active follow per group admission. @category constructors */
+/**
+ * Group follows, active and ended; one active follow per group admission.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupFollows.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const active = Effect.flatMap(read, (space) => rows.all(space.records.of("groupFollows"))).pipe(
@@ -87,5 +101,10 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
   return GroupFollowStore.make(workspaceId, driver);
 });
 
-/** Provide group follow storage over the caller's binding. @category layers */
+/**
+ * Provide group follow storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make());

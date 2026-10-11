@@ -1,9 +1,24 @@
+/**
+ * How a log entry maps to its `log_entries` row: a fact's subject, name, and version, and its
+ * provenance's performer, cause, correlation, and time, each in columns of their own beside the
+ * binary payload; an entry of a log without facts leaves them null. The provenance's workspace is
+ * the row's, so it is not stored again. `Journal` writes entries with `toColumns` and reads them
+ * with `columns` and `decodeRows`.
+ *
+ * @since 0.1.0
+ */
 import { Performer } from "@amends-dev/core/identity";
 import { Event, Store } from "@amends-dev/core/journal";
 import { Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Schema, Predicate } from "effect";
 import { logEntries } from "./internal/schema.ts";
 
+/**
+ * The `log_entries` columns a read selects, named as `decodeRows` expects them.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const columns = {
   id: logEntries.id,
   logId: logEntries.logId,
@@ -91,6 +106,13 @@ const Row = Schema.Struct({
   }),
 );
 
+/**
+ * Decode rows selected with `columns` as `Store.Entry` values of `workspaceId`, failing on a row
+ * whose fact header is incomplete or whose performer or cause is malformed.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
   workspaceId: Workspace.Id,
   input: unknown,
@@ -139,7 +161,14 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
   });
 });
 
-/** Call only after validating the complete content and its workspace binding. */
+/**
+ * The header columns of an entry's content: its fact's subject, name, version, and provenance, or
+ * nulls for content without a fact. Call only after validating the complete content and its
+ * workspace binding, since the provenance's workspace is not stored.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const toColumns = (entry: Store.Content) => {
   const provenance = entry.fact?.provenance;
   const performer = provenance?.performedBy;

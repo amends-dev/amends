@@ -1,3 +1,11 @@
+/**
+ * The storage contract for turns, which every storage adapter implements and `TurnProjection`
+ * writes. Reads honor the caller's transaction when there is one; writes require it. The store
+ * checks what it is given and authorizes nobody: operations do that. It enforces that an agent
+ * has at most one active turn on each thread.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import type * as Store from "../journal/Store.ts";
@@ -8,25 +16,44 @@ import * as Turn from "./Turn.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing turns.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("TurnStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused ID, a second
+ * active turn for the same agent and thread, or a missing turn.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("TurnStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
- * Internal projection storage. Reads honor an existing transaction; writes require one.
+ * The turn store, bound to one workspace by the host: what a storage adapter implements for
+ * turns. Reads honor an existing transaction; writes require one.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class TurnStore extends Context.Service<
   TurnStore,
   {
+    /** The turn, if stored. */
     readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Record>, Failure>;
     /** The agent's active turn on the thread: queued, running, or cancelling. */
     readonly findActive: (

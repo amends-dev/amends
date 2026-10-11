@@ -1,3 +1,12 @@
+/**
+ * The gateway's `SignInStorage.SignInStorage` over two tables kept across every workspace:
+ * `sign_in_codes`, each address's pending code digest with its expiry, failed tries, and sends in
+ * the current window, and `sign_in_sessions`, each session by its token's digest, with its
+ * account's human ID, start, and end. `PostgresStorage.layer` provides it beside workspace storage.
+ * Storage failures are defects, as the contract has them.
+ *
+ * @since 0.1.0
+ */
 import { SignInStorage } from "@amends-dev/gateway";
 import { eq } from "drizzle-orm";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -24,6 +33,7 @@ const decodeSession = Schema.decodeUnknownEffect(SessionRow);
  * across every process.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("PostgresSignInStorage.make")(function* () {
   const { db, sql } = yield* PostgresDatabase.PostgresDatabase;
@@ -88,8 +98,9 @@ export const make = Effect.fn("PostgresSignInStorage.make")(function* () {
 });
 
 /**
- * Provide SignInStorage.SignInStorage using its constructor and the caller's dependencies.
+ * Provides `SignInStorage.SignInStorage` over the caller's `PostgresDatabase.PostgresDatabase`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(SignInStorage.SignInStorage, make());

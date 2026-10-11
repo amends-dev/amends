@@ -240,9 +240,11 @@ documentation is generated from them.
   neighbours, then `@since`.
 - **`@category` and `@since` on every export**, with a sentence or more on what it is, except a
   type that twins a schema, which carries only the tags. A service is a class named after its
-  module, `ThreadStore.ThreadStore`, with its methods documented one by one in its shape. The categories are `schemas`, `options` for operation inputs and options,
-  `models` for types that are not schemas, `errors`, `services`, `constructors`, `layers`,
-  `utils`, `facts`, `projections`, `permissions`, and `kinds` for activity kinds.
+  module, `ThreadStore.ThreadStore`, with its methods documented one by one in its shape. The
+  categories are `schemas`, `options` for operation inputs and options, `models` for types that
+  are not schemas, `errors`, `services`, `constructors`, `layers`, `utils`, `facts`,
+  `projections`, `permissions`, `kinds` for activity kinds, and `testing` for a conformance suite
+  and its fixture.
 - **Examples** where a reader would otherwise have to find a caller: `**Example** (Title)` and a
   ```ts block, formatted at the repository's print width, verified by extraction as
   [publishing](publishing.md) describes.

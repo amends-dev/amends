@@ -1,9 +1,21 @@
+/**
+ * Keeps the membership read model, `MemberStore`: each member as added, as since renamed, and
+ * whether removed.
+ *
+ * @since 0.1.0
+ */
 import { Effect } from "effect";
 import * as Projection from "../journal/Projection.ts";
 import * as MemberFacts from "./MemberFacts.ts";
 import * as MemberStore from "./MemberStore.ts";
 
-/** Projects recorded membership changes into the host's transactional read model. */
+/**
+ * Inserts each added member as active, sets the name of each renamed one, and marks each removed
+ * one removed, keeping its record.
+ *
+ * @category projections
+ * @since 0.1.0
+ */
 export const definition = Projection.make("workspace.members", { version: 1 })
   .on(
     MemberFacts.Added,

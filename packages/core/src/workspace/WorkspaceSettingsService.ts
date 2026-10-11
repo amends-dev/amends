@@ -1,3 +1,12 @@
+/**
+ * The operations behind a workspace's settings an actor calls: reading the workspace with what the
+ * actor may do there, listing members for management with their access and whether each can be
+ * removed, and renaming the workspace. The flags it computes come from the same permissions and
+ * delegation rules the operations they describe enforce, read through `MemberService` and
+ * `AssignmentService`.
+ *
+ * @since 0.1.0
+ */
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import * as Assignment from "../authorization/Assignment.ts";
@@ -21,7 +30,24 @@ import * as Workspace from "./Workspace.ts";
 import * as WorkspaceSettings from "./WorkspaceSettings.ts";
 import * as WorkspaceSettingsPermissions from "./WorkspaceSettingsPermissions.ts";
 import { Changed } from "./WorkspaceSettingsErrors.ts";
-export { Changed } from "./WorkspaceSettingsErrors.ts";
+export {
+  /**
+   * The workspace's name is no longer the one the renamer expected: someone renamed it meanwhile,
+   * and nothing was recorded.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Changed,
+} from "./WorkspaceSettingsErrors.ts";
+
+/**
+ * What the settings operations can fail with: the outcome in `WorkspaceSettingsErrors`, and the
+ * failures of what they depend on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | AssignmentService.Error
   | MemberService.Error
@@ -31,21 +57,48 @@ export type Error =
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError;
+
+/**
+ * The settings operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class WorkspaceSettingsService extends Context.Service<
   WorkspaceSettingsService,
   {
+    /**
+     * The workspace, whether the actor may rename it, read invitations, and invite, and the
+     * built-in roles with whether the actor may assign each. Requires active membership alone.
+     */
     readonly get: Effect.Effect<WorkspaceSettings.View, Error, Actor.Actor>;
+    /**
+     * The members the actor may read, each with their access when the actor may read it and whether
+     * the actor may remove them. One resolution of the actor's grants decides every member, by the
+     * delegation rule (`Delegation.recipientDenial`) role changes and removals enforce.
+     */
     readonly members: Effect.Effect<
       ReadonlyArray<WorkspaceSettings.MemberEntry>,
       Error,
       Actor.Actor
     >;
+    /**
+     * Rename the workspace, under `workspace.rename`. The same name again records nothing;
+     * otherwise a current name other than `expectedName` is `Changed`, and nothing is recorded.
+     * Names are compared, not versions, so a rename away and back goes unnoticed. Publishes
+     * `WorkspaceFacts.Renamed` in one commit and returns the renamed workspace.
+     */
     readonly rename: (
       input: WorkspaceSettings.RenameInput,
     ) => Effect.Effect<Workspace.Record, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/workspace/settings/Service") {}
-/** @category constructors */
+/**
+ * Capture bound services; each operation authorizes the actor when it runs.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore,
     authorization = yield* Authorization.Authorization,
@@ -159,5 +212,11 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   );
   return WorkspaceSettingsService.of({ get, members: listing, rename });
 });
-/** @category layers */
+/**
+ * Provide the settings operations over the workspace store, the member and assignment operations,
+ * authorization, and delegation.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(WorkspaceSettingsService, make());

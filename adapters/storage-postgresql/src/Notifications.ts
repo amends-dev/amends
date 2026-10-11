@@ -1,3 +1,19 @@
+/**
+ * The PostgreSQL driver for `NotificationStore.NotificationStore`, over `notifications` and
+ * `notification_seen`. A row's `state` is the notification's, and a check keeps each state to its
+ * own columns; a recipient's inbox is keyed by the membership notified, the contact's ID, or
+ * nothing for the workspace's triage. A person's `Seen` is private state outside the journal, so
+ * `markSeen` also records it in `notification_seen`, which rebuilds keep, and inserting a pending
+ * human notification again restores it in the same statement. `NotificationStore.make` checks
+ * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
+ * key refuses a reused ID and `notifications_by_source_recipient` a second notification of one
+ * source entry for one recipient, each as the store's `Conflict`, and `markSeen` and `accept` check
+ * every notification first, writing nothing unless each is eligible. Every statement is scoped to
+ * the binding's workspace and runs under its `guard`, which lets a read join the caller's
+ * transaction and requires one for a write, except `markSeen`, which also runs on its own.
+ *
+ * @since 0.1.0
+ */
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
@@ -86,9 +102,11 @@ const inboxOf = (recipient: Notification.Recipient) =>
       : recipient.memberId;
 
 /**
- * Notification records and recipient reads over the workspace transaction.
+ * Builds the notification store for the binding's workspace: this module's driver inside
+ * `NotificationStore.make`, which checks every input first.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Notifications.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -433,8 +451,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
 });
 
 /**
- * Provide NotificationStore.NotificationStore using its constructor and the caller's dependencies.
+ * Provides `NotificationStore.NotificationStore` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(NotificationStore.NotificationStore, make());

@@ -1,3 +1,13 @@
+/**
+ * The memory implementation of `GroupStore` from `../group/GroupStore.ts`, over the workspace's
+ * `Binding`: group records, and each group's latest activity as a row of its own. It keeps what the
+ * contract leaves to storage: a reused ID conflicts, and so does a second direct group for one
+ * member set; renaming conflicts unless the group is a stored team, and recording latest activity
+ * conflicts for a missing group, while a time no later than the recorded one changes nothing.
+ * `GroupStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Group, GroupStore } from "../group/index.ts";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -11,7 +21,12 @@ const latestRows = Rows.make(Schema.fromJsonString(Group.Latest));
 const keyOf = (record: Group.Record) =>
   record.kind === "Direct" ? Group.directKey(record.memberIds) : undefined;
 
-/** Group records over the current workspace transaction. @category constructors */
+/**
+ * Group records over the current workspace transaction.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Groups.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const driver: GroupStore.GroupStore["Service"] = {
@@ -122,5 +137,10 @@ export const make = Effect.fn("Groups.make")(function* () {
   return GroupStore.make(workspaceId, driver);
 });
 
-/** Provide group storage over the caller's binding. @category layers */
+/**
+ * Provide group storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupStore.GroupStore, make());

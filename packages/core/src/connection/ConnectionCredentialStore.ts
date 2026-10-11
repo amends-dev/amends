@@ -1,3 +1,12 @@
+/**
+ * The storage contract for connections' credentials, each the key a connection authenticates with,
+ * which every storage adapter implements and keeps outside the journal. `ConnectionService` stores
+ * a connection's key in the commit that records the connection, replaces it, reads it to check the
+ * connection, and deletes it on removal; `AgentQuery` and `ChannelQuery` read it to give what runs
+ * on a connection its key. A host that keeps no credentials reports `Unavailable`.
+ *
+ * @since 0.1.0
+ */
 import { Connection as ConnectionContract } from "@amends-dev/connection";
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
@@ -6,11 +15,23 @@ import type * as Store from "../journal/Store.ts";
 import * as Connection from "./Connection.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 
+/**
+ * Storage failed while reading or writing credentials.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("ConnectionCredentialStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
-/** This host keeps no credentials, as when it has no key to protect them with. */
+
+/**
+ * This host keeps no credentials, as when it has no key to protect them with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Unavailable extends Schema.TaggedError<Unavailable>()(
   "ConnectionCredentialStore.Unavailable",
   { reason: Schema.String },
@@ -23,9 +44,11 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()(
  * stored together or not at all. An adapter protects credentials at rest as its storage allows,
  * bound to the connection they belong to; reads return them only to the server.
  *
- * `make` builds the store over a driver of the same shape. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
+ * `make` builds the store over a driver of the same shape. It checks every input against its
+ * schema before the driver sees it, so a driver keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class ConnectionCredentialStore extends Context.Service<
   ConnectionCredentialStore,

@@ -1,3 +1,12 @@
+/**
+ * How a workspace comes to be: the one trusted entry point the gateway calls once it has checked
+ * the creator's entitlement and bound storage to a new workspace ID. It runs before any member or
+ * actor exists, so it carries the creator's identity as the commit's provenance itself, and it
+ * records in one commit everything a workspace starts with. Repeating it is `AlreadyInitialized`
+ * and grants nothing.
+ *
+ * @since 0.1.0
+ */
 import { Crypto, DateTime, Effect, Option, Schema } from "effect";
 
 import * as PermissionCatalog from "../authorization/PermissionCatalog.ts";
@@ -19,6 +28,13 @@ import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as Workspace from "./Workspace.ts";
 
+/**
+ * The workspace has a record already: initialization ran before, and nothing is repeated or
+ * granted again.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class AlreadyInitialized extends Schema.TaggedError<AlreadyInitialized>()(
   "WorkspaceInitialization.AlreadyInitialized",
   {
@@ -34,6 +50,9 @@ export class AlreadyInitialized extends Schema.TaggedError<AlreadyInitialized>()
  * the creator receives one workspace-scoped Owner assignment. Existing roles are never refreshed
  * here; `BuiltinRoleUpgrade` brings an older workspace's roles to a later revision. The workspace
  * starts with its general group, public and holding the creator; see `Group.GeneralId`.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const initialize = Effect.fn("WorkspaceInitialization.initialize")(function* (
   creator: Identity.HumanId,

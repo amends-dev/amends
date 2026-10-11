@@ -1,23 +1,77 @@
+/**
+ * The commit coordinator: it runs a program as one commit of the workspace's storage, and joins
+ * nested commits to the one already running. `run` opens a native transaction with
+ * `Store.transaction`, and inside it every write, such as a publication or a log append, runs as a
+ * step through `operation`, and every read through `step`, one at a time, so that a read never
+ * interleaves with writes the store has staged. A write that fails fails the whole commit, even
+ * when its caller catches the failure, and once its program ends the commit closes and rejects
+ * late writes. `Journal` and `Log` share one coordinator, from `Log.layer`, so their writes join
+ * one commit.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect";
 import type { Cause, Scope } from "effect";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Store from "./Store.ts";
 
+/**
+ * A write in the commit had failed, though its caller caught the failure, so the commit rolls
+ * back; later writes in it fail with this too. `cause` is the first failure.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Aborted extends Schema.TaggedError<Aborted>()("Commit.Aborted", {
   cause: Schema.Defect(),
 }) {}
+
+/**
+ * The commit had ended when a write or a nested commit tried to use it, such as from a fiber that
+ * outlived it.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Closed extends Schema.TaggedError<Closed>()("Commit.Closed", {}) {}
+
+/**
+ * A write reached a commit it does not belong to: one another coordinator opened, a native
+ * transaction core did not open, or, for a projection, an entry of another log or commit.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Foreign extends Schema.TaggedError<Foreign>()("Commit.Foreign", {}) {}
+
+/**
+ * A write was attempted where writes are forbidden, such as a projection appending to a log;
+ * `reason` says which.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()("Commit.WriteForbidden", {
   reason: Schema.String,
 }) {}
+
 /**
  * A commit's storage work began a step while another fiber's step was running. A commit runs its
  * reads and writes one at a time, so await each before the next; concurrent work in one commit is
  * a defect of the program that started it, raised as a defect and aborting the commit.
+ *
+ * @category errors
+ * @since 0.1.0
  */
 export class Concurrent extends Schema.TaggedError<Concurrent>()("Commit.Concurrent", {}) {}
 
+/**
+ * What running a commit can fail with: storage's failures, conflicts, and uncertain outcomes, and
+ * the coordinator's own errors.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Store.Failure
   | Store.Conflict
@@ -26,12 +80,33 @@ export type Error =
   | Closed
   | Foreign
   | WriteForbidden;
+
+/**
+ * What a program run as a commit still requires once the commit provides its scope and
+ * `Store.Transaction`.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Remaining<R> = Exclude<Exclude<R, Scope.Scope>, Store.Transaction>;
 
+/**
+ * The commit coordinator of one workspace's storage, shared by `Log` and `Journal`. `make` builds
+ * it over `Store.Store`, and `layer` provides it.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Transaction extends Context.Service<
   Transaction,
   {
+    /** The workspace whose storage it commits to. */
     readonly workspaceId: WorkspaceId.Id;
+    /**
+     * Runs `program` as one commit in a native transaction, or within the current commit when
+     * nested. A nested program or write that fails fails the outer commit, with `Aborted` when its
+     * caller caught the failure.
+     */
     readonly run: <A, E, R>(
       program: Effect.Effect<A, E, R>,
     ) => Effect.Effect<A, E | Error, Remaining<R>>;
@@ -68,7 +143,13 @@ class Forbidden extends Context.Service<Forbidden, string>()(
   "@amends-dev/core/journal/transaction/Forbidden",
 ) {}
 
-/** Projections may update their stores, but may not append new log entries. */
+/**
+ * Projections may update their stores, but may not append new log entries: runs `program` so that
+ * appends and publications in it fail with `WriteForbidden`, giving `reason`.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const withoutAppends = <A, E, R>(program: Effect.Effect<A, E, R>, reason: string) =>
   Effect.provideService(program, Forbidden, reason);
 
@@ -83,9 +164,11 @@ const recordFailure = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =
   );
 
 /**
- * Construct a transaction coordinator over host storage. Each acquisition owns its commits.
+ * Construct a transaction coordinator over host storage. Each acquisition owns its commits: a
+ * commit one coordinator opened cannot be joined through another.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return<
   Transaction["Service"],
@@ -207,5 +290,6 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
  * Provide one transaction coordinator over host storage.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Transaction, make());

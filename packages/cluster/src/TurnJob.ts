@@ -5,7 +5,10 @@
  * entity on one runner at a time and redelivers a request whose handling was cut short, so a turn
  * cut short runs again. A request that fails is tried again where it is, as `JobRequests` says;
  * then a run that accepted a turn gives the turn up. The job's runs take turns, while a stop
- * reaches the run in progress.
+ * reaches the run in progress. `layerRequests` gives core's `TurnJobs.TurnJobs` to commits, and
+ * `layerWorker` handles each job's requests through its `TurnRunner`.
+ *
+ * @since 0.1.0
  */
 import { Store } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
@@ -23,7 +26,12 @@ import * as JobRequests from "./JobRequests.ts";
  */
 const keyed = { key: Schema.String };
 
-/** A request to run the agent's next turn in the thread. */
+/**
+ * A request to run the agent's next turn in the thread, keyed by the commit that stored it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export class Run extends Schema.Class<Run>("amends/TurnJob/Run")({
   ...TurnJobs.Job.fields,
   ...keyed,
@@ -33,7 +41,13 @@ export class Run extends Schema.Class<Run>("amends/TurnJob/Run")({
   }
 }
 
-/** A request to stop the turn, which was asked to stop or whose agent no longer takes part. */
+/**
+ * A request to stop the turn `turnId`, which was asked to stop or whose agent no longer takes part,
+ * keyed by the turn and the commit that stored it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export class Stop extends Schema.Class<Stop>("amends/TurnJob/Stop")({
   ...TurnJobs.Job.fields,
   ...keyed,
@@ -44,13 +58,25 @@ export class Stop extends Schema.Class<Stop>("amends/TurnJob/Stop")({
   }
 }
 
-/** An agent's work in one thread; its requests survive the runner. */
+/**
+ * The `amends/TurnJob` entity: an agent's work in one thread, addressed by `entityId`. Its `Run`
+ * and `Stop` requests are persisted, so they survive the runner.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export const entity = Entity.make("amends/TurnJob", [
   Rpc.make("Run", { payload: Run }).annotate(ClusterSchema.Persisted, true),
   Rpc.make("Stop", { payload: Stop }).annotate(ClusterSchema.Persisted, true),
 ]);
 
-/** The entity of a job. */
+/**
+ * The ID of `job`'s entity: its workspace, membership, and thread as a JSON array, which the
+ * worker reads back into the job.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const entityId = (job: TurnJobs.Job) =>
   JSON.stringify([job.workspaceId, job.memberId, job.threadId]);
 
@@ -63,17 +89,24 @@ const jobOf = (entityId: string): TurnJobs.Job => {
   return { workspaceId, memberId, threadId };
 };
 
-/** A request the job handles. */
+/**
+ * A request the job handles: a `Run` or a `Stop`.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Request = Run | Stop;
 
 /**
- * Requests stored by Cluster. Sent inside a commit, a request shares its transaction when Cluster's
- * message storage uses the same SQL client as the workspace's storage, so it commits or rolls back
- * with the commit; the host composing them owns that. Cluster looks for the request as it stores
- * it, before the commit can show it, so once the commit is done this runner reads storage again
- * rather than finding the request at its next poll.
+ * Provides core's `TurnJobs.TurnJobs`, whose requests Cluster stores, each keyed by the commit that
+ * asks for it. Sent inside a commit, a request shares its transaction when Cluster's message
+ * storage uses the same SQL client as the workspace's storage, so it commits or rolls back with the
+ * commit; the host composing them owns that. Cluster looks for the request as it stores it, before
+ * the commit can show it, so once the commit is done this runner reads storage again rather than
+ * finding the request at its next poll.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerRequests = Layer.effect(
   TurnJobs.TurnJobs,
@@ -116,6 +149,7 @@ export const layerRequests = Layer.effect(
  * is dropped.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerWorker = entity.toLayer(
   Effect.gen(function* () {
@@ -172,5 +206,11 @@ export const layerWorker = entity.toLayer(
   { concurrency: "unbounded", maxIdleTime: "1 minute" },
 );
 
-/** Stored requests and the worker that handles them, over the host's Cluster. @category layers */
+/**
+ * Both `layerRequests` and `layerWorker`, over the host's Cluster: the requests commits store, and
+ * the worker that handles them.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.merge(layerWorker, layerRequests);

@@ -1,7 +1,11 @@
 /**
  * One workspace's view of memory storage: its identity, the transaction boundary every commit
  * runs inside, and the state each statement sees. Store modules require this service and
- * nothing else of each other.
+ * nothing else of each other; `MemoryStores.layer` provides it to all of them over the host's
+ * `MemoryConnection`. `Journal` opens transactions through it, and `Notifications` runs its
+ * exclusive writes through it.
+ *
+ * @since 0.1.0
  */
 import { Commit, Store } from "../journal/index.ts";
 import type { Workspace } from "../workspace/index.ts";
@@ -9,23 +13,44 @@ import { Context, DateTime, Effect, Exit, Layer, Option } from "effect";
 import * as MemoryConnection from "./MemoryConnection.ts";
 import * as MemoryDatabase from "./MemoryDatabase.ts";
 
-/** The native handle a session exposes to core. */
+/**
+ * The handle core's `Store.Transaction` service holds while a transaction runs: the commit's ID,
+ * its `append`, and `afterCommit`. `Journal` builds one for each session it opens.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>;
 
-/** One open transaction: a snapshot of the workspace that its writes change until it commits. */
+/**
+ * One open transaction: a snapshot of the workspace that its writes change until it commits.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface TransactionState {
+  /** The connection that opened it; a handle reaching another connection's binding fails. */
   readonly connection: MemoryConnection.MemoryConnection["Service"];
   readonly workspaceId: Workspace.Id;
+  /** The commit it records, with the count of entries appended so far. */
   readonly commit: Commit.Record;
+  /** Its snapshot of the workspace, which its writes change and a commit makes committed. */
   readonly space: MemoryDatabase.Space;
   /** Logs this transaction holds against their other writers, released when it ends. */
   readonly held: Set<string>;
   /** What `afterCommit` asked to run once the transaction commits, in order. */
   readonly afterCommit: Array<Effect.Effect<void>>;
+  /** Cleared when the transaction ends, so a handle kept past it fails. */
   active: boolean;
 }
 
-/** Ask for `effect` to run once the session's transaction commits; a closed session's handle is expired. */
+/**
+ * Ask for `effect` to run once the session's transaction commits; a closed session's handle is
+ * expired. `Journal` gives it to core as the handle's `afterCommit`.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const afterCommit = (session: TransactionState, effect: Effect.Effect<void>) =>
   Effect.suspend(() => {
     if (!session.active)
@@ -39,15 +64,30 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
     return Effect.void;
   });
 
-/** The session a program runs under; statements check it against their own binding. */
+/**
+ * The session a program runs under; statements check it against their own binding. `transaction`
+ * provides it beside core's `Store.Transaction`, and `Journal` reads it to hold logs.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
   "@amends-dev/core/memory/binding/Current",
 ) {}
 
+/**
+ * One workspace's view: what a read, a projection write, and a write outside the journal see, and
+ * the transaction boundary. Every store module takes it, and `MemoryStores.layer` provides it.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Binding extends Context.Service<
   Binding,
   {
+    /** The workspace every store over this binding reads and writes. */
     readonly workspaceId: Workspace.Id;
+    /** The host's connection: the storage the stores read, and the gate transactions take. */
     readonly connection: MemoryConnection.MemoryConnection["Service"];
     /**
      * What a read sees: the live transaction of this workspace on this connection, or committed
@@ -86,6 +126,7 @@ export class Binding extends Context.Service<
  * Construct one workspace binding over the caller's connection.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.Id) {
   const memoryConnection = yield* MemoryConnection.MemoryConnection;
@@ -234,8 +275,9 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
 });
 
 /**
- * Provide Binding using its constructor and the caller's dependencies.
+ * The binding of one workspace, over the caller's `MemoryConnection`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (workspaceId: Workspace.Id) => Layer.effect(Binding, make(workspaceId));

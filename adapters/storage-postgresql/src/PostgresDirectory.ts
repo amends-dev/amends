@@ -1,3 +1,12 @@
+/**
+ * The gateway's `WorkspaceDirectory.WorkspaceDirectory` over the read models of every workspace in
+ * the database: one identity's memberships, active and removed, through `members_by_identity`,
+ * each with its workspace's count of active members, and a human's pending invitations that have
+ * not expired, with their workspaces' names. It reads across workspaces, so it is built over
+ * `PostgresDatabase.PostgresDatabase` rather than a binding. Storage failures are defects.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "@amends-dev/core/identity";
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import { WorkspaceDirectory } from "@amends-dev/gateway";
@@ -20,6 +29,7 @@ const Membership = Schema.Struct({
  * reads read models directly and performs no authorization of its own.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("PostgresDirectory.make")(function* () {
   const { db } = yield* PostgresDatabase.PostgresDatabase;
@@ -101,8 +111,10 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
 });
 
 /**
- * Provide WorkspaceDirectory.WorkspaceDirectory using its constructor and the caller's dependencies.
+ * Provides `WorkspaceDirectory.WorkspaceDirectory` over the caller's
+ * `PostgresDatabase.PostgresDatabase`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(WorkspaceDirectory.WorkspaceDirectory, make());

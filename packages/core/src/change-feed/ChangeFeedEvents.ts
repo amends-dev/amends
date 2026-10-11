@@ -1,3 +1,12 @@
+/**
+ * Which facts the change feed delivers, and how each becomes an event a reader may see: a registry
+ * of fact versions with the audience each reaches, the read permission a reader also needs, the
+ * public view of its payload, whose access it changes, and the notifications it created.
+ * `ChangeFeedSource` prepares each committed entry with `prepare`, and `ChangeFeedService` filters
+ * what it prepared for each reader. A fact not registered here stays within the host.
+ *
+ * @since 0.1.0
+ */
 import { Data, Effect, Option, Schema } from "effect";
 import * as TurnFacts from "../turn/TurnFacts.ts";
 import * as AgentFacts from "../agent/AgentFacts.ts";
@@ -43,21 +52,38 @@ import * as ChangeFeed from "./ChangeFeed.ts";
 /**
  * How a fact changes what one reader may see: their group admissions, their grants (or anyone's,
  * without a member), or their workspace membership ending.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export type Access = Data.TaggedEnum<{
   Groups: { readonly memberId: Member.Id };
   Grants: { readonly memberId: Member.Id | undefined };
   Removed: { readonly memberId: Member.Id };
 }>;
+/**
+ * @category models
+ * @since 0.1.0
+ */
 export const Access = Data.taggedEnum<Access>();
 
-/** A notification the event created, for the reader holding its recipient's scope. */
+/**
+ * A notification the event created, for the reader holding its recipient's scope.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Addressed {
   readonly scope: Audience.Scope;
   readonly record: Notification.Record;
 }
 
-/** One decoded event, ready to filter for each reader. */
+/**
+ * One decoded event, ready to filter for each reader.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Prepared {
   readonly event: ChangeFeed.Event;
   readonly audience: Audience.Value;
@@ -69,7 +95,12 @@ export interface Prepared {
   readonly notifications: ReadonlyArray<Addressed>;
 }
 
-/** A published fact's name recorded with a version this host does not know. */
+/**
+ * A published fact's name recorded with a version this host does not know.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnknownVersion extends Schema.TaggedError<UnknownVersion>()(
   "ChangeFeedEvents.UnknownVersion",
   { name: Schema.String, version: Schema.Finite },
@@ -83,15 +114,15 @@ interface Registered {
   ) => Effect.Effect<Prepared, Schema.SchemaError | Event.FactMismatch>;
 }
 
-/**
- * Deliver one fact version to its audience. The payload is the fact's own unless a view names
- * the public shape, which then matches what the corresponding read returns.
- */
 /** A fact whose payload schema needs no services, as every domain fact's does. */
 type Standalone = Fact.Definition & {
   readonly payload: { readonly DecodingServices: never; readonly EncodingServices: never };
 };
 
+/**
+ * Deliver one fact version to its audience. The payload is the fact's own unless a view names
+ * the public shape, which then matches what the corresponding read returns.
+ */
 const registerFact = <F extends Standalone, View extends Schema.Constraint = F["payload"]>(
   fact: F,
   options: {
@@ -379,7 +410,12 @@ for (const registered of registry) {
   byName.set(registered.name, versions);
 }
 
-/** Whether the feed delivers a fact at this version; facts it does not register are internal. */
+/**
+ * Whether the feed delivers a fact at this version; facts it does not register are internal.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const delivers = (fact: { readonly name: string; readonly version: number }) =>
   byName.get(fact.name)?.has(fact.version) ?? false;
 
@@ -387,6 +423,9 @@ export const delivers = (fact: { readonly name: string; readonly version: number
  * Decode one journal entry for delivery. Facts the feed does not register are internal and
  * yield None; a registered name recorded with an unknown version fails rather than disappear,
  * and the source makes subscribers refresh instead of delivering its commit.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const prepare = Effect.fn("ChangeFeedEvents.prepare")(function* (
   entry: Log.Entry<Event.Envelope>,

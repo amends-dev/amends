@@ -1,3 +1,10 @@
+/**
+ * The storage contract for admissions, which every storage adapter implements and
+ * `GroupMembershipProjection` writes. Reads honor the caller's transaction when there is one;
+ * writes require it. The store checks what it is given and authorizes nobody: operations do that.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
 import type * as Store from "../journal/Store.ts";
@@ -9,26 +16,45 @@ import * as GroupMembership from "./GroupMembership.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing admissions.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("GroupMembershipStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
 
+/**
+ * A write disagreed with what is stored: a malformed or foreign record, a reused ID, a second
+ * active admission of one member to one group, or a missing or ended admission.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("GroupMembershipStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
 
 /**
- * Projection storage for admissions, retaining their workspace-membership references.
+ * The admission store, bound to one workspace by the host.
+ *
+ * What a storage adapter implements for admissions, which keep their workspace-member references.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class GroupMembershipStore extends Context.Service<
   GroupMembershipStore,
   {
+    /** The admission, active or ended, if stored. */
     readonly get: (
       id: GroupMembership.Id,
     ) => Effect.Effect<Option.Option<GroupMembership.Record>, Failure>;
@@ -40,6 +66,7 @@ export class GroupMembershipStore extends Context.Service<
     readonly getMany: (
       ids: ReadonlyArray<GroupMembership.Id>,
     ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
+    /** The member's active admission to the group, if any: at most one is active at a time. */
     readonly findActive: (
       groupId: GroupId.Id,
       memberId: MemberId.Id,
@@ -54,15 +81,16 @@ export class GroupMembershipStore extends Context.Service<
     ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
     /**
      * How many active admissions each of several groups has, and whether this member holds one, in
-     * one read. Groups without any are omitted; order is unspecified. An empty request reads nothing.
+     * one read. Groups without any are omitted; order is unspecified. An empty request reads
+     * nothing.
      */
     readonly summarize: (
       groupIds: ReadonlyArray<GroupId.Id>,
       memberId: MemberId.Id,
     ) => Effect.Effect<ReadonlyArray<Group.Summary>, Failure>;
     /**
-     * Stable ID order, including historical admissions. A history read for inspection; operations
-     * use the bounded reads.
+     * Every admission of a group, active or ended, in stable ID order. A history read for
+     * inspection; operations use the bounded reads.
      */
     readonly listByGroup: (
       groupId: GroupId.Id,
@@ -77,7 +105,10 @@ export class GroupMembershipStore extends Context.Service<
       memberId: MemberId.Id,
       options: GroupMembership.ByMemberOptions,
     ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;
-    /** Active admissions for workspace departure, in stable admission-ID order. Internal only. */
+    /**
+     * A member's active admissions, in stable admission-ID order, which `MemberService.remove`
+     * ends when the member is removed from the workspace. Internal only.
+     */
     readonly listActiveByMember: (
       memberId: MemberId.Id,
     ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, Failure>;

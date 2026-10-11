@@ -1,3 +1,12 @@
+/**
+ * A notification is one recipient's reference to a committed thread activity, and where its
+ * handling stands. Recorded activity is its only source: `NotificationProjection` generates one,
+ * with `fromActivity`, for each recipient the activity selected, and `NotificationStore` keeps
+ * them. A person sees theirs, a turn accepts an agent's, and a delivery a contact's. A person's
+ * `Seen` is private state outside the journal; the journal settles everything else.
+ *
+ * @since 0.1.0
+ */
 import { Schema } from "effect";
 import type { DateTime } from "effect";
 import * as Identity from "../identity/Identity.ts";
@@ -10,25 +19,56 @@ import * as MemberId from "../workspace/MemberId.ts";
 import * as TurnId from "../turn/TurnId.ts";
 import * as DeliveryId from "../channel/DeliveryId.ts";
 
+/**
+ * Names a notification. One generated from thread activity is named by its source entry and the
+ * recipient's participation, so replay names it the same.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Id = typeof Id.Type;
 
-/** A committed source entry in this notification's workspace; independent of a thread schema. */
+/**
+ * The committed journal entry a notification tells of, by log and entry, in the notification's
+ * workspace. It names an entry rather than a thread, so it depends on no thread schema.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Source = Schema.Struct({
   logId: Entry.LogId,
   entryId: Entry.Id,
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Source extends Schema.Schema.Type<typeof Source> {}
 
 /**
  * The thread and timeline position of a notification's source activity, with the thread's group,
  * by which a reader's pending notifications are counted.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const ThreadReference = Schema.Struct({
   threadId: ThreadId.Id,
   groupId: GroupId.Id,
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface ThreadReference extends Schema.Schema.Type<typeof ThreadReference> {}
 
 /**
@@ -36,6 +76,9 @@ export interface ThreadReference extends Schema.Schema.Type<typeof ThreadReferen
  * membership, keeping their identity kind: someone who rejoins under a new member ID starts with an
  * empty inbox, as with their groups, threads, and read positions. Triage is one workspace-local
  * recipient.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Recipient = Schema.TaggedUnion({
   Human: { ...Identity.Reference.cases.Human.fields, memberId: MemberId.Id },
@@ -43,9 +86,19 @@ export const Recipient = Schema.TaggedUnion({
   Contact: Identity.Reference.cases.Contact.fields,
   Triage: {},
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Recipient = typeof Recipient.Type;
 
-/** The recipient a member is notified as: their identity, within this membership. */
+/**
+ * The recipient a member is notified as: their identity, within this membership.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const ofMember = <const I extends Identity.MemberReference>(
   memberId: MemberId.Id,
   identity: I,
@@ -54,17 +107,28 @@ export const ofMember = <const I extends Identity.MemberReference>(
 /**
  * What accepted a notification and owns the work from then on: an agent's turn, for an agent's,
  * or a delivery, for a contact's.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const AcceptedBy = Schema.TaggedUnion({
   Turn: { turnId: TurnId.Id },
   Delivery: { deliveryId: DeliveryId.Id },
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type AcceptedBy = typeof AcceptedBy.Type;
 
 /**
  * Where a notification stands. Pending waits for its recipient: a person sees it, an agent accepts
  * it into a turn, or a delivery accepts it to carry it to a contact, which owns the work from then
  * on. Seen is private to the person, kept outside the journal; the journal settles everything else.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const State = Schema.TaggedUnion({
   Pending: {},
@@ -83,11 +147,19 @@ export const State = Schema.TaggedUnion({
    */
   Informational: {},
 });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type State = typeof State.Type;
 
 /**
  * Only people see their notifications; only an agent's are accepted by a turn, and only a
- * contact's by a delivery.
+ * contact's by a delivery. `Record` holds every notification to this.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const fitsRecipient = (recipient: Recipient, state: State) =>
   (!State.isAnyOf(["Seen"])(state) || Recipient.isAnyOf(["Human"])(recipient)) &&
@@ -100,6 +172,9 @@ export const fitsRecipient = (recipient: Recipient, state: State) =>
  * One recipient's notification of a recorded source. Generation chooses
  * a stable ID and recorded time from historical input, including on replay.
  * Source existence and recipient selection are responsibilities of that workflow.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Record = Schema.Struct({
   id: Id,
@@ -118,6 +193,11 @@ export const Record = Schema.Struct({
       fitsRecipient(record.recipient, record.state) || "State does not match the recipient",
   ),
 );
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 
 /**
@@ -125,6 +205,9 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * or informational for an agent the activity asks no work of. Everything comes from the
  * activity's journal entry, so replay and the change feed reproduce the record exactly: its ID is
  * the entry and the recipient's participation.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const fromActivity = (
   entry: { readonly logId: Entry.LogId; readonly id: Entry.Id; readonly recordedAt: DateTime.Utc },

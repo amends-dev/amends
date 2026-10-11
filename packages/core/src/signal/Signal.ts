@@ -1,3 +1,11 @@
+/**
+ * What a signal is: something happening now, told to the readers connected at the time and never
+ * stored. `Value` is the kinds a workspace publishes through its `SignalHub`, and
+ * `changeFeedReachOf` says whom each reaches on the change feed, which `ChangeFeedService` checks
+ * before it forwards one.
+ *
+ * @since 0.1.0
+ */
 import { Schema } from "effect";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as Group from "../group/Group.ts";
@@ -15,6 +23,9 @@ import * as MemberId from "../workspace/MemberId.ts";
 /**
  * Something happening now, for the readers connected at the time. Signals are never stored:
  * one missed is gone, and what it describes is either transient or read again from the stores.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Value = Schema.TaggedUnion({
   /** A member is composing a message in a thread; readers show it until `until`. */
@@ -62,9 +73,18 @@ export const Value = Schema.TaggedUnion({
     draft: Turn.Draft,
   },
 }).annotate({ identifier: "Signal" });
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Value = typeof Value.Type;
 
-/** Who may receive a signal: its scopes, and any read permission a reader also needs. */
+/**
+ * Who may receive a signal: its scopes, and any read permission a reader also needs.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Reach {
   readonly audience: Audience.Value;
   readonly requirement: Requirement.Value | undefined;
@@ -88,6 +108,9 @@ const threadReaders = (signal: {
  * Who on the workspace's change feed may receive a signal. Typing reaches the thread's readers, as
  * its messages do; read state reaches only its member's own sessions. A turn's drafts reach no
  * one there: only readers following its log, which checks their access itself.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const changeFeedReachOf = (signal: Value): Reach | undefined =>
   Value.match(signal, {

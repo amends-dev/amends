@@ -1,3 +1,13 @@
+/**
+ * The memory implementation of `TaskStore` from `../task/TaskStore.ts`, over the workspace's
+ * `Binding`: tasks keyed by their thread. It keeps what the contract leaves to storage: a second
+ * task for one thread conflicts, and a change applies only to a stored task that still holds the
+ * value the change replaces, so a change made against a stale value conflicts. A group's tasks
+ * list newest first, then by thread ID in descending binary order. `TaskStore.make` checks every
+ * input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Task, TaskStore } from "../task/index.ts";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
@@ -13,7 +23,12 @@ const newestFirst = (
   right: { readonly at: number; readonly id: string },
 ) => right.at - left.at || compareBinary(right.id, left.id);
 
-/** Tasks by thread, over one workspace's binding. @category constructors */
+/**
+ * Tasks by thread, over one workspace's binding.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Tasks.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const driver: TaskStore.TaskStore["Service"] = {
@@ -81,5 +96,10 @@ export const make = Effect.fn("Tasks.make")(function* () {
   };
   return TaskStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provide task storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(TaskStore.TaskStore, make());

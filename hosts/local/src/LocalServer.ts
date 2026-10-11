@@ -1,3 +1,11 @@
+/**
+ * The local host's HTTP server: the routes and OpenAPI documentation of `@amends-dev/server-http`,
+ * with the CORS policy the desktop app needs, served by Bun on the loopback interface over a host
+ * layer and an authentication. As the server stops, open change streams end first, so it waits
+ * only for ordinary requests.
+ *
+ * @since 0.1.0
+ */
 import { Draining, Routes } from "@amends-dev/server-http";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import type { Accounts, SessionTokens, SignIn, SignInStorage } from "@amends-dev/gateway";
@@ -7,9 +15,12 @@ import { HttpRouter } from "effect/http";
 import type * as LocalHost from "./LocalHost.ts";
 
 /**
- * Register the HTTP API, its OpenAPI document, and docs over the required host services.
+ * Register the HTTP API, its OpenAPI document, and docs over the required host services, with a
+ * CORS policy that admits the desktop app's origins and the headers clients send. Tests serve it
+ * without the Bun server.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layerRoutes = Layer.mergeAll(
   Routes.layer,
@@ -34,10 +45,21 @@ export const layerRoutes = Layer.mergeAll(
   }),
 );
 
-/** The largest request body the server reads, in bytes: one mebibyte. Bun answers 413 beyond it. */
+/**
+ * The largest request body the server reads, in bytes: one mebibyte. Bun answers 413 beyond it.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const maxRequestBodySize = 1024 * 1024;
 
-/** How the host signs people in and resolves their bearer tokens, over the host's services. */
+/**
+ * How the host signs people in and resolves their bearer tokens, over the host's services:
+ * `DevelopmentAuthentication.layer` or `EmailAuthentication.layer`.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Authentication = Layer.Layer<
   SignIn.SignIn | SessionTokens.SessionTokens,
   never,
@@ -45,10 +67,11 @@ export type Authentication = Layer.Layer<
 >;
 
 /**
- * Serve the routes over a host and its authentication on the loopback interface; the web
+ * Serve the routes over a host and its authentication on the loopback interface at `port`; the web
  * development proxy targets this.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (host: LocalHost.HostLayer, authentication: Authentication, port: number) =>
   // Built after the server, the drain is released first as the host stops, ending open change

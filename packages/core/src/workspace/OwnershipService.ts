@@ -1,3 +1,11 @@
+/**
+ * The operations on ownership an actor calls: reading who owns the workspace, and transferring
+ * ownership to another active human member. A transfer replaces both members' built-in workspace
+ * roles through `AssignmentCommand` and records `WorkspaceFacts.OwnershipTransferred` in one
+ * commit; only initialization and this transfer establish Owner access.
+ *
+ * @since 0.1.0
+ */
 import * as Identity from "../identity/Identity.ts";
 import * as Assignment from "../authorization/Assignment.ts";
 import * as Scope from "../authorization/Scope.ts";
@@ -25,8 +33,47 @@ import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
 import { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./OwnershipErrors.ts";
-export { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./OwnershipErrors.ts";
+export {
+  /**
+   * The Owner assignment is no longer the one the caller reviewed: ownership moved meanwhile, and
+   * nothing was recorded.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Changed,
+  /**
+   * The member cannot become owner: they are the owner already, removed, or an agent, as `reason`
+   * says.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  InvalidRecipient,
+  /**
+   * No membership has the ID given as the recipient.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  MemberNotFound,
+  /**
+   * The actor is not the current owner, or is not a person; only the owner transfers, whatever
+   * their grants.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotOwner,
+} from "./OwnershipErrors.ts";
 
+/**
+ * What the ownership operations can fail with: the outcomes in `OwnershipErrors`, and the failures
+ * of what they depend on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error =
   | Delegation.Error
   | WorkspaceStore.Failure
@@ -38,17 +85,41 @@ export type Error =
   | MemberNotFound
   | InvalidRecipient
   | Changed;
+
+/**
+ * The ownership operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class OwnershipService extends Context.Service<
   OwnershipService,
   {
+    /**
+     * The workspace, its owner, and its current Owner assignment, for any active member. Only the
+     * owner, a person holding `workspace.transfer-ownership`, can transfer, and only they receive
+     * the candidates: the other active human members.
+     */
     readonly get: Effect.Effect<Ownership.View, Error, Actor.Actor>;
+    /**
+     * Make another active human member the owner, under `workspace.transfer-ownership`, as the
+     * current owner (otherwise `NotOwner`), and against the Owner assignment the caller reviewed
+     * (otherwise `Changed`). One commit revokes both members' built-in workspace roles, makes the
+     * recipient Owner and the former owner Administrator, and moves `ownerMemberId`; direct grants,
+     * scoped assignments, the name, and `createdBy` stay. Returns the workspace as it now stands.
+     */
     readonly transfer: (
       input: Ownership.TransferInput,
     ) => Effect.Effect<Workspace.Record, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/workspace/ownership-application/Service") {}
 
-/** Construct ownership operations over one workspace's journal and access policy. @category constructors */
+/**
+ * Construct ownership operations over one workspace's journal and access policy.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.Return<
   OwnershipService["Service"],
   never,
@@ -173,5 +244,11 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   return OwnershipService.of({ get, transfer });
 });
 
-/** @category layers */
+/**
+ * Provide the ownership operations over the workspace, member, and assignment stores, the
+ * assignment writes, and authorization.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(OwnershipService, make());

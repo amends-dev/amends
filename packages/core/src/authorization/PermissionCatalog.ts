@@ -1,14 +1,40 @@
+/**
+ * The permissions this host declares, checked and frozen once at start: core's `index.ts`
+ * registers every feature's declarations through `layer`. `Authorization` looks a requirement's
+ * permission up here, `GrantResolver` drops a stored grant whose permission is no longer declared,
+ * `AssignmentService.permissions` lists the workspace-wide ones, and `BuiltinRoles.make` and
+ * `BuiltinRoleUpgrade` build the built-in bundles from `definitions`.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Layer, Schema } from "effect";
 import * as Permission from "./Permission.ts";
 import { Unknown } from "./PermissionCatalogErrors.ts";
-export { Unknown } from "./PermissionCatalogErrors.ts";
+export {
+  /**
+   * The name is not a declared permission: no feature registered it with this host.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Unknown,
+} from "./PermissionCatalogErrors.ts";
 
+/**
+ * Two registered declarations share a name.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Duplicate extends Schema.TaggedError<Duplicate>()("PermissionCatalog.Duplicate", {
   name: Permission.Name,
 }) {}
 
 /**
  * Immutable code-defined permissions, shared independently of workspace assignments.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class PermissionCatalog extends Context.Service<
   PermissionCatalog,
@@ -26,6 +52,7 @@ const decodeDefinition = Schema.decodeEffect(Permission.Definition);
  * Construct an immutable catalog from domain definitions, rejecting every duplicate name.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("PermissionCatalog.make")(function* (
   definitions: ReadonlyArray<Permission.Definition>,
@@ -59,6 +86,7 @@ export const make = Effect.fn("PermissionCatalog.make")(function* (
  * Provide the permission catalog constructed from domain declarations.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = (definitions: ReadonlyArray<Permission.Definition>) =>
   Layer.effect(PermissionCatalog, make(definitions));

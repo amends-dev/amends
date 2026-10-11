@@ -1,7 +1,10 @@
 /**
  * The integrations of the sandbox providers this host runs, which workspaces connect to: this
  * machine's sandboxes, under a directory the host gives, since a workspace cannot say where on the
- * host's disk its sandboxes go; and those of Daytona organizations.
+ * host's disk its sandboxes go; and those of Daytona organizations. `LocalHost.makeIntegrations`
+ * installs both.
+ *
+ * @since 0.1.0
  */
 import { Connection, Integration } from "@amends-dev/connection";
 import { Sandbox } from "@amends-dev/sandbox";
@@ -11,6 +14,12 @@ import { Daytona, type DaytonaConfig, DaytonaError } from "@daytona/sdk";
 import { Crypto, Effect, FileSystem, Path, Redacted, Schema } from "effect";
 import { ChildProcessSpawner } from "effect/process";
 
+/**
+ * What the host installs this machine's sandboxes with.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface LocalOptions {
   /** The directory that holds one directory per connection, which holds its sandboxes. */
   readonly directory: string;
@@ -23,6 +32,9 @@ const isDirectoryName = (id: string): boolean => Schema.is(Schema.String.check(S
  * The integration of this machine's sandboxes. A connection to it gives no settings and no
  * credential, and keeps its sandboxes in a directory of its own, named by its id, so that it never
  * resumes another's. Checking a connection makes that directory.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const local = Effect.fn("SandboxIntegrations.local")(function* (options: LocalOptions) {
   const context = yield* Effect.context<
@@ -71,9 +83,12 @@ export const local = Effect.fn("SandboxIntegrations.local")(function* (options: 
 
 /**
  * The integration of Daytona. A connection to it is an organization, which authenticates with its
- * API key, and may give Daytona's API, when it is not that of Daytona's own cloud, and the region to
- * create sandboxes in. Checking a connection asks Daytona for one of the organization's sandboxes,
- * which it lists only for a valid key, and creates nothing.
+ * API key, and may give Daytona's API, when it is not that of Daytona's own cloud, and the region
+ * to create sandboxes in. Checking a connection asks Daytona for one of the organization's
+ * sandboxes, which it lists only for a valid key, and creates nothing.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const daytona = Effect.map(Crypto.Crypto, (crypto) =>
   Integration.make({

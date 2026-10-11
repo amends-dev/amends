@@ -1,3 +1,11 @@
+/**
+ * How a turn's activity appears in a thread's timeline: each kind in `TurnActivity` as an item of
+ * its own, carrying the activity alone, since its details say everything the item shows, so the
+ * resolver reads nothing beyond the page. A client folds a turn's items into one row at its
+ * `turn.created` position.
+ *
+ * @since 0.1.0
+ */
 import { Effect, Schema } from "effect";
 import type * as Thread from "../thread/Thread.ts";
 import type * as ThreadActivity from "../thread/ThreadActivity.ts";
@@ -5,17 +13,60 @@ import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
 import * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 
-/** A turn accepted here: where its row shows. */
+/**
+ * A turn accepted here, or a retry asked again: where its row shows.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const CreatedItem = Schema.Struct({ activity: TurnActivity.Created.Activity });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface CreatedItem extends Schema.Schema.Type<typeof CreatedItem> {}
-/** The turn began working. */
+
+/**
+ * The turn began working.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const StartedItem = Schema.Struct({ activity: TurnActivity.Started.Activity });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface StartedItem extends Schema.Schema.Type<typeof StartedItem> {}
-/** The turn was asked to stop while working. */
+
+/**
+ * The turn was asked to stop while working.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const StoppingItem = Schema.Struct({ activity: TurnActivity.Stopping.Activity });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface StoppingItem extends Schema.Schema.Type<typeof StoppingItem> {}
-/** The turn ended, and how. */
+
+/**
+ * The turn ended, and how: its outcome, the reply it posted, and why it failed or was stopped.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const EndedItem = Schema.Struct({ activity: TurnActivity.Ended.Activity });
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface EndedItem extends Schema.Schema.Type<typeof EndedItem> {}
 
 type Created = CreatedItem;
@@ -36,6 +87,7 @@ declare module "../thread/ThreadActivityKind.ts" {
  * shows each turn where it began, as its later activity says it went.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const resolver = Effect.succeed({
   kinds: [TurnActivity.Created, TurnActivity.Started, TurnActivity.Stopping, TurnActivity.Ended],

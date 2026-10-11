@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `TaskStore.TaskStore`, over the `tasks` table: one row per task, keyed
+ * by its thread, with its creator's kind in a column beside that kind's own ID column. A group's
+ * tasks page newest first through `tasks_by_group`, from an exclusive row cursor.
+ * `TaskStore.make` checks every input before the driver sees it, so the driver keeps only what
+ * storage keeps: the primary key refuses a thread that has a task as the store's `Conflict`, and
+ * applying a change is a conditional update that conflicts unless the task holds the value the
+ * change replaces. Every statement is scoped to the binding's workspace and runs under its
+ * `guard`, which lets a read join the caller's transaction and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Task, TaskStore } from "@amends-dev/core/task";
 import { ThreadMessage } from "@amends-dev/core/thread";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -43,7 +55,13 @@ const changeColumns = (
       };
   }
 };
-/** Tasks by thread, over one workspace's binding. @category constructors */
+/**
+ * Builds the task store for the binding's workspace: this module's driver inside
+ * `TaskStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Tasks.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -122,5 +140,10 @@ export const make = Effect.fn("Tasks.make")(function* () {
   };
   return TaskStore.make(workspaceId, driver);
 });
-/** @category layers */
+/**
+ * Provides `TaskStore.TaskStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(TaskStore.TaskStore, make());

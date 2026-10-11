@@ -1,3 +1,12 @@
+/**
+ * The read of groups that operations share: whether the actor is currently in a group's audience,
+ * and through which admission. The group, thread, channel, and read-state operations check it,
+ * each mapping its refusal to their own outcome. It writes nothing and checks no action permission;
+ * each operation checks its own, inside its commit when it writes. Internal: not among
+ * `Core.Operations`.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Actor from "../identity/Actor.ts";
@@ -5,17 +14,35 @@ import * as GroupId from "./GroupId.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 
-/** Does not disclose whether the requested group exists. Operations map this to their read outcome. */
+/**
+ * The actor holds no current admission to the group, or the group is missing; the two are not told
+ * apart, so nothing discloses whether a group exists. Operations map it to their own outcome.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NotMember extends Schema.TaggedError<NotMember>()("GroupQuery.NotMember", {
   groupId: GroupId.Id,
 }) {}
 
+/**
+ * What checking the audience can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type AudienceError =
   | Authorization.Error
   | GroupMembershipStore.Failure
   | Schema.SchemaError
   | NotMember;
 
+/**
+ * The shared read of groups. Internal: not among `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class GroupQuery extends Context.Service<
   GroupQuery,
   {
@@ -30,7 +57,13 @@ export class GroupQuery extends Context.Service<
   }
 >()("@amends-dev/core/group/query/Service") {}
 
-/** Capture bound services; check the acting member and current admission on every call. @category constructors */
+/**
+ * Capture the membership store and authorization; check the acting member and current admission
+ * on every call.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupQuery.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
@@ -47,5 +80,10 @@ export const make = Effect.fn("GroupQuery.make")(function* () {
   return GroupQuery.of({ requireAudience });
 });
 
-/** Internal reads shared by group, thread, and read-state operations. @category layers */
+/**
+ * Provide the shared read over the membership store and authorization.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupQuery, make());

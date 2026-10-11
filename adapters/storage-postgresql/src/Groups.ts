@@ -1,3 +1,17 @@
+/**
+ * The PostgreSQL driver for `GroupStore.GroupStore`, over the `groups` table: team groups fill
+ * `visibility` and `name`, direct groups `member_ids` and `direct_key`, derived from the ordered
+ * member set, and the `groups_kind` check rejects rows that mix them. `GroupStore.make` checks
+ * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
+ * key refuses a reused ID and `direct_groups_by_members` a second direct group for one member set,
+ * each as the store's `Conflict`; renaming conflicts unless it finds a team group, and
+ * `latest_activity_at` only moves forward, a missing group conflicting. A direct row whose key
+ * disagrees with its members fails the read. Every statement is scoped to the binding's workspace
+ * and runs under its `guard`, which lets a read join the caller's transaction and requires one for
+ * a write.
+ *
+ * @since 0.1.0
+ */
 import { Group, GroupStore } from "@amends-dev/core/group";
 import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -50,7 +64,13 @@ const toRow = (record: Group.Record): typeof groups.$inferInsert => ({
     : { memberIds: [...record.memberIds], directKey: Group.directKey(record.memberIds) }),
 });
 
-/** Group records over the current workspace transaction. @category constructors */
+/**
+ * Builds the group store for the binding's workspace: this module's driver inside
+ * `GroupStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Groups.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -200,5 +220,10 @@ export const make = Effect.fn("Groups.make")(function* () {
   return GroupStore.make(workspaceId, driver);
 });
 
-/** Provide group storage over the caller's binding. @category layers */
+/**
+ * Provides `GroupStore.GroupStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupStore.GroupStore, make());

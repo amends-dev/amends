@@ -1,3 +1,11 @@
+/**
+ * The operations on members an actor calls: reading one or the members it may read, choosing its
+ * own name, and removing a member. Adding a member is not among them: accepting an invitation or
+ * creating an agent does that, through `MemberCommand`. Each operation authorizes the actor
+ * itself, writes inside one journal commit, and reads outside any.
+ *
+ * @since 0.1.0
+ */
 import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -24,11 +32,54 @@ import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
 
 import { AlreadyRemoved, NotFound, OwnerProtected } from "./MemberErrors.ts";
-export { AlreadyRemoved, NotFound, OwnerProtected } from "./MemberErrors.ts";
+export {
+  /**
+   * The member to remove was removed already; nothing more is recorded.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  AlreadyRemoved,
+  /**
+   * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+  /**
+   * The member is the current owner, who cannot be removed; ownership must be transferred first.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  OwnerProtected,
+} from "./MemberErrors.ts";
 
+/**
+ * What reading members can fail with: the outcome in `MemberErrors`, and the failures of what a
+ * read depends on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error = Authorization.Error | MemberStore.Failure | Schema.SchemaError | NotFound;
 
+/**
+ * What renaming oneself can fail with: what a read can, and the failures of the commit.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RenameError = Error | Projection.Error | Log.WriteError | PlatformError.PlatformError;
+
+/**
+ * What removing a member can fail with: the outcomes in `MemberErrors`, the delegation rules, and
+ * the failures of the group departures, invitation revocations, and commit a removal includes.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RemoveError =
   | GroupCommand.RemoveError
   | Error
@@ -42,27 +93,34 @@ export type RemoveError =
   | OwnerProtected
   | AlreadyRemoved;
 
+/**
+ * The member operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class MemberService extends Context.Service<
   MemberService,
   {
     /**
-     * Read an active or removed membership after requiring member.read on it.
-     * Authorization and lookup read current state without opening a transaction.
-     * They use an existing commit when present. Only authorized callers can receive NotFound.
+     * Read an active or removed membership after requiring `member.read` on it. Authorization and
+     * lookup read current state without opening a transaction, and use an existing commit when
+     * there is one. Only authorized callers can receive `NotFound`.
      */
     readonly get: (memberId: Member.Id) => Effect.Effect<Member.Record, Error, Actor.Actor>;
     /**
-     * List the memberships the actor may read, active and removed. Active
-     * membership is required; each record is then included only when member.read
-     * covers it, so a workspace-scoped grant sees everyone and an exact grant sees
-     * that member. This does not open a transaction or promise a shared snapshot.
+     * List the memberships the actor may read, active and removed. Active membership is required;
+     * each record is then included only when `member.read` covers it, so a workspace-scoped grant
+     * sees everyone and an exact grant sees that member. One grant resolution decides them all.
+     * This does not open a transaction or promise a shared snapshot.
      */
     readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Error, Actor.Actor>;
     /**
-     * Require member.remove on an active target, protect current ownership, and
-     * publish its removal and revoke its human recipient's pending invitations in
-     * one commit, ending all of its active group admissions. Historical membership and grants remain;
-     * authorization rejects removed members. Rejoining requires a new member ID.
+     * Remove a member, under `member.remove` on them and the delegation rules: the current owner is
+     * `OwnerProtected`, and a member removed already is `AlreadyRemoved`. One commit publishes the
+     * removal, ends every active group admission of the membership, and, for a person, revokes
+     * their pending invitations. The record and its grants remain for history; authorization
+     * rejects the removed member, and rejoining needs a new invitation and member ID.
      */
     readonly remove: (
       memberId: Member.Id,
@@ -78,9 +136,10 @@ export class MemberService extends Context.Service<
 const decodeId = Schema.decodeEffect(Member.Id);
 
 /**
- * Construct member operations from workspace services; the caller supplies Actor.Actor per call.
+ * Construct member operations from workspace services; the caller supplies `Actor.Actor` per call.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Return<
   MemberService["Service"],
@@ -213,5 +272,6 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
  * Provide member operations over the caller's workspace services.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(MemberService, make());

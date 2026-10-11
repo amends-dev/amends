@@ -1,10 +1,22 @@
+/**
+ * Keeps the agent read model, `AgentStore`: each agent as it was created and since configured.
+ * Agents' names and departures are their memberships', which `MemberProjection` keeps.
+ *
+ * @since 0.1.0
+ */
 import { Effect, Option } from "effect";
 import * as Projection from "../journal/Projection.ts";
 import * as Agent from "./Agent.ts";
 import * as AgentFacts from "./AgentFacts.ts";
 import * as AgentStore from "./AgentStore.ts";
 
-/** Agents' records; their names and departures are their memberships'. */
+/**
+ * Inserts each created agent, and replaces the setup of each configured one. A configured agent
+ * that is not stored is a defect, since its creation was recorded before.
+ *
+ * @category projections
+ * @since 0.1.0
+ */
 export const definition = Projection.make("agents", { version: 1 })
   .on(
     AgentFacts.Created,

@@ -7,7 +7,9 @@
  * What a run does with each part the agent streams is one decision, `advance`: from the run's
  * `Progress` so far and the part, the progress after it, the entries to append to the log, and the
  * drafts to show. The run's loop performs it, part by part, and keeps the latest progress for the
- * turn's end to read.
+ * turn's end to read. `TurnJob`'s worker makes a runner for each job with `make`.
+ *
+ * @since 0.1.0
  */
 import {
   SessionLog,
@@ -36,7 +38,13 @@ import * as TurnWorkspace from "./TurnWorkspace.ts";
 /** The least time between two drafts of a step's text, in milliseconds. */
 const draftInterval = 100;
 
-/** How a run of a turn came out. */
+/**
+ * How a run of a turn came out, which decides how the turn ends: closed with its answer, failed, or
+ * confirmed stopped.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Outcome = Data.TaggedEnum<{
   /** The agent finished the turn, whose answer is the text of its last step. */
   Answered: {};
@@ -45,11 +53,22 @@ export type Outcome = Data.TaggedEnum<{
   /** The turn was asked to stop, and was. */
   Stopped: {};
 }>;
+
+/**
+ * Makes and matches `Outcome`s: `Outcome.Answered()`, `Outcome.Failed({ reason })`,
+ * `Outcome.Stopped()`, and `Outcome.$match`.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const Outcome = Data.taggedEnum<Outcome>();
 
 /**
  * A run of the job failed before its turn ended; the turn it ran, if it accepted one, is still
  * active.
+ *
+ * @category errors
+ * @since 0.1.0
  */
 export class RunFailed extends Data.TaggedError("TurnRunner.RunFailed")<{
   readonly turnId: Turn.Id | undefined;
@@ -58,7 +77,10 @@ export class RunFailed extends Data.TaggedError("TurnRunner.RunFailed")<{
 
 /**
  * The drafts of the response `responseId`: the text each text part of `step` has past what
- * `shown` holds, by the part's position.
+ * `shown` holds, by the part's position. `advance` shows them as the step grows.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const newDrafts = (
   responseId: string,
@@ -90,6 +112,9 @@ const savedOf = (state: Session.SessionState): SessionStateStore.Resume =>
 /**
  * What a run of a turn is, as its parts are recorded: whose turn, on which agent, where its opening
  * sits in the log, and whether it continues the turn.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Run {
   readonly turnId: Turn.Id;
@@ -101,7 +126,12 @@ export interface Run {
   readonly continues: boolean;
 }
 
-/** What a run of a turn has recorded of the agent's parts so far, which the turn's end reads. */
+/**
+ * What a run of a turn has recorded of the agent's parts so far, which the turn's end reads.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Progress {
   /** Whether the log notes that this run started the turn from its prompt. */
   readonly started: boolean;
@@ -117,7 +147,12 @@ export interface Progress {
   readonly reported: unknown;
 }
 
-/** The progress of a run that has recorded nothing yet. */
+/**
+ * The progress of a run that has recorded nothing yet.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const initialProgress: Progress = {
   started: false,
   stepParts: [],
@@ -130,6 +165,9 @@ export const initialProgress: Progress = {
 /**
  * What a run does with a part the agent streamed: its progress after it, what it appends to the
  * log, and what it shows readers.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Advance {
   readonly progress: Progress;
@@ -148,6 +186,9 @@ const stepId = (openedAt: number, index: number) => `${openedAt}.${index}`;
  * up, with the id its drafts carried, and the step after starts from nothing shown. Any other part
  * joins the step being written, whose text is shown as drafts when it ends, and at most every
  * `draftInterval` milliseconds as it grows; an error the agent reports fails the turn.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const advance = (
   run: Run,
@@ -205,7 +246,15 @@ export const advance = (
   }
 };
 
-/** @category constructors */
+/**
+ * Makes the turn runner of `job`, which `TurnJob`'s worker holds for the job's entity:
+ * `runNextTurn` runs the agent's next turn, after any run in progress, `stopTurn` stops a turn
+ * where it runs, and `giveUp` fails a turn the job could not run. It calls the workspace through
+ * `TurnWorkspace`, over `Gateway.Gateway` and the host's `Integrations`.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
   const runs = yield* Semaphore.make(1);
   /** The turn a run holds, and how to ask it to stop. */
@@ -384,4 +433,10 @@ const releaseSession = (started: TurnAgent.Started | undefined) => {
   );
 };
 
+/**
+ * What `make` returns: `runNextTurn`, `stopTurn`, and `giveUp`.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type TurnRunner = Effect.Success<ReturnType<typeof make>>;

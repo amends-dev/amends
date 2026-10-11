@@ -1,3 +1,11 @@
+/**
+ * Request keys, which let a client retry a creating operation safely: a key names one logical
+ * request, the record the request creates takes an ID derived from the key, and a retry finds that
+ * record and returns it instead of creating another. Every creating operation takes `Options` and
+ * derives its record's ID with `idFor`.
+ *
+ * @since 0.1.0
+ */
 import { Crypto, Effect, Result, Schema } from "effect";
 import { Hex } from "effect/encoding";
 
@@ -5,13 +13,25 @@ import { Hex } from "effect/encoding";
  * A key the client chooses once for one logical request, such as a UUID, and repeats on every
  * retry of that request. A member's keys are independent of other members', and each creating
  * operation has its own.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Key = Schema.NonEmptyString.check(Schema.isTrimmed(), Schema.isMaxLength(200)).pipe(
   Schema.brand("RequestKey"),
 );
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Key = typeof Key.Type;
 
-/** What a creating operation accepts besides its input. */
+/**
+ * What a creating operation accepts besides its input.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** Without a key, every call creates anew; with one, a retry returns the first call's result. */
   readonly requestKey?: Key | undefined;
@@ -24,6 +44,9 @@ const utf8 = (text: string) => Result.getOrThrow(Hex.decode(Hex.encode(text)));
  * The ID a keyed request gives the record it creates, derived from parts naming the operation,
  * who asked, and the key: a retry names the same record, so finding it answers the retry, and
  * nobody without the key can predict it. Formatted as a UUID (version 8).
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<string>) {
   const crypto = yield* Crypto.Crypto;
@@ -44,6 +67,9 @@ export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<strin
  * The ID a creating request gives its record: new each time without a key, or derived from the
  * parts naming the operation and requester and from the key, so a retry names the record its first
  * attempt created and returns it.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const idFor = Effect.fnUntraced(function* (
   key: Key | undefined,

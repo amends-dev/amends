@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `Checkpoint` from `../journal/Checkpoint.ts`, over the workspace's
+ * `Binding`: each projection version's progress through one log while it is rebuilt, and the
+ * versions live on each log, kept as one row per log. Both are written in the caller's
+ * transaction, with the projection's rows, so progress and rows commit together. Its failures are
+ * the journal's `Store.Failure`. `Checkpoint.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Checkpoint, Store } from "../journal/index.ts";
 import { Effect, Layer, Schema, Option } from "effect";
 import * as Binding from "./Binding.ts";
@@ -15,6 +24,7 @@ const idOf = (key: Checkpoint.Key) => keyOf(key.logId, key.name, key.version);
  * projection's rows, and the versions that are live.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Checkpoints.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
@@ -55,8 +65,9 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
 });
 
 /**
- * Provide Checkpoint.Checkpoint using its constructor and the caller's dependencies.
+ * Provide checkpoint storage over the caller's binding.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(Checkpoint.Checkpoint, make());

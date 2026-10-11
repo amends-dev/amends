@@ -4,7 +4,10 @@
  * through the workspace, and for each, in order, readies it, posts it through the channel's
  * transport, built from the connection's integration with its key, and records how the post went.
  * A system that cannot be reached now fails the run, for the job to try again; one that refuses
- * the message, or the connection, fails the delivery there and then.
+ * the message, or the connection, fails the delivery there and then. `DeliveryJob`'s worker makes a
+ * runner for each job with `make`.
+ *
+ * @since 0.1.0
  */
 import { Integrations } from "@amends-dev/connection";
 import type { Delivery, DeliveryJobs } from "@amends-dev/core/channel";
@@ -12,7 +15,13 @@ import { DeliveryExecution } from "@amends-dev/core/channel";
 import { Gateway } from "@amends-dev/gateway";
 import { Data, Effect, Predicate, Ref, Result } from "effect";
 
-/** A run of the job failed before it had posted every delivery; `deliveryId` names the one it was on. */
+/**
+ * A run of the job failed before it had posted every delivery; `deliveryId` names the one it was
+ * on, which the job gives up once it stops trying.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class RunFailed extends Data.TaggedError("DeliveryRunner.RunFailed")<{
   readonly deliveryId: Delivery.Id | undefined;
   readonly cause: unknown;
@@ -32,7 +41,15 @@ const isRetryable = (error: unknown) =>
   Predicate.hasProperty(error, "isRetryable") &&
   error.isRetryable === true;
 
-/** @category constructors */
+/**
+ * Makes the delivery runner of `job`, over `Gateway.Gateway` and the host's `Integrations`, which
+ * `DeliveryJob`'s worker holds for the job's entity: `deliver` posts what the thread's contacts
+ * were told, and `giveUp` fails the delivery the job could not post. It counts the tries it made of
+ * each delivery, which the delivery records.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
   const gateway = yield* Gateway.Gateway;
   const integrations = yield* Integrations.Integrations;
@@ -130,4 +147,10 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
   };
 });
 
+/**
+ * What `make` returns: `deliver` and `giveUp`.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type DeliveryRunner = Effect.Success<ReturnType<typeof make>>;

@@ -38,7 +38,32 @@ import type * as ChannelStore from "./ChannelStore.ts";
 import * as Contact from "./Contact.ts";
 import * as ContactStore from "./ContactStore.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
-export { NotFound, Rejected, Unavailable } from "./ChannelErrors.ts";
+export {
+  /**
+   * The channel is missing or removed, or the actor may not read it; the three are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+  /**
+   * The channel's transport rejected what the host received: it is not the external system's, or
+   * its signature does not hold. Nothing was taken in.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Rejected,
+  /**
+   * The channel cannot be reached now: its connection was removed or has no key, its integration is
+   * not installed or gives no channels, or the external system could not answer. The system may send
+   * again.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Unavailable,
+} from "./ChannelErrors.ts";
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or

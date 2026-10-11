@@ -1,3 +1,14 @@
+/**
+ * The PostgreSQL driver for `WorkspaceStore.WorkspaceStore`, over the `workspaces` table: one row
+ * per workspace, keyed by its ID, with its name, creator, and owner. `WorkspaceStore.make` checks
+ * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
+ * key refuses creating the workspace twice as the store's `Conflict`, and renaming and transferring
+ * ownership are conditional updates that conflict unless the row still holds the previous name or
+ * owner. Every statement is scoped to the binding's workspace and runs under its `guard`, which
+ * lets a read join the caller's transaction and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Workspace, WorkspaceStore } from "@amends-dev/core/workspace";
 import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
@@ -15,9 +26,11 @@ const recordColumns = {
 const decode = Schema.decodeUnknownEffect(Schema.Array(Workspace.Record));
 
 /**
- * Workspace metadata, with ownership changes guarded by the previous owner.
+ * Builds the workspace store for the binding's workspace: this module's driver inside
+ * `WorkspaceStore.make`, which checks every input first.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Workspaces.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -75,8 +88,9 @@ export const make = Effect.fn("Workspaces.make")(function* () {
 });
 
 /**
- * Provide WorkspaceStore.WorkspaceStore using its constructor and the caller's dependencies.
+ * Provides `WorkspaceStore.WorkspaceStore` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(WorkspaceStore.WorkspaceStore, make());

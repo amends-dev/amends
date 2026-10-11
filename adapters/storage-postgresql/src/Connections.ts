@@ -1,3 +1,14 @@
+/**
+ * The PostgreSQL driver for `ConnectionStore.ConnectionStore`, over the `connections` table: one
+ * row per connection, removed ones included, with the settings its integration declares as JSON.
+ * Its credential is kept apart, by `ConnectionCredentials`. `ConnectionStore.make` checks every
+ * input before the driver sees it, so the driver keeps only what storage keeps: the primary key
+ * refuses a reused ID as the store's `Conflict`, and an update that finds no row conflicts. Every
+ * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read
+ * join the caller's transaction and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Connection, ConnectionStore } from "@amends-dev/core/connection";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -22,7 +33,13 @@ const toRow = (record: Connection.Record): typeof connections.$inferInsert => ({
   createdAt: DateTime.toDate(record.createdAt),
 });
 
-/** Connection records in the workspace's database. @category constructors */
+/**
+ * Builds the connection store for the binding's workspace: this module's driver inside
+ * `ConnectionStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("Connections.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -71,5 +88,10 @@ export const make = Effect.fn("Connections.make")(function* () {
   return ConnectionStore.make(workspaceId, driver);
 });
 
-/** Provide connection storage over the caller's binding. @category layers */
+/**
+ * Provides `ConnectionStore.ConnectionStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ConnectionStore.ConnectionStore, make());

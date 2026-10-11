@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `SessionStateStore.SessionStateStore`, over the `session_states`
+ * table: each participation's harness session as its last turn left it, with what it ran on as
+ * columns and what the agent returned of its own as JSON. The table lies outside the read models,
+ * so rebuilds keep it. `SessionStateStore.make` checks every input before the driver sees it, so
+ * the driver keeps only what storage keeps: `set` replaces a participation's session in one upsert,
+ * joining the commit that ends the turn. Every statement is scoped to the binding's workspace and
+ * runs under its `guard`, which lets a read join the caller's transaction and requires one for a
+ * write.
+ *
+ * @since 0.1.0
+ */
 import { SessionStateStore } from "@amends-dev/core/turn";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
@@ -37,6 +49,7 @@ const agentStateColumn = (agentState: Schema.Json | undefined) =>
  * ends the turn.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("SessionStates.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -88,5 +101,10 @@ export const make = Effect.fn("SessionStates.make")(function* () {
   return SessionStateStore.make(driver);
 });
 
-/** Provide session storage over the caller's binding. @category layers */
+/**
+ * Provides `SessionStateStore.SessionStateStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(SessionStateStore.SessionStateStore, make());

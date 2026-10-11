@@ -1,3 +1,13 @@
+/**
+ * The `assignments` endpoint group: the roles that give a member permissions, and what the caller
+ * may do. Its endpoints call `AssignmentService`: `permissions`, `roles`, `list`, `assign`,
+ * `change`, and `revoke`. Any active member reads their own permissions and the built-in roles to
+ * choose from; reading another member's access needs `assignment.read` on them, and giving,
+ * replacing, or taking away a role follows the delegation rules. `AssignmentsHandlers` in
+ * `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Assignment, Permission } from "@amends-dev/core/authorization";
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
@@ -9,6 +19,14 @@ const params = { workspaceId: Workspace.Id };
 const member = { ...params, memberId: Member.Id };
 const error = [...ApiErrors.member, ...ApiErrors.assignment];
 
+/**
+ * A member's access: the caller's own workspace-wide permissions, the built-in roles to choose
+ * from, one member's assignments, and adding a role, replacing the workspace roles as a whole
+ * against the assignments expected, and revoking one.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export class AssignmentsGroup extends HttpApiGroup.make("assignments")
   .add(
     HttpApiEndpoint.get("permissions", "/permissions", {

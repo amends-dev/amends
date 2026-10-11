@@ -1,3 +1,12 @@
+/**
+ * The operations on agents an actor calls: listing and reading the agents they may read, as
+ * `Agent.View`, and creating, configuring, and renaming them. An agent is a member, so creating
+ * one adds its membership through `MemberCommand`, and its role is changed, and it is removed, by
+ * members' and assignments' operations. Each operation authorizes the actor itself, writes inside
+ * one journal commit, and reads outside any; the outcomes it reports are `AgentErrors`.
+ *
+ * @since 0.1.0
+ */
 import { Integrations } from "@amends-dev/connection";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
@@ -27,33 +36,112 @@ import * as AgentFacts from "./AgentFacts.ts";
 import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
-export { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./AgentErrors.ts";
+export {
+  /**
+   * The agent's name is no longer the one expected: someone renamed it meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Changed,
+  /**
+   * The connection named for a part of the agent's setup is missing or removed, or the actor may not
+   * read and use it, which they cannot tell apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  ConnectionUnavailable,
+  /**
+   * The agent cannot run as it would be set up, for the issues its readiness would report.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Incomplete,
+  /**
+   * Missing agents, agents whose membership ended, and agents the actor may not read share this.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+} from "./AgentErrors.ts";
 
+/**
+ * What listing agents can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ListError =
   | Authorization.Error
   | AgentStore.Failure
   | MemberStore.Failure
   | ConnectionStore.Failure;
-/** Reading one agent, which can be missing. */
+
+/**
+ * What reading one agent can fail with: listing's failures, a malformed ID, and a missing agent.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError = ListError | Schema.SchemaError | NotFound;
-/** What every change can meet besides reading. */
+
+/**
+ * What every change can fail with: what reading meets, and what writing its commit meets.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
-/** A setup naming a connection the actor may not give an agent, or one that cannot run. */
+
+/**
+ * A setup naming a connection the actor may not give an agent, or one that cannot run.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type SetupError = ConnectionUnavailable | Incomplete;
-/** Creating also adds a membership, with a role the actor must be able to grant. */
+
+/**
+ * What creating can fail with. Creating also adds a membership, with a role the actor must be
+ * able to grant.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type CreateError = Error | SetupError | Delegation.Error | MemberCommand.Error;
+
+/**
+ * What configuring can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ConfigureError = Error | SetupError;
+
+/**
+ * What renaming can fail with: a rename made meanwhile, besides what every change meets.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type RenameError = Error | Changed;
 
 /**
- * The workspace's agents. An agent is a member, so its role is changed, and it is removed, as any
- * member's is, by members' and assignments' operations.
+ * The agent operations an actor calls. An agent is a member, so its role is changed, and it is
+ * removed, as any member's is, by members' and assignments' operations.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class AgentService extends Context.Service<
   AgentService,
   {
     /** The workspace's agents the actor may read, by name; those whose membership ended are gone. */
     readonly list: Effect.Effect<ReadonlyArray<Agent.View>, ListError, Actor.Actor>;
+    /** The agent by ID, as the actor sees it; one they may not read is missing. */
     readonly get: (agentId: Agent.Id) => Effect.Effect<Agent.View, ReadError, Actor.Actor>;
     /**
      * Add an agent: a membership, with its name and the role it starts with, which the actor must be
@@ -76,7 +164,12 @@ export class AgentService extends Context.Service<
   }
 >()("@amends-dev/core/agent/service/Service") {}
 
-/** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
+/**
+ * Capture workspace dependencies; resolve authority inside each operation.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("AgentService.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const delegation = yield* Delegation.Delegation;
@@ -312,5 +405,11 @@ export const make = Effect.fn("AgentService.make")(function* () {
   return AgentService.of({ list, get, create, configure, rename });
 });
 
-/** @category layers */
+/**
+ * Provide the agent operations over the stores, the member command, the host's integrations, the
+ * journal, authorization, and delegation.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(AgentService, make());

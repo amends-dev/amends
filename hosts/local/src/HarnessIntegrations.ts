@@ -3,7 +3,10 @@
  * which runs in this process, and opencode, which works in a sandbox behind its bridge, in an
  * integration for each of its versions. A connection to any of them gives no settings and no
  * credential, and reaches nothing, so it is always healthy. Its harness runs the agent on the
- * endpoints it is given, which connections to model providers give.
+ * endpoints it is given, which connections to model providers give. `LocalHost.makeIntegrations`
+ * installs them.
+ *
+ * @since 0.1.0
  */
 import { Connection, Integration } from "@amends-dev/connection";
 import { type Agent, Harness } from "@amends-dev/harness";
@@ -19,6 +22,9 @@ const healthy = () => Effect.succeed<Connection.Health>({ status: "healthy" });
  * The integration of amends's agent, for the host to install with what the agent takes besides
  * its models: the most steps a turn takes, and how long a command runs. The agent makes its models
  * with the `Models.LanguageModels` the integration is made with.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const amends = Effect.fn("HarnessIntegrations.amends")(function* (
   options: Omit<AmendsAgent.Options, keyof Agent.Options> = {},
@@ -40,7 +46,12 @@ export const amends = Effect.fn("HarnessIntegrations.amends")(function* (
   });
 });
 
-/** What the host installs opencode's agents with besides their models. */
+/**
+ * What the host installs opencode's agents with besides their models.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export type OpencodeOptions = Omit<OpencodeAgent.Options, keyof Agent.Options>;
 
 /**
@@ -49,6 +60,9 @@ export type OpencodeOptions = Omit<OpencodeAgent.Options, keyof Agent.Options>;
  * opencode's `config` and `env`. Endpoints that opencode cannot serve together are refused with
  * `UnsupportedError`. Its id is `opencode-agent`, as `opencode` is the id of OpenCode Zen, a
  * provider of models in the catalog.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const opencode = (options: OpencodeOptions) =>
   makeOpencodeIntegration(options, {
@@ -62,6 +76,9 @@ export const opencode = (options: OpencodeOptions) =>
  * The integration of opencode 2, as `opencode` gives that of opencode 1, with the id
  * `opencode2-agent`. Its agent records a session started on another agent as opencode's own, but
  * refuses an answer in JSON.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const opencode2 = (options: OpencodeOptions) =>
   makeOpencodeIntegration(options, {

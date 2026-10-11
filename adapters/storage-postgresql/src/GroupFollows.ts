@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `GroupFollowStore.GroupFollowStore`, over the `group_follows` table:
+ * each follow, active or ended, with the group admission it belongs to. `GroupFollowStore.make`
+ * checks every input before the driver sees it, so the driver keeps only what storage keeps: the
+ * primary key refuses a reused ID and `active_group_follow` a second active follow for one
+ * admission, each as the store's `Conflict`, and ending a follow is a conditional update that
+ * conflicts unless it finds exactly the addressed follow active. Every statement is scoped to the
+ * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
+ * and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { GroupFollow, GroupFollowStore } from "@amends-dev/core/group";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -16,7 +28,13 @@ const decode = Schema.decodeUnknownEffect(
   ),
 );
 
-/** Group follows, active and ended; one active follow per group admission. @category constructors */
+/**
+ * Builds the group follow store for the binding's workspace: this module's driver inside
+ * `GroupFollowStore.make`, which checks every input first.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("GroupFollows.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
@@ -124,5 +142,10 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
   return GroupFollowStore.make(workspaceId, driver);
 });
 
-/** Provide group follow storage over the caller's binding. @category layers */
+/**
+ * Provides `GroupFollowStore.GroupFollowStore` over the caller's `Binding.Binding`.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make());

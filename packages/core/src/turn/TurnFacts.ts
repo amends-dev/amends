@@ -1,3 +1,12 @@
+/**
+ * The facts recorded about turns: a turn's creation or retry, its start, a request that it stop,
+ * and how it ended. `TurnProjection` folds them into `TurnStore`, and `TurnJobs` reacts to those
+ * that change an agent's work. Every fact names the turn's thread and group, whose members may
+ * learn of it, and its agent's membership. The facts that end a turn are published only through
+ * `TurnCommand.endTurn`, in the commit that records `turn.ended` in the thread's timeline.
+ *
+ * @since 0.1.0
+ */
 import { Schema } from "effect";
 import * as Agent from "../agent/Agent.ts";
 import * as Group from "../group/Group.ts";
@@ -23,7 +32,13 @@ const Where = {
 const audience = (payload: { readonly groupId: GroupId.Id }) => [Group.audienceOf(payload.groupId)];
 const subject = (payload: { readonly turnId: Turn.Id }) => Subject.make("turn", payload.turnId);
 
-/** An agent accepted work into a new turn, settling the notifications that asked for it. */
+/**
+ * An agent accepted work into a new turn, settling the notifications that asked for it. The
+ * payload is the turn's record with the notifications it settled.
+ *
+ * @category facts
+ * @since 0.1.0
+ */
 export const Created = Fact.make("turn.created", {
   version: 1,
   audience,
@@ -38,6 +53,9 @@ export const Created = Fact.make("turn.created", {
 /**
  * Someone asked a failed or stopped turn to run again: a new turn for the same agent and input,
  * on what the agent is set up with now, continuing the session the turn it retries left.
+ *
+ * @category facts
+ * @since 0.1.0
  */
 export const Retried = Fact.make("turn.retried", {
   version: 1,
@@ -47,7 +65,12 @@ export const Retried = Fact.make("turn.retried", {
   payload: Schema.Struct(Turn.Record.fields),
 });
 
-/** The turn's job started it, with the harness, model, and sandbox it runs on. */
+/**
+ * The turn's job started it, with the harness, model, and sandbox it runs on.
+ *
+ * @category facts
+ * @since 0.1.0
+ */
 export const Started = Fact.make("turn.started", {
   version: 1,
   audience,
@@ -61,7 +84,13 @@ export const Started = Fact.make("turn.started", {
   }),
 });
 
-/** Someone asked the turn to stop, or its agent stopped taking part; stopping is confirmed later. */
+/**
+ * Someone asked the turn to stop, or its agent stopped taking part; stopping is confirmed later,
+ * by `Cancelled`, except for a queued turn, which `TurnCommand.requestStop` ends at once.
+ *
+ * @category facts
+ * @since 0.1.0
+ */
 export const CancelRequested = Fact.make("turn.cancel-requested", {
   version: 1,
   audience,
@@ -75,7 +104,12 @@ export const CancelRequested = Fact.make("turn.cancel-requested", {
   }),
 });
 
-/** The turn finished its work, with the reply it posted, if it had one. */
+/**
+ * The turn finished its work, with the reply it posted, if it had one.
+ *
+ * @category facts
+ * @since 0.1.0
+ */
 export const Completed = Fact.make("turn.completed", {
   version: 1,
   audience,
@@ -89,7 +123,12 @@ export const Completed = Fact.make("turn.completed", {
   }),
 });
 
-/** The turn could not continue, for the reason recorded. */
+/**
+ * The turn could not continue, for the reason recorded.
+ *
+ * @category facts
+ * @since 0.1.0
+ */
 export const Failed = Fact.make("turn.failed", {
   version: 1,
   audience,
@@ -106,6 +145,9 @@ export const Failed = Fact.make("turn.failed", {
 /**
  * The turn stopped, as it was asked to or because its agent no longer takes part where it worked;
  * its accepted input stays for a later turn.
+ *
+ * @category facts
+ * @since 0.1.0
  */
 export const Cancelled = Fact.make("turn.cancelled", {
   version: 1,

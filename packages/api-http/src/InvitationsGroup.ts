@@ -1,3 +1,14 @@
+/**
+ * The `invitations` endpoint group: inviting people into a workspace by address. Its endpoints call
+ * `InvitationService`: `list`, `issue`, `accept`, and `revoke`. Listing, issuing, and revoking need
+ * active membership and `invitation.manage`, and the role an invitation gives follows the
+ * delegation rules; issuing resolves the address to its account first, creating one the first
+ * time. Accepting is for the recipient, a person not yet a member, so it enters the workspace
+ * without an actor and answers `ApiErrors.WorkspaceNotFound` for a workspace never created.
+ * `InvitationsHandlers` in `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import * as Accounts from "@amends-dev/gateway/Accounts";
 import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
@@ -15,7 +26,12 @@ const IssueInput = Schema.Struct({
   expiresAt: Invitation.IssueInput.fields.expiresAt,
 }).annotate({ identifier: "WorkspaceInvitationIssueInput" });
 
-/** Invitation issuance, acceptance, and revocation within one workspace. */
+/**
+ * Invitation listing, issuance, acceptance, and revocation within one workspace.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export class InvitationsGroup extends HttpApiGroup.make("invitations")
   .add(
     HttpApiEndpoint.get("list", "/", {

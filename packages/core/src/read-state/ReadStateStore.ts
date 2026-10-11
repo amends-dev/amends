@@ -1,3 +1,11 @@
+/**
+ * The storage contract for read state, which every storage adapter implements: each person's read
+ * positions in threads and the times they last read groups, kept outside the journal.
+ * `ReadStateCommand` and `ReadStateService` advance it, and `ThreadQuery` and `GroupService` read
+ * it to show what is unread.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Schema } from "effect";
 
 import * as GroupId from "../group/GroupId.ts";
@@ -8,10 +16,23 @@ import * as ReadState from "./ReadState.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
+/**
+ * Storage failed while reading or writing read state.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Failure extends Schema.TaggedError<Failure>()("ReadStateStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
+/**
+ * A write disagreed with what is stored: a malformed record, or one for another workspace.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class Conflict extends Schema.TaggedError<Conflict>()("ReadStateStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
@@ -28,6 +49,9 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ReadStateStore.Con
  * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class ReadStateStore extends Context.Service<
   ReadStateStore,
@@ -37,6 +61,7 @@ export class ReadStateStore extends Context.Service<
       memberId: MemberId.Id,
       threadIds: ReadonlyArray<ThreadId.Id>,
     ) => Effect.Effect<ReadonlyArray<ReadState.ThreadPosition>, Failure>;
+    /** Advance a member's read position in a thread; one at or before the stored one is kept. */
     readonly advanceThread: (
       position: ReadState.ThreadPosition,
     ) => Effect.Effect<void, Failure | Conflict>;
@@ -45,9 +70,11 @@ export class ReadStateStore extends Context.Service<
       memberId: MemberId.Id,
       groupIds: ReadonlyArray<GroupId.Id>,
     ) => Effect.Effect<ReadonlyArray<ReadState.GroupRead>, Failure>;
+    /** Advance when a member last read a group; a time at or before the stored one is kept. */
     readonly advanceGroup: (read: ReadState.GroupRead) => Effect.Effect<void, Failure | Conflict>;
   }
 >()("@amends-dev/core/read-state/store/Service") {}
+
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
  * workspace, before the driver sees it.

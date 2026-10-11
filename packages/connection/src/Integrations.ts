@@ -2,14 +2,24 @@
  * The integrations a host installs, among which a connection finds its own by the id it names: the
  * built-in ones it chooses, such as those of `ModelIntegrations` and `ToolIntegrations`, and those
  * it declares itself, such as of the sandbox providers it runs.
+ *
+ * @since 0.1.0
  */
 import { Context, Effect } from "effect";
 import { ConnectionError, NotFoundError } from "./Connection.ts";
 import type { Integration } from "./Integration.ts";
 
+/**
+ * The service through which a connection finds its integration among those the host installs.
+ * The host provides it from `make`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Integrations extends Context.Service<
   Integrations,
   {
+    /** Every installed integration, in the order the host gave them. */
     readonly all: ReadonlyArray<Integration>;
 
     /** The integration of the id `id`, failing with `NotFoundError` for one the host has not. */
@@ -17,7 +27,13 @@ export class Integrations extends Context.Service<
   }
 >()("@amends-dev/connection/Integrations") {}
 
-/** The installed integrations `integrations`, whose ids must be distinct. */
+/**
+ * The installed integrations `integrations`, whose ids must be distinct. It dies when two share an
+ * id.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = (integrations: ReadonlyArray<Integration>) => {
   const byId = new Map(integrations.map((integration) => [integration.id, integration]));
   if (byId.size !== integrations.length) {

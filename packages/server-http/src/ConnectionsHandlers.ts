@@ -1,3 +1,11 @@
+/**
+ * Implements `ConnectionsGroup`. Each handler enters the workspace as the principal's membership
+ * through `Gateway.asMember` and calls one `ConnectionService` operation, merging the path's
+ * connection ID, the body, and the `Idempotency-Key` header into its input. `Routes` composes its
+ * `layer` with the other groups'.
+ *
+ * @since 0.1.0
+ */
 import { Api, Principal } from "@amends-dev/api-http";
 import { ConnectionService } from "@amends-dev/core/connection";
 import type { Actor } from "@amends-dev/core/identity";
@@ -11,6 +19,7 @@ import { HttpApiBuilder } from "effect/http-api";
  * request.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = HttpApiBuilder.group(
   Api,

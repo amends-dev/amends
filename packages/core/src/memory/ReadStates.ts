@@ -1,3 +1,14 @@
+/**
+ * The memory implementation of `ReadStateStore` from `../read-state/ReadStateStore.ts`, over the
+ * workspace's `Binding`: each member's private read state, the sequence read through in each
+ * thread and when they last read each group, kept beside the projected records so rebuilding
+ * projections keeps it. A write keeps the later of the stored and given value; it joins the
+ * caller's transaction when there is one and otherwise applies at once, and a commit keeps the
+ * later of its own and the committed values. `ReadStateStore.make` checks every input before this
+ * driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { ReadStateStore } from "../read-state/index.ts";
 import { DateTime, Effect, Layer } from "effect";
 import * as Binding from "./Binding.ts";
@@ -13,6 +24,7 @@ const advance = (values: Map<string, number>, key: string, value: number) =>
  * transaction when there is one and otherwise apply at once.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("ReadStates.make")(function* () {
   const { workspaceId, read, join } = yield* Binding.Binding;
@@ -63,5 +75,10 @@ export const make = Effect.fn("ReadStates.make")(function* () {
   return ReadStateStore.make(workspaceId, driver);
 });
 
-/** Provide read-state storage over the caller's binding. @category layers */
+/**
+ * Provide read-state storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(ReadStateStore.ReadStateStore, make());

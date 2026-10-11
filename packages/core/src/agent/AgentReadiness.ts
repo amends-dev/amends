@@ -2,6 +2,10 @@
  * Whether an agent can run as it is set up: what keeps each connection it names from giving it its
  * part, as the integrations its host installs now find them, and which harnesses `Auto` has to
  * choose from. It reads and runs nothing: callers give it the workspace's connections.
+ * `AgentService` reports it in each view and refuses a setup that cannot run, and `AgentQuery`
+ * selects a turn's harness by it and fails when the agent cannot run.
+ *
+ * @since 0.1.0
  */
 import type {
   Connection as ConnectionContract,
@@ -12,13 +16,29 @@ import { Array, DateTime, Effect, Option, Order } from "effect";
 import * as Connection from "../connection/Connection.ts";
 import type * as Agent from "./Agent.ts";
 
-/** How an agent is set up, as far as whether it can run depends on it. */
+/**
+ * How an agent is set up, as far as whether it can run depends on it: a record's harness, model,
+ * and sandbox, or a configuration's.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Setup = Pick<Agent.Record, "harness" | "model" | "sandbox">;
 
-/** The workspace's connections that are not removed, which a setup names by id. */
+/**
+ * The workspace's connections that are not removed, which a setup names by id.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Connections = ReadonlyArray<Connection.Record>;
 
-/** A connection a setup names, by the part it gives. */
+/**
+ * A connection a setup names, by the part it gives.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Named {
   readonly part: Agent.Part;
   readonly connectionId: Connection.Id;
@@ -27,6 +47,9 @@ export interface Named {
 /**
  * The connections `setup` names, by the part each gives, in order: its harness, when it names one
  * rather than `Auto`; its model; and its sandbox, when it has one.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const namedConnections = (setup: Setup): ReadonlyArray<Named> => {
   const named: Array<Named> = [];
@@ -42,6 +65,9 @@ export const namedConnections = (setup: Setup): ReadonlyArray<Named> => {
  * What keeps `setup` from running over `connections`, as `integrations` find them: on `Auto`,
  * that no connection gives a harness it can run on, and then what keeps each connection it names
  * from giving its part, for its harness, then its model, then its sandbox.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const issuesOf = Effect.fnUntraced(function* (
   setup: Setup,
@@ -57,13 +83,21 @@ export const issuesOf = Effect.fnUntraced(function* (
   return choices.length === 0 ? [{ _tag: "NoHarness" }, ...issues] : issues;
 });
 
-/** Ready when nothing keeps an agent from running, and otherwise incomplete for `issues`. */
+/**
+ * Ready when nothing keeps an agent from running, and otherwise incomplete for `issues`.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const readinessOf = (issues: ReadonlyArray<Agent.Issue>): Agent.Readiness =>
   Array.isReadonlyArrayNonEmpty(issues) ? { _tag: "Incomplete", issues } : { _tag: "Ready" };
 
 /**
  * What a connection is to an agent's setup: removed, of an integration its host no longer
  * installs, or installed.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export type Resolved =
   | { readonly _tag: "Removed" }
@@ -74,7 +108,12 @@ export type Resolved =
       readonly integration: Integration.Integration;
     };
 
-/** The connection `connectionId` among `connections`, with its integration when one is installed. */
+/**
+ * The connection `connectionId` among `connections`, with its integration when one is installed.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const resolveConnection = Effect.fnUntraced(function* (
   connectionId: Connection.Id,
   connections: Connections,
@@ -156,6 +195,9 @@ const oldestFirst: Order.Order<Connection.Record> = Order.combine(
 /**
  * The connections whose harness an agent on `Auto`, set up as `setup`, can run on, oldest first:
  * those that would give it its harness with no issue.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const harnessesToChoose = Effect.fnUntraced(function* (
   setup: Setup,
@@ -175,6 +217,9 @@ export const harnessesToChoose = Effect.fnUntraced(function* (
  * The harness an agent on `Auto` runs on, of the connections `harnessesToChoose` gives: the one
  * its last turn in a conversation ran on, `previous`, while it is still among them, so that the
  * conversation stays with one harness, and otherwise the first.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const chooseHarness = (
   harnesses: ReadonlyArray<Connection.Id>,

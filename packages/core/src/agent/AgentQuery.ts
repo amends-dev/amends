@@ -1,3 +1,13 @@
+/**
+ * The reads of agents that turns share: what a turn runs on, and the agent ready to run on it.
+ * `TurnExecution` calls it when a turn starts or runs again, as no actor, so it checks no
+ * permission: who may direct an agent was checked when its work was asked for. It reads
+ * `AgentStore`, `MemberStore`, `ConnectionStore`, and `ConnectionCredentialStore`, and finds each
+ * connection's integration among those the host installs. Whoever runs the agent builds its
+ * harness and sandbox from what `buildRunnable` gives, so core runs nothing of an agent.
+ *
+ * @since 0.1.0
+ */
 import { Integrations } from "@amends-dev/connection";
 import { Array, Context, Effect, Layer, Option, Schema } from "effect";
 import * as Connection from "../connection/Connection.ts";
@@ -11,21 +21,48 @@ import { Incomplete } from "./AgentErrors.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
 
-/** The member is not one of the workspace's agents: it is a person, or its membership ended. */
+/**
+ * The member is not one of the workspace's agents: it is a person, or its membership ended.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NotFound extends Schema.TaggedError<NotFound>()("AgentQuery.NotFound", {
   memberId: MemberId.Id,
 }) {}
 
+/**
+ * What reading the agent of a member can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type ReadError = NotFound | MemberStore.Failure | AgentStore.Failure;
-/** The agent cannot run, for the issues its readiness reports, besides what reading meets. */
+
+/**
+ * What selecting can fail with: what reading the agent and the workspace's connections meets, and
+ * `Incomplete`, when the agent cannot run for the issues its readiness reports.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type SelectError = ReadError | ConnectionStore.Failure | Incomplete;
-/** Building can also meet a connection whose key cannot be read. */
+
+/**
+ * What building can fail with: what selecting meets, and a connection whose key cannot be read.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export type BuildError = SelectError | ConnectionCredentialStore.Failure;
 
 /**
  * An agent ready to run on a selection, as data: what it works by, and the connections of its
  * harness, model, and sandbox, each with its key. Whoever runs the agent builds it from them with
  * the integrations its host installs, so the keys go to it.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Runnable = Schema.Struct({
   instructions: Agent.Instructions,
@@ -35,8 +72,18 @@ export const Runnable = Schema.Struct({
   /** The sandbox's connection, or none for an agent that works without a sandbox. */
   sandbox: Schema.NullOr(Connection.Access),
 });
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Runnable extends Schema.Schema.Type<typeof Runnable> {}
 
+/**
+ * The agent reads turns share, which jobs call as no actor.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class AgentQuery extends Context.Service<
   AgentQuery,
   {
@@ -74,7 +121,12 @@ const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
 const invalid = (part: Agent.Part, description: string) =>
   new Incomplete({ issues: [{ _tag: "Invalid", part, description }] });
 
-/** @category constructors */
+/**
+ * Capture the stores and the host's integrations; each read finds the agent by its membership.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("AgentQuery.make")(function* () {
   const memberStore = yield* MemberStore.MemberStore;
   const agentStore = yield* AgentStore.AgentStore;
@@ -192,5 +244,11 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
   return AgentQuery.of({ select, buildRunnable });
 });
 
-/** Internal reads that turns share. @category layers */
+/**
+ * Provide the agent reads over the member, agent, connection, and credential stores, and the
+ * host's integrations.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(AgentQuery, make());

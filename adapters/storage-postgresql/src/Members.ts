@@ -1,3 +1,15 @@
+/**
+ * The PostgreSQL driver for `MemberStore.MemberStore`, over the `members` table: each membership,
+ * active or removed, with its identity and the name it goes by in the workspace, which
+ * `PostgresDirectory` also reads. `MemberStore.make` checks every input before the driver sees it,
+ * so the driver keeps only what storage keeps: the primary key refuses a reused ID and
+ * `active_member_identity` a second active membership for one identity, each as the store's
+ * `Conflict`, and renaming and removal are conditional updates that conflict unless they find the
+ * membership active. Every statement is scoped to the binding's workspace and runs under its
+ * `guard`, which lets a read join the caller's transaction and requires one for a write.
+ *
+ * @since 0.1.0
+ */
 import { Member, MemberStore } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
@@ -17,9 +29,11 @@ const recordColumns = {
 const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
 
 /**
- * Memberships, active and removed; one active membership per identity.
+ * Builds the membership store for the binding's workspace: this module's driver inside
+ * `MemberStore.make`, which checks every input first.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("Members.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding;
@@ -98,8 +112,9 @@ export const make = Effect.fn("Members.make")(function* () {
 });
 
 /**
- * Provide MemberStore.MemberStore using its constructor and the caller's dependencies.
+ * Provides `MemberStore.MemberStore` over the caller's `Binding.Binding`.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(MemberStore.MemberStore, make());

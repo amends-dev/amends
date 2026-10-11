@@ -1,10 +1,22 @@
+/**
+ * Keeps the role read model, `RoleStore`: each role as created, renamed, and given new
+ * permissions, and the built-in bundles' revision the workspace holds.
+ *
+ * @since 0.1.0
+ */
 import { Effect } from "effect";
 import * as Projection from "../journal/Projection.ts";
 
 import * as RoleFacts from "./RoleFacts.ts";
 import * as RoleStore from "./RoleStore.ts";
 
-/** Projects recorded role changes into the host's transactional read model. */
+/**
+ * Inserts each created role, renames it and replaces its permissions as recorded, and records
+ * each built-in revision, into the host's transactional read model.
+ *
+ * @category projections
+ * @since 0.1.0
+ */
 export const definition = Projection.make("workspace.roles", { version: 1 })
   .on(
     RoleFacts.Created,

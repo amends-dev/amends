@@ -1,3 +1,14 @@
+/**
+ * The `turns` endpoint group: agents' turns on threads, and their logs. Its endpoints call
+ * `TurnService`: `listActive`, `get`, `watchLog`, `cancel`, and `retry`. Every endpoint needs
+ * active membership and a thread the caller may open, and stopping or retrying a turn needs
+ * permission to direct its agent. Following a log is a server-sent event stream of
+ * `Turn.LogMessage` that counts within the same limits as change streams, and ends with
+ * `Turn.LogUnavailable` when it cannot go on. `TurnsHandlers` in `@amends-dev/server-http`
+ * implements it.
+ *
+ * @since 0.1.0
+ */
 import { Turn } from "@amends-dev/core/turn";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
@@ -15,6 +26,9 @@ const view = Turn.View.annotate({ identifier: "Turn" });
  * turn ends. Whoever may direct the agent may stop an active turn, or retry one that failed or
  * stopped; each turn says whether the caller may do either now. The workspace's active turns are
  * those in threads the caller may open.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class TurnsGroup extends HttpApiGroup.make("turns")
   .add(

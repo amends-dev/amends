@@ -1,3 +1,10 @@
+/**
+ * Every host contract the gateway needs from storage, in process memory and in one layer. The
+ * gateway's tests build each host from it, and run the conformance suites over it as an adapter
+ * runs them over its own storage.
+ *
+ * @since 0.1.0
+ */
 import { MemoryConnection } from "@amends-dev/core/memory";
 import { Layer } from "effect";
 import * as MemoryAccounts from "./MemoryAccounts.ts";
@@ -13,6 +20,7 @@ import * as MemoryWorkspaceStorage from "./MemoryWorkspaceStorage.ts";
  * storage is another host.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.mergeAll(
   MemoryWorkspaceStorage.layer,

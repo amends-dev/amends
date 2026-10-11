@@ -1,3 +1,11 @@
+/**
+ * The workspace directory in process memory, the reference implementation of
+ * `WorkspaceDirectory.WorkspaceDirectory`: it reads the workspace, member, and invitation records
+ * of every workspace in `MemoryDatabase` to list one identity's memberships and pending
+ * invitations, in binary ID order.
+ *
+ * @since 0.1.0
+ */
 import { Identity } from "@amends-dev/core/identity";
 import { MemoryDatabase, Rows } from "@amends-dev/core/memory";
 import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
@@ -14,6 +22,7 @@ const invitations = Rows.make(Schema.fromJsonString(Invitation.Record));
  * authorization of its own.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("MemoryDirectory.make")(function* () {
   const database = yield* MemoryDatabase.MemoryDatabase;
@@ -60,8 +69,9 @@ export const make = Effect.fn("MemoryDirectory.make")(function* () {
 });
 
 /**
- * Provide WorkspaceDirectory.WorkspaceDirectory using its constructor and the caller's dependencies.
+ * Provide `WorkspaceDirectory.WorkspaceDirectory` over the `MemoryDatabase` beneath it.
  *
  * @category layers
+ * @since 0.1.0
  */
 export const layer = Layer.effect(WorkspaceDirectory.WorkspaceDirectory, make());

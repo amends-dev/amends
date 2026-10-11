@@ -4,6 +4,10 @@
  * COMMIT succeeds, on its own connection, rather than inside its transaction, where the
  * notification lock would serialize every notifying commit on the server; a notice lost between
  * the two leaves readers to their poll. One listener per pool, on one connection, routes both.
+ * `PostgresDatabase` makes one for each pool; `Journal` and `SessionLogs` wait on its append
+ * notices, and `PostgresSignalHub` relays each workspace's signals through it.
+ *
+ * @since 0.1.0
  */
 import { PgClient } from "@effect/sql-pg";
 import { Signal, SignalHub } from "@amends-dev/core/signal";
@@ -11,17 +15,30 @@ import type { Workspace } from "@amends-dev/core/workspace";
 import { Deferred, Duration, Effect, Option, Queue, RcRef, Schema, Stream } from "effect";
 import type { Scope } from "effect";
 
-/** The channel every notice uses. */
+/**
+ * The channel every notice uses.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const channel = "amends_notices";
 
 /**
  * The notice an append sends for each log it appended to: a journal log, by its id, or a session
  * log, by `sessionLogKey`.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const appendNotice = (workspaceId: Workspace.Id, logId: string): string =>
   JSON.stringify(["append", workspaceId, logId]);
 
-/** How appends name a participation's session log, apart from every journal log's id. */
+/**
+ * How appends name a participation's session log, apart from every journal log's id.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const sessionLogKey = (participationId: string): string =>
   JSON.stringify(["session-log", participationId]);
 
@@ -46,6 +63,12 @@ const parse = (payload: string) => {
   return undefined;
 };
 
+/**
+ * One pool's notices: waiting for appends, telling other pools of them, and relaying signals.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface PostgresNotices {
   /**
    * Keep this pool listening for the caller's scope. The first lease waits for PostgreSQL to
@@ -76,15 +99,23 @@ export interface PostgresNotices {
   ) => Effect.Effect<Stream.Stream<Signal.Value>, never, Scope.Scope>;
 }
 
+/**
+ * How the listener recovers when its connection fails.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** How long to wait before listening again after the listener's connection fails. */
   readonly retry?: Duration.Input | undefined;
 }
 
 /**
- * Construct the notice router and its listener over the pool's client.
+ * Construct the notice router and its listener over the pool's client. The listener starts with
+ * the first `listening` lease and stops 30 seconds after the last.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const make = Effect.fn("PostgresNotices.make")(function* (options: Options = {}) {
   const client = yield* PgClient.PgClient;

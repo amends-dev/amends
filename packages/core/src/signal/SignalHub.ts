@@ -1,3 +1,11 @@
+/**
+ * How a workspace's signals reach its subscribers. `SignalHub` is the service a storage adapter
+ * binds to each workspace, which the operations publish through and the change feed subscribes
+ * to; `makeLocal` is the hub for one process, which an adapter relays between processes when
+ * several share its storage.
+ *
+ * @since 0.1.0
+ */
 import { Context, Effect, Option, PubSub, RcMap, Stream } from "effect";
 import type { Scope } from "effect";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
@@ -6,6 +14,9 @@ import type * as Signal from "./Signal.ts";
 /**
  * One workspace's signals, across every process sharing its storage. Storage binds it to the
  * workspace; it holds nothing durable and takes no part in the journal or its write order.
+ *
+ * @category services
+ * @since 0.1.0
  */
 export class SignalHub extends Context.Service<
   SignalHub,
@@ -30,6 +41,7 @@ const capacity = 256;
  * processes where several share their storage. The hub lasts for the scope.
  *
  * @category constructors
+ * @since 0.1.0
  */
 export const makeLocal = Effect.gen(function* () {
   const workspaces = yield* RcMap.make({
@@ -51,4 +63,10 @@ export const makeLocal = Effect.gen(function* () {
   return { publish, subscribe };
 });
 
+/**
+ * One process's hub, as `makeLocal` builds it: what a storage adapter binds to a workspace.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Local = Effect.Success<typeof makeLocal>;

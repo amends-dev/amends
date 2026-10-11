@@ -1,3 +1,14 @@
+/**
+ * The `groups` endpoint group: the caller's groups, public groups to browse and join, rosters,
+ * following, and catching up. Its endpoints call `GroupService` (`listMine`, `listPublic`,
+ * `createTeam`, `rename`, `get`), `GroupMembershipService` (`listCurrent`, `add`, `remove`,
+ * `join`, `leave`), `GroupFollowService` (`follow`, `unfollow`), and
+ * `ReadStateService.markGroupRead`. Every endpoint needs active membership of the workspace, and
+ * reading a group needs current membership of it; a group the caller does not belong to answers
+ * as missing. `GroupsHandlers` in `@amends-dev/server-http` implements it.
+ *
+ * @since 0.1.0
+ */
 import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
@@ -16,6 +27,9 @@ const follower = Schema.Struct({ memberId: GroupFollow.Input.fields.memberId });
  * The caller's groups, their rosters, following, and catching up. Every read requires current
  * membership of the group; a group the caller does not belong to answers as missing. Public groups
  * can also be browsed and joined; their threads stay with their members.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export class GroupsGroup extends HttpApiGroup.make("groups")
   .add(

@@ -1,3 +1,12 @@
+/**
+ * The memory implementation of `TurnStore` from `../turn/TurnStore.ts`, over the workspace's
+ * `Binding`. It keeps what the contract leaves to storage: a reused ID conflicts, and so does a
+ * second active turn of one agent on one thread; an update of a missing turn conflicts. An agent's
+ * turns on a thread order by creation time, then how far each accepted input, then ID.
+ * `TurnStore.make` checks every input before this driver sees it.
+ *
+ * @since 0.1.0
+ */
 import { Thread } from "../thread/index.ts";
 import { Turn, TurnStore } from "../turn/index.ts";
 import { Member } from "../workspace/index.ts";
@@ -18,7 +27,12 @@ const byCreated = (left: Turn.Record, right: Turn.Record) =>
   left.acceptedThroughSequence - right.acceptedThroughSequence ||
   compareBinary(left.id, right.id);
 
-/** Turn records over the current workspace transaction. @category constructors */
+/**
+ * Turn records over the current workspace transaction.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("TurnRecords.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Binding;
   const all = (operation: string) =>
@@ -108,5 +122,10 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
   return TurnStore.make(workspaceId, driver);
 });
 
-/** Provide turn storage over the caller's binding. @category layers */
+/**
+ * Provide turn storage over the caller's binding.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(TurnStore.TurnStore, make());

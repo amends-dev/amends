@@ -62,9 +62,10 @@ for integrations that check over HTTP.
 
 The model catalog is what amends knows of the models it can run: for each provider, the models
 reached through Anthropic Messages, OpenAI Responses, or Chat Completions, with where each is
-served, its limits, modalities, tool support, reasoning controls, and cost. It is `src/internal/snapshot.ts`,
-which `bun run update-models` writes from [models.dev](https://models.dev), failing when a field the
-catalog keeps changes shape; `ModelCatalog.layer` reads it.
+served, its limits, modalities, tool support, reasoning controls, and cost. It is
+`src/internal/snapshot.ts`, which `bun run update-models` writes from
+[models.dev](https://models.dev), failing when a field the catalog keeps changes shape;
+`ModelCatalog.layer` reads it.
 
 `ModelIntegrations.catalogProviders` is an integration for each provider in the catalog. A
 connection authenticates with an API key, gives the settings the provider's URLs name, such as a
