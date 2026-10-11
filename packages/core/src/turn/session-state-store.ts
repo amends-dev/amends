@@ -1,8 +1,9 @@
-import { Context, Schema } from "effect";
+import { Context, Effect, Schema } from "effect";
 import { Agent } from "../agent/agent.ts";
-import type { Effect, Option } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
+import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("SessionStateStore.Failure", {
   operation: Schema.String,
@@ -37,6 +38,10 @@ export interface Saved extends Schema.Schema.Type<typeof Saved> {}
  * view holds it, and rebuilding projections keeps it. Writes join the commit that ends the turn,
  * so a reply and the session it came from are stored together or not at all. A participation that
  * ended keeps its session, and taking part again starts another.
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   /** The participation's session as its last turn left it, or none before its first ended. */
@@ -53,5 +58,25 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/turn/session-state-store/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  return {
+    get: (participationId) =>
+      Effect.flatMap(read("get", ThreadParticipationId.Id, participationId), driver.get),
+    set: Effect.fn("SessionStateStore.set")(function* (participationId, saved) {
+      return yield* driver.set(
+        yield* read("set", ThreadParticipationId.Id, participationId),
+        yield* read("set", Saved, saved),
+      );
+    }),
+  };
+};
 
 export * as SessionStateStore from "./session-state-store.ts";

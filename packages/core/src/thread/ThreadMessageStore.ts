@@ -5,12 +5,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
 
-import type { ThreadMessage } from "./ThreadMessage.ts";
+import { ThreadMessage } from "./ThreadMessage.ts";
 import { ThreadId } from "./ThreadId.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /**
  * How many messages a thread holds whose content remains.
@@ -57,6 +59,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadMessageStore
  *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   readonly get: (
@@ -77,7 +83,7 @@ export interface Interface {
     ids: ReadonlyArray<ThreadId.Id>,
   ) => Effect.Effect<ReadonlyArray<Count>, Failure>;
   /**
-   * Reject malformed or foreign records and reused IDs. The author and mentions are recorded as
+   * Reject reused IDs. The author and mentions are recorded as
    * given: publication checks that they take part. Preserve historical values on replay.
    */
   readonly insert: (
@@ -85,15 +91,15 @@ export interface Interface {
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
    * Projection write that replaces a message's text and mentions at the edit's revision, the
-   * next after the current one. A missing, foreign, or deleted message, or another revision,
+   * next after the current one. A missing or deleted message, or another revision,
    * conflicts.
    */
   readonly edit: (
     edited: ThreadMessage.Edited,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
-   * Projection write that replaces a message's content with its deletion. A missing, foreign, or
-   * already deleted message conflicts.
+   * Projection write that replaces a message's content with its deletion. A missing or already deleted
+   * message conflicts.
    */
   readonly delete: (
     deleted: ThreadMessage.Deleted,
@@ -109,5 +115,29 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/thread/ThreadMessageStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", ThreadMessage.Id, id), driver.get),
+    getMany: (ids) =>
+      Effect.flatMap(read("getMany", Schema.Array(ThreadMessage.Id), ids), driver.getMany),
+    countByThread: (ids) =>
+      Effect.flatMap(read("countByThread", Schema.Array(ThreadId.Id), ids), driver.countByThread),
+    insert: (record) =>
+      Effect.flatMap(write("insert", ThreadMessage.Record, record), driver.insert),
+    edit: (edited) => Effect.flatMap(write("edit", ThreadMessage.Edited, edited), driver.edit),
+    delete: (deleted) =>
+      Effect.flatMap(write("delete", ThreadMessage.Deleted, deleted), driver.delete),
+  };
+};
 
 export * as ThreadMessageStore from "./ThreadMessageStore.ts";

@@ -1,9 +1,11 @@
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
-import type { Identity } from "../../identity/identity.ts";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
+import { Identity } from "../../identity/identity.ts";
 import type { Store } from "../../journal/store.ts";
 
-import type { Invitation } from "./invitation.ts";
+import { Invitation } from "./invitation.ts";
+import { StoreInput } from "../../journal/StoreInput.ts";
+import type { WorkspaceId } from "../id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("InvitationStore.Failure", {
   operation: Schema.String,
@@ -14,7 +16,13 @@ export class Conflict extends Schema.TaggedError<Conflict>()("InvitationStore.Co
   message: Schema.String,
 }) {}
 
-/** Workspace-bound read model. All writes share the journal's native transaction. */
+/**
+ * Workspace-bound read model. All writes share the journal's native transaction.
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ */
 export interface Interface {
   /** Return an isolated record from the current transaction or committed state. */
   readonly get: (id: Invitation.Id) => Effect.Effect<Option.Option<Invitation.Record>, Failure>;
@@ -24,7 +32,7 @@ export interface Interface {
   ) => Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
   /** Every invitation in this workspace in issue order, whatever its state. */
   readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
-  /** Insert a valid Pending invitation with a fresh ID in this workspace; invalid records and duplicate IDs conflict. Never upsert. */
+  /** Insert a pending invitation; a duplicate ID conflicts. Never upsert. */
   readonly insert: (
     record: Invitation.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
@@ -37,5 +45,49 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/workspace/invitation-store/Service",
 ) {}
+
+/** The states an invitation settles into. */
+const Settled = Schema.Union([Invitation.State.cases.Accepted, Invitation.State.cases.Revoked]);
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", Invitation.Id, id), driver.get),
+    listPendingByRecipient: (recipientId) =>
+      Effect.flatMap(
+        read("listPendingByRecipient", Identity.HumanId, recipientId),
+        driver.listPendingByRecipient,
+      ),
+    list: driver.list,
+    insert: (record) =>
+      write("insert", Invitation.Record, record).pipe(
+        Effect.filterOrFail(
+          (record) =>
+            record.details.workspaceId === workspaceId &&
+            Invitation.State.isAnyOf(["Pending"])(record.state),
+          () =>
+            new Conflict({
+              operation: "insert",
+              message: "Expected a pending invitation in this workspace",
+            }),
+        ),
+        Effect.flatMap(driver.insert),
+      ),
+    settle: Effect.fn("InvitationStore.settle")(function* (id, state) {
+      return yield* driver.settle(
+        yield* write("settle", Invitation.Id, id),
+        yield* write("settle", Settled, state),
+      );
+    }),
+  };
+};
 
 export * as InvitationStore from "./store.ts";

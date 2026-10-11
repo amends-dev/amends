@@ -1,7 +1,7 @@
 import { Checkpoint, Store } from "../journal/index.ts";
 import { Effect, Layer, Schema, Option } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { compareBinary, keyOf, Rows } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Checkpoint.Cursor));
@@ -16,28 +16,22 @@ const idOf = (key: Checkpoint.Key) => keyOf(key.logId, key.name, key.version);
  * @category constructors
  */
 export const make = Effect.fn("Checkpoints.make")(function* () {
-  const { read, write } = yield* Binding.Service;
-  return Checkpoint.Service.of({
+  const { workspaceId, read, write } = yield* Binding.Service;
+  const driver: Checkpoint.Interface = {
     get: Effect.fn("Checkpoints.get")(
       function* (key) {
         return yield* rows.get((yield* read).records.of("checkpoints"), idOf(key));
       },
       Effect.mapError(storeFailure(Store, "checkpoint.get")),
     ),
-    set: Effect.fn("Checkpoints.set")(function* (inputKey, inputCursor) {
-      yield* Store.Transaction;
-      const key = yield* Schema.decodeEffect(Checkpoint.Key)(inputKey).pipe(
-        Effect.mapError(storeConflict(Store, "checkpoint.set")),
-      );
-      const cursor = yield* Schema.decodeEffect(Schema.toType(Checkpoint.Cursor))(inputCursor).pipe(
-        Effect.mapError(storeConflict(Store, "checkpoint.set")),
-      );
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Store, "checkpoint.set")));
-      const row = yield* rows
-        .encode(cursor)
-        .pipe(Effect.mapError(storeFailure(Store, "checkpoint.set")));
-      space.records.of("checkpoints").set(idOf(key), row);
-    }),
+    set: Effect.fn("Checkpoints.set")(
+      function* (key, cursor) {
+        const space = yield* write;
+        const row = yield* rows.encode(cursor);
+        space.records.of("checkpoints").set(idOf(key), row);
+      },
+      Effect.mapError(storeFailure(Store, "checkpoint.set")),
+    ),
     listLive: Effect.fn("Checkpoints.listLive")(
       function* (logId) {
         const live = yield* liveRows.get((yield* read).records.of("liveProjections"), keyOf(logId));
@@ -47,18 +41,16 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
       },
       Effect.mapError(storeFailure(Store, "checkpoint.listLive")),
     ),
-    setLive: Effect.fn("Checkpoints.setLive")(function* (logId, input) {
-      yield* Store.Transaction;
-      const versions = yield* Schema.decodeEffect(Checkpoint.LiveVersions)(input).pipe(
-        Effect.mapError(storeConflict(Store, "checkpoint.setLive")),
-      );
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Store, "checkpoint.setLive")));
-      const row = yield* liveRows
-        .encode(versions)
-        .pipe(Effect.mapError(storeFailure(Store, "checkpoint.setLive")));
-      space.records.of("liveProjections").set(keyOf(logId), row);
-    }),
-  });
+    setLive: Effect.fn("Checkpoints.setLive")(
+      function* (logId, versions) {
+        const space = yield* write;
+        const row = yield* liveRows.encode(versions);
+        space.records.of("liveProjections").set(keyOf(logId), row);
+      },
+      Effect.mapError(storeFailure(Store, "checkpoint.setLive")),
+    ),
+  };
+  return Checkpoint.make(workspaceId, driver);
 });
 
 /**

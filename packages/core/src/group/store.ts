@@ -1,9 +1,11 @@
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
 
 import type { MemberId } from "../workspace/member/id.ts";
-import type { Group } from "./group.ts";
+import { Group } from "./group.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("GroupStore.Failure", {
   operation: Schema.String,
@@ -15,7 +17,13 @@ export class Conflict extends Schema.TaggedError<Conflict>()("GroupStore.Conflic
   message: Schema.String,
 }) {}
 
-/** Internal projection storage. Reads honor an existing transaction; writes require one. */
+/**
+ * Internal projection storage. Reads honor an existing transaction; writes require one.
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ */
 export interface Interface {
   readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
   /**
@@ -34,7 +42,7 @@ export interface Interface {
     memberIds: ReadonlyArray<MemberId.Id>,
   ) => Effect.Effect<Option.Option<Group.DirectRecord>, Failure>;
   /**
-   * Reject invalid/foreign records, reused IDs, and a second direct group for the same member set.
+   * Reject reused IDs and a second direct group for the same member set.
    * The creator is recorded as given: references to other read models are checked when facts are
    * published, so this one rebuilds alone. Never upsert.
    */
@@ -42,7 +50,7 @@ export interface Interface {
     record: Group.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
-   * Projection write that sets a team group's name. A missing, foreign, or direct group conflicts;
+   * Projection write that sets a team group's name. A missing or direct group conflicts;
    * the same name again changes nothing.
    */
   readonly rename: (
@@ -57,7 +65,7 @@ export interface Interface {
   ) => Effect.Effect<ReadonlyArray<Group.Latest>, Failure>;
   /**
    * Projection write that advances a group's latest activity time. A time at or before the recorded
-   * one changes nothing; a missing, foreign, or malformed group conflicts.
+   * one changes nothing; a missing group conflicts.
    */
   readonly recordLatest: (
     latest: Group.Latest,
@@ -67,5 +75,34 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/group/store/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", Group.Id, id), driver.get),
+    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Group.Id), ids), driver.getMany),
+    pagePublic: (options) =>
+      Effect.flatMap(read("pagePublic", Group.ListOptions, options), driver.pagePublic),
+    findDirect: (memberIds) =>
+      Effect.flatMap(
+        read("findDirect", Group.DirectMembers, Group.directMembers(memberIds)),
+        driver.findDirect,
+      ),
+    insert: (record) => Effect.flatMap(write("insert", Group.Record, record), driver.insert),
+    rename: (renamed) => Effect.flatMap(write("rename", Group.Renamed, renamed), driver.rename),
+    getLatest: (ids) =>
+      Effect.flatMap(read("getLatest", Schema.Array(Group.Id), ids), driver.getLatest),
+    recordLatest: (latest) =>
+      Effect.flatMap(write("recordLatest", Group.Latest, latest), driver.recordLatest),
+  };
+};
 
 export * as GroupStore from "./store.ts";

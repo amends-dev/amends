@@ -6,12 +6,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
 
-import type { ThreadActivity } from "./ThreadActivity.ts";
+import { ThreadActivity } from "./ThreadActivity.ts";
 import { ThreadId } from "./ThreadId.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /**
  * One page of a thread's timeline, always in ascending sequence order. The range lies strictly
@@ -72,6 +74,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadActivityStor
  *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   readonly get: (
@@ -104,7 +110,7 @@ export interface Interface {
     options: ReadOptions,
   ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
   /**
-   * Reject malformed or foreign records, reused IDs, a position other than the thread's next, and a
+   * Reject reused IDs, a position other than the thread's next, and a
    * second activity with one occurrence key. The subject is recorded as given, checked when the
    * activity is recorded. Preserve historical values on replay.
    */
@@ -122,5 +128,33 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/thread/ThreadActivityStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", ThreadActivity.Id, id), driver.get),
+    listByThread: (id) =>
+      Effect.flatMap(read("listByThread", ThreadId.Id, id), driver.listByThread),
+    latest: (id) => Effect.flatMap(read("latest", ThreadId.Id, id), driver.latest),
+    getFirst: (ids) =>
+      Effect.flatMap(read("getFirst", Schema.Array(ThreadId.Id), ids), driver.getFirst),
+    readPage: Effect.fn("ThreadActivityStore.readPage")(function* (id, options) {
+      return yield* driver.readPage(
+        yield* read("readPage", ThreadId.Id, id),
+        yield* read("readPage", ReadOptions, options),
+      );
+    }),
+    insert: (record) =>
+      Effect.flatMap(write("insert", ThreadActivity.Record, record), driver.insert),
+  };
+};
 
 export * as ThreadActivityStore from "./ThreadActivityStore.ts";

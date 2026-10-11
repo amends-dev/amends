@@ -1,12 +1,10 @@
 import { Thread, ThreadStore, ThreadMessage } from "@amends-dev/core/thread";
-import { Group } from "@amends-dev/core/group";
-import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
 import { threads } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(Thread.Record));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ...Thread.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
@@ -48,10 +46,9 @@ export const make = Effect.fn("Threads.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   const inWorkspace = eq(threads.workspaceId, workspaceId);
-  return ThreadStore.Service.of({
+  const driver: ThreadStore.Interface = {
     get: Effect.fn("Threads.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -62,8 +59,7 @@ export const make = Effect.fn("Threads.make")(function* () {
       Effect.mapError(storeFailure(ThreadStore, "get")),
     ),
     getMany: Effect.fn("Threads.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -75,8 +71,7 @@ export const make = Effect.fn("Threads.make")(function* () {
       Effect.mapError(storeFailure(ThreadStore, "getMany")),
     ),
     listByGroup: Effect.fn("Threads.listByGroup")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Group.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -88,9 +83,7 @@ export const make = Effect.fn("Threads.make")(function* () {
       Effect.mapError(storeFailure(ThreadStore, "listByGroup")),
     ),
     listByLatest: Effect.fn("Threads.listByLatest")(
-      function* (groupInput, input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
+      function* (groupId, options) {
         const orderedId = sql`${threads.id} COLLATE "C"`;
         return yield* guard(
           db
@@ -114,9 +107,7 @@ export const make = Effect.fn("Threads.make")(function* () {
       Effect.mapError(storeFailure(ThreadStore, "listByLatest")),
     ),
     listByStart: Effect.fn("Threads.listByStart")(
-      function* (groupInput, input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input);
+      function* (groupId, options) {
         const orderedId = sql`${threads.id} COLLATE "C"`;
         return yield* guard(
           db
@@ -138,8 +129,7 @@ export const make = Effect.fn("Threads.make")(function* () {
       Effect.mapError(storeFailure(ThreadStore, "listByStart")),
     ),
     getLatest: Effect.fn("Threads.getLatest")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -154,11 +144,7 @@ export const make = Effect.fn("Threads.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadStore, "getLatest")),
     ),
-    recordLatest: Effect.fn("Threads.recordLatest")(function* (input) {
-      yield* Store.Transaction;
-      const latest = yield* Schema.decodeEffect(Schema.toType(Thread.Latest))(input).pipe(
-        Effect.mapError(storeConflict(ThreadStore, "recordLatest")),
-      );
+    recordLatest: Effect.fn("Threads.recordLatest")(function* (latest) {
       const advanced = yield* guard(
         db
           .update(threads)
@@ -191,16 +177,7 @@ export const make = Effect.fn("Threads.make")(function* () {
           message: "Thread is missing",
         });
     }),
-    rename: Effect.fn("Threads.rename")(function* (input) {
-      yield* Store.Transaction;
-      const renamed = yield* Schema.decodeEffect(Schema.toType(Thread.Renamed))(input).pipe(
-        Effect.mapError(storeConflict(ThreadStore, "rename")),
-      );
-      if (renamed.workspaceId !== workspaceId)
-        return yield* new ThreadStore.Conflict({
-          operation: "rename",
-          message: "Expected a thread in this workspace",
-        });
+    rename: Effect.fn("Threads.rename")(function* (renamed) {
       const updated = yield* guard(
         db
           .update(threads)
@@ -215,16 +192,7 @@ export const make = Effect.fn("Threads.make")(function* () {
           message: "Thread is missing",
         });
     }),
-    insert: Effect.fn("Threads.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validate(input).pipe(
-        Effect.mapError(storeConflict(ThreadStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ThreadStore.Conflict({
-          operation: "insert",
-          message: "Invalid initial record or workspace",
-        });
+    insert: Effect.fn("Threads.insert")(function* (record) {
       const creator = record.createdBy;
       const { createdBy: _, ...fields } = record;
       yield* guard(
@@ -236,7 +204,8 @@ export const make = Effect.fn("Threads.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(ThreadStore, "insert")));
     }),
-  });
+  };
+  return ThreadStore.make(workspaceId, driver);
 });
 /** @category layers */
 export const layer = Layer.effect(ThreadStore.Service, make());

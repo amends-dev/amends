@@ -1,14 +1,11 @@
 import { Assignment, AssignmentStore } from "@amends-dev/core/authorization";
-import { Store } from "@amends-dev/core/journal";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { assignments } from "./schema.ts";
 import { ScopeColumns } from "./scope.ts";
-
-const validateRecord = Schema.decodeEffect(Schema.toType(Assignment.Record));
 
 /** A row is one of two source cases, so it is shaped in code before decoding checks it. */
 const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
@@ -40,7 +37,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
       Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))),
       Effect.mapError(storeFailure(AssignmentStore, operation)),
     );
-  return AssignmentStore.Service.of({
+  const driver: AssignmentStore.Interface = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(assignments.id, id))), Array.head),
     listActiveByMember: (memberId) =>
       select(
@@ -57,16 +54,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
           eq(assignments.status, "active"),
         ),
       ),
-    insert: Effect.fn("Assignments.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(AssignmentStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId || record.status !== "active")
-        return yield* new AssignmentStore.Conflict({
-          operation: "insert",
-          message: "Expected an active assignment in this workspace",
-        });
+    insert: Effect.fn("Assignments.insert")(function* (record) {
       const source = record.source;
       yield* guard(
         db.insert(assignments).values({
@@ -87,7 +75,6 @@ export const make = Effect.fn("Assignments.make")(function* () {
       ).pipe(Effect.mapError(storeError(AssignmentStore, "insert")));
     }),
     markRevoked: Effect.fn("Assignments.markRevoked")(function* (id) {
-      yield* Store.Transaction;
       const rows = yield* guard(
         db
           .update(assignments)
@@ -102,7 +89,8 @@ export const make = Effect.fn("Assignments.make")(function* () {
           message: "Expected an active assignment",
         });
     }),
-  });
+  };
+  return AssignmentStore.make(workspaceId, driver);
 });
 
 /**

@@ -1,10 +1,8 @@
-import { ChannelBinding, ChannelBindingStore, ChannelId } from "@amends-dev/core/channel";
-import { Store } from "@amends-dev/core/journal";
-import { Thread } from "@amends-dev/core/thread";
+import { ChannelBinding, ChannelBindingStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { channelBindings } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(ChannelBinding.Record));
@@ -29,10 +27,9 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   const inWorkspace = eq(channelBindings.workspaceId, workspaceId);
-  return ChannelBindingStore.Service.of({
+  const driver: ChannelBindingStore.Interface = {
     get: Effect.fn("ChannelBindings.get")(
-      function* (input) {
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(input);
+      function* (threadId) {
         return yield* guard(
           db
             .select()
@@ -43,9 +40,7 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
       Effect.mapError(storeFailure(ChannelBindingStore, "get")),
     ),
     findByConversation: Effect.fn("ChannelBindings.findByConversation")(
-      function* (channelInput, conversationInput) {
-        const channelId = yield* Schema.decodeEffect(ChannelId.Id)(channelInput);
-        const conversationId = yield* Schema.decodeEffect(Schema.NonEmptyString)(conversationInput);
+      function* (channelId, conversationId) {
         return yield* guard(
           db
             .select()
@@ -61,16 +56,7 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
       },
       Effect.mapError(storeFailure(ChannelBindingStore, "findByConversation")),
     ),
-    insert: Effect.fn("ChannelBindings.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(ChannelBindingStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ChannelBindingStore.Conflict({
-          operation: "insert",
-          message: "Expected a binding in this workspace",
-        });
+    insert: Effect.fn("ChannelBindings.insert")(function* (record) {
       yield* guard(
         db.insert(channelBindings).values({
           workspaceId: record.workspaceId,
@@ -84,7 +70,8 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(ChannelBindingStore, "insert")));
     }),
-  });
+  };
+  return ChannelBindingStore.make(workspaceId, driver);
 });
 
 /** Provide channel binding storage over the caller's binding. @category layers */

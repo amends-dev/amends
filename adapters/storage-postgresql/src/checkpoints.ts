@@ -2,7 +2,7 @@ import { Checkpoint, Store } from "@amends-dev/core/journal";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { checkpoints, liveProjections } from "./schema.ts";
 
 /**
@@ -20,7 +20,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
     index: checkpoints.entryIndex,
     entryId: checkpoints.entryId,
   };
-  return Checkpoint.Service.of({
+  const driver: Checkpoint.Interface = {
     get: Effect.fn("Checkpoints.get")(function* (key) {
       const rows = yield* guard(
         db
@@ -40,14 +40,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
       );
       return Array.head(rows);
     }),
-    set: Effect.fn("Checkpoints.set")(function* (inputKey, inputCursor) {
-      yield* Store.Transaction;
-      const key = yield* Schema.decodeEffect(Checkpoint.Key)(inputKey).pipe(
-        Effect.mapError(storeConflict(Store, "checkpoint.set")),
-      );
-      const cursor = yield* Schema.decodeEffect(Schema.toType(Checkpoint.Cursor))(inputCursor).pipe(
-        Effect.mapError(storeConflict(Store, "checkpoint.set")),
-      );
+    set: Effect.fn("Checkpoints.set")(function* (key, cursor) {
       const progress = {
         position: cursor.position,
         commitId: cursor.commitId,
@@ -89,11 +82,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
         Effect.flatMap(Schema.decodeUnknownEffect(Checkpoint.LiveVersions)),
         Effect.mapError(storeFailure(Store, "checkpoint.listLive")),
       ),
-    setLive: Effect.fn("Checkpoints.setLive")(function* (logId, input) {
-      yield* Store.Transaction;
-      const versions = yield* Schema.decodeEffect(Checkpoint.LiveVersions)(input).pipe(
-        Effect.mapError(storeConflict(Store, "checkpoint.setLive")),
-      );
+    setLive: Effect.fn("Checkpoints.setLive")(function* (logId, versions) {
       const clear = db
         .delete(liveProjections)
         .where(and(eq(liveProjections.workspaceId, workspaceId), eq(liveProjections.logId, logId)));
@@ -111,7 +100,8 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
             );
       yield* guard(replace, true).pipe(Effect.mapError(storeError(Store, "checkpoint.setLive")));
     }),
-  });
+  };
+  return Checkpoint.make(workspaceId, driver);
 });
 
 /**

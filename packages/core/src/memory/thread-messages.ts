@@ -1,11 +1,9 @@
-import { Store } from "../journal/index.ts";
 import { Thread, ThreadMessage, ThreadMessageStore } from "../thread/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
 
-const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
 const rows = Rows.make(Schema.fromJsonString(ThreadMessage.Record));
 const hasText = (record: ThreadMessage.Record) =>
   ThreadMessage.Content.isAnyOf(["Text"])(record.content);
@@ -13,24 +11,21 @@ const hasText = (record: ThreadMessage.Record) =>
 /** Workspace-bound thread-messages projection storage. @category constructors */
 export const make = Effect.fn("ThreadMessages.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
-  return ThreadMessageStore.Service.of({
+  const driver: ThreadMessageStore.Interface = {
     get: Effect.fn("ThreadMessages.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(ThreadMessage.Id)(input);
+      function* (id) {
         return yield* rows.get((yield* read).records.of("threadMessages"), id);
       },
       Effect.mapError(storeFailure(ThreadMessageStore, "get")),
     ),
     getMany: Effect.fn("ThreadMessages.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(ThreadMessage.Id))(input);
+      function* (ids) {
         return yield* rows.getMany((yield* read).records.of("threadMessages"), ids);
       },
       Effect.mapError(storeFailure(ThreadMessageStore, "getMany")),
     ),
     countByThread: Effect.fn("ThreadMessages.countByThread")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+      function* (ids) {
         const wanted = new Set(ids);
         const counts = new Map<Thread.Id, number>();
         for (const record of yield* rows.all((yield* read).records.of("threadMessages")))
@@ -40,16 +35,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadMessageStore, "countByThread")),
     ),
-    insert: Effect.fn("ThreadMessages.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validate(input).pipe(
-        Effect.mapError(storeConflict(ThreadMessageStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "insert",
-          message: "Invalid initial record or workspace",
-        });
+    insert: Effect.fn("ThreadMessages.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadMessageStore, "insert")));
       if (space.records.of("threadMessages").has(record.id))
         return yield* new ThreadMessageStore.Conflict({
@@ -61,16 +47,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         .pipe(Effect.mapError(storeFailure(ThreadMessageStore, "insert")));
       space.records.of("threadMessages").set(record.id, row);
     }),
-    edit: Effect.fn("ThreadMessages.edit")(function* (input) {
-      yield* Store.Transaction;
-      const edited = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Edited))(input).pipe(
-        Effect.mapError(storeConflict(ThreadMessageStore, "edit")),
-      );
-      if (edited.workspaceId !== workspaceId)
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "edit",
-          message: "Expected a message in this workspace",
-        });
+    edit: Effect.fn("ThreadMessages.edit")(function* (edited) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadMessageStore, "edit")));
       const found = yield* rows
         .get(space.records.of("threadMessages"), edited.messageId)
@@ -97,16 +74,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         .pipe(Effect.mapError(storeFailure(ThreadMessageStore, "edit")));
       space.records.of("threadMessages").set(edited.messageId, row);
     }),
-    delete: Effect.fn("ThreadMessages.delete")(function* (input) {
-      yield* Store.Transaction;
-      const deleted = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Deleted))(input).pipe(
-        Effect.mapError(storeConflict(ThreadMessageStore, "delete")),
-      );
-      if (deleted.workspaceId !== workspaceId)
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "delete",
-          message: "Expected a message in this workspace",
-        });
+    delete: Effect.fn("ThreadMessages.delete")(function* (deleted) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadMessageStore, "delete")));
       const found = yield* rows
         .get(space.records.of("threadMessages"), deleted.messageId)
@@ -122,7 +90,8 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         .pipe(Effect.mapError(storeFailure(ThreadMessageStore, "delete")));
       space.records.of("threadMessages").set(deleted.messageId, row);
     }),
-  });
+  };
+  return ThreadMessageStore.make(workspaceId, driver);
 });
 /** @category layers */
 export const layer = Layer.effect(ThreadMessageStore.Service, make());

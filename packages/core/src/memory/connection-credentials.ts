@@ -1,6 +1,5 @@
 import { Connection } from "@amends-dev/connection";
 import { ConnectionCredentialStore } from "../connection/index.ts";
-import { Store } from "../journal/index.ts";
 import { Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeFailure } from "./errors.ts";
@@ -12,10 +11,9 @@ const rows = Rows.make(Schema.fromJsonString(Schema.toCodecJson(Connection.Crede
 /** Each connection's credential in the workspace's memory, written in its transactions. @category constructors */
 export const make = Effect.fn("ConnectionCredentials.make")(function* () {
   const { read, write } = yield* Binding.Service;
-  return ConnectionCredentialStore.Service.of({
+  const driver: ConnectionCredentialStore.Interface = {
     set: Effect.fn("ConnectionCredentials.set")(
       function* (connectionId, credential) {
-        yield* Store.Transaction;
         const row = yield* rows.encode(credential);
         (yield* write).connectionCredentials.set(connectionId, row);
       },
@@ -29,12 +27,12 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
     ),
     remove: Effect.fn("ConnectionCredentials.remove")(
       function* (connectionId) {
-        yield* Store.Transaction;
         (yield* write).connectionCredentials.delete(connectionId);
       },
       Effect.mapError(storeFailure(ConnectionCredentialStore, "remove")),
     ),
-  });
+  };
+  return ConnectionCredentialStore.make(driver);
 });
 
 /** Provide credential storage over the caller's binding. @category layers */

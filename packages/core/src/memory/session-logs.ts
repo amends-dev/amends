@@ -19,7 +19,7 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
   const { database } = connection;
   const keyOf = (participationId: string) => Rows.keyOf(workspaceId, participationId);
   const logOf = (participationId: string) => database.sessionLogs.get(keyOf(participationId)) ?? [];
-  return SessionLogStore.Service.of({
+  const driver: SessionLogStore.Interface = {
     head: (participationId) => Effect.sync(() => logOf(participationId).length),
     append: Effect.fn("SessionLogs.append")(function* (participationId, entries, after) {
       const log = logOf(participationId);
@@ -53,7 +53,8 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
         yield* Deferred.await(appended);
       }
     }),
-  });
+  };
+  return SessionLogStore.make(workspaceId, driver);
 });
 
 /** Provide session logs over the caller's binding. @category layers */

@@ -2,12 +2,9 @@ import { Commit, Entry, Store } from "../journal/index.ts";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { MemoryDatabase } from "./database.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { keyOf } from "./rows.ts";
 
-const validateAppend = Schema.decodeEffect(Schema.toType(Store.AppendInput));
-const validateReadFacts = Schema.decodeEffect(Store.ReadFactsOptions);
-const validateRead = Schema.decodeEffect(Store.ReadOptions);
 const validateReceipt = Schema.decodeUnknownEffect(Schema.toType(Store.AppendReceipt));
 /** Decoding builds new objects, so a returned entry shares nothing mutable with storage. */
 const decodeEntry = Schema.decodeEffect(Schema.toType(Store.Entry));
@@ -81,25 +78,13 @@ export const make = Effect.fn("Journal.make")(function* () {
 
   const append = Effect.fn("Journal.append")(function* (
     session: Binding.TransactionState,
-    input: Store.AppendInput,
+    request: Store.AppendInput,
   ) {
     const current = yield* Effect.serviceOption(Binding.CurrentTransaction);
     if (!session.active || Option.isNone(current) || current.value !== session)
       return yield* new Store.Failure({
         operation: "append",
         cause: "Closed or foreign append handle",
-      });
-    const request = yield* validateAppend(input).pipe(
-      Effect.mapError(storeConflict(Store, "append")),
-    );
-    if (
-      request.entries.some(
-        (entry) => entry.fact !== undefined && entry.fact.provenance.workspaceId !== workspaceId,
-      )
-    )
-      return yield* new Store.Conflict({
-        operation: "append",
-        message: "Fact belongs to another workspace",
       });
     yield* hold(session, request.logId);
     const space = session.space;
@@ -170,7 +155,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     return yield* copyEntries(written).pipe(Effect.mapError(storeFailure(Store, "append")));
   });
 
-  return Store.Service.of({
+  const driver: Store.Interface = {
     workspaceId,
     getEntry: Effect.fn("Journal.getEntry")(
       function* (logId, entryId) {
@@ -184,8 +169,7 @@ export const make = Effect.fn("Journal.make")(function* () {
       Effect.mapError(storeFailure(Store, "getEntry")),
     ),
     readFacts: Effect.fn("Journal.readFacts")(
-      function* (logId, input) {
-        const options = yield* validateReadFacts(input);
+      function* (logId, options) {
         const space = yield* read;
         const matching = (space.logs.get(logId) ?? [])
           .flatMap((batch) => batch.entries)
@@ -252,8 +236,7 @@ export const make = Effect.fn("Journal.make")(function* () {
       Effect.mapError(storeFailure(Store, "head")),
     ),
     read: Effect.fn("Journal.read")(
-      function* (logId, input) {
-        const options = yield* validateRead(input);
+      function* (logId, options) {
         const space = yield* read;
         const after = options.after;
         const selected = (space.logs.get(logId) ?? [])
@@ -287,7 +270,8 @@ export const make = Effect.fn("Journal.make")(function* () {
         yield* Deferred.await(appended);
       }
     }),
-  });
+  };
+  return Store.make(driver);
 });
 
 /**

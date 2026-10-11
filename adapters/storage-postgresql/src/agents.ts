@@ -1,14 +1,12 @@
 import { Agent, AgentStore } from "@amends-dev/core/agent";
-import { Store } from "@amends-dev/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { agents } from "./schema.ts";
 
 type Row = typeof agents.$inferSelect;
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Agent.Record));
 const decodeRecord = Schema.decodeUnknownEffect(
   Schema.Struct({ ...Agent.Record.fields, createdAt: Schema.DateTimeUtcFromDate }),
 );
@@ -55,24 +53,9 @@ export const make = Effect.fn("Agents.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   const inWorkspace = (id: Agent.Id) => and(eq(agents.workspaceId, workspaceId), eq(agents.id, id));
-  /** Validate a record for this workspace before writing it. */
-  const valid = (operation: string, input: Agent.Record) =>
-    Effect.gen(function* () {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(AgentStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new AgentStore.Conflict({
-          operation,
-          message: "Expected an agent in this workspace",
-        });
-      return record;
-    });
-  return AgentStore.Service.of({
+  const driver: AgentStore.Interface = {
     get: Effect.fn("Agents.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Agent.Id)(input);
+      function* (id) {
         return yield* guard(db.select().from(agents).where(inWorkspace(id))).pipe(
           Effect.flatMap(decodeRows),
           Effect.map(Array.head),
@@ -84,14 +67,12 @@ export const make = Effect.fn("Agents.make")(function* () {
       Effect.flatMap(decodeRows),
       Effect.mapError(storeFailure(AgentStore, "list")),
     ),
-    insert: Effect.fn("Agents.insert")(function* (input) {
-      const record = yield* valid("insert", input);
+    insert: Effect.fn("Agents.insert")(function* (record) {
       yield* guard(db.insert(agents).values(toRow(record)), true).pipe(
         Effect.mapError(storeError(AgentStore, "insert")),
       );
     }),
-    update: Effect.fn("Agents.update")(function* (input) {
-      const record = yield* valid("update", input);
+    update: Effect.fn("Agents.update")(function* (record) {
       const updated = yield* guard(
         db
           .update(agents)
@@ -106,7 +87,8 @@ export const make = Effect.fn("Agents.make")(function* () {
           message: "Expected a stored agent",
         });
     }),
-  });
+  };
+  return AgentStore.make(workspaceId, driver);
 });
 
 /** Provide agent storage over the caller's binding. @category layers */

@@ -1,13 +1,10 @@
-import { Store } from "@amends-dev/core/journal";
 import { Invitation, InvitationStore, type Workspace } from "@amends-dev/core/workspace";
 import { and, asc, eq, type SQL } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import type { PostgresDatabase } from "./database.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { invitations } from "./schema.ts";
-
-const validateRecord = Schema.decodeEffect(Schema.toType(Invitation.Record));
 
 type InvitationRow = typeof invitations.$inferSelect;
 
@@ -66,7 +63,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
   const inWorkspace = eq(invitations.workspaceId, workspaceId);
   const read = (operation: string, where: SQL | undefined, order: ReadonlyArray<SQL>) =>
     guard(select(db, where, order)).pipe(Effect.mapError(storeFailure(InvitationStore, operation)));
-  return InvitationStore.Service.of({
+  const driver: InvitationStore.Interface = {
     get: (id) => Effect.map(read("get", and(inWorkspace, eq(invitations.id, id)), []), Array.head),
     listPendingByRecipient: (recipientId) =>
       read(
@@ -79,19 +76,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
         [asc(invitations.id)],
       ),
     list: read("list", inWorkspace, [asc(invitations.issuedAt), asc(invitations.id)]),
-    insert: Effect.fn("Invitations.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(InvitationStore, "insert")),
-      );
-      if (
-        record.details.workspaceId !== workspaceId ||
-        !Invitation.State.isAnyOf(["Pending"])(record.state)
-      )
-        return yield* new InvitationStore.Conflict({
-          operation: "insert",
-          message: "Expected a pending invitation in this workspace",
-        });
+    insert: Effect.fn("Invitations.insert")(function* (record) {
       const { details } = record;
       yield* guard(
         db.insert(invitations).values({
@@ -107,13 +92,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(InvitationStore, "insert")));
     }),
-    settle: Effect.fn("Invitations.settle")(function* (id, input) {
-      yield* Store.Transaction;
-      const state = yield* Schema.decodeEffect(
-        Schema.toType(
-          Schema.Union([Invitation.State.cases.Accepted, Invitation.State.cases.Revoked]),
-        ),
-      )(input).pipe(Effect.mapError(storeConflict(InvitationStore, "settle")));
+    settle: Effect.fn("Invitations.settle")(function* (id, state) {
       const rows = yield* guard(
         db
           .update(invitations)
@@ -140,7 +119,8 @@ export const make = Effect.fn("Invitations.make")(function* () {
           message: "Expected a pending invitation",
         });
     }),
-  });
+  };
+  return InvitationStore.make(workspaceId, driver);
 });
 
 /**

@@ -5,13 +5,15 @@
  *
  * @since 0.1.0
  */
-import type { ChannelTransport } from "@amends-dev/channel";
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { ChannelTransport } from "@amends-dev/channel";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { ThreadId } from "../thread/ThreadId.ts";
-import type { ChannelId } from "./ChannelId.ts";
-import type { Delivery } from "./Delivery.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
+import { ChannelId } from "./ChannelId.ts";
+import { Delivery } from "./Delivery.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing deliveries.
@@ -41,6 +43,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("DeliveryStore.Conf
  *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   readonly get: (id: Delivery.Id) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
@@ -58,11 +64,11 @@ export interface Interface {
     conversationId: ChannelTransport.ExternalId,
     externalMessageId: ChannelTransport.ExternalId,
   ) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
-  /** Reject malformed or foreign records and reused ids. Never upsert. */
+  /** Reject a reused id. Never upsert. */
   readonly insert: (
     record: Delivery.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Replace a stored delivery; a missing, foreign, or malformed record conflicts. */
+  /** Replace a stored delivery; a missing record conflicts. */
   readonly update: (
     record: Delivery.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
@@ -77,5 +83,36 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/channel/DeliveryStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", Delivery.Id, id), driver.get),
+    listRequestedByThread: (threadId) =>
+      Effect.flatMap(
+        read("listRequestedByThread", ThreadId.Id, threadId),
+        driver.listRequestedByThread,
+      ),
+    findByExternalMessage: Effect.fn("DeliveryStore.findByExternalMessage")(
+      function* (channelId, conversationId, externalMessageId) {
+        return yield* driver.findByExternalMessage(
+          yield* read("findByExternalMessage", ChannelId.Id, channelId),
+          yield* read("findByExternalMessage", ChannelTransport.ExternalId, conversationId),
+          yield* read("findByExternalMessage", ChannelTransport.ExternalId, externalMessageId),
+        );
+      },
+    ),
+    insert: (record) => Effect.flatMap(write("insert", Delivery.Record, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Delivery.Record, record), driver.update),
+  };
+};
 
 export * as DeliveryStore from "./DeliveryStore.ts";

@@ -1,11 +1,9 @@
 import { Group, GroupStore } from "../group/index.ts";
-import { Store } from "../journal/index.ts";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { compareBinary, Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
 const rows = Rows.make(Schema.fromJsonString(Group.Record));
 const latestRows = Rows.make(Schema.fromJsonString(Group.Latest));
 /** Only a direct group has a member-set key. */
@@ -15,24 +13,21 @@ const keyOf = (record: Group.Record) =>
 /** Group records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Groups.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
-  return GroupStore.Service.of({
+  const driver: GroupStore.Interface = {
     get: Effect.fn("Groups.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Group.Id)(input);
+      function* (id) {
         return yield* rows.get((yield* read).records.of("groups"), id);
       },
       Effect.mapError(storeFailure(GroupStore, "get")),
     ),
     getMany: Effect.fn("Groups.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Group.Id))(input);
+      function* (ids) {
         return yield* rows.getMany((yield* read).records.of("groups"), ids);
       },
       Effect.mapError(storeFailure(GroupStore, "getMany")),
     ),
     pagePublic: Effect.fn("Groups.pagePublic")(
-      function* (input) {
-        const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
+      function* (options) {
         const after = options.after;
         return (yield* rows.all((yield* read).records.of("groups")))
           .flatMap((group) =>
@@ -48,10 +43,7 @@ export const make = Effect.fn("Groups.make")(function* () {
       Effect.mapError(storeFailure(GroupStore, "pagePublic")),
     ),
     findDirect: Effect.fn("Groups.findDirect")(
-      function* (input) {
-        const memberIds = yield* Schema.decodeEffect(Group.DirectMembers)(
-          Group.directMembers(input),
-        );
+      function* (memberIds) {
         const key = Group.directKey(memberIds);
         const groups = yield* rows.all((yield* read).records.of("groups"));
         return Array.findFirst(groups, (group) =>
@@ -61,22 +53,12 @@ export const make = Effect.fn("Groups.make")(function* () {
       Effect.mapError(storeFailure(GroupStore, "findDirect")),
     ),
     getLatest: Effect.fn("Groups.getLatest")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Group.Id))(input);
+      function* (ids) {
         return yield* latestRows.getMany((yield* read).records.of("groupLatest"), ids);
       },
       Effect.mapError(storeFailure(GroupStore, "getLatest")),
     ),
-    rename: Effect.fn("Groups.rename")(function* (input) {
-      yield* Store.Transaction;
-      const renamed = yield* Schema.decodeEffect(Schema.toType(Group.Renamed))(input).pipe(
-        Effect.mapError(storeConflict(GroupStore, "rename")),
-      );
-      if (renamed.workspaceId !== workspaceId)
-        return yield* new GroupStore.Conflict({
-          operation: "rename",
-          message: "Expected a group in this workspace",
-        });
+    rename: Effect.fn("Groups.rename")(function* (renamed) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(GroupStore, "rename")));
       const found = yield* rows
         .get(space.records.of("groups"), renamed.groupId)
@@ -91,11 +73,7 @@ export const make = Effect.fn("Groups.make")(function* () {
         .pipe(Effect.mapError(storeFailure(GroupStore, "rename")));
       space.records.of("groups").set(renamed.groupId, row);
     }),
-    recordLatest: Effect.fn("Groups.recordLatest")(function* (input) {
-      yield* Store.Transaction;
-      const latest = yield* Schema.decodeEffect(Schema.toType(Group.Latest))(input).pipe(
-        Effect.mapError(storeConflict(GroupStore, "recordLatest")),
-      );
+    recordLatest: Effect.fn("Groups.recordLatest")(function* (latest) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(GroupStore, "recordLatest")));
       if (!space.records.of("groups").has(latest.groupId))
         return yield* new GroupStore.Conflict({
@@ -116,16 +94,7 @@ export const make = Effect.fn("Groups.make")(function* () {
         .pipe(Effect.mapError(storeFailure(GroupStore, "recordLatest")));
       space.records.of("groupLatest").set(latest.groupId, row);
     }),
-    insert: Effect.fn("Groups.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(GroupStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new GroupStore.Conflict({
-          operation: "insert",
-          message: "Expected a group in this workspace",
-        });
+    insert: Effect.fn("Groups.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(GroupStore, "insert")));
       if (space.records.of("groups").has(record.id))
         return yield* new GroupStore.Conflict({
@@ -148,7 +117,8 @@ export const make = Effect.fn("Groups.make")(function* () {
         .pipe(Effect.mapError(storeFailure(GroupStore, "insert")));
       space.records.of("groups").set(record.id, row);
     }),
-  });
+  };
+  return GroupStore.make(workspaceId, driver);
 });
 
 /** Provide group storage over the caller's binding. @category layers */

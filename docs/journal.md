@@ -75,8 +75,8 @@ The PostgreSQL adapter stores `subject`, `fact_name`, and `fact_version` as colu
 `log_entries`. Separate indexes cover workspace/log/name and workspace/log/subject,
 each ordered by position and entry index. Provenance's performer, cause, correlation,
 and occurrence time have separate columns. Workspace IDs in PostgreSQL
-provenance are reconstructed from the containing row; writes validate workspace
-consistency before omitting those repeated IDs. Neither adapter duplicates the
+provenance are reconstructed from the containing row; the journal store checks that
+every appended fact names the workspace before the adapter omits those repeated IDs. Neither adapter duplicates the
 fact header inside a second binary wrapper.
 
 Generic execution logs have no fact header and continue to encode their complete

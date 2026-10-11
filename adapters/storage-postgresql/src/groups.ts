@@ -1,10 +1,9 @@
 import { Group, GroupStore } from "@amends-dev/core/group";
-import { Store } from "@amends-dev/core/journal";
 import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { groups } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Record));
@@ -55,10 +54,9 @@ const toRow = (record: Group.Record): typeof groups.$inferInsert => ({
 export const make = Effect.fn("Groups.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
-  return GroupStore.Service.of({
+  const driver: GroupStore.Interface = {
     get: Effect.fn("Groups.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Group.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -72,8 +70,7 @@ export const make = Effect.fn("Groups.make")(function* () {
       Effect.mapError(storeFailure(GroupStore, "get")),
     ),
     getMany: Effect.fn("Groups.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Group.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -85,8 +82,7 @@ export const make = Effect.fn("Groups.make")(function* () {
       Effect.mapError(storeFailure(GroupStore, "getMany")),
     ),
     pagePublic: Effect.fn("Groups.pagePublic")(
-      function* (input) {
-        const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
+      function* (options) {
         const ordered = sql`${groups.id} COLLATE "C"`;
         const found = yield* guard(
           db
@@ -107,10 +103,7 @@ export const make = Effect.fn("Groups.make")(function* () {
       Effect.mapError(storeFailure(GroupStore, "pagePublic")),
     ),
     findDirect: Effect.fn("Groups.findDirect")(
-      function* (input) {
-        const memberIds = yield* Schema.decodeEffect(Group.DirectMembers)(
-          Group.directMembers(input),
-        );
+      function* (memberIds) {
         const rows = yield* guard(
           db
             .select()
@@ -129,8 +122,7 @@ export const make = Effect.fn("Groups.make")(function* () {
       Effect.mapError(storeFailure(GroupStore, "findDirect")),
     ),
     getLatest: Effect.fn("Groups.getLatest")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Group.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -147,16 +139,7 @@ export const make = Effect.fn("Groups.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupStore, "getLatest")),
     ),
-    rename: Effect.fn("Groups.rename")(function* (input) {
-      yield* Store.Transaction;
-      const renamed = yield* Schema.decodeEffect(Schema.toType(Group.Renamed))(input).pipe(
-        Effect.mapError(storeConflict(GroupStore, "rename")),
-      );
-      if (renamed.workspaceId !== workspaceId)
-        return yield* new GroupStore.Conflict({
-          operation: "rename",
-          message: "Expected a group in this workspace",
-        });
+    rename: Effect.fn("Groups.rename")(function* (renamed) {
       const updated = yield* guard(
         db
           .update(groups)
@@ -177,11 +160,7 @@ export const make = Effect.fn("Groups.make")(function* () {
           message: "Expected a team group",
         });
     }),
-    recordLatest: Effect.fn("Groups.recordLatest")(function* (input) {
-      yield* Store.Transaction;
-      const latest = yield* Schema.decodeEffect(Schema.toType(Group.Latest))(input).pipe(
-        Effect.mapError(storeConflict(GroupStore, "recordLatest")),
-      );
+    recordLatest: Effect.fn("Groups.recordLatest")(function* (latest) {
       const at = DateTime.toDate(latest.occurredAt);
       const advanced = yield* guard(
         db
@@ -212,21 +191,13 @@ export const make = Effect.fn("Groups.make")(function* () {
           message: "Group is missing",
         });
     }),
-    insert: Effect.fn("Groups.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(GroupStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new GroupStore.Conflict({
-          operation: "insert",
-          message: "Expected a group in this workspace",
-        });
+    insert: Effect.fn("Groups.insert")(function* (record) {
       yield* guard(db.insert(groups).values(toRow(record)), true).pipe(
         Effect.mapError(storeError(GroupStore, "insert")),
       );
     }),
-  });
+  };
+  return GroupStore.make(workspaceId, driver);
 });
 
 /** Provide group storage over the caller's binding. @category layers */

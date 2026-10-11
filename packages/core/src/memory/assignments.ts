@@ -1,11 +1,9 @@
 import { Assignment, AssignmentStore } from "../authorization/index.ts";
-import { Store } from "../journal/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Assignment.Record));
 const rows = Rows.make(Schema.fromJsonString(Assignment.Record));
 
 /**
@@ -20,7 +18,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
       Effect.map((records) => records.filter(predicate)),
       Effect.mapError(storeFailure(AssignmentStore, operation)),
     );
-  return AssignmentStore.Service.of({
+  const driver: AssignmentStore.Interface = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("assignments"), id)).pipe(
         Effect.mapError(storeFailure(AssignmentStore, "get")),
@@ -38,16 +36,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
           Assignment.Source.isAnyOf(["Role"])(record.source) &&
           record.source.roleId === roleId,
       ),
-    insert: Effect.fn("Assignments.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(AssignmentStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId || record.status !== "active")
-        return yield* new AssignmentStore.Conflict({
-          operation: "insert",
-          message: "Expected an active assignment in this workspace",
-        });
+    insert: Effect.fn("Assignments.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(AssignmentStore, "insert")));
       if (space.records.of("assignments").has(record.id))
         return yield* new AssignmentStore.Conflict({
@@ -60,7 +49,6 @@ export const make = Effect.fn("Assignments.make")(function* () {
       space.records.of("assignments").set(record.id, row);
     }),
     markRevoked: Effect.fn("Assignments.markRevoked")(function* (id) {
-      yield* Store.Transaction;
       const space = yield* write.pipe(
         Effect.mapError(storeFailure(AssignmentStore, "markRevoked")),
       );
@@ -77,7 +65,8 @@ export const make = Effect.fn("Assignments.make")(function* () {
         .pipe(Effect.mapError(storeFailure(AssignmentStore, "markRevoked")));
       space.records.of("assignments").set(id, row);
     }),
-  });
+  };
+  return AssignmentStore.make(workspaceId, driver);
 });
 
 /**

@@ -1,14 +1,9 @@
-import { Store } from "../journal/index.ts";
 import { Invitation, InvitationStore } from "../workspace/index.ts";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { compareBinary, Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Invitation.Record));
-const validateSettled = Schema.decodeEffect(
-  Schema.toType(Schema.Union([Invitation.State.cases.Accepted, Invitation.State.cases.Revoked])),
-);
 export const rows = Rows.make(Schema.fromJsonString(Invitation.Record));
 
 /** Issue order: issue time, then ID. */
@@ -27,7 +22,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
     Effect.flatMap(read, (space) => rows.all(space.records.of("invitations"))).pipe(
       Effect.mapError(storeFailure(InvitationStore, operation)),
     );
-  return InvitationStore.Service.of({
+  const driver: InvitationStore.Interface = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("invitations"), id)).pipe(
         Effect.mapError(storeFailure(InvitationStore, "get")),
@@ -43,19 +38,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
           .toSorted((left, right) => compareBinary(left.details.id, right.details.id)),
       ),
     list: Effect.map(all("list"), (records) => records.toSorted(byIssue)),
-    insert: Effect.fn("Invitations.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(InvitationStore, "insert")),
-      );
-      if (
-        record.details.workspaceId !== workspaceId ||
-        !Invitation.State.isAnyOf(["Pending"])(record.state)
-      )
-        return yield* new InvitationStore.Conflict({
-          operation: "insert",
-          message: "Expected a pending invitation in this workspace",
-        });
+    insert: Effect.fn("Invitations.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(InvitationStore, "insert")));
       if (space.records.of("invitations").has(record.details.id))
         return yield* new InvitationStore.Conflict({
@@ -67,11 +50,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
         .pipe(Effect.mapError(storeFailure(InvitationStore, "insert")));
       space.records.of("invitations").set(record.details.id, row);
     }),
-    settle: Effect.fn("Invitations.settle")(function* (id, input) {
-      yield* Store.Transaction;
-      const state = yield* validateSettled(input).pipe(
-        Effect.mapError(storeConflict(InvitationStore, "settle")),
-      );
+    settle: Effect.fn("Invitations.settle")(function* (id, state) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(InvitationStore, "settle")));
       const current = yield* rows
         .get(space.records.of("invitations"), id)
@@ -86,7 +65,8 @@ export const make = Effect.fn("Invitations.make")(function* () {
         .pipe(Effect.mapError(storeFailure(InvitationStore, "settle")));
       space.records.of("invitations").set(id, row);
     }),
-  });
+  };
+  return InvitationStore.make(workspaceId, driver);
 });
 
 /**

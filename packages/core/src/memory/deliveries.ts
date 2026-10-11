@@ -1,42 +1,23 @@
-import { ChannelId, Delivery, DeliveryStore } from "../channel/index.ts";
-import { Store } from "../journal/index.ts";
-import { Thread } from "../thread/index.ts";
+import { Delivery, DeliveryStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { compareBinary, Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Delivery.Record));
 const rows = Rows.make(Schema.fromJsonString(Delivery.Record));
 
 /** Delivery records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Deliveries.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
-  /** Validate a record for this workspace before writing it. */
-  const valid = (operation: string, input: Delivery.Record) =>
-    Effect.gen(function* () {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(DeliveryStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new DeliveryStore.Conflict({
-          operation,
-          message: "Expected a delivery in this workspace",
-        });
-      return record;
-    });
-  return DeliveryStore.Service.of({
+  const driver: DeliveryStore.Interface = {
     get: Effect.fn("Deliveries.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Delivery.Id)(input);
+      function* (id) {
         return yield* rows.get((yield* read).records.of("deliveries"), id);
       },
       Effect.mapError(storeFailure(DeliveryStore, "get")),
     ),
     listRequestedByThread: Effect.fn("Deliveries.listRequestedByThread")(
-      function* (input) {
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(input);
+      function* (threadId) {
         const records = yield* rows.all((yield* read).records.of("deliveries"));
         return records
           .filter((record) => record.threadId === threadId && record.status === "requested")
@@ -47,10 +28,7 @@ export const make = Effect.fn("Deliveries.make")(function* () {
       Effect.mapError(storeFailure(DeliveryStore, "listRequestedByThread")),
     ),
     findByExternalMessage: Effect.fn("Deliveries.findByExternalMessage")(
-      function* (channelInput, conversationInput, messageInput) {
-        const channelId = yield* Schema.decodeEffect(ChannelId.Id)(channelInput);
-        const conversationId = yield* Schema.decodeEffect(Schema.NonEmptyString)(conversationInput);
-        const externalMessageId = yield* Schema.decodeEffect(Schema.NonEmptyString)(messageInput);
+      function* (channelId, conversationId, externalMessageId) {
         const records = yield* rows.all((yield* read).records.of("deliveries"));
         return Option.fromUndefinedOr(
           records.find(
@@ -63,8 +41,7 @@ export const make = Effect.fn("Deliveries.make")(function* () {
       },
       Effect.mapError(storeFailure(DeliveryStore, "findByExternalMessage")),
     ),
-    insert: Effect.fn("Deliveries.insert")(function* (input) {
-      const record = yield* valid("insert", input);
+    insert: Effect.fn("Deliveries.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(DeliveryStore, "insert")));
       if (space.records.of("deliveries").has(record.id))
         return yield* new DeliveryStore.Conflict({
@@ -76,8 +53,7 @@ export const make = Effect.fn("Deliveries.make")(function* () {
         .pipe(Effect.mapError(storeFailure(DeliveryStore, "insert")));
       space.records.of("deliveries").set(record.id, row);
     }),
-    update: Effect.fn("Deliveries.update")(function* (input) {
-      const record = yield* valid("update", input);
+    update: Effect.fn("Deliveries.update")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(DeliveryStore, "update")));
       const found = yield* rows
         .get(space.records.of("deliveries"), record.id)
@@ -92,7 +68,8 @@ export const make = Effect.fn("Deliveries.make")(function* () {
         .pipe(Effect.mapError(storeFailure(DeliveryStore, "update")));
       space.records.of("deliveries").set(record.id, row);
     }),
-  });
+  };
+  return DeliveryStore.make(workspaceId, driver);
 });
 
 /** Provide delivery storage over the caller's binding. @category layers */

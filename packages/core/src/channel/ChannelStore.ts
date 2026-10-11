@@ -5,10 +5,12 @@
  *
  * @since 0.1.0
  */
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { Channel } from "./Channel.ts";
+import { Channel } from "./Channel.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing channels.
@@ -38,17 +40,21 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ChannelStore.Confl
  *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   /** The channel, removed or not. */
   readonly get: (id: Channel.Id) => Effect.Effect<Option.Option<Channel.Record>, Failure>;
   /** The workspace's channels that are not removed, in no particular order. */
   readonly listActive: Effect.Effect<ReadonlyArray<Channel.Record>, Failure>;
-  /** Reject malformed or foreign records and reused ids. Never upsert. */
+  /** Reject a reused id. Never upsert. */
   readonly insert: (
     record: Channel.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Replace a stored channel; a missing, foreign, or malformed record conflicts. */
+  /** Replace a stored channel; a missing record conflicts. */
   readonly update: (
     record: Channel.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
@@ -63,5 +69,23 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/channel/ChannelStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", Channel.Id, id), driver.get),
+    listActive: driver.listActive,
+    insert: (record) => Effect.flatMap(write("insert", Channel.Record, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Channel.Record, record), driver.update),
+  };
+};
 
 export * as ChannelStore from "./ChannelStore.ts";

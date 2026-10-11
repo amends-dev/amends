@@ -1,11 +1,10 @@
-import { Store } from "@amends-dev/core/journal";
 import { Thread } from "@amends-dev/core/thread";
 import { Turn, TurnStore } from "@amends-dev/core/turn";
 import { Member } from "@amends-dev/core/workspace";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { turns } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Turn.Record));
@@ -85,26 +84,11 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(turns.workspaceId, workspaceId);
   const orderedId = sql`${turns.id} COLLATE "C"`;
-  /** Validate a record for this workspace before writing it. */
-  const valid = (operation: string, input: Turn.Record) =>
-    Effect.gen(function* () {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(TurnStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new TurnStore.Conflict({
-          operation,
-          message: "Expected a turn in this workspace",
-        });
-      return record;
-    });
   const ofAgent = (memberId: Member.Id, threadId: Thread.Id) =>
     and(inWorkspace, eq(turns.memberId, memberId), eq(turns.threadId, threadId));
-  return TurnStore.Service.of({
+  const driver: TurnStore.Interface = {
     get: Effect.fn("TurnRecords.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Turn.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -115,9 +99,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       Effect.mapError(storeFailure(TurnStore, "get")),
     ),
     findActive: Effect.fn("TurnRecords.findActive")(
-      function* (memberInput, threadInput) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+      function* (memberId, threadId) {
         return yield* guard(
           db
             .select()
@@ -128,9 +110,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       Effect.mapError(storeFailure(TurnStore, "findActive")),
     ),
     findLatest: Effect.fn("TurnRecords.findLatest")(
-      function* (memberInput, threadInput) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+      function* (memberId, threadId) {
         return yield* guard(
           db
             .select()
@@ -156,8 +136,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       Effect.mapError(storeFailure(TurnStore, "listActive")),
     ),
     listActiveByMember: Effect.fn("TurnRecords.listActiveByMember")(
-      function* (memberInput) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+      function* (memberId) {
         return yield* guard(
           db
             .select()
@@ -174,14 +153,12 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       },
       Effect.mapError(storeFailure(TurnStore, "listActiveByMember")),
     ),
-    insert: Effect.fn("TurnRecords.insert")(function* (input) {
-      const record = yield* valid("insert", input);
+    insert: Effect.fn("TurnRecords.insert")(function* (record) {
       yield* guard(db.insert(turns).values(toRow(record)), true).pipe(
         Effect.mapError(storeError(TurnStore, "insert")),
       );
     }),
-    update: Effect.fn("TurnRecords.update")(function* (input) {
-      const record = yield* valid("update", input);
+    update: Effect.fn("TurnRecords.update")(function* (record) {
       const updated = yield* guard(
         db
           .update(turns)
@@ -196,7 +173,8 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
           message: "Expected a stored turn",
         });
     }),
-  });
+  };
+  return TurnStore.make(workspaceId, driver);
 });
 
 /** Provide turn storage over the caller's binding. @category layers */

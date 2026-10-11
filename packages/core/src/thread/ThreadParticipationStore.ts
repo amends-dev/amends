@@ -5,14 +5,16 @@
  *
  * @since 0.1.0
  */
-import { Context, Schema } from "effect";
-import type { Effect, Option, DateTime } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option, DateTime } from "effect";
 import type { Store } from "../journal/store.ts";
 
-import type { ThreadParticipation } from "./ThreadParticipation.ts";
+import { ThreadParticipation } from "./ThreadParticipation.ts";
 
-import type { ThreadId } from "./ThreadId.ts";
-import type { GroupMembership } from "../group/membership/membership.ts";
+import { ThreadId } from "./ThreadId.ts";
+import { GroupMembership } from "../group/membership/membership.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing participations.
@@ -42,6 +44,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadParticipatio
  *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   readonly get: (
@@ -93,7 +99,7 @@ export interface Interface {
     endedAt: DateTime.Utc,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
-   * Reject malformed or foreign records, an ended one, reused IDs, and a second active
+   * Reject reused IDs and a second active
    * participation for one participant in the thread. The thread and admission are recorded as
    * given, checked when the participant is admitted. Preserve historical values on replay.
    */
@@ -111,5 +117,58 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/thread/ThreadParticipationStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", ThreadParticipation.Id, id), driver.get),
+    getMany: (ids) =>
+      Effect.flatMap(read("getMany", Schema.Array(ThreadParticipation.Id), ids), driver.getMany),
+    listByThread: (id) =>
+      Effect.flatMap(read("listByThread", ThreadId.Id, id), driver.listByThread),
+    pageActiveByThread: Effect.fn("ThreadParticipationStore.pageActiveByThread")(
+      function* (id, options) {
+        return yield* driver.pageActiveByThread(
+          yield* read("pageActiveByThread", ThreadId.Id, id),
+          yield* read("pageActiveByThread", ThreadParticipation.ListOptions, options),
+        );
+      },
+    ),
+    findActive: Effect.fn("ThreadParticipationStore.findActive")(function* (id, participants) {
+      return yield* driver.findActive(
+        yield* read("findActive", ThreadId.Id, id),
+        yield* read("findActive", Schema.Array(ThreadParticipation.Reference), participants),
+      );
+    }),
+    endByAdmission: Effect.fn("ThreadParticipationStore.endByAdmission")(function* (id, endedAt) {
+      return yield* driver.endByAdmission(
+        yield* write("endByAdmission", GroupMembership.Id, id),
+        yield* write("endByAdmission", Schema.DateTimeUtc, endedAt),
+      );
+    }),
+    end: Effect.fn("ThreadParticipationStore.end")(function* (departure, endedAt) {
+      return yield* driver.end(
+        yield* write("end", ThreadParticipation.Departure, departure),
+        yield* write("end", Schema.DateTimeUtc, endedAt),
+      );
+    }),
+    insert: (record) =>
+      write("insert", ThreadParticipation.Record, record).pipe(
+        Effect.filterOrFail(
+          (record) => record.status === "active" && record.endedAt === null,
+          () => new Conflict({ operation: "insert", message: "Expected an active participation" }),
+        ),
+        Effect.flatMap(driver.insert),
+      ),
+  };
+};
 
 export * as ThreadParticipationStore from "./ThreadParticipationStore.ts";

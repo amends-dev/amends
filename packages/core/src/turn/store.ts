@@ -1,10 +1,12 @@
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { ThreadId } from "../thread/ThreadId.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
 
-import type { MemberId } from "../workspace/member/id.ts";
-import type { Turn } from "./turn.ts";
+import { MemberId } from "../workspace/member/id.ts";
+import { Turn } from "./turn.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("TurnStore.Failure", {
   operation: Schema.String,
@@ -15,7 +17,13 @@ export class Conflict extends Schema.TaggedError<Conflict>()("TurnStore.Conflict
   message: Schema.String,
 }) {}
 
-/** Internal projection storage. Reads honor an existing transaction; writes require one. */
+/**
+ * Internal projection storage. Reads honor an existing transaction; writes require one.
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ */
 export interface Interface {
   readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Record>, Failure>;
   /** The agent's active turn on the thread: queued, running, or cancelling. */
@@ -38,13 +46,13 @@ export interface Interface {
     memberId: MemberId.Id,
   ) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
   /**
-   * Reject invalid or foreign records, reused IDs, and a second active turn for the same agent
+   * Reject reused IDs and a second active turn for the same agent
    * and thread. Never upsert.
    */
   readonly insert: (
     record: Turn.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Replace a stored turn; a missing, foreign, or invalid record conflicts. */
+  /** Replace a stored turn; a missing record conflicts. */
   readonly update: (
     record: Turn.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
@@ -53,5 +61,38 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/turn/store/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", Turn.Id, id), driver.get),
+    findActive: Effect.fn("TurnStore.findActive")(function* (memberId, threadId) {
+      return yield* driver.findActive(
+        yield* read("findActive", MemberId.Id, memberId),
+        yield* read("findActive", ThreadId.Id, threadId),
+      );
+    }),
+    findLatest: Effect.fn("TurnStore.findLatest")(function* (memberId, threadId) {
+      return yield* driver.findLatest(
+        yield* read("findLatest", MemberId.Id, memberId),
+        yield* read("findLatest", ThreadId.Id, threadId),
+      );
+    }),
+    listActive: (limit) =>
+      Effect.flatMap(read("listActive", Schema.Natural, limit), driver.listActive),
+    listActiveByMember: (memberId) =>
+      Effect.flatMap(read("listActiveByMember", MemberId.Id, memberId), driver.listActiveByMember),
+    insert: (record) => Effect.flatMap(write("insert", Turn.Record, record), driver.insert),
+    update: (record) => Effect.flatMap(write("update", Turn.Record, record), driver.update),
+  };
+};
 
 export * as TurnStore from "./store.ts";

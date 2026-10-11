@@ -1,6 +1,5 @@
 import { Connection } from "@amends-dev/connection";
 import { ConnectionCredentialStore } from "@amends-dev/core/connection";
-import { Store } from "@amends-dev/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
@@ -33,9 +32,8 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
       eq(connectionCredentials.workspaceId, workspaceId),
       eq(connectionCredentials.connectionId, connectionId),
     );
-  return ConnectionCredentialStore.Service.of({
+  const driver: ConnectionCredentialStore.Interface = {
     set: Effect.fn("ConnectionCredentials.set")(function* (connectionId, credential) {
-      yield* Store.Transaction;
       if (Option.isNone(credentialKey)) return yield* unavailable;
       const sealed = yield* encodeCredential(credential).pipe(
         Effect.flatMap((json) => credentialKey.value.seal(json, bindingOf(connectionId))),
@@ -68,12 +66,12 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
         );
     }),
     remove: Effect.fn("ConnectionCredentials.remove")(function* (connectionId) {
-      yield* Store.Transaction;
       yield* guard(db.delete(connectionCredentials).where(ofConnection(connectionId)), true).pipe(
         Effect.mapError(storeFailure(ConnectionCredentialStore, "remove")),
       );
     }),
-  });
+  };
+  return ConnectionCredentialStore.make(driver);
 });
 
 /** Provide credential storage over the caller's binding and credential key. @category layers */

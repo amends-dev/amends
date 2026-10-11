@@ -1,12 +1,10 @@
 import { Identity } from "../identity/index.ts";
-import { Store } from "../journal/index.ts";
 import { Member, MemberStore } from "../workspace/index.ts";
 import { Array, Effect, Layer, Schema, Option } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { compareBinary, Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Member.Record));
 const rows = Rows.make(Schema.fromJsonString(Member.Record));
 
 const isActive = (member: Member.Record, identity: Identity.MemberReference) =>
@@ -25,7 +23,7 @@ export const make = Effect.fn("Members.make")(function* () {
     Effect.flatMap(read, (space) => rows.all(space.records.of("members"))).pipe(
       Effect.mapError(storeFailure(MemberStore, operation)),
     );
-  return MemberStore.Service.of({
+  const driver: MemberStore.Interface = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("members"), id)).pipe(
         Effect.mapError(storeFailure(MemberStore, "get")),
@@ -42,16 +40,7 @@ export const make = Effect.fn("Members.make")(function* () {
     list: Effect.map(all("list"), (members) =>
       members.toSorted((left, right) => compareBinary(left.id, right.id)),
     ),
-    insert: Effect.fn("Members.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(MemberStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId || record.status !== "active")
-        return yield* new MemberStore.Conflict({
-          operation: "insert",
-          message: "Expected an active member in this workspace",
-        });
+    insert: Effect.fn("Members.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(MemberStore, "insert")));
       const members = yield* rows
         .all(space.records.of("members"))
@@ -71,11 +60,7 @@ export const make = Effect.fn("Members.make")(function* () {
         .pipe(Effect.mapError(storeFailure(MemberStore, "insert")));
       space.records.of("members").set(record.id, row);
     }),
-    rename: Effect.fn("Members.rename")(function* (id, input) {
-      yield* Store.Transaction;
-      const name = yield* Schema.decodeEffect(Member.Name)(input).pipe(
-        Effect.mapError(storeConflict(MemberStore, "rename")),
-      );
+    rename: Effect.fn("Members.rename")(function* (id, name) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(MemberStore, "rename")));
       const current = yield* rows
         .get(space.records.of("members"), id)
@@ -91,7 +76,6 @@ export const make = Effect.fn("Members.make")(function* () {
       space.records.of("members").set(id, row);
     }),
     markRemoved: Effect.fn("Members.markRemoved")(function* (id) {
-      yield* Store.Transaction;
       const space = yield* write.pipe(Effect.mapError(storeFailure(MemberStore, "markRemoved")));
       const current = yield* rows
         .get(space.records.of("members"), id)
@@ -106,7 +90,8 @@ export const make = Effect.fn("Members.make")(function* () {
         .pipe(Effect.mapError(storeFailure(MemberStore, "markRemoved")));
       space.records.of("members").set(id, row);
     }),
-  });
+  };
+  return MemberStore.make(workspaceId, driver);
 });
 
 /**

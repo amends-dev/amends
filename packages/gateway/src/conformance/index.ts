@@ -19,7 +19,6 @@ import { signInStorage } from "./sign-in-storage.ts";
 import { signals } from "./signals.ts";
 import { standaloneAppends } from "./standalone-appends.ts";
 import { transactions } from "./transactions.ts";
-import { workspaceIsolation } from "./workspace-isolation.ts";
 
 export type { Fixture, Host, HostOptions, Storage } from "./fixture.ts";
 export { Support } from "./support.ts";
@@ -36,7 +35,6 @@ export const run = (fixture: Fixture) => {
   factMetadata(fixture);
   reads(fixture);
   contracts(fixture);
-  workspaceIsolation(fixture);
   accounts(fixture);
   signInStorage(fixture);
 };

@@ -1,11 +1,9 @@
-import { Store } from "../journal/index.ts";
-import { Ownership, Workspace, WorkspaceSettings, WorkspaceStore } from "../workspace/index.ts";
+import { Workspace, WorkspaceStore } from "../workspace/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Workspace.Record));
 const rows = Rows.make(Schema.fromJsonString(Workspace.Record));
 
 /**
@@ -17,20 +15,11 @@ export const make = Effect.fn("Workspaces.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
   const writable = (operation: string) =>
     write.pipe(Effect.mapError(storeFailure(WorkspaceStore, operation)));
-  return WorkspaceStore.Service.of({
+  const driver: WorkspaceStore.Interface = {
     get: Effect.flatMap(read, (space) => rows.get(space.records.of("workspace"), workspaceId)).pipe(
       Effect.mapError(storeFailure(WorkspaceStore, "get")),
     ),
-    insert: Effect.fn("Workspaces.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(WorkspaceStore, "insert")),
-      );
-      if (record.id !== workspaceId)
-        return yield* new WorkspaceStore.Conflict({
-          operation: "insert",
-          message: "Record belongs to another workspace",
-        });
+    insert: Effect.fn("Workspaces.insert")(function* (record) {
       const space = yield* writable("insert");
       if (space.records.of("workspace").has(workspaceId))
         return yield* new WorkspaceStore.Conflict({
@@ -42,16 +31,7 @@ export const make = Effect.fn("Workspaces.make")(function* () {
         .pipe(Effect.mapError(storeFailure(WorkspaceStore, "insert")));
       space.records.of("workspace").set(workspaceId, row);
     }),
-    rename: Effect.fn("Workspaces.rename")(function* (input) {
-      yield* Store.Transaction;
-      const change = yield* Schema.decodeEffect(WorkspaceSettings.NameChange)(input).pipe(
-        Effect.mapError(storeConflict(WorkspaceStore, "rename")),
-      );
-      if (change.workspaceId !== workspaceId)
-        return yield* new WorkspaceStore.Conflict({
-          operation: "rename",
-          message: "Change belongs to another workspace",
-        });
+    rename: Effect.fn("Workspaces.rename")(function* (change) {
       const space = yield* writable("rename");
       const current = yield* rows
         .get(space.records.of("workspace"), workspaceId)
@@ -66,16 +46,7 @@ export const make = Effect.fn("Workspaces.make")(function* () {
         .pipe(Effect.mapError(storeFailure(WorkspaceStore, "rename")));
       space.records.of("workspace").set(workspaceId, row);
     }),
-    transferOwnership: Effect.fn("Workspaces.transferOwnership")(function* (input) {
-      yield* Store.Transaction;
-      const change = yield* Schema.decodeEffect(Ownership.Change)(input).pipe(
-        Effect.mapError(storeConflict(WorkspaceStore, "transferOwnership")),
-      );
-      if (change.workspaceId !== workspaceId)
-        return yield* new WorkspaceStore.Conflict({
-          operation: "transferOwnership",
-          message: "Change belongs to another workspace",
-        });
+    transferOwnership: Effect.fn("Workspaces.transferOwnership")(function* (change) {
       const space = yield* writable("transferOwnership");
       const current = yield* rows
         .get(space.records.of("workspace"), workspaceId)
@@ -90,7 +61,8 @@ export const make = Effect.fn("Workspaces.make")(function* () {
         .pipe(Effect.mapError(storeFailure(WorkspaceStore, "transferOwnership")));
       space.records.of("workspace").set(workspaceId, row);
     }),
-  });
+  };
+  return WorkspaceStore.make(workspaceId, driver);
 });
 
 /**

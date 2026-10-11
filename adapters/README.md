@@ -44,17 +44,18 @@ Cluster stores its messages in, as `PostgresClusterStorage`, pruning those the h
 
 ### Validation
 
-A store validates a record against core's schema before turning it into columns or JSON, with
-`Schema.decodeEffect(Schema.toType(...))`: a TypeScript type does not enforce a schema's
-refinements. Validation comes before any mapping that loses information, so a record whose workspace
-a row implies still passes its whole check first.
+Core checks what reaches a store before the adapter sees it. Each store contract's `make` builds
+the store over the adapter's driver: it decodes every input against its schema, with
+`Schema.decodeEffect(Schema.toType(...))`, because a TypeScript type does not enforce a schema's
+refinements, and it refuses a record of another workspace. A malformed read fails; a malformed or
+foreign write conflicts. The driver keeps only what storage keeps: reused IDs, missing records,
+conditional writes, and uniqueness.
 
-- A rejected value becomes the store's `Conflict`, through `storeConflict`, as does a workspace
-  mismatch, an invalid initial state, or a conditional write that lost.
-- An encoding failure after validation, or a failure of the database itself, is a `Failure`; a
-  malformed stored row fails when it is read.
-- Every write runs in the active workspace transaction, so a failed validation leaves no partial
-  rows, and an unhandled failure rolls the transaction back.
+- A conditional write that lost, or a row the database refused, becomes the store's `Conflict`.
+- An encoding failure, or a failure of the database itself, is a `Failure`; a malformed stored row
+  fails when it is read.
+- Every write runs in the active workspace transaction, so a refused write leaves no partial rows,
+  and an unhandled failure rolls the transaction back.
 
 ### Construction
 

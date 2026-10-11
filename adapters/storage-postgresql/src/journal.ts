@@ -4,7 +4,7 @@ import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect
 import { JournalEntry } from "./journal-entry.ts";
 import { PostgresNotices } from "./notices.ts";
 import { Binding } from "./binding.ts";
-import { isContention, storeConflict, storeError, storeFailure } from "./errors.ts";
+import { isContention, storeError, storeFailure } from "./errors.ts";
 import { insertChunked } from "./parameters.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
 
@@ -86,8 +86,6 @@ export const make = Effect.fn("Journal.make")(function* () {
     logId: Entry.LogId,
     key: Store.IdempotencyKey,
   ) {
-    yield* Schema.decodeEffect(Entry.LogId)(logId);
-    yield* Schema.decodeEffect(Store.IdempotencyKey)(key);
     const found = yield* db
       .select({
         logId: logAppendKeys.logId,
@@ -299,25 +297,13 @@ export const make = Effect.fn("Journal.make")(function* () {
 
   const append = Effect.fn("Journal.append")(function* (
     session: Binding.TransactionState,
-    input: Store.AppendInput,
+    request: Store.AppendInput,
   ) {
     const current = yield* Effect.serviceOption(Binding.CurrentTransaction);
     if (!session.active || Option.isNone(current) || current.value !== session)
       return yield* new Store.Failure({
         operation: "append",
         cause: "Closed or foreign append handle",
-      });
-    const request = yield* Schema.decodeEffect(Schema.toType(Store.AppendInput))(input).pipe(
-      Effect.mapError(storeConflict(Store, "append")),
-    );
-    if (
-      request.entries.some(
-        (entry) => entry.fact !== undefined && entry.fact.provenance.workspaceId !== workspaceId,
-      )
-    )
-      return yield* new Store.Conflict({
-        operation: "append",
-        message: "Fact belongs to another workspace",
       });
     const staging = stagingOf(session);
     yield* hold(staging, request.logId);
@@ -409,12 +395,10 @@ export const make = Effect.fn("Journal.make")(function* () {
     return entries.map(copyEntry);
   });
 
-  return Store.Service.of({
+  const driver: Store.Interface = {
     workspaceId,
     getEntry: Effect.fn("Journal.getEntry")(
       function* (logId, entryId) {
-        yield* Schema.decodeEffect(Entry.LogId)(logId);
-        yield* Schema.decodeEffect(Entry.Id)(entryId);
         // An entry is either staged by this transaction or stored; staged ones need no write.
         const session = yield* stagedSession;
         const staged = Option.flatMap(session, (value) =>
@@ -440,36 +424,30 @@ export const make = Effect.fn("Journal.make")(function* () {
       },
       Effect.mapError(storeFailure(Store, "getEntry")),
     ),
-    readFacts: Effect.fn("Journal.readFacts")(function* (logId, input) {
+    readFacts: Effect.fn("Journal.readFacts")(function* (logId, options) {
       return yield* flushed(
         guard(
-          Effect.gen(function* () {
-            yield* Schema.decodeEffect(Entry.LogId)(logId);
-            const options = yield* Schema.decodeEffect(Store.ReadFactsOptions)(input);
-            return yield* db
-              .select(entryColumns)
-              .from(logEntries)
-              .where(
-                and(
-                  eq(logEntries.workspaceId, workspaceId),
-                  eq(logEntries.logId, logId),
-                  options.name === undefined ? undefined : eq(logEntries.factName, options.name),
-                  options.subject === undefined
-                    ? undefined
-                    : eq(logEntries.subject, options.subject),
-                  options.version === undefined
-                    ? undefined
-                    : eq(logEntries.factVersion, options.version),
-                  // A row comparison bounds the index scan; the equivalent OR form only filters it.
-                  options.after === undefined
-                    ? undefined
-                    : sql`(${logEntries.position}, ${logEntries.entryIndex}) > (${options.after.position}, ${options.after.index})`,
-                ),
-              )
-              .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
-              .limit(options.limit)
-              .pipe(Effect.flatMap(decodeEntries));
-          }),
+          db
+            .select(entryColumns)
+            .from(logEntries)
+            .where(
+              and(
+                eq(logEntries.workspaceId, workspaceId),
+                eq(logEntries.logId, logId),
+                options.name === undefined ? undefined : eq(logEntries.factName, options.name),
+                options.subject === undefined ? undefined : eq(logEntries.subject, options.subject),
+                options.version === undefined
+                  ? undefined
+                  : eq(logEntries.factVersion, options.version),
+                // A row comparison bounds the index scan; the equivalent OR form only filters it.
+                options.after === undefined
+                  ? undefined
+                  : sql`(${logEntries.position}, ${logEntries.entryIndex}) > (${options.after.position}, ${options.after.index})`,
+              ),
+            )
+            .orderBy(asc(logEntries.position), asc(logEntries.entryIndex))
+            .limit(options.limit)
+            .pipe(Effect.flatMap(decodeEntries)),
         ),
       ).pipe(Effect.mapError(storeFailure(Store, "readFacts")));
     }),
@@ -577,7 +555,8 @@ export const make = Effect.fn("Journal.make")(function* () {
         }),
       );
     }),
-  });
+  };
+  return Store.make(driver);
 });
 
 /**

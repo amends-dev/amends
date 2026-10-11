@@ -1,13 +1,10 @@
-import { Store } from "@amends-dev/core/journal";
 import { Member, MemberStore } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { members } from "./schema.ts";
-
-const validateRecord = Schema.decodeEffect(Schema.toType(Member.Record));
 
 /** Selected in the record's shape; decoding checks the brands and the identity union. */
 const recordColumns = {
@@ -33,12 +30,9 @@ export const make = Effect.fn("Members.make")(function* () {
       Effect.flatMap(decode),
       Effect.mapError(storeFailure(MemberStore, operation)),
     );
-  return MemberStore.Service.of({
+  const driver: MemberStore.Interface = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(members.id, id))), Array.head),
-    getMany: Effect.fn("Members.getMany")(function* (input) {
-      const ids = yield* Schema.decodeEffect(Schema.Array(Member.Id))(input).pipe(
-        Effect.mapError(storeFailure(MemberStore, "getMany")),
-      );
+    getMany: Effect.fn("Members.getMany")(function* (ids) {
       if (ids.length === 0) return [];
       return yield* select("getMany", and(inWorkspace, inIds(members.id, ids)));
     }),
@@ -56,16 +50,7 @@ export const make = Effect.fn("Members.make")(function* () {
         Array.head,
       ),
     list: select("list", inWorkspace),
-    insert: Effect.fn("Members.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(MemberStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId || record.status !== "active")
-        return yield* new MemberStore.Conflict({
-          operation: "insert",
-          message: "Expected an active member in this workspace",
-        });
+    insert: Effect.fn("Members.insert")(function* (record) {
       yield* guard(
         db.insert(members).values({
           workspaceId,
@@ -78,11 +63,7 @@ export const make = Effect.fn("Members.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(MemberStore, "insert")));
     }),
-    rename: Effect.fn("Members.rename")(function* (id, input) {
-      yield* Store.Transaction;
-      const name = yield* Schema.decodeEffect(Member.Name)(input).pipe(
-        Effect.mapError(storeConflict(MemberStore, "rename")),
-      );
+    rename: Effect.fn("Members.rename")(function* (id, name) {
       const rows = yield* guard(
         db
           .update(members)
@@ -98,7 +79,6 @@ export const make = Effect.fn("Members.make")(function* () {
         });
     }),
     markRemoved: Effect.fn("Members.markRemoved")(function* (id) {
-      yield* Store.Transaction;
       const rows = yield* guard(
         db
           .update(members)
@@ -113,7 +93,8 @@ export const make = Effect.fn("Members.make")(function* () {
           message: "Expected an active membership",
         });
     }),
-  });
+  };
+  return MemberStore.make(workspaceId, driver);
 });
 
 /**

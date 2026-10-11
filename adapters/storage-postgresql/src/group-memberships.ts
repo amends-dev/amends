@@ -1,14 +1,11 @@
 import { Group, GroupMembership, GroupMembershipStore } from "@amends-dev/core/group";
-import { Store } from "@amends-dev/core/journal";
-import { Member } from "@amends-dev/core/workspace";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { groupMemberships } from "./schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(GroupMembership.Record));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ ...GroupMembership.Record.fields, admittedAt: Schema.DateTimeUtcFromDate }),
@@ -22,10 +19,9 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   const inWorkspace = eq(groupMemberships.workspaceId, workspaceId);
-  return GroupMembershipStore.Service.of({
+  const driver: GroupMembershipStore.Interface = {
     get: Effect.fn("GroupMemberships.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -36,8 +32,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "get")),
     ),
     getMany: Effect.fn("GroupMemberships.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(GroupMembership.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -49,9 +44,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "getMany")),
     ),
     findActive: Effect.fn("GroupMemberships.findActive")(
-      function* (groupInput, memberInput) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+      function* (groupId, memberId) {
         return yield* guard(
           db
             .select()
@@ -69,9 +62,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "findActive")),
     ),
     findActiveMany: Effect.fn("GroupMemberships.findActiveMany")(
-      function* (groupInput, input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const memberIds = yield* Schema.decodeEffect(Schema.Array(Member.Id))(input);
+      function* (groupId, memberIds) {
         if (memberIds.length === 0) return [];
         return yield* guard(
           db
@@ -90,9 +81,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "findActiveMany")),
     ),
     summarize: Effect.fn("GroupMemberships.summarize")(
-      function* (groupInput, memberInput) {
-        const groupIds = yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput);
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+      function* (groupIds, memberId) {
         if (groupIds.length === 0) return [];
         return yield* guard(
           db
@@ -115,8 +104,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "summarize")),
     ),
     listByGroup: Effect.fn("GroupMemberships.listByGroup")(
-      function* (input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(input);
+      function* (groupId) {
         return yield* guard(
           db
             .select()
@@ -128,9 +116,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "listByGroup")),
     ),
     pageActiveByGroup: Effect.fn("GroupMemberships.pageActiveByGroup")(
-      function* (groupInput, input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input);
+      function* (groupId, options) {
         const orderedId = sql`${groupMemberships.id} COLLATE "C"`;
         return yield* guard(
           db
@@ -151,9 +137,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByGroup")),
     ),
     pageActiveByMember: Effect.fn("GroupMemberships.pageActiveByMember")(
-      function* (memberInput, input) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
-        const options = yield* Schema.decodeEffect(GroupMembership.ByMemberOptions)(input);
+      function* (memberId, options) {
         const orderedGroup = sql`${groupMemberships.groupId} COLLATE "C"`;
         return yield* guard(
           db
@@ -176,8 +160,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByMember")),
     ),
     listActiveByMember: Effect.fn("GroupMemberships.listActiveByMember")(
-      function* (input) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(input);
+      function* (memberId) {
         return yield* guard(
           db
             .select()
@@ -194,16 +177,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "listActiveByMember")),
     ),
-    markRemoved: Effect.fn("GroupMemberships.markRemoved")(function* (input) {
-      yield* Store.Transaction;
-      const removal = yield* Schema.decodeEffect(GroupMembership.Removal)(input).pipe(
-        Effect.mapError(storeConflict(GroupMembershipStore, "markRemoved")),
-      );
-      if (removal.workspaceId !== workspaceId)
-        return yield* new GroupMembershipStore.Conflict({
-          operation: "markRemoved",
-          message: "Removal belongs to another workspace",
-        });
+    markRemoved: Effect.fn("GroupMemberships.markRemoved")(function* (removal) {
       const rows = yield* guard(
         db
           .update(groupMemberships)
@@ -226,24 +200,15 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
           message: "Expected the specified active group admission",
         });
     }),
-    insert: Effect.fn("GroupMemberships.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(GroupMembershipStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId || record.status !== "active")
-        return yield* new GroupMembershipStore.Conflict({
-          operation: "insert",
-          message: "Expected an active group membership in this workspace",
-        });
+    insert: Effect.fn("GroupMemberships.insert")(function* (record) {
+      const { admittedAt, ...fields } = record;
       yield* guard(
-        db
-          .insert(groupMemberships)
-          .values({ ...record, admittedAt: DateTime.toDate(record.admittedAt) }),
+        db.insert(groupMemberships).values({ ...fields, admittedAt: DateTime.toDate(admittedAt) }),
         true,
       ).pipe(Effect.mapError(storeError(GroupMembershipStore, "insert")));
     }),
-  });
+  };
+  return GroupMembershipStore.make(workspaceId, driver);
 });
 
 /** Provide group admission storage over the caller's binding. @category layers */

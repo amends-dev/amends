@@ -572,6 +572,12 @@ reference implementation of the storage contracts, which enforces with plain map
 PostgreSQL adapter enforces with keys and indexes, and which core's tests run over. Nothing
 survives the process.
 
+Every store contract builds its store with `make(workspaceId, driver)`, over the driver an
+adapter implements: the store checks each input against its schema, and a record against the
+workspace, through `StoreInput`, before the driver sees it. A driver keeps only what storage
+keeps, such as reused IDs and conditional writes, and an adapter's module returns
+`XStore.make(workspaceId, driver)` from its constructor.
+
 - `MemoryDatabase` is the storage every connected host shares. Each workspace has one `Space`:
   its commits, log batches, keyed append slices, projected records by kind, with the live
   projection versions and rebuild checkpoints, and private read state. Beside the workspaces sit

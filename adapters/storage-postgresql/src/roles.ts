@@ -1,12 +1,9 @@
-import { BuiltinRoles, Role, RoleStore } from "@amends-dev/core/authorization";
-import { Store } from "@amends-dev/core/journal";
+import { Role, RoleStore } from "@amends-dev/core/authorization";
 import { and, eq, lt } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { builtinRoleRevisions, roles } from "./schema.ts";
-
-const validateRecord = Schema.decodeEffect(Schema.toType(Role.Record));
 
 /** The table's columns already have the record's names; decoding checks brands and uniqueness. */
 const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Record));
@@ -26,7 +23,6 @@ export const make = Effect.fn("Roles.make")(function* () {
     id: Role.Id,
     change: Partial<typeof roles.$inferInsert>,
   ) {
-    yield* Store.Transaction;
     const rows = yield* guard(
       db
         .update(roles)
@@ -38,7 +34,7 @@ export const make = Effect.fn("Roles.make")(function* () {
     if (rows.length === 0)
       return yield* new RoleStore.Conflict({ operation, message: "Role does not exist" });
   });
-  return RoleStore.Service.of({
+  const driver: RoleStore.Interface = {
     get: (id) =>
       guard(
         db
@@ -50,16 +46,7 @@ export const make = Effect.fn("Roles.make")(function* () {
         Effect.map(Array.head),
         Effect.mapError(storeFailure(RoleStore, "get")),
       ),
-    insert: Effect.fn("Roles.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(RoleStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new RoleStore.Conflict({
-          operation: "insert",
-          message: "Role belongs to another workspace",
-        });
+    insert: Effect.fn("Roles.insert")(function* (record) {
       yield* guard(
         db.insert(roles).values({
           workspaceId,
@@ -70,16 +57,10 @@ export const make = Effect.fn("Roles.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(RoleStore, "insert")));
     }),
-    rename: Effect.fn("Roles.rename")(function* (id, name) {
-      const validated = yield* Schema.decodeEffect(Role.Record.fields.name)(name).pipe(
-        Effect.mapError(storeConflict(RoleStore, "rename")),
-      );
+    rename: Effect.fn("Roles.rename")(function* (id, validated) {
       yield* edit("rename", id, { name: validated });
     }),
-    setPermissions: Effect.fn("Roles.setPermissions")(function* (id, permissions) {
-      const validated = yield* Schema.decodeEffect(Schema.toType(Role.Record.fields.permissions))(
-        permissions,
-      ).pipe(Effect.mapError(storeConflict(RoleStore, "setPermissions")));
+    setPermissions: Effect.fn("Roles.setPermissions")(function* (id, validated) {
       yield* edit("setPermissions", id, { permissions: [...validated] });
     }),
     builtinRevision: guard(
@@ -91,11 +72,7 @@ export const make = Effect.fn("Roles.make")(function* () {
       Effect.map((rows) => Array.head(rows.map(({ revision }) => revision))),
       Effect.mapError(storeFailure(RoleStore, "builtinRevision")),
     ),
-    recordBuiltinRevision: Effect.fn("Roles.recordBuiltinRevision")(function* (input) {
-      yield* Store.Transaction;
-      const revision = yield* Schema.decodeEffect(BuiltinRoles.Revision)(input).pipe(
-        Effect.mapError(storeConflict(RoleStore, "recordBuiltinRevision")),
-      );
+    recordBuiltinRevision: Effect.fn("Roles.recordBuiltinRevision")(function* (revision) {
       // Only a later revision replaces the recorded one.
       const rows = yield* guard(
         db
@@ -115,7 +92,8 @@ export const make = Effect.fn("Roles.make")(function* () {
           message: "Expected a later built-in revision",
         });
     }),
-  });
+  };
+  return RoleStore.make(workspaceId, driver);
 });
 
 /**

@@ -1,4 +1,3 @@
-import { Store } from "@amends-dev/core/journal";
 import { SessionStateStore } from "@amends-dev/core/turn";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
@@ -47,7 +46,7 @@ export const make = Effect.fn("SessionStates.make")(function* () {
       eq(sessionStates.workspaceId, workspaceId),
       eq(sessionStates.participationId, participationId),
     );
-  return SessionStateStore.Service.of({
+  const driver: SessionStateStore.Interface = {
     get: Effect.fn("SessionStates.get")(
       function* (participationId) {
         const rows = yield* guard(
@@ -61,7 +60,6 @@ export const make = Effect.fn("SessionStates.make")(function* () {
     ),
     set: Effect.fn("SessionStates.set")(
       function* (participationId, saved) {
-        yield* Store.Transaction;
         const { selection } = saved;
         const columns = {
           agent: saved.agent,
@@ -86,7 +84,8 @@ export const make = Effect.fn("SessionStates.make")(function* () {
       },
       Effect.mapError(storeFailure(SessionStateStore, "set")),
     ),
-  });
+  };
+  return SessionStateStore.make(driver);
 });
 
 /** Provide session storage over the caller's binding. @category layers */

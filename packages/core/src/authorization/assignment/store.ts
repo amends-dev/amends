@@ -1,10 +1,12 @@
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../../journal/store.ts";
-import type { Member } from "../../workspace/member/member.ts";
+import { Member } from "../../workspace/member/member.ts";
 
-import type { Assignment } from "./assignment.ts";
-import type { Role } from "../role/role.ts";
+import { Assignment } from "./assignment.ts";
+import { Role } from "../role/role.ts";
+import { StoreInput } from "../../journal/StoreInput.ts";
+import type { WorkspaceId } from "../../workspace/id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("AssignmentStore.Failure", {
   operation: Schema.String,
@@ -28,6 +30,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("AssignmentStore.Co
  * Reject expired or foreign transaction handles and never retry the program internally.
  * Membership, role ownership, permission compatibility, and grant authority are
  * checked by services before publication.
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   /** Find an active or revoked assignment in this workspace; None if absent. */
@@ -46,9 +52,7 @@ export interface Interface {
   ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Failure>;
 
   /**
-   * Insert a valid, active Assignment.Record belonging to this workspace. Fail
-   * with Conflict for schema violations (including scope/workspace mismatch),
-   * a foreign workspace, an inactive record, or a reused assignment ID, including
+   * Insert an active assignment. Fail with Conflict for a reused assignment ID, including
    * revoked IDs. Overlapping grants remain separate assignments. Never upsert.
    */
   readonly insert: (
@@ -68,5 +72,34 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/authorization/assignment-store/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (assignmentId) => Effect.flatMap(read("get", Assignment.Id, assignmentId), driver.get),
+    listActiveByMember: (memberId) =>
+      Effect.flatMap(read("listActiveByMember", Member.Id, memberId), driver.listActiveByMember),
+    listActiveByRole: (roleId) =>
+      Effect.flatMap(read("listActiveByRole", Role.Id, roleId), driver.listActiveByRole),
+    insert: (record) =>
+      write("insert", Assignment.Record, record).pipe(
+        Effect.filterOrFail(
+          (record) => record.status === "active",
+          () => new Conflict({ operation: "insert", message: "Expected an active assignment" }),
+        ),
+        Effect.flatMap(driver.insert),
+      ),
+    markRevoked: (assignmentId) =>
+      Effect.flatMap(write("markRevoked", Assignment.Id, assignmentId), driver.markRevoked),
+  };
+};
 
 export * as AssignmentStore from "./store.ts";

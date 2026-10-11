@@ -5,12 +5,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
 
-import type { Thread } from "./Thread.ts";
-import type { GroupId } from "../group/id.ts";
+import { Thread } from "./Thread.ts";
+import { GroupId } from "../group/id.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing threads.
@@ -40,6 +42,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadStore.Confli
  *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Record>, Failure>;
@@ -72,14 +78,14 @@ export interface Interface {
     options: Thread.OpeningOptions,
   ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
   /**
-   * Reject malformed or foreign records and reused IDs. The group and creator are recorded as
+   * Reject reused IDs. The group and creator are recorded as
    * given, checked when the thread starts. Preserve historical values on replay.
    */
   readonly insert: (
     record: Thread.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
-   * Projection write that sets a thread's title. A missing, foreign, or malformed thread conflicts;
+   * Projection write that sets a thread's title. A missing thread conflicts;
    * the same title again changes nothing.
    */
   readonly rename: (
@@ -94,7 +100,7 @@ export interface Interface {
   ) => Effect.Effect<ReadonlyArray<Thread.Latest>, Failure>;
   /**
    * Projection write that advances a thread's latest content activity. A position at or before the
-   * recorded one changes nothing; a missing, foreign, or malformed thread conflicts.
+   * recorded one changes nothing; a missing thread conflicts.
    */
   readonly recordLatest: (
     latest: Thread.Latest,
@@ -110,5 +116,40 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/thread/ThreadStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (id) => Effect.flatMap(read("get", Thread.Id, id), driver.get),
+    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Thread.Id), ids), driver.getMany),
+    listByGroup: (id) => Effect.flatMap(read("listByGroup", GroupId.Id, id), driver.listByGroup),
+    listByLatest: Effect.fn("ThreadStore.listByLatest")(function* (id, options) {
+      return yield* driver.listByLatest(
+        yield* read("listByLatest", GroupId.Id, id),
+        yield* read("listByLatest", Thread.ListOptions, options),
+      );
+    }),
+    listByStart: Effect.fn("ThreadStore.listByStart")(function* (id, options) {
+      return yield* driver.listByStart(
+        yield* read("listByStart", GroupId.Id, id),
+        yield* read("listByStart", Thread.OpeningOptions, options),
+      );
+    }),
+    insert: (record) => Effect.flatMap(write("insert", Thread.Record, record), driver.insert),
+    rename: (renamed) => Effect.flatMap(write("rename", Thread.Renamed, renamed), driver.rename),
+    getLatest: (ids) =>
+      Effect.flatMap(read("getLatest", Schema.Array(Thread.Id), ids), driver.getLatest),
+    recordLatest: (latest) =>
+      Effect.flatMap(write("recordLatest", Thread.Latest, latest), driver.recordLatest),
+  };
+};
 
 export * as ThreadStore from "./ThreadStore.ts";

@@ -1,7 +1,9 @@
-import { Context, Schema } from "effect";
-import type { Array, Effect } from "effect";
-import type { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
-import type { SessionLog } from "./session-log.ts";
+import { Context, Effect, Schema } from "effect";
+import type { Array } from "effect";
+import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
+import { SessionLog } from "./session-log.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("SessionLogStore.Failure", {
   operation: Schema.String,
@@ -19,6 +21,24 @@ export class Conflict extends Schema.TaggedError<Conflict>()("SessionLogStore.Co
  * workspace. Logs take part in no commit, so a host may keep them apart from its other stores, in
  * one built for appending. A log's first entry is at position 1, and each next one follows it.
  */
+/**
+ * A page of a log: its entries past `after`, at most `limit` of them.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export const ReadOptions = Schema.Struct({
+  after: Schema.Natural,
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
+
+/**
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ */
 export interface Interface {
   /** The position of the log's latest entry, or 0 while it has none. */
   readonly head: (participationId: ThreadParticipationId.Id) => Effect.Effect<number, Failure>;
@@ -35,7 +55,7 @@ export interface Interface {
   /** The log's entries past `after`, oldest first, at most `limit` of them. */
   readonly read: (
     participationId: ThreadParticipationId.Id,
-    options: { readonly after: number; readonly limit: number },
+    options: ReadOptions,
   ) => Effect.Effect<ReadonlyArray<SessionLog.Recorded>, Failure>;
   /** Completes once the log holds an entry past `after`. */
   readonly waitForAppend: (
@@ -47,5 +67,39 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/turn/session-log-store/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  return {
+    head: (participationId) =>
+      Effect.flatMap(read("head", ThreadParticipationId.Id, participationId), driver.head),
+    append: Effect.fn("SessionLogStore.append")(function* (participationId, entries, after) {
+      return yield* driver.append(
+        yield* read("append", ThreadParticipationId.Id, participationId),
+        yield* read("append", Schema.NonEmptyArray(SessionLog.Entry), entries),
+        yield* read("append", Schema.Natural, after),
+      );
+    }),
+    read: Effect.fn("SessionLogStore.read")(function* (participationId, options) {
+      return yield* driver.read(
+        yield* read("read", ThreadParticipationId.Id, participationId),
+        yield* read("read", ReadOptions, options),
+      );
+    }),
+    waitForAppend: Effect.fn("SessionLogStore.waitForAppend")(function* (participationId, after) {
+      return yield* driver.waitForAppend(
+        yield* read("waitForAppend", ThreadParticipationId.Id, participationId),
+        yield* read("waitForAppend", Schema.Natural, after),
+      );
+    }),
+  };
+};
 
 export * as SessionLogStore from "./session-log-store.ts";

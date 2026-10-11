@@ -5,12 +5,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
-import type { GroupId } from "../group/id.ts";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
+import { GroupId } from "../group/id.ts";
 import type { Store } from "../journal/store.ts";
-import type { ThreadId } from "../thread/ThreadId.ts";
-import type { Task } from "./Task.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
+import { Task } from "./Task.ts";
 
 /**
  * Storage failed while reading or writing tasks.
@@ -37,9 +39,12 @@ export class Conflict extends Schema.TaggedError<Conflict>()("TaskStore.Conflict
 
 /**
  * What a storage adapter implements for tasks.
- *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   /** The thread's task, if it has one. */
@@ -60,7 +65,7 @@ export interface Interface {
     groupId: GroupId.Id,
     options: Task.ListOptions,
   ) => Effect.Effect<ReadonlyArray<Task.Record>, Failure>;
-  /** Reject malformed or foreign records, and a thread that has a task. */
+  /** Reject a thread that has a task. */
   readonly insert: (
     record: Task.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
@@ -83,5 +88,35 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/task/TaskStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (threadId) => Effect.flatMap(read("get", ThreadId.Id, threadId), driver.get),
+    getMany: (threadIds) =>
+      Effect.flatMap(read("getMany", Schema.Array(ThreadId.Id), threadIds), driver.getMany),
+    listByGroup: Effect.fn("TaskStore.listByGroup")(function* (groupId, options) {
+      return yield* driver.listByGroup(
+        yield* read("listByGroup", GroupId.Id, groupId),
+        yield* read("listByGroup", Task.ListOptions, options),
+      );
+    }),
+    insert: (record) => Effect.flatMap(write("insert", Task.Record, record), driver.insert),
+    apply: Effect.fn("TaskStore.apply")(function* (threadId, change) {
+      return yield* driver.apply(
+        yield* write("apply", ThreadId.Id, threadId),
+        yield* write("apply", Task.Change, change),
+      );
+    }),
+  };
+};
 
 export * as TaskStore from "./TaskStore.ts";

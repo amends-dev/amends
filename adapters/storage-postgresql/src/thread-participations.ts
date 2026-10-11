@@ -1,12 +1,10 @@
-import { ThreadParticipation, Thread, ThreadParticipationStore } from "@amends-dev/core/thread";
-import { GroupMembership } from "@amends-dev/core/group";
-import { Store } from "@amends-dev/core/journal";
+import { ThreadParticipation, ThreadParticipationStore } from "@amends-dev/core/thread";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, eq, sql } from "drizzle-orm";
 import { threadParticipations } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -77,10 +75,9 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   const inWorkspace = eq(threadParticipations.workspaceId, workspaceId);
-  return ThreadParticipationStore.Service.of({
+  const driver: ThreadParticipationStore.Interface = {
     get: Effect.fn("ThreadParticipations.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(ThreadParticipation.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -91,8 +88,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       Effect.mapError(storeFailure(ThreadParticipationStore, "get")),
     ),
     getMany: Effect.fn("ThreadParticipations.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(ThreadParticipation.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -104,8 +100,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       Effect.mapError(storeFailure(ThreadParticipationStore, "getMany")),
     ),
     listByThread: Effect.fn("ThreadParticipations.listByThread")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -117,9 +112,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       Effect.mapError(storeFailure(ThreadParticipationStore, "listByThread")),
     ),
     pageActiveByThread: Effect.fn("ThreadParticipations.pageActiveByThread")(
-      function* (threadInput, input) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(threadInput);
-        const options = yield* Schema.decodeEffect(ThreadParticipation.ListOptions)(input);
+      function* (id, options) {
         const orderedId = sql`${threadParticipations.id} COLLATE "C"`;
         return yield* guard(
           db
@@ -140,11 +133,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       Effect.mapError(storeFailure(ThreadParticipationStore, "pageActiveByThread")),
     ),
     findActive: Effect.fn("ThreadParticipations.findActive")(
-      function* (threadInput, input) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(threadInput);
-        const references = yield* Schema.decodeEffect(Schema.Array(ThreadParticipation.Reference))(
-          input,
-        );
+      function* (id, references) {
         if (references.length === 0) return [];
         // Each participant as the active-participation index keys it: its kind and ID.
         const kinds = references.map((reference) => reference._tag);
@@ -171,14 +160,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadParticipationStore, "findActive")),
     ),
-    endByAdmission: Effect.fn("ThreadParticipations.endByAdmission")(function* (input, time) {
-      yield* Store.Transaction;
-      const id = yield* Schema.decodeEffect(GroupMembership.Id)(input).pipe(
-        Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")),
-      );
-      const endedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
-        time,
-      ).pipe(Effect.mapError(storeConflict(ThreadParticipationStore, "endByAdmission")));
+    endByAdmission: Effect.fn("ThreadParticipations.endByAdmission")(function* (id, endedAt) {
       // One statement however many there are; participations_by_admission finds them.
       yield* guard(
         db
@@ -194,19 +176,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "endByAdmission")));
     }),
-    end: Effect.fn("ThreadParticipations.end")(function* (input, time) {
-      yield* Store.Transaction;
-      const departure = yield* Schema.decodeEffect(ThreadParticipation.Departure)(input).pipe(
-        Effect.mapError(storeConflict(ThreadParticipationStore, "end")),
-      );
-      const endedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
-        time,
-      ).pipe(Effect.mapError(storeConflict(ThreadParticipationStore, "end")));
-      if (departure.workspaceId !== workspaceId)
-        return yield* new ThreadParticipationStore.Conflict({
-          operation: "end",
-          message: "Departure belongs to another workspace",
-        });
+    end: Effect.fn("ThreadParticipations.end")(function* (departure, endedAt) {
       const rows = yield* guard(
         db
           .update(threadParticipations)
@@ -228,20 +198,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           message: "Participation is missing, mismatched, or already ended",
         });
     }),
-    insert: Effect.fn("ThreadParticipations.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validate(input).pipe(
-        Effect.mapError(storeConflict(ThreadParticipationStore, "insert")),
-      );
-      if (
-        record.workspaceId !== workspaceId ||
-        record.status !== "active" ||
-        record.endedAt !== null
-      )
-        return yield* new ThreadParticipationStore.Conflict({
-          operation: "insert",
-          message: "Invalid initial record or workspace",
-        });
+    insert: Effect.fn("ThreadParticipations.insert")(function* (record) {
       const participant = record.participant;
       const { participant: _, ...fields } = record;
       yield* guard(
@@ -254,7 +211,8 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "insert")));
     }),
-  });
+  };
+  return ThreadParticipationStore.make(workspaceId, driver);
 });
 /** @category layers */
 export const layer = Layer.effect(ThreadParticipationStore.Service, make());

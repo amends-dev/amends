@@ -1,12 +1,10 @@
 import { Channel, ChannelStore } from "@amends-dev/core/channel";
-import { Store } from "@amends-dev/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { channels } from "./schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Channel.Record));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ...Channel.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
 );
@@ -28,24 +26,9 @@ export const make = Effect.fn("Channels.make")(function* () {
   const { db } = database;
   const inWorkspace = (id: Channel.Id) =>
     and(eq(channels.workspaceId, workspaceId), eq(channels.id, id));
-  /** Validate a record for this workspace before writing it. */
-  const valid = (operation: string, input: Channel.Record) =>
-    Effect.gen(function* () {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(ChannelStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ChannelStore.Conflict({
-          operation,
-          message: "Expected a channel in this workspace",
-        });
-      return record;
-    });
-  return ChannelStore.Service.of({
+  const driver: ChannelStore.Interface = {
     get: Effect.fn("Channels.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Channel.Id)(input);
+      function* (id) {
         return yield* guard(db.select().from(channels).where(inWorkspace(id))).pipe(
           Effect.flatMap(decodeRows),
           Effect.map(Array.head),
@@ -59,14 +42,12 @@ export const make = Effect.fn("Channels.make")(function* () {
         .from(channels)
         .where(and(eq(channels.workspaceId, workspaceId), eq(channels.status, "active"))),
     ).pipe(Effect.flatMap(decodeRows), Effect.mapError(storeFailure(ChannelStore, "listActive"))),
-    insert: Effect.fn("Channels.insert")(function* (input) {
-      const record = yield* valid("insert", input);
+    insert: Effect.fn("Channels.insert")(function* (record) {
       yield* guard(db.insert(channels).values(toRow(record)), true).pipe(
         Effect.mapError(storeError(ChannelStore, "insert")),
       );
     }),
-    update: Effect.fn("Channels.update")(function* (input) {
-      const record = yield* valid("update", input);
+    update: Effect.fn("Channels.update")(function* (record) {
       const updated = yield* guard(
         db
           .update(channels)
@@ -81,7 +62,8 @@ export const make = Effect.fn("Channels.make")(function* () {
           message: "Expected a stored channel",
         });
     }),
-  });
+  };
+  return ChannelStore.make(workspaceId, driver);
 });
 
 /** Provide channel storage over the caller's binding. @category layers */

@@ -1,22 +1,14 @@
-import { Thread, ThreadParticipation } from "@amends-dev/core/thread";
-import { Member } from "@amends-dev/core/workspace";
-import { Store } from "@amends-dev/core/journal";
-import { Group } from "@amends-dev/core/group";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { inIds } from "./id-list.ts";
 import { insertChunked } from "./parameters.ts";
 import { notificationSeen, notifications } from "./schema.ts";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
-const validateRecipient = Schema.decodeEffect(Notification.Recipient);
-const validateOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
-const validateLatest = Schema.decodeEffect(Schema.toType(NotificationStore.LatestOptions));
-const validateRange = Schema.decodeEffect(Schema.toType(NotificationStore.ThreadRange));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
@@ -108,11 +100,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
   const recorded = () => db.select().from(notifications);
   const pendingOnly = eq(notifications.state, "Pending");
   const listPending = Effect.fnUntraced(function* (
-    recipient: Notification.Recipient,
-    options: NotificationStore.ReadOptions,
+    target: Notification.Recipient,
+    request: NotificationStore.ReadOptions,
   ) {
-    const target = yield* validateRecipient(recipient);
-    const request = yield* validateOptions(options);
     const after = request.after;
     return yield* guard(
       recorded()
@@ -135,12 +125,10 @@ export const make = Effect.fn("Notifications.make")(function* () {
 
   /** Newest first: the recipient indexes read backwards. */
   const latest = Effect.fnUntraced(function* (
-    recipient: Notification.Recipient,
-    options: NotificationStore.LatestOptions,
+    target: Notification.Recipient,
+    request: NotificationStore.LatestOptions,
     pending: boolean,
   ) {
-    const target = yield* validateRecipient(recipient);
-    const request = yield* validateLatest(options);
     const before = request.before;
     return yield* guard(
       recorded()
@@ -160,27 +148,13 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
   });
 
-  /** Validate every record, then write them in as few statements as fit. */
+  /** Write the records in as few statements as fit. */
   const insert = Effect.fnUntraced(function* (
-    input: ReadonlyArray<Notification.Record>,
+    records: ReadonlyArray<Notification.Record>,
     operation: string,
   ) {
-    yield* Store.Transaction;
     const rows: Array<PgInsertValue<typeof notifications>> = [];
-    for (const value of input) {
-      const record = yield* validateRecord(value).pipe(
-        Effect.mapError(storeConflict(NotificationStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new NotificationStore.Conflict({
-          operation,
-          message: "Expected a notification in this workspace",
-        });
-      if (Notification.State.isAnyOf(["Seen", "Accepted"])(record.state))
-        return yield* new NotificationStore.Conflict({
-          operation,
-          message: "Seen and Accepted are recorded with markSeen and accept",
-        });
+    for (const record of records) {
       // A rebuild inserts notifications again; the Seen that outlived their rows comes back.
       const seenAt =
         Notification.Recipient.isAnyOf(["Human"])(record.recipient) &&
@@ -223,10 +197,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ).pipe(Effect.mapError(storeError(NotificationStore, operation)));
   });
 
-  return NotificationStore.Service.of({
+  const driver: NotificationStore.Interface = {
     get: Effect.fn("Notifications.get")(
-      function* (id) {
-        const requestedId = yield* Schema.decodeEffect(Notification.Id)(id);
+      function* (requestedId) {
         return yield* guard(
           recorded().where(and(inWorkspace, eq(notifications.id, requestedId))),
         ).pipe(
@@ -237,8 +210,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       Effect.mapError(storeFailure(NotificationStore, "get")),
     ),
     countPendingByRecipient: Effect.fn("Notifications.countPendingByRecipient")(
-      function* (recipient) {
-        const target = yield* validateRecipient(recipient);
+      function* (target) {
         const [row] = yield* guard(
           db
             .select({ count: sql<number>`count(*)::int` })
@@ -257,9 +229,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       Effect.mapError(storeFailure(NotificationStore, "countPendingByRecipient")),
     ),
     countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
-      function* (recipient, groupInput) {
-        const target = yield* validateRecipient(recipient);
-        const groupIds = yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput);
+      function* (target, groupIds) {
         if (groupIds.length === 0) return [];
         const rows = yield* guard(
           db
@@ -283,10 +253,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       Effect.mapError(storeFailure(NotificationStore, "countPendingByGroup")),
     ),
     listByThread: Effect.fn("Notifications.listByThread")(
-      function* (recipient, threadInput, rangeInput) {
-        const target = yield* validateRecipient(recipient);
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
-        const range = yield* validateRange(rangeInput);
+      function* (target, threadId, range) {
         return yield* guard(
           recorded()
             .where(
@@ -305,10 +272,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       Effect.mapError(storeFailure(NotificationStore, "listByThread")),
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
-      function* (recipient, threadInput, throughSequence) {
-        const target = yield* validateRecipient(recipient);
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
-        const through = yield* Schema.decodeEffect(Schema.Int)(throughSequence);
+      function* (target, threadId, through) {
         return yield* guard(
           recorded()
             .where(
@@ -338,13 +302,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       (recipient, options) => latest(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listLatestPendingByRecipient")),
     ),
-    markSeen: Effect.fn("Notifications.markSeen")(function* (input, at) {
-      const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(input).pipe(
-        Effect.mapError(storeConflict(NotificationStore, "markSeen")),
-      );
-      const seenAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
-        at,
-      ).pipe(Effect.mapError(storeConflict(NotificationStore, "markSeen")));
+    markSeen: Effect.fn("Notifications.markSeen")(function* (ids, seenAt) {
       const unique = [...new Set(ids)];
       if (unique.length === 0) return;
       // Check every notification, then record them in one statement, however many there are.
@@ -382,17 +340,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           ON CONFLICT DO NOTHING`),
       ).pipe(Effect.mapError(storeError(NotificationStore, "markSeen")));
     }),
-    accept: Effect.fn("Notifications.accept")(function* (input, byInput, at) {
-      yield* Store.Transaction;
-      const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(input).pipe(
-        Effect.mapError(storeConflict(NotificationStore, "accept")),
-      );
-      const by = yield* Schema.decodeEffect(Schema.toType(Notification.AcceptedBy))(byInput).pipe(
-        Effect.mapError(storeConflict(NotificationStore, "accept")),
-      );
-      const acceptedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
-        at,
-      ).pipe(Effect.mapError(storeConflict(NotificationStore, "accept")));
+    accept: Effect.fn("Notifications.accept")(function* (ids, by, acceptedAt) {
       const unique = [...new Set(ids)];
       if (unique.length === 0) return;
       // A turn takes pending notifications of one agent; a delivery takes those of contacts. Check
@@ -436,11 +384,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       ).pipe(Effect.mapError(storeError(NotificationStore, "accept")));
     }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
-      function* (input) {
-        yield* Store.Transaction;
-        const id = yield* Schema.decodeEffect(ThreadParticipation.Id)(input).pipe(
-          Effect.mapError(storeConflict(NotificationStore, "discardPendingForParticipation")),
-        );
+      function* (id) {
         yield* guard(
           db
             .update(notifications)
@@ -458,14 +402,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       },
     ),
     discardPendingForGroup: Effect.fn("Notifications.discardPendingForGroup")(
-      function* (memberInput, groupInput) {
-        yield* Store.Transaction;
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput).pipe(
-          Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
-        );
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput).pipe(
-          Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
-        );
+      function* (memberId, groupId) {
         // The same predicate as the pending counts, so pending_notifications_by_group finds them.
         const settlements = [
           { kind: "Human", reason: "access-lost" },
@@ -491,7 +428,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ),
     insert: Effect.fn("Notifications.insert")((input) => insert([input], "insert")),
     insertMany: Effect.fn("Notifications.insertMany")((input) => insert(input, "insertMany")),
-  });
+  };
+  return NotificationStore.make(workspaceId, driver);
 });
 
 /**

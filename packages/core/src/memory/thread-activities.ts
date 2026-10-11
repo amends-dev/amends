@@ -1,11 +1,9 @@
-import { Store } from "../journal/index.ts";
 import { Thread, ThreadActivity, ThreadActivityStore } from "../thread/index.ts";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
 
-const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
 const rows = Rows.make(Schema.fromJsonString(ThreadActivity.Record));
 const bySequence = (left: ThreadActivity.Record, right: ThreadActivity.Record) =>
   left.sequence - right.sequence;
@@ -17,29 +15,28 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
     const records = yield* rows.all((yield* read).records.of("threadActivities"));
     return records.filter((record) => record.threadId === threadId).toSorted(bySequence);
   });
-  return ThreadActivityStore.Service.of({
+  const driver: ThreadActivityStore.Interface = {
     get: Effect.fn("ThreadActivities.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(ThreadActivity.Id)(input);
+      function* (id) {
         return yield* rows.get((yield* read).records.of("threadActivities"), id);
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "get")),
     ),
     listByThread: Effect.fn("ThreadActivities.listByThread")(
       function* (input) {
-        return yield* inThread(yield* Schema.decodeEffect(Thread.Id)(input));
+        return yield* inThread(input);
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "listByThread")),
     ),
     latest: Effect.fn("ThreadActivities.latest")(
       function* (input) {
-        return Array.last(yield* inThread(yield* Schema.decodeEffect(Thread.Id)(input)));
+        return Array.last(yield* inThread(input));
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "latest")),
     ),
     getFirst: Effect.fn("ThreadActivities.getFirst")(
       function* (input) {
-        const ids = new Set(yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input));
+        const ids = new Set(input);
         if (ids.size === 0) return [];
         // Recording keeps each timeline contiguous from 1, so its first activity is at 1.
         return (yield* rows.all((yield* read).records.of("threadActivities"))).filter(
@@ -49,9 +46,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       Effect.mapError(storeFailure(ThreadActivityStore, "getFirst")),
     ),
     readPage: Effect.fn("ThreadActivities.readPage")(
-      function* (input, options) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(input);
-        const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
+      function* (id, request) {
         const before = request.beforeSequence;
         const range = (yield* inThread(id)).filter(
           (record) =>
@@ -64,16 +59,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "readPage")),
     ),
-    insert: Effect.fn("ThreadActivities.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validate(input).pipe(
-        Effect.mapError(storeConflict(ThreadActivityStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ThreadActivityStore.Conflict({
-          operation: "insert",
-          message: "Invalid initial record or workspace",
-        });
+    insert: Effect.fn("ThreadActivities.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadActivityStore, "insert")));
       const activities = yield* rows
         .all(space.records.of("threadActivities"))
@@ -100,7 +86,8 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         .pipe(Effect.mapError(storeFailure(ThreadActivityStore, "insert")));
       space.records.of("threadActivities").set(record.id, row);
     }),
-  });
+  };
+  return ThreadActivityStore.make(workspaceId, driver);
 });
 /** @category layers */
 export const layer = Layer.effect(ThreadActivityStore.Service, make());

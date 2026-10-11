@@ -1,12 +1,9 @@
 import { Group, GroupMembership, GroupMembershipStore } from "../group/index.ts";
-import { Store } from "../journal/index.ts";
-import { Member } from "../workspace/index.ts";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { compareBinary, Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(GroupMembership.Record));
 const rows = Rows.make(Schema.fromJsonString(GroupMembership.Record));
 const byId = (left: GroupMembership.Record, right: GroupMembership.Record) =>
   compareBinary(left.id, right.id);
@@ -15,25 +12,21 @@ const byId = (left: GroupMembership.Record, right: GroupMembership.Record) =>
 export const make = Effect.fn("GroupMemberships.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("groupMemberships")));
-  return GroupMembershipStore.Service.of({
+  const driver: GroupMembershipStore.Interface = {
     get: Effect.fn("GroupMemberships.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);
+      function* (id) {
         return yield* rows.get((yield* read).records.of("groupMemberships"), id);
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "get")),
     ),
     getMany: Effect.fn("GroupMemberships.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(GroupMembership.Id))(input);
+      function* (ids) {
         return yield* rows.getMany((yield* read).records.of("groupMemberships"), ids);
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "getMany")),
     ),
     findActive: Effect.fn("GroupMemberships.findActive")(
-      function* (groupInput, memberInput) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+      function* (groupId, memberId) {
         return Array.findFirst(
           yield* all,
           (record) =>
@@ -45,9 +38,8 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "findActive")),
     ),
     findActiveMany: Effect.fn("GroupMemberships.findActiveMany")(
-      function* (groupInput, input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const memberIds = new Set(yield* Schema.decodeEffect(Schema.Array(Member.Id))(input));
+      function* (groupId, input) {
+        const memberIds = new Set(input);
         if (memberIds.size === 0) return [];
         return (yield* all).filter(
           (record) =>
@@ -60,8 +52,8 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
     ),
     summarize: Effect.fn("GroupMemberships.summarize")(
       function* (groupInput, memberInput) {
-        const groupIds = new Set(yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput));
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
+        const groupIds = new Set(groupInput);
+        const memberId = memberInput;
         if (groupIds.size === 0) return [];
         const summaries = new Map<Group.Id, Group.Summary>();
         for (const record of yield* all) {
@@ -78,16 +70,13 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "summarize")),
     ),
     listByGroup: Effect.fn("GroupMemberships.listByGroup")(
-      function* (input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(input);
+      function* (groupId) {
         return (yield* all).filter((record) => record.groupId === groupId).toSorted(byId);
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "listByGroup")),
     ),
     pageActiveByGroup: Effect.fn("GroupMemberships.pageActiveByGroup")(
-      function* (groupInput, input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput);
-        const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input);
+      function* (groupId, options) {
         const after = options.after;
         return (yield* all)
           .filter(
@@ -102,9 +91,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByGroup")),
     ),
     pageActiveByMember: Effect.fn("GroupMemberships.pageActiveByMember")(
-      function* (memberInput, input) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
-        const options = yield* Schema.decodeEffect(GroupMembership.ByMemberOptions)(input);
+      function* (memberId, options) {
         const after = options.afterGroupId;
         return (yield* all)
           .filter(
@@ -119,24 +106,14 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
       Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByMember")),
     ),
     listActiveByMember: Effect.fn("GroupMemberships.listActiveByMember")(
-      function* (input) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(input);
+      function* (memberId) {
         return (yield* all)
           .filter((record) => record.memberId === memberId && record.status === "active")
           .toSorted(byId);
       },
       Effect.mapError(storeFailure(GroupMembershipStore, "listActiveByMember")),
     ),
-    markRemoved: Effect.fn("GroupMemberships.markRemoved")(function* (input) {
-      yield* Store.Transaction;
-      const removal = yield* Schema.decodeEffect(GroupMembership.Removal)(input).pipe(
-        Effect.mapError(storeConflict(GroupMembershipStore, "markRemoved")),
-      );
-      if (removal.workspaceId !== workspaceId)
-        return yield* new GroupMembershipStore.Conflict({
-          operation: "markRemoved",
-          message: "Removal belongs to another workspace",
-        });
+    markRemoved: Effect.fn("GroupMemberships.markRemoved")(function* (removal) {
       const space = yield* write.pipe(
         Effect.mapError(storeFailure(GroupMembershipStore, "markRemoved")),
       );
@@ -158,16 +135,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
         .pipe(Effect.mapError(storeFailure(GroupMembershipStore, "markRemoved")));
       space.records.of("groupMemberships").set(removal.membershipId, row);
     }),
-    insert: Effect.fn("GroupMemberships.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(GroupMembershipStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId || record.status !== "active")
-        return yield* new GroupMembershipStore.Conflict({
-          operation: "insert",
-          message: "Expected an active group membership in this workspace",
-        });
+    insert: Effect.fn("GroupMemberships.insert")(function* (record) {
       const space = yield* write.pipe(
         Effect.mapError(storeFailure(GroupMembershipStore, "insert")),
       );
@@ -192,7 +160,8 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
         .pipe(Effect.mapError(storeFailure(GroupMembershipStore, "insert")));
       space.records.of("groupMemberships").set(record.id, row);
     }),
-  });
+  };
+  return GroupMembershipStore.make(workspaceId, driver);
 });
 
 /** Provide group admission storage over the caller's binding. @category layers */

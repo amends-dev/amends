@@ -1,11 +1,8 @@
 import { ReadState, ReadStateStore } from "@amends-dev/core/read-state";
-import { Group } from "@amends-dev/core/group";
-import { Thread } from "@amends-dev/core/thread";
-import { Member } from "@amends-dev/core/workspace";
 import { and, eq, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { inIds } from "./id-list.ts";
 import { groupReadTimes, threadReadPositions } from "./schema.ts";
 
@@ -26,11 +23,9 @@ const decodeGroups = Schema.decodeUnknownEffect(
 export const make = Effect.fn("ReadStates.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
-  return ReadStateStore.Service.of({
+  const driver: ReadStateStore.Interface = {
     getThreadPositions: Effect.fn("ReadStates.getThreadPositions")(
-      function* (memberInput, threadInput) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
-        const threadIds = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(threadInput);
+      function* (memberId, threadIds) {
         if (threadIds.length === 0) return [];
         return yield* guard(
           db
@@ -47,15 +42,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
       },
       Effect.mapError(storeFailure(ReadStateStore, "getThreadPositions")),
     ),
-    advanceThread: Effect.fn("ReadStates.advanceThread")(function* (input) {
-      const position = yield* Schema.decodeEffect(ReadState.ThreadPosition)(input).pipe(
-        Effect.mapError(storeConflict(ReadStateStore, "advanceThread")),
-      );
-      if (position.workspaceId !== workspaceId)
-        return yield* new ReadStateStore.Conflict({
-          operation: "advanceThread",
-          message: "Read position belongs to another workspace",
-        });
+    advanceThread: Effect.fn("ReadStates.advanceThread")(function* (position) {
       yield* guard(
         db
           .insert(threadReadPositions)
@@ -73,9 +60,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
       ).pipe(Effect.mapError(storeError(ReadStateStore, "advanceThread")));
     }),
     getGroupReads: Effect.fn("ReadStates.getGroupReads")(
-      function* (memberInput, groupInput) {
-        const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
-        const groupIds = yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput);
+      function* (memberId, groupIds) {
         if (groupIds.length === 0) return [];
         return yield* guard(
           db
@@ -92,19 +77,12 @@ export const make = Effect.fn("ReadStates.make")(function* () {
       },
       Effect.mapError(storeFailure(ReadStateStore, "getGroupReads")),
     ),
-    advanceGroup: Effect.fn("ReadStates.advanceGroup")(function* (input) {
-      const groupRead = yield* Schema.decodeEffect(Schema.toType(ReadState.GroupRead))(input).pipe(
-        Effect.mapError(storeConflict(ReadStateStore, "advanceGroup")),
-      );
-      if (groupRead.workspaceId !== workspaceId)
-        return yield* new ReadStateStore.Conflict({
-          operation: "advanceGroup",
-          message: "Group read time belongs to another workspace",
-        });
+    advanceGroup: Effect.fn("ReadStates.advanceGroup")(function* (groupRead) {
+      const { readAt, ...fields } = groupRead;
       yield* guard(
         db
           .insert(groupReadTimes)
-          .values({ ...groupRead, readAt: DateTime.toDate(groupRead.readAt) })
+          .values({ ...fields, readAt: DateTime.toDate(readAt) })
           .onConflictDoUpdate({
             target: [groupReadTimes.workspaceId, groupReadTimes.memberId, groupReadTimes.groupId],
             set: {
@@ -113,7 +91,8 @@ export const make = Effect.fn("ReadStates.make")(function* () {
           }),
       ).pipe(Effect.mapError(storeError(ReadStateStore, "advanceGroup")));
     }),
-  });
+  };
+  return ReadStateStore.make(workspaceId, driver);
 });
 
 /** Provide read-state storage over the caller's binding. @category layers */

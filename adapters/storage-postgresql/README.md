@@ -175,9 +175,9 @@ first. Key and entry lookups inside the transaction answer staged appends from m
 therefore spends one statement per fact on journal bookkeeping, for its idempotency key, plus a few
 per commit.
 
-The adapter checks what it writes before writing: records are validated against core's schemas,
-including scope and workspace consistency and invitation expiry, and an invalid value returns the
-store's `Conflict` before any statement changes data. Rows read back are assembled as encoded
+Core checks what the adapter writes before the adapter sees it: each store contract's `make`
+decodes every input against its schema and refuses records of another workspace, so an invalid
+value returns the store's `Conflict` before any statement runs. Rows read back are assembled as encoded
 records and decoded with core's schemas, so a corrupt row fails the read. A statement PostgreSQL
 refuses aborts its transaction, and the commit checks what PostgreSQL actually did, so a program
 that swallowed such a refusal fails rather than losing its writes.

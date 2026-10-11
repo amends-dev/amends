@@ -1,34 +1,17 @@
 import { Connection, ConnectionStore } from "../connection/index.ts";
-import { Store } from "../journal/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Connection.Record));
 const rows = Rows.make(Schema.fromJsonString(Connection.Record));
 
 /** Connection records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Connections.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
-  /** Validate a record for this workspace before writing it. */
-  const valid = (operation: string, input: Connection.Record) =>
-    Effect.gen(function* () {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(ConnectionStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ConnectionStore.Conflict({
-          operation,
-          message: "Expected a connection in this workspace",
-        });
-      return record;
-    });
-  return ConnectionStore.Service.of({
+  const driver: ConnectionStore.Interface = {
     get: Effect.fn("Connections.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Connection.Id)(input);
+      function* (id) {
         return yield* rows.get((yield* read).records.of("connections"), id);
       },
       Effect.mapError(storeFailure(ConnectionStore, "get")),
@@ -37,8 +20,7 @@ export const make = Effect.fn("Connections.make")(function* () {
       const records = yield* rows.all((yield* read).records.of("connections"));
       return records.filter((record) => record.status === "active");
     }).pipe(Effect.mapError(storeFailure(ConnectionStore, "listActive"))),
-    insert: Effect.fn("Connections.insert")(function* (input) {
-      const record = yield* valid("insert", input);
+    insert: Effect.fn("Connections.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(ConnectionStore, "insert")));
       if (space.records.of("connections").has(record.id))
         return yield* new ConnectionStore.Conflict({
@@ -50,8 +32,7 @@ export const make = Effect.fn("Connections.make")(function* () {
         .pipe(Effect.mapError(storeFailure(ConnectionStore, "insert")));
       space.records.of("connections").set(record.id, row);
     }),
-    update: Effect.fn("Connections.update")(function* (input) {
-      const record = yield* valid("update", input);
+    update: Effect.fn("Connections.update")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(ConnectionStore, "update")));
       const found = yield* rows
         .get(space.records.of("connections"), record.id)
@@ -66,7 +47,8 @@ export const make = Effect.fn("Connections.make")(function* () {
         .pipe(Effect.mapError(storeFailure(ConnectionStore, "update")));
       space.records.of("connections").set(record.id, row);
     }),
-  });
+  };
+  return ConnectionStore.make(workspaceId, driver);
 });
 
 /** Provide connection storage over the caller's binding. @category layers */

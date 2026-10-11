@@ -248,7 +248,7 @@ implementation, in the `backend` project.
 
 The suites cover the journal, transactions, and standalone appends, the change feed and signals
 across hosts, session logs, idempotency keys, fact metadata, reads beside a writer, the direct
-store contracts, workspace isolation, accounts, and sign-in storage. Every workflow the stores
+store contracts, accounts, and sign-in storage. Every workflow the stores
 serve, from workspaces and access to threads, notifications, turns, and channels, is tested in
 the gateway's tests over the memory implementation, as a host runs it.
 

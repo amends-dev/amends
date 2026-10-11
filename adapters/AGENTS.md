@@ -2,10 +2,10 @@
 
 Read [README.md](./README.md) before changing adapters. Keep one focused module
 per store and consistent row, column, domain-record, and transaction names.
-Validate decoded records and edited fields against core schemas before storage
-conversion. Rejected writes are conflicts; malformed stored rows and infrastructure
-errors are failures. Preserve transaction guards and validate before any SQL write
-or conversion that drops domain information. Put behavior every adapter must share in
+A driver is given checked input: core's store contracts decode every input and refuse
+foreign records before calling it, so a driver keeps only what storage keeps. Refused
+writes are conflicts; malformed stored rows and infrastructure errors are failures.
+Preserve transaction guards. Put behavior every adapter must share in
 the gateway's conformance suites, which each adapter runs through its fixture.
 Keep only what one adapter stores or fails differently in its own tests. Change the memory implementation in core and
 the gateway with any contract change: it is the reference implementation.

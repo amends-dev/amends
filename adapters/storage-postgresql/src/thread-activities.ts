@@ -1,12 +1,11 @@
-import { ThreadActivity, Thread, ThreadActivityStore } from "@amends-dev/core/thread";
+import { ThreadActivity, ThreadActivityStore } from "@amends-dev/core/thread";
 
-import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { threadActivities } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -22,10 +21,9 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   const inWorkspace = eq(threadActivities.workspaceId, workspaceId);
-  return ThreadActivityStore.Service.of({
+  const driver: ThreadActivityStore.Interface = {
     get: Effect.fn("ThreadActivities.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(ThreadActivity.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -36,8 +34,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       Effect.mapError(storeFailure(ThreadActivityStore, "get")),
     ),
     listByThread: Effect.fn("ThreadActivities.listByThread")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -49,8 +46,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       Effect.mapError(storeFailure(ThreadActivityStore, "listByThread")),
     ),
     latest: Effect.fn("ThreadActivities.latest")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -63,8 +59,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       Effect.mapError(storeFailure(ThreadActivityStore, "latest")),
     ),
     getFirst: Effect.fn("ThreadActivities.getFirst")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         // Recording keeps each timeline contiguous from 1, so its first activity is at 1.
         return yield* guard(
@@ -83,9 +78,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       Effect.mapError(storeFailure(ThreadActivityStore, "getFirst")),
     ),
     readPage: Effect.fn("ThreadActivities.readPage")(
-      function* (input, options) {
-        const id = yield* Schema.decodeEffect(Thread.Id)(input);
-        const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
+      function* (id, request) {
         const newest = request.from === "newest";
         const rows = yield* guard(
           db
@@ -109,16 +102,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "readPage")),
     ),
-    insert: Effect.fn("ThreadActivities.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validate(input).pipe(
-        Effect.mapError(storeConflict(ThreadActivityStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ThreadActivityStore.Conflict({
-          operation: "insert",
-          message: "Invalid initial record or workspace",
-        });
+    insert: Effect.fn("ThreadActivities.insert")(function* (record) {
       const sequenceRows = yield* guard(
         db
           .select({ next: sql<number>`coalesce(max(${threadActivities.sequence}),0)+1` })
@@ -132,14 +116,14 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
           message: "Activity must follow the current thread sequence",
         });
 
+      const { occurredAt, ...fields } = record;
       yield* guard(
-        db
-          .insert(threadActivities)
-          .values({ ...record, occurredAt: DateTime.toDate(record.occurredAt) }),
+        db.insert(threadActivities).values({ ...fields, occurredAt: DateTime.toDate(occurredAt) }),
         true,
       ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
     }),
-  });
+  };
+  return ThreadActivityStore.make(workspaceId, driver);
 });
 /** @category layers */
 export const layer = Layer.effect(ThreadActivityStore.Service, make());

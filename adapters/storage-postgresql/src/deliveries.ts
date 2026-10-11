@@ -1,13 +1,10 @@
-import { ChannelId, Delivery, DeliveryStore } from "@amends-dev/core/channel";
-import { Store } from "@amends-dev/core/journal";
-import { Thread } from "@amends-dev/core/thread";
+import { Delivery, DeliveryStore } from "@amends-dev/core/channel";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { channelDeliveries } from "./schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Delivery.Record));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
@@ -39,24 +36,9 @@ export const make = Effect.fn("Deliveries.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   const inWorkspace = eq(channelDeliveries.workspaceId, workspaceId);
-  /** Validate a record for this workspace before writing it. */
-  const valid = (operation: string, input: Delivery.Record) =>
-    Effect.gen(function* () {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(DeliveryStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new DeliveryStore.Conflict({
-          operation,
-          message: "Expected a delivery in this workspace",
-        });
-      return record;
-    });
-  return DeliveryStore.Service.of({
+  const driver: DeliveryStore.Interface = {
     get: Effect.fn("Deliveries.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Delivery.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -67,8 +49,7 @@ export const make = Effect.fn("Deliveries.make")(function* () {
       Effect.mapError(storeFailure(DeliveryStore, "get")),
     ),
     listRequestedByThread: Effect.fn("Deliveries.listRequestedByThread")(
-      function* (input) {
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(input);
+      function* (threadId) {
         return yield* guard(
           db
             .select()
@@ -89,10 +70,7 @@ export const make = Effect.fn("Deliveries.make")(function* () {
       Effect.mapError(storeFailure(DeliveryStore, "listRequestedByThread")),
     ),
     findByExternalMessage: Effect.fn("Deliveries.findByExternalMessage")(
-      function* (channelInput, conversationInput, messageInput) {
-        const channelId = yield* Schema.decodeEffect(ChannelId.Id)(channelInput);
-        const conversationId = yield* Schema.decodeEffect(Schema.NonEmptyString)(conversationInput);
-        const externalMessageId = yield* Schema.decodeEffect(Schema.NonEmptyString)(messageInput);
+      function* (channelId, conversationId, externalMessageId) {
         return yield* guard(
           db
             .select()
@@ -109,14 +87,12 @@ export const make = Effect.fn("Deliveries.make")(function* () {
       },
       Effect.mapError(storeFailure(DeliveryStore, "findByExternalMessage")),
     ),
-    insert: Effect.fn("Deliveries.insert")(function* (input) {
-      const record = yield* valid("insert", input);
+    insert: Effect.fn("Deliveries.insert")(function* (record) {
       yield* guard(db.insert(channelDeliveries).values(toRow(record)), true).pipe(
         Effect.mapError(storeError(DeliveryStore, "insert")),
       );
     }),
-    update: Effect.fn("Deliveries.update")(function* (input) {
-      const record = yield* valid("update", input);
+    update: Effect.fn("Deliveries.update")(function* (record) {
       const updated = yield* guard(
         db
           .update(channelDeliveries)
@@ -131,7 +107,8 @@ export const make = Effect.fn("Deliveries.make")(function* () {
           message: "Expected a stored delivery",
         });
     }),
-  });
+  };
+  return DeliveryStore.make(workspaceId, driver);
 });
 
 /** Provide delivery storage over the caller's binding. @category layers */

@@ -1,8 +1,10 @@
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import { Commit } from "./commit.ts";
 import { Entry } from "./entry.ts";
 import { Store } from "./store.ts";
+import { StoreInput } from "./StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /** Each projection version owns progress for one domain log. */
 export const Key = Schema.Struct({
@@ -40,6 +42,12 @@ export const LiveVersions = Schema.Array(LiveVersion).check(
   ),
 );
 
+/**
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ */
 export interface Interface {
   /**
    * Progress of a consumer that reads behind the log, such as a projection being rebuilt.
@@ -66,8 +74,7 @@ export interface Interface {
   ) => Effect.Effect<ReadonlyArray<LiveVersion>, Store.Failure>;
   /**
    * Replace this log's live versions with exactly these, enlisted in the active
-   * Store.Transaction. Invalid input, including two versions of one name, conflicts before
-   * any change. Reject expired or foreign transaction handles. Do not retry.
+   * Store.Transaction. Reject expired or foreign transaction handles. Do not retry.
    */
   readonly setLive: (
     logId: Entry.LogId,
@@ -79,5 +86,34 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/journal/checkpoint/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Store.Failure);
+  const write = StoreInput.write(Store.Conflict, workspaceId);
+  return {
+    get: (key) => Effect.flatMap(read("checkpoint.get", Key, key), driver.get),
+    set: Effect.fn("Checkpoint.set")(function* (key, cursor) {
+      return yield* driver.set(
+        yield* write("checkpoint.set", Key, key),
+        yield* write("checkpoint.set", Cursor, cursor),
+      );
+    }),
+    listLive: (logId) =>
+      Effect.flatMap(read("checkpoint.listLive", Entry.LogId, logId), driver.listLive),
+    setLive: Effect.fn("Checkpoint.setLive")(function* (logId, versions) {
+      return yield* driver.setLive(
+        yield* write("checkpoint.setLive", Entry.LogId, logId),
+        yield* write("checkpoint.setLive", LiveVersions, versions),
+      );
+    }),
+  };
+};
 
 export * as Checkpoint from "./checkpoint.ts";

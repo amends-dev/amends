@@ -5,6 +5,7 @@ import { Entry as LogEntry } from "./entry.ts";
 import { Event } from "./event.ts";
 import { Occurrence } from "./occurrence.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
+import { StoreInput } from "./StoreInput.ts";
 
 /** Domain journals provide a fact header; generic logs provide only payload bytes. */
 export const Content = Schema.Struct({
@@ -178,6 +179,14 @@ export class Transaction extends Context.Service<
   }
 >()("@amends-dev/core/journal/store/Transaction") {}
 
+/**
+ * What a storage adapter implements for the journal. `make` builds the store over a driver that
+ * implements this interface. It checks every input against its schema, and an appended fact
+ * against the workspace, before the driver sees it, so a driver keeps only what storage keeps.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export interface Interface {
   /** Every log and read addresses this workspace alone. */
   readonly workspaceId: WorkspaceId.Id;
@@ -277,5 +286,81 @@ export const runAfterCommit = (effects: ReadonlyArray<Effect.Effect<void>>) =>
       ),
     { discard: true },
   );
+
+/**
+ * The store over a driver: each input is checked against its schema, and an appended fact
+ * against the workspace, before the driver sees it. A transaction's appends are checked the same
+ * way, through the handle the program is given.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, driver.workspaceId);
+  const appendInput = (request: AppendInput) =>
+    write("append", AppendInput, request).pipe(
+      Effect.filterOrFail(
+        (request) =>
+          request.entries.every(
+            (entry) =>
+              entry.fact === undefined || entry.fact.provenance.workspaceId === driver.workspaceId,
+          ),
+        () => new Conflict({ operation: "append", message: "Fact belongs to another workspace" }),
+      ),
+    );
+  const checked = (transaction: Transaction["Service"]): Transaction["Service"] => ({
+    id: transaction.id,
+    append: (request) => Effect.flatMap(appendInput(request), transaction.append),
+    afterCommit: transaction.afterCommit,
+  });
+  return {
+    workspaceId: driver.workspaceId,
+    getAppend: Effect.fn("Store.getAppend")(function* (logId, key) {
+      return yield* driver.getAppend(
+        yield* read("getAppend", LogEntry.LogId, logId),
+        yield* read("getAppend", IdempotencyKey, key),
+      );
+    }),
+    transaction: (program) =>
+      driver.transaction(
+        Effect.flatMap(Transaction, (transaction) =>
+          Effect.provideService(program, Transaction, checked(transaction)),
+        ),
+      ),
+    append: (request) => Effect.flatMap(appendInput(request), driver.append),
+    getEntry: Effect.fn("Store.getEntry")(function* (logId, entryId) {
+      return yield* driver.getEntry(
+        yield* read("getEntry", LogEntry.LogId, logId),
+        yield* read("getEntry", LogEntry.Id, entryId),
+      );
+    }),
+    get: Effect.fn("Store.get")(function* (logId, commitId) {
+      return yield* driver.get(
+        yield* read("get", LogEntry.LogId, logId),
+        yield* read("get", Commit.Id, commitId),
+      );
+    }),
+    head: (logId) => Effect.flatMap(read("head", LogEntry.LogId, logId), driver.head),
+    read: Effect.fn("Store.read")(function* (logId, options) {
+      return yield* driver.read(
+        yield* read("read", LogEntry.LogId, logId),
+        yield* read("read", ReadOptions, options),
+      );
+    }),
+    readFacts: Effect.fn("Store.readFacts")(function* (logId, options) {
+      return yield* driver.readFacts(
+        yield* read("readFacts", LogEntry.LogId, logId),
+        yield* read("readFacts", ReadFactsOptions, options),
+      );
+    }),
+    waitForAppend: Effect.fn("Store.waitForAppend")(function* (logId, after) {
+      return yield* driver.waitForAppend(
+        yield* read("waitForAppend", LogEntry.LogId, logId),
+        yield* read("waitForAppend", Schema.Option(LogEntry.Position), after),
+      );
+    }),
+  };
+};
 
 export * as Store from "./store.ts";

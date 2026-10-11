@@ -1,12 +1,10 @@
 import { Connection, ConnectionStore } from "@amends-dev/core/connection";
-import { Store } from "@amends-dev/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 import { connections } from "./schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Connection.Record));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ ...Connection.Record.fields, createdAt: Schema.DateTimeUtcFromDate }),
@@ -30,24 +28,9 @@ export const make = Effect.fn("Connections.make")(function* () {
   const { db } = database;
   const inWorkspace = (id: Connection.Id) =>
     and(eq(connections.workspaceId, workspaceId), eq(connections.id, id));
-  /** Validate a record for this workspace before writing it. */
-  const valid = (operation: string, input: Connection.Record) =>
-    Effect.gen(function* () {
-      yield* Store.Transaction;
-      const record = yield* validateRecord(input).pipe(
-        Effect.mapError(storeConflict(ConnectionStore, operation)),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ConnectionStore.Conflict({
-          operation,
-          message: "Expected a connection in this workspace",
-        });
-      return record;
-    });
-  return ConnectionStore.Service.of({
+  const driver: ConnectionStore.Interface = {
     get: Effect.fn("Connections.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(Connection.Id)(input);
+      function* (id) {
         return yield* guard(db.select().from(connections).where(inWorkspace(id))).pipe(
           Effect.flatMap(decodeRows),
           Effect.map(Array.head),
@@ -64,14 +47,12 @@ export const make = Effect.fn("Connections.make")(function* () {
       Effect.flatMap(decodeRows),
       Effect.mapError(storeFailure(ConnectionStore, "listActive")),
     ),
-    insert: Effect.fn("Connections.insert")(function* (input) {
-      const record = yield* valid("insert", input);
+    insert: Effect.fn("Connections.insert")(function* (record) {
       yield* guard(db.insert(connections).values(toRow(record)), true).pipe(
         Effect.mapError(storeError(ConnectionStore, "insert")),
       );
     }),
-    update: Effect.fn("Connections.update")(function* (input) {
-      const record = yield* valid("update", input);
+    update: Effect.fn("Connections.update")(function* (record) {
       const updated = yield* guard(
         db
           .update(connections)
@@ -86,7 +67,8 @@ export const make = Effect.fn("Connections.make")(function* () {
           message: "Expected a stored connection",
         });
     }),
-  });
+  };
+  return ConnectionStore.make(workspaceId, driver);
 });
 
 /** Provide connection storage over the caller's binding. @category layers */

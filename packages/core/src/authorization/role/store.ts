@@ -1,8 +1,11 @@
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../../journal/store.ts";
 
-import type { Role } from "./role.ts";
+import { Role } from "./role.ts";
+import { StoreInput } from "../../journal/StoreInput.ts";
+import type { WorkspaceId } from "../../workspace/id.ts";
+import { BuiltinRoles } from "./builtin.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("RoleStore.Failure", {
   operation: Schema.String,
@@ -24,22 +27,24 @@ export class Conflict extends Schema.TaggedError<Conflict>()("RoleStore.Conflict
  * expired or foreign transaction handles and never retry the program internally.
  * Permission definitions, affected assignments, and grant authority are checked
  * by services before publication.
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   /** Find a role in this workspace; None if absent. */
   readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Record>, Failure>;
 
   /**
-   * Insert a valid Role.Record belonging to this workspace. Fail with Conflict
-   * for schema violations, a workspace mismatch, or a reused role ID. Never upsert.
+   * Fail with Conflict for a reused role ID. Never upsert.
    */
   readonly insert: (
     record: Role.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
   /**
-   * Change only the display name. Fail with Conflict if the role is absent in
-   * this workspace or the name violates Role.Record's name schema.
+   * Change only the display name. Fail with Conflict if the role is absent in this workspace.
    */
   readonly rename: (
     roleId: Role.Id,
@@ -48,8 +53,7 @@ export interface Interface {
 
   /**
    * Replace the complete permission list, retaining the ID, workspace, and name.
-   * An empty list is valid. Fail with Conflict if the role is absent in this
-   * workspace or the list violates Role.Record's permissions schema.
+   * An empty list is valid. Fail with Conflict if the role is absent in this workspace.
    */
   readonly setPermissions: (
     roleId: Role.Id,
@@ -60,8 +64,8 @@ export interface Interface {
   readonly builtinRevision: Effect.Effect<Option.Option<number>, Failure>;
 
   /**
-   * Record a later built-in bundle revision. Fail with Conflict for one that is not a positive
-   * integer or not later than the recorded revision.
+   * Record a later built-in bundle revision. Fail with Conflict for one not later than the
+   * recorded revision.
    */
   readonly recordBuiltinRevision: (
     revision: number,
@@ -71,5 +75,39 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/authorization/role-store/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (roleId) => Effect.flatMap(read("get", Role.Id, roleId), driver.get),
+    insert: (record) => Effect.flatMap(write("insert", Role.Record, record), driver.insert),
+    rename: Effect.fn("RoleStore.rename")(function* (roleId, name) {
+      return yield* driver.rename(
+        yield* write("rename", Role.Id, roleId),
+        yield* write("rename", Role.Record.fields.name, name),
+      );
+    }),
+    setPermissions: Effect.fn("RoleStore.setPermissions")(function* (roleId, permissions) {
+      return yield* driver.setPermissions(
+        yield* write("setPermissions", Role.Id, roleId),
+        yield* write("setPermissions", Role.Record.fields.permissions, permissions),
+      );
+    }),
+    builtinRevision: driver.builtinRevision,
+    recordBuiltinRevision: (revision) =>
+      Effect.flatMap(
+        write("recordBuiltinRevision", BuiltinRoles.Revision, revision),
+        driver.recordBuiltinRevision,
+      ),
+  };
+};
 
 export * as RoleStore from "./store.ts";

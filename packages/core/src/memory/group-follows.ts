@@ -1,11 +1,9 @@
-import { Group, GroupFollow, GroupFollowStore, GroupMembership } from "../group/index.ts";
-import { Store } from "../journal/index.ts";
+import { GroupFollow, GroupFollowStore } from "../group/index.ts";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
-import { storeConflict, storeFailure } from "./errors.ts";
+import { storeFailure } from "./errors.ts";
 import { compareBinary, Rows } from "./rows.ts";
 
-const validate = Schema.decodeEffect(Schema.toType(GroupFollow.Record));
 const rows = Rows.make(Schema.fromJsonString(GroupFollow.Record));
 
 /** Group follows, active and ended; one active follow per group admission. @category constructors */
@@ -14,52 +12,36 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
   const active = Effect.flatMap(read, (space) => rows.all(space.records.of("groupFollows"))).pipe(
     Effect.map((records) => records.filter((record) => record.status === "active")),
   );
-  return GroupFollowStore.Service.of({
+  const driver: GroupFollowStore.Interface = {
     get: Effect.fn("GroupFollows.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(GroupFollow.Id)(input);
+      function* (id) {
         return yield* rows.get((yield* read).records.of("groupFollows"), id);
       },
       Effect.mapError(storeFailure(GroupFollowStore, "get")),
     ),
     findActive: Effect.fn("GroupFollows.findActive")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);
+      function* (id) {
         return Array.findFirst(yield* active, (record) => record.groupMembershipId === id);
       },
       Effect.mapError(storeFailure(GroupFollowStore, "findActive")),
     ),
     findActiveMany: Effect.fn("GroupFollows.findActiveMany")(
       function* (input) {
-        const ids = new Set(yield* Schema.decodeEffect(Schema.Array(GroupMembership.Id))(input));
+        const ids = new Set(input);
         if (ids.size === 0) return [];
         return (yield* active).filter((record) => ids.has(record.groupMembershipId));
       },
       Effect.mapError(storeFailure(GroupFollowStore, "findActiveMany")),
     ),
     listActiveByGroup: Effect.fn("GroupFollows.listActiveByGroup")(
-      function* (input) {
-        const groupId = yield* Schema.decodeEffect(Group.Id)(input);
+      function* (groupId) {
         return (yield* active)
           .filter((record) => record.groupId === groupId)
           .toSorted((left, right) => compareBinary(left.id, right.id));
       },
       Effect.mapError(storeFailure(GroupFollowStore, "listActiveByGroup")),
     ),
-    insert: Effect.fn("GroupFollows.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validate(input).pipe(
-        Effect.mapError(storeConflict(GroupFollowStore, "insert")),
-      );
-      if (
-        record.workspaceId !== workspaceId ||
-        record.status !== "active" ||
-        record.endedAt !== null
-      )
-        return yield* new GroupFollowStore.Conflict({
-          operation: "insert",
-          message: "Expected an active follow in this workspace",
-        });
+    insert: Effect.fn("GroupFollows.insert")(function* (record) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(GroupFollowStore, "insert")));
       const follows = yield* rows
         .all(space.records.of("groupFollows"))
@@ -80,19 +62,7 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
         .pipe(Effect.mapError(storeFailure(GroupFollowStore, "insert")));
       space.records.of("groupFollows").set(record.id, row);
     }),
-    end: Effect.fn("GroupFollows.end")(function* (input, time) {
-      yield* Store.Transaction;
-      const ending = yield* Schema.decodeEffect(GroupFollow.Ending)(input).pipe(
-        Effect.mapError(storeConflict(GroupFollowStore, "end")),
-      );
-      const endedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
-        time,
-      ).pipe(Effect.mapError(storeConflict(GroupFollowStore, "end")));
-      if (ending.workspaceId !== workspaceId)
-        return yield* new GroupFollowStore.Conflict({
-          operation: "end",
-          message: "Ending belongs to another workspace",
-        });
+    end: Effect.fn("GroupFollows.end")(function* (ending, endedAt) {
       const space = yield* write.pipe(Effect.mapError(storeFailure(GroupFollowStore, "end")));
       const current = yield* rows
         .get(space.records.of("groupFollows"), ending.followId)
@@ -112,7 +82,8 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
         .pipe(Effect.mapError(storeFailure(GroupFollowStore, "end")));
       space.records.of("groupFollows").set(ending.followId, row);
     }),
-  });
+  };
+  return GroupFollowStore.make(workspaceId, driver);
 });
 
 /** Provide group follow storage over the caller's binding. @category layers */

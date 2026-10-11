@@ -1,9 +1,10 @@
-import type { Connection as ConnectionContract } from "@amends-dev/connection";
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Connection as ConnectionContract } from "@amends-dev/connection";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
 
-import type { Connection } from "./connection.ts";
+import { Connection } from "./connection.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("ConnectionCredentialStore.Failure", {
   operation: Schema.String,
@@ -21,6 +22,10 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()(
  * keeps them. Writes join the commit that records them, so a connection and its credential are
  * stored together or not at all. An adapter protects credentials at rest as its storage allows,
  * bound to the connection they belong to; reads return them only to the server.
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   /** Store the connection's credential, in place of any it had. */
@@ -39,5 +44,26 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/connection/credential-store/Service",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  return {
+    set: Effect.fn("ConnectionCredentialStore.set")(function* (connectionId, credential) {
+      return yield* driver.set(
+        yield* read("set", Connection.Id, connectionId),
+        yield* read("set", ConnectionContract.Credential, credential),
+      );
+    }),
+    get: (connectionId) => Effect.flatMap(read("get", Connection.Id, connectionId), driver.get),
+    remove: (connectionId) =>
+      Effect.flatMap(read("remove", Connection.Id, connectionId), driver.remove),
+  };
+};
 
 export * as ConnectionCredentialStore from "./credential-store.ts";

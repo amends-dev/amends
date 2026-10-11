@@ -5,13 +5,15 @@
  *
  * @since 0.1.0
  */
-import type { ChannelTransport } from "@amends-dev/channel";
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { ChannelTransport } from "@amends-dev/channel";
+import { Context, Effect, Schema } from "effect";
+import type { Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { ThreadId } from "../thread/ThreadId.ts";
-import type { ChannelBinding } from "./ChannelBinding.ts";
-import type { ChannelId } from "./ChannelId.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
+import { ChannelBinding } from "./ChannelBinding.ts";
+import { ChannelId } from "./ChannelId.ts";
+import { StoreInput } from "../journal/StoreInput.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing bindings.
@@ -41,6 +43,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ChannelBindingStor
  *
  * @category services
  * @since 0.1.0
+ *
+ * `make` builds the store over a driver that implements this interface. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
  */
 export interface Interface {
   /** The thread's binding, if it came through a channel. */
@@ -53,7 +59,7 @@ export interface Interface {
     conversationId: ChannelTransport.ExternalId,
   ) => Effect.Effect<Option.Option<ChannelBinding.Record>, Failure>;
   /**
-   * Reject malformed or foreign records, a thread bound already, and a conversation bound to
+   * Reject a thread bound already, and a conversation bound to
    * another thread of the channel.
    */
   readonly insert: (
@@ -70,5 +76,30 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/channel/ChannelBindingStore",
 ) {}
+
+/**
+ * The store over a driver: each input is checked against its schema, and a record against the
+ * workspace, before the driver sees it.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+  const read = StoreInput.read(Failure);
+  const write = StoreInput.write(Conflict, workspaceId);
+  return {
+    get: (threadId) => Effect.flatMap(read("get", ThreadId.Id, threadId), driver.get),
+    findByConversation: Effect.fn("ChannelBindingStore.findByConversation")(
+      function* (channelId, conversationId) {
+        return yield* driver.findByConversation(
+          yield* read("findByConversation", ChannelId.Id, channelId),
+          yield* read("findByConversation", ChannelTransport.ExternalId, conversationId),
+        );
+      },
+    ),
+    insert: (record) =>
+      Effect.flatMap(write("insert", ChannelBinding.Record, record), driver.insert),
+  };
+};
 
 export * as ChannelBindingStore from "./ChannelBindingStore.ts";

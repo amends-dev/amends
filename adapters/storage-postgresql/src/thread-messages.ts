@@ -1,12 +1,11 @@
-import { Thread, ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread";
+import { ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread";
 
-import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, count, eq } from "drizzle-orm";
 import { threadMessages } from "./schema.ts";
 import { Binding } from "./binding.ts";
 import { inIds } from "./id-list.ts";
-import { storeConflict, storeError, storeFailure } from "./errors.ts";
+import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -143,10 +142,9 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
             : "Expected a message with text at the revision before",
       });
   });
-  return ThreadMessageStore.Service.of({
+  const driver: ThreadMessageStore.Interface = {
     get: Effect.fn("ThreadMessages.get")(
-      function* (input) {
-        const id = yield* Schema.decodeEffect(ThreadMessage.Id)(input);
+      function* (id) {
         return yield* guard(
           db
             .select()
@@ -157,8 +155,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
       Effect.mapError(storeFailure(ThreadMessageStore, "get")),
     ),
     getMany: Effect.fn("ThreadMessages.getMany")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(ThreadMessage.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -170,8 +167,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
       Effect.mapError(storeFailure(ThreadMessageStore, "getMany")),
     ),
     countByThread: Effect.fn("ThreadMessages.countByThread")(
-      function* (input) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+      function* (ids) {
         if (ids.length === 0) return [];
         return yield* guard(
           db
@@ -189,16 +185,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadMessageStore, "countByThread")),
     ),
-    insert: Effect.fn("ThreadMessages.insert")(function* (input) {
-      yield* Store.Transaction;
-      const record = yield* validate(input).pipe(
-        Effect.mapError(storeConflict(ThreadMessageStore, "insert")),
-      );
-      if (record.workspaceId !== workspaceId)
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "insert",
-          message: "Invalid initial record or workspace",
-        });
+    insert: Effect.fn("ThreadMessages.insert")(function* (record) {
       yield* guard(
         db.insert(threadMessages).values({
           workspaceId: record.workspaceId,
@@ -212,16 +199,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         true,
       ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
     }),
-    edit: Effect.fn("ThreadMessages.edit")(function* (input) {
-      yield* Store.Transaction;
-      const edited = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Edited))(input).pipe(
-        Effect.mapError(storeConflict(ThreadMessageStore, "edit")),
-      );
-      if (edited.workspaceId !== workspaceId)
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "edit",
-          message: "Expected a message in this workspace",
-        });
+    edit: Effect.fn("ThreadMessages.edit")(function* (edited) {
       yield* replaceContent(
         "edit",
         edited.messageId,
@@ -235,16 +213,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         edited.revision - 1,
       );
     }),
-    delete: Effect.fn("ThreadMessages.delete")(function* (input) {
-      yield* Store.Transaction;
-      const deleted = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Deleted))(input).pipe(
-        Effect.mapError(storeConflict(ThreadMessageStore, "delete")),
-      );
-      if (deleted.workspaceId !== workspaceId)
-        return yield* new ThreadMessageStore.Conflict({
-          operation: "delete",
-          message: "Expected a message in this workspace",
-        });
+    delete: Effect.fn("ThreadMessages.delete")(function* (deleted) {
       yield* replaceContent(
         "delete",
         deleted.messageId,
@@ -252,7 +221,8 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         undefined,
       );
     }),
-  });
+  };
+  return ThreadMessageStore.make(workspaceId, driver);
 });
 /** @category layers */
 export const layer = Layer.effect(ThreadMessageStore.Service, make());

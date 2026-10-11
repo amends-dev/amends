@@ -70,7 +70,7 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
       Effect.map((rows) => rows[0]?.head ?? 0),
       Effect.mapError(storeFailure(SessionLogStore, "head")),
     );
-  return SessionLogStore.Service.of({
+  const driver: SessionLogStore.Interface = {
     head: readHead,
     append: Effect.fn("SessionLogs.append")(function* (participationId, entries, after) {
       const conflict = new SessionLogStore.Conflict({ participationId, after });
@@ -131,7 +131,8 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
         }),
       );
     }),
-  });
+  };
+  return SessionLogStore.make(workspaceId, driver);
 });
 
 /** Provide session logs over the caller's binding. @category layers */
