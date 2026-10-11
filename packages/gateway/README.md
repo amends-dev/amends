@@ -115,6 +115,24 @@ their schemas for contracts. On the wire, a membership's `activeMemberCount` is 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces through
 `inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do.
 
+## Memory
+
+`@amends-dev/gateway/memory` implements the host contracts in process memory over core's
+[memory storage](../core/README.md#memory). `MemoryStorage.layer` provides workspace storage, the
+directory, accounts, and sign-in storage over a new connection to the `MemoryDatabase` beneath it,
+with cryptography from the host for new human IDs. Building it again over the same database is
+another host over the same storage, which is how tests of what several hosts do together run.
+Accounts, sign-in codes, and sessions are tables beside the workspaces' state, and a change to an
+address's code holds the address's lock across every host.
+
+```ts
+import { MemoryDatabase } from "@amends-dev/core/memory";
+import { MemoryStorage } from "@amends-dev/gateway/memory";
+import { Layer } from "effect";
+
+const storage = MemoryStorage.layer.pipe(Layer.provide(MemoryDatabase.layer));
+```
+
 ## Email sign-in
 
 `EmailSignIn.layer({ codeKey, policy? })` provides `SignIn.Service` and `SessionTokens.Service` over

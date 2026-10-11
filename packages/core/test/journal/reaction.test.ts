@@ -10,7 +10,7 @@ import type { Reaction } from "../../src/journal/reaction.ts";
 import { Store } from "../../src/journal/store.ts";
 import { Subject } from "../../src/journal/subject.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Counter, make } from "../memory-store.ts";
+import { Counter, make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const workspaceId = WorkspaceId.Id.make("workspace-one");

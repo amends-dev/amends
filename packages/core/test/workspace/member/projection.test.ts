@@ -13,7 +13,7 @@ import { MemberProjection } from "../../../src/workspace/member/projection.ts";
 import { MemberStore } from "../../../src/workspace/member/store.ts";
 import { Member } from "../../../src/workspace/member/member.ts";
 import { Workspace } from "../../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../../memory-store.ts";
+import { make, type Fixture } from "../../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Log.Id.make("workspace-one/journal");
@@ -49,7 +49,7 @@ const run = <A, E>(
     Effect.provide(Log.layer),
     Effect.provideService(Store.Service, fixture.store),
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-    Effect.provideService(MemberStore.Service, fixture.members(workspaceId)),
+    Effect.provideService(MemberStore.Service, fixture.members),
   );
 it.effect(
   "membership projection adds humans and agents, preserves removal, and admits a fresh membership",

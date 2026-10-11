@@ -23,7 +23,7 @@ import { Store } from "../../src/journal/store.ts";
 import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import { make, type Fixture } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
@@ -66,11 +66,11 @@ const dependencies = (fixture: Fixture, overrides: Overrides = {}) =>
   Layer.mergeAll(
     Layer.succeed(
       AssignmentStore.Service,
-      AssignmentStore.Service.of({ ...fixture.assignments(workspaceId), ...overrides.assignments }),
+      AssignmentStore.Service.of({ ...fixture.assignments, ...overrides.assignments }),
     ),
     Layer.succeed(
       RoleStore.Service,
-      RoleStore.Service.of({ ...fixture.roles(workspaceId), ...overrides.roles }),
+      RoleStore.Service.of({ ...fixture.roles, ...overrides.roles }),
     ),
     PermissionCatalog.layer([MemberPermissions.Read, MemberPermissions.Remove, ManageWorkspace]),
   );
@@ -91,8 +91,8 @@ const seed = (
 ) =>
   fixture.store.transaction(
     Effect.gen(function* () {
-      for (const record of roles) yield* fixture.roles(workspaceId).insert(record);
-      for (const record of assignments) yield* fixture.assignments(workspaceId).insert(record);
+      for (const record of roles) yield* fixture.roles.insert(record);
+      for (const record of assignments) yield* fixture.assignments.insert(record);
     }),
   );
 it.effect("the resolver reads current state without requiring a transaction", () =>
@@ -236,8 +236,8 @@ it.effect(
         Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
         Effect.provideService(Store.Service, fixture.store),
         Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-        Effect.provideService(RoleStore.Service, fixture.roles(workspaceId)),
-        Effect.provideService(AssignmentStore.Service, fixture.assignments(workspaceId)),
+        Effect.provideService(RoleStore.Service, fixture.roles),
+        Effect.provideService(AssignmentStore.Service, fixture.assignments),
       );
     }),
 );
@@ -248,7 +248,7 @@ it.effect("members without active assignments receive no grants", () =>
     expect(yield* run(fixture, resolve)).toEqual([]);
     const revoked = assigned("revoked", roleSource(workspaceScope, Role.Id.make("missing")));
     yield* seed(fixture, [], [revoked]);
-    yield* fixture.store.transaction(fixture.assignments(workspaceId).markRevoked(revoked.id));
+    yield* fixture.store.transaction(fixture.assignments.markRevoked(revoked.id));
     expect(yield* run(fixture, resolve)).toEqual([]);
   }),
 );

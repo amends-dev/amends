@@ -12,7 +12,7 @@ import { Publication } from "../../src/journal/publication.ts";
 import { Store } from "../../src/journal/store.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
-import { make } from "../memory-store.ts";
+import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");

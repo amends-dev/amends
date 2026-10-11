@@ -91,20 +91,6 @@
         "effect": "catalog:",
       },
     },
-    "adapters/storage-memory": {
-      "name": "@amends-dev/storage-memory",
-      "version": "0.0.0",
-      "dependencies": {
-        "@amends-dev/connection": "workspace:*",
-        "@amends-dev/core": "workspace:*",
-        "@amends-dev/gateway": "workspace:*",
-        "effect": "catalog:",
-      },
-      "devDependencies": {
-        "@amends-dev/storage-conformance": "workspace:*",
-        "@effect/platform-bun": "catalog:",
-      },
-    },
     "adapters/storage-postgresql": {
       "name": "@amends-dev/storage-postgresql",
       "version": "0.0.0",
@@ -483,8 +469,6 @@
     "@amends-dev/site": ["@amends-dev/site@workspace:apps/site"],
 
     "@amends-dev/storage-conformance": ["@amends-dev/storage-conformance@workspace:packages/storage-conformance"],
-
-    "@amends-dev/storage-memory": ["@amends-dev/storage-memory@workspace:adapters/storage-memory"],
 
     "@amends-dev/storage-postgresql": ["@amends-dev/storage-postgresql@workspace:adapters/storage-postgresql"],
 

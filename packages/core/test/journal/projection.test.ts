@@ -13,7 +13,7 @@ import { Projection } from "../../src/journal/projection.ts";
 import { Store } from "../../src/journal/store.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
-import { Counter, make, type Fixture } from "../memory-store.ts";
+import { Counter, make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");

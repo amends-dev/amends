@@ -18,7 +18,7 @@ import { ThreadQuery } from "../../src/thread/ThreadQuery.ts";
 import { Thread } from "../../src/thread/Thread.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
-import { make } from "../memory-store.ts";
+import { make } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const groupId = Group.Id.make("group");

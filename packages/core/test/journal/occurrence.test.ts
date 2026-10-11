@@ -10,7 +10,7 @@ import { Publication } from "../../src/journal/publication.ts";
 import { Store } from "../../src/journal/store.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Counter, make, type Fixture } from "../memory-store.ts";
+import { Counter, make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");

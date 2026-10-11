@@ -16,7 +16,7 @@ import { Store } from "../../src/journal/store.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 import { MemberId } from "../../src/workspace/member/id.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import { make, type Fixture } from "../memory.ts";
 import { testCrypto, testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");

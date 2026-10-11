@@ -23,7 +23,7 @@ import { MemberFacts } from "../../src/workspace/member/facts.ts";
 import { MemberProjection } from "../../src/workspace/member/projection.ts";
 import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import { make, type Fixture } from "../memory.ts";
 import { TestSignalHub } from "../signal-hub.ts";
 import { SignalHub } from "../../src/signal/hub.ts";
 
@@ -66,7 +66,7 @@ const unexpected = () => Effect.die("Notification reads must not write");
 const seed = (fixture: Fixture) =>
   fixture.store.transaction(
     Effect.forEach([alice, agent, bob], (actor) =>
-      fixture.members(workspaceId).insert({
+      fixture.members.insert({
         id: actor.memberId,
         workspaceId,
         identity: actor.identity,
@@ -105,9 +105,9 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
   const host = Layer.mergeAll(
     Layer.succeed(Store.Service, fixture.store),
     Layer.succeed(Checkpoint.Service, fixture.checkpoints),
-    Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
-    Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
-    Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
+    Layer.succeed(MemberStore.Service, fixture.members),
+    Layer.succeed(RoleStore.Service, fixture.roles),
+    Layer.succeed(AssignmentStore.Service, fixture.assignments),
     PermissionCatalog.layer([]),
   );
   const journal = Journal.layer({ logId, projections: [MemberProjection.definition] }).pipe(
@@ -252,7 +252,7 @@ it.effect(
     Effect.gen(function* () {
       const fixture = yield* make(workspaceId);
       yield* seed(fixture);
-      yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(bob.memberId));
+      yield* fixture.store.transaction(fixture.members.markRemoved(bob.memberId));
       for (const actor of [
         bob,
         Actor.Value.make({ ...alice, memberId: Member.Id.make("missing") }),

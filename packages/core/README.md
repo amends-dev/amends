@@ -565,6 +565,44 @@ returns `NotFound` for missing and inaccessible threads alike; repeats from the 
 same thread within two seconds are dropped. `ReadStateService` and `NotificationService.markSeen`
 and `markSeenThrough` publish the read-state signals after their writes.
 
+## Memory
+
+`@amends-dev/core/memory` implements every store, and the signal hub, in process memory: the
+reference implementation of the storage contracts, which enforces with plain maps what the
+PostgreSQL adapter enforces with keys and indexes, and which core's tests run over. Nothing
+survives the process.
+
+- `MemoryDatabase` is the storage every connected host shares. Each workspace has one `Space`:
+  its commits, log batches, keyed append slices, projected records by kind, with the live
+  projection versions and rebuild checkpoints, and private read state. Beside the workspaces sit
+  the session logs, and tables and locks by name, created on first use, for what a host stores
+  across its workspaces, such as its accounts.
+- `MemoryConnection` is one host's connection: its transactions take turns on a one-permit gate,
+  as on one database connection.
+- `MemoryStores.layer(workspaceId)` binds every store and the signal hub to one workspace over the
+  connection, as the gateway's [memory storage](../gateway/README.md#memory) does for each
+  workspace it opens.
+
+Records are the JSON of their encoded form, keyed by ID. Stored values never change: writes
+replace them, and every read decodes a fresh record; journal entries are copied on the way in and
+out. The stores check what the PostgreSQL adapter enforces with keys and unique indexes: reused
+IDs, one active membership per identity, one agent per membership, one direct group per member
+set, one active follow per admission, one active participation per participant, and contiguous
+thread sequences. Lists order IDs by their UTF-8 bytes, as binary collation does.
+
+A transaction copies its workspace's maps, runs against the copy, and on success makes the copy
+the committed state; a failure or interruption discards it. A workspace another connection is
+writing reports `JournalStore.Conflict` at once, as a lock wait that timed out immediately would;
+the same connection's writers wait for each other. Each log has a lock shared by every host: a
+transaction takes it on its first append to the log, or lookup of one of its keys, refreshes its
+copy of that log from committed state, and keeps it until it ends; a standalone append takes only
+its log's lock, so it never waits for the workspace. Reads outside a transaction see committed
+state, and inside one its copy; a handle from another connection, workspace, or closed transaction
+fails. Read-state writes outside a transaction apply at once, so a commit keeps the later of its
+own and the committed values. Session logs take part in no transaction: an append is kept at once
+and wakes waiting readers, as a commit's appends do. The signal hub offers each signal to the
+subscribers present, through `SignalHub.makeLocal`; nothing is kept.
+
 ## Conventions
 
 ### Features and modules
@@ -674,8 +712,8 @@ keep their domain verbs, such as `publish`, `resolve`, `issue`, and `accept`.
 bun run test packages/core
 ```
 
-Core's tests follow its domain and feature directories under `test/`, over in-memory stores
-(`test/memory-store.ts`); tests across authorization features live in `test/authorization/`.
+Core's tests follow its domain and feature directories under `test/`, over its
+[memory storage](#memory) (`test/memory.ts`); tests across authorization features live in `test/authorization/`.
 Behavior that storage adapters must share belongs in the
 [storage conformance suites](../storage-conformance/README.md), which run core over each adapter.
 Construction tests exercise transaction ownership, rollback, dependency capture, and lifetimes

@@ -66,13 +66,12 @@ currently run through TypeScript. Check compatibility before changing this setup
   bridge in a sandbox; each gives the integration a host installs. `sandbox-local` and
   `sandbox-daytona` implement the sandbox contract over this machine's directories and over
   Daytona, and depend on it and their platform's SDK alone; the host declares their integrations.
-  `storage-postgresql` implements workspace storage,
-  the workspace directory, and accounts over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
-  per record field, except the kind-specific `details` of a thread activity or a session log
-  entry, stored as JSON;
-  `storage-memory` implements them in process memory as the reference
-  implementation of the storage contracts, with no dependencies. Both follow one shape:
-  a module per store over a workspace binding, merged at the edge.
+  `storage-postgresql` implements workspace storage, the workspace directory, accounts, and sign-in
+  storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field, except
+  the kind-specific `details` of a thread activity or a session log entry, stored as JSON. The
+  reference implementation of the same contracts, in process memory, lives beside them: core's
+  stores in `core/memory`, the gateway's contracts in `gateway/memory`, which their tests run over.
+  Both follow one shape: a module per store over a workspace binding, merged at the edge.
   Hosts compose adapters and implement no storage themselves; shared packages never
   depend on adapters.
 - `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves

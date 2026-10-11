@@ -9,7 +9,8 @@
     "./accounts": "./src/accounts.ts",
     "./directory": "./src/directory.ts",
     "./errors": "./src/errors.ts",
-    "./sign-in": "./src/sign-in.ts"
+    "./sign-in": "./src/sign-in.ts",
+    "./memory": "./src/memory/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -25,7 +25,7 @@ import { MemberProjection } from "../../src/workspace/member/projection.ts";
 import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import { make, type Fixture } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Log.Id.make("workspace-one/journal");
@@ -94,9 +94,9 @@ const run = <A, E>(
     Effect.provide(Log.layer),
     Effect.provideService(Store.Service, fixture.store),
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-    Effect.provideService(RoleStore.Service, fixture.roles(workspaceId)),
-    Effect.provideService(AssignmentStore.Service, fixture.assignments(workspaceId)),
-    Effect.provideService(MemberStore.Service, fixture.members(workspaceId)),
+    Effect.provideService(RoleStore.Service, fixture.roles),
+    Effect.provideService(AssignmentStore.Service, fixture.assignments),
+    Effect.provideService(MemberStore.Service, fixture.members),
   );
 it.effect(
   "live role and assignment projections preserve role references, queries, and revocation history",
@@ -486,6 +486,7 @@ it.effect(
     Effect.gen(function* () {
       const fixture = yield* make();
       const foreign = Workspace.Id.make("another-workspace");
+      const other = yield* fixture.bind(foreign);
       yield* run(
         fixture,
         Effect.gen(function* () {
@@ -516,10 +517,17 @@ it.effect(
                 source: localDirect,
                 status: "active",
               });
-              yield* fixture
-                .roles(foreign)
-                .insert({ ...initialRole, workspaceId: foreign, name: "Foreign role" });
-              yield* fixture.assignments(foreign).insert({
+            }),
+          );
+          // The other workspace's records land in a commit of its own, as another workspace's do.
+          yield* other.store.transaction(
+            Effect.gen(function* () {
+              yield* other.roles.insert({
+                ...initialRole,
+                workspaceId: foreign,
+                name: "Foreign role",
+              });
+              yield* other.assignments.insert({
                 id: roleAssignmentId,
                 workspaceId: foreign,
                 memberId,
@@ -536,7 +544,7 @@ it.effect(
           const role = yield* roleStore.get(roleId);
           if (Option.isNone(role)) throw new Error("Missing role");
           expect(role.value.permissions).toEqual([MemberPermissions.Read.name]);
-          expect(Option.map(yield* fixture.roles(foreign).get(roleId), (r) => r.name)).toEqual(
+          expect(Option.map(yield* other.roles.get(roleId), (r) => r.name)).toEqual(
             Option.some("Foreign role"),
           );
           Reflect.set(role.value.permissions, 0, MemberPermissions.Remove.name);
@@ -552,7 +560,7 @@ it.effect(
           const list = yield* assignmentStore.listActiveByMember(memberId);
           expect(list).toHaveLength(2);
           expect(yield* assignmentStore.listActiveByRole(roleId)).toHaveLength(1);
-          expect(yield* fixture.assignments(foreign).listActiveByMember(memberId)).toHaveLength(1);
+          expect(yield* other.assignments.listActiveByMember(memberId)).toHaveLength(1);
           for (const assignment of list) Reflect.set(assignment, "status", "revoked");
           const byRole = yield* assignmentStore.listActiveByRole(roleId);
           for (const assignment of byRole) {

@@ -31,7 +31,7 @@ import { MemberProjection } from "../../src/workspace/member/projection.ts";
 import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import { make, type Fixture } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
@@ -101,13 +101,13 @@ const dependencies = (fixture: Fixture, overrides: Overrides = {}) =>
   Layer.mergeAll(
     Layer.succeed(
       MemberStore.Service,
-      MemberStore.Service.of({ ...fixture.members(workspaceId), ...overrides.members }),
+      MemberStore.Service.of({ ...fixture.members, ...overrides.members }),
     ),
     Layer.succeed(
       RoleStore.Service,
-      RoleStore.Service.of({ ...fixture.roles(workspaceId), ...overrides.roles }),
+      RoleStore.Service.of({ ...fixture.roles, ...overrides.roles }),
     ),
-    Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
+    Layer.succeed(AssignmentStore.Service, fixture.assignments),
     Layer.succeed(Store.Service, fixture.store),
     PermissionCatalog.layer([MemberPermissions.Read, MemberPermissions.Remove, Create]),
   );
@@ -139,10 +139,9 @@ const seed = (
 ) =>
   fixture.store.transaction(
     Effect.gen(function* () {
-      for (const actor of actors) yield* fixture.members(workspaceId).insert(membership(actor));
-      for (const role of roles) yield* fixture.roles(workspaceId).insert(role);
-      for (const assignment of assignments)
-        yield* fixture.assignments(workspaceId).insert(assignment);
+      for (const actor of actors) yield* fixture.members.insert(membership(actor));
+      for (const role of roles) yield* fixture.roles.insert(role);
+      for (const assignment of assignments) yield* fixture.assignments.insert(assignment);
     }),
   );
 it.effect("authorization reads each caller's actor and uses an agent's own grants", () =>
@@ -357,7 +356,7 @@ it.effect(
       yield* seed(fixture, [alice]);
       yield* run(fixture, check([removeBob]));
       yield* run(fixture, check([]));
-      yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(alice.memberId));
+      yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
       for (const requirements of [[], [removeBob]]) {
         expect(yield* run(fixture, Effect.flip(check(requirements)))).toMatchObject({
           _tag: "Authorization.InvalidActor",
@@ -488,10 +487,7 @@ it.effect(
           }),
         );
         expect(
-          Option.map(
-            yield* fixture.members(workspaceId).get(bob.memberId),
-            (member) => member.status,
-          ),
+          Option.map(yield* fixture.members.get(bob.memberId), (member) => member.status),
         ).toEqual(Option.some("removed"));
         const before = yield* fixture.snapshot;
         const denied = yield* Effect.flip(
@@ -574,9 +570,9 @@ it.effect(
         Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
         Effect.provideService(Store.Service, fixture.store),
         Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-        Effect.provideService(MemberStore.Service, fixture.members(workspaceId)),
-        Effect.provideService(RoleStore.Service, fixture.roles(workspaceId)),
-        Effect.provideService(AssignmentStore.Service, fixture.assignments(workspaceId)),
+        Effect.provideService(MemberStore.Service, fixture.members),
+        Effect.provideService(RoleStore.Service, fixture.roles),
+        Effect.provideService(AssignmentStore.Service, fixture.assignments),
         Effect.provideService(Actor.Service, alice),
       );
     }),

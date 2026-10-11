@@ -4,14 +4,13 @@ An adapter implements one contract over one external system, such as a database,
 platform, or an agent, and installs that system's dependencies, which is why it lives outside
 [packages](../packages/README.md). Hosts compose adapters; shared packages never depend on them.
 
-| Adapter                                              | What it implements                                                      | Published |
-| ---------------------------------------------------- | ----------------------------------------------------------------------- | --------- |
-| [`harness-amends`](harness-amends/README.md)         | amends's own agent, a loop over an Effect AI language model             | npm       |
-| [`harness-opencode`](harness-opencode/README.md)     | opencode as an agent, behind its bridge in a sandbox                    | npm       |
-| [`sandbox-local`](sandbox-local/README.md)           | Sandboxes as directories on this machine, for development and tests     | npm       |
-| [`sandbox-daytona`](sandbox-daytona/README.md)       | Sandboxes on Daytona                                                    | npm       |
-| [`storage-postgresql`](storage-postgresql/README.md) | Workspace storage and the workspace directory over PostgreSQL           | No        |
-| [`storage-memory`](storage-memory/README.md)         | The same contracts in process memory, as their reference implementation | No        |
+| Adapter                                              | What it implements                                                  | Published |
+| ---------------------------------------------------- | ------------------------------------------------------------------- | --------- |
+| [`harness-amends`](harness-amends/README.md)         | amends's own agent, a loop over an Effect AI language model         | npm       |
+| [`harness-opencode`](harness-opencode/README.md)     | opencode as an agent, behind its bridge in a sandbox                | npm       |
+| [`sandbox-local`](sandbox-local/README.md)           | Sandboxes as directories on this machine, for development and tests | npm       |
+| [`sandbox-daytona`](sandbox-daytona/README.md)       | Sandboxes on Daytona                                                | npm       |
+| [`storage-postgresql`](storage-postgresql/README.md) | Workspace storage and the workspace directory over PostgreSQL       | No        |
 
 Each adapter extends `../../tsconfig.base.json`, enables its own runtime's types, and has a
 `typecheck` script.
@@ -26,21 +25,21 @@ provider runs against itself. Each depends on its contract and its platform's ow
 
 ## Storage adapters
 
-The storage adapters implement the gateway's workspace storage, its signal hub, and the workspace
-directory. The PostgreSQL adapter, which the local host uses, stores one column per record field,
+The PostgreSQL adapter implements the gateway's workspace storage, its signal hub, the workspace
+directory, accounts, and sign-in storage, for the local host. It stores one column per record field,
 except the kind-specific details of a thread activity or a session log entry, which it stores as
-JSON. The memory adapter keeps everything in process memory, with no dependencies, and no host uses
-it.
+JSON. The reference implementation of the same contracts, in process memory, lives beside the
+contracts, in [core](../packages/core/README.md#memory) and the
+[gateway](../packages/gateway/README.md#memory).
 
 Both have one shape. A workspace binding owns one workspace's view of the database and its
 transaction boundary. Each store is a module over that binding, implementing core's store
-contract, with matching filenames in both adapters, such as `thread-messages.ts`. `layerWorkspace`
-merges the stores over one binding, and each adapter's workspace storage module,
-`PostgresWorkspaceStorage` or `MemoryWorkspaceStorage`, builds those views on demand as
+contract, with matching filenames in both, such as `thread-messages.ts`. `layerWorkspace` merges
+the stores over one binding, and `PostgresWorkspaceStorage` builds those views on demand as
 `WorkspaceStorage.Service`. Database tables and migrations belong to the adapter; domain records
-and store contracts belong to core. `PostgresStorage.layer` and `MemoryStorage.layer` compose workspace storage, the directory, the
-accounts, and sign-in storage, with the signal hub that relays signals between hosts over the same
-storage, and leave the database itself to the host. The PostgreSQL adapter also keeps up the tables Effect
+and store contracts belong to core. `PostgresStorage.layer` composes workspace storage, the directory, the accounts, and sign-in
+storage, with the signal hub that relays signals between hosts over the same database, and leaves
+the database itself to the host. The PostgreSQL adapter also keeps up the tables Effect
 Cluster stores its messages in, as `PostgresClusterStorage`, pruning those the host has handled.
 
 ### Validation
@@ -63,8 +62,7 @@ Adapters follow the [shared construction conventions](../packages/README.md#cons
 In the PostgreSQL adapter, `PostgresDatabase.make()` applies the current schema baseline to an
 Effect SQL client it is given, without opening a connection, and `PostgresDatabase.layer(config)`
 opens the client's pool and delegates to it. The binding, `PostgresWorkspaceStorage`, and
-`PostgresDirectory` construct over the database service, and each store over the binding. The memory adapter's `MemoryDatabase.make()` creates empty storage, and
-`MemoryConnection` stands for one host's connection to it.
+`PostgresDirectory` construct over the database service, and each store over the binding.
 
 A host acquires the database once and shares it across workspace views, which acquire nothing of
 their own. Workspace identity is fixed when a view is built, and the current transaction is checked

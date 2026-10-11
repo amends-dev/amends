@@ -6,9 +6,8 @@ adapter for another database passes the same tests as those in this repository. 
 store keeps its workspace's data its own, refusing any record that names another workspace, and core
 relies on that rather than checking each record again.
 
-The [memory adapter](../../adapters/storage-memory/README.md) runs the suites as the reference
-implementation, and the [PostgreSQL adapter](../../adapters/storage-postgresql/README.md) runs them
-over a real database. The package depends on Effect, `@effect/vitest`, core, the gateway, and the
+The [PostgreSQL adapter](../../adapters/storage-postgresql/README.md) runs them over a real
+database. The package depends on Effect, `@effect/vitest`, core, the gateway, and the
 harness, connection, and channel contracts. It has no runtime of its own: the adapter's harness
 supplies cryptography and the storage under test. It is internal to this repository and not
 published to npm.
@@ -91,7 +90,6 @@ enters a workspace through the gateway and runs one core operation as a protocol
 The suites run where adapters call `run`, so run them through an adapter:
 
 ```sh
-bun run test adapters/storage-memory
 bun run test --project postgresql adapters/storage-postgresql
 ```
 

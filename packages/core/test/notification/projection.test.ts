@@ -28,7 +28,7 @@ import { GroupMembershipFacts } from "../../src/group/membership/facts.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Transaction } from "../../src/journal/transaction.ts";
 import { NotificationProjection } from "../../src/notification/projection.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import { make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");

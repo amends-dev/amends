@@ -641,8 +641,8 @@ between projection versions.
 
 ## Verification
 
-`bun run test packages/core/test` exercises the portable implementation with a test-only
-memory adapter, including cross-log atomicity, rollback, nested publication, rejecting concurrent
+`bun run test packages/core/test` exercises the portable implementation over its
+[memory storage](../packages/core/README.md#memory), including cross-log atomicity, rollback, nested publication, rejecting concurrent
 storage work in one commit, interruption, cursor isolation, and uncertain outcomes. Projection tests
 also cover resume, batch rollback, checkpoint failures, concurrent runners, version
 routing, going live after a rebuild, the live-version checks on commit, retired and
@@ -658,8 +658,7 @@ and that a journal that does not run a live projection cannot publish to its log
 Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
 staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The
-[PostgreSQL](../adapters/storage-postgresql/README.md) and
-[memory](../adapters/storage-memory/README.md) adapters run these contracts through the
+[PostgreSQL](../adapters/storage-postgresql/README.md) adapter runs these contracts through the
 conformance suites, over independent connections, including standalone appends beside a
 transaction that holds the workspace or the log; PostgreSQL suites require an available
 server as described in the [testing guide](testing.md). The

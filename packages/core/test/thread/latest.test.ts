@@ -21,7 +21,7 @@ import { Log } from "../../src/journal/log.ts";
 import { Publication } from "../../src/journal/publication.ts";
 import { Store } from "../../src/journal/store.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
-import { make } from "../memory-store.ts";
+import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const workspaceId = WorkspaceId.Id.make("workspace-one");

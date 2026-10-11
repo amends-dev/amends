@@ -56,7 +56,7 @@ import { WorkspaceFacts } from "../../src/workspace/facts.ts";
 import { Role } from "../../src/authorization/role/role.ts";
 import { RoleFacts } from "../../src/authorization/role/facts.ts";
 import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import { make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 import { TestSignalHub } from "../signal-hub.ts";
 import { Notification } from "../../src/notification/notification.ts";
@@ -197,7 +197,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     ];
     yield* fixture.store.transaction(
       Effect.gen(function* () {
-        yield* fixture.members(workspaceId).insert({
+        yield* fixture.members.insert({
           id: actor.memberId,
           workspaceId,
           identity: actor.identity,
@@ -205,7 +205,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
           status: "active",
         });
         for (const [index, source] of grants.entries())
-          yield* fixture.assignments(workspaceId).insert({
+          yield* fixture.assignments.insert({
             id: Assignment.Id.make(`grant-${index}`),
             workspaceId,
             memberId: actor.memberId,
@@ -217,7 +217,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     const admitted = new Set<Group.Id>();
     const memberRead = racing();
     const accessRead = racing();
-    const members = fixture.members(workspaceId);
+    const members = fixture.members;
     const unexpected = () => Effect.die(new Error("Unexpected membership store use"));
     const memberships = GroupMembershipStore.Service.of({
       get: unexpected,
@@ -244,8 +244,8 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
         MemberStore.Service,
         Object.assign({}, members, { get: (id: Member.Id) => memberRead.after(members.get(id)) }),
       ),
-      Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
-      Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
+      Layer.succeed(RoleStore.Service, fixture.roles),
+      Layer.succeed(AssignmentStore.Service, fixture.assignments),
       Layer.succeed(GroupMembershipStore.Service, memberships),
       TestSignalHub.layer,
       PermissionCatalog.layer([
@@ -977,7 +977,7 @@ it.effect(
         // The reader's active membership is checked, and then their removal commits.
         afterMemberRead(
           Effect.andThen(
-            fixture.store.transaction(fixture.members(workspaceId).markRemoved(actor.memberId)),
+            fixture.store.transaction(fixture.members.markRemoved(actor.memberId)),
             commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId })),
           ).pipe(Effect.asVoid, Effect.orDie, Effect.provideService(Journal.Service, journal)),
         );
@@ -1098,7 +1098,7 @@ it.effect(
 it.effect("a removed member cannot subscribe", () =>
   run(({ fixture }) =>
     Effect.gen(function* () {
-      yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(actor.memberId));
+      yield* fixture.store.transaction(fixture.members.markRemoved(actor.memberId));
       const error = yield* Effect.flip((yield* ChangeFeedService.Service).watch());
       expect(error).toMatchObject({ _tag: "Authorization.InvalidActor" });
     }),
