@@ -11,17 +11,17 @@ import {
 import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Stream } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { alice, boundTo, forWorkspace, Support } from "./support.ts";
 
 /** Reads outside transactions, which never wait for writers. */
-export const reads = (harness: Harness) => {
-  const { gateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: reads`, () => {
+export const reads = (fixture: Fixture) => {
+  const { gateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: reads`, () => {
     it.effect(
       "workspace reads and SSE open while another host's transaction holds the writer",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect({ failFast: true });
             yield* Effect.gen(function* () {

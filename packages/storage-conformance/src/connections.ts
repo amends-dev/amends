@@ -7,7 +7,7 @@ import type { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Redacted, Schema } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -86,11 +86,11 @@ const keyOf = (bound: Support.Bound, connectionId: Connection.Id) =>
     Option.map(credential, ({ apiKey }) => Redacted.value(apiKey)),
   );
 
-export const connections = (harness: Harness) => {
-  const { core, gateway, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: connections`, () => {
+export const connections = (fixture: Fixture) => {
+  const { core, gateway, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: connections`, () => {
     it.effect("lists the integrations the host installs to every member, with their forms", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -158,7 +158,7 @@ export const connections = (harness: Harness) => {
     it.effect(
       "creates a connection with its key, which members read and only administrators manage",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -225,7 +225,7 @@ export const connections = (harness: Harness) => {
     );
 
     it.effect("gives the models a connection offers to whoever may read it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -257,7 +257,7 @@ export const connections = (harness: Harness) => {
     );
 
     it.effect("checks a connection with its system, using the key it has now", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -303,7 +303,7 @@ export const connections = (harness: Harness) => {
     );
 
     it.effect("refuses a connection its integration does not take, and creates nothing", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -363,7 +363,7 @@ export const connections = (harness: Harness) => {
     );
 
     it.effect("renames, reconfigures, and removes a connection with its key", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -431,7 +431,7 @@ export const connections = (harness: Harness) => {
     );
 
     it.effect("stores a connection's key with the commit that records it, or not at all", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -468,7 +468,7 @@ export const connections = (harness: Harness) => {
     it.effect(
       "returns the first connection when a create is retried with its key, until it is removed",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -500,7 +500,7 @@ export const connections = (harness: Harness) => {
     it.effect(
       "shows each connection as ready as the integrations its host installs now find it",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const { workspace, keyed, keyless } = yield* runGateway(
               storage,
@@ -574,7 +574,7 @@ export const connections = (harness: Harness) => {
     );
 
     it.effect("rebuilds connections from the journal, keeping their keys", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {

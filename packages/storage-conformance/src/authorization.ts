@@ -4,17 +4,17 @@ import { Journal, Publication } from "@amends-dev/core/journal";
 import { MemberService, MemberPermissions } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { alice, forWorkspace, Support, testProvenance, workspaceId } from "./support.ts";
 
 /** Stored roles and assignments as authorization reads them. */
-export const authorization = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: authorization`, () => {
+export const authorization = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: authorization`, () => {
     it.effect(
       "the persistent role and assignment projections support edits and independent revocations",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const workspace = yield* initialized(bound);

@@ -12,16 +12,17 @@ It is internal to this repository and not published to npm.
 ## Use
 
 ```ts
-import { MemoryDatabase, layer } from "@amends-dev/storage-memory";
+import { MemoryDatabase, MemoryStorage } from "@amends-dev/storage-memory";
 import { Layer } from "effect";
 
-const storage = layer.pipe(Layer.provide(MemoryDatabase.layer));
+const storage = MemoryStorage.layer.pipe(Layer.provide(MemoryDatabase.layer));
 ```
 
-`layer` provides the storage contract, with each workspace's signal hub, the directory, the
-accounts, and the sign-in storage over a new connection to the database beneath it, with cryptography from the host for new
-human IDs. Building `layer` again over the same `MemoryDatabase` is another host over the same
-storage, which is how the conformance suites test what several hosts do together.
+`MemoryStorage.layer` provides the storage contract, with each workspace's signal hub, the
+directory, the accounts, and the sign-in storage over a new connection to the database beneath it,
+with cryptography from the host for new human IDs. Building it again over the same `MemoryDatabase`
+is another host over the same storage, which is how the conformance suites test what several hosts
+do together.
 
 ## Model
 
@@ -77,7 +78,7 @@ The adapter's tests run in the `backend` project:
 bun run test adapters/storage-memory
 ```
 
-`test/harness.ts` supplies the conformance harness: new storage for each test, `discardProjections`
+`test/fixture.ts` supplies the conformance fixture: new storage for each test, `discardProjections`
 clears projected records, live versions, and checkpoints in every workspace, and `footprint` counts
-commits, batches, entries, append slices, records, and read state. Each test file registers one
+commits, batches, entries, append slices, records, and read state. `conformance.test.ts` runs every
 suite. See [testing](../../docs/testing.md) and the [adapter conventions](../README.md).

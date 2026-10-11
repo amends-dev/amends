@@ -23,7 +23,7 @@ import {
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import { TestClock } from "effect/testing";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import {
   type Bound,
   boundTo,
@@ -38,9 +38,9 @@ import {
 
 /** Tasks: creation with a thread or in one, changes and whom they reach, and the task store. */
 
-export const tasks = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: tasks`, () => {
+export const tasks = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: tasks`, () => {
     const humanId = Member.Id.make("human");
     const otherId = Member.Id.make("other");
     const agentId = Member.Id.make("agent");
@@ -165,7 +165,7 @@ export const tasks = (harness: Harness) => {
     it.effect(
       "a thread started as a task creates it at its second position, admitting triage or its assignee",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -348,7 +348,7 @@ export const tasks = (harness: Harness) => {
     it.effect(
       "a conversation becomes a task, and each change admits and tells by its kind, refusing a stale one",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -579,7 +579,7 @@ export const tasks = (harness: Harness) => {
     it.effect(
       "the task store rejects foreign and second tasks, and a change to another value",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

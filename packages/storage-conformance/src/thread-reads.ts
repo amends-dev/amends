@@ -67,7 +67,7 @@ import {
   threadInternals,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Thread discovery, metadata, timeline pages, and participant summaries. */
 
@@ -75,9 +75,9 @@ import type { Harness } from "./harness.ts";
 const textOf = (message: ThreadMessage.Record) =>
   ThreadMessage.Content.isAnyOf(["Text"])(message.content) ? message.content.text : null;
 
-export const threadReads = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: thread reads`, () => {
+export const threadReads = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: thread reads`, () => {
     const readerId = Member.Id.make("reader");
     const otherId = Member.Id.make("other");
     const agentId = Member.Id.make("agent");
@@ -276,7 +276,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "a default Viewer reads a narrowed thread without joining, exposing routing identities, or changing notifications",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -353,7 +353,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "exact thread grants filter discovery and suffice without group-read, member-read, participation, or agent-use grants",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -401,7 +401,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "ownership, group management, and broad read grants cannot bypass the audience or reveal private thread metadata",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -445,7 +445,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "a view opens at the newest activity and pages back to the first, always oldest first",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -495,7 +495,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "timeline pages follow sequence rather than timestamps, with exclusive cursors and no repeats across later appends",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -576,7 +576,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "departures and readmission change access and current participation without restoring old participation",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -647,7 +647,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "reads neither open a transaction nor advance checkpoints, and custom-role revocation stays live",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -734,7 +734,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "staged message activity, departure, and permission changes are visible inside the caller's transaction",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -818,7 +818,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "new group members can read earlier history without joining or receiving earlier notifications",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -873,7 +873,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "current-participant reads exclude inactive workspace members even with stale active admission projections",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -914,7 +914,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "gateway reads expose not-found and input outcomes while rejecting foreign thread IDs",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -987,7 +987,7 @@ export const threadReads = (harness: Harness) => {
     );
 
     it.effect("a storage failure reaches a timeline reader as it is, and records nothing", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1016,7 +1016,7 @@ export const threadReads = (harness: Harness) => {
     );
 
     it.effect("batch reads return each stored record once and omit absent or foreign IDs", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1130,7 +1130,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "current participants page in ID order and are found by participant, active ones only",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1240,7 +1240,7 @@ export const threadReads = (harness: Harness) => {
     );
 
     it.effect("participant pages skip lapsed admissions yet fill every page", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1320,7 +1320,7 @@ export const threadReads = (harness: Harness) => {
     it.effect(
       "a kind defined outside the thread domain records, stores, rebuilds, and reads in timelines",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

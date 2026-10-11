@@ -1,12 +1,8 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Invitation } from "@amends-dev/core/workspace";
-import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
-import { harness } from "./harness.ts";
 import { bob, inDatabase, initialized, setup, views, workspaceId } from "./support.ts";
-
-Suites.invitations(harness);
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {

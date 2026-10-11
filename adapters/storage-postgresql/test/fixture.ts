@@ -1,9 +1,9 @@
-import type { Harness } from "@amends-dev/storage-conformance";
+import type { Fixture } from "@amends-dev/storage-conformance";
 import { BunCrypto } from "@effect/platform-bun";
 import { Effect, Layer, Redacted } from "effect";
 import { Base64 } from "effect/encoding";
 import { SqlClient } from "effect/sql";
-import { layer } from "../src/index.ts";
+import { PostgresStorage } from "../src/index.ts";
 import { database, inDatabase, setup } from "./support.ts";
 
 /** Projection tables, truncated to discard every projected record. */
@@ -40,10 +40,9 @@ const { available, withDatabase } = setup();
 const credentialKey = Redacted.make(Base64.encode(new Uint8Array(32).fill(7)));
 
 /** A database for each test on the run's server; each connection is another host's pool. */
-export const harness: Harness = {
+export const fixture: Fixture = {
   name: "PostgreSQL",
   available,
-  crypto: BunCrypto.layer,
   withStorage: (use) =>
     withDatabase((url) => {
       const maintain = <A>(program: Effect.Effect<A, unknown, SqlClient.SqlClient>) =>
@@ -52,10 +51,10 @@ export const harness: Harness = {
         connect: (options) =>
           Layer.build(
             // Waiting readers rely on notifications: the fallback poll is the default five seconds.
-            layer({
+            PostgresStorage.layer({
               credentialKey,
               ...(options?.failFast === true && { lockTimeout: "100 millis" }),
-            }).pipe(Layer.provideMerge(database(url)), Layer.provide(BunCrypto.layer)),
+            }).pipe(Layer.provideMerge(database(url)), Layer.provideMerge(BunCrypto.layer)),
           ).pipe(Effect.orDie),
         discardProjections: maintain(
           Effect.flatMap(SqlClient.SqlClient, (sql) =>

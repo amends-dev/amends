@@ -8,7 +8,7 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { Context, Deferred, Effect, Fiber, Option, Result } from "effect";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import {
   alice,
   bob,
@@ -21,13 +21,13 @@ import {
 } from "./support.ts";
 
 /** Atomic commits: concurrent writers, rollback, interruption, foreign handles, and work after a commit. */
-export const transactions = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: transactions`, () => {
+export const transactions = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: transactions`, () => {
     it.effect(
       "initialization commits once under competing requests and never replaces ownership",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const results = yield* Effect.forEach(
@@ -51,7 +51,7 @@ export const transactions = (harness: Harness) => {
     it.effect(
       "a late failure rolls back workspace, membership, roles, assignments, the log, and live projections",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const failure = new Store.Failure({
@@ -73,7 +73,7 @@ export const transactions = (harness: Harness) => {
     );
 
     it.effect("interruption rolls back initialization and leaves the host usable", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const ready = yield* Deferred.make<void>();
@@ -104,7 +104,7 @@ export const transactions = (harness: Harness) => {
     it.effect(
       "work asked to run after a commit runs once it is done, in order, and never after a rollback",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const ran: Array<string> = [];
@@ -157,7 +157,7 @@ export const transactions = (harness: Harness) => {
     it.effect(
       "workspace stores reject foreign and expired transactions, including escaped native append handles",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect();
             const a = yield* forWorkspace(host, workspaceId);
@@ -188,7 +188,7 @@ export const transactions = (harness: Harness) => {
     it.effect(
       "another host's writer reports the busy workspace as contention without retrying",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const a = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const b = yield* forWorkspace(yield* storage.connect({ failFast: true }), workspaceId);

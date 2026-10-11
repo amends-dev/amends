@@ -33,13 +33,13 @@ import {
   testProvenance,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Private team and direct group creation, storage constraints, and replay. */
 
-export const groups = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: groups`, () => {
+export const groups = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: groups`, () => {
     const journalId = Log.Id.make("journal");
     const memberId = Member.Id.make("group-member");
     const agentId = Member.Id.make("group-agent");
@@ -99,7 +99,7 @@ export const groups = (harness: Harness) => {
     it.effect(
       "creates a private team and explicit initial memberships in one attributed commit",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -159,7 +159,7 @@ export const groups = (harness: Harness) => {
     it.effect(
       "creation follows live custom-role and direct permissions rather than role names",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -246,7 +246,7 @@ export const groups = (harness: Harness) => {
     );
 
     it.effect("invalid initial audiences and names cannot leave group facts or rows", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -289,7 +289,7 @@ export const groups = (harness: Harness) => {
     it.effect(
       "a failure after the first admission rolls back the group, memberships, facts, and checkpoints",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -355,7 +355,7 @@ export const groups = (harness: Harness) => {
     );
 
     it.effect("creation joins an outer transaction and sees its staged permission revocation", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -406,7 +406,7 @@ export const groups = (harness: Harness) => {
     it.effect(
       "reopening and replay preserve identities and timestamps without rechecking current authority",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -464,7 +464,7 @@ export const groups = (harness: Harness) => {
     it.effect(
       "group stores reject invalid or foreign records and enforce admission uniqueness",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -541,7 +541,7 @@ export const groups = (harness: Harness) => {
     );
 
     it.effect("direct groups keep a fixed member set that resolves to one group", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -643,7 +643,7 @@ export const groups = (harness: Harness) => {
     );
 
     it.effect("renaming a team group records one attributed fact that replay applies", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -756,7 +756,7 @@ export const groups = (harness: Harness) => {
     );
 
     it.effect("group latest activity only moves forward and belongs to an existing group", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {

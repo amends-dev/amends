@@ -22,7 +22,7 @@ import {
 import { InvitationService, Member, MemberPermissions } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import {
   alice,
   bob,
@@ -44,13 +44,13 @@ const byName = (live: ReadonlyArray<Checkpoint.LiveVersion>) =>
   live.toSorted((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
 
 /** Logs across hosts and workspaces, live projections, and rebuilding them from the journal. */
-export const journal = (harness: Harness) => {
-  const { core, initialized, seed } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: journal`, () => {
+export const journal = (fixture: Fixture) => {
+  const { core, initialized, seed } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: journal`, () => {
     it.live(
       "separate hosts observe live appends; identical log IDs stay isolated by workspace",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect();
             const a = yield* forWorkspace(host, workspaceId);
@@ -106,7 +106,7 @@ export const journal = (harness: Harness) => {
     it.effect(
       "a log's head is its latest batch, per log and workspace, and a transaction sees its own",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect();
             const a = yield* forWorkspace(host, workspaceId);
@@ -141,7 +141,7 @@ export const journal = (harness: Harness) => {
     it.effect(
       "replay restores ownership, membership, and recorded roles without regenerating permission bundles",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const workspace = yield* initialized(bound);
@@ -188,7 +188,7 @@ export const journal = (harness: Harness) => {
     it.effect(
       "projections rebuild in any order to the same read models, each from facts and its own records",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const workspace = yield* initialized(bound);
@@ -360,7 +360,7 @@ export const journal = (harness: Harness) => {
     it.effect(
       "a new log's first commit makes every registered projection live, and live commits record no progress",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             expect(yield* bound.checkpoints.listLive(journalLog)).toEqual([]);
@@ -381,7 +381,7 @@ export const journal = (harness: Harness) => {
     it.effect(
       "commits stop while a registered projection isn't live or another runs unregistered, until replay settles both",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             yield* initialized(bound);
@@ -430,7 +430,7 @@ export const journal = (harness: Harness) => {
     );
 
     it.effect("a projection registered later rebuilds from the log's history, then goes live", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const logId = Log.Id.make("rebuild-conformance");
@@ -484,7 +484,7 @@ export const journal = (harness: Harness) => {
     );
 
     it.effect("a projection another host retires rebuilds only the commits it missed", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const newerHost = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const olderHost = yield* forWorkspace(yield* storage.connect(), workspaceId);

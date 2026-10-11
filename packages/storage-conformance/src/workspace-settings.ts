@@ -6,7 +6,7 @@ import { Workspace, WorkspaceSettingsService } from "@amends-dev/core/workspace"
 import { Gateway, WorkspaceDirectory } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Tracer } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -59,13 +59,13 @@ const rename = (
   );
 const dave = Identities.Reference.cases.Human.make({ id: Identities.HumanId.make("dave") });
 const erin = Identities.Reference.cases.Human.make({ id: Identities.HumanId.make("erin") });
-export const workspaceSettings = (harness: Harness) => {
-  const { core, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: workspace settings`, () => {
+export const workspaceSettings = (fixture: Fixture) => {
+  const { core, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: workspace settings`, () => {
     it.effect(
       "renames once, rejects stale values, updates the directory, and survives replay",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -101,7 +101,7 @@ export const workspaceSettings = (harness: Harness) => {
     it.effect(
       "computes member actions for owners, administrators, viewers, and removed members",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -162,7 +162,7 @@ export const workspaceSettings = (harness: Harness) => {
         ),
     );
     it.effect("member actions follow the delegation policy for every actor and target", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -233,7 +233,7 @@ export const workspaceSettings = (harness: Harness) => {
       ),
     );
     it.effect("lists members with one assignment read each and a fixed number of other reads", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -272,7 +272,7 @@ export const workspaceSettings = (harness: Harness) => {
       ),
     );
     it.effect("guards store updates and rolls back a failed rename with its fact", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {

@@ -27,7 +27,7 @@ import type { WorkspaceStorage } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
-import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
+import { PostgresDatabase, PostgresWorkspaceStorage } from "../src/index.ts";
 import { temporary } from "./postgres.ts";
 
 export const setup = () => {
@@ -69,9 +69,9 @@ export const bind = (
 });
 export type Bound = ReturnType<typeof bind>;
 /** Workspace views over the database in context, each with its signals. */
-export const views = (options: PostgresStorage.Options = {}) =>
+export const views = (options: PostgresWorkspaceStorage.Options = {}) =>
   Effect.gen(function* () {
-    const service = yield* PostgresStorage.make(options);
+    const service = yield* PostgresWorkspaceStorage.make(options);
     return {
       forWorkspace: (workspaceId: Workspace.Id) =>
         Effect.map(service.forWorkspace(workspaceId), (context) =>

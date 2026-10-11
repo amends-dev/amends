@@ -2,7 +2,7 @@ import { Accounts, SignInStorage } from "@amends-dev/gateway";
 import { Identity } from "@amends-dev/core/identity";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { runHost } from "./support.ts";
 
 const email = Accounts.Email.make("ada@example.com");
@@ -35,10 +35,10 @@ const withSignInStorage = <A, E, R>(
 ) => Effect.flatMap(SignInStorage.Service, use);
 
 /** Sign-in codes changed one at a time from every host, and sessions found, extended, and ended. */
-export const signInStorage = (harness: Harness) => {
-  describe.skipIf(!harness.available)(`${harness.name}: sign-in storage`, () => {
+export const signInStorage = (fixture: Fixture) => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: sign-in storage`, () => {
     it.effect("keeps an address's pending code until a change replaces or removes it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           expect(yield* runHost(storage, readCode)).toEqual(Option.none());
           yield* runHost(storage, writeCode(Option.some(pending)));
@@ -54,7 +54,7 @@ export const signInStorage = (harness: Harness) => {
     );
 
     it.effect("applies changes to one address one at a time, from every host", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           yield* runHost(storage, writeCode(Option.some(pending)));
           const count = (current: Option.Option<SignInStorage.PendingCode>) =>
@@ -81,7 +81,7 @@ export const signInStorage = (harness: Harness) => {
     );
 
     it.effect("finds a session by digest from any host, extends it, and ends it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           yield* runHost(
             storage,

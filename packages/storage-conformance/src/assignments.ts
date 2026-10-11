@@ -9,16 +9,16 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { Effect, Option, Result } from "effect";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 
 import { alice, bob, boundTo, charlie, failingLate, future, request, Support } from "./support.ts";
 
 /** Assigning, changing, and revoking access, and delegation limits. */
 
-export const assignments = (harness: Harness) => {
-  const { core, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: assignments`, () => {
+export const assignments = (fixture: Fixture) => {
+  const { core, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: assignments`, () => {
     const setup = Effect.gen(function* () {
       const workspace = yield* Operations.createWorkspace(alice.id);
       const invitation = yield* Operations.invite(workspace.id, alice, request(yield* future));
@@ -40,7 +40,7 @@ export const assignments = (harness: Harness) => {
       return { workspace, viewer, admin, bound: yield* boundTo(workspace.id) };
     });
     it.effect("assignments cannot be addressed through another workspace or recipient", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -77,7 +77,7 @@ export const assignments = (harness: Harness) => {
     );
 
     it.effect("each member reads what their own grants let them do across the workspace", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -118,7 +118,7 @@ export const assignments = (harness: Harness) => {
     it.effect(
       "assignments are additive, duplicate assignment is idempotent, and role replacement is atomic",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -172,7 +172,7 @@ export const assignments = (harness: Harness) => {
     it.effect(
       "delegation protects owners and administrators across assignment and member-removal endpoints",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -260,7 +260,7 @@ export const assignments = (harness: Harness) => {
     it.effect(
       "competing role changes reject stale assignments rather than overwrite the winner, and a new host reads the outcome",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runGateway(
@@ -314,7 +314,7 @@ export const assignments = (harness: Harness) => {
     );
 
     it.effect("a late role-change failure restores the previous assignments and journal", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -350,7 +350,7 @@ export const assignments = (harness: Harness) => {
     );
 
     it.effect("pending invitations recheck the administrator's authority after demotion", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {

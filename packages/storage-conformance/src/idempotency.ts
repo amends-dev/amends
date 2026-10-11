@@ -2,7 +2,7 @@ import { Role, RoleFacts } from "@amends-dev/core/authorization";
 import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema, Result } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { forWorkspace, otherWorkspaceId, Support, testProvenance, workspaceId } from "./support.ts";
 
 const key = Log.IdempotencyKey.make("occurrence/one");
@@ -10,11 +10,11 @@ const executionId = Log.Id.make("execution");
 const options = { idempotencyKey: key };
 
 /** Keyed appends: durable identity, validation, rollback, and concurrent attempts. */
-export const idempotency = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: idempotency`, () => {
+export const idempotency = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: idempotency`, () => {
     it.effect("one commit keeps every keyed append past the parameters a statement can bind", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           yield* initialized(bound);
@@ -42,7 +42,7 @@ export const idempotency = (harness: Harness) => {
     it.effect(
       "keyed publications and append slices survive reopening with their original identities",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const original = yield* Effect.scoped(
               Effect.gen(function* () {
@@ -128,7 +128,7 @@ export const idempotency = (harness: Harness) => {
     it.effect(
       "native keyed append validates content, rolls its receipt back, and preserves returned byte ownership",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const append = (payloads: ReadonlyArray<Uint8Array>, idempotencyKey = key) =>
@@ -190,7 +190,7 @@ export const idempotency = (harness: Harness) => {
     );
 
     it.effect("independent hosts converge concurrent keyed attempts on one durable append", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const a = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const b = yield* forWorkspace(yield* storage.connect(), workspaceId);

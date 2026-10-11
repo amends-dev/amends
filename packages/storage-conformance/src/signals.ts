@@ -8,7 +8,7 @@ import { Thread, ThreadMessageService, ThreadService } from "@amends-dev/core/th
 import { Member } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Queue, Schema, Stream } from "effect";
-import type { Harness, Host } from "./harness.ts";
+import type { Fixture, Host, Storage } from "./fixture.ts";
 import {
   alice,
   type Bound,
@@ -71,15 +71,15 @@ const hubOf = (host: Context.Context<Host>, id = workspaceId) =>
   Effect.map(forWorkspace(host, id), (bound) => Context.get(bound.context, SignalHub.Service));
 
 /** Ephemeral signals through the host's hub: delivery across hosts, by workspace and by reach. */
-export const signals = (harness: Harness) => {
-  const { core, initialized, seed } = Support.make(harness);
+export const signals = (fixture: Fixture) => {
+  const { core, initialized, seed } = Support;
 
   /**
    * Two hosts over the storage, each with one core for the workspace as a running process has.
    * The owner, the reader, and an unpermitted member share a private group with a thread that
    * mentions the reader; the outsider is a viewer outside the group.
    */
-  const world = (storage: Parameters<Parameters<Harness["withStorage"]>[0]>[0]) =>
+  const world = (storage: Storage) =>
     Effect.gen(function* () {
       const first = yield* storage.connect();
       const second = yield* storage.connect();
@@ -139,11 +139,11 @@ export const signals = (harness: Harness) => {
       };
     });
 
-  describe.skipIf(!harness.available)(`${harness.name}: signals`, () => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: signals`, () => {
     it.live(
       "signals reach the workspace's subscribers on every host in order, and only while subscribed",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const first = yield* storage.connect();
             const second = yield* storage.connect();
@@ -184,7 +184,7 @@ export const signals = (harness: Harness) => {
     );
 
     it.live("typing on one host reaches the thread's readers on another, and nobody else", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { first, owner, groupId, threadId, as, feed } = yield* world(storage);
           const [readerFeed, outsiderFeed, unpermittedFeed] = yield* Effect.forEach(
@@ -224,7 +224,7 @@ export const signals = (harness: Harness) => {
     );
 
     it.live("typing needs access to the thread and permission to post in it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { threadId, as } = yield* world(storage);
           const typing = (actor: Actor.Value, thread = threadId) =>
@@ -247,7 +247,7 @@ export const signals = (harness: Harness) => {
     );
 
     it.live("a person's read state reaches their sessions on every host, and nobody else", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { first, owner, groupId, threadId, as, feed } = yield* world(storage);
           const elsewhere = yield* feed("second", reader);

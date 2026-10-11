@@ -1,6 +1,5 @@
 import { Entry, Store } from "@amends-dev/core/journal";
 import { Workspace } from "@amends-dev/core/workspace";
-import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import {
   Cause,
@@ -18,12 +17,9 @@ import {
 } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Binding } from "../src/binding.ts";
-import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
-import { harness } from "./harness.ts";
+import { PostgresDatabase, PostgresWorkspaceStorage } from "../src/index.ts";
 import type { Bound } from "./support.ts";
 import { initialized, inDatabase, setup, views, workspaceId } from "./support.ts";
-
-Suites.transactions(harness);
 
 const { available, withDatabase } = setup();
 const execution = Entry.LogId.make("execution");
@@ -34,7 +30,7 @@ const second = Workspace.Id.make("workspace-second");
 const process = Effect.fnUntraced(function* (
   url: string,
   size: number,
-  options: PostgresStorage.Options = {},
+  options: PostgresWorkspaceStorage.Options = {},
 ) {
   const pool = yield* Layer.build(
     PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: size }),
@@ -229,7 +225,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               "statementTimeout must be at least lockTimeout",
             ],
           ] as const) {
-            const exit = yield* Effect.exit(PostgresStorage.make(options));
+            const exit = yield* Effect.exit(PostgresWorkspaceStorage.make(options));
             if (Exit.isSuccess(exit)) return expect.fail("Expected the storage not to start");
             expect(Cause.hasDies(exit.cause)).toBe(true);
             expect(String(Cause.squash(exit.cause))).toContain(expected);

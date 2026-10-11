@@ -15,26 +15,26 @@ published to npm.
 
 ## Running the suites
 
-An adapter supplies a `Harness`, by convention in its `test/harness.ts`:
+An adapter supplies a `Fixture`, by convention in its `test/fixture.ts`:
 
 - `name` names the adapter in suite titles.
 - `available` set to `false` skips every suite, as the PostgreSQL adapter does without a server.
-- `crypto` is the hosts' cryptography layer.
 - `withStorage` runs one test over fresh, empty storage and releases it when the test ends.
 
 `withStorage` gives the test a `Storage`:
 
 - `connect(options?)` opens another host over the same storage, with its own connection or pool,
-  closed with the test's scope: its storage, directory, accounts, sign-in storage, and signal hub. `failFast` asks
-  for prompt contention where the adapter would otherwise wait.
+  closed with the test's scope: its storage, directory, accounts, sign-in storage, and signal hub,
+  with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
+  would otherwise wait.
 - `discardProjections` removes every projected record, live projection version, and checkpoint,
   keeping logs and read state, as rebuilding projections does before replay. No storage contract
   performs this.
 - `footprint` counts every stored record, so a test can show that a rolled-back write left none.
 
-Each adapter test file registers one suite, such as `Suites.transactions(harness)`. Tests of how one
-adapter stores data, such as SQL columns, query plans, and driver failure injection, stay in that
-adapter's own files beside the registration. The package also exports `Operations`, a driver that
+One test file in each adapter runs every suite with `run(fixture)`. Tests of how one adapter stores
+data, such as SQL columns, query plans, and driver failure injection, stay in that adapter's own
+files. The package also exports `Operations`, a driver that
 enters a workspace through the gateway and runs one core operation as a protocol handler does, and
 `Support`, the identities and fixtures the suites share.
 
@@ -88,7 +88,7 @@ enters a workspace through the gateway and runs one core operation as a protocol
 
 ## Development
 
-The suites run where adapters register them, so run them through an adapter:
+The suites run where adapters call `run`, so run them through an adapter:
 
 ```sh
 bun run test adapters/storage-memory
@@ -96,5 +96,5 @@ bun run test --project postgresql adapters/storage-postgresql
 ```
 
 Behavior core relies on belongs in a suite here, not in one adapter's tests. A new store or rule
-adds its suite to `src/suites.ts` and a registration file to each adapter. See
+adds its suite to `run` in `src/index.ts`. See
 [testing](../../docs/testing.md).

@@ -7,7 +7,7 @@ import { InvitationService, Member } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Layer, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture, Storage } from "./fixture.ts";
 import {
   alice,
   type Bound,
@@ -30,11 +30,11 @@ const key = Request.Key.make("request-1");
 const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
 
 /** Request keys: a retry of a creating request returns what its first attempt created. */
-export const requests = (harness: Harness) => {
-  const { core, initialized, seed, gateway } = Support.make(harness);
+export const requests = (fixture: Fixture) => {
+  const { core, initialized, seed, gateway } = Support;
 
   /** A workspace with its owner and another viewer, both in one team group. */
-  const world = (storage: Parameters<Parameters<Harness["withStorage"]>[0]>[0]) =>
+  const world = (storage: Storage) =>
     Effect.gen(function* () {
       const host = yield* storage.connect();
       const bound = yield* forWorkspace(host, workspaceId);
@@ -64,9 +64,9 @@ export const requests = (harness: Harness) => {
       return { storage, bound, owner, group, services, as, start };
     });
 
-  describe.skipIf(!harness.available)(`${harness.name}: request keys`, () => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: request keys`, () => {
     it.effect("a retried keyed start returns the first thread and records nothing more", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, as, start } = yield* world(storage);
           const first = yield* as(owner, start("Hello"));
@@ -83,7 +83,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("a reused key returns what it created, whatever the retry asks for", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, as, start } = yield* world(storage);
           const first = yield* as(owner, start("Hello"));
@@ -106,7 +106,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("keys belong to their member and their operation", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { owner, as, start } = yield* world(storage);
           const mine = yield* as(owner, start("Hello"));
@@ -128,7 +128,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("a retry passes the start's checks again before it finds the thread", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, group, as, start } = yield* world(storage);
           yield* as(other, start("Hello"));
@@ -150,7 +150,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("a retry after a rolled-back attempt runs again", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, group, as, start } = yield* world(storage);
           const failure = new Store.Failure({ operation: "commit", cause: "injected" });
@@ -164,7 +164,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("concurrent duplicates create one thread, and another host's retry finds it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, group, as, start } = yield* world(storage);
           const attempts = yield* Effect.forEach([1, 2, 3], () => as(owner, start("Hello")), {
@@ -180,7 +180,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("replies, direct starts, group creation, and invitations also run once per key", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, as, start } = yield* world(storage);
           const started = yield* as(owner, start("Hello"));
@@ -227,7 +227,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("a created record's key returns it, whatever the retry asks for", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, as } = yield* world(storage);
           const create = (name: string) =>
@@ -243,7 +243,7 @@ export const requests = (harness: Harness) => {
     );
 
     it.effect("a keyed workspace creation returns the same workspace on retry", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const host = yield* storage.connect();
           const create = (name: string, creator = alice.id) =>

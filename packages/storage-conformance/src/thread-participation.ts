@@ -69,13 +69,13 @@ import {
   workspaceId,
 } from "./support.ts";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Following and unfollowing threads: quiet activity, stale departures, settlement, and replay. */
 
-export const threadParticipation = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: thread participation`, () => {
+export const threadParticipation = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: thread participation`, () => {
     /** Narrow a stored participation to its member participant for assertions. */
     const memberParticipant = (record: ThreadParticipation.Record) => {
       if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
@@ -207,7 +207,7 @@ export const threadParticipation = (harness: Harness) => {
     });
 
     it.effect("every thread fact carries its own thread's group, which is its audience", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -292,7 +292,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "following records a quiet timeline boundary and returns only a public summary; repeated follow is a no-op",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -352,7 +352,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "unfollowing keeps read access and human notification history while stopping broadcasts until a fresh rejoin",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -404,7 +404,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "agent unfollow discards only that participation's pending input; following is not a work request",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -463,7 +463,7 @@ export const threadParticipation = (harness: Harness) => {
     );
 
     it.effect("replies and mentions can readmit an unfollowed member without a follow grant", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -503,7 +503,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "follow grants are scoped and live; unfollow remains self-service after grants are revoked",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -589,7 +589,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "unfollow cannot address another member, thread, workspace, or missing participation",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -673,7 +673,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "follow and unfollow roll back participation, timeline, and input cleanup together",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -730,7 +730,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "outer commits observe follow, unfollow, and replies in order, and staged revocation fails atomically",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -782,7 +782,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "concurrent follows and publication produce ordered activity and one active participation",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -851,7 +851,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "concurrent unfollow and broadcast cannot leave pending input for an ended agent participation",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -926,7 +926,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "reopening and replay preserve quiet boundaries, repeated rejoining, and ended input after permissions change",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -987,7 +987,7 @@ export const threadParticipation = (harness: Harness) => {
     );
 
     it.effect("gateway returns public participation summaries and opaque self-service errors", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -1046,7 +1046,7 @@ export const threadParticipation = (harness: Harness) => {
     );
 
     it.effect("stores refuse a second follow activity and stale departures", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1098,7 +1098,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "one activity notification handler supports message, follow, and ending recipients and replays their selection",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1219,7 +1219,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "group and workspace departures end every active participation at once, without thread activity, and roll back a partial cascade",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1376,7 +1376,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "a departure recorded with an ending for each participation, as before, rebuilds to the same state",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1456,7 +1456,7 @@ export const threadParticipation = (harness: Harness) => {
     );
 
     it.effect("a direct conversation's threads cannot be unfollowed, and nothing is recorded", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1488,7 +1488,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "ending activity settles pending input with no recipients; the preceding domain fact does not",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1584,7 +1584,7 @@ export const threadParticipation = (harness: Harness) => {
     it.effect(
       "contacts and triage participate without group admission, author messages, and receive notifications",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

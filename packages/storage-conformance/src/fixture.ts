@@ -4,17 +4,19 @@ import type {
   WorkspaceDirectory,
   WorkspaceStorage,
 } from "@amends-dev/gateway";
-import type { Context, Crypto, Effect, Layer, Scope } from "effect";
+import type { Context, Crypto, Effect, Scope } from "effect";
 
 /**
- * The gateway contracts a storage adapter implements; one host holds them all. Hosts over the same
- * storage share each workspace's signals, as processes over one system do.
+ * The gateway contracts a storage adapter implements, with the cryptography it was built over;
+ * one host holds them all. Hosts over the same storage share each workspace's signals, as
+ * processes over one system do.
  */
 export type Host =
   | WorkspaceStorage.Service
   | WorkspaceDirectory.Service
   | Accounts.Service
-  | SignInStorage.Service;
+  | SignInStorage.Service
+  | Crypto.Crypto;
 
 export interface HostOptions {
   /**
@@ -42,18 +44,14 @@ export interface Storage {
   readonly footprint: Effect.Effect<number>;
 }
 
-/** What an adapter supplies to run the conformance suites against itself. */
-export interface Harness {
+/** What an adapter's tests give `run`: how to open fresh storage, and what the suites cannot assume. */
+export interface Fixture {
   /** Names the adapter in suite titles. */
   readonly name: string;
   /** False skips every suite, for an adapter whose backing system is absent here. */
   readonly available: boolean;
-  /** Cryptography for the hosts under test. */
-  readonly crypto: Layer.Layer<Crypto.Crypto>;
   /** Run one test over fresh, empty storage. */
   readonly withStorage: <A, E>(
     use: (storage: Storage) => Effect.Effect<A, E, Scope.Scope>,
   ) => Effect.Effect<A, E>;
 }
-
-export * as Harness from "./harness.ts";

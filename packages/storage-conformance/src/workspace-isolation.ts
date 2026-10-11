@@ -16,7 +16,7 @@ import { Turn } from "@amends-dev/core/turn";
 import { Invitation, Member } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Store } from "@amends-dev/core/journal";
 import { type Bound, forWorkspace, otherWorkspaceId, Support, workspaceId } from "./support.ts";
 
@@ -32,14 +32,14 @@ interface Attempt {
  * workspace's data stays its own whatever a caller asks a store to write. Core relies on this
  * rather than checking each fact's workspace again as it applies it.
  */
-export const workspaceIsolation = (harness: Harness) => {
-  const { initialized } = Support.make(harness);
+export const workspaceIsolation = (fixture: Fixture) => {
+  const { initialized } = Support;
 
-  describe.skipIf(!harness.available)(`${harness.name}: workspace isolation`, () => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: workspace isolation`, () => {
     it.effect(
       "every store refuses a record that names another workspace and keeps none of it",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect();
             const bound = yield* forWorkspace(host, workspaceId);

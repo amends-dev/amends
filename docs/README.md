@@ -24,7 +24,7 @@ remaining gaps with links to their owning code.
 | [HTTP contract](../packages/api-http/README.md)                      | Endpoint groups, wire formats, authentication, and SSE semantics.                                                               |
 | [HTTP server](../packages/server-http/README.md)                     | Handler registration, request scopes, and authentication wiring.                                                                |
 | [Adapters](../adapters/README.md)                                    | Store validation, construction, and migration conventions.                                                                      |
-| [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                                    |
+| [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the fixture an adapter supplies.                                                    |
 | [Harness](../packages/harness/README.md)                             | The harness contract: an agent's sessions and turns in one stream format, and the bridge into sandboxes.                        |
 | [Sandbox](../packages/sandbox/README.md)                             | The sandbox contract: Effect's file system and processes inside, ports, network, lifecycle, and the suites every provider runs. |
 | [Channel](../packages/channel/README.md)                             | The channel transport contract: receiving what an external system sends and replying in its conversations.                      |

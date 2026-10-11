@@ -2,14 +2,10 @@ import { Identity } from "@amends-dev/core/identity";
 import { Entry } from "@amends-dev/core/journal";
 import { Member } from "@amends-dev/core/workspace";
 import { Notification, type NotificationStore } from "@amends-dev/core/notification";
-import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import { SqlClient } from "effect/sql";
-import { harness } from "./harness.ts";
 import { boundTo, inDatabase, initialized, setup, workspaceId } from "./support.ts";
-
-Suites.notifications(harness);
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {

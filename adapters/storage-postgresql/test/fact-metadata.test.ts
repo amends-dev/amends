@@ -1,12 +1,9 @@
 import { Codec, Journal, Log, Publication, Subject } from "@amends-dev/core/journal";
-import { Changed, Changed2, Other, Suites } from "@amends-dev/storage-conformance";
+import { Changed, Changed2, Other } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
-import { harness } from "./harness.ts";
 import { boundTo, core, inDatabase, setup, testProvenance, workspaceId } from "./support.ts";
-
-Suites.factMetadata(harness);
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {

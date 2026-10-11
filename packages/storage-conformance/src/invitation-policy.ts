@@ -3,7 +3,7 @@ import { Journal, Log, Publication } from "@amends-dev/core/journal";
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -19,13 +19,13 @@ import {
 
 /** Who may invite whom, with which role, until when, and rechecks at acceptance. */
 
-export const invitationPolicy = (harness: Harness) => {
-  const { core, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: invitation policy`, () => {
+export const invitationPolicy = (fixture: Fixture) => {
+  const { core, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: invitation policy`, () => {
     it.effect(
       "recipient identity and workspace binding protect pending and accepted invitations",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -60,7 +60,7 @@ export const invitationPolicy = (harness: Harness) => {
     );
 
     it.effect("expiry is checked against the operation clock, including the exact deadline", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -96,7 +96,7 @@ export const invitationPolicy = (harness: Harness) => {
     );
 
     it.effect("administrators can invite viewers but cannot invite administrators or owners", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -132,7 +132,7 @@ export const invitationPolicy = (harness: Harness) => {
     );
 
     it.effect("acceptance rechecks original inviter's permission, membership, and ownership", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -203,7 +203,7 @@ export const invitationPolicy = (harness: Harness) => {
     );
 
     it.effect("unsupported and Owner roles never publish an invitation", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {

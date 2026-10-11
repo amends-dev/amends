@@ -50,13 +50,13 @@ import {
   workspaceId,
 } from "./support.ts";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Group admission and departure: authority, workspace removal, concurrency, and replay. */
 
-export const groupMemberships = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: group memberships`, () => {
+export const groupMemberships = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: group memberships`, () => {
     const journalId = Log.Id.make("journal");
     const managerId = Member.Id.make("manager");
     const humanId = Member.Id.make("new-human");
@@ -176,7 +176,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "starts each workspace with a general group that nobody leaves until they leave the workspace",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -223,7 +223,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "adds human and agent members with group-scoped authority and records the actual actor and admission time",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -279,7 +279,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "group creation and audience membership confer no management authority; custom roles and revocation do",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -375,7 +375,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "rejects missing or foreign groups, missing or inactive members, and duplicate admissions without writes",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -421,7 +421,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "any member tidies a private group; removing people from a public one takes a moderator in it",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -504,7 +504,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "anyone who may join finds the public groups with their sizes and joins them as themselves",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -629,7 +629,7 @@ export const groupMemberships = (harness: Harness) => {
         ),
     );
     it.effect("a failure after the admission projection rolls back its row and fact", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -652,7 +652,7 @@ export const groupMemberships = (harness: Harness) => {
     );
 
     it.effect("outer rollback and staged permission or member removal remain authoritative", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -717,7 +717,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "reopening and replay preserve a later admission after its actor and recipient lose workspace access",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -778,7 +778,7 @@ export const groupMemberships = (harness: Harness) => {
     );
 
     it.effect("independent connections cannot concurrently admit the same member twice", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const saved = yield* Effect.scoped(runHost(storage, prepare()));
           const start = yield* Deferred.make<void>();
@@ -856,7 +856,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "gateway exposes membership outcomes and observes permission changes through its cached runtime",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -935,7 +935,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "managed departure uses group-scoped permission, preserves history, and records actor and time",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1003,7 +1003,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "human, agent, and owner can leave themselves without any grants; others' admissions stay private",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1083,7 +1083,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "creation permission cannot remove members; custom management roles and live revocation apply",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1160,7 +1160,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "stale removal and leave never end a fresh readmission; wrong-group and foreign IDs reveal no admission",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1226,7 +1226,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "workspace removal settles human and agent admissions and invitations without group-management grants",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1349,7 +1349,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "departure projection failure and outer rollback restore the admission and journal",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1392,7 +1392,7 @@ export const groupMemberships = (harness: Harness) => {
     );
 
     it.effect("failure after one group departure rolls back the entire workspace removal", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1431,7 +1431,7 @@ export const groupMemberships = (harness: Harness) => {
     );
 
     it.effect("departure observes staged management revocation and workspace removal", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1487,7 +1487,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "reopening and replay preserve departures and fresh admissions after authority changes",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -1549,7 +1549,7 @@ export const groupMemberships = (harness: Harness) => {
     );
 
     it.effect("concurrent removal and self-leave end the admission exactly once", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const saved = yield* Effect.scoped(
             runHost(
@@ -1634,7 +1634,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "concurrent addition and workspace removal cannot leave an active admission for a removed member",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(runHost(storage, prepare()));
             const start = yield* Deferred.make<void>();
@@ -1702,7 +1702,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "store departures validate references, reject repeated transitions, and preserve historical fields",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1773,7 +1773,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "gateway exposes departure outcomes and accepts self-leave with no management grant",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -1845,7 +1845,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect.each([humanId, agentId])(
       "workspace self-removal settles admissions without reauthorizing the departed actor: %s",
       (memberId) =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1905,7 +1905,7 @@ export const groupMemberships = (harness: Harness) => {
     it.effect(
       "repeating a recorded departure reuses its event and cannot change its reason or a fresh admission",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

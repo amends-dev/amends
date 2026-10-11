@@ -29,7 +29,7 @@ import type { StreamPart } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Redacted, Stream } from "effect";
 import type { Prompt } from "effect/ai";
-import type { Harness as ConformanceHarness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -374,13 +374,13 @@ const joinedOf = (id: Workspace.Id, turnId: Turn.Id) =>
       conversation.map((message) => ({ role: message.role, texts: textsOf(message) })),
   );
 
-export const turns = (harness: ConformanceHarness) => {
-  const { runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: turns`, () => {
+export const turns = (fixture: Fixture) => {
+  const { runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: turns`, () => {
     it.effect(
       "an agent accepts the work asked of it into a turn, which starts on its setup with the thread's prompt",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -469,7 +469,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "closing posts the turn's answer and keeps its session, and the next turn is prompted with what followed",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -567,7 +567,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "a reader follows a turn's log: its prompt, drafts, each step that wrote text, and its end",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.scoped(
@@ -635,7 +635,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "a queued turn stops at once, a running one once its job confirms, and work waits meanwhile",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.scoped(
@@ -771,7 +771,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "a failed turn runs again once, telling the agent who asked, while nothing follows",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -839,7 +839,7 @@ export const turns = (harness: ConformanceHarness) => {
     );
 
     it.effect("a turn the agent cannot run as it is set up fails before it starts", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -879,7 +879,7 @@ export const turns = (harness: ConformanceHarness) => {
     );
 
     it.effect("a turn whose answer the agent may no longer post fails, keeping its session", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -916,7 +916,7 @@ export const turns = (harness: ConformanceHarness) => {
     );
 
     it.effect("an agent that stops taking part in a thread has its turn there stopped", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -970,7 +970,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "an agent taken off a task has its turn there stopped, and is asked anew as work resumes",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -1057,7 +1057,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "an agent given a task is asked with the thread as it stands and what made it a task, then told each change in its words",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -1152,7 +1152,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "an agent assigned a channel's task is told the contact's messages by the contact's name",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -1197,7 +1197,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "an agent asked back into a thread ends its departed turn, then starts anew with what it missed",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -1255,7 +1255,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "an agent reads every message it has not been told, however many, before and after it joined",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -1299,7 +1299,7 @@ export const turns = (harness: ConformanceHarness) => {
     it.effect(
       "a member who may not read a thread may not read its turns or follow their logs",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -1337,7 +1337,7 @@ export const turns = (harness: ConformanceHarness) => {
     );
 
     it.effect("following a turn's log ends once the reader may no longer read its thread", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.scoped(

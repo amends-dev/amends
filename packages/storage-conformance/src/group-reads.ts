@@ -34,13 +34,13 @@ import {
   testProvenance,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Group reads: audience, rosters, management reads, and paging. */
 
-export const groupReads = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: group reads`, () => {
+export const groupReads = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: group reads`, () => {
     const readerId = Member.Id.make("reader");
     const otherId = Member.Id.make("other");
     const agentId = Member.Id.make("agent");
@@ -179,7 +179,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "default Viewer reads only its own groups; lists are stable and current rosters include human and agent admissions",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -230,7 +230,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "group-read grants are scoped, independent of membership, and sufficient without member-read grants",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -262,7 +262,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "no grant reaches a private or direct group from outside it: not the owner's, not a direct one",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -327,7 +327,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "the reusable audience check needs no action grant and has no management or ownership bypass",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -360,7 +360,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "missing and foreign groups share the same ordinary read outcome, including through the gateway",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -415,7 +415,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "one constructed service observes departure, readmission, role revocation, and workspace removal",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -533,7 +533,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "reads and audience policy never open a writer transaction or advance checkpoints",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -581,7 +581,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "reads honor staged departures, admissions, and grant changes and an outer rollback restores them",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -646,7 +646,7 @@ export const groupReads = (harness: Harness) => {
     it.effect(
       "current rosters exclude ended admissions and inactive workspace members without exposing membership history",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -682,7 +682,7 @@ export const groupReads = (harness: Harness) => {
     );
 
     it.effect("each listed group says whether the reader may manage its members", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -754,7 +754,7 @@ export const groupReads = (harness: Harness) => {
     );
 
     it.effect("read revocation and invalid actors are checked again on every read", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -822,7 +822,7 @@ export const groupReads = (harness: Harness) => {
     );
 
     it.effect("a storage failure reaches a group reader as it is, and records nothing", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -853,7 +853,7 @@ export const groupReads = (harness: Harness) => {
     );
 
     it.effect("group lists and rosters page in ID order and skip what the reader cannot see", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {

@@ -1,7 +1,7 @@
 import { Event } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -15,13 +15,13 @@ import {
 } from "./support.ts";
 
 /** Attribution recorded with each operation's facts. */
-export const provenance = (harness: Harness) => {
-  const { gateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: provenance`, () => {
+export const provenance = (fixture: Fixture) => {
+  const { gateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: provenance`, () => {
     it.effect(
       "bootstrap, acceptance and removal retain truthful attribution after reopening storage",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const workspace = yield* Effect.scoped(
               Effect.gen(function* () {

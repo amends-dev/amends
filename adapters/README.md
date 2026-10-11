@@ -35,11 +35,12 @@ it.
 Both have one shape. A workspace binding owns one workspace's view of the database and its
 transaction boundary. Each store is a module over that binding, implementing core's store
 contract, with matching filenames in both adapters, such as `thread-messages.ts`. `layerWorkspace`
-merges the stores over one binding, and each adapter's storage module, `PostgresStorage` or
-`MemoryStorage`, builds those views on demand as `WorkspaceStorage.Service`. Database tables and migrations belong to the adapter; domain records
-and store contracts belong to core. Each adapter's root `layer` composes workspace storage, the
-directory, and the signal hub, which relays signals between hosts over the same storage, and
-leaves the database itself to the host. The PostgreSQL adapter also keeps up the tables Effect
+merges the stores over one binding, and each adapter's workspace storage module,
+`PostgresWorkspaceStorage` or `MemoryWorkspaceStorage`, builds those views on demand as
+`WorkspaceStorage.Service`. Database tables and migrations belong to the adapter; domain records
+and store contracts belong to core. `PostgresStorage.layer` and `MemoryStorage.layer` compose workspace storage, the directory, the
+accounts, and sign-in storage, with the signal hub that relays signals between hosts over the same
+storage, and leave the database itself to the host. The PostgreSQL adapter also keeps up the tables Effect
 Cluster stores its messages in, as `PostgresClusterStorage`, pruning those the host has handled.
 
 ### Validation
@@ -61,7 +62,7 @@ a row implies still passes its whole check first.
 Adapters follow the [shared construction conventions](../packages/README.md#constructors-and-layers).
 In the PostgreSQL adapter, `PostgresDatabase.make()` applies the current schema baseline to an
 Effect SQL client it is given, without opening a connection, and `PostgresDatabase.layer(config)`
-opens the client's pool and delegates to it. The binding, `PostgresStorage`, and
+opens the client's pool and delegates to it. The binding, `PostgresWorkspaceStorage`, and
 `PostgresDirectory` construct over the database service, and each store over the binding. The memory adapter's `MemoryDatabase.make()` creates empty storage, and
 `MemoryConnection` stands for one host's connection to it.
 
@@ -72,7 +73,7 @@ on each operation.
 ## Testing and migrations
 
 Every storage adapter runs the [conformance suites](../packages/storage-conformance/README.md)
-through `test/harness.ts`, one suite per test file. Behavior core relies on belongs in those suites;
+through `test/fixture.ts`, from one test file that calls `run`. Behavior core relies on belongs in those suites;
 an adapter's own tests keep what only it has, such as columns, query plans, or a driver's failures.
 
 Each storage adapter keeps one schema baseline: PostgreSQL's generated baseline is in

@@ -22,7 +22,7 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { Effect, Option, Result } from "effect";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 
 import {
@@ -40,9 +40,9 @@ import {
 
 /** Ownership transfer: authority, recipients, competition, rollback, and replay. */
 
-export const ownership = (harness: Harness) => {
-  const { core, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: ownership`, () => {
+export const ownership = (fixture: Fixture) => {
+  const { core, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: ownership`, () => {
     const setup = Effect.gen(function* () {
       const workspace = yield* Operations.createWorkspace(alice.id);
       const invitation = yield* Operations.invite(workspace.id, alice, request(yield* future));
@@ -63,7 +63,7 @@ export const ownership = (harness: Harness) => {
     it.effect(
       "transfer replaces workspace roles, preserves separate access and attribution, and changes delegation immediately",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -153,7 +153,7 @@ export const ownership = (harness: Harness) => {
     it.effect(
       "only a permitted current owner can transfer to another active human in the same workspace",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -250,7 +250,7 @@ export const ownership = (harness: Harness) => {
     it.effect(
       "competing transfers leave one owner and stale requests stay stale after ownership returns",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -294,7 +294,7 @@ export const ownership = (harness: Harness) => {
     );
 
     it.effect("a late ownership failure rolls back metadata, roles, assignments, and journal", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -337,7 +337,7 @@ export const ownership = (harness: Harness) => {
     it.effect(
       "ownership transfer survives restart and journal replay without reauthorizing the former owner",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runGateway(

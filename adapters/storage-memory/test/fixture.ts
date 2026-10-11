@@ -1,20 +1,19 @@
-import type { Harness } from "@amends-dev/storage-conformance";
+import type { Fixture } from "@amends-dev/storage-conformance";
 import { BunCrypto } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
-import { layer, MemoryDatabase } from "../src/index.ts";
+import { MemoryDatabase, MemoryStorage } from "../src/index.ts";
 
 /** New memory storage for each test; each connection is another host over it. */
-export const harness: Harness = {
+export const fixture: Fixture = {
   name: "memory",
   available: true,
-  crypto: BunCrypto.layer,
   withStorage: (use) =>
     Effect.scoped(
       Effect.gen(function* () {
         const database = yield* MemoryDatabase.make();
         return yield* use({
           connect: () =>
-            Layer.build(layer.pipe(Layer.provide(BunCrypto.layer))).pipe(
+            Layer.build(MemoryStorage.layer.pipe(Layer.provideMerge(BunCrypto.layer))).pipe(
               Effect.provideService(MemoryDatabase.Service, database),
             ),
           discardProjections: Effect.sync(() => {

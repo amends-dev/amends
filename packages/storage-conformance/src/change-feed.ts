@@ -10,7 +10,7 @@ import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Queue, Stream } from "effect";
 import type { Scope } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import {
   alice,
   bob,
@@ -64,8 +64,8 @@ const memberActor = (name: string) =>
   });
 
 /** The change feed read from the journal: delivery across hosts, resumption, and audiences. */
-export const changeFeed = (harness: Harness) => {
-  const { core, gateway, initialized, seed } = Support.make(harness);
+export const changeFeed = (fixture: Fixture) => {
+  const { core, gateway, initialized, seed } = Support;
   /** Record a role every member may see, as a trusted fixture would. */
   const marker = (bound: Bound) =>
     Effect.flatMap(Journal.Service, (journal) =>
@@ -81,9 +81,9 @@ export const changeFeed = (harness: Harness) => {
       Effect.provideService(Publication.Service, testProvenance(workspaceId)),
       Effect.provide(core(bound)),
     );
-  describe.skipIf(!harness.available)(`${harness.name}: change feed`, () => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: change feed`, () => {
     it.live("a subscriber receives commits made through its own host and through another", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           // Each host keeps one gateway for the test, as a running process would.
           const first = yield* Layer.build(gateway(yield* storage.connect()));
@@ -130,7 +130,7 @@ export const changeFeed = (harness: Harness) => {
     );
 
     it.live("a cursor resumes on another host with the commits missed in between", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const first = yield* storage.connect();
           const second = yield* storage.connect();
@@ -172,7 +172,7 @@ export const changeFeed = (harness: Harness) => {
     );
 
     it.live("thread activity reaches the group's members with read access, and nobody else", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -239,7 +239,7 @@ export const changeFeed = (harness: Harness) => {
     );
 
     it.live("a mention's notification reaches its recipient as their inbox lists it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {

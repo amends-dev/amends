@@ -6,9 +6,8 @@ Validate decoded records and edited fields against core schemas before storage
 conversion. Rejected writes are conflicts; malformed stored rows and infrastructure
 errors are failures. Preserve transaction guards and validate before any SQL write
 or conversion that drops domain information. Put behavior every adapter must share in
-the `@amends-dev/storage-conformance` suites, which each adapter runs through its harness.
-Keep only what one adapter stores or fails differently in its own tests, beside the suite
-registrations. Change the memory adapter with
+the `@amends-dev/storage-conformance` suites, which each adapter runs through its fixture.
+Keep only what one adapter stores or fails differently in its own tests. Change the memory adapter with
 any contract change: it is the reference implementation.
 Applied migrations, serialized fields, and service keys remain stable through
 source reorganizations. Keep bindings and raw table schemas internal.

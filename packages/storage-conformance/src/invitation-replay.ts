@@ -10,7 +10,7 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { DateTime, Effect, Option, Result } from "effect";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 
 import {
@@ -29,13 +29,13 @@ import {
 
 /** Acceptance and removal roll back together, and replay restores invitation records. */
 
-export const invitationReplay = (harness: Harness) => {
-  const { core, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: invitation replay`, () => {
+export const invitationReplay = (fixture: Fixture) => {
+  const { core, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: invitation replay`, () => {
     it.effect(
       "a late acceptance failure rolls back membership, assignments, consumption, and journal together",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -75,7 +75,7 @@ export const invitationReplay = (harness: Harness) => {
     it.effect(
       "removal and pending invitation revocation roll back together, commit once, and replay within their workspace",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -216,7 +216,7 @@ export const invitationReplay = (harness: Harness) => {
     it.effect(
       "invitation replay restores pending, accepted, and revoked records without rechecking time or authority",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {

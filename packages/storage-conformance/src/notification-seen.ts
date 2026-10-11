@@ -41,16 +41,16 @@ import {
   workspaceId,
 } from "./support.ts";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /**
  * Marking notifications seen: a human's Seen is private state outside the journal. Ownership,
  * repeats, transactions, concurrency, and survival through rebuilds.
  */
 
-export const notificationSeen = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: marking notifications seen`, () => {
+export const notificationSeen = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: marking notifications seen`, () => {
     const human: Actor.Value = {
       workspaceId,
       memberId: Member.Id.make("human"),
@@ -202,7 +202,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "marking seen records Seen privately with a stable time, and writes nothing to the journal",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -239,7 +239,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "seeing everything through the newest shown leaves later arrivals pending, and the count follows",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -304,7 +304,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "marking seen requires active ownership, has no role bypass, and cannot accept agent work",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -362,7 +362,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "people can clear their own inbox after source access is lost without resolving or rejoining",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -409,7 +409,7 @@ export const notificationSeen = (harness: Harness) => {
     );
 
     it.effect("a failed Seen write leaves the notification pending, and a retry records it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -437,7 +437,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "seeing notifications that leaving their group settles first reports them handled, not a failure",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -544,7 +544,7 @@ export const notificationSeen = (harness: Harness) => {
     );
 
     it.effect("a Seen write during a departure's commit agrees with what rebuilding settles", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -602,7 +602,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "Seen joins its caller's transaction, sees staged records, and rolls back with the caller",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -642,7 +642,7 @@ export const notificationSeen = (harness: Harness) => {
     );
 
     it.effect("staged member removal prevents marking seen within the same outer commit", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -676,7 +676,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "Seen survives reopening, rebuilding projections, and departure, and never revives pending work",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -754,7 +754,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "direct Seen writes accept only pending human notifications here, keep the first time, and are atomic",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -841,7 +841,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "marking seen concurrently from two hosts succeeds for both with the one stored time",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(runHost(storage, prepare()));
             const journal = yield* Effect.scoped(
@@ -888,7 +888,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "marking another recipient's notification seen reads as missing and writes nothing",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -910,7 +910,7 @@ export const notificationSeen = (harness: Harness) => {
     it.effect(
       "gateway exposes marking-seen outcomes and invalid-input errors without exposing internal services",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const p = yield* Effect.scoped(runHost(storage, prepare()));
             yield* runGateway(

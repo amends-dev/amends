@@ -4,7 +4,7 @@ import { Entry, Store } from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import { Member, MemberStore, Workspace } from "@amends-dev/core/workspace";
 import { SessionTokens } from "@amends-dev/gateway";
-import { PostgresDatabase, PostgresStorage } from "@amends-dev/storage-postgresql";
+import { PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
@@ -115,7 +115,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           );
           // Agent admission is not implemented yet; seed the read models to reach an agent recipient.
           yield* Effect.gen(function* () {
-            const storage = yield* PostgresStorage.make();
+            const storage = yield* PostgresWorkspaceStorage.make();
             const context = yield* storage.forWorkspace(workspace.id);
             const notifications = Context.get(context, NotificationStore.Service);
             const members = Context.get(context, MemberStore.Service);

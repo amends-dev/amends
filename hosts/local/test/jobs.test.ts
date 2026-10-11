@@ -6,7 +6,7 @@ import { SessionLogStore, TurnExecution, TurnJobs } from "@amends-dev/core/turn"
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
-import { PostgresStorage } from "@amends-dev/storage-postgresql";
+import { PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, Context, Duration, Effect, Exit, Layer, Option, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
@@ -89,7 +89,7 @@ describe.skipIf(!available)("jobs on the local host", () => {
               LocalHost.layerDatabase(Redacted.make(url)),
             ),
           );
-          const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
+          const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(job.workspaceId), Store.Service);
           const requests = Context.get(context, TurnJobs.Service);
           const stored = Effect.flatMap(
@@ -135,7 +135,7 @@ describe.skipIf(!available)("jobs on the local host", () => {
               LocalHost.layerDatabase(Redacted.make(url), { pollInterval: "1 minute" }),
             ),
           );
-          const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
+          const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(job.workspaceId), Store.Service);
           const requests = Context.get(context, TurnJobs.Service);
           // A commit goes on after it makes a request, as a real one does with its later facts

@@ -45,13 +45,13 @@ import {
   threadInternals,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Resolving a notification's source under current access, without writing. */
 
-export const notificationSources = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: notification sources`, () => {
+export const notificationSources = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: notification sources`, () => {
     /** Narrow a stored participation to its member participant for assertions. */
     const memberParticipant = (record: ThreadParticipation.Record) => {
       if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
@@ -205,7 +205,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "humans and agents resolve only authorized source content using a direct read without side effects",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -259,7 +259,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "the inbox holds only its reader's notifications, and checks their identity before reading sources",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -300,7 +300,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "current grants and group access control historical sources independently of participation",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -414,7 +414,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "the inbox lists the reader's notifications newest first with the sources they can read",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -509,7 +509,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "discarded agent notifications remain readable history without becoming pending work",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -546,7 +546,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "missing or unsupported sources are unavailable and lookups stay scoped to the workspace journal",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -597,7 +597,7 @@ export const notificationSources = (harness: Harness) => {
     );
 
     it.effect("source failures remain failures and a denied read never loads message content", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -627,7 +627,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "follow and ending sources use the same typed resolver and omit internal identities",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -748,7 +748,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "source resolution observes staged publication, revocation, and group departure in an outer transaction",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -807,7 +807,7 @@ export const notificationSources = (harness: Harness) => {
     it.effect(
       "sources resolve after reopening, and the gateway shows a missing source as none",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(

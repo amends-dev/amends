@@ -18,7 +18,7 @@ import { Models } from "@amends-dev/harness-amends";
 import {
   PostgresClusterStorage,
   PostgresDatabase,
-  layer as postgres,
+  PostgresStorage,
 } from "@amends-dev/storage-postgresql";
 import { BunClusterSocket, BunCrypto, BunServices, BunSocket } from "@effect/platform-bun";
 import { Duration, Effect, Layer, Option, Redacted } from "effect";
@@ -174,7 +174,7 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     makeIntegrations(sandboxDirectory, options.credentialKey),
     (integrations) => {
       const gateway = Gateway.layer({ integrations }).pipe(
-        Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
+        Layer.provideMerge(PostgresStorage.layer({ credentialKey: options.credentialKey })),
         Layer.provide(Layer.merge(TurnJob.layerRequests, DeliveryJob.layerRequests)),
       );
       const installed = Layer.effect(Integrations.Integrations, Integrations.make(integrations));

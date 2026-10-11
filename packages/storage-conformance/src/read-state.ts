@@ -30,13 +30,13 @@ import {
   testProvenance,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Thread and group lists with unread state, forward-only read state, and settling on reading. */
 
-export const readState = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: read state`, () => {
+export const readState = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: read state`, () => {
     const humanId = Member.Id.make("human");
     const otherId = Member.Id.make("other");
     const plainId = Member.Id.make("plain");
@@ -140,7 +140,7 @@ export const readState = (harness: Harness) => {
     });
 
     it.effect("messages advance a thread's and group's latest activity; quiet changes do not", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -226,7 +226,7 @@ export const readState = (harness: Harness) => {
     it.effect(
       "marking a thread read moves forward only and settles the reader's inbox up to it",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -279,7 +279,7 @@ export const readState = (harness: Harness) => {
     );
 
     it.effect("marking a group read records a read time that only moves forward", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -316,7 +316,7 @@ export const readState = (harness: Harness) => {
     );
 
     it.effect("read-state storage keeps the later value, inside or outside a transaction", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -388,7 +388,7 @@ export const readState = (harness: Harness) => {
     );
 
     it.effect("group thread lists page by latest activity with each reader's unread state", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -492,7 +492,7 @@ export const readState = (harness: Harness) => {
     it.effect(
       "group streams page threads by start with their opening, replies, and unread state",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -580,7 +580,7 @@ export const readState = (harness: Harness) => {
     );
 
     it.effect("a stream page reads storage a fixed number of times, however many threads", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -636,7 +636,7 @@ export const readState = (harness: Harness) => {
     it.effect(
       "group lists report latest activity, catching up, following, and pending counts",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -720,7 +720,7 @@ export const readState = (harness: Harness) => {
     it.effect(
       "posting reads the thread through the author's message and settles their earlier notifications",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

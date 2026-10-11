@@ -29,13 +29,13 @@ import {
   threadInternals,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Thread starts and replies make the same store reads at any group size. */
 
-export const threadStarts = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: thread starts`, () => {
+export const threadStarts = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: thread starts`, () => {
     const humanId = Member.Id.make("human");
     const otherId = Member.Id.make("other");
     const contactId = Identity.ContactId.make("customer");
@@ -184,7 +184,7 @@ export const threadStarts = (harness: Harness) => {
     it.effect(
       "starting a direct group reuses it for the same members and enrolls all of them",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -269,7 +269,7 @@ export const threadStarts = (harness: Harness) => {
     it.effect(
       "the shared start opens a contact's conversation with contact and triage participants only",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -370,7 +370,7 @@ export const threadStarts = (harness: Harness) => {
     it.effect(
       "group creation, starts, replies, and timelines read storage the same way at any size",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -454,7 +454,7 @@ export const threadStarts = (harness: Harness) => {
     it.effect(
       "a reply reads the records of those it addresses, not the group's roster or the thread's history",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

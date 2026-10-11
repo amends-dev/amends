@@ -3,7 +3,7 @@ import { type SessionLog, Turn } from "@amends-dev/core/turn";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Result } from "effect";
 import { Prompt } from "effect/ai";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { forWorkspace, otherWorkspaceId, workspaceId } from "./support.ts";
 
 const participation = ThreadParticipation.Id.make("participation-1");
@@ -74,12 +74,12 @@ const started: SessionLog.Entry = {
 const interrupted: SessionLog.Entry = { _tag: "Interrupted", turnId, reason: "The run stopped." };
 
 /** Each participation's session log: append-only, apart from every commit. */
-export const sessionLogs = (harness: Harness) => {
-  describe.skipIf(!harness.available)(`${harness.name}: session logs`, () => {
+export const sessionLogs = (fixture: Fixture) => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: session logs`, () => {
     it.live(
       "appends entries after the latest, at the next positions, and reads them as recorded",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const { sessionLogs } = yield* forWorkspace(yield* storage.connect(), workspaceId);
             expect(yield* sessionLogs.head(participation)).toBe(0);
@@ -114,7 +114,7 @@ export const sessionLogs = (harness: Harness) => {
     );
 
     it.live("refuses an append after any position but the latest, taking none of it", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const one = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const other = yield* forWorkspace(yield* storage.connect(), workspaceId);
@@ -146,7 +146,7 @@ export const sessionLogs = (harness: Harness) => {
     );
 
     it.live("keeps each participation's log apart, and each workspace's", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const host = yield* storage.connect();
           const here = yield* forWorkspace(host, workspaceId);
@@ -168,7 +168,7 @@ export const sessionLogs = (harness: Harness) => {
     );
 
     it.live("takes part in no commit: an append in a transaction that rolls back is kept", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const rolledBack = yield* Effect.flip(
@@ -192,7 +192,7 @@ export const sessionLogs = (harness: Harness) => {
     it.live(
       "a reader waiting for an entry past a position wakes once one lands, from any host",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const reader = yield* forWorkspace(yield* storage.connect(), workspaceId);

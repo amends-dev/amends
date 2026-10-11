@@ -11,7 +11,7 @@ import {
 } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import {
   forWorkspace,
   journalLog,
@@ -40,13 +40,13 @@ export const Other = Fact.make("storage.other", {
 });
 
 /** Fact headers: stored beside payloads, filtered in storage, and compared on retries. */
-export const factMetadata = (harness: Harness) => {
-  const { core } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: fact metadata`, () => {
+export const factMetadata = (fixture: Fixture) => {
+  const { core } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: fact metadata`, () => {
     it.effect(
       "fact metadata survives reopening, and fact reads page matching entries across versions and commits",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const events = yield* Effect.scoped(
               Effect.gen(function* () {
@@ -132,7 +132,7 @@ export const factMetadata = (harness: Harness) => {
     it.effect(
       "native idempotency compares fact metadata and rejects foreign provenance before writing",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const provenance = testProvenance(workspaceId);
@@ -200,7 +200,7 @@ export const factMetadata = (harness: Harness) => {
     it.effect(
       "subject reads span fact names, preserve entry cursors, and persist contact attribution",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const Payload = Schema.Struct({ threadId: Schema.NonEmptyString, text: Schema.String });
             const subject = (payload: typeof Payload.Type) =>

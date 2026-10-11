@@ -68,13 +68,13 @@ import {
   workspaceId,
 } from "./support.ts";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Replies: admission, recipients, concurrent sequencing, rollback, and replay. */
 
-export const threadReplies = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: thread replies`, () => {
+export const threadReplies = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: thread replies`, () => {
     /** Narrow a stored participation to its member participant for assertions. */
     const memberParticipant = (record: ThreadParticipation.Record) => {
       if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
@@ -206,7 +206,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "a human reply joins its author and broadcasts only to current thread participants",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -339,7 +339,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "mentions admit eligible members and narrow recipients without removing existing participants",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -393,7 +393,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "start and publish remain separate permissions, default Viewer grants publish, and scoped grants are live",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -479,7 +479,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "invalid content, outsiders, inactive members, foreign threads, and agent authors fail without writes",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -555,7 +555,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "group readmission restores access without participation; a later mention creates a fresh boundary",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -622,7 +622,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "projection and late failures roll back author admission, message, activity, and notifications",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -672,7 +672,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "an enclosing commit sees staged publications, permissions, and departures and can roll everything back",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -742,7 +742,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "concurrent replies serialize sequence allocation and admit a new author only once",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -808,7 +808,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "reopening and replay preserve later admissions, recipients, sequence, and departure settlement",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -869,7 +869,7 @@ export const threadReplies = (harness: Harness) => {
     );
 
     it.effect("gateway exposes human reply outcomes without internal participation snapshots", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -921,7 +921,7 @@ export const threadReplies = (harness: Harness) => {
     );
 
     it.effect("a storage failure before a reply commits leaves nothing behind", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -946,7 +946,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "a captured reply service checks live group access and gives a returning author fresh participation",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1012,7 +1012,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "a concurrent reply and removal cannot leave actionable input for the removed agent",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(runHost(storage, prepare()));
             const gate = yield* Deferred.make<void>();
@@ -1096,7 +1096,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "an agent's message tells other agents without asking them for work, and people as usual",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1205,7 +1205,7 @@ export const threadReplies = (harness: Harness) => {
     it.effect(
       "an edit replaces a reply's text at its next revision and tells only the newly mentioned, and a deletion keeps its place",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

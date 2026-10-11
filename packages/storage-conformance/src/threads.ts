@@ -62,13 +62,13 @@ import {
   workspaceId,
 } from "./support.ts";
 
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Thread starts in private groups: records, participation, activity, rollback, and replay. */
 
-export const threads = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: threads`, () => {
+export const threads = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: threads`, () => {
     /** Narrow a stored participation to its member participant for assertions. */
     const memberParticipant = (record: ThreadParticipation.Record) => {
       if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
@@ -175,7 +175,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "an unmentioned team opening enrolls only its author and notifies no one, atomically and in order",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -265,7 +265,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "mentions narrow initial participation and recipients without admitting outsiders",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -304,7 +304,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "starting requires current audience, scoped start permission, and agent-use authority for mentioned agents",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -410,7 +410,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "a direct group needs agent-use authority for its agents when created, and later only for mentioned ones",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -476,7 +476,7 @@ export const threads = (harness: Harness) => {
     );
 
     it.effect("notification failure after earlier inserts rolls back all thread records", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -528,7 +528,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "group and workspace departures end participation and discard pending agent input without reviving it on readmission",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -609,7 +609,7 @@ export const threads = (harness: Harness) => {
     );
 
     it.effect("outer rollback and staged revocation or departure remain authoritative", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -678,7 +678,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "reopening and replay retain initial selection, attribution, sequence, and later departure outcomes",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runHost(
@@ -770,7 +770,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "gateway exposes unavailable-participant outcomes and rejects invalid opening content",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -812,7 +812,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "direct stores reject foreign records, a second active participation, a message's second activity, and timeline gaps",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -891,7 +891,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "concurrent opening and removal cannot retain active participation for an ended admission",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(runHost(storage, prepare()));
             const readyOne = yield* Deferred.make<void>();
@@ -975,7 +975,7 @@ export const threads = (harness: Harness) => {
     it.effect(
       "a late failure rolls back an opening, and group-departure failure restores input and participation",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -1046,7 +1046,7 @@ export const threads = (harness: Harness) => {
     );
 
     it.effect("direct stores refuse reused IDs and misplaced timeline entries", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -1168,7 +1168,7 @@ export const threads = (harness: Harness) => {
     );
 
     it.effect("renaming a thread records one fact and a quiet activity that replay applies", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {

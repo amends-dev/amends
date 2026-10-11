@@ -15,7 +15,7 @@ import { Member, type Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Redacted } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -157,8 +157,8 @@ type Operation = (
   agentService: AgentService.Interface,
 ) => Effect.Effect<unknown, unknown, Actor.Service>;
 
-export const agents = (harness: Harness) => {
-  const { core, gateway, runGateway } = Support.make(harness);
+export const agents = (fixture: Fixture) => {
+  const { core, gateway, runGateway } = Support;
   let directGrants = 0;
   /** Give the member each of `grants` directly, which no operation does. */
   const grant = (bound: Bound, memberId: Member.Id, grants: ReadonlyArray<Grant.Value>) =>
@@ -190,11 +190,11 @@ export const agents = (harness: Harness) => {
         { discard: true },
       ),
     );
-  describe.skipIf(!harness.available)(`${harness.name}: agents`, () => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: agents`, () => {
     it.effect(
       "creates an agent as a member, which members read and only administrators configure",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -306,7 +306,7 @@ export const agents = (harness: Harness) => {
     it.effect(
       "refuses a setup naming a connection it cannot use, or that cannot run, and creates nothing",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -401,7 +401,7 @@ export const agents = (harness: Harness) => {
     it.effect(
       "gives an agent only connections the actor may read and use, each checked",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -459,7 +459,7 @@ export const agents = (harness: Harness) => {
     );
 
     it.effect("stores an agent once, for one membership, and changes only a stored one", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -503,7 +503,7 @@ export const agents = (harness: Harness) => {
     );
 
     it.effect("configures and renames an agent, recording nothing when nothing changes", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -598,7 +598,7 @@ export const agents = (harness: Harness) => {
     it.effect(
       "removes an agent with its membership, and returns the first when a create is retried",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -647,7 +647,7 @@ export const agents = (harness: Harness) => {
     it.effect(
       "shows each agent as ready as its connections and the host's integrations now find them",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const { workspace, connections, auto, reviewing } = yield* runGateway(
               storage,
@@ -750,7 +750,7 @@ export const agents = (harness: Harness) => {
     );
 
     it.effect("rebuilds agents from the journal", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {

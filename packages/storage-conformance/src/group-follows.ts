@@ -30,13 +30,13 @@ import {
   testProvenance,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Following groups: joining later threads, ending with the admission, and storage constraints. */
 
-export const groupFollows = (harness: Harness) => {
-  const { core, initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: group follows`, () => {
+export const groupFollows = (fixture: Fixture) => {
+  const { core, initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: group follows`, () => {
     const humanId = Member.Id.make("human");
     const plainId = Member.Id.make("plain");
     const outsiderId = Member.Id.make("outsider");
@@ -150,7 +150,7 @@ export const groupFollows = (harness: Harness) => {
     });
 
     it.effect("following a team group joins its new threads until the member unfollows", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -193,7 +193,7 @@ export const groupFollows = (harness: Harness) => {
     it.effect(
       "an agent follows on behalf of someone who may use it and then joins member posts",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -240,7 +240,7 @@ export const groupFollows = (harness: Harness) => {
     it.effect(
       "following needs group.follow and a team group, ends with the admission, and replays",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -318,7 +318,7 @@ export const groupFollows = (harness: Harness) => {
     it.effect(
       "group follow storage keeps one active follow per admission and rejects invalid records",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {

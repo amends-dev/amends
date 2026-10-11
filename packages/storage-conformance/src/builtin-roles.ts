@@ -22,7 +22,7 @@ import {
 import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import {
   alice,
   type Bound,
@@ -61,8 +61,8 @@ const older = Core.permissions.filter(({ name }) => name !== AgentPermissions.Us
 const ownerMemberId = Member.Id.make("owner");
 
 /** Built-in role bundles: recorded at creation, and upgraded through facts to later revisions. */
-export const builtinRoles = (harness: Harness) => {
-  const { core, initialized, gateway } = Support.make(harness);
+export const builtinRoles = (fixture: Fixture) => {
+  const { core, initialized, gateway } = Support;
   const roles = (bound: Bound) => Effect.forEach(roleIds, (id) => bound.roles.get(id));
   const upgrade = (bound: Bound, target?: BuiltinRoleUpgrade.Target) =>
     BuiltinRoleUpgrade.upgrade(target).pipe(Effect.provide(core(bound)));
@@ -116,12 +116,12 @@ export const builtinRoles = (harness: Harness) => {
       Effect.provide(core(bound)),
     );
 
-  describe.skipIf(!harness.available)(`${harness.name}: built-in roles`, () => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: built-in roles`, () => {
     // Real time: the host tries again a second after the first attempt failed.
     it.live(
       "a host that cannot upgrade the roles as it loads the workspace upgrades them once it can",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             yield* recordedBeforeRevisions(bound);
@@ -157,7 +157,7 @@ export const builtinRoles = (harness: Harness) => {
     );
 
     it.effect("a new workspace holds the current revision, and upgrading it records nothing", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           yield* initialized(bound);
@@ -181,7 +181,7 @@ export const builtinRoles = (harness: Harness) => {
     it.effect(
       "a workspace recorded before revisions takes the current bundles when a host loads it",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             yield* recordedBeforeRevisions(bound);
@@ -217,7 +217,7 @@ export const builtinRoles = (harness: Harness) => {
     it.effect(
       "a later revision replaces the bundles once, and an earlier one never reverts it",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             yield* initialized(bound);
@@ -243,7 +243,7 @@ export const builtinRoles = (harness: Harness) => {
     );
 
     it.effect("roles holding a permission only a newer host declares still work on this host", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           yield* initialized(bound);
@@ -276,7 +276,7 @@ export const builtinRoles = (harness: Harness) => {
     );
 
     it.effect("hosts upgrading one workspace together record the upgrade once", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           yield* initialized(bound);

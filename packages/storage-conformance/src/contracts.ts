@@ -6,7 +6,7 @@ import { ThreadId } from "@amends-dev/core/thread";
 import { Invitation, Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import {
   bob,
   type Bound,
@@ -20,9 +20,9 @@ import {
 
 /** Direct store calls: validation, rejection without partial writes, and round trips. */
 
-export const contracts = (harness: Harness) => {
-  const { initialized } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: store contracts`, () => {
+export const contracts = (fixture: Fixture) => {
+  const { initialized } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: store contracts`, () => {
     const permission = MemberPermissions.Read.name;
     const roleId = Role.Id.make("contract-role");
     const localScope = (
@@ -67,7 +67,7 @@ export const contracts = (harness: Harness) => {
     it.effect(
       "role validation rejects invalid inserts and edits without poisoning the transaction or record",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -121,7 +121,7 @@ export const contracts = (harness: Harness) => {
     ] as const)(
       "%s assignments reject a foreign %s scope before converting columns",
       ([kind, scopeKind]) =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -163,7 +163,7 @@ export const contracts = (harness: Harness) => {
     it.effect.each(["missing", "blank"] as const)(
       "invitations reject a %s role and invalid expiry without leaving partial rows",
       (invalidRole) =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -217,7 +217,7 @@ export const contracts = (harness: Harness) => {
     it.effect(
       "an uncaught schema conflict rolls back earlier store writes in the same transaction",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -253,7 +253,7 @@ export const contracts = (harness: Harness) => {
     it.effect(
       "checkpoint validation rejects invalid progress without leaving a partial checkpoint",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -294,7 +294,7 @@ export const contracts = (harness: Harness) => {
     );
 
     it.effect("workspace names are required at the store boundary without partial writes", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -335,7 +335,7 @@ export const contracts = (harness: Harness) => {
     it.effect(
       "ownership storage validates transitions and changes only the owner when the previous owner matches",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -407,7 +407,7 @@ export const contracts = (harness: Harness) => {
     );
 
     it.effect("contact identities cannot be persisted as workspace memberships", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -451,7 +451,7 @@ export const contracts = (harness: Harness) => {
     it.effect(
       "member storage keeps one active membership per identity and never reuses a member ID",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -516,7 +516,7 @@ export const contracts = (harness: Harness) => {
     it.effect(
       "workspace, role, and assignment storage refuse reused IDs, including revoked ones",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -572,7 +572,7 @@ export const contracts = (harness: Harness) => {
     );
 
     it.effect("the live register keeps one version per projection name for each log", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {

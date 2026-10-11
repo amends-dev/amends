@@ -1,7 +1,7 @@
 import { Log, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { type Bound, forWorkspace, workspaceId } from "./support.ts";
 
 const execution = Log.Id.make("execution");
@@ -34,12 +34,12 @@ const holding = (bound: Bound, logs: ReadonlyArray<Log.Id>, outcome: "commit" | 
   });
 
 /** Appends outside any transaction, which wait only for their log's other writers. */
-export const standaloneAppends = (harness: Harness) => {
-  describe.skipIf(!harness.available)(`${harness.name}: standalone appends`, () => {
+export const standaloneAppends = (fixture: Fixture) => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: standalone appends`, () => {
     it.live(
       "a standalone append commits while another host's transaction holds the workspace",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const other = yield* forWorkspace(
@@ -65,7 +65,7 @@ export const standaloneAppends = (harness: Harness) => {
     it.live(
       "standalone appends from several hosts take consecutive positions, and none is lost",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const hosts = yield* Effect.forEach([1, 2, 3], () =>
               Effect.flatMap(storage.connect(), (host) => forWorkspace(host, workspaceId)),
@@ -94,7 +94,7 @@ export const standaloneAppends = (harness: Harness) => {
     it.live(
       "a transaction holding a log keeps its standalone appends waiting, and only those",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const other = yield* forWorkspace(yield* storage.connect(), workspaceId);
@@ -124,7 +124,7 @@ export const standaloneAppends = (harness: Harness) => {
     it.live(
       "a key a transaction looked up stays free until it commits, then answers the retry",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const other = yield* forWorkspace(yield* storage.connect(), workspaceId);
@@ -160,7 +160,7 @@ export const standaloneAppends = (harness: Harness) => {
     );
 
     it.live("keys and expected positions hold across standalone and transaction appends", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const other = yield* forWorkspace(yield* storage.connect(), workspaceId);

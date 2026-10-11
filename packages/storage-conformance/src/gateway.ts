@@ -28,7 +28,7 @@ import {
 import { Gateway, GatewayErrors, WorkspaceDirectory } from "@amends-dev/gateway";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Layer, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -42,13 +42,13 @@ import {
 } from "./support.ts";
 
 /** Workspace creation, isolation, boot, and the directory through the gateway. */
-export const gateway = (harness: Harness) => {
-  const { core, runGateway, gateway: gatewayOn } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: gateway`, () => {
+export const gateway = (fixture: Fixture) => {
+  const { core, runGateway, gateway: gatewayOn } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: gateway`, () => {
     it.effect(
       "one host creates two isolated workspaces and uses each operation's authenticated identity",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             expectTypeOf<
               Effect.Services<ReturnType<typeof Operations.getMember>>
@@ -196,7 +196,7 @@ export const gateway = (harness: Harness) => {
     );
 
     it.effect("the gateway runs the membership workflow over two isolated workspaces", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const outcome = yield* Effect.scoped(
             runGateway(
@@ -344,7 +344,7 @@ export const gateway = (harness: Harness) => {
     it.effect(
       "a host whose projection another host retired rebuilds it for the next request, not a restart",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* Layer.build(gatewayOn(yield* storage.connect()));
             const workspace = yield* Operations.createWorkspace(alice.id).pipe(
@@ -393,7 +393,7 @@ export const gateway = (harness: Harness) => {
     it.effect(
       "a job enters a workspace without an actor, and a workspace never created is refused",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -420,7 +420,7 @@ export const gateway = (harness: Harness) => {
     );
 
     it.effect("workspace creation rejects blank names before persisting a workspace", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -453,7 +453,7 @@ export const gateway = (harness: Harness) => {
     it.effect(
       "requests for workspaces that were never created, or by non-members, leave nothing stored",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const workspace = yield* Effect.scoped(
               runGateway(storage, Operations.createWorkspace(alice.id)),
@@ -490,7 +490,7 @@ export const gateway = (harness: Harness) => {
     );
 
     it.effect("cold workspace boot replays projection history before resolving the caller", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const workspace = yield* Effect.scoped(
             runGateway(storage, Operations.createWorkspace(alice.id)),
@@ -528,7 +528,7 @@ export const gateway = (harness: Harness) => {
     );
 
     it.effect("the directory keeps a workspace whose members were all removed", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {

@@ -3,7 +3,7 @@ import { Accounts, EmailSender, EmailSignIn, SessionTokens, SignIn } from "@amen
 import { describe, expect, it } from "@effect/vitest";
 import { Context, Effect, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
-import type { Harness, Storage } from "./harness.ts";
+import type { Fixture, Storage } from "./fixture.ts";
 
 const ada = Accounts.Email.make("ada@example.com");
 const bob = Accounts.Email.make("bob@example.com");
@@ -17,7 +17,7 @@ const otherThan = (code: SignIn.Code) => SignIn.Code.make(code === "000000" ? "0
  * Email sign-in on a new host over the storage, as a separate process would run it, with the
  * emails it sent. Its provider refuses every email while `refusing` is set.
  */
-const connectSignIn = (harness: Harness, storage: Storage) =>
+const connectSignIn = (storage: Storage) =>
   Effect.gen(function* () {
     const sent: Array<EmailSender.Message> = [];
     const provider = { refusing: false };
@@ -33,7 +33,6 @@ const connectSignIn = (harness: Harness, storage: Storage) =>
         Layer.provide(
           Layer.mergeAll(
             Layer.succeedContext(host),
-            harness.crypto,
             Layer.succeed(EmailSender.Service, emailSender),
           ),
         ),
@@ -54,12 +53,12 @@ const connectSignIn = (harness: Harness, storage: Storage) =>
   });
 
 /** Sign-in with emailed codes over the storage: its accounts, limits, and sessions. */
-export const emailSignIn = (harness: Harness) => {
-  describe.skipIf(!harness.available)(`${harness.name}: email sign-in`, () => {
+export const emailSignIn = (fixture: Fixture) => {
+  describe.skipIf(!fixture.available)(`${fixture.name}: email sign-in`, () => {
     it.effect("a code signs in once, as the address's account", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const host = yield* connectSignIn(harness, storage);
+          const host = yield* connectSignIn(storage);
           yield* host.signIn.start(ada, client);
           expect(host.sent).toMatchObject([{ to: ada, subject: "Your sign-in code" }]);
           const code = host.lastCode(ada);
@@ -83,9 +82,9 @@ export const emailSignIn = (harness: Harness) => {
     );
 
     it.effect("a code stops working after five wrong ones, or ten minutes", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const host = yield* connectSignIn(harness, storage);
+          const host = yield* connectSignIn(storage);
           yield* host.signIn.start(ada, client);
           const code = host.lastCode(ada);
           for (let attempt = 0; attempt < 5; attempt++)
@@ -106,9 +105,9 @@ export const emailSignIn = (harness: Harness) => {
     );
 
     it.effect("an address is sent a code at most every thirty seconds, and five an hour", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const host = yield* connectSignIn(harness, storage);
+          const host = yield* connectSignIn(storage);
           yield* host.signIn.start(ada, client);
           const first = host.lastCode(ada);
           expect(yield* Effect.flip(host.signIn.start(ada, client))).toMatchObject({
@@ -137,9 +136,9 @@ export const emailSignIn = (harness: Harness) => {
     );
 
     it.effect("a client asks for at most twenty codes an hour, whatever the addresses", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const host = yield* connectSignIn(harness, storage);
+          const host = yield* connectSignIn(storage);
           const address = (index: number) => Accounts.Email.make(`person-${index}@example.com`);
           for (let index = 0; index < 20; index++) yield* host.signIn.start(address(index), client);
           expect(yield* Effect.flip(host.signIn.start(address(20), client))).toMatchObject({
@@ -154,9 +153,9 @@ export const emailSignIn = (harness: Harness) => {
     );
 
     it.effect("a code the provider did not send leaves the address as it was", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const host = yield* connectSignIn(harness, storage);
+          const host = yield* connectSignIn(storage);
           yield* host.signIn.start(ada, client);
           const delivered = host.lastCode(ada);
           yield* TestClock.adjust("30 seconds");
@@ -172,10 +171,10 @@ export const emailSignIn = (harness: Harness) => {
     );
 
     it.effect("codes and sessions hold across every host over the storage", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const first = yield* connectSignIn(harness, storage);
-          const second = yield* connectSignIn(harness, storage);
+          const first = yield* connectSignIn(storage);
+          const second = yield* connectSignIn(storage);
           yield* first.signIn.start(ada, client);
           expect(yield* Effect.flip(second.signIn.start(ada, client))).toMatchObject({
             _tag: "SignIn.Limited",
@@ -195,9 +194,9 @@ export const emailSignIn = (harness: Harness) => {
     );
 
     it.effect("a session ends after thirty days unused", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const host = yield* connectSignIn(harness, storage);
+          const host = yield* connectSignIn(storage);
           const session = yield* host.signInWithCode(ada);
           expect(yield* Effect.flip(host.resolve("not-a-token"))).toMatchObject({
             reason: "unknown",
@@ -217,9 +216,9 @@ export const emailSignIn = (harness: Harness) => {
     );
 
     it.effect("a session in use lasts ninety days at most", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const host = yield* connectSignIn(harness, storage);
+          const host = yield* connectSignIn(storage);
           const session = yield* host.signInWithCode(ada);
           for (const days of [29, 29, 29, 2]) {
             yield* TestClock.adjust(`${days} days`);

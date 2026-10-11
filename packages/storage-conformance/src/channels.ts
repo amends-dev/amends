@@ -20,7 +20,7 @@ import { Member, type Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -99,9 +99,9 @@ const toldOf = (bound: Support.Bound, recipient: Notification.Recipient) =>
  * Channels: a connection's conversations becoming threads, what their contacts write and what is
  * carried back to them, and the channel operations.
  */
-export const channels = (harness: Harness) => {
-  const { runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: channels`, () => {
+export const channels = (fixture: Fixture) => {
+  const { runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: channels`, () => {
     /**
      * A workspace owned by alice, who follows its general group, with bob as a member, a connection
      * to the test channels, and a channel over it into the general group that opens tasks.
@@ -159,7 +159,7 @@ export const channels = (harness: Harness) => {
     it.effect(
       "a conversation received opens a bound thread as a task in triage, with its contact and the group's followers, and is received again into nothing",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -311,7 +311,7 @@ export const channels = (harness: Harness) => {
     it.effect(
       "a member's reply is carried to the conversation by the thread's delivery job, which settles the contact's notification, and the contact's replies, edits, and deletions come back in",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -508,7 +508,7 @@ export const channels = (harness: Harness) => {
     it.effect(
       "channels are read by members and managed by administrators, and a removed channel receives nothing",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {

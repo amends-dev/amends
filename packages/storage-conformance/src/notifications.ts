@@ -26,7 +26,7 @@ import {
   Support,
   workspaceId,
 } from "./support.ts";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 
 /** Notification storage: isolation, paging, batches, staged reads, and gateway reads. */
 
@@ -34,9 +34,9 @@ import type { Harness } from "./harness.ts";
 const inboxOf = (...records: ReadonlyArray<Notification.Record>) =>
   records.map((notification) => ({ notification }));
 
-export const notifications = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: notifications`, () => {
+export const notifications = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: notifications`, () => {
     const humanIdentity = Identity.Reference.cases.Human.make({
       id: Identity.HumanId.make("recipient"),
     });
@@ -71,7 +71,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "notification storage persists across reopening and isolates workspaces and recipient kinds",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const one = record("same-id");
             const two = record("agent", { source: one.source, recipient: agent });
@@ -127,7 +127,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "pending counts per group include only the recipient's pending thread notifications",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -181,7 +181,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "a recipient's notifications from one thread list by position in a range, whatever their state",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -255,7 +255,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("pending notifications paginate exclusively by instant and binary ID order", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -287,7 +287,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "both latest notification lists page newest first, exclusively, in the same order",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -349,7 +349,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "notification uniqueness rejects reused IDs and duplicate source-recipient associations",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -385,7 +385,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("writes and reads keep every record past the parameters one statement can bind", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -423,7 +423,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("batch notification insertion writes every record or conflicts as a whole", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -460,7 +460,7 @@ export const notifications = (harness: Harness) => {
     it.effect.each([human, agent, contact, triage])(
       "competing notification insertions produce only one source-recipient record for %o",
       (recipient) =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -491,7 +491,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "notifications, source entries, and checkpoints share staged reads and rollback",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -540,7 +540,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "invalid notification writes conflict before conversion without poisoning the transaction",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -581,7 +581,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "notification reads reject invalid paging and recipient input as typed failures",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -633,7 +633,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "notification operations reject foreign, expired, and incomplete transaction contexts",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -671,7 +671,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("notification storage isolates input and returned nested records from mutation", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -698,7 +698,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "gateway inbox reads enforce recipient and workspace isolation with real pagination",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -740,9 +740,7 @@ export const notifications = (harness: Harness) => {
               yield* b.store.transaction(b.notifications.insert(foreign));
               const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 });
               const gateway = yield* Gateway.make().pipe(
-                Effect.provide(
-                  Layer.mergeAll(harness.crypto, layerRecordedTurnJobs, layerRecordedDeliveryJobs),
-                ),
+                Effect.provide(Layer.mergeAll(layerRecordedTurnJobs, layerRecordedDeliveryJobs)),
               );
               yield* gateway.asMember(
                 workspaceId,
@@ -815,7 +813,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("inbox reads see staged inserts in the outer commit and respect rollback", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -860,7 +858,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("settling an ended participation discards only its pending agent input", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
@@ -904,7 +902,7 @@ export const notifications = (harness: Harness) => {
     it.effect(
       "settling a group departure discards only the member's pending notifications from it: a person's unseen ones, and an agent's input",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runHost(
             storage,
             Effect.gen(function* () {
@@ -983,7 +981,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("leaving a group settles what was pending from it, and nothing from elsewhere", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
@@ -1058,7 +1056,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect("someone invited back after removal starts with an empty inbox", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {

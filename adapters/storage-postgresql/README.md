@@ -11,18 +11,17 @@ every storage adapter runs. It is internal to this repository and not published 
 
 ```ts
 Gateway.layer().pipe(
-  Layer.provideMerge(layer()),
+  Layer.provideMerge(PostgresStorage.layer()),
   Layer.provide(PostgresDatabase.layer({ url: Redacted.make(databaseUrl) })),
 );
 ```
 
-The root `layer(options)` provides the storage contract, with its signal hubs, the directory, the
+`PostgresStorage.layer(options)` provides the storage contract, with its signal hubs, the directory, the
 accounts, and the sign-in storage, leaving the database, and the cryptography that issues human IDs, to the host. Its
 options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
 as base64, that seal connections' credentials; without it the store keeps none and reports
 `Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as
-`maxConnections` (ten by default), and applies the schema before returning;
-`PostgresDatabase.layerClient` connects the same pool without applying it, for tools that only read.
+`maxConnections` (ten by default), and applies the schema before returning.
 `PostgresDatabase.make()` instead takes a `SqlClient.SqlClient` from the context and applies the
 schema through it, inside a transaction holding an advisory lock, so processes starting together on
 an empty database take turns. Keep the client's scope open while using the result; bindings,
@@ -205,7 +204,7 @@ Once it holds the lock, a transaction sets its own session limits, which end wit
 program that runs past `transactionTimeout` rolls back and fails with a store failure; if the
 process itself stalls, PostgreSQL ends its session after twice that long idle, releasing its locks.
 Every duration must be finite and at least a millisecond, since PostgreSQL reads zero as no limit;
-`PostgresStorage.make` refuses others when the host starts.
+`PostgresWorkspaceStorage.make` refuses others when the host starts.
 
 Reads outside a transaction see committed state, each on a pooled connection of its own, and take no
 lock, so they proceed while writers hold the workspace. A process's statements for one workspace
@@ -257,8 +256,9 @@ returns to the pool, or by PostgreSQL when the process dies.
 One module per store, each exporting `make` and a `layer` for the core store it implements, such as
 `members.ts`, `threads.ts`, `turn-records.ts`, `session-logs.ts`, and `deliveries.ts`. They share
 `binding.ts`, one workspace's view of the database: its identity, the transaction boundary, and the
-guard each statement runs under. `storage.ts` composes every store over a binding for one workspace
-(`layerWorkspace`), and its private `layerStores` registers each store. `database.ts` prepares the
+guard each statement runs under. `workspace-storage.ts` composes every store over a binding for one
+workspace (`layerWorkspace`), its private `layerStores` registers each store, and `storage.ts` is
+the adapter: every gateway contract it implements, in one layer. `database.ts` prepares the
 SQL client, `directory.ts` reads across workspaces, `schema.ts` holds the tables, `notices.ts` is
 the pool's notification listener that `signal-hub.ts` binds to each workspace, `turns.ts` and
 `reads.ts` are the writer queue and read cap above, `credential-key.ts` seals credentials,
@@ -287,10 +287,10 @@ Without it, the tests start a throwaway cluster from a local installation found 
 usual Homebrew and Debian locations, and stop it afterwards; without either, they are skipped. Each
 test creates its own database and drops it when done.
 
-`test/harness.ts` runs the conformance suites over a database per test: another host is another
-pool, and a test that asks for prompt contention gets a 100-millisecond lock timeout. Beside the
-registrations, only what PostgreSQL stores or fails differently is tested here, such as a failed
-`COMMIT` returning `CommitUncertain` and the lock and session limits (`transactions.test.ts`), the
+`test/fixture.ts` opens a database per test for the conformance suites, which `conformance.test.ts`
+runs: another host is another pool, and a test that asks for prompt contention gets a
+100-millisecond lock timeout. Beside that run, only what PostgreSQL stores or fails differently is
+tested here, such as a failed `COMMIT` returning `CommitUncertain` and the lock and session limits (`transactions.test.ts`), the
 fact columns (`fact-metadata.test.ts`), a refused statement still aborting its transaction
 (`invitations.test.ts`), waiters woken through notifications (`journal.test.ts`), construction,
 concurrent schema application, and the plan test (`database.test.ts`), scope columns

@@ -239,10 +239,10 @@ anything.
 ## Storage conformance
 
 The [conformance suites](../packages/storage-conformance/README.md) specify storage
-behavior once and run it on every adapter. Each adapter's `test/harness.ts` supplies
+behavior once and run it on every adapter. Each adapter's `test/fixture.ts` supplies
 fresh storage per test, further hosts over it, a way to discard projections before replay,
-and a count of stored records for rollback checks. A test file registers one suite, such as
-`Suites.journal(harness)`, and adds tests only for what that adapter stores or fails
+and a count of stored records for rollback checks. Its `conformance.test.ts` runs every suite
+with `run(fixture)`, and its other test files cover only what that adapter stores or fails
 differently. The memory adapter runs the same suites as the reference implementation; its
 tests run in the `backend` project.
 

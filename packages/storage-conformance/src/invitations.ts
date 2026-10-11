@@ -5,7 +5,7 @@ import { Journal, Log } from "@amends-dev/core/journal";
 import { Invitation, InvitationService, Member } from "@amends-dev/core/workspace";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Result } from "effect";
-import type { Harness } from "./harness.ts";
+import type { Fixture } from "./fixture.ts";
 import { Operations } from "./operations.ts";
 import {
   alice,
@@ -21,13 +21,13 @@ import {
 
 /** Invitation lifecycle: acceptance, revocation, competition, and stored settlement. */
 
-export const invitations = (harness: Harness) => {
-  const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: invitations`, () => {
+export const invitations = (fixture: Fixture) => {
+  const { core, initialized, runGateway } = Support;
+  describe.skipIf(!fixture.available)(`${fixture.name}: invitations`, () => {
     it.effect(
       "members choose their names on creating, on joining, and later; replay keeps them",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runGateway(
@@ -113,7 +113,7 @@ export const invitations = (harness: Harness) => {
     it.effect(
       "owner invites a reader; concurrent repeat acceptance grants once and never reactivates removed membership",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             expectTypeOf<
               Effect.Services<ReturnType<InvitationService.Interface["accept"]>>
@@ -205,7 +205,7 @@ export const invitations = (harness: Harness) => {
     it.effect(
       "revocation is persistent and idempotent; accepted invitations cannot be revoked",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const saved = yield* Effect.scoped(
               runGateway(
@@ -273,7 +273,7 @@ export const invitations = (harness: Harness) => {
     it.effect(
       "competing invitations cannot create two active memberships or combine their grants",
       () =>
-        harness.withStorage((storage) =>
+        fixture.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
@@ -304,7 +304,7 @@ export const invitations = (harness: Harness) => {
     );
 
     it.effect("invitations keep their roles, instants, and terminal states across settlement", () =>
-      harness.withStorage((storage) =>
+      fixture.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {

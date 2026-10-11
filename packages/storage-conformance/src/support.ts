@@ -66,8 +66,19 @@ import {
 } from "@amends-dev/core/turn";
 import { Harness as AgentHarness } from "@amends-dev/harness";
 import { Gateway, WorkspaceStorage } from "@amends-dev/gateway";
-import { Clock, Context, DateTime, Effect, Layer, Option, Redacted, Result, Schema } from "effect";
-import type { Harness, Host, Storage } from "./harness.ts";
+import {
+  Clock,
+  Context,
+  Crypto,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Redacted,
+  Result,
+  Schema,
+} from "effect";
+import type { Host, Storage } from "./fixture.ts";
 
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
@@ -299,7 +310,11 @@ export const takeTurnJobs = (id: Workspace.Id) =>
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
   context: Context.Context<
-    WorkspaceStorage.Bindings | TurnJobs.Service | DeliveryJobs.Service | Integrations.Integrations
+    | WorkspaceStorage.Bindings
+    | TurnJobs.Service
+    | DeliveryJobs.Service
+    | Integrations.Integrations
+    | Crypto.Crypto
   >,
 ) => ({
   context,
@@ -347,13 +362,18 @@ export const listOldestFirst = (
   );
 
 /**
- * A workspace's stores and signal hub, with turn jobs the suites run themselves: a suite takes the
- * requests its commits made, and runs the turns it expects, as a host's turn jobs would.
+ * A workspace's stores and signal hub, with the host's cryptography and turn jobs the suites run
+ * themselves: a suite takes the requests its commits made, and runs the turns it expects, as a
+ * host's turn jobs would.
  */
-const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>) =>
+const withHostServices = (
+  context: Context.Context<WorkspaceStorage.Bindings>,
+  crypto: Crypto.Crypto,
+) =>
   Effect.map(Integrations.make(testIntegrations), (integrations) =>
     bind(
       context.pipe(
+        Context.add(Crypto.Crypto, crypto),
         Context.add(TurnJobs.Service, recordedTurnJobs),
         Context.add(DeliveryJobs.Service, recordedDeliveryJobs),
         Context.add(Integrations.Integrations, integrations),
@@ -363,13 +383,16 @@ const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>) =
 
 /** One workspace's stores and signals on a host. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
-  Effect.flatMap(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), withHostServices);
+  Effect.flatMap(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
+    withHostServices(context, Context.get(host, Crypto.Crypto)),
+  );
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
-export const boundTo = (id: Workspace.Id) =>
-  Effect.flatMap(WorkspaceStorage.Service, (workspaceStorage) =>
-    Effect.flatMap(workspaceStorage.forWorkspace(id), withHostServices),
-  );
+export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
+  const workspaceStorage = yield* WorkspaceStorage.Service;
+  const crypto = yield* Crypto.Crypto;
+  return yield* withHostServices(yield* workspaceStorage.forWorkspace(id), crypto);
+});
 
 /**
  * The bound stores with each commit failing after its program completes, before it commits: a
@@ -393,71 +416,62 @@ export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
 export const runHost = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(storage.connect(), (host) => Effect.provide(program, host));
 
-/** Cores and gateways over the harness's hosts. */
-export const make = (harness: Harness) => {
-  const core = (bound: Bound) =>
-    Core.layer.pipe(
-      Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), harness.crypto)),
-    );
-  /** A gateway over a host, which installs what the suites' hosts do, or what `options` say. */
-  const gateway = (host: Context.Context<Host>, options: Gateway.Options = installed) =>
-    Gateway.layer(options).pipe(
-      Layer.provideMerge(
-        Layer.mergeAll(
-          Layer.succeedContext(host),
-          harness.crypto,
-          layerRecordedTurnJobs,
-          layerRecordedDeliveryJobs,
-        ),
-      ),
-    );
-  return {
-    core,
-    gateway,
-    /** Initialize the bound workspace for its creator, as the gateway's bootstrap does. */
-    initialized: (bound: Bound, creator = alice.id) =>
-      WorkspaceInitialization.initialize(creator, {
-        name: "Test workspace",
-        memberName: Member.Name.make(creator),
-      }).pipe(Effect.provide(core(bound))),
-    /** Add members, giving some the viewer role, as invitation acceptance would. */
-    seed: (
-      bound: Bound,
-      members: ReadonlyArray<Actor.Value>,
-      viewers: ReadonlyArray<Actor.Value>,
-    ) =>
-      Effect.flatMap(Journal.Service, (journal) =>
-        journal.commit(
-          Effect.gen(function* () {
-            for (const member of members)
-              yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.store.workspaceId,
-                memberId: member.memberId,
-                identity: member.identity,
-                name: Member.Name.make(member.identity.id),
-              });
-            for (const viewer of viewers)
-              yield* journal.publish(AssignmentFacts.Created, {
-                workspaceId: bound.store.workspaceId,
-                assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
-                memberId: viewer.memberId,
-                source: {
-                  _tag: "Role",
-                  roleId: BuiltinRoles.MemberId,
-                  scope: { _tag: "Workspace", workspaceId: bound.store.workspaceId },
-                },
-              });
-          }),
-        ),
-      ).pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
-        Effect.provide(core(bound)),
-      ),
-    /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */
-    runGateway: <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
-      Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host)))),
-  };
-};
+/** Core over one workspace's bound stores, with the host's cryptography, as a host runs it. */
+export const core = (bound: Bound) =>
+  Core.layer.pipe(Layer.provideMerge(Layer.succeedContext(bound.context)));
+
+/** A gateway over a host, which installs what the suites' hosts do, or what `options` say. */
+export const gateway = (host: Context.Context<Host>, options: Gateway.Options = installed) =>
+  Gateway.layer(options).pipe(
+    Layer.provideMerge(
+      Layer.mergeAll(Layer.succeedContext(host), layerRecordedTurnJobs, layerRecordedDeliveryJobs),
+    ),
+  );
+
+/** Initialize the bound workspace for its creator, as the gateway's bootstrap does. */
+export const initialized = (bound: Bound, creator = alice.id) =>
+  WorkspaceInitialization.initialize(creator, {
+    name: "Test workspace",
+    memberName: Member.Name.make(creator),
+  }).pipe(Effect.provide(core(bound)));
+
+/** Add members, giving some the viewer role, as invitation acceptance would. */
+export const seed = (
+  bound: Bound,
+  members: ReadonlyArray<Actor.Value>,
+  viewers: ReadonlyArray<Actor.Value>,
+) =>
+  Effect.flatMap(Journal.Service, (journal) =>
+    journal.commit(
+      Effect.gen(function* () {
+        for (const member of members)
+          yield* journal.publish(MemberFacts.Added, {
+            workspaceId: bound.store.workspaceId,
+            memberId: member.memberId,
+            identity: member.identity,
+            name: Member.Name.make(member.identity.id),
+          });
+        for (const viewer of viewers)
+          yield* journal.publish(AssignmentFacts.Created, {
+            workspaceId: bound.store.workspaceId,
+            assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
+            memberId: viewer.memberId,
+            source: {
+              _tag: "Role",
+              roleId: BuiltinRoles.MemberId,
+              scope: { _tag: "Workspace", workspaceId: bound.store.workspaceId },
+            },
+          });
+      }),
+    ),
+  ).pipe(
+    Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+    Effect.provide(core(bound)),
+  );
+
+/** Run a program on a gateway over a new host, which stays open for the enclosing scope. */
+export const runGateway = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
+  Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host))));
 
 /** The message a timeline activity publishes, when it is a message publication. */
 export const publishedMessage = (activity: ThreadActivity.Record) =>
