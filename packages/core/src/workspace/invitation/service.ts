@@ -45,12 +45,12 @@ export interface Interface {
   ) => Effect.Effect<Invitation.Record, Error, Actor.Service>;
   /**
    * Trusted ingress supplies the authenticated recipient; no membership is required yet. The
-   * recipient may say what people in the workspace call them.
+   * recipient says what people in the workspace call them.
    */
   readonly accept: (
     id: Invitation.Id,
     recipient: Identity.HumanId,
-    options?: { readonly name?: Member.Name },
+    name: Member.Name,
   ) => Effect.Effect<Member.Record, Error>;
   readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Record, Error, Actor.Service>;
   /** Every invitation in the workspace in issue order; requires invitation.manage. */
@@ -151,13 +151,10 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   const accept = Effect.fn("InvitationService.accept")(function* (
     id: Invitation.Id,
     authenticated: Identity.HumanId,
-    options: { readonly name?: Member.Name } = {},
+    chosenName: Member.Name,
   ) {
     const recipient = yield* Schema.decodeEffect(Identity.HumanId)(authenticated);
-    const name =
-      options.name === undefined
-        ? undefined
-        : yield* Schema.decodeEffect(Member.NewName)(options.name);
+    const name = yield* Schema.decodeEffect(Member.NewName)(chosenName);
     const invitation = yield* requireInvitation(id);
     const { details, state } = invitation;
     if (details.recipientId !== recipient) return yield* new NotRecipient({ invitationId: id });

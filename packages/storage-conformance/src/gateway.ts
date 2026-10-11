@@ -17,6 +17,7 @@ import {
 import {
   InvitationService,
   InvitationPermissions,
+  Member,
   MemberService,
   MemberFacts,
   MemberPermissions,
@@ -202,8 +203,14 @@ export const gateway = (harness: Harness) => {
               storage,
               Effect.gen(function* () {
                 const gateway = yield* Gateway.Service;
-                const a = yield* gateway.createWorkspace(alice.id, { name: "Alice workspace" });
-                const b = yield* gateway.createWorkspace(bob.id, { name: "Bob workspace" });
+                const a = yield* gateway.createWorkspace(alice.id, {
+                  name: "Alice workspace",
+                  memberName: "alice",
+                });
+                const b = yield* gateway.createWorkspace(bob.id, {
+                  name: "Bob workspace",
+                  memberName: "bob",
+                });
                 const getMember = (
                   workspace: Workspace.Record,
                   identity: Identity.MemberReference,
@@ -238,7 +245,11 @@ export const gateway = (harness: Harness) => {
                 const joined = yield* gateway.inWorkspace(
                   a.id,
                   Effect.flatMap(InvitationService.Service, (invitationService) =>
-                    invitationService.accept(invitation.details.id, bob.id),
+                    invitationService.accept(
+                      invitation.details.id,
+                      bob.id,
+                      Member.Name.make("bob"),
+                    ),
                   ),
                 );
                 const afterJoin = yield* (yield* WorkspaceDirectory.Service).list(bob);
@@ -415,15 +426,20 @@ export const gateway = (harness: Harness) => {
           Effect.gen(function* () {
             const gateway = yield* Gateway.Service;
             for (const name of ["", " \t\n"]) {
-              expect(yield* Effect.flip(gateway.createWorkspace(alice.id, { name }))).toMatchObject(
-                { _tag: "Gateway.InvalidInput" },
-              );
+              expect(
+                yield* Effect.flip(
+                  gateway.createWorkspace(alice.id, { name, memberName: "alice" }),
+                ),
+              ).toMatchObject({ _tag: "Gateway.InvalidInput" });
             }
             expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toEqual({
               memberships: [],
               invitations: [],
             });
-            const workspace = yield* gateway.createWorkspace(alice.id, { name: "Studio" });
+            const workspace = yield* gateway.createWorkspace(alice.id, {
+              name: "Studio",
+              memberName: "alice",
+            });
             expect(workspace.name).toBe("Studio");
             const listing = yield* (yield* WorkspaceDirectory.Service).list(alice);
             expect(listing.memberships.map((membership) => membership.workspace)).toEqual([
@@ -518,6 +534,7 @@ export const gateway = (harness: Harness) => {
           Effect.gen(function* () {
             const workspace = yield* (yield* Gateway.Service).createWorkspace(alice.id, {
               name: "Archive",
+              memberName: "alice",
             });
             // Applications keep an owner; a direct fact reaches the empty state the directory must list.
             const bound = yield* boundTo(workspace.id);
@@ -540,6 +557,7 @@ export const gateway = (harness: Harness) => {
                     id: workspace.ownerMemberId,
                     workspaceId: workspace.id,
                     identity: alice,
+                    name: "alice",
                     status: "removed",
                   },
                   activeMemberCount: 0,

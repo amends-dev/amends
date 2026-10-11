@@ -209,7 +209,13 @@ it("replaces a crashed view with a reload, without account controls", async () =
 
 const membership = (id: string, name: string, status = "active") => ({
   workspace: { id, name, createdBy: "alice", ownerMemberId: `owner-${id}` },
-  member: { id: `owner-${id}`, workspaceId: id, identity: { _tag: "Human", id: "alice" }, status },
+  member: {
+    id: `owner-${id}`,
+    workspaceId: id,
+    identity: { _tag: "Human", id: "alice" },
+    name: "alice",
+    status,
+  },
   people: 1,
 });
 it("resolves active workspace scope from the directory and updates it during navigation", async () => {
@@ -392,6 +398,9 @@ it("retains a created workspace through directory failure and navigates after re
   fireEvent.input(within(dialog).getByRole("textbox", { name: "Workspace name" }), {
     target: { value: "Studio" },
   });
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Your name" }), {
+    target: { value: "Alice" },
+  });
   fireEvent.click(within(dialog).getByRole("button", { name: "Create workspace" }));
   await within(dialog).findByText(/Your workspace was created, but/);
   expect(history.get()).toBe("/workspaces/new");
@@ -486,6 +495,7 @@ it("redirects the Settings entry to its workspace section and keeps the rail's s
     id: "owner",
     workspaceId: "one",
     identity: { _tag: "Human", id: "alice" },
+    name: "alice",
     status: "active",
   };
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
@@ -1423,6 +1433,7 @@ function connectionsHost() {
             id: "owner-one",
             workspaceId: "one",
             identity: { _tag: "Human", id: "alice" },
+            name: "alice",
             status: "active",
           },
           people: 1,
@@ -1554,6 +1565,7 @@ function agentsHost() {
             id: "owner-one",
             workspaceId: "one",
             identity: { _tag: "Human", id: "alice" },
+            name: "alice",
             status: "active",
           },
           people: 1,

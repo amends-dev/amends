@@ -22,6 +22,7 @@ const listing = (name: string) => ({
         id: "owner",
         workspaceId: "one",
         identity: { _tag: "Human", id: "alice" },
+        name: "alice",
         status: "active",
       },
       people: 1,

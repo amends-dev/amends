@@ -107,6 +107,7 @@ it("signs in from the desktop page and resumes the workspace query through hash 
               id: "owner-one",
               workspaceId: "one",
               identity: { _tag: "Human", id: "jo@mercier.co" },
+              name: "jo@mercier.co",
               status: "active",
             },
             people: 1,
@@ -159,6 +160,7 @@ it("opens creation from the picker and enters the created workspace through hash
           id: "owner",
           workspaceId: "one",
           identity: { _tag: "Human", id: "alice" },
+          name: "alice",
           status: "active",
         },
         people: 1,
@@ -177,6 +179,9 @@ it("opens creation from the picker and enters the created workspace through hash
   expect(window.location.hash).toBe("#/workspaces/new");
   fireEvent.input(within(dialog).getByRole("textbox", { name: "Workspace name" }), {
     target: { value: "Studio" },
+  });
+  fireEvent.input(within(dialog).getByRole("textbox", { name: "Your name" }), {
+    target: { value: "Alice" },
   });
   fireEvent.click(within(dialog).getByRole("button", { name: "Create workspace" }));
   await screen.findByRole("heading", { name: "Inbox" });
@@ -201,6 +206,7 @@ it("navigates workspace sections with persistent chrome and retains appearance a
           id: "owner",
           workspaceId: "one",
           identity: { _tag: "Human", id: "alice" },
+          name: "alice",
           status: "active",
         },
         people: 1,
@@ -238,6 +244,7 @@ it("redirects the Settings entry to its workspace section and keeps the rail's s
     id: "owner",
     workspaceId: "one",
     identity: { _tag: "Human", id: "alice" },
+    name: "alice",
     status: "active",
   };
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
@@ -291,6 +298,7 @@ it("keeps a workspace current through its change feed over the desktop host conn
       id: "owner-one",
       workspaceId: "one",
       identity: { _tag: "Human", id: "jo" },
+      name: "jo",
       status: "active",
     };
     if (path.endsWith("/settings"))
@@ -423,6 +431,7 @@ it("shows a group's stream at its route and an open thread beside it", async () 
                 id: "owner-one",
                 workspaceId: "one",
                 identity: { _tag: "Human", id: "alice" },
+                name: "alice",
                 status: "active",
               },
               people: 1,
@@ -501,6 +510,7 @@ it("lists the inbox at its hash route, and opening one marks it seen and shows i
                 id: "owner-one",
                 workspaceId: "one",
                 identity: { _tag: "Human", id: "alice" },
+                name: "alice",
                 status: "active",
               },
               people: 1,
@@ -560,6 +570,7 @@ it("creates a group from the sidebar and opens it at its hash route", async () =
             id: "owner-one",
             workspaceId: "one",
             identity: { _tag: "Human", id: "alice" },
+            name: "alice",
             status: "active",
           },
           people: 1,
@@ -616,6 +627,7 @@ it("browses public groups from the sidebar, and joining one opens it", async () 
             id: "owner-one",
             workspaceId: "one",
             identity: { _tag: "Human", id: "alice" },
+            name: "alice",
             status: "active",
           },
           people: 1,
@@ -673,6 +685,7 @@ it("drafts a first direct message at its hash route and opens the conversation",
             id: "owner-one",
             workspaceId: "one",
             identity: { _tag: "Human", id: "alice" },
+            name: "alice",
             status: "active",
           },
           people: 2,
@@ -694,6 +707,7 @@ it("links teammates to a first message within the hash router", async () => {
     id: "owner-one",
     workspaceId: "one",
     identity: { _tag: "Human", id: "jo" },
+    name: "jo",
     status: "active",
   };
   const directory = {
@@ -773,6 +787,7 @@ function connectionsHost() {
             id: "owner-one",
             workspaceId: "one",
             identity: { _tag: "Human", id: "alice" },
+            name: "alice",
             status: "active",
           },
           people: 1,
@@ -900,6 +915,7 @@ function agentsHost() {
             id: "owner-one",
             workspaceId: "one",
             identity: { _tag: "Human", id: "alice" },
+            name: "alice",
             status: "active",
           },
           people: 1,

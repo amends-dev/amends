@@ -22,13 +22,13 @@ export const NewName = Name.check(Text.isName);
 
 /**
  * Removed memberships retain their identity for historical references. A name is what the member
- * chose to be called in this workspace; without one, clients show their identity.
+ * is called in this workspace: what a person chose on joining, or an agent's name.
  */
 export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   identity: Identity.MemberReference,
-  name: Schema.optionalKey(Name),
+  name: Name,
   status: Status,
 }).annotate({ identifier: "WorkspaceMember" });
 export interface Record extends Schema.Schema.Type<typeof Record> {}

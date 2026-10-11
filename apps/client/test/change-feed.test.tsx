@@ -33,6 +33,7 @@ const owner = {
   id: "owner",
   workspaceId: "one",
   identity: { _tag: "Human", id: "alice" },
+  name: "alice",
   status: "active",
 };
 const event = (name: string, payload: unknown) => ({

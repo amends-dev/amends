@@ -201,6 +201,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
           id: actor.memberId,
           workspaceId,
           identity: actor.identity,
+          name: Member.Name.make("alice"),
           status: "active",
         });
         for (const [index, source] of grants.entries())
@@ -815,6 +816,7 @@ it.effect("workspace facts reach readers who may read them, and the member they 
             workspaceId,
             memberId: bobMember,
             identity: { _tag: "Human", id: Identity.HumanId.make("bob") },
+            name: Member.Name.make("bob"),
           }),
         );
         yield* commit(
@@ -872,6 +874,7 @@ it.effect("an exact member-read grant shows that member's changes, and not other
               workspaceId,
               memberId,
               identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+              name: Member.Name.make(memberId),
             }),
           );
         expect(committed(yield* feed.next).events[0]?.payload).toMatchObject({

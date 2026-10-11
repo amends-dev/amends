@@ -32,7 +32,7 @@ export const accounts = (harness: Harness) => {
     it.effect("an address typed with capitals or spaces is the same account", () =>
       harness.withStorage((storage) =>
         Effect.gen(function* () {
-          const typed = yield* Schema.decodeUnknownEffect(Accounts.Email)(" Alice@Example.COM ");
+          const typed = yield* Schema.decodeEffect(Accounts.Email)(" Alice@Example.COM ");
           expect(typed).toBe(alice);
           const created = yield* runHost(storage, findOrCreate(alice));
           expect(yield* runHost(storage, findOrCreate(typed))).toEqual(created);

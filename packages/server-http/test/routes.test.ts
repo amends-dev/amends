@@ -50,7 +50,13 @@ import { Routes } from "../src/index.ts";
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const workspaceId = Workspace.Id.make("workspace-one");
 const memberId = Member.Id.make("member-one");
-const member: Member.Record = { id: memberId, workspaceId, identity: alice, status: "active" };
+const member: Member.Record = {
+  id: memberId,
+  workspaceId,
+  identity: alice,
+  name: Member.Name.make("alice"),
+  status: "active",
+};
 const workspace: Workspace.Record = {
   id: workspaceId,
   createdBy: alice.id,
@@ -487,7 +493,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
         client.members.remove({ params: { workspaceId, memberId }, responseMode: "response-only" }),
         client.workspaces.create({
           headers: {},
-          payload: { name: "Test workspace" },
+          payload: { name: "Test workspace", memberName: member.name },
           responseMode: "response-only",
         }),
       ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
@@ -514,30 +520,34 @@ it.effect("workspace creation and acceptance require a human principal", () =>
     const created = yield* run("alice", (client) =>
       client.workspaces.create({
         headers: { "idempotency-key": Request.Key.make("create-1") },
-        payload: { name: "Test workspace" },
+        payload: { name: "Test workspace", memberName: member.name },
       }),
     );
     expect(created).toEqual(workspace);
     const refused = yield* run("agent", (client) =>
       client.workspaces
-        .create({ headers: {}, payload: { name: "Test workspace" } })
+        .create({ headers: {}, payload: { name: "Test workspace", memberName: member.name } })
         .pipe(Effect.flip),
     );
     expect(refused).toMatchObject({ _tag: "Api.HumanRequired" });
     const accepted = yield* run("alice", (client) =>
       client.invitations.accept({
         params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
-        payload: {},
+        payload: { name: member.name },
       }),
     );
     expect(accepted).toEqual(member);
     expect(calls).toEqual([
       {
         operation: "createWorkspace",
-        arguments: [alice.id, { name: "Test workspace" }, { requestKey: "create-1" }],
+        arguments: [
+          alice.id,
+          { name: "Test workspace", memberName: member.name },
+          { requestKey: "create-1" },
+        ],
       },
       { operation: "inWorkspace", arguments: [workspaceId] },
-      { operation: "accept", arguments: ["invitation-one", alice.id, {}] },
+      { operation: "accept", arguments: ["invitation-one", alice.id, member.name] },
     ]);
   }),
 );

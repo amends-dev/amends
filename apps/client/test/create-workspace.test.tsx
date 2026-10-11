@@ -27,6 +27,7 @@ const listing = {
         id: "owner",
         workspaceId: "one",
         identity: { _tag: "Human", id: "alice" },
+        name: "alice",
         status: "active",
       },
       people: 1,
@@ -108,6 +109,7 @@ function fixture() {
     ready: async () => {
       (await at(0)).resolve(json({ memberships: [], invitations: [] }));
       await waitFor(() => expect(directory.state()._tag).toBe("Ready"));
+      controller.setMemberName("Alice");
     },
   };
 }
@@ -122,7 +124,7 @@ it("validates and trims the name, blocks duplicate submissions, and refreshes be
   f.controller.setName("ignored");
   const creation = await f.at(1);
   expect(creation.request.method).toBe("POST");
-  expect(await creation.request.json()).toEqual({ name: "Studio" });
+  expect(await creation.request.json()).toEqual({ name: "Studio", memberName: "Alice" });
   expect(creation.request.headers.get("authorization")).toBe("Bearer alice");
   expect(creation.request.headers.get("idempotency-key")).toBeTruthy();
   creation.resolve(json(workspace, 201));
@@ -134,10 +136,12 @@ it("validates and trims the name, blocks duplicate submissions, and refreshes be
   expect(f.directory.state()).toMatchObject({ listing: { memberships: [{ workspace }] } });
   expect(f.calls).toHaveLength(3);
 });
-it("sends the creator's chosen name, trimmed, and a new key when it changes", async () => {
+it("requires the creator's name, sends it trimmed, and a new key when it changes", async () => {
   const f = fixture();
   await f.ready();
-  expect(f.controller.state()).toMatchObject({ memberName: "" });
+  f.controller.setMemberName("   ");
+  f.controller.submit("Studio");
+  expect(f.controller.state()).toMatchObject({ error: "invalid-member-name" });
   f.controller.setMemberName("x".repeat(81));
   f.controller.submit("Studio");
   expect(f.controller.state()).toMatchObject({ error: "invalid-member-name" });

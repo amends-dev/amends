@@ -165,6 +165,7 @@ export const threadReplies = (harness: Harness) => {
                   workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: identityFor(memberId),
+                  name: Member.Name.make(memberId),
                 });
             }),
           ),
@@ -875,6 +876,7 @@ export const threadReplies = (harness: Harness) => {
             const gateway = yield* Gateway.Service;
             const workspace = yield* gateway.createWorkspace(Identity.HumanId.make("owner"), {
               name: "Workspace",
+              memberName: "owner",
             });
             const bound = yield* boundTo(workspace.id);
             yield* seed(bound);
@@ -1118,6 +1120,7 @@ export const threadReplies = (harness: Harness) => {
                     workspaceId,
                     memberId: helperId,
                     identity: helper,
+                    name: Member.Name.make(helper.id),
                   }),
                 ),
               );

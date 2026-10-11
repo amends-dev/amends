@@ -100,6 +100,7 @@ export const groupFollows = (harness: Harness) => {
                   workspaceId,
                   memberId,
                   identity: identityOf(memberId),
+                  name: Member.Name.make(memberId),
                 }),
                 memberId === humanId || memberId === outsiderId
                   ? journal.publish(AssignmentFacts.Created, {

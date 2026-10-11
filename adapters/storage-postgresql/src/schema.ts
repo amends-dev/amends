@@ -115,8 +115,8 @@ export const members = pgTable(
     id: text("id").notNull(),
     identityKind: text("identity_kind", { enum: memberIdentityKinds }).notNull(),
     identityId: text("identity_id").notNull(),
-    // What the member chose to be called in this workspace, when they have.
-    name: text("name"),
+    // What the member is called in this workspace.
+    name: text("name").notNull(),
     status: text("status", { enum: memberStatuses }).notNull(),
   },
   (table) => [

@@ -23,6 +23,7 @@ const membership = (id: string, name: string, status = "active", owner = true) =
     id: `alice-${id}`,
     workspaceId: id,
     identity: { _tag: "Human", id: "ada.lovelace@example.com" },
+    name: "ada.lovelace@example.com",
     status,
   },
   people: 3,
@@ -52,6 +53,7 @@ const joinedMember = {
   id: "alice-fold",
   workspaceId: "fold",
   identity: { _tag: "Human", id: "ada.lovelace@example.com" },
+  name: "ada.lovelace@example.com",
   status: "active",
 };
 const joinedListing = {
@@ -142,7 +144,7 @@ it("accepts under a trimmed name, one attempt at a time, and reloads the directo
   const f = fixture();
   await f.ready();
   f.picker.accept("invitation-fold", "  Ada  ");
-  f.picker.accept("invitation-quiet");
+  f.picker.accept("invitation-quiet", "Ada");
   expect(f.picker.accepting()).toEqual({
     invitationId: "invitation-fold",
     pending: true,
@@ -165,12 +167,20 @@ it("accepts under a trimmed name, one attempt at a time, and reloads the directo
   expect(f.calls).toHaveLength(3);
 });
 
-it("reports a refused invitation and sends no name when none is given", async () => {
+it("refuses a blank name before any request, and reports a refused invitation", async () => {
   const f = fixture();
   await f.ready();
   f.picker.accept("invitation-quiet", "   ");
+  expect(f.picker.accepting()).toEqual({
+    invitationId: "invitation-quiet",
+    pending: false,
+    error: "invalid-name",
+    joined: false,
+  });
+  expect(f.calls).toHaveLength(1);
+  f.picker.accept("invitation-quiet", "Ada");
   const accept = await f.at(1);
-  expect(await accept.request.json()).toEqual({});
+  expect(await accept.request.json()).toEqual({ name: "Ada" });
   accept.resolve(
     json({ _tag: "InvitationService.NotFound", invitationId: "invitation-quiet" }, 404),
   );
@@ -182,7 +192,7 @@ it("reports a refused invitation and sends no name when none is given", async ()
 it("retries only the reload once joined, and settles when a later reload drops the invitation", async () => {
   const f = fixture();
   await f.ready();
-  f.picker.accept("invitation-fold");
+  f.picker.accept("invitation-fold", "Ada");
   (await f.at(1)).resolve(json(joinedMember));
   (await f.at(2)).resolve(json({}, 503));
   await waitFor(() =>

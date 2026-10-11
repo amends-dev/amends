@@ -45,7 +45,7 @@ export const layer = HttpApiBuilder.group(
           return yield* gateway.inWorkspace(
             params.workspaceId,
             Effect.flatMap(InvitationService.Service, (invitationService) =>
-              invitationService.accept(params.invitationId, principal.id, payload ?? {}),
+              invitationService.accept(params.invitationId, principal.id, payload.name),
             ),
           );
         }),

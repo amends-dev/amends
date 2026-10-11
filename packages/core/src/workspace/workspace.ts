@@ -17,7 +17,7 @@ export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isNa
 /** A new workspace's name, and what its creator is called there. */
 export const CreateInput = Schema.Struct({
   name: NewName,
-  memberName: Schema.optionalKey(Member.NewName),
+  memberName: Member.NewName,
 }).annotate({
   identifier: "WorkspaceCreateInput",
 });

@@ -153,7 +153,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     const group = groupId();
     navigate(group ? paths.group(workspaceId, group) : path("inbox"));
   };
-  const ownName = () => membership()?.member.name ?? session.session?.humanId ?? "";
+  const ownName = () => membership()?.member.name ?? "";
 
   const people = useWorkspacePeople(workspaceId);
   const creation = useCreateGroup(workspaceId, (id) => {

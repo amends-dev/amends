@@ -48,13 +48,25 @@ describe.skipIf(!available)("PostgreSQL", () => {
             headers: { authorization: "Bearer alice", "idempotency-key": key },
             body: HttpBody.jsonUnsafe(body),
           });
-        const created = yield* post("/workspaces", { name: "Studio" }, "create-1");
+        const created = yield* post(
+          "/workspaces",
+          { name: "Studio", memberName: "alice" },
+          "create-1",
+        );
         expect(created.status).toBe(201);
         const workspace = (yield* created.json) as { readonly id: string };
-        const retried = yield* post("/workspaces", { name: "Studio" }, "create-1");
+        const retried = yield* post(
+          "/workspaces",
+          { name: "Studio", memberName: "alice" },
+          "create-1",
+        );
         expect(yield* retried.json).toEqual(workspace);
         // The key alone names the request: reused with another name, it returns the first.
-        const reused = yield* post("/workspaces", { name: "Other" }, "create-1");
+        const reused = yield* post(
+          "/workspaces",
+          { name: "Other", memberName: "alice" },
+          "create-1",
+        );
         expect(yield* reused.json).toEqual(workspace);
         const invitation = {
           recipientId: "bob",
@@ -83,7 +95,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const asBob = yield* client(bob);
             const workspace = yield* asAlice.workspaces.create({
               headers: {},
-              payload: { name: "Test workspace" },
+              payload: { name: "Test workspace", memberName: "alice" },
             });
             const params = { workspaceId: workspace.id, memberId: workspace.ownerMemberId };
             const owner = yield* asAlice.members.get({ params });
@@ -102,7 +114,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               invitationId: invitation.details.id,
             };
             const wrongRecipient = yield* Effect.flip(
-              asAlice.invitations.accept({ params: invitationParams, payload: {} }),
+              asAlice.invitations.accept({ params: invitationParams, payload: { name: "alice" } }),
             );
             const joined = yield* asBob.invitations.accept({
               params: invitationParams,
@@ -225,12 +237,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const before = yield* client.me.workspaces();
             const workspace = yield* client.workspaces.create({
               headers: {},
-              payload: { name: "Test workspace" },
+              payload: { name: "Test workspace", memberName: "Jo" },
             });
             const inviter = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken(alice)));
             const other = yield* inviter.workspaces.create({
               headers: {},
-              payload: { name: "Test workspace" },
+              payload: { name: "Test workspace", memberName: "alice" },
             });
             const invitation = yield* inviter.invitations.issue({
               headers: {},
@@ -244,7 +256,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const after = yield* client.me.workspaces();
             yield* client.invitations.accept({
               params: { workspaceId: other.id, invitationId: invitation.details.id },
-              payload: {},
+              payload: { name: "Jo" },
             });
             const joined = yield* client.me.workspaces();
             return { wrong, session, reused, before, workspace, other, after, joined };

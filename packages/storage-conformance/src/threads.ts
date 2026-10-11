@@ -136,6 +136,7 @@ export const threads = (harness: Harness) => {
                   workspaceId: bound.store.workspaceId,
                   memberId,
                   identity,
+                  name: Member.Name.make(identity.id),
                 });
             }),
           ),
@@ -776,6 +777,7 @@ export const threads = (harness: Harness) => {
               const gateway = yield* Gateway.Service;
               const workspace = yield* gateway.createWorkspace(Identity.HumanId.make("owner"), {
                 name: "Workspace",
+                memberName: "owner",
               });
               const bound = yield* boundTo(workspace.id);
               yield* seed(bound);

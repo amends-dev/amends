@@ -81,7 +81,10 @@ export const transactions = (harness: Harness) => {
             const journal = yield* Journal.Service;
             return yield* journal.commit(
               Effect.gen(function* () {
-                yield* WorkspaceInitialization.initialize(alice.id, { name: "Test workspace" });
+                yield* WorkspaceInitialization.initialize(alice.id, {
+                  name: "Test workspace",
+                  memberName: "alice",
+                });
                 yield* Deferred.succeed(ready, undefined);
                 return yield* Effect.never;
               }),
@@ -197,6 +200,7 @@ export const transactions = (harness: Harness) => {
                 Effect.gen(function* () {
                   const record = yield* WorkspaceInitialization.initialize(alice.id, {
                     name: "Test workspace",
+                    memberName: "alice",
                   });
                   yield* Deferred.succeed(ready, undefined);
                   yield* Deferred.await(release);

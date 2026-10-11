@@ -19,6 +19,7 @@ const owner = {
   id: "owner",
   workspaceId: "one",
   identity: { _tag: "Human", id: "alice" },
+  name: "alice",
   status: "active",
 };
 for (const replacement of [false, true])

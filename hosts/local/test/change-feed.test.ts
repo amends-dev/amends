@@ -86,9 +86,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const bob = yield* client("bob");
           const workspace = yield* alice.workspaces.create({
             headers: {},
-            payload: { name: "First" },
+            payload: { name: "First", memberName: "alice" },
           });
-          const other = yield* alice.workspaces.create({ headers: {}, payload: { name: "Other" } });
+          const other = yield* alice.workspaces.create({
+            headers: {},
+            payload: { name: "Other", memberName: "alice" },
+          });
           const first = yield* listen(alice, workspace.id);
           const second = yield* listen(alice, workspace.id);
           const foreign = yield* listen(alice, other.id);
@@ -123,7 +126,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* foreign.next).toMatchObject({ _tag: "Committed", workspaceId: other.id });
           const member = yield* bob.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: invitation.details.id },
-            payload: {},
+            payload: { name: "bob" },
           });
           const accepted = yield* first.next;
           expect(yield* second.next).toEqual(accepted);
@@ -173,7 +176,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const eve = yield* client("eve");
           yield* eve.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: after.details.id },
-            payload: {},
+            payload: { name: "eve" },
           });
           const joined = yield* second.next;
           if (!ChangeFeed.Message.isAnyOf(["Committed"])(joined))
@@ -232,7 +235,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const bob = yield* client("bob");
         const workspace = yield* alice.workspaces.create({
           headers: {},
-          payload: { name: "Typing" },
+          payload: { name: "Typing", memberName: "alice" },
         });
         const invitation = yield* alice.invitations.issue({
           headers: {},
@@ -245,7 +248,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         const member = yield* bob.invitations.accept({
           params: { workspaceId: workspace.id, invitationId: invitation.details.id },
-          payload: {},
+          payload: { name: "bob" },
         });
         // No HTTP endpoint starts threads yet; the host's gateway does it as alice.
         const gateway = yield* Gateway.Service;
@@ -291,7 +294,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const alice = yield* client("alice");
           const workspace = yield* alice.workspaces.create({
             headers: {},
-            payload: { name: "First" },
+            payload: { name: "First", memberName: "alice" },
           });
           const http = yield* HttpClient.HttpClient;
           const path = `/workspaces/${workspace.id}/changes`;
@@ -336,7 +339,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const carol = yield* client("carol");
         const workspace = yield* alice.workspaces.create({
           headers: {},
-          payload: { name: "Busy" },
+          payload: { name: "Busy", memberName: "alice" },
         });
         for (const [api, id] of [
           [bob, "bob"],
@@ -353,7 +356,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           yield* api.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: invitation.details.id },
-            payload: {},
+            payload: { name: id },
           });
         }
         const refused = (api: typeof alice) =>

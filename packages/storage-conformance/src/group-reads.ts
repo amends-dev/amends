@@ -117,6 +117,7 @@ export const groupReads = (harness: Harness) => {
                   workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: actorFor(memberId).identity,
+                  name: Member.Name.make(memberId),
                 });
             }),
           ),
@@ -366,11 +367,13 @@ export const groupReads = (harness: Harness) => {
               const gateway = yield* Gateway.Service;
               const workspace = yield* gateway.createWorkspace(Identity.HumanId.make("owner"), {
                 name: "Workspace",
+                memberName: "owner",
               });
               const foreign = yield* gateway.createWorkspace(
                 Identity.HumanId.make("foreign-owner"),
                 {
                   name: "Foreign",
+                  memberName: "foreign-owner",
                 },
               );
               const bound = yield* boundTo(workspace.id);

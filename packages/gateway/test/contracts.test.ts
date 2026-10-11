@@ -28,6 +28,7 @@ it.each([0, 2])("directory JSON retains people for an active member count of %i"
           id: "agent-member",
           workspaceId: "workspace",
           identity: { _tag: "Agent", id: "agent" },
+          name: "agent",
           status: "active",
         },
         people: count,

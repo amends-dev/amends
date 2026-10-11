@@ -77,12 +77,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends-dev/core/agent/service/Service",
 ) {}
 
-/** An agent's membership's name; an agent joins with one, and only it can rename it. */
-const nameOf = (member: Member.Record) =>
-  member.name === undefined
-    ? Effect.die("An agent's membership has no name")
-    : Effect.succeed(member.name);
-
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("AgentService.make")(function* () {
   const authorization = yield* Authorization.Service;
@@ -115,7 +109,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     const member = yield* memberStore.get(found.value.memberId);
     if (Option.isNone(member) || member.value.status !== "active")
       return yield* new NotFound({ agentId });
-    return { record: found.value, name: yield* nameOf(member.value) };
+    return { record: found.value, name: member.value.name };
   });
 
   /** An agent the actor may act on with `permission`; to anyone else it is missing. */
@@ -179,7 +173,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     const active: Array<{ readonly record: Agent.Record; readonly name: Member.Name }> = [];
     for (const record of records) {
       const member = membersById.get(record.memberId);
-      if (member?.status === "active") active.push({ record, name: yield* nameOf(member) });
+      if (member?.status === "active") active.push({ record, name: member.name });
     }
     return active;
   });

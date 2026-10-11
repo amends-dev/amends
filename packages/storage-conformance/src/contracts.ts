@@ -420,6 +420,7 @@ export const contracts = (harness: Harness) => {
               identity: Identity.MemberReference.cases.Human.make({
                 id: Identity.HumanId.make("external"),
               }),
+              name: Member.Name.make("external"),
             };
             Reflect.set(
               invalid,
@@ -463,6 +464,7 @@ export const contracts = (harness: Harness) => {
                 id: Member.Id.make(id),
                 workspaceId,
                 identity,
+                name: Member.Name.make(identity.id),
                 status: "active",
               });
               // Each refused write gets its own transaction: a database may abort the rest of one.

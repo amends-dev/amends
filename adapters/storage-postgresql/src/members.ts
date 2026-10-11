@@ -17,12 +17,7 @@ const recordColumns = {
   name: members.name,
   status: members.status,
 };
-/** A row as the record reads it: a member who never chose a name has none. */
-export const toMember = <R extends { readonly name: string | null }>({ name, ...row }: R) =>
-  name === null ? row : { ...row, name };
-const decodeRecords = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
-const decode = (rows: ReadonlyArray<{ readonly name: string | null }>) =>
-  decodeRecords(rows.map(toMember));
+const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
 
 /**
  * Memberships, active and removed; one active membership per identity.
@@ -77,7 +72,7 @@ export const make = Effect.fn("Members.make")(function* () {
           id: record.id,
           identityKind: record.identity._tag,
           identityId: record.identity.id,
-          name: record.name ?? null,
+          name: record.name,
           status: record.status,
         }),
         true,

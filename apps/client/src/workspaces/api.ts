@@ -27,8 +27,8 @@ export const newWorkspaceRequestKey = () =>
   Schema.decodeSync(ApiErrors.requestKey["idempotency-key"])(crypto.randomUUID());
 export interface NewWorkspace {
   readonly name: string;
-  /** What the creator is called there; none shows their identity. */
-  readonly memberName?: string;
+  /** What the creator is called there. */
+  readonly memberName: string;
   readonly key: ReturnType<typeof newWorkspaceRequestKey>;
 }
 
@@ -46,10 +46,7 @@ export function workspaceRejection(
 /** Create a workspace; a retry with the same key returns the first attempt's workspace. */
 export const createWorkspace = (api: Api, workspace: NewWorkspace) =>
   api.workspaces.create({
-    payload: {
-      name: workspace.name,
-      ...(workspace.memberName ? { memberName: workspace.memberName } : {}),
-    },
+    payload: { name: workspace.name, memberName: workspace.memberName },
     headers: { "idempotency-key": workspace.key },
   });
 
@@ -67,11 +64,11 @@ export const renameSelf = (workspace: string) => (api: Api, name: string) =>
     return renamed;
   });
 
-/** An invitation to accept, with what the member will be called there; none shows the identity. */
+/** An invitation to accept, with what the member will be called there. */
 export interface Acceptance {
   readonly workspaceId: string;
   readonly invitationId: string;
-  readonly name?: string;
+  readonly name: string;
 }
 /** Accept an invitation, joining its workspace. */
 export const acceptInvitation = (api: Api, acceptance: Acceptance) =>
@@ -81,6 +78,6 @@ export const acceptInvitation = (api: Api, acceptance: Acceptance) =>
         workspaceId: yield* command(Workspace.Id)(acceptance.workspaceId),
         invitationId: yield* command(Invitation.Id)(acceptance.invitationId),
       },
-      payload: acceptance.name ? { name: yield* command(Member.NewName)(acceptance.name) } : {},
+      payload: { name: yield* command(Member.NewName)(acceptance.name) },
     });
   });

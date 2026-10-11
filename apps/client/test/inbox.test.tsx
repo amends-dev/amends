@@ -22,7 +22,13 @@ const store: SessionStore = { read: () => session, write: () => {}, subscribe: (
 const at = (minute: number) => new Date(Date.UTC(2026, 8, 25, 12, minute)).toISOString();
 
 const members = [
-  { id: "owner", workspaceId: "one", identity: { _tag: "Human", id: "alice" }, status: "active" },
+  {
+    id: "owner",
+    workspaceId: "one",
+    identity: { _tag: "Human", id: "alice" },
+    name: "alice",
+    status: "active",
+  },
   {
     id: "ada",
     workspaceId: "one",

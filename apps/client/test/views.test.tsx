@@ -25,16 +25,16 @@ const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" }
 const store: SessionStore = { read: () => session, write: () => {}, subscribe: () => () => {} };
 const at = (minute: number) => new Date(Date.UTC(2026, 8, 25, 12, minute)).toISOString();
 
-const member = (id: string, identity: { _tag: string; id: string }, name?: string) => ({
+const member = (id: string, identity: { _tag: string; id: string }, name: string) => ({
   id,
   workspaceId: "one",
   identity,
+  name,
   status: "active",
-  ...(name ? { name } : {}),
 });
 const members = [
   member("owner", { _tag: "Human", id: "alice" }, "Alice"),
-  member("ada", { _tag: "Human", id: "ada@example.test" }),
+  member("ada", { _tag: "Human", id: "ada@example.test" }, "Ada"),
   member("scout", { _tag: "Agent", id: "scout" }, "Scout"),
   { ...member("former", { _tag: "Human", id: "bo@example.test" }, "Bo"), status: "removed" },
 ];
@@ -233,7 +233,7 @@ function fixture(
 it("names teams by name and direct groups by their other people", async () => {
   const { views } = fixture();
   await waitFor(() => expect(views.groups.all()).toHaveLength(2));
-  await waitFor(() => expect(views.groups.directs()[0]?.name).toBe("ada@example.test"));
+  await waitFor(() => expect(views.groups.directs()[0]?.name).toBe("Ada"));
   expect(views.groups.teams()).toEqual([
     expect.objectContaining({
       id: "g1",
@@ -252,7 +252,7 @@ it("shows a group's threads with their authors, mentions, and replies", async ()
   const { views } = fixture();
   expect(views.stream.status()).toBe("loading");
   await waitFor(() => expect(views.stream.entries()).toHaveLength(1));
-  await waitFor(() => expect(views.stream.entries()[0]?.author.name).toBe("ada@example.test"));
+  await waitFor(() => expect(views.stream.entries()[0]?.author.name).toBe("Ada"));
   expect(views.stream.status()).toBeUndefined();
   expect(views.stream.entries()[0]).toMatchObject({
     kind: "message",
@@ -289,7 +289,7 @@ it("shows a thread's messages and notes, naming the reader as themself", async (
   expect(views.thread.entries()[1]).toMatchObject({ change: "followed", who: "Alice", self: true });
   expect(views.thread.entries()[2]).toMatchObject({
     change: "left-group",
-    who: "ada@example.test",
+    who: "Ada",
     self: false,
   });
   // An agent's reply names the turn that posted it, however long ago; people's messages none.
@@ -341,12 +341,12 @@ it("reads back to the message to show, and after a page fails waits to be asked 
 it("offers the group's other members to mention, and the rest of the workspace to add", async () => {
   const { views } = fixture();
   await waitFor(() =>
-    expect(views.candidates()).toEqual([{ id: "ada", name: "ada@example.test", agent: false }]),
+    expect(views.candidates()).toEqual([{ id: "ada", name: "Ada", agent: false }]),
   );
   await waitFor(() => expect(views.people.roster()).toHaveLength(2));
   expect(views.people.roster().map((entry) => [entry.name, entry.you, entry.removable])).toEqual([
     ["Alice", true, false],
-    ["ada@example.test", false, true],
+    ["Ada", false, true],
   ]);
   expect(views.people.candidates()).toEqual([{ id: "scout", name: "Scout", agent: true }]);
   expect(views.workspace().map((person) => person.id)).toEqual(["ada", "scout"]);
@@ -362,7 +362,7 @@ it("shows members' profiles by ID: people, agents with their page, the reader, a
     you: true,
     former: false,
   });
-  expect(views.profile("ada")).toMatchObject({ name: "ada@example.test", you: false });
+  expect(views.profile("ada")).toMatchObject({ name: "Ada", you: false });
   expect(views.profile("scout")).toEqual({
     id: "scout",
     name: "Scout",

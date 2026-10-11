@@ -44,11 +44,11 @@ import { toDate } from "./time.ts";
 import { useTyping } from "./typing.ts";
 
 /**
- * What people in a workspace call a member: the name they chose there, or the identity they sign
- * in as until they choose one. Someone no longer in the workspace reads as "Former member".
+ * What people in a workspace call a member. Someone no longer in the workspace reads as "Former
+ * member".
  */
 export const memberName = (member: Member.Record | undefined) =>
-  member === undefined ? "Former member" : (member.name ?? member.identity.id);
+  member === undefined ? "Former member" : member.name;
 
 /**
  * Whether a live read lost its access: a refresh answered that what it reads is gone or denied,

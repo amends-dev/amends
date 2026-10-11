@@ -318,6 +318,7 @@ it.effect(
                   identity: Identity.Reference.cases.Human.make({
                     id: Identity.HumanId.make("human"),
                   }),
+                  name: Member.Name.make("human"),
                 });
                 yield* journal.publish(RoleFacts.Created, createdRole);
                 yield* journal.publish(AssignmentFacts.Created, assigned(roleAssignmentId));

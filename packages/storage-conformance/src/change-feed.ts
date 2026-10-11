@@ -95,7 +95,7 @@ export const changeFeed = (harness: Harness) => {
           const workspace = yield* on(
             first,
             Effect.flatMap(Gateway.Service, (gateway) =>
-              gateway.createWorkspace(alice.id, { name: "Feed" }),
+              gateway.createWorkspace(alice.id, { name: "Feed", memberName: "alice" }),
             ),
           );
           const next = yield* on(
@@ -135,7 +135,7 @@ export const changeFeed = (harness: Harness) => {
           const first = yield* storage.connect();
           const second = yield* storage.connect();
           const workspace = yield* Effect.flatMap(Gateway.Service, (gateway) =>
-            gateway.createWorkspace(alice.id, { name: "Resume" }),
+            gateway.createWorkspace(alice.id, { name: "Resume", memberName: "alice" }),
           ).pipe(Effect.provide(gateway(first)));
           const cursor = yield* Effect.scoped(
             Effect.gen(function* () {

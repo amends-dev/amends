@@ -61,7 +61,7 @@ versions each log's commits apply; live commits write neither. See the
 
 ### Members, access, and groups
 
-Members keep the name they chose in a nullable `name` column, which the directory also returns.
+Members keep their name in a `name` column, which the directory also returns.
 Invitations store a required role ID, role permissions are a text array, and grant scopes have a
 column for each target kind, such as `target_connection_id`. `builtin_role_revisions` holds each
 workspace's built-in bundle revision, which an upsert only moves forward.

@@ -165,6 +165,7 @@ export const ownership = (harness: Harness) => {
                     workspaceId: workspace.id,
                     memberId: agentId,
                     identity: { _tag: "Agent", id: Identity.AgentId.make("agent") },
+                    name: Member.Name.make("agent"),
                   })
                   .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
               ).pipe(Effect.provide(core(bound)));

@@ -37,7 +37,10 @@ const server = (url: string) =>
 const workspaceWithBob = Effect.gen(function* () {
   const asAlice = yield* client(alice);
   const asBob = yield* client(bob);
-  const workspace = yield* asAlice.workspaces.create({ headers: {}, payload: { name: "Studio" } });
+  const workspace = yield* asAlice.workspaces.create({
+    headers: {},
+    payload: { name: "Studio", memberName: "alice" },
+  });
   const invitation = yield* asAlice.invitations.issue({
     headers: {},
     params: { workspaceId: workspace.id },
@@ -49,7 +52,7 @@ const workspaceWithBob = Effect.gen(function* () {
   });
   yield* asBob.invitations.accept({
     params: { workspaceId: workspace.id, invitationId: invitation.details.id },
-    payload: {},
+    payload: { name: "bob" },
   });
   return { asAlice, asBob, workspaceId: workspace.id };
 });

@@ -83,11 +83,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const outsiderClient = yield* client("outsider");
           const workspace = yield* humanClient.workspaces.create({
             headers: {},
-            payload: { name: "Inbox" },
+            payload: { name: "Inbox", memberName: "alice" },
           });
           const otherWorkspace = yield* humanClient.workspaces.create({
             headers: {},
-            payload: { name: "Other inbox" },
+            payload: { name: "Other inbox", memberName: "alice" },
           });
           const params = { workspaceId: workspace.id };
           expect(yield* humanClient.notifications.inbox({ params, query: { limit: 10 } })).toEqual(
@@ -122,12 +122,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
                   id: bobMemberId,
                   workspaceId: workspace.id,
                   identity: bob,
+                  name: Member.Name.make("bob"),
                   status: "active",
                 });
                 yield* members.insert({
                   id: agentMemberId,
                   workspaceId: workspace.id,
                   identity: agent,
+                  name: Member.Name.make("agent"),
                   status: "active",
                 });
                 yield* Effect.forEach([second, forBob, forAgent, first], notifications.insert);
@@ -231,7 +233,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const humanClient = yield* client("human");
         const workspace = yield* humanClient.workspaces.create({
           headers: {},
-          payload: { name: "Inbox" },
+          payload: { name: "Inbox", memberName: "alice" },
         });
         const http = yield* HttpClient.HttpClient;
         const base = `/workspaces/${workspace.id}/notifications`;

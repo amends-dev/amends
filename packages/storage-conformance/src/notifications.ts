@@ -728,6 +728,7 @@ export const notifications = (harness: Harness) => {
                     id: agentMemberId,
                     workspaceId,
                     identity: agentIdentity,
+                    name: Member.Name.make(agentIdentity.id),
                     status: "active",
                   });
                   yield* Effect.forEach(
