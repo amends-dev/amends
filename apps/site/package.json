@@ -7,8 +7,8 @@
     "dev": "bun run generate && astro dev --host 127.0.0.1 --port 4400",
     "generate": "bun run scripts/generate-docs.ts",
     "build": "bun run generate && astro build",
-    "preview": "wrangler dev --port 4400",
-    "deploy": "bun run build && wrangler deploy",
+    "deploy": "alchemy deploy",
+    "destroy": "alchemy destroy",
     "typecheck": "astro sync && tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -19,7 +19,9 @@
     "solid-js": "^1.9.13"
   },
   "devDependencies": {
+    "@effect/platform-node": "catalog:",
     "@vanilla-extract/vite-plugin": "^5.2.6",
-    "wrangler": "4.149.0"
+    "alchemy": "catalog:",
+    "effect": "catalog:"
   }
 }

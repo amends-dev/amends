@@ -51,4 +51,6 @@ output/
 apps/site/src/content/docs/docs/api/
 apps/site/src/content/docs/docs/packages/
 apps/site/.astro/
-apps/site/.wrangler/
+
+# Alchemy's logs and local state, written where a stack is deployed from
+.alchemy/

@@ -51,13 +51,29 @@ README and docgen pages to Starlight pages, which the tests in `test/` cover.
 ## Build and deploy
 
 ```sh
-bun run --filter @amends-dev/site build     # the generated docs, then the site in dist/
-bun run --filter @amends-dev/site preview   # dist/ as Cloudflare serves it, at port 4400
+bun run --filter @amends-dev/site build   # the generated docs, then the site in dist/
 bun run test --project @amends-dev/site
 ```
 
-`build` writes the pages, a search index, and a sitemap to `dist/`, and CI runs it. The site is
-served from Cloudflare Workers as static assets, configured in `wrangler.jsonc`: unknown paths get
-the 404 page, and pages are served at their trailing-slash URLs. To deploy, log in once with
-`bunx wrangler login`, run `bun run --filter @amends-dev/site deploy`, which builds and uploads,
-and add amends.dev as the Worker's custom domain in Cloudflare.
+`build` writes the pages, a search index, and a sitemap to `dist/`, and CI runs it.
+
+The site is served from Cloudflare Workers as static assets, with no Worker code: unknown paths get
+the 404 page, and pages are served at their trailing-slash URLs. [Alchemy](https://alchemy.run)
+deploys it from `alchemy.run.ts`, which builds the site when anything the build reads has changed
+and uploads what changed. Each deployment is a stage: `prod` serves amends.dev, and any other stage
+gets its own workers.dev address. Alchemy keeps each stage's state in a store on the Cloudflare
+account, which it sets up on its first deploy.
+
+The [site workflow](../../.github/workflows/site.yml) deploys `prod` from main, deploys a
+`pr-<number>` preview for each pull request opened from this repository and links it in a comment,
+and destroys the preview when the pull request closes. Its Cloudflare token and account are
+repository secrets that [`stacks/github.ts`](../../stacks/github.ts) creates.
+
+To deploy from your machine, connect Alchemy to the Cloudflare account once, then deploy from this
+directory to a stage of your own:
+
+```sh
+bun alchemy profile edit --add Cloudflare
+bun alchemy deploy                      # your stage, such as live_<you>
+bun alchemy destroy                     # and remove it
+```
