@@ -103,7 +103,7 @@ export class ReadStateService extends Context.Service<
       input: ReadState.MarkGroupReadInput,
     ) => Effect.Effect<void, Error, Actor.Actor>;
   }
->()("@amends-dev/core/read-state/service/Service") {}
+>()("@amends-dev/core/read-state/ReadStateService") {}
 
 /**
  * Builds the read-state operations over thread and group reads, the shared write, the store, and

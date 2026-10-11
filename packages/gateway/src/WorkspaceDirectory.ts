@@ -75,4 +75,4 @@ export class WorkspaceDirectory extends Context.Service<
      */
     readonly list: (identity: Identity.MemberReference) => Effect.Effect<Listing>;
   }
->()("@amends-dev/gateway/directory/Service") {}
+>()("@amends-dev/gateway/WorkspaceDirectory") {}

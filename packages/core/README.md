@@ -677,9 +677,10 @@ identifiers, such as `Workspace` and `WorkspaceMember`; status-specific variants
 HTTP contract.
 
 Source names and serialized names are separate contracts. Preserve fact names, versions, brands,
-error tags, service keys, projection keys, and encoded fields when reorganizing code. During
-development, change schemas in place at version 1 and reset development data: keep one current
-database baseline, with no upgrade migrations, backfills, or legacy decoding.
+error tags, projection keys, and encoded fields when reorganizing code. A service key is not
+serialized: it names its module, such as `@amends-dev/core/thread/ThreadStore`, and moves with it.
+During development, change schemas in place at version 1 and reset development data: keep one
+current database baseline, with no upgrade migrations, backfills, or legacy decoding.
 
 ### Constructors and layers
 

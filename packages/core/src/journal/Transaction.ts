@@ -124,7 +124,7 @@ export class Transaction extends Context.Service<
      */
     readonly step: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   }
->()("@amends-dev/core/journal/transaction/Service") {}
+>()("@amends-dev/core/journal/Transaction") {}
 
 interface State {
   readonly owner: symbol;
@@ -134,13 +134,13 @@ interface State {
   failure: Option.Option<Cause.Cause<unknown>>;
 }
 class Current extends Context.Service<Current, State>()(
-  "@amends-dev/core/journal/transaction/Current",
+  "@amends-dev/core/journal/Transaction/Current",
 ) {}
 class OperationOwner extends Context.Service<OperationOwner, number>()(
-  "@amends-dev/core/journal/transaction/OperationOwner",
+  "@amends-dev/core/journal/Transaction/OperationOwner",
 ) {}
 class Forbidden extends Context.Service<Forbidden, string>()(
-  "@amends-dev/core/journal/transaction/Forbidden",
+  "@amends-dev/core/journal/Transaction/Forbidden",
 ) {}
 
 /**

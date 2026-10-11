@@ -130,7 +130,7 @@ export class GroupCommand extends Context.Service<
       occurredAt: DateTime.Utc,
     ) => Effect.Effect<Established, EstablishError, Store.Transaction | Publication.Publication>;
   }
->()("@amends-dev/core/group/command/Service") {}
+>()("@amends-dev/core/group/GroupCommand") {}
 
 /**
  * Capture the group and member stores and the journal, but no actor or transaction: every write

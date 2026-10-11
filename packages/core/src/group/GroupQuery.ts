@@ -55,7 +55,7 @@ export class GroupQuery extends Context.Service<
       groupId: GroupId.Id,
     ) => Effect.Effect<GroupMembership.GroupMembership, AudienceError, Actor.Actor>;
   }
->()("@amends-dev/core/group/query/Service") {}
+>()("@amends-dev/core/group/GroupQuery") {}
 
 /**
  * Capture the membership store and authorization; check the acting member and current admission

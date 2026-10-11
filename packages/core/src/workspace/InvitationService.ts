@@ -143,7 +143,7 @@ export class InvitationService extends Context.Service<
      */
     readonly list: Effect.Effect<ReadonlyArray<Invitation.Invitation>, Error, Actor.Actor>;
   }
->()("@amends-dev/core/workspace/invitation-application/Service") {}
+>()("@amends-dev/core/workspace/InvitationService") {}
 
 /**
  * Construct invitation operations from workspace services; read the actor during protected calls.

@@ -90,7 +90,7 @@ export class SessionStateStore extends Context.Service<
       saved: Saved,
     ) => Effect.Effect<void, Failure, Store.Transaction>;
   }
->()("@amends-dev/core/turn/session-state-store/Service") {}
+>()("@amends-dev/core/turn/SessionStateStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema before the driver sees it.

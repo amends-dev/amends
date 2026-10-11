@@ -83,7 +83,7 @@ export class GroupFollowStore extends Context.Service<
       endedAt: DateTime.Utc,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/group/follow/store/Service") {}
+>()("@amends-dev/core/group/GroupFollowStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

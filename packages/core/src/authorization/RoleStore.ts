@@ -100,7 +100,7 @@ export class RoleStore extends Context.Service<
       revision: number,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/authorization/role-store/Service") {}
+>()("@amends-dev/core/authorization/RoleStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

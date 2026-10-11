@@ -44,4 +44,4 @@ export class SessionTokens extends Context.Service<
      */
     readonly revoke: (token: Redacted.Redacted<string>) => Effect.Effect<void>;
   }
->()("@amends-dev/gateway/session-tokens/Service") {}
+>()("@amends-dev/gateway/SessionTokens") {}

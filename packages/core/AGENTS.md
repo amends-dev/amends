@@ -18,7 +18,8 @@ module dependencies, schema names, and construction conventions.
 - Name a module's main type after the module (`Member.Member`), and follow the documented
   meanings of `Reference`, `Definition`, operation inputs/options, `State`, `Status`, and a
   service's shape, `Foo["Service"]`.
-- Preserve serialized contracts and service keys when moving or renaming source.
+- Preserve serialized contracts, such as fact names and error tags, when moving or renaming
+  source. A service key names its module, `@amends-dev/core/thread/ThreadStore`, and moves with it.
 - Keep tests grouped by domain and feature under `test/`.
 - Read operations authorize and query current state without opening a transaction.
   Read-only policy helpers must not require `Store.Transaction`. An existing caller

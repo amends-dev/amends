@@ -131,7 +131,7 @@ export class MemberService extends Context.Service<
      */
     readonly rename: (name: Member.Name) => Effect.Effect<Member.Member, RenameError, Actor.Actor>;
   }
->()("@amends-dev/core/workspace/member-application/Service") {}
+>()("@amends-dev/core/workspace/MemberService") {}
 
 const decodeId = Schema.decodeEffect(Member.Id);
 

@@ -44,7 +44,7 @@ export class PermissionCatalog extends Context.Service<
     /** Resolve an explicitly registered name to its validated definition. */
     readonly get: (name: Permission.Name) => Effect.Effect<Permission.Definition, Unknown>;
   }
->()("@amends-dev/core/authorization/permission-catalog/Service") {}
+>()("@amends-dev/core/authorization/PermissionCatalog") {}
 
 const decodeDefinition = Schema.decodeEffect(Permission.Definition);
 

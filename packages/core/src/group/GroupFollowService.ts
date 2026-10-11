@@ -107,7 +107,7 @@ export class GroupFollowService extends Context.Service<
      */
     readonly unfollow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Actor>;
   }
->()("@amends-dev/core/group/follow/service/Service") {}
+>()("@amends-dev/core/group/GroupFollowService") {}
 
 /**
  * Capture the stores, the shared group read, the journal, and authorization; resolve authority

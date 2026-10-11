@@ -231,7 +231,7 @@ export class ConnectionService extends Context.Service<
     /** Stop its use and delete its key, under `connection.manage`; its record remains. */
     readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, RemoveError, Actor.Actor>;
   }
->()("@amends-dev/core/connection/service/Service") {}
+>()("@amends-dev/core/connection/ConnectionService") {}
 
 /**
  * Builds the connection operations over the stores, the host's `Integrations`, the journal, and

@@ -21,7 +21,7 @@ import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
  * @since 0.1.0
  */
 export class Principal extends Context.Service<Principal, Identity.MemberReference>()(
-  "@amends-dev/api-http/authentication/Principal",
+  "@amends-dev/api-http/Authentication/Principal",
 ) {}
 
 /**
@@ -32,7 +32,7 @@ export class Principal extends Context.Service<Principal, Identity.MemberReferen
  * @since 0.1.0
  */
 export class Credential extends Context.Service<Credential, Redacted.Redacted<string>>()(
-  "@amends-dev/api-http/authentication/Credential",
+  "@amends-dev/api-http/Authentication/Credential",
 ) {}
 
 /**

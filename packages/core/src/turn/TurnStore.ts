@@ -86,7 +86,7 @@ export class TurnStore extends Context.Service<
       record: Turn.Turn,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/turn/store/Service") {}
+>()("@amends-dev/core/turn/TurnStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

@@ -72,7 +72,7 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
  * @since 0.1.0
  */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
-  "@amends-dev/core/memory/binding/Current",
+  "@amends-dev/core/memory/Binding/CurrentTransaction",
 ) {}
 
 /**
@@ -120,7 +120,7 @@ export class Binding extends Context.Service<
       Exclude<R, Store.Transaction>
     >;
   }
->()("@amends-dev/core/memory/binding/Service") {}
+>()("@amends-dev/core/memory/Binding") {}
 
 /**
  * Construct one workspace binding over the caller's connection.

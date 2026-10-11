@@ -108,7 +108,7 @@ export class AgentQuery extends Context.Service<
       selection: Agent.Selection,
     ) => Effect.Effect<Runnable, BuildError>;
   }
->()("@amends-dev/core/agent/query/Service") {}
+>()("@amends-dev/core/agent/AgentQuery") {}
 
 /** `selection` as the setup whose readiness says whether it can run. */
 const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({

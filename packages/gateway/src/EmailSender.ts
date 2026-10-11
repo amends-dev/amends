@@ -47,4 +47,4 @@ export class EmailSender extends Context.Service<
     /** Hand the message to the email provider; success means the provider accepted it. */
     readonly send: (message: Message) => Effect.Effect<void, Undelivered>;
   }
->()("@amends-dev/gateway/email-sender/Service") {}
+>()("@amends-dev/gateway/EmailSender") {}

@@ -274,7 +274,7 @@ export class NotificationStore extends Context.Service<
       groupId: GroupId.Id,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/notification/store/Service") {}
+>()("@amends-dev/core/notification/NotificationStore") {}
 
 /** Seen and Accepted are recorded with markSeen and accept, never inserted. */
 const unsettled = (record: Notification.Notification) =>

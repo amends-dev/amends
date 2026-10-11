@@ -70,7 +70,7 @@ export class MemberCommand extends Context.Service<
       member: NewMember,
     ) => Effect.Effect<Member.Member, Error, Store.Transaction | Publication.Publication>;
   }
->()("@amends-dev/core/workspace/member/command/Service") {}
+>()("@amends-dev/core/workspace/MemberCommand") {}
 
 /**
  * Capture bound services; `add` publishes in the caller's commit.

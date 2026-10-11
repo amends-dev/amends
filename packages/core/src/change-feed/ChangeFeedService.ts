@@ -53,7 +53,7 @@ export class ChangeFeedService extends Context.Service<
       Actor.Actor | Scope.Scope
     >;
   }
->()("@amends-dev/core/change-feed/service/Service") {}
+>()("@amends-dev/core/change-feed/ChangeFeedService") {}
 
 /** What one reader may see: their delivery scopes and resolved grants. */
 interface Access {

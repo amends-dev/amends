@@ -188,7 +188,7 @@ export class TurnService extends Context.Service<
      */
     readonly retry: (turnId: Turn.Id) => Effect.Effect<Turn.View, RetryError, Actor.Actor>;
   }
->()("@amends-dev/core/turn/service/Service") {}
+>()("@amends-dev/core/turn/TurnService") {}
 
 /** Entries of a session log read at a time. */
 const logPage = 100;

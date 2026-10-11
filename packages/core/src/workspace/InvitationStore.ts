@@ -76,7 +76,7 @@ export class InvitationStore extends Context.Service<
       state: Exclude<Invitation.State, { readonly _tag: "Pending" }>,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/workspace/invitation-store/Service") {}
+>()("@amends-dev/core/workspace/InvitationStore") {}
 
 /** The states an invitation settles into. */
 const Settled = Schema.Union([Invitation.State.cases.Accepted, Invitation.State.cases.Revoked]);

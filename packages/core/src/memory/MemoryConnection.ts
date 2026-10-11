@@ -24,7 +24,7 @@ export class MemoryConnection extends Context.Service<
     /** One permit: held for the whole of each of this host's transactions. */
     readonly gate: Semaphore.Semaphore;
   }
->()("@amends-dev/core/memory/connection/Service") {}
+>()("@amends-dev/core/memory/MemoryConnection") {}
 
 /**
  * Connect to the caller's `MemoryDatabase`, with a gate of this connection's own.

@@ -134,7 +134,7 @@ export class Checkpoint extends Context.Service<
       versions: ReadonlyArray<LiveVersion>,
     ) => Effect.Effect<void, Store.Failure | Store.Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/journal/checkpoint/Service") {}
+>()("@amends-dev/core/journal/Checkpoint") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

@@ -182,7 +182,7 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
  * @since 0.1.0
  */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
-  "@amends-dev/storage-postgresql/binding/Current",
+  "@amends-dev/storage-postgresql/Binding/CurrentTransaction",
 ) {}
 
 /**
@@ -228,7 +228,7 @@ export class Binding extends Context.Service<
       Exclude<R, Store.Transaction>
     >;
   }
->()("@amends-dev/storage-postgresql/binding/Service") {}
+>()("@amends-dev/storage-postgresql/Binding") {}
 
 /** Contention is a conflict the caller may retry; anything else failed the transaction. */
 const transactionError = (cause: SqlError.SqlError) =>

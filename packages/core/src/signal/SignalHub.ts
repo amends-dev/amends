@@ -29,7 +29,7 @@ export class SignalHub extends Context.Service<
     /** The signals published after this registers, until the scope closes. */
     readonly subscribe: Effect.Effect<Stream.Stream<Signal.Signal>, never, Scope.Scope>;
   }
->()("@amends-dev/core/signal/hub/Service") {}
+>()("@amends-dev/core/signal/SignalHub") {}
 
 /** Signals a subscriber may fall behind by before it misses the oldest. */
 const capacity = 256;

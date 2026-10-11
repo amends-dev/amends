@@ -122,4 +122,4 @@ export class SignIn extends Context.Service<
     /** Exchange a delivered code for a session as the address's account. A code works once. */
     readonly complete: (email: Accounts.Email, code: Code) => Effect.Effect<Session, Rejected>;
   }
->()("@amends-dev/gateway/sign-in/Service") {}
+>()("@amends-dev/gateway/SignIn") {}

@@ -74,4 +74,4 @@ export class Accounts extends Context.Service<
       ids: ReadonlyArray<Identity.HumanId>,
     ) => Effect.Effect<ReadonlyArray<Account>>;
   }
->()("@amends-dev/gateway/accounts/Service") {}
+>()("@amends-dev/gateway/Accounts") {}

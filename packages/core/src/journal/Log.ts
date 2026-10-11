@@ -251,7 +251,7 @@ export class Log extends Context.Service<
     /** Runs `program` as one commit, or as part of the current one, as `Journal.commit` does. */
     readonly commit: Transaction.Transaction["Service"]["run"];
   }
->()("@amends-dev/core/journal/log/Service") {}
+>()("@amends-dev/core/journal/Log") {}
 
 const batchSchema = Schema.toType(Store.Batch).check(
   Schema.makeFilter(({ logId, position, commit, entries }) => {

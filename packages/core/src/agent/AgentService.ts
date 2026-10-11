@@ -162,7 +162,7 @@ export class AgentService extends Context.Service<
       input: Agent.RenameInput,
     ) => Effect.Effect<Agent.View, RenameError, Actor.Actor>;
   }
->()("@amends-dev/core/agent/service/Service") {}
+>()("@amends-dev/core/agent/AgentService") {}
 
 /**
  * Capture workspace dependencies; resolve authority inside each operation.

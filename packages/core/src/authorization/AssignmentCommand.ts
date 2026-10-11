@@ -55,7 +55,7 @@ export class AssignmentCommand extends Context.Service<
       assignment: Assignment.Assignment,
     ) => Effect.Effect<Assignment.Assignment, Error, Store.Transaction | Publication.Publication>;
   }
->()("@amends-dev/core/authorization/assignment/command/Service") {}
+>()("@amends-dev/core/authorization/AssignmentCommand") {}
 
 /**
  * Capture the journal, crypto, and workspace; a new assignment takes a random ID.

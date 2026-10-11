@@ -67,7 +67,7 @@ export class ConnectionStore extends Context.Service<
       record: Connection.Connection,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/connection/store/Service") {}
+>()("@amends-dev/core/connection/ConnectionStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

@@ -101,7 +101,7 @@ export class MemberStore extends Context.Service<
       memberId: Member.Id,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/workspace/member-store/Service") {}
+>()("@amends-dev/core/workspace/MemberStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

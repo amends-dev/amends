@@ -32,4 +32,4 @@ export class Actor extends Context.Service<
     /** The human or agent the member was resolved from. */
     readonly identity: Identity.MemberReference;
   }
->()("@amends-dev/core/identity/actor/Service") {}
+>()("@amends-dev/core/identity/Actor") {}

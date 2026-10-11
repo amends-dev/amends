@@ -106,7 +106,7 @@ export class TurnCommand extends Context.Service<
       reason: Turn.CancelReason,
     ) => Effect.Effect<Turn.Turn, EndError, Store.Transaction | Publication.Publication>;
   }
->()("@amends-dev/core/turn/command/Service") {}
+>()("@amends-dev/core/turn/TurnCommand") {}
 
 /**
  * The command over the thread store, the thread command, and the journal.

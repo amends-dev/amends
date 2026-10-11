@@ -194,7 +194,7 @@ export class GroupMembershipService extends Context.Service<
       options: GroupMembership.ListOptions,
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, ReadError, Actor.Actor>;
   }
->()("@amends-dev/core/group/membership/service/Service") {}
+>()("@amends-dev/core/group/GroupMembershipService") {}
 
 /**
  * Capture the stores, the shared group read and writes, the journal, and authorization; resolve

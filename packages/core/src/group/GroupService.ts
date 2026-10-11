@@ -182,7 +182,7 @@ export class GroupService extends Context.Service<
       options: Group.ListOptions,
     ) => Effect.Effect<ReadonlyArray<Group.PublicItem>, ReadError, Actor.Actor>;
   }
->()("@amends-dev/core/group/service/Service") {}
+>()("@amends-dev/core/group/GroupService") {}
 
 /**
  * Capture the stores, the shared reads and writes, the journal, and authorization; resolve

@@ -112,7 +112,7 @@ export class OwnershipService extends Context.Service<
       input: Ownership.TransferInput,
     ) => Effect.Effect<Workspace.Workspace, Error, Actor.Actor>;
   }
->()("@amends-dev/core/workspace/ownership-application/Service") {}
+>()("@amends-dev/core/workspace/OwnershipService") {}
 
 /**
  * Construct ownership operations over one workspace's journal and access policy.

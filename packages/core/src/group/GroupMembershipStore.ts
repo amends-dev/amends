@@ -129,7 +129,7 @@ export class GroupMembershipStore extends Context.Service<
       removal: GroupMembership.Removal,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/group/membership/store/Service") {}
+>()("@amends-dev/core/group/GroupMembershipStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

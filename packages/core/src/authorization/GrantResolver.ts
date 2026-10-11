@@ -47,7 +47,7 @@ export class GrantResolver extends Context.Service<
      */
     readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Grant>, Error>;
   }
->()("@amends-dev/core/authorization/grant-resolver/Service") {}
+>()("@amends-dev/core/authorization/GrantResolver") {}
 
 /**
  * Construct a resolver from workspace stores and metadata; read assignments and roles per call.

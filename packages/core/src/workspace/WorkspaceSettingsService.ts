@@ -92,7 +92,7 @@ export class WorkspaceSettingsService extends Context.Service<
       input: WorkspaceSettings.RenameInput,
     ) => Effect.Effect<Workspace.Workspace, Error, Actor.Actor>;
   }
->()("@amends-dev/core/workspace/settings/Service") {}
+>()("@amends-dev/core/workspace/WorkspaceSettingsService") {}
 /**
  * Capture bound services; each operation authorizes the actor when it runs.
  *

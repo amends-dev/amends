@@ -129,7 +129,7 @@ export class Journal extends Context.Service<
       | Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
     >;
   }
->()("@amends-dev/core/journal/Service") {}
+>()("@amends-dev/core/journal/Journal") {}
 
 /**
  * What a journal is built from: the log it records facts in, the projections every commit

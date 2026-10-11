@@ -89,7 +89,7 @@ export class SessionLogStore extends Context.Service<
       after: number,
     ) => Effect.Effect<void, Failure>;
   }
->()("@amends-dev/core/turn/session-log-store/Service") {}
+>()("@amends-dev/core/turn/SessionLogStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema before the driver sees it.

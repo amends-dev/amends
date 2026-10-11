@@ -78,7 +78,7 @@ export class Gateway extends Context.Service<
       Scope.Scope
     >;
   }
->()("@amends-dev/gateway/Service") {}
+>()("@amends-dev/gateway/Gateway") {}
 
 const isPublic = Schema.is(GatewayErrors.PublicError);
 const isConflict = Schema.is(Store.Conflict);

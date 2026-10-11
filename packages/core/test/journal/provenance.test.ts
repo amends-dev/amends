@@ -144,7 +144,7 @@ it.effect(
       );
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit))
-        expect(Cause.pretty(exit.cause)).toContain("@amends-dev/core/journal/publication/Service");
+        expect(Cause.pretty(exit.cause)).toContain("@amends-dev/core/journal/Publication");
       expect((yield* fixture.snapshot).logs.size).toBe(0);
     }),
 );

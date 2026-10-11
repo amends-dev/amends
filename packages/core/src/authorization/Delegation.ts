@@ -117,7 +117,7 @@ export class Delegation extends Context.Service<
      */
     readonly requireRemoval: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Actor>;
   }
->()("@amends-dev/core/authorization/delegation/Service") {}
+>()("@amends-dev/core/authorization/Delegation") {}
 
 /**
  * One member an actor would change the roles of, or remove when `selfRemoval` is set.

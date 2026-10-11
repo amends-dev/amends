@@ -83,7 +83,7 @@ export class ChangeFeedSource extends Context.Service<
       after: Option.Option<Entry.Position>,
     ) => Effect.Effect<Subscription, ChangeFeed.Unavailable, Scope.Scope>;
   }
->()("@amends-dev/core/change-feed/source/Service") {}
+>()("@amends-dev/core/change-feed/ChangeFeedSource") {}
 
 /**
  * How much the follower buffers for each subscriber, how far back a subscriber may resume, and

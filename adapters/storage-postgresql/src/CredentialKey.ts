@@ -43,7 +43,7 @@ export interface Cipher {
  * @since 0.1.0
  */
 export class CredentialKey extends Context.Service<CredentialKey, Option.Option<Cipher>>()(
-  "@amends-dev/storage-postgresql/credential-key/Service",
+  "@amends-dev/storage-postgresql/CredentialKey",
 ) {}
 
 const version = "v1";

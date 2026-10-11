@@ -97,7 +97,7 @@ export class Authorization extends Context.Service<
       requirements: ReadonlyArray<Requirement.Requirement>,
     ) => Effect.Effect<ReadonlyArray<boolean>, Exclude<Error, Denied>, Actor.Actor>;
   }
->()("@amends-dev/core/authorization/authorization/Service") {}
+>()("@amends-dev/core/authorization/Authorization") {}
 
 const sameIdentity = Schema.toEquivalence(Identity.Reference);
 const requireWorkspace = Effect.fnUntraced(function* (

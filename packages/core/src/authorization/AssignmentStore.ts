@@ -97,7 +97,7 @@ export class AssignmentStore extends Context.Service<
       assignmentId: Assignment.Id,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/authorization/assignment-store/Service") {}
+>()("@amends-dev/core/authorization/AssignmentStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

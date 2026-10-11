@@ -99,7 +99,7 @@ export class GroupStore extends Context.Service<
       latest: Group.Latest,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/group/store/Service") {}
+>()("@amends-dev/core/group/GroupStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

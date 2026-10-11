@@ -57,7 +57,7 @@ export class PostgresDatabase extends Context.Service<
     /** The cap on connections one workspace's statements outside its transactions use at once. */
     readonly reads: PostgresReads.PostgresReads;
   }
->()("@amends-dev/storage-postgresql/database/Service") {}
+>()("@amends-dev/storage-postgresql/PostgresDatabase") {}
 
 /**
  * Construct the database service over the caller's PostgreSQL client, applying pending

@@ -344,7 +344,7 @@ export class Transaction extends Context.Service<
      */
     readonly afterCommit: (effect: Effect.Effect<void>) => Effect.Effect<void, Failure>;
   }
->()("@amends-dev/core/journal/store/Transaction") {}
+>()("@amends-dev/core/journal/Store/Transaction") {}
 
 /**
  * What a storage adapter implements for the journal. `make` builds the store over a driver of
@@ -444,7 +444,7 @@ export class Store extends Context.Service<
       after: Option.Option<LogEntry.Position>,
     ) => Effect.Effect<void, Failure>;
   }
->()("@amends-dev/core/journal/store/Service") {}
+>()("@amends-dev/core/journal/Store") {}
 
 /**
  * Run what a committed transaction's `afterCommit` collected, in order, logging each failure

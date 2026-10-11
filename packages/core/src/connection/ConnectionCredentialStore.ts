@@ -67,7 +67,7 @@ export class ConnectionCredentialStore extends Context.Service<
       connectionId: Connection.Id,
     ) => Effect.Effect<void, Failure, Store.Transaction>;
   }
->()("@amends-dev/core/connection/credential-store/Service") {}
+>()("@amends-dev/core/connection/ConnectionCredentialStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema before the driver sees it.

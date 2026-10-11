@@ -65,7 +65,7 @@ export class AgentStore extends Context.Service<
       record: Agent.Agent,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/agent/store/Service") {}
+>()("@amends-dev/core/agent/AgentStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

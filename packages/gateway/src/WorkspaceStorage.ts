@@ -44,4 +44,4 @@ export class WorkspaceStorage extends Context.Service<
      */
     readonly forWorkspace: (workspaceId: Workspace.Id) => Effect.Effect<Context.Context<Bindings>>;
   }
->()("@amends-dev/gateway/storage/Service") {}
+>()("@amends-dev/gateway/WorkspaceStorage") {}

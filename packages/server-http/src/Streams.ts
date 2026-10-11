@@ -68,7 +68,7 @@ export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse)
 export const Limits = Context.Reference<{
   readonly perWorkspace: number;
   readonly perMember: number;
-}>("@amends-dev/server-http/streams/Limits", {
+}>("@amends-dev/server-http/Streams/Limits", {
   defaultValue: () => ({ perWorkspace: 1000, perMember: 20 }),
 });
 
@@ -99,7 +99,7 @@ export class Streams extends Context.Service<
       unavailable: () => E,
     ) => Stream.Stream<A, E, R>;
   }
->()("@amends-dev/server-http/streams/Service") {}
+>()("@amends-dev/server-http/Streams") {}
 
 /**
  * Builds `Streams` over the `Limits` in context and, where the host provides it, `Draining`. It

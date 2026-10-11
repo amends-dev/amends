@@ -73,7 +73,7 @@ export class ReadStateStore extends Context.Service<
     /** Advance when a member last read a group; a time at or before the stored one is kept. */
     readonly advanceGroup: (read: ReadState.GroupRead) => Effect.Effect<void, Failure | Conflict>;
   }
->()("@amends-dev/core/read-state/store/Service") {}
+>()("@amends-dev/core/read-state/ReadStateStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

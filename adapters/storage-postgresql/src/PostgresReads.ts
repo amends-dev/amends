@@ -31,7 +31,7 @@ interface Lane {
 
 /** Marks a fiber already holding a place for a key, so statements inside it do not wait again. */
 class Holding extends Context.Service<Holding, string>()(
-  "@amends-dev/storage-postgresql/reads/Holding",
+  "@amends-dev/storage-postgresql/PostgresReads/Holding",
 ) {}
 
 /**

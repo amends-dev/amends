@@ -17,7 +17,7 @@ import { Context, Deferred, Effect, Layer } from "effect";
  * @since 0.1.0
  */
 export class Draining extends Context.Service<Draining, Deferred.Deferred<void>>()(
-  "@amends-dev/server-http/draining/Service",
+  "@amends-dev/server-http/Draining",
 ) {}
 
 /**

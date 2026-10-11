@@ -73,7 +73,7 @@ export class WorkspaceStore extends Context.Service<
       change: Ownership.Change,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   }
->()("@amends-dev/core/workspace/workspace-store/Service") {}
+>()("@amends-dev/core/workspace/WorkspaceStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the

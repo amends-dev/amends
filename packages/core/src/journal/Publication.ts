@@ -24,7 +24,7 @@ import * as Event from "./Event.ts";
  * @since 0.1.0
  */
 export class Publication extends Context.Service<Publication, Event.Provenance>()(
-  "@amends-dev/core/journal/publication/Service",
+  "@amends-dev/core/journal/Publication",
 ) {}
 
 /**

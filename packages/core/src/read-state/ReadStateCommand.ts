@@ -47,7 +47,7 @@ export class ReadStateCommand extends Context.Service<
       throughSequence: number,
     ) => Effect.Effect<void, Error>;
   }
->()("@amends-dev/core/read-state/command/Service") {}
+>()("@amends-dev/core/read-state/ReadStateCommand") {}
 
 /**
  * Builds the shared write over the notification and read-state stores.

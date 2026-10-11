@@ -139,7 +139,7 @@ export class AssignmentService extends Context.Service<
       input: Assignment.ChangeInput,
     ) => Effect.Effect<Assignment.Assignment, Error, Actor.Actor>;
   }
->()("@amends-dev/core/authorization/assignment/service/Service") {}
+>()("@amends-dev/core/authorization/AssignmentService") {}
 
 /**
  * Capture the stores, authorization, delegation, and the command; the workspace-wide permissions

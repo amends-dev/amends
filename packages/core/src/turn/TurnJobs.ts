@@ -70,7 +70,7 @@ export class TurnJobs extends Context.Service<
       job: Job & { readonly turnId: Turn.Id },
     ) => Effect.Effect<void, Store.Failure, Store.Transaction>;
   }
->()("@amends-dev/core/turn/jobs/Service") {}
+>()("@amends-dev/core/turn/TurnJobs") {}
 
 /**
  * For a host that runs no turn jobs: requests are accepted and nothing runs, so work waits in

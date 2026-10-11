@@ -82,4 +82,4 @@ export class SignInStorage extends Context.Service<
     /** Remove the session under a token's digest, as revoking it does; a missing one stays gone. */
     readonly deleteSession: (digest: string) => Effect.Effect<void>;
   }
->()("@amends-dev/gateway/sign-in-storage/Service") {}
+>()("@amends-dev/gateway/SignInStorage") {}

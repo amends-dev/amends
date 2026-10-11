@@ -128,7 +128,7 @@ export class NotificationService extends Context.Service<
     /** How many notifications are still pending for the acting member, from anywhere. */
     readonly countPending: Effect.Effect<number, Error, Actor.Actor>;
   }
->()("@amends-dev/core/notification/service/Service") {}
+>()("@amends-dev/core/notification/NotificationService") {}
 
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options));
 const isSameRecipient = Schema.toEquivalence(Notification.Recipient);

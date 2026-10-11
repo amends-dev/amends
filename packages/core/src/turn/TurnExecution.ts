@@ -248,7 +248,7 @@ export class TurnExecution extends Context.Service<
       stopped: { readonly resume?: SessionStateStore.Resume | undefined },
     ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
   }
->()("@amends-dev/core/turn/execution/Service") {}
+>()("@amends-dev/core/turn/TurnExecution") {}
 
 /** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
