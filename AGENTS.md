@@ -97,7 +97,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   client hooks to UI screens. `desktop` owns the Tauri shell; platform APIs stay in the entry apps.
   `site` is amends.dev on Astro and Starlight: static pages composed from UI's site sections without
   client, and docs whose package guides and API reference are generated from each published
-  package's README and source. Apps may install UI dependencies and consume shared packages. Run
+  package's README and source, deployed with [Alchemy](https://alchemy.run) from its
+  `alchemy.run.ts`; `stacks/` holds Alchemy stacks for the repository itself, such as its CI
+  secrets. Apps may install UI dependencies and consume shared packages. Run
   desktop's `check:native` after changing Rust or Tauri configuration; root checks cover its
   TypeScript only.
 

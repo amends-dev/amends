@@ -123,6 +123,11 @@ binding more parameters than one statement can) run about three times slower tha
 `cargo check` only when `apps/desktop/src-tauri` or the workflow changes, with Tauri's Linux
 libraries and a Rust build cache.
 
+[`.github/workflows/site.yml`](../.github/workflows/site.yml) deploys the site with Alchemy: main to
+amends.dev, and each pull request opened from this repository to a preview that it links in a
+comment and destroys when the pull request closes; see the
+[site](../apps/site/README.md#build-and-deploy).
+
 ## Choosing a test API
 
 - Use `it.effect` for Effect programs. Return the Effect from the callback; the

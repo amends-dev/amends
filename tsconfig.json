@@ -5,6 +5,7 @@
   },
   "include": [
     "scripts/**/*.ts",
+    "stacks/**/*.ts",
     "packages/core/test/**/*.ts",
     "packages/gateway/test/**/*.ts",
     "packages/cluster/test/**/*.ts",

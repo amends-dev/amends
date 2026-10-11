@@ -65,6 +65,7 @@ apps/            the design system, the headless client, the web and desktop app
 docs/            guides, design documents, and known limitations
 design-system/   the visual references the design system is built from
 scripts/         repository tooling
+stacks/          Alchemy stacks for the repository itself, such as its CI secrets
 repos/effect/    Effect's source, vendored as read-only reference
 ```
 
