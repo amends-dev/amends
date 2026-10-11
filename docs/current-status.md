@@ -118,9 +118,22 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Catching up with a group records the host's time when the mark arrives, not the newest activity
   the reader saw, so activity that lands in between counts as read.
 
+## Sign-in and accounts
+
+Each email address has one [account](sign-in-design.md#accounts), with an opaque human ID the host
+issues, created on the address's first sign-in or invitation. Only the local host's development
+sign-in exists: it logs codes instead of emailing them, nothing proves control of an address, and
+its tokens are the human ID itself, which it trusts from any caller and cannot revoke. Production
+sign-in and identity providers are [designed](sign-in-design.md#production-sign-in) but not built;
+`GET /session/methods` lists no providers, and the apps offer email codes without reading it. An
+account's address never changes, and accounts are never deleted. Invitations send no email.
+Issuing an invitation creates the address's account before the workspace checks that the issuer
+may invite, so a member without that permission can still create accounts for addresses, though
+nothing about the workspace is revealed or sent.
+
 ## HTTP coverage
 
-HTTP exposes sign-in, workspace creation and the directory, members, invitations, assignments, ownership,
+HTTP exposes sign-in, accounts, workspace creation and the directory, members, invitations, assignments, ownership,
 the notification inbox, its sources and marking them seen, groups, threads, replies, following, read
 state, the change feed, and typing. No operation reaches a group from outside it, so there is no
 workspace-wide oversight of private groups or direct groups by design.
@@ -173,9 +186,9 @@ Agents page join it as every member does. The sidebar lists teammates the reader
 not messaged under Direct messages, capped at six, and opens a first message to them. There is no
 conversation with oneself, since a direct group needs another member.
 
-People are shown by the name they chose in the workspace, or by the identity they sign in as
-until they choose one. The apps ask for a name when creating a workspace or accepting an
-invitation, suggesting one from an email address, and the account menu changes it later. Each
+People are shown by the name they chose in the workspace, which every member has. The apps ask
+for it when creating a workspace or accepting an invitation, suggesting one from an email address,
+and the account menu changes it later. Each
 member names only themselves: nobody renames another member, and agents are named by whoever adds
 or configures them on the Agents page. There are no profile photos.
 

@@ -4,14 +4,17 @@ import { Schema } from "effect";
 import { WorkspaceDirectory } from "../src/directory.ts";
 import { SignIn } from "../src/sign-in.ts";
 
-it("saved sessions retain their JSON format while exposing the human ID", () => {
-  const stored = { token: "session-token", identity: "human-one" };
+it("saved sessions round-trip their token and account through JSON", () => {
+  const stored = { token: "session-token", account: { id: "human-one", email: "jo@mercier.co" } };
   const json = Schema.fromJsonString(SignIn.Session);
   const session = Schema.decodeSync(json)(JSON.stringify(stored));
 
-  expect(session).toEqual({ token: "session-token", humanId: Identity.HumanId.make("human-one") });
+  expect(session).toEqual({
+    token: "session-token",
+    account: { id: Identity.HumanId.make("human-one"), email: "jo@mercier.co" },
+  });
   expect(JSON.parse(Schema.encodeSync(json)(session))).toEqual(stored);
-  expect(() => Schema.decodeSync(SignIn.Session)({ ...stored, identity: "" })).toThrow();
+  expect(() => Schema.decodeSync(SignIn.Session)({ ...stored, token: "" })).toThrow();
 });
 
 it.each([0, 2])("directory JSON retains people for an active member count of %i", (count) => {
@@ -28,6 +31,7 @@ it.each([0, 2])("directory JSON retains people for an active member count of %i"
           id: "agent-member",
           workspaceId: "workspace",
           identity: { _tag: "Agent", id: "agent" },
+          name: "agent",
           status: "active",
         },
         people: count,

@@ -14,7 +14,6 @@ import { LocalServer } from "../src/server.ts";
 import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");
-const bob = Identity.HumanId.make("bob");
 const asToken = (token: string) =>
   HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
@@ -24,9 +23,9 @@ const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(as
 const server = (url: string) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
-      Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url)),
-        DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer)),
+      DevelopmentAuthentication.layer(() => Effect.void).pipe(
+        Layer.provide(BunCrypto.layer),
+        Layer.provideMerge(LocalHost.layer(Redacted.make(url))),
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
@@ -34,20 +33,24 @@ const server = (url: string) =>
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
   const asAlice = yield* client(alice);
-  const asBob = yield* client(bob);
-  const workspace = yield* asAlice.workspaces.create({ headers: {}, payload: { name: "Studio" } });
+  const workspace = yield* asAlice.workspaces.create({
+    headers: {},
+    payload: { name: "Studio", memberName: "alice" },
+  });
   const invitation = yield* asAlice.invitations.issue({
     headers: {},
     params: { workspaceId: workspace.id },
     payload: {
-      recipientId: bob,
+      email: "bob@example.com",
       expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
       roleId: BuiltinRoles.MemberId,
     },
   });
+  // Development tokens are human IDs: Bob's is his account's, which the invitation names.
+  const asBob = yield* client(invitation.details.recipientId);
   const joined = yield* asBob.invitations.accept({
     params: { workspaceId: workspace.id, invitationId: invitation.details.id },
-    payload: {},
+    payload: { name: "bob" },
   });
   return { asAlice, asBob, workspace, aliceId: workspace.ownerMemberId, bobId: joined.id };
 });

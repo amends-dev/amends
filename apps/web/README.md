@@ -82,7 +82,7 @@ under one.
   which owns its dialogs, and a sidebar's + asks its page to open the create dialog through
   `?add=`. A page may also show a side panel from UI, such as Settings' member details.
 - `src/turn-log.tsx` shows a turn's log in the thread panel.
-- `src/account.ts` gives the standalone screens the signed-in identity and Sign out;
+- `src/account.ts` gives the standalone screens the signed-in address and Sign out;
   `src/appearance.ts` keeps the appearance, a mode of Light, Dark, or System and a palette of
   Neutral, Linen, Sage, or Slate, and follows the system's; `src/workspace-actions.ts` lets pages
   offer the layout's Create group and show toasts.

@@ -57,7 +57,7 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
                 id: member.id,
                 workspaceId: member.workspaceId,
                 identity: { _tag: member.identityKind, id: member.identityId },
-                ...(member.name === null ? {} : { name: member.name }),
+                name: member.name,
                 status: member.status,
               },
               activeMemberCount,

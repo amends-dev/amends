@@ -22,10 +22,12 @@ const secondId = Member.Id.make("member-two");
 const agentId = Member.Id.make("member-agent");
 const human = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") });
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") });
+const name = Member.Name.make("same-id");
 const added = (memberId: Member.Id, identity: Identity.MemberReference) => ({
   memberId,
   workspaceId,
   identity,
+  name,
 });
 const removed = (memberId: Member.Id) => ({ memberId, workspaceId });
 const setup = Journal.make({ logId, projections: [MemberProjection.definition] });
@@ -67,6 +69,7 @@ it.effect(
                   id: firstId,
                   workspaceId,
                   identity: human,
+                  name,
                   status: "active",
                 }),
               );
@@ -78,6 +81,7 @@ it.effect(
               id: agentId,
               workspaceId,
               identity: agent,
+              name,
               status: "active",
             }),
           );
@@ -93,6 +97,7 @@ it.effect(
               id: firstId,
               workspaceId,
               identity: human,
+              name,
               status: "removed",
             }),
           );
@@ -101,6 +106,7 @@ it.effect(
               id: secondId,
               workspaceId,
               identity: human,
+              name,
               status: "active",
             }),
           );
@@ -142,6 +148,7 @@ it.effect("replay reconstructs membership history and resumes without reapplying
             id: firstId,
             workspaceId,
             identity: human,
+            name,
             status: "removed",
           }),
         );
@@ -234,6 +241,7 @@ it.effect(
               id: firstId,
               workspaceId,
               identity: human,
+              name,
               status: "active",
             }),
           );

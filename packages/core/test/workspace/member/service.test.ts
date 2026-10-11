@@ -49,6 +49,7 @@ const bob = Member.Record.make({
   id: Member.Id.make("bob"),
   workspaceId,
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
+  name: Member.Name.make("bob"),
   status: "active",
 });
 const missingId = Member.Id.make("missing");
@@ -187,6 +188,7 @@ const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Record> = 
           id: actor.memberId,
           workspaceId,
           identity: actor.identity,
+          name: Member.Name.make(actor.identity.id),
           status: "active",
         });
       }
@@ -409,6 +411,7 @@ it.effect(
         id: bob.id,
         workspaceId,
         identity: bob.identity,
+        name: bob.name,
         status: "removed",
       });
       expect(yield* fixture.members(workspaceId).get(bob.id)).toEqual(Option.some(removed));

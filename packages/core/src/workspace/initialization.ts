@@ -68,7 +68,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         workspaceId: record.id,
         memberId: ownerMemberId,
         identity: Identity.Reference.cases.Human.make({ id: createdBy }),
-        ...(memberName === undefined ? {} : { name: memberName }),
+        name: memberName,
       });
       for (const role of BuiltinRoles.make(record.id, permissionCatalog.definitions)) {
         yield* journal.publish(RoleFacts.Created, {

@@ -1,11 +1,11 @@
 # @amends-dev/storage-postgresql
 
-Workspace storage, each workspace's signal hub, and the workspace directory over PostgreSQL: the
-storage the [local host](../../hosts/local/README.md) runs on. Statements are written with Drizzle
-and run through `@effect/sql-pg`, so they share the Effect client's transaction service: the journal
-opens each commit on a reserved connection, and every statement inside it lands there. The adapter
-passes the [conformance suites](../../packages/storage-conformance/README.md) every storage adapter
-runs. It is internal to this repository and not published to npm.
+Workspace storage, each workspace's signal hub, the workspace directory, and the host's accounts
+over PostgreSQL: the storage the [local host](../../hosts/local/README.md) runs on. Statements are
+written with Drizzle and run through `@effect/sql-pg`, so they share the Effect client's transaction
+service: the journal opens each commit on a reserved connection, and every statement inside it lands
+there. The adapter passes the [conformance suites](../../packages/storage-conformance/README.md)
+every storage adapter runs. It is internal to this repository and not published to npm.
 
 ## Use
 
@@ -16,16 +16,17 @@ Gateway.layer().pipe(
 );
 ```
 
-The root `layer(options)` provides the storage contract, with its signal hubs, and the directory,
-leaving the database to the host. Its options are the [lock and timeout](#locks-and-timeouts)
-settings and `credentialKey`, the 32 bytes, as base64, that seal connections' credentials; without
-it the store keeps none and reports `Unavailable`. `PostgresDatabase.layer` takes the Effect
-client's pool configuration, such as `maxConnections` (ten by default), and applies the schema
-before returning; `PostgresDatabase.layerClient` connects the same pool without applying it, for
-tools that only read. `PostgresDatabase.make()` instead takes a `SqlClient.SqlClient` from the
-context and applies the schema through it, inside a transaction holding an advisory lock, so
-processes starting together on an empty database take turns. Keep the client's scope open while
-using the result; bindings, queries, and journal transactions all share it.
+The root `layer(options)` provides the storage contract, with its signal hubs, the directory, and
+the accounts, leaving the database, and the cryptography that issues human IDs, to the host. Its
+options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
+as base64, that seal connections' credentials; without it the store keeps none and reports
+`Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as
+`maxConnections` (ten by default), and applies the schema before returning;
+`PostgresDatabase.layerClient` connects the same pool without applying it, for tools that only read.
+`PostgresDatabase.make()` instead takes a `SqlClient.SqlClient` from the context and applies the
+schema through it, inside a transaction holding an advisory lock, so processes starting together on
+an empty database take turns. Keep the client's scope open while using the result; bindings,
+queries, and journal transactions all share it.
 
 ## Schema
 
@@ -35,8 +36,9 @@ channel binding's conversation, and what a harness's agent returned of its sessi
 its primary key with `workspace_id`, and each reference between tables carries the workspace, so a
 join that starts scoped stays scoped. Projection tables have no foreign keys to one another: each
 read model rebuilds alone, in any order, and core checks references when it publishes the facts they
-come from. The log's own tables keep theirs. Tagged unions become a discriminator column plus the
-columns each case needs, with a check constraint that they agree.
+come from. The log's own tables keep theirs. `accounts` alone spans workspaces: the host's people, a
+human ID for each lowercase address, which is unique. Tagged unions become a discriminator column
+plus the columns each case needs, with a check constraint that they agree.
 
 `drizzle/` holds one generated baseline for a fresh database, which `PostgresDatabase.make` applies
 once. There are no upgrade migrations, backfills, or legacy formats; see [Development](#development)
@@ -59,7 +61,7 @@ versions each log's commits apply; live commits write neither. See the
 
 ### Members, access, and groups
 
-Members keep the name they chose in a nullable `name` column, which the directory also returns.
+Members keep their name in a `name` column, which the directory also returns.
 Invitations store a required role ID, role permissions are a text array, and grant scopes have a
 column for each target kind, such as `target_connection_id`. `builtin_role_revisions` holds each
 workspace's built-in bundle revision, which an upsert only moves forward.

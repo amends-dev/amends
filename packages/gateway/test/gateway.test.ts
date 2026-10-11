@@ -129,6 +129,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
                 id: memberId,
                 workspaceId: boundWorkspaceId,
                 identity,
+                name: Member.Name.make(identity.id),
                 status: "active",
               })),
           list: unexpected(),
@@ -565,7 +566,13 @@ it.effect("one gateway resolves each caller's current membership and stops after
           Effect.sync(() => {
             seen.push(identity);
             return active
-              ? Option.some({ id: memberId, workspaceId, identity, status: "active" })
+              ? Option.some({
+                  id: memberId,
+                  workspaceId,
+                  identity,
+                  name: Member.Name.make(identity.id),
+                  status: "active",
+                })
               : Option.none();
           }),
       },
@@ -713,7 +720,13 @@ it.effect(
         findActive: (identity) =>
           Effect.sync(() => {
             lookups.push(identity);
-            return Option.some({ id: memberId, workspaceId, identity, status: "active" as const });
+            return Option.some({
+              id: memberId,
+              workspaceId,
+              identity,
+              name: Member.Name.make(identity.id),
+              status: "active" as const,
+            });
           }),
       });
       expect(yield* gateway.asMember(workspaceId, alice, Actor.Service)).toEqual({
@@ -739,7 +752,13 @@ it.effect("read models awaiting a rebuild are prepared first, then resolve membe
       findActive: (identity) =>
         Effect.sync(() =>
           rebuilt && identity.id === alice.id
-            ? Option.some({ id: memberId, workspaceId, identity, status: "active" as const })
+            ? Option.some({
+                id: memberId,
+                workspaceId,
+                identity,
+                name: Member.Name.make(identity.id),
+                status: "active" as const,
+              })
             : Option.none(),
         ),
       onBoot: () => {

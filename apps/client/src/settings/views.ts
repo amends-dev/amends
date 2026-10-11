@@ -106,6 +106,10 @@ export function useWorkspaceSettings(
   });
   const send = changes.send;
 
+  /** Each person's address by human ID, for a reader who manages invitations. */
+  const addresses = createMemo(
+    () => new Map((data()?.accounts ?? []).map((account) => [account.id as string, account.email])),
+  );
   const person = (member: Member.Record): SettingsPerson => ({
     id: member.id,
     name: memberName(member),
@@ -136,7 +140,7 @@ export function useWorkspaceSettings(
     return {
       detail: {
         ...person(entry.member),
-        signIn: entry.member.identity.id,
+        signIn: addresses().get(entry.member.identity.id),
         status: entry.member.status,
         role: roleName,
         access: current?.assignments.map(({ id, source, status }) => {
@@ -184,7 +188,7 @@ export function useWorkspaceSettings(
           member.status === filter() &&
           (words === "" ||
             member.name.toLowerCase().includes(words) ||
-            member.signIn.toLowerCase().includes(words)),
+            member.signIn?.includes(words) === true),
       );
   });
   const invitations = createMemo(() => {
@@ -197,7 +201,7 @@ export function useWorkspaceSettings(
         );
         return {
           id: invitation.details.id,
-          recipient: invitation.details.recipientId,
+          recipient: addresses().get(invitation.details.recipientId) ?? "Unknown address",
           role: role?.role.name ?? invitation.details.roleId,
           status,
           issuedAt: toDate(invitation.details.issuedAt),
@@ -421,7 +425,7 @@ export function useWorkspaceSettings(
         const recipient = invite().recipient.trim();
         const roleId = invite().roleId ?? inviteRoles()[0]?.id;
         if (recipient === "" || roleId === undefined) return;
-        if (intent?.recipientId !== recipient || intent.roleId !== roleId)
+        if (intent?.email !== recipient || intent.roleId !== roleId)
           intent = invitationIntent(recipient, roleId);
         send(intent, recipient);
       },
@@ -452,18 +456,23 @@ function connect(reads: SettingsReads, section: SettingsTab) {
   const invitations = useAtomValue(() =>
     reads.invitations(section === "members" && canReadInvitations()),
   );
+  const accounts = useAtomValue(() =>
+    reads.accounts(section === "members" && canReadInvitations()),
+  );
   return {
     // Keep the last complete view while reads refresh, so live updates never blank the page.
     data: createMemo<SettingsData | undefined>((previous) => {
       const view = AsyncResult.value(settings()),
         owner = AsyncResult.value(ownership()),
         people = AsyncResult.value(members()),
-        invites = AsyncResult.value(invitations());
+        invites = AsyncResult.value(invitations()),
+        addresses = AsyncResult.value(accounts());
       if (
         Option.isNone(view) ||
         Option.isNone(owner) ||
         Option.isNone(people) ||
-        Option.isNone(invites)
+        Option.isNone(invites) ||
+        Option.isNone(addresses)
       )
         return previous;
       return {
@@ -471,12 +480,17 @@ function connect(reads: SettingsReads, section: SettingsTab) {
         ownership: owner.value,
         members: people.value,
         invitations: invites.value,
+        accounts: addresses.value,
       };
     }),
     /** Why the latest read failed, once it settles. */
     failure: createMemo(
       () =>
-        settled(settings()) ?? settled(ownership()) ?? settled(members()) ?? settled(invitations()),
+        settled(settings()) ??
+        settled(ownership()) ??
+        settled(members()) ??
+        settled(invitations()) ??
+        settled(accounts()),
     ),
   };
 }

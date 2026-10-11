@@ -8,7 +8,7 @@ import {
   ToolIntegrations,
 } from "@amends-dev/connection";
 import { DeliveryJob, JobPruning, TurnJob } from "@amends-dev/cluster";
-import { Gateway, type WorkspaceDirectory } from "@amends-dev/gateway";
+import { type Accounts, Gateway, type WorkspaceDirectory } from "@amends-dev/gateway";
 import { Models } from "@amends-dev/harness-amends";
 import {
   PostgresClusterStorage,
@@ -29,8 +29,11 @@ import type { SqlClient } from "effect/sql";
 import { HarnessIntegrations } from "./harness-integrations.ts";
 import { SandboxIntegrations } from "./sandbox-integrations.ts";
 
-/** Gateway and directory owned by one host lifetime. */
-export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
+/** Gateway, directory, and accounts owned by one host lifetime. */
+export type HostLayer = Layer.Layer<
+  Gateway.Service | WorkspaceDirectory.Service | Accounts.Service,
+  unknown
+>;
 
 export interface Options {
   /** The most connections to open to the database, twenty by default. */
@@ -147,8 +150,8 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 };
 
 /**
- * The gateway and the workspace directory over one PostgreSQL database, through the storage
- * adapter, with the turn jobs that run agents' turns and the delivery jobs that carry messages to
+ * The gateway, the workspace directory, and the accounts over one PostgreSQL database, through
+ * the storage adapter, with the turn jobs that run agents' turns and the delivery jobs that carry messages to
  * channels, both on the integrations the host installs, and handled job requests pruned after
  * seven days. The HTTP server resolves bearer tokens before
  * entering the gateway.

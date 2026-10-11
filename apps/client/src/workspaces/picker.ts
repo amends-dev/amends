@@ -11,7 +11,7 @@ import { directoryQuery } from "../api/directory.ts";
 import { workspaceFailure } from "../api/failures.ts";
 import { useMutation } from "../api/mutation.ts";
 import { refreshResult } from "../api/refresh.ts";
-import { acceptInvitation, suggestedName } from "./api.ts";
+import { acceptInvitation, isMemberName, suggestedName } from "./api.ts";
 import { toDate } from "../conversations/time.ts";
 import { useApiClient, useSession } from "../provider.tsx";
 import { useDirectory, DirectoryState } from "../session/directory.tsx";
@@ -24,8 +24,8 @@ export interface WorkspacePickerController {
   readonly refreshFailed: Accessor<boolean>;
   readonly retry: () => void;
   readonly accepting: Accessor<PickerAccept | undefined>;
-  /** Join as `name`, or as the identity when it is blank. One attempt runs at a time. */
-  readonly accept: (invitationId: string, name?: string) => void;
+  /** Join as `name`. One attempt runs at a time. */
+  readonly accept: (invitationId: string, name: string) => void;
   /** A first name to offer when joining, from the identity. */
   readonly suggestedName: Accessor<string>;
 }
@@ -63,18 +63,19 @@ export function useWorkspacePicker(): WorkspacePickerController {
   const client = useApiClient();
   const reload = useMutation(() => refreshResult(directoryQuery(client)));
   /** Join, unless already joined, then reload the directory so the workspace shows. */
-  async function accept(invitationId: string, name?: string) {
+  async function accept(invitationId: string, name: string) {
     const invitation = invitations().find((entry) => entry.id === invitationId);
     if (!invitation || attempt()?.pending) return;
     const settle = (error: AcceptInvitationError | undefined, member: boolean) =>
       setAttempt({ invitationId, pending: false, error, joined: member });
+    const trimmed = name.trim();
+    if (!joined.has(invitationId) && !isMemberName(trimmed)) return settle("invalid-name", false);
     setAttempt({ invitationId, pending: true, error: undefined, joined: joined.has(invitationId) });
     if (!joined.has(invitationId)) {
-      const trimmed = name?.trim();
       const exit = await join.run({
         workspaceId: invitation.workspaceId,
         invitationId,
-        ...(trimmed ? { name: trimmed } : {}),
+        name: trimmed,
       });
       if (exit === undefined) return;
       if (Exit.isFailure(exit)) return settle(workspaceFailure(exit.cause), false);
@@ -101,7 +102,7 @@ export function useWorkspacePicker(): WorkspacePickerController {
     retry: directory.retry,
     accepting,
     accept: (invitationId, name) => void accept(invitationId, name),
-    suggestedName: () => suggestedName(session.session?.humanId),
+    suggestedName: () => suggestedName(session.session?.account.email),
   };
 }
 

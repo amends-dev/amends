@@ -49,7 +49,7 @@ export function useCreateWorkspace(): CreateWorkspaceController {
   const [state, setState] = createSignal<CreateWorkspaceState>(
     CreateWorkspaceState.Form({
       name: "",
-      memberName: suggestedName(session.session?.humanId),
+      memberName: suggestedName(session.session?.account.email),
       pending: false,
       error: undefined,
     }),
@@ -67,13 +67,12 @@ export function useCreateWorkspace(): CreateWorkspaceController {
       );
       return;
     }
-    // A name is optional; without one, people see the creator's identity.
     const memberName = value.memberName.trim();
-    if (memberName !== "" && !isMemberName(memberName)) {
+    if (!isMemberName(memberName)) {
       setState(CreateWorkspaceState.Form({ ...value, name, error: "invalid-member-name" }));
       return;
     }
-    if (intent?.name !== name || (intent.memberName ?? "") !== memberName)
+    if (intent?.name !== name || intent.memberName !== memberName)
       intent = { name, memberName, key: newWorkspaceRequestKey() };
     const submitting = CreateWorkspaceState.Form({
       ...value,

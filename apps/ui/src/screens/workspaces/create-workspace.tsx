@@ -102,6 +102,7 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
                       autocomplete="name"
                       maxLength={80}
                       disabled={props.pending}
+                      required
                     />
                   </Field.Root>
                   <Show

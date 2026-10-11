@@ -15,14 +15,15 @@ import { Effect } from "effect";
 /**
  * Test driver over the gateway: each function enters a workspace and runs one
  * core application operation for an asserted identity, the way a protocol
- * handler does, without going through HTTP.
+ * handler does, without going through HTTP. A person joins named as their human
+ * ID unless a test names them.
  */
-export const createWorkspace = (creator: Identity.HumanId, memberName?: Member.Name) =>
+export const createWorkspace = (
+  creator: Identity.HumanId,
+  memberName: Member.Name = Member.Name.make(creator),
+) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.createWorkspace(creator, {
-      name: "Test workspace",
-      ...(memberName === undefined ? {} : { memberName }),
-    }),
+    gateway.createWorkspace(creator, { name: "Test workspace", memberName }),
   );
 export const renameMember = (
   workspaceId: Workspace.Id,
@@ -90,14 +91,14 @@ export const acceptInvitation = (
   workspaceId: Workspace.Id,
   recipient: Identity.HumanId,
   invitationId: Invitation.Id,
-  name?: Member.Name,
+  name: Member.Name = Member.Name.make(recipient),
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
     Effect.scoped(
       gateway.inWorkspace(
         workspaceId,
         Effect.flatMap(InvitationService.Service, (invitationService) =>
-          invitationService.accept(invitationId, recipient, name === undefined ? {} : { name }),
+          invitationService.accept(invitationId, recipient, name),
         ),
       ),
     ),

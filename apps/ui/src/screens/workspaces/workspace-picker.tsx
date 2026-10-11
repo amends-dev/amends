@@ -37,6 +37,7 @@ export interface PickerInvitation {
 
 /** Why accepting failed, or `refresh-failed` when it joined but the list did not reload. */
 export type AcceptInvitationError =
+  | "invalid-name"
   | "changed"
   | "denied"
   | "gone"
@@ -64,7 +65,7 @@ export interface WorkspacePickerProps {
   readonly accept?: PickerAccept;
   /** The name Join suggests, such as one from the reader's email address. */
   readonly suggestedName?: string;
-  /** Join as `name`; empty shows the reader's identity instead. */
+  /** Join as `name`. */
   readonly onAccept: (id: string, name: string) => void;
   /** Opens a workspace in place of following its link. */
   readonly onOpen?: (id: string) => void;
@@ -74,6 +75,7 @@ export interface WorkspacePickerProps {
 }
 
 const acceptMessages: { readonly [Error in AcceptInvitationError]: string } = {
+  "invalid-name": "Use 1 to 80 characters, with no invisible ones.",
   changed: "This invitation changed while you were accepting it. Try again.",
   denied: "This invitation isn’t addressed to this address.",
   gone: "This invitation is no longer available.",
@@ -304,7 +306,11 @@ export function WorkspacePicker(props: WorkspacePickerProps) {
                 if (current && !attempt()?.pending) props.onAccept(current.id, memberName().trim());
               }}
             >
-              <Field.Root>
+              <Field.Root
+                error={
+                  attempt()?.error === "invalid-name" ? acceptMessages["invalid-name"] : undefined
+                }
+              >
                 <Field.Label>Your name</Field.Label>
                 <Input
                   value={memberName()}
@@ -314,9 +320,10 @@ export function WorkspacePicker(props: WorkspacePickerProps) {
                   maxLength={80}
                   disabled={attempt()?.pending || attempt()?.joined}
                   autofocus
+                  required
                 />
               </Field.Root>
-              <Show when={attempt()?.error}>
+              <Show when={attempt()?.error !== "invalid-name" && attempt()?.error}>
                 {(error) => <Field.Alert>{acceptMessages[error()]}</Field.Alert>}
               </Show>
             </form>

@@ -1,11 +1,17 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "4e2f7a3b-b022-42e6-a509-65a99669295e",
+  "id": "e7e466d8-ae2d-488c-873f-9ebd19aafc9f",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
   "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "accounts",
+      "entityType": "tables",
+      "schema": "public"
+    },
     {
       "isRlsEnabled": false,
       "name": "agents",
@@ -209,6 +215,32 @@
       "name": "workspaces",
       "entityType": "tables",
       "schema": "public"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "human_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "accounts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "email",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "accounts"
     },
     {
       "type": "text",
@@ -2371,7 +2403,7 @@
     {
       "type": "text",
       "typeSchema": null,
-      "notNull": false,
+      "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
@@ -6168,6 +6200,16 @@
     },
     {
       "columns": [
+        "human_id"
+      ],
+      "nameExplicit": false,
+      "name": "accounts_pkey",
+      "schema": "public",
+      "table": "accounts",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
         "workspace_id"
       ],
       "nameExplicit": false,
@@ -6185,6 +6227,17 @@
       "schema": "public",
       "table": "workspaces",
       "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "email"
+      ],
+      "nullsNotDistinct": false,
+      "name": "accounts_email_key",
+      "schema": "public",
+      "table": "accounts",
+      "entityType": "uniques"
     },
     {
       "value": "(\"source_kind\" = 'Role' AND \"role_id\" IS NOT NULL AND \"permission\" IS NULL) OR (\"source_kind\" = 'Direct' AND \"permission\" IS NOT NULL AND \"role_id\" IS NULL)",

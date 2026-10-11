@@ -29,6 +29,7 @@ export const reads = (harness: Harness) => {
               // Creating the workspace also completes boot; this test exercises warm requests.
               const workspace = yield* gateway.createWorkspace(alice.id, {
                 name: "Read concurrency",
+                memberName: "alice",
               });
               const bound = yield* boundTo(workspace.id);
               const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });

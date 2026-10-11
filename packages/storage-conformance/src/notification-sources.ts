@@ -137,6 +137,7 @@ export const notificationSources = (harness: Harness) => {
                   workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: identityFor(memberId),
+                  name: Member.Name.make(memberId),
                 });
             }),
           ),

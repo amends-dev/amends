@@ -14,6 +14,7 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const signIn = yield* SignIn.Service;
     return handlers.handleAll({
+      methods: () => Effect.succeed(signIn.methods),
       start: ({ payload }) => signIn.start(payload.email),
       complete: ({ payload }) => signIn.complete(payload.email, payload.code),
     });

@@ -13,6 +13,9 @@ it.effect.each(["make", "layer"] as const)(
         expect(yield* sessionTokens.resolve(Redacted.make("alice"))).toEqual(
           Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") }),
         );
+        // Development tokens cannot be revoked: signing out forgets one in the client alone.
+        yield* sessionTokens.revoke(Redacted.make("alice"));
+        expect(yield* sessionTokens.resolve(Redacted.make("alice"))).toMatchObject({ id: "alice" });
         expect(yield* Effect.flip(sessionTokens.resolve(Redacted.make("")))).toMatchObject({
           _tag: "SessionTokens.Rejected",
           reason: "malformed",

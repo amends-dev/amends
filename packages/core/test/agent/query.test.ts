@@ -256,6 +256,7 @@ describe("what an agent runs a turn on", () => {
         id: Member.Id.make("member-person"),
         workspaceId,
         identity: { _tag: "Human", id: Identity.HumanId.make("alice") },
+        name: Member.Name.make("alice"),
         status: "active",
       };
       const agentQuery = yield* queryIn({

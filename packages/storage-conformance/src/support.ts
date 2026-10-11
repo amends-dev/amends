@@ -37,7 +37,7 @@ import {
 import {
   type Invitation,
   InvitationStore,
-  type Member,
+  Member,
   MemberFacts,
   MemberStore,
   Workspace,
@@ -416,9 +416,10 @@ export const make = (harness: Harness) => {
     gateway,
     /** Initialize the bound workspace for its creator, as the gateway's bootstrap does. */
     initialized: (bound: Bound, creator = alice.id) =>
-      WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
-        Effect.provide(core(bound)),
-      ),
+      WorkspaceInitialization.initialize(creator, {
+        name: "Test workspace",
+        memberName: Member.Name.make(creator),
+      }).pipe(Effect.provide(core(bound))),
     /** Add members, giving some the viewer role, as invitation acceptance would. */
     seed: (
       bound: Bound,
@@ -433,6 +434,7 @@ export const make = (harness: Harness) => {
                 workspaceId: bound.store.workspaceId,
                 memberId: member.memberId,
                 identity: member.identity,
+                name: Member.Name.make(member.identity.id),
               });
             for (const viewer of viewers)
               yield* journal.publish(AssignmentFacts.Created, {

@@ -168,6 +168,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                     workspaceId,
                     memberId,
                     identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+                    name: Member.Name.make(memberId),
                   }),
                 ),
               )

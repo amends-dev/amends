@@ -48,9 +48,9 @@ export const layer = (host: LocalHost.HostLayer, port: number) =>
     Layer.provide(
       HttpRouter.serve(layerRoutes).pipe(
         Layer.provide(
-          Layer.mergeAll(
-            host,
-            DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer)),
+          DevelopmentAuthentication.layer().pipe(
+            Layer.provide(BunCrypto.layer),
+            Layer.provideMerge(host),
           ),
         ),
         Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port, maxRequestBodySize })),

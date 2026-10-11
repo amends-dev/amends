@@ -279,8 +279,8 @@ export function MemberSettings(props: MemberSettingsProps) {
 
 /** A member as their details show them. */
 export interface MemberDetail extends RosterMember {
-  /** What they sign in as, such as an email address. */
-  readonly signIn: string;
+  /** The address they sign in with, when the reader may see it. */
+  readonly signIn?: string;
   /** Their access, when the reader may read it. */
   readonly access?: ReadonlyArray<{
     readonly id: string;
@@ -345,7 +345,9 @@ export function MemberDetails(props: MemberDetailsProps) {
                 />
                 <div class={s.personText}>
                   <h3 class={s.identityName}>{displayName(props.member)}</h3>
-                  <span class={s.identityDetail}>{props.member.signIn}</span>
+                  <Show when={props.member.signIn}>
+                    {(address) => <span class={s.identityDetail}>{address()}</span>}
+                  </Show>
                 </div>
               </div>
               <p class={s.note}>{summary()}</p>

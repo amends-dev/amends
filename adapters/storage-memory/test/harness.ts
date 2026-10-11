@@ -14,7 +14,9 @@ export const harness: Harness = {
         const database = yield* MemoryDatabase.make();
         return yield* use({
           connect: () =>
-            Layer.build(layer).pipe(Effect.provideService(MemoryDatabase.Service, database)),
+            Layer.build(layer.pipe(Layer.provide(BunCrypto.layer))).pipe(
+              Effect.provideService(MemoryDatabase.Service, database),
+            ),
           discardProjections: Effect.sync(() => {
             for (const space of database.spaces.values())
               for (const name of MemoryDatabase.projections) space.records[name].clear();
@@ -34,7 +36,7 @@ export const harness: Harness = {
               for (const name of MemoryDatabase.projections) total += space.records[name].size;
             }
             for (const log of database.sessionLogs.values()) total += log.length;
-            return total;
+            return total + database.accounts.size;
           }),
         });
       }),

@@ -18,21 +18,30 @@ client app's does through Effect's `AtomHttpApi` and the local host's tests' thr
 `HttpApiClient`, and a server registers handlers for each group with `HttpApiBuilder`.
 
 `Authentication` is bearer middleware that provides `Principal`, the authenticated human or agent
-identity. A server implements it by verifying the credential, and a client by attaching one with
-`HttpApiMiddleware.layerClient`. Endpoints only a person may call fail with `HumanRequired` when the
+identity, and `Credential`, the token the request presented. A server implements it by verifying
+the credential, and a client by attaching one with `HttpApiMiddleware.layerClient`. Endpoints only a person may call fail with `HumanRequired` when the
 principal is an agent, and a request without a credential the host accepts fails with
 `Unauthorized`. The contract does not define how credentials are issued; the `session` group asks
 the host's sign-in for one.
 
 ## Endpoints
 
-- `session`: `POST /session/email` requests a one-time code for an address and `POST /session/code`
-  exchanges it for a session. Neither needs a credential.
-- `me`: `GET /me/workspaces` lists the principal's memberships and pending invitations.
-- `workspaces`: `POST /workspaces` accepts `Workspace.CreateInput` (`{ "name": "Design studio" }`)
-  and creates a workspace owned by the authenticated human. The name is required, non-empty, and
-  trimmed; the returned `Workspace.Record` includes it. An optional `memberName` names the creator's
-  membership. `GET /workspaces/:workspaceId/settings` returns metadata and action/role flags;
+- `session`: `GET /session/methods` lists the ways the host signs people in, `SignIn.Methods`:
+  whether it sends email codes, and its identity providers. `POST /session/email` requests a
+  one-time code for an address and `POST /session/code` exchanges it for a `SignIn.Session`, a token
+  and the account it signs in as. None needs a credential.
+- `me`: `GET /me` returns the principal's `Accounts.Account`, its human ID and address; an agent
+  gets 403 `HumanRequired`, and a session no account holds 401. `GET /me/workspaces` lists the
+  principal's memberships and pending invitations. `DELETE /me/session` signs out: the host stops
+  honoring the presented token.
+- `accounts`: `GET /workspaces/:workspaceId/accounts` returns the accounts of the workspace's human
+  members and of its invitations' recipients, to someone who may manage invitations, so settings can
+  show addresses beside names.
+- `workspaces`: `POST /workspaces` accepts `Workspace.CreateInput`
+  (`{ "name": "Design studio", "memberName": "Alice" }`) and creates a workspace owned by the
+  authenticated human, with the creator's membership named `memberName`. Both names are required,
+  non-empty, and trimmed; the returned `Workspace.Record` includes the workspace's.
+  `GET /workspaces/:workspaceId/settings` returns metadata and action/role flags;
   `GET …/member-management` adds access and removal flags to readable members. `PUT …/name` accepts
   `{ name, expectedName }` and returns the renamed workspace (409 `WorkspaceSettings.Changed` when
   the previous name no longer matches). `GET /workspaces/:workspaceId/ownership` returns current
@@ -42,8 +51,8 @@ the host's sign-in for one.
   authority or an ineligible recipient returns 409; missing recipients return 404.
 - `members`: `GET /workspaces/:workspaceId/members` lists readable memberships; `GET` and
   `DELETE /workspaces/:workspaceId/members/:memberId` read or remove one. `PUT …/members/me/name`
-  accepts `{ name }` and returns the caller's own renamed member. Member records carry an optional
-  `name` (`Member.Name`, 1 to 80 trimmed characters); a name chosen now is `Member.NewName`, which
+  accepts `{ name }` and returns the caller's own renamed member. Member records carry a `name`
+  (`Member.Name`, 1 to 80 trimmed characters); a name chosen now is `Member.NewName`, which
   also refuses control, direction, and invisible characters. Group and workspace names chosen now
   are `Group.NewName` and `Workspace.NewName`, the same rule, while records keep the lenient `Name`.
 - `assignments`: `GET …/permissions` lists the caller's own workspace-wide permission names, such as
@@ -52,11 +61,12 @@ the host's sign-in for one.
   `PUT …/assignments` atomically replaces workspace roles with an expected assignment-ID set;
   `DELETE …/members/:memberId/assignments/:assignmentId` revokes access.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations; `POST` to the same
-  path issues one with required `recipientId`, `roleId`, and `expiresAt`.
+  path issues one to an `email`, with required `roleId` and `expiresAt`. The host resolves the
+  address to its account, creating one the first time, and the invitation records that account's
+  human ID as `recipientId`.
   `POST …/:invitationId/accept` and `POST …/:invitationId/revoke` change state; accepting in a
-  workspace that was never created returns 404 with `Gateway.WorkspaceNotFound`. Acceptance takes no
-  body or `{ name? }`, the new member's name; the payload lists `Schema.Null` first so a bodiless
-  request still decodes, and generated clients pass `payload: {}`.
+  workspace that was never created returns 404 with `Gateway.WorkspaceNotFound`. Acceptance takes
+  `{ name }`, the new member's name.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
 - `connections`: connections to the integrations this host installs; see

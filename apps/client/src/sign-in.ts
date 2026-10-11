@@ -1,7 +1,7 @@
 import type { SignInCodeError, SignInEmailError } from "@amends-dev/ui/screens/sign-in";
-import { Cause, Data, Exit, Schema } from "effect";
+import { Cause, Data, Exit, Option, Schema } from "effect";
 import { createSignal, type Accessor } from "solid-js";
-import { SignIn } from "./api/contracts.ts";
+import { Accounts, SignIn } from "./api/contracts.ts";
 import { useMutation } from "./api/mutation.ts";
 import { useSession } from "./provider.tsx";
 
@@ -36,7 +36,7 @@ export interface SignInController {
   readonly changeEmail: () => void;
 }
 
-const isEmail = Schema.is(SignIn.Email);
+const decodeEmail = Schema.decodeUnknownOption(Accounts.Email);
 const isCode = Schema.is(SignIn.Code);
 const isRejected = Schema.is(SignIn.Rejected);
 /** Why the host refused a code, when it did. */
@@ -47,8 +47,8 @@ const rejectionOf = (cause: Cause.Cause<unknown>): SignIn.Rejected["reason"] | u
 };
 
 /**
- * Sign in by email: send a code, then check it. Values go as typed, neither trimmed nor
- * case-folded, so a code keeps its leading zeros. An action that does not fit the current step, or
+ * Sign in by email: send a code, then check it. An address goes trimmed and lowercased, as
+ * accounts hold it; a code goes as typed, keeping its leading zeros. An action that does not fit the current step, or
  * comes while one runs, does nothing; a failure keeps what was typed for another try.
  */
 export function useSignIn(): SignInController {
@@ -70,16 +70,17 @@ export function useSignIn(): SignInController {
   async function requestCode(draft?: string) {
     const step = idle("Email");
     if (!step) return;
-    const email = draft ?? step.email;
-    if (!isEmail(email)) {
-      setState(SignInState.Email({ email, pending: false, error: "invalid-email" }));
+    const typed = draft ?? step.email;
+    const email = decodeEmail(typed);
+    if (Option.isNone(email)) {
+      setState(SignInState.Email({ email: typed, pending: false, error: "invalid-email" }));
       return;
     }
-    setState(SignInState.Email({ email, pending: true, error: undefined }));
-    const exit = await sendCode.run(email);
+    setState(SignInState.Email({ email: typed, pending: true, error: undefined }));
+    const exit = await sendCode.run(email.value);
     if (exit === undefined) return;
-    if (Exit.isSuccess(exit)) askForCode(email, false);
-    else setState(SignInState.Email({ email, pending: false, error: "request-failed" }));
+    if (Exit.isSuccess(exit)) askForCode(email.value, false);
+    else setState(SignInState.Email({ email: typed, pending: false, error: "request-failed" }));
   }
   async function verifyCode(draft?: string) {
     const step = idle("Code");

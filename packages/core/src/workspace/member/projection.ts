@@ -13,7 +13,7 @@ export const definition = Projection.make("workspace.members", { version: 1 })
         id: payload.memberId,
         workspaceId: payload.workspaceId,
         identity: payload.identity,
-        ...(payload.name === undefined ? {} : { name: payload.name }),
+        name: payload.name,
         status: "active",
       });
     }),

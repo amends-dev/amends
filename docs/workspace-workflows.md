@@ -10,7 +10,7 @@ The examples assume the local host on port 8787 with its development bearer iden
 `POST /workspaces` requires a JSON body with a `name` of 1 to 80 characters without surrounding space, control characters, direction overrides or isolates, or invisible spaces. It creates
 a workspace owned by the caller and returns `id`, `name`, `createdBy`, and
 `ownerMemberId`. Missing, blank, untrimmed, long, or hidden-character names return HTTP 400 without creating
-a workspace. Names are display labels; IDs remain the stable routing identity. An optional
+a workspace. Names are display labels; IDs remain the stable routing identity. The required
 `memberName` says what people in the workspace call the creator; see
 [member names](#member-names).
 
@@ -59,12 +59,11 @@ ID with the new invitation's role, and inherits no group admissions.
 
 ### Member names
 
-Each workspace member may have a `name`: what people in that workspace call them. It belongs to
+Each workspace member has a `name`: what people in that workspace call them. It belongs to
 the membership, not the identity, so the same person can go by different names in different
-workspaces, and a rejoined membership starts without one. Names chosen now are 1 to 80 characters without surrounding space, control characters, direction overrides or isolates, or invisible spaces, since each
+workspaces, and a rejoined membership is named again. Names chosen now are 1 to 80 characters without surrounding space, control characters, direction overrides or isolates, or invisible spaces, since each
 can make one name read as another; invalid names return HTTP 400. Names recorded before stay
-readable. Joiners stay allowed, for emoji and scripts that need them. A member without a name has no `name`
-field, and the apps show their identity instead.
+readable. Joiners stay allowed, for emoji and scripts that need them.
 
 A member names themselves when creating the workspace (`memberName`), when accepting an
 invitation (`name`), or later with `PUT /workspaces/:id/members/me/name`:
@@ -80,20 +79,24 @@ it returns their member record. The same name again records nothing. Each name i
 
 ## Invitations
 
-`POST /workspaces/:id/invitations` issues an invitation to an address with an
-ISO expiry in the future and a required built-in role:
+`POST /workspaces/:id/invitations` issues an invitation to an email address with an
+ISO expiry in the future and a required built-in role. The host resolves the address to its
+account, creating one with a new human ID the first time the address comes up, and the invitation
+names that human ID as its `recipientId`; the person signing in with the address later signs in as
+that account. With the local host's development tokens, the recipient's token is that human ID:
 
 ```bash
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
-  -d '{"recipientId":"bob","expiresAt":"<expiry-ISO>","roleId":"builtin:member"}' \
+  -d '{"email":"bob@example.com","expiresAt":"<expiry-ISO>","roleId":"builtin:member"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations
-curl -X POST -H 'Authorization: Bearer bob' http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
-curl -X POST -H 'Authorization: Bearer bob' -H 'content-type: application/json' \
+curl -X POST -H 'Authorization: Bearer <recipient-id>' -H 'content-type: application/json' \
   -d '{"name":"Bob Chen"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
 ```
 
-Acceptance takes no body, or an optional `name` for the new member.
+Acceptance takes the new member's `name`. `GET /workspaces/:id/accounts` returns the addresses
+behind the workspace's human members and invitations to whoever may list invitations, which is
+how settings show them; nobody else in the workspace sees an address.
 
 The response carries the invitation ID under `details.id` and the selected role
 under `details.roleId`. Expiry must follow issuance; acceptance at the exact
@@ -109,7 +112,8 @@ inviter's active membership, permissions, and current authority to delegate the
 referenced role, then commits membership, a role assignment, acceptance, and the new member's
 admission to the workspace's [general group](group-workflows.md#the-general-group) together.
 The role's current stored permissions apply; they are not copied into direct grants.
-Invitations use stable human IDs; email delivery is outside this workflow.
+Invitations record human IDs, and no email is sent: the recipient finds the invitation after
+signing in with the address.
 
 Already-active members cannot be invited or accept a second invitation. Multiple
 pending invitations may exist, but only one can establish an active membership.

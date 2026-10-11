@@ -79,6 +79,7 @@ export const threadStarts = (harness: Harness) => {
                   workspaceId,
                   memberId,
                   identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+                  name: Member.Name.make(memberId),
                 }),
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
@@ -386,6 +387,7 @@ export const threadStarts = (harness: Harness) => {
                         workspaceId,
                         memberId,
                         identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+                        name: Member.Name.make(memberId),
                       }),
                     ),
                   ),
@@ -469,6 +471,7 @@ export const threadStarts = (harness: Harness) => {
                         workspaceId,
                         memberId,
                         identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
+                        name: Member.Name.make(memberId),
                       }),
                     ),
                   ),

@@ -68,11 +68,13 @@ export const groups = (harness: Harness) => {
               workspaceId,
               memberId,
               identity: memberIdentity,
+              name: Member.Name.make(memberIdentity.id),
             });
             yield* journal.publish(MemberFacts.Added, {
               workspaceId,
               memberId: agentId,
               identity: { _tag: "Agent", id: Identity.AgentId.make("group-agent") },
+              name: Member.Name.make("group-agent"),
             });
           }),
         );

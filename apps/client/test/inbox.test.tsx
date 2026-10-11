@@ -17,12 +17,21 @@ import { eventStream } from "./event-stream.ts";
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
+const session = Schema.decodeSync(Session)({
+  token: "alice",
+  account: { id: "alice", email: "alice@example.com" },
+});
 const store: SessionStore = { read: () => session, write: () => {}, subscribe: () => () => {} };
 const at = (minute: number) => new Date(Date.UTC(2026, 8, 25, 12, minute)).toISOString();
 
 const members = [
-  { id: "owner", workspaceId: "one", identity: { _tag: "Human", id: "alice" }, status: "active" },
+  {
+    id: "owner",
+    workspaceId: "one",
+    identity: { _tag: "Human", id: "alice" },
+    name: "alice",
+    status: "active",
+  },
   {
     id: "ada",
     workspaceId: "one",

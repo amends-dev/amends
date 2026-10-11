@@ -22,6 +22,7 @@ const listing = (name: string) => ({
         id: "owner",
         workspaceId: "one",
         identity: { _tag: "Human", id: "alice" },
+        name: "alice",
         status: "active",
       },
       people: 1,
@@ -55,7 +56,11 @@ it("retains the shell and an open account menu through directory refresh and rec
     <Application
       apiBaseUrl="https://host.test"
       sessionStore={{
-        read: () => Schema.decodeSync(Session)({ token: "alice", identity: "alice" }),
+        read: () =>
+          Schema.decodeSync(Session)({
+            token: "alice",
+            account: { id: "alice", email: "alice@example.com" },
+          }),
         write: () => {},
         subscribe: () => () => {},
       }}

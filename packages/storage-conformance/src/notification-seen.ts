@@ -118,6 +118,7 @@ export const notificationSeen = (harness: Harness) => {
                 workspaceId,
                 memberId: actor.memberId,
                 identity: actor.identity,
+                name: Member.Name.make(actor.identity.id),
               }),
             ).pipe(
               Effect.andThen(

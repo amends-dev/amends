@@ -1,6 +1,7 @@
 import { Api } from "@amends-dev/api-http";
 import { Layer } from "effect";
 import { HttpApiBuilder, HttpApiScalar } from "effect/http-api";
+import { AccountsHandlers } from "./accounts.ts";
 import { BearerAuthentication } from "./authentication.ts";
 import { InvitationsHandlers } from "./invitations.ts";
 import { AssignmentsHandlers } from "./assignments.ts";
@@ -26,6 +27,7 @@ import { TurnsHandlers } from "./turns.ts";
 export const layerHandlers = Layer.mergeAll(
   SessionHandlers.layer,
   MeHandlers.layer,
+  AccountsHandlers.layer,
   WorkspacesHandlers.layer,
   MembersHandlers.layer,
   InvitationsHandlers.layer,
@@ -43,8 +45,8 @@ export const layerHandlers = Layer.mergeAll(
 
 /**
  * The API routes and its OpenAPI document. Hosts provide Gateway.Service,
- * SignIn.Service, SessionTokens.Service, WorkspaceDirectory.Service, and their
- * platform's HTTP services, then serve this through HttpRouter.serve or
+ * Accounts.Service, SignIn.Service, SessionTokens.Service, WorkspaceDirectory.Service,
+ * and their platform's HTTP services, then serve this through HttpRouter.serve or
  * HttpRouter.toWebHandler.
  *
  * @category layers

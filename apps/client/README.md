@@ -86,15 +86,17 @@ any request.
 It reads the stored credential and makes an API client for it, which sends its token, and an atom
 registry. Signing in or out remounts everything under the provider with a new client and
 registry, which interrupts the old credential's requests and discards what it read. That remount
-is the only guard: no hook checks the session. `useSession()` gives the credential, `signIn`,
+is the only guard: no hook checks the session. `useSession()` gives the credential, a token and
+the account it signs in as, with the address the apps show and suggest names from; `signIn`,
 `signOut`, and `signedOut`, which holds once the credential was cleared by signing out, here or in
 another window, rather than rejected, so the apps send the next person to sign-in afresh.
 
 A request the host answers with `401` signs the credential out in the API client, so operations
 never handle it. The sign-out clears storage only while storage still holds the rejected
-credential; a newer one another window stored is adopted instead. Signing out does not revoke the
-token on the server; the local host uses
-[development authentication](../../hosts/local/README.md#development-authentication).
+credential; a newer one another window stored is adopted instead. Signing out clears the credential
+at once and asks the host to revoke the token with `DELETE /me/session`, apart from the replaced
+client; the local host's [development tokens](../../hosts/local/README.md#development-authentication)
+cannot be revoked.
 
 `createBrowserSessionStore(apiBaseUrl)` keeps the credential in local storage keyed by API URL,
 discards malformed records, follows other windows' changes, and falls back to memory when storage

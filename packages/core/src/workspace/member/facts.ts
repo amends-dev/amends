@@ -15,8 +15,8 @@ export const Added = Fact.make("workspace.member.added", {
     memberId: Member.Id,
     workspaceId: Workspace.Id,
     identity: Identity.MemberReference,
-    /** What the member chose to be called on joining; later facts may rename them. */
-    name: Schema.optionalKey(Member.Name),
+    /** What the member is called on joining; later facts may rename them. */
+    name: Member.Name,
   }),
   occurrence: (payload) => [payload.memberId],
 });

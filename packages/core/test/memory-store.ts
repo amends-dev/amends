@@ -83,16 +83,13 @@ const cloneReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
 const cloneMember = (
   member: Member.Record,
   changes: { readonly name?: Member.Name; readonly status?: Member.Status } = {},
-): Member.Record => {
-  const name = changes.name ?? member.name;
-  return {
-    id: member.id,
-    workspaceId: member.workspaceId,
-    identity: { ...member.identity },
-    ...(name === undefined ? {} : { name }),
-    status: changes.status ?? member.status,
-  };
-};
+): Member.Record => ({
+  id: member.id,
+  workspaceId: member.workspaceId,
+  identity: { ...member.identity },
+  name: changes.name ?? member.name,
+  status: changes.status ?? member.status,
+});
 const cloneRole = (role: Role.Record): Role.Record => ({
   id: role.id,
   workspaceId: role.workspaceId,

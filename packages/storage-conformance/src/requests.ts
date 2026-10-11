@@ -248,7 +248,11 @@ export const requests = (harness: Harness) => {
           const host = yield* storage.connect();
           const create = (name: string, creator = alice.id) =>
             Effect.flatMap(Gateway.Service, (gateway) =>
-              gateway.createWorkspace(creator, { name }, { requestKey: key }),
+              gateway.createWorkspace(
+                creator,
+                { name, memberName: Member.Name.make(creator) },
+                { requestKey: key },
+              ),
             ).pipe(Effect.provide(gateway(host)));
           const first = yield* create("Studio");
           expect(yield* create("Studio")).toEqual(first);
@@ -260,7 +264,11 @@ export const requests = (harness: Harness) => {
           const elsewhere = yield* storage.connect();
           expect(
             yield* Effect.flatMap(Gateway.Service, (gateway) =>
-              gateway.createWorkspace(alice.id, { name: "Studio" }, { requestKey: key }),
+              gateway.createWorkspace(
+                alice.id,
+                { name: "Studio", memberName: "alice" },
+                { requestKey: key },
+              ),
             ).pipe(Effect.provide(gateway(elsewhere))),
           ).toEqual(first);
         }),

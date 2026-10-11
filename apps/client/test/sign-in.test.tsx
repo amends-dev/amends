@@ -18,7 +18,8 @@ const json = (body: unknown, status = 200) =>
     headers: { "content-type": "application/json" },
   });
 const accepted = () => new Response(null, { status: 202 });
-const session = (token: string) => Schema.decodeSync(Session)({ token, identity: token });
+const session = (token: string) =>
+  Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } });
 
 function network() {
   const calls: Array<{
@@ -115,7 +116,7 @@ it("starts at the email step without requests, and ignores code actions there", 
   fixture.controller.resendCode();
   expect(http.fetch).not.toHaveBeenCalled();
 });
-it.each(["", "alice", "alice@local", " alice@example.com", "alice@example.com "])(
+it.each(["", "alice", "alice@local", "alice @example.com"])(
   "validates email %s against the shared schema before HTTP",
   (email) => {
     const http = network(),
@@ -132,23 +133,23 @@ it.each(["", "alice", "alice@local", " alice@example.com", "alice@example.com "]
     expect(controller.state()).toMatchObject({ email: "Alice@example.com", error: undefined });
   },
 );
-it("uses the typed API, preserves leading zeros, and installs a decoded session through the existing scope", async () => {
+it("uses the typed API, sends the address as accounts hold it, preserves leading zeros, and installs a decoded session through the existing scope", async () => {
   const http = network(),
     fixture = mount(http.fetch),
     guest = fixture.controller;
-  guest.setEmail("Alice@example.com");
+  guest.setEmail(" Alice@example.com");
   guest.requestCode();
   expect(guest.state()).toMatchObject({ _tag: "Email", pending: true });
   await waitFor(() => expect(http.calls).toHaveLength(1));
   expect(http.at(0).request.method).toBe("POST");
   expect(http.at(0).request.url).toBe("https://host.test/api/session/email");
   expect(http.at(0).request.headers.has("authorization")).toBe(false);
-  expect(await http.at(0).request.json()).toEqual({ email: "Alice@example.com" });
+  expect(await http.at(0).request.json()).toEqual({ email: "alice@example.com" });
   http.at(0).resolve(accepted());
   await waitFor(() =>
     expect(guest.state()).toMatchObject({
       _tag: "Code",
-      email: "Alice@example.com",
+      email: "alice@example.com",
       code: "",
       pending: undefined,
     }),
@@ -157,10 +158,15 @@ it("uses the typed API, preserves leading zeros, and installs a decoded session 
   guest.verifyCode();
   await waitFor(() => expect(http.calls).toHaveLength(2));
   expect(http.at(1).request.url).toBe("https://host.test/api/session/code");
-  expect(await http.at(1).request.json()).toEqual({ email: "Alice@example.com", code: "001234" });
-  http.at(1).resolve(json({ token: "credential", identity: "human" }));
+  expect(await http.at(1).request.json()).toEqual({ email: "alice@example.com", code: "001234" });
+  http
+    .at(1)
+    .resolve(json({ token: "credential", account: { id: "human", email: "human@example.com" } }));
   await waitFor(() =>
-    expect(fixture.store.read()).toEqual({ token: "credential", humanId: "human" }),
+    expect(fixture.store.read()).toEqual({
+      token: "credential",
+      account: { id: "human", email: "human@example.com" },
+    }),
   );
   expect(fixture.writes).toHaveBeenCalledOnce();
   // The credential remounted the app: a new flow starts, and the old one is disposed.
@@ -265,7 +271,9 @@ it.each(["mismatch", "expired", "unknown"] as const)(
     expect(controller.state()).toMatchObject({ error: undefined });
     controller.verifyCode();
     await waitFor(() => expect(http.calls).toHaveLength(3));
-    http.at(2).resolve(json({ token: "valid", identity: "alice" }));
+    http
+      .at(2)
+      .resolve(json({ token: "valid", account: { id: "alice", email: "alice@example.com" } }));
     await waitFor(() => expect(fixture.store.read()?.token).toBe("valid"));
   },
 );
@@ -323,7 +331,7 @@ it.each(["wrong-fields", "empty-token", "invalid-json", "unknown-rejection"] as 
       kind === "wrong-fields"
         ? json({ token: "bad", humanId: "alice" })
         : kind === "empty-token"
-          ? json({ token: "", identity: "alice" })
+          ? json({ token: "", account: { id: "alice", email: "alice@example.com" } })
           : kind === "unknown-rejection"
             ? json({ _tag: "SignIn.Rejected", reason: "not-in-contract" }, 403)
             : new Response("{", { headers: { "content-type": "application/json" } });
@@ -383,7 +391,11 @@ it.each(["verifying", "resending"] as const)(
     await waitFor(() => expect(http.calls).toHaveLength(3));
     http
       .at(1)
-      .resolve(action === "verifying" ? json({ token: "stale", identity: "old" }) : accepted());
+      .resolve(
+        action === "verifying"
+          ? json({ token: "stale", account: { id: "old", email: "old@example.com" } })
+          : accepted(),
+      );
     http.at(2).resolve(accepted());
     await waitFor(() =>
       expect(controller.state()).toMatchObject({
@@ -414,7 +426,7 @@ it("cancels a disposed form inside a live credential scope and ignores its retai
   fixture.show();
   fixture.controller.requestCode("new@example.com");
   await waitFor(() => expect(http.calls).toHaveLength(3));
-  http.at(1).resolve(json({ token: "stale", identity: "old" }));
+  http.at(1).resolve(json({ token: "stale", account: { id: "old", email: "old@example.com" } }));
   http.at(2).resolve(accepted());
   await waitFor(() =>
     expect(fixture.controller.state()).toMatchObject({ _tag: "Code", email: "new@example.com" }),
@@ -434,7 +446,7 @@ it("cancels requests on credential replacement and cannot overwrite a newer sess
   fixture.changeSession(session("new-session"));
   await waitFor(() => expect(http.at(1).request.signal.aborted).toBe(true));
   expect(fixture.controller).not.toBe(old);
-  http.at(1).resolve(json({ token: "stale", identity: "old" }));
+  http.at(1).resolve(json({ token: "stale", account: { id: "old", email: "old@example.com" } }));
   old.changeEmail();
   old.requestCode("ignored@example.com");
   fixture.view.unmount();

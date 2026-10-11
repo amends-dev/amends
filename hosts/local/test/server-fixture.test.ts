@@ -28,8 +28,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           url,
           async (call) => {
             expect(
-              (await call("fixture-owner", "POST", "/workspaces", { name: "Test workspace" }))
-                .status,
+              (
+                await call("fixture-owner", "POST", "/workspaces", {
+                  name: "Test workspace",
+                  memberName: "fixture-owner",
+                })
+              ).status,
             ).toBe(201);
           },
           { env: { AMENDS_DATABASE_URL: unreachable, AMENDS_PORT: "-1" } },

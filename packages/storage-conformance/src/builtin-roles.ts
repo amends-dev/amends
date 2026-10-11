@@ -88,6 +88,7 @@ export const builtinRoles = (harness: Harness) => {
             workspaceId,
             memberId: ownerMemberId,
             identity: alice,
+            name: Member.Name.make(alice.id),
           });
           const [viewer] = current;
           const [, , owner] = BuiltinRoles.make(workspaceId, older);

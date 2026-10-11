@@ -60,6 +60,7 @@ const membership = (actor: Actor.Value) =>
     id: actor.memberId,
     workspaceId: actor.workspaceId,
     identity: actor.identity,
+    name: Member.Name.make(actor.identity.id),
     status: "active",
   });
 const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });

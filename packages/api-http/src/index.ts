@@ -1,9 +1,10 @@
+export { AccountsGroup } from "./accounts.ts";
 export { AgentsGroup } from "./agents.ts";
 export { Api } from "./api.ts";
 export { ChangeFeedGroup } from "./change-feed.ts";
 export { ChannelEventsGroup, ChannelsGroup } from "./channels.ts";
 export { ConnectionsGroup } from "./connections.ts";
-export { Authentication, Principal, Unauthorized } from "./authentication.ts";
+export { Authentication, Credential, Principal, Unauthorized } from "./authentication.ts";
 export { ApiErrors } from "./errors.ts";
 export { GroupsGroup } from "./groups.ts";
 export { InvitationsGroup } from "./invitations.ts";

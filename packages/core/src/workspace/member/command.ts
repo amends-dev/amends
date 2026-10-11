@@ -18,8 +18,8 @@ export type Error = AssignmentCommand.Error | GroupStore.Failure;
 export interface NewMember {
   readonly identity: Identity.MemberReference;
 
-  /** What people in the workspace call them; without one, clients show their identity. */
-  readonly name?: Member.Name | undefined;
+  /** What people in the workspace call them. */
+  readonly name: Member.Name;
 
   /** The role the member holds across the workspace from the start. */
   readonly roleId: Role.Id;
@@ -56,14 +56,14 @@ export const make = Effect.fn("MemberCommand.make")(function* () {
       id: Member.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       identity: member.identity,
-      ...(member.name === undefined ? {} : { name: member.name }),
+      name: member.name,
       status: "active",
     };
     yield* journal.publish(MemberFacts.Added, {
       memberId: added.id,
       workspaceId,
       identity: added.identity,
-      ...(added.name === undefined ? {} : { name: added.name }),
+      name: added.name,
     });
     yield* assignmentCommand.assignRole(added.id, member.roleId);
     // A workspace created before general groups existed has none.

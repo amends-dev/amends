@@ -1,7 +1,7 @@
 import { Api as Contract, Authentication, Unauthorized } from "@amends-dev/api-http";
 import { Cause, Effect, Layer, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
-import { HttpApiMiddleware } from "effect/http-api";
+import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import { AtomHttpApi } from "effect/reactivity";
 import type { SignIn } from "./contracts.ts";
 
@@ -14,8 +14,8 @@ export interface ApiClientOptions {
   readonly rejected?: () => void;
 }
 
-/** The typed API for one credential: each session gets its own client, runtime, and reads. */
-export function createApiClient(options: ApiClientOptions) {
+/** How a credential's requests travel: with its bearer token, reporting a rejection of it. */
+const httpClientOf = (options: ApiClientOptions) => {
   const transport = options.transport ?? FetchHttpClient.layer;
   const { session, rejected = () => {} } = options;
   const signingOut = Layer.effect(
@@ -25,18 +25,36 @@ export function createApiClient(options: ApiClientOptions) {
       HttpClient.tap((response) => (response.status === 401 ? Effect.sync(rejected) : Effect.void)),
     ),
   ).pipe(Layer.provide(transport));
+  return Layer.mergeAll(
+    session ? signingOut : transport,
+    HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+      next(session ? HttpClientRequest.bearerToken(request, session.token) : request),
+    ),
+  );
+};
+
+/** The typed API for one credential: each session gets its own client, runtime, and reads. */
+export function createApiClient(options: ApiClientOptions) {
   class Client extends AtomHttpApi.Service<Client>()("@amends-dev/client/api/ApiClient", {
     api: Contract,
     baseUrl: options.baseUrl,
-    httpClient: Layer.mergeAll(
-      session ? signingOut : transport,
-      HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
-        next(session ? HttpClientRequest.bearerToken(request, session.token) : request),
-      ),
-    ),
+    httpClient: httpClientOf(options),
   }) {}
   return Client;
 }
+
+/**
+ * Ask the host to stop honoring a credential, as signing out does. It runs apart from any
+ * credential's client, since signing out replaces that client; a failure leaves the credential to
+ * expire on its own.
+ */
+export const revokeSession = (options: ApiClientOptions) =>
+  HttpApiClient.make(Contract, { baseUrl: options.baseUrl }).pipe(
+    Effect.flatMap((api) => api.me.signOut()),
+    Effect.provide(httpClientOf(options)),
+    Effect.timeout("10 seconds"),
+    Effect.ignore,
+  );
 export type ApiClient = ReturnType<typeof createApiClient>;
 /** The generated HTTP client operations call. */
 export type Api = ApiClient["Service"];

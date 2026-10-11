@@ -13,7 +13,6 @@ import { DevelopmentAuthentication } from "../src/authentication/authentication.
 import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");
-const bob = Identity.HumanId.make("bob");
 const asToken = (token: string) =>
   HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
@@ -26,11 +25,11 @@ const server = (url: string) => {
     disableListenLog: true,
   }).pipe(
     Layer.provide(
-      Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url)),
-        DevelopmentAuthentication.layer((email, code) =>
-          Effect.sync(() => delivered.set(email, code)),
-        ).pipe(Layer.provide(BunCrypto.layer)),
+      DevelopmentAuthentication.layer((email, code) =>
+        Effect.sync(() => delivered.set(email, code)),
+      ).pipe(
+        Layer.provide(BunCrypto.layer),
+        Layer.provideMerge(LocalHost.layer(Redacted.make(url))),
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
@@ -48,24 +47,42 @@ describe.skipIf(!available)("PostgreSQL", () => {
             headers: { authorization: "Bearer alice", "idempotency-key": key },
             body: HttpBody.jsonUnsafe(body),
           });
-        const created = yield* post("/workspaces", { name: "Studio" }, "create-1");
+        const created = yield* post(
+          "/workspaces",
+          { name: "Studio", memberName: "alice" },
+          "create-1",
+        );
         expect(created.status).toBe(201);
         const workspace = (yield* created.json) as { readonly id: string };
-        const retried = yield* post("/workspaces", { name: "Studio" }, "create-1");
+        const retried = yield* post(
+          "/workspaces",
+          { name: "Studio", memberName: "alice" },
+          "create-1",
+        );
         expect(yield* retried.json).toEqual(workspace);
         // The key alone names the request: reused with another name, it returns the first.
-        const reused = yield* post("/workspaces", { name: "Other" }, "create-1");
+        const reused = yield* post(
+          "/workspaces",
+          { name: "Other", memberName: "alice" },
+          "create-1",
+        );
         expect(yield* reused.json).toEqual(workspace);
         const invitation = {
-          recipientId: "bob",
+          email: "bob@example.com",
           roleId: BuiltinRoles.MemberId,
           expiresAt: "2036-09-20T12:00:00.000Z",
         };
         const path = `/workspaces/${workspace.id}/invitations`;
-        const issued = yield* (yield* post(path, invitation, "issue-1")).json;
-        expect(yield* (yield* post(path, invitation, "issue-1")).json).toEqual(issued);
-        const other = yield* (yield* post(path, invitation, "issue-2")).json;
+        const issue = (body: unknown, key: string) =>
+          Effect.flatMap(post(path, body, key), (response) => response.json).pipe(
+            Effect.map((json) => json as { readonly details: { readonly recipientId: string } }),
+          );
+        const issued = yield* issue(invitation, "issue-1");
+        expect(yield* issue(invitation, "issue-1")).toEqual(issued);
+        // Another invitation to the address, however it is written, goes to the same account.
+        const other = yield* issue({ ...invitation, email: " Bob@Example.COM " }, "issue-2");
         expect(other).not.toEqual(issued);
+        expect(other.details.recipientId).toBe(issued.details.recipientId);
       }).pipe(Effect.scoped, Effect.provide(server(url).layer)),
     ),
   );
@@ -80,29 +97,30 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const client = (token: string) =>
               HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
             const asAlice = yield* client(alice);
-            const asBob = yield* client(bob);
             const workspace = yield* asAlice.workspaces.create({
               headers: {},
-              payload: { name: "Test workspace" },
+              payload: { name: "Test workspace", memberName: "alice" },
             });
             const params = { workspaceId: workspace.id, memberId: workspace.ownerMemberId };
             const owner = yield* asAlice.members.get({ params });
-            const outsider = yield* Effect.flip(asBob.members.get({ params }));
             const invitation = yield* asAlice.invitations.issue({
               headers: {},
               params: { workspaceId: workspace.id },
               payload: {
-                recipientId: bob,
+                email: "bob@example.com",
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
                 roleId: BuiltinRoles.MemberId,
               },
             });
+            // Development tokens are human IDs: Bob's is his account's, which the invitation names.
+            const asBob = yield* client(invitation.details.recipientId);
+            const outsider = yield* Effect.flip(asBob.members.get({ params }));
             const invitationParams = {
               workspaceId: workspace.id,
               invitationId: invitation.details.id,
             };
             const wrongRecipient = yield* Effect.flip(
-              asAlice.invitations.accept({ params: invitationParams, payload: {} }),
+              asAlice.invitations.accept({ params: invitationParams, payload: { name: "alice" } }),
             );
             const joined = yield* asBob.invitations.accept({
               params: invitationParams,
@@ -119,7 +137,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 headers: {},
                 params: { workspaceId: workspace.id },
                 payload: {
-                  recipientId: Identity.HumanId.make("charlie"),
+                  email: "charlie@example.com",
                   expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
                   roleId: BuiltinRoles.MemberId,
                 },
@@ -174,7 +192,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             _tag: "InvitationService.NotRecipient",
           });
           expect(outcome.joined).toMatchObject({
-            identity: { _tag: "Human", id: bob },
+            identity: { _tag: "Human", id: outcome.invitation.details.recipientId },
             status: "active",
           });
           expect(outcome.readByBob.id).toBe(outcome.owner.id);
@@ -199,13 +217,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
   );
 
   it.live(
-    "email sign-in issues a session the server accepts, and the directory lists what it can reach",
+    "email sign-in signs in as the address's account, which the server accepts, and the directory lists what it can reach",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
           const fixture = server(url);
           const outcome = yield* Effect.gen(function* () {
             const anonymous = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken("")));
+            const methods = yield* anonymous.session.methods();
             const email = "jo@mercier.co";
             yield* anonymous.session.start({ payload: { email } });
             const code = fixture.delivered.get(email);
@@ -219,39 +238,90 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const reused = yield* Effect.flip(
               anonymous.session.complete({ payload: { email, code } }),
             );
+            // Signing in with the address written otherwise reaches the same account.
+            const http = yield* HttpClient.HttpClient;
+            const written = " Jo@Mercier.CO ";
+            yield* http.post("/session/email", { body: HttpBody.jsonUnsafe({ email: written }) });
+            const again = yield* Effect.flatMap(
+              http.post("/session/code", {
+                body: HttpBody.jsonUnsafe({ email: written, code: fixture.delivered.get(email) }),
+              }),
+              (response) => response.json,
+            );
             const client = yield* HttpApiClient.make(Api).pipe(
               Effect.provide(asToken(session.token)),
             );
+            const account = yield* client.me.account();
             const before = yield* client.me.workspaces();
             const workspace = yield* client.workspaces.create({
               headers: {},
-              payload: { name: "Test workspace" },
+              payload: { name: "Test workspace", memberName: "Jo" },
             });
             const inviter = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken(alice)));
             const other = yield* inviter.workspaces.create({
               headers: {},
-              payload: { name: "Test workspace" },
+              payload: { name: "Test workspace", memberName: "alice" },
             });
             const invitation = yield* inviter.invitations.issue({
               headers: {},
               params: { workspaceId: other.id },
               payload: {
-                recipientId: session.humanId,
+                email,
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
                 roleId: BuiltinRoles.MemberId,
               },
             });
             const after = yield* client.me.workspaces();
+            // Alice, who manages invitations, reads her invitee's account; she has none herself.
+            const invitees = yield* inviter.accounts.list({ params: { workspaceId: other.id } });
+            const noAccount = yield* inviter.me.account({ responseMode: "response-only" });
             yield* client.invitations.accept({
               params: { workspaceId: other.id, invitationId: invitation.details.id },
-              payload: {},
+              payload: { name: "Jo" },
             });
             const joined = yield* client.me.workspaces();
-            return { wrong, session, reused, before, workspace, other, after, joined };
+            const members = yield* client.accounts.list({ params: { workspaceId: workspace.id } });
+            const cannotList = yield* Effect.flip(
+              client.accounts.list({ params: { workspaceId: other.id } }),
+            );
+            const signedOut = yield* client.me.signOut({ responseMode: "response-only" });
+            return {
+              methods,
+              wrong,
+              session,
+              reused,
+              again,
+              account,
+              before,
+              workspace,
+              other,
+              invitation,
+              after,
+              invitees,
+              noAccount,
+              joined,
+              members,
+              cannotList,
+              signedOut,
+            };
           }).pipe(Effect.scoped, Effect.provide(fixture.layer));
+          expect(outcome.methods).toEqual({ emailCode: true, providers: [] });
           expect(outcome.wrong).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
-          expect(outcome.session.humanId).toBe(Identity.HumanId.make("jo@mercier.co"));
+          // The session's token is its account's human ID, which is not the address.
+          const { account } = outcome.session;
+          expect(outcome.session.token).toBe(account.id);
+          expect(account).toEqual({ id: account.id, email: "jo@mercier.co" });
+          expect(account.id).not.toBe("jo@mercier.co");
+          expect(outcome.account).toEqual(account);
+          expect(outcome.again).toEqual({ token: account.id, account });
           expect(outcome.reused).toMatchObject({ _tag: "SignIn.Rejected", reason: "unknown" });
+          // An invitation to the address goes to the account its owner signed in as.
+          expect(outcome.invitation.details.recipientId).toBe(account.id);
+          expect(outcome.invitees).toEqual([account]);
+          expect(outcome.noAccount.status).toBe(401);
+          expect(outcome.members).toEqual([account]);
+          expect(outcome.cannotList).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(outcome.signedOut.status).toBe(204);
           expect(outcome.before).toEqual({ memberships: [], invitations: [] });
           expect(outcome.after.memberships).toMatchObject([
             {

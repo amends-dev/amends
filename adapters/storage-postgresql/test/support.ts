@@ -14,6 +14,7 @@ import { NotificationStore } from "@amends-dev/core/notification";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
 import {
   InvitationStore,
+  Member,
   MemberStore,
   Workspace,
   WorkspaceInitialization,
@@ -100,9 +101,10 @@ export const inDatabase = <A, E>(
   program: Effect.Effect<A, E, PostgresDatabase.Service | SqlClient.SqlClient>,
 ) => program.pipe(Effect.provide(database(url)));
 export const initialized = (bound: Bound, creator = alice.id) =>
-  WorkspaceInitialization.initialize(creator, { name: "Test workspace" }).pipe(
-    Effect.provide(core(bound)),
-  );
+  WorkspaceInitialization.initialize(creator, {
+    name: "Test workspace",
+    memberName: Member.Name.make(creator),
+  }).pipe(Effect.provide(core(bound)));
 export const boundTo = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   return yield* (yield* views()).forWorkspace(workspaceId);
 });

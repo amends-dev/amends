@@ -15,7 +15,7 @@ the endpoints only a person may call.
 
 ## Use
 
-A host supplies `Gateway.Service`, `SignIn.Service`, `SessionTokens.Service`,
+A host supplies `Gateway.Service`, `Accounts.Service`, `SignIn.Service`, `SessionTokens.Service`,
 `WorkspaceDirectory.Service`, and its platform's HTTP services, then mounts the routes with
 `HttpRouter.serve` or `HttpRouter.toWebHandler`:
 
@@ -24,12 +24,15 @@ A host supplies `Gateway.Service`, `SignIn.Service`, `SessionTokens.Service`,
 - `Routes.layerHandlers` is the group layers and authentication alone, for tests.
 - `BearerAuthentication.make()` builds the contract's `Authentication` from `SessionTokens.Service`,
   and `BearerAuthentication.layer` provides it. Each request resolves its own bearer token and
-  supplies its own `Principal`.
+  supplies its own `Principal` and `Credential`.
 
 ## Handlers
 
-The session and directory handlers call the host's `SignIn` and `WorkspaceDirectory` directly. Every
-other group enters a workspace and calls the core service it is named for: notifications call
+The session and `me` handlers call the host's `SignIn`, `Accounts`, `WorkspaceDirectory`, and
+`SessionTokens` directly; signing out revokes the request's `Credential`. Issuing an invitation finds
+or creates the account of the address it names before calling `InvitationService`, and the
+workspace accounts handler lists invitations, which authorizes the read, then reads the accounts of
+the members and recipients. Every other group enters a workspace and calls the core service it is named for: notifications call
 `NotificationService`, groups and threads call `GroupService`, `GroupMembershipService`,
 `GroupFollowService`, `ThreadService`, `ThreadMessageService`, `ThreadParticipationService`, and
 `ReadStateService`, and so on for tasks, connections, agents, turns, and channels. A handler merges

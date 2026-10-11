@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./accounts": "./src/accounts.ts",
     "./directory": "./src/directory.ts",
     "./errors": "./src/errors.ts",
     "./sign-in": "./src/sign-in.ts"

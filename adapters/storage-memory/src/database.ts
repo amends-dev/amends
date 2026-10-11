@@ -100,6 +100,8 @@ export interface Interface {
    * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
    */
   readonly sessionLogs: Map<string, ReadonlyArray<string>>;
+  /** The host's accounts across its workspaces: each one's address by its human ID. */
+  readonly accounts: Map<string, string>;
   /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
   appended: Deferred.Deferred<void>;
   /** Every workspace's signals, across every host; signals themselves are never kept. */
@@ -237,6 +239,7 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
     writers: new Map(),
     logLocks: new Map(),
     sessionLogs: new Map(),
+    accounts: new Map(),
     appended: yield* Deferred.make<void>(),
     signals: yield* SignalHub.makeLocal,
     nextId: (prefix) => `${prefix}-${++issued}`,

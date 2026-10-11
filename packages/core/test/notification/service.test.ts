@@ -70,6 +70,7 @@ const seed = (fixture: Fixture) =>
         id: actor.memberId,
         workspaceId,
         identity: actor.identity,
+        name: Member.Name.make(actor.identity.id),
         status: "active",
       }),
     ),

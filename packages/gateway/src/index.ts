@@ -1,3 +1,4 @@
+export { Accounts } from "./accounts.ts";
 export { SessionTokens } from "./session-tokens.ts";
 export { WorkspaceDirectory } from "./directory.ts";
 export { GatewayErrors } from "./errors.ts";

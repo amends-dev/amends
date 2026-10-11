@@ -35,6 +35,7 @@ import {
   Workspace,
 } from "@amends-dev/core/workspace";
 import {
+  Accounts,
   SessionTokens,
   Gateway,
   GatewayErrors,
@@ -48,9 +49,16 @@ import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
 import { Routes } from "../src/index.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
+const bob = Identity.HumanId.make("bob");
 const workspaceId = Workspace.Id.make("workspace-one");
 const memberId = Member.Id.make("member-one");
-const member: Member.Record = { id: memberId, workspaceId, identity: alice, status: "active" };
+const member: Member.Record = {
+  id: memberId,
+  workspaceId,
+  identity: alice,
+  name: Member.Name.make("alice"),
+  status: "active",
+};
 const workspace: Workspace.Record = {
   id: workspaceId,
   createdBy: alice.id,
@@ -74,6 +82,18 @@ const denied = new Authorization.Denied({
   ),
 });
 const actor = Actor.Value.make({ workspaceId, memberId, identity: alice });
+const pending = ({ recipientId, roleId, expiresAt }: Invitation.IssueInput): Invitation.Record => ({
+  details: {
+    recipientId,
+    roleId,
+    expiresAt,
+    id: Invitation.Id.make("invitation-one"),
+    workspaceId,
+    inviterMemberId: memberId,
+    issuedAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+  },
+  state: { _tag: "Pending" },
+});
 const notification: Notification.Record = {
   id: Notification.Id.make("pending"),
   workspaceId,
@@ -276,23 +296,16 @@ const operations = Layer.mergeAll(
   Layer.succeed(
     InvitationService.Service,
     InvitationService.Service.of({
-      issue: record("issue", (request) =>
-        Effect.succeed({
-          details: {
-            recipientId: request.recipientId,
-            roleId: request.roleId,
-            expiresAt: request.expiresAt,
-            id: Invitation.Id.make("invitation-one"),
-            workspaceId,
-            inviterMemberId: memberId,
-            issuedAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
-          },
-          state: { _tag: "Pending" },
-        } satisfies Invitation.Record),
-      ),
+      issue: record("issue", (input) => Effect.succeed(pending(input))),
       accept: record("accept", () => Effect.succeed(member)),
       revoke: record("revoke", () => Effect.die("unused")),
-      list: Effect.succeed([]),
+      list: Effect.succeed([
+        pending({
+          recipientId: bob,
+          roleId: BuiltinRoles.MemberId,
+          expiresAt: DateTime.makeUnsafe("2026-02-01T00:00:00Z"),
+        }),
+      ]),
     }),
   ),
 );
@@ -344,6 +357,7 @@ const credentials = Layer.succeed(
         Identity.Reference.cases.Human.make({ id: Identity.HumanId.make(token) }),
       );
     },
+    revoke: record("revoke", () => Effect.void),
   }),
 );
 const asToken = (token: string) =>
@@ -351,14 +365,50 @@ const asToken = (token: string) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 /** Sign-in and the directory are host services with their own tests; the stubs answer plainly. */
+const jo: Accounts.Account = {
+  id: Identity.HumanId.make("jo"),
+  email: Accounts.Email.make("jo@mercier.co"),
+};
+const methods: SignIn.Methods = {
+  emailCode: true,
+  providers: [{ id: "google", name: "Google" }],
+};
 const signIn = Layer.succeed(
   SignIn.Service,
   SignIn.Service.of({
+    methods,
     start: record("start", () => Effect.void),
-    complete: record("complete", (email, code) =>
+    complete: record("complete", (_email, code) =>
       code === "419270"
-        ? Effect.succeed({ token: email, humanId: Identity.HumanId.make(email) })
+        ? Effect.succeed({ token: jo.id, account: jo })
         : Effect.fail(new SignIn.Rejected({ reason: "mismatch" })),
+    ),
+  }),
+);
+/** Alice's and Bob's accounts, and one for any other address the first time it comes up. */
+const addresses = new Map<Identity.HumanId, Accounts.Email>([
+  [alice.id, Accounts.Email.make("alice@example.com")],
+  [bob, Accounts.Email.make("bob@example.com")],
+]);
+const accounts = Layer.succeed(
+  Accounts.Service,
+  Accounts.Service.of({
+    findOrCreate: record("findOrCreate", (email) =>
+      Effect.sync(() => {
+        const found = [...addresses].find(([, address]) => address === email);
+        if (found !== undefined) return { id: found[0], email };
+        const id = Identity.HumanId.make(crypto.randomUUID());
+        addresses.set(id, email);
+        return { id, email };
+      }),
+    ),
+    findByIds: record("findByIds", (ids) =>
+      Effect.succeed(
+        ids.flatMap((id) => {
+          const email = addresses.get(id);
+          return email === undefined ? [] : [{ id, email }];
+        }),
+      ),
     ),
   }),
 );
@@ -374,7 +424,9 @@ const directory = Layer.succeed(
   }),
 );
 const services = Layer.mergeAll(
-  Routes.layerHandlers.pipe(Layer.provide(Layer.mergeAll(gateway, signIn, credentials, directory))),
+  Routes.layerHandlers.pipe(
+    Layer.provide(Layer.mergeAll(gateway, signIn, credentials, directory, accounts)),
+  ),
   HttpServer.layerServices,
 );
 const run = <A, E>(
@@ -387,6 +439,7 @@ const run = <A, E>(
 const makeClient = HttpApiTest.groups(Api, [
   "session",
   "me",
+  "accounts",
   "workspaces",
   "tasks",
   "members",
@@ -487,7 +540,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
         client.members.remove({ params: { workspaceId, memberId }, responseMode: "response-only" }),
         client.workspaces.create({
           headers: {},
-          payload: { name: "Test workspace" },
+          payload: { name: "Test workspace", memberName: member.name },
           responseMode: "response-only",
         }),
       ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
@@ -514,30 +567,34 @@ it.effect("workspace creation and acceptance require a human principal", () =>
     const created = yield* run("alice", (client) =>
       client.workspaces.create({
         headers: { "idempotency-key": Request.Key.make("create-1") },
-        payload: { name: "Test workspace" },
+        payload: { name: "Test workspace", memberName: member.name },
       }),
     );
     expect(created).toEqual(workspace);
     const refused = yield* run("agent", (client) =>
       client.workspaces
-        .create({ headers: {}, payload: { name: "Test workspace" } })
+        .create({ headers: {}, payload: { name: "Test workspace", memberName: member.name } })
         .pipe(Effect.flip),
     );
     expect(refused).toMatchObject({ _tag: "Api.HumanRequired" });
     const accepted = yield* run("alice", (client) =>
       client.invitations.accept({
         params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
-        payload: {},
+        payload: { name: member.name },
       }),
     );
     expect(accepted).toEqual(member);
     expect(calls).toEqual([
       {
         operation: "createWorkspace",
-        arguments: [alice.id, { name: "Test workspace" }, { requestKey: "create-1" }],
+        arguments: [
+          alice.id,
+          { name: "Test workspace", memberName: member.name },
+          { requestKey: "create-1" },
+        ],
       },
       { operation: "inWorkspace", arguments: [workspaceId] },
-      { operation: "accept", arguments: ["invitation-one", alice.id, {}] },
+      { operation: "accept", arguments: ["invitation-one", alice.id, member.name] },
     ]);
   }),
 );
@@ -550,28 +607,22 @@ it.effect("invitation payloads round-trip dates and roles through JSON", () =>
       client.invitations.issue({
         headers: { "idempotency-key": Request.Key.make("issue-1") },
         params: { workspaceId },
-        payload: {
-          recipientId: Identity.HumanId.make("bob"),
-          expiresAt,
-          roleId: BuiltinRoles.MemberId,
-        },
+        payload: { email: "bob@example.com", expiresAt, roleId: BuiltinRoles.MemberId },
       }),
     );
-    expect(issued.details.recipientId).toBe(Identity.HumanId.make("bob"));
+    // The invitation goes to the account of the address it names.
+    expect(issued.details.recipientId).toBe(bob);
     expect(DateTime.toEpochMillis(issued.details.expiresAt)).toBe(
       DateTime.toEpochMillis(expiresAt),
     );
     expect(issued.state).toEqual({ _tag: "Pending" });
-    expect(calls[1]).toMatchObject({
-      operation: "issue",
-      arguments: [
-        {
-          recipientId: "bob",
-          roleId: BuiltinRoles.MemberId,
-        },
-        { requestKey: "issue-1" },
-      ],
-    });
+    expect(calls.slice(1)).toMatchObject([
+      { operation: "findOrCreate", arguments: ["bob@example.com"] },
+      {
+        operation: "issue",
+        arguments: [{ recipientId: bob, roleId: BuiltinRoles.MemberId }, { requestKey: "issue-1" }],
+      },
+    ]);
   }),
 );
 
@@ -581,6 +632,7 @@ it.effect("sign-in needs no credential, and the directory answers for the princi
     const email = "jo@mercier.co";
     const outcome = yield* run("", (client) =>
       Effect.gen(function* () {
+        expect(yield* client.session.methods()).toEqual(methods);
         yield* client.session.start({ payload: { email } });
         const rejected = yield* Effect.flip(
           client.session.complete({ payload: { email, code: "000000" } }),
@@ -593,7 +645,7 @@ it.effect("sign-in needs no credential, and the directory answers for the princi
       }),
     );
     expect(outcome.rejected).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
-    expect(outcome.session).toEqual({ token: email, humanId: Identity.HumanId.make(email) });
+    expect(outcome.session).toEqual({ token: jo.id, account: jo });
     // The client rejects a malformed address before any request is sent.
     expect(outcome.malformed._tag).toBe("SchemaError");
     expect(calls.map((call) => call.operation)).toEqual(["start", "complete", "complete"]);
@@ -604,7 +656,7 @@ it.effect("sign-in needs no credential, and the directory answers for the princi
   }),
 );
 
-it.effect("session and directory responses retain their existing JSON field names", () =>
+it.effect("session and directory responses keep their JSON field names", () =>
   Effect.gen(function* () {
     const session = yield* run("", (client) =>
       client.session
@@ -614,13 +666,54 @@ it.effect("session and directory responses retain their existing JSON field name
         })
         .pipe(Effect.flatMap((response) => response.json)),
     );
-    expect(session).toEqual({ token: "jo@mercier.co", identity: "jo@mercier.co" });
+    expect(session).toEqual({ token: "jo", account: { id: "jo", email: "jo@mercier.co" } });
     const directory = yield* run("alice", (client) =>
       client.me
         .workspaces({ responseMode: "response-only" })
         .pipe(Effect.flatMap((response) => response.json)),
     );
     expect(directory).toEqual({ memberships: [{ workspace, member, people: 1 }], invitations: [] });
+  }),
+);
+
+it.effect("a person reads their account, and signs out with the credential they presented", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    expect(yield* run("alice", (client) => client.me.account())).toEqual({
+      id: alice.id,
+      email: "alice@example.com",
+    });
+    const agent = yield* run("agent", (client) => Effect.flip(client.me.account()));
+    expect(agent).toMatchObject({ _tag: "Api.HumanRequired" });
+    // A session no account holds is not honored.
+    const unknown = yield* run("carol", (client) =>
+      client.me.account({ responseMode: "response-only" }),
+    );
+    expect(unknown.status).toBe(401);
+    const signedOut = yield* run("alice", (client) =>
+      client.me.signOut({ responseMode: "response-only" }),
+    );
+    expect(signedOut.status).toBe(204);
+    expect(calls.map(({ operation }) => operation)).toEqual(["findByIds", "findByIds", "revoke"]);
+    const credential = calls[2]?.arguments[0];
+    expect(Redacted.isRedacted(credential) && Redacted.value(credential)).toBe("alice");
+  }),
+);
+
+it.effect("a workspace's accounts are those of its human members and its invitees", () =>
+  Effect.gen(function* () {
+    calls.length = 0;
+    const listed = yield* run("alice", (client) =>
+      client.accounts.list({ params: { workspaceId } }),
+    );
+    expect(listed).toEqual([
+      { id: alice.id, email: "alice@example.com" },
+      { id: bob, email: "bob@example.com" },
+    ]);
+    expect(calls).toEqual([
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "findByIds", arguments: [[alice.id, bob]] },
+    ]);
   }),
 );
 

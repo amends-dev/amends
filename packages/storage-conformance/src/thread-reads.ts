@@ -173,6 +173,7 @@ export const threadReads = (harness: Harness) => {
                   workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: identityFor(memberId),
+                  name: Member.Name.make(memberId),
                 });
             }),
           ),
@@ -829,7 +830,12 @@ export const threadReads = (harness: Harness) => {
               yield* publish(
                 bound,
                 Effect.flatMap(Journal.Service, (journal) =>
-                  journal.publish(MemberFacts.Added, { workspaceId, memberId, identity }),
+                  journal.publish(MemberFacts.Added, {
+                    workspaceId,
+                    memberId,
+                    identity,
+                    name: Member.Name.make(identity.id),
+                  }),
                 ),
               );
               yield* grant(bound, memberId, ThreadPermissions.Read);
@@ -915,9 +921,11 @@ export const threadReads = (harness: Harness) => {
               const gateway = yield* Gateway.Service;
               const workspace = yield* gateway.createWorkspace(Identity.HumanId.make("owner"), {
                 name: "Workspace",
+                memberName: "owner",
               });
               const other = yield* gateway.createWorkspace(Identity.HumanId.make("foreign-owner"), {
                 name: "Foreign",
+                memberName: "foreign-owner",
               });
               const bound = yield* boundTo(workspace.id);
               yield* seed(bound);

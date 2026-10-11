@@ -4,7 +4,7 @@ import { Actor, Identity } from "@amends-dev/core/identity";
 
 import { Journal, Publication, Store } from "@amends-dev/core/journal";
 
-import { InvitationService, MemberService } from "@amends-dev/core/workspace";
+import { InvitationService, Member, MemberService } from "@amends-dev/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 
@@ -55,7 +55,8 @@ export const invitationReplay = (harness: Harness) => {
               const broken = failingLate(bound, error);
               const failure = yield* Effect.flatMap(
                 InvitationService.Service,
-                (invitationService) => invitationService.accept(invitation.details.id, bob.id),
+                (invitationService) =>
+                  invitationService.accept(invitation.details.id, bob.id, Member.Name.make("bob")),
               ).pipe(Effect.provide(core(broken)), Effect.flip);
               expect(failure).toBe(error);
               expect(yield* bound.members.findActive(bob)).toEqual(Option.none());

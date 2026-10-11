@@ -161,6 +161,7 @@ for await (const path of new Bun.Glob(
         /^apps\/client\/src\/[^/]+\/api\.ts$/.test(path)) &&
       [
         "@amends-dev/api-http",
+        "@amends-dev/gateway/accounts",
         "@amends-dev/gateway/sign-in",
         "@amends-dev/gateway/directory",
       ].includes(dependency);

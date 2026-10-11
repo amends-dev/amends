@@ -101,6 +101,7 @@ export const groupMemberships = (harness: Harness) => {
                   workspaceId: bound.store.workspaceId,
                   memberId,
                   identity,
+                  name: Member.Name.make(identity.id),
                 });
             }),
           ),
@@ -864,6 +865,7 @@ export const groupMemberships = (harness: Harness) => {
                 Identity.HumanId.make("gateway-owner"),
                 {
                   name: "Workspace",
+                  memberName: "gateway-owner",
                 },
               );
               const bound = yield* boundTo(workspace.id);
@@ -1780,6 +1782,7 @@ export const groupMemberships = (harness: Harness) => {
                 Identity.HumanId.make("gateway-owner"),
                 {
                   name: "Workspace",
+                  memberName: "gateway-owner",
                 },
               );
               const bound = yield* boundTo(workspace.id);
@@ -1879,6 +1882,7 @@ export const groupMemberships = (harness: Harness) => {
                     workspaceId,
                     memberId: newMemberId,
                     identity: actor.identity,
+                    name: Member.Name.make(actor.identity.id),
                   }),
                 ),
               );

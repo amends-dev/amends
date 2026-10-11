@@ -153,7 +153,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     const group = groupId();
     navigate(group ? paths.group(workspaceId, group) : path("inbox"));
   };
-  const ownName = () => membership()?.member.name ?? session.session?.humanId ?? "";
+  const ownName = () => membership()?.member.name ?? "";
 
   const people = useWorkspacePeople(workspaceId);
   const creation = useCreateGroup(workspaceId, (id) => {
@@ -224,7 +224,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
             account={{
               name: ownName(),
               menu: {
-                identity: session.session?.humanId ?? "",
+                identity: session.session?.account.email ?? "",
                 appearance: appearance.preference(),
                 onAppearanceChange: appearance.setPreference,
                 palette: appearance.palette(),

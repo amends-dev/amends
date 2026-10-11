@@ -13,7 +13,7 @@ export function WorkspaceUnavailablePage(props: { readonly workspaceId: string }
     <WorkspaceUnavailableScreen
       homeHref="/"
       account={account()}
-      identity={session.session?.humanId ?? "this address"}
+      identity={session.session?.account.email ?? "this address"}
       access={access()}
       onWorkspaces={() => navigate(paths.workspaces)}
     />
