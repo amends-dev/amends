@@ -1,6 +1,7 @@
 # @amends-dev/storage-memory
 
-Workspace storage, each workspace's signal hub, and the workspace directory, held in process memory.
+Workspace storage, each workspace's signal hub, the workspace directory, and the host's accounts,
+held in process memory.
 It is the reference implementation of the gateway's storage contracts: it passes the same
 [conformance suites](../../packages/storage-conformance/README.md) as the
 [PostgreSQL adapter](../storage-postgresql/README.md) and enforces the same rules with plain maps
@@ -17,10 +18,10 @@ import { Layer } from "effect";
 const storage = layer.pipe(Layer.provide(MemoryDatabase.layer));
 ```
 
-`layer` provides the storage contract, with each workspace's signal hub, and the directory over a
-new connection to the database beneath it. Building `layer` again over the same `MemoryDatabase` is
-another host over the same storage, which is how the conformance suites test what several hosts do
-together.
+`layer` provides the storage contract, with each workspace's signal hub, the directory, and the
+accounts over a new connection to the database beneath it, with cryptography from the host for new
+human IDs. Building `layer` again over the same `MemoryDatabase` is another host over the same
+storage, which is how the conformance suites test what several hosts do together.
 
 ## Model
 
@@ -39,8 +40,9 @@ in each database.
 
 Some state sits outside the projections a rebuild discards: each connection's credential, as the
 JSON of its encoded form and unsealed, since this adapter is for tests; each participation's harness
-session; and the session logs. Session logs take part in no transaction: an append is kept at once
-and wakes readers waiting for one, as a commit's appends do.
+session; the session logs; and the accounts, each one's address by its human ID. Session logs take
+part in no transaction: an append is kept at once and wakes readers waiting for one, as a commit's
+appends do.
 
 ## Transactions
 

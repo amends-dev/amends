@@ -1,11 +1,7 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { Effect } from "effect";
-
-export const Email = Schema.String.check(
-  Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { title: "email address" }),
-);
-export type Email = typeof Email.Type;
+import type { Accounts } from "./accounts.ts";
 
 export const Code = Schema.String.check(Schema.isPattern(/^\d{6}$/, { title: "six-digit code" }));
 export type Code = typeof Code.Type;
@@ -22,12 +18,12 @@ export class Rejected extends Schema.TaggedError<Rejected>()("SignIn.Rejected", 
 
 export interface Interface {
   /**
-   * Send a one-time code to the address. Unknown addresses are accepted: the
-   * same step creates the identity, and one address is one identity.
+   * Send a one-time code to the address. Unknown addresses are accepted: completing
+   * sign-in finds or creates the address's account.
    */
-  readonly start: (email: Email) => Effect.Effect<void>;
-  /** Exchange a delivered code for a session. A code works once. */
-  readonly complete: (email: Email, code: Code) => Effect.Effect<Session, Rejected>;
+  readonly start: (email: Accounts.Email) => Effect.Effect<void>;
+  /** Exchange a delivered code for a session as the address's account. A code works once. */
+  readonly complete: (email: Accounts.Email, code: Code) => Effect.Effect<Session, Rejected>;
 }
 
 /** The ingress that produces authenticated humans; hosts own delivery and token issuance. */

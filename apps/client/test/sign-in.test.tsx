@@ -115,7 +115,7 @@ it("starts at the email step without requests, and ignores code actions there", 
   fixture.controller.resendCode();
   expect(http.fetch).not.toHaveBeenCalled();
 });
-it.each(["", "alice", "alice@local", " alice@example.com", "alice@example.com "])(
+it.each(["", "alice", "alice@local", "alice @example.com"])(
   "validates email %s against the shared schema before HTTP",
   (email) => {
     const http = network(),
@@ -132,23 +132,23 @@ it.each(["", "alice", "alice@local", " alice@example.com", "alice@example.com "]
     expect(controller.state()).toMatchObject({ email: "Alice@example.com", error: undefined });
   },
 );
-it("uses the typed API, preserves leading zeros, and installs a decoded session through the existing scope", async () => {
+it("uses the typed API, sends the address as accounts hold it, preserves leading zeros, and installs a decoded session through the existing scope", async () => {
   const http = network(),
     fixture = mount(http.fetch),
     guest = fixture.controller;
-  guest.setEmail("Alice@example.com");
+  guest.setEmail(" Alice@example.com");
   guest.requestCode();
   expect(guest.state()).toMatchObject({ _tag: "Email", pending: true });
   await waitFor(() => expect(http.calls).toHaveLength(1));
   expect(http.at(0).request.method).toBe("POST");
   expect(http.at(0).request.url).toBe("https://host.test/api/session/email");
   expect(http.at(0).request.headers.has("authorization")).toBe(false);
-  expect(await http.at(0).request.json()).toEqual({ email: "Alice@example.com" });
+  expect(await http.at(0).request.json()).toEqual({ email: "alice@example.com" });
   http.at(0).resolve(accepted());
   await waitFor(() =>
     expect(guest.state()).toMatchObject({
       _tag: "Code",
-      email: "Alice@example.com",
+      email: "alice@example.com",
       code: "",
       pending: undefined,
     }),
@@ -157,7 +157,7 @@ it("uses the typed API, preserves leading zeros, and installs a decoded session 
   guest.verifyCode();
   await waitFor(() => expect(http.calls).toHaveLength(2));
   expect(http.at(1).request.url).toBe("https://host.test/api/session/code");
-  expect(await http.at(1).request.json()).toEqual({ email: "Alice@example.com", code: "001234" });
+  expect(await http.at(1).request.json()).toEqual({ email: "alice@example.com", code: "001234" });
   http.at(1).resolve(json({ token: "credential", identity: "human" }));
   await waitFor(() =>
     expect(fixture.store.read()).toEqual({ token: "credential", humanId: "human" }),

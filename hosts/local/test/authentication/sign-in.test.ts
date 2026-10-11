@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Identity } from "@amends-dev/core/identity";
-import { SessionTokens, SignIn } from "@amends-dev/gateway";
+import { Accounts, SessionTokens, SignIn } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Cause, Clock, Crypto, Deferred, Effect, Exit, Fiber, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
@@ -12,12 +12,12 @@ it.effect.each(["make", "layer"] as const)(
   "sign-in %s issues usable session tokens and enforces one-time codes and expiry",
   (construction) =>
     Effect.gen(function* () {
-      const delivered = new Map<SignIn.Email, SignIn.Code>();
+      const delivered = new Map<Accounts.Email, SignIn.Code>();
       const deliver: DevelopmentSignIn.DeliverCode = (email, code) =>
         Effect.sync(() => {
           delivered.set(email, code);
         });
-      const codeFor = (email: SignIn.Email): SignIn.Code => {
+      const codeFor = (email: Accounts.Email): SignIn.Code => {
         const code = delivered.get(email);
         if (code === undefined) throw new Error("No code was delivered");
         return code;
@@ -25,8 +25,8 @@ it.effect.each(["make", "layer"] as const)(
       const program = Effect.gen(function* () {
         const signIn = yield* SignIn.Service;
         const sessionTokens = yield* SessionTokens.Service;
-        const alice = SignIn.Email.make("alice@example.com");
-        const bob = SignIn.Email.make("bob@example.com");
+        const alice = Accounts.Email.make("alice@example.com");
+        const bob = Accounts.Email.make("bob@example.com");
         expect(delivered.size).toBe(0);
         yield* signIn.start(alice);
         yield* signIn.start(bob);
@@ -86,7 +86,7 @@ it.effect("each evaluation of the sign-in constructor owns its pending codes", (
     yield* Effect.gen(function* () {
       const first = yield* acquire;
       const second = yield* acquire;
-      const email = SignIn.Email.make("alice@example.com");
+      const email = Accounts.Email.make("alice@example.com");
       yield* first.start(email);
       const code = delivered;
       if (code === undefined) throw new Error("No code was delivered");
@@ -116,7 +116,7 @@ it.effect("concurrent completions consume a code once even when the clock suspen
         delivered = code;
       }),
     );
-    const email = SignIn.Email.make("alice@example.com");
+    const email = Accounts.Email.make("alice@example.com");
     yield* signIn.start(email);
     const code = delivered;
     if (code === undefined) return yield* Effect.die("No code delivered");
@@ -163,7 +163,7 @@ it.effect("a repeated request replaces the previous code", () =>
           delivered.push(code);
         }),
       );
-      const email = SignIn.Email.make("alice@example.com");
+      const email = Accounts.Email.make("alice@example.com");
       yield* signIn.start(email);
       yield* signIn.start(email);
       const [first, second] = delivered;
@@ -189,7 +189,7 @@ it.effect("a failed delivery leaves no usable code and a later request can succe
       if (fail) throw new Error("Delivery failed");
       return Effect.void;
     });
-    const email = SignIn.Email.make("alice@example.com");
+    const email = Accounts.Email.make("alice@example.com");
     expect(Exit.hasDies(yield* Effect.exit(signIn.start(email)))).toBe(true);
     const failed = delivered[0];
     if (failed === undefined) return yield* Effect.die("Expected failed delivery");
@@ -223,7 +223,7 @@ it.effect.each(["failure", "interruption"] as const)(
         replacement = code;
         return Effect.void;
       });
-      const email = SignIn.Email.make("alice@example.com");
+      const email = Accounts.Email.make("alice@example.com");
       const first = yield* Effect.forkScoped(signIn.start(email));
       const firstCode = yield* Deferred.await(entered);
       // The delivery has started but has not succeeded yet.

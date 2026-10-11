@@ -25,8 +25,8 @@ An adapter supplies a `Harness`, by convention in its `test/harness.ts`:
 `withStorage` gives the test a `Storage`:
 
 - `connect(options?)` opens another host over the same storage, with its own connection or pool,
-  closed with the test's scope: its storage, directory, and signal hub. `failFast` asks for prompt
-  contention where the adapter would otherwise wait.
+  closed with the test's scope: its storage, directory, accounts, and signal hub. `failFast` asks
+  for prompt contention where the adapter would otherwise wait.
 - `discardProjections` removes every projected record, live projection version, and checkpoint,
   keeping logs and read state, as rebuilding projections does before replay. No storage contract
   performs this.
@@ -82,6 +82,7 @@ enters a workspace through the gateway and runs one core operation as a protocol
 | `turns`               | Accepting work into turns, prompts, runs cut short, closing with the answer and session, logs, stopping, failing, retrying, and leaving.    |
 | `channels`            | Conversations received into bound threads, echoes and rejected requests, replies delivered and their edits, and managing channels.          |
 | `workspaceIsolation`  | Every store refusing a record that names another workspace, and keeping none of it.                                                         |
+| `accounts`            | One account per address, however typed and from any host, concurrent first requests sharing one, and accounts read back by ID.              |
 
 ## Development
 

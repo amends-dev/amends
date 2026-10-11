@@ -55,7 +55,7 @@ export const harness: Harness = {
             layer({
               credentialKey,
               ...(options?.failFast === true && { lockTimeout: "100 millis" }),
-            }).pipe(Layer.provideMerge(database(url))),
+            }).pipe(Layer.provideMerge(database(url)), Layer.provide(BunCrypto.layer)),
           ).pipe(Effect.orDie),
         discardProjections: maintain(
           Effect.flatMap(SqlClient.SqlClient, (sql) =>

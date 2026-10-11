@@ -1,5 +1,5 @@
 import { Identity } from "@amends-dev/core/identity";
-import { SignIn } from "@amends-dev/gateway";
+import { type Accounts, SignIn } from "@amends-dev/gateway";
 import { Crypto, DateTime, Duration, Effect, Exit, Layer, Schema } from "effect";
 
 interface PendingCode {
@@ -9,7 +9,7 @@ interface PendingCode {
 }
 
 /** How a code reaches the person; development logs it where the server runs. */
-export type DeliverCode = (email: SignIn.Email, code: SignIn.Code) => Effect.Effect<void>;
+export type DeliverCode = (email: Accounts.Email, code: SignIn.Code) => Effect.Effect<void>;
 
 export const logCode: DeliverCode = (email, code) =>
   Effect.logInfo(`Sign-in code for ${email}: ${code}`);
@@ -29,7 +29,7 @@ export const make = Effect.fn("DevelopmentSignIn.make")(function* (
   deliver: DeliverCode = logCode,
 ): Effect.fn.Return<SignIn.Interface, never, Crypto.Crypto> {
   const crypto = yield* Crypto.Crypto;
-  const pending = new Map<SignIn.Email, PendingCode>();
+  const pending = new Map<Accounts.Email, PendingCode>();
   const start: SignIn.Interface["start"] = Effect.fn("DevelopmentSignIn.start")(function* (email) {
     const bytes = yield* Effect.orDie(crypto.randomBytes(4));
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

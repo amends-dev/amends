@@ -1057,3 +1057,12 @@ export const sessionLogEntries = pgTable(
     check("session_log_entry_turn", sql`(${t.kind} = 'Joined') = (${t.turnId} IS NULL)`),
   ],
 );
+
+/**
+ * The people this host knows, across its workspaces: the one table not kept per workspace. An
+ * address is held lowercase, so it is unique as written.
+ */
+export const accounts = pgTable("accounts", {
+  humanId: text("human_id").primaryKey(),
+  email: text("email").notNull().unique(),
+});

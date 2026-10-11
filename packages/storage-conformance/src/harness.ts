@@ -1,11 +1,11 @@
-import type { WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway";
+import type { Accounts, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway";
 import type { Context, Crypto, Effect, Layer, Scope } from "effect";
 
 /**
- * The gateway contracts a storage adapter implements; one host holds both. Hosts over the same
+ * The gateway contracts a storage adapter implements; one host holds them all. Hosts over the same
  * storage share each workspace's signals, as processes over one system do.
  */
-export type Host = WorkspaceStorage.Service | WorkspaceDirectory.Service;
+export type Host = WorkspaceStorage.Service | WorkspaceDirectory.Service | Accounts.Service;
 
 export interface HostOptions {
   /**

@@ -1,3 +1,8 @@
+CREATE TABLE "accounts" (
+	"human_id" text PRIMARY KEY,
+	"email" text NOT NULL UNIQUE
+);
+--> statement-breakpoint
 CREATE TABLE "agents" (
 	"workspace_id" text,
 	"id" text,

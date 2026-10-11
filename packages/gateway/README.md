@@ -84,18 +84,23 @@ projection tables directly.
 - `WorkspaceStorage.Service` binds one workspace's stores and its `SignalHub.Service`, which
   delivers [signals](../core/README.md#signals) between every process over the same storage, best
   effort.
+- `Accounts.Service` holds the people a host knows across its workspaces: `findOrCreate` gives an
+  address's `Accounts.Account`, its `id`, the human ID core names the person by, and its `email`,
+  creating it the first time the address comes up; `findByIds` reads accounts back by ID. The ID is
+  the host's own and never the address. `Accounts.Email` trims and lowercases an address as it
+  decodes, so one address is one account however it was typed.
 - `SignIn.Service` produces authenticated people: `start` delivers a one-time code to an address,
   and `complete` exchanges it for a `SignIn.Session`, a token the host's authentication accepts and
-  the `humanId`.
+  the `humanId` of the address's account.
 - `SessionTokens.Service` resolves a session token into an identity.
 - `WorkspaceDirectory.Service` is one identity's routing table, `WorkspaceDirectory.Listing`: its
   memberships, ended ones included, each with its workspace's `activeMemberCount`, and its pending
   invitations.
 
 These span workspaces or issue credentials, which core never does, so hosts implement them; there is
-no default `make` or `layer` here. The `./sign-in` and `./directory` exports carry their schemas for
-contracts. On the wire, a session's `humanId` is `identity` and a membership's `activeMemberCount`
-is `people`.
+no default `make` or `layer` here. The `./accounts`, `./sign-in`, and `./directory` exports carry
+their schemas for contracts. On the wire, a session's `humanId` is `identity` and a membership's
+`activeMemberCount` is `people`.
 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces through
 `inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do.
