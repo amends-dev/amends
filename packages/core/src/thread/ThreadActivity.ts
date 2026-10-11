@@ -7,11 +7,11 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as Subject from "../journal/subject.ts";
+import * as Subject from "../journal/Subject.ts";
 import * as ThreadId from "./ThreadId.ts";
 import * as ThreadParticipationId from "./ThreadParticipationId.ts";
-import * as WorkspaceId from "../workspace/id.ts";
-import * as Notification from "../notification/notification.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as Notification from "../notification/Notification.ts";
 
 /**
  * Names an activity.

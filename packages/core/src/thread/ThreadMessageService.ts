@@ -7,23 +7,23 @@
  *
  * @since 0.1.0
  */
-import * as Identity from "../identity/identity.ts";
+import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Schema } from "effect";
-import * as Authorization from "../authorization/authorization.ts";
-import * as Requirement from "../authorization/requirement.ts";
-import * as AgentPermissions from "../agent/permissions.ts";
-import * as Actor from "../identity/actor.ts";
-import * as Journal from "../journal/journal.ts";
-import * as Publication from "../journal/publication.ts";
-import * as Store from "../journal/store.ts";
+import * as Authorization from "../authorization/Authorization.ts";
+import * as Requirement from "../authorization/Requirement.ts";
+import * as AgentPermissions from "../agent/AgentPermissions.ts";
+import * as Actor from "../identity/Actor.ts";
+import * as Journal from "../journal/Journal.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
 import * as ThreadCommand from "./ThreadCommand.ts";
 import * as ThreadQuery from "./ThreadQuery.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
-import type * as Member from "../workspace/member/member.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as ThreadMessage from "./ThreadMessage.ts";
 import * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts";
-import * as ReadStateCommand from "../read-state/command.ts";
-import * as Request from "../request/request.ts";
+import * as ReadStateCommand from "../read-state/ReadStateCommand.ts";
+import * as Request from "../request/Request.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 import {
   Changed,
@@ -34,9 +34,9 @@ import {
   NotFound,
   ParticipantUnavailable,
 } from "./ThreadMessageErrors.ts";
-import * as Notification from "../notification/notification.ts";
-import * as Signal from "../signal/signal.ts";
-import * as SignalHub from "../signal/hub.ts";
+import * as Notification from "../notification/Notification.ts";
+import * as Signal from "../signal/Signal.ts";
+import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
 export {
   Changed,

@@ -1,0 +1,349 @@
+/** What the suites share: identities, bound stores, and cores and gateways over a host. */
+import * as Core from "@amends-dev/core";
+import { ReadStateStore } from "@amends-dev/core/read-state";
+import {
+  Assignment,
+  AssignmentFacts,
+  AssignmentStore,
+  BuiltinRoles,
+  type Role,
+  RoleStore,
+} from "@amends-dev/core/authorization";
+import {
+  GroupQuery,
+  GroupFollowStore,
+  GroupMembershipStore,
+  GroupStore,
+} from "@amends-dev/core/group";
+import { type Actor, Identity, Performer } from "@amends-dev/core/identity";
+import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
+import {
+  type ThreadActivity,
+  ThreadActivityKind,
+  ThreadActivityResolvers,
+  ThreadActivityStore,
+  ThreadCommand,
+  ThreadMessage,
+  ThreadMessageActivity,
+  ThreadMessageStore,
+  ThreadMessageTimeline,
+  ThreadParticipationStore,
+  ThreadParticipationTimeline,
+  ThreadQuery,
+  ThreadStore,
+} from "@amends-dev/core/thread";
+import {
+  type Invitation,
+  InvitationStore,
+  Member,
+  MemberFacts,
+  MemberStore,
+  Workspace,
+  WorkspaceInitialization,
+  WorkspaceStore,
+} from "@amends-dev/core/workspace";
+import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/connection";
+import { AgentStore } from "@amends-dev/core/agent";
+import {
+  ChannelBindingStore,
+  ChannelStore,
+  ContactStore,
+  DeliveryJobs,
+  DeliveryStore,
+} from "@amends-dev/core/channel";
+import { TaskStore, TaskTimeline } from "@amends-dev/core/task";
+import { Integrations } from "@amends-dev/connection";
+import {
+  SessionLogStore,
+  SessionStateStore,
+  TurnJobs,
+  TurnStore,
+  TurnTimeline,
+} from "@amends-dev/core/turn";
+import { Gateway, WorkspaceStorage } from "../index.ts";
+import { Clock, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import type { Host, Storage } from "./Fixture.ts";
+
+export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
+export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
+export const charlie = Identity.Reference.cases.Human.make({
+  id: Identity.HumanId.make("charlie"),
+});
+export const workspaceId = Workspace.Id.make("workspace-one");
+export const otherWorkspaceId = Workspace.Id.make("workspace-two");
+export const journalLog = Log.Id.make("journal");
+
+/** The bound stores by name, for direct assertions beside the context core receives. */
+export const bind = (
+  context: Context.Context<
+    | WorkspaceStorage.Bindings
+    | TurnJobs.TurnJobs
+    | DeliveryJobs.DeliveryJobs
+    | Integrations.Integrations
+    | Crypto.Crypto
+  >,
+) => ({
+  context,
+  threads: Context.get(context, ThreadStore.ThreadStore),
+  participations: Context.get(context, ThreadParticipationStore.ThreadParticipationStore),
+  messages: Context.get(context, ThreadMessageStore.ThreadMessageStore),
+  activities: Context.get(context, ThreadActivityStore.ThreadActivityStore),
+  tasks: Context.get(context, TaskStore.TaskStore),
+  channels: Context.get(context, ChannelStore.ChannelStore),
+  channelBindings: Context.get(context, ChannelBindingStore.ChannelBindingStore),
+  contacts: Context.get(context, ContactStore.ContactStore),
+  deliveries: Context.get(context, DeliveryStore.DeliveryStore),
+  store: Context.get(context, Store.Store),
+  checkpoints: Context.get(context, Checkpoint.Checkpoint),
+  workspace: Context.get(context, WorkspaceStore.WorkspaceStore),
+  members: Context.get(context, MemberStore.MemberStore),
+  roles: Context.get(context, RoleStore.RoleStore),
+  assignments: Context.get(context, AssignmentStore.AssignmentStore),
+  invitations: Context.get(context, InvitationStore.InvitationStore),
+  notifications: Context.get(context, NotificationStore.NotificationStore),
+  groups: Context.get(context, GroupStore.GroupStore),
+  groupMemberships: Context.get(context, GroupMembershipStore.GroupMembershipStore),
+  groupFollows: Context.get(context, GroupFollowStore.GroupFollowStore),
+  readStates: Context.get(context, ReadStateStore.ReadStateStore),
+  connections: Context.get(context, ConnectionStore.ConnectionStore),
+  connectionCredentials: Context.get(context, ConnectionCredentialStore.ConnectionCredentialStore),
+  agents: Context.get(context, AgentStore.AgentStore),
+  turns: Context.get(context, TurnStore.TurnStore),
+  sessionStates: Context.get(context, SessionStateStore.SessionStateStore),
+  sessionLogs: Context.get(context, SessionLogStore.SessionLogStore),
+});
+export type Bound = ReturnType<typeof bind>;
+
+/**
+ * A recipient's notifications oldest first, as a suite reads all of them: the inbox's newest-first
+ * page, reversed.
+ */
+export const listOldestFirst = (
+  notificationStore: NotificationStore.NotificationStore["Service"],
+  recipient: Notification.Recipient,
+  options: { readonly limit: number },
+) =>
+  Effect.map(notificationStore.listLatestByRecipient(recipient, options), (latest) =>
+    latest.toReversed(),
+  );
+
+/**
+ * A workspace's stores and signal hub, with the host's cryptography, no integrations, and jobs
+ * that accept requests and run nothing: the suites run turns themselves when they need to.
+ */
+const withHostServices = (
+  context: Context.Context<WorkspaceStorage.Bindings>,
+  crypto: Crypto.Crypto,
+) =>
+  Effect.map(Integrations.make([]), (integrations) =>
+    bind(
+      context.pipe(
+        Context.add(Crypto.Crypto, crypto),
+        Context.add(TurnJobs.TurnJobs, TurnJobs.noRunner),
+        Context.add(DeliveryJobs.DeliveryJobs, DeliveryJobs.noRunner),
+        Context.add(Integrations.Integrations, integrations),
+      ),
+    ),
+  );
+
+/** One workspace's stores and signals on a host. */
+export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
+  Effect.flatMap(Context.get(host, WorkspaceStorage.WorkspaceStorage).forWorkspace(id), (context) =>
+    withHostServices(context, Context.get(host, Crypto.Crypto)),
+  );
+
+/** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
+export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
+  const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage;
+  const crypto = yield* Crypto.Crypto;
+  return yield* withHostServices(yield* workspaceStorage.forWorkspace(id), crypto);
+});
+
+/**
+ * The bound stores with each commit failing after its program completes, before it commits: a
+ * failure after every projection has written, as a late write in the commit would cause.
+ */
+export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
+  Object.assign({}, bound, {
+    context: Context.add(
+      bound.context,
+      Store.Store,
+      Store.Store.of(
+        Object.assign({}, bound.store, {
+          transaction: <A, E, R>(program: Effect.Effect<A, E, R>) =>
+            bound.store.transaction(Effect.andThen(program, Effect.fail(failure))),
+        }),
+      ),
+    ),
+  });
+
+/** Run a program on a new host over the storage, which stays open for the enclosing scope. */
+export const runHost = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
+  Effect.flatMap(storage.connect(), (host) => Effect.provide(program, host));
+
+/** Core over one workspace's bound stores, with the host's cryptography, as a host runs it. */
+export const core = (bound: Bound) =>
+  Core.layer.pipe(Layer.provideMerge(Layer.succeedContext(bound.context)));
+
+/** A gateway over a host, installing what `options` say, and running no jobs. */
+export const gateway = (host: Context.Context<Host>, options: Gateway.Options = {}) =>
+  Gateway.layer(options).pipe(
+    Layer.provideMerge(
+      Layer.mergeAll(
+        Layer.succeedContext(host),
+        TurnJobs.layerNoRunner,
+        DeliveryJobs.layerNoRunner,
+      ),
+    ),
+  );
+
+/** Initialize the bound workspace for its creator, as the gateway's bootstrap does. */
+export const initialized = (bound: Bound, creator = alice.id) =>
+  WorkspaceInitialization.initialize(creator, {
+    name: "Test workspace",
+    memberName: Member.Name.make(creator),
+  }).pipe(Effect.provide(core(bound)));
+
+/** Add members, giving some the viewer role, as invitation acceptance would. */
+export const seed = (
+  bound: Bound,
+  members: ReadonlyArray<Actor.Value>,
+  viewers: ReadonlyArray<Actor.Value>,
+) =>
+  Effect.flatMap(Journal.Journal, (journal) =>
+    journal.commit(
+      Effect.gen(function* () {
+        for (const member of members)
+          yield* journal.publish(MemberFacts.Added, {
+            workspaceId: bound.store.workspaceId,
+            memberId: member.memberId,
+            identity: member.identity,
+            name: Member.Name.make(member.identity.id),
+          });
+        for (const viewer of viewers)
+          yield* journal.publish(AssignmentFacts.Created, {
+            workspaceId: bound.store.workspaceId,
+            assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
+            memberId: viewer.memberId,
+            source: {
+              _tag: "Role",
+              roleId: BuiltinRoles.MemberId,
+              scope: { _tag: "Workspace", workspaceId: bound.store.workspaceId },
+            },
+          });
+      }),
+    ),
+  ).pipe(
+    Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
+    Effect.provide(core(bound)),
+  );
+
+/** Run a program on a gateway over a new host, which stays open for the enclosing scope. */
+export const runGateway = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
+  Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host))));
+
+/** The message a timeline activity publishes, when it is a message publication. */
+export const publishedMessage = (activity: ThreadActivity.Record) =>
+  ThreadActivityKind.is(ThreadMessageActivity.Published)(activity)
+    ? Schema.decodeUnknownSync(ThreadMessageActivity.Published.details)(activity.details).messageId
+    : undefined;
+
+/**
+ * A post's result with the timeline activity that placed its message, read back from the store:
+ * starts and replies return what they created, not where it landed in the timeline.
+ */
+export const placed = Effect.fnUntraced(function* <
+  A extends { readonly message: ThreadMessage.Record },
+>(result: A) {
+  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
+  const found = (yield* threadActivityStore.listByThread(result.message.threadId)).find(
+    (activity) => publishedMessage(activity) === result.message.id,
+  );
+  if (found === undefined) return yield* Effect.die(new Error("A posted message has no activity"));
+  const activity = yield* Effect.orDie(
+    ThreadActivityKind.decode(ThreadMessageActivity.Published, found),
+  );
+  return Object.assign({}, result, { activity });
+});
+
+/** `placed`, reading a workspace binding's store, for a post made through the gateway. */
+export const placedIn =
+  (bound: Bound) =>
+  <A extends { readonly message: ThreadMessage.Record }>(result: A) =>
+    placed(result).pipe(
+      Effect.provideService(ThreadActivityStore.ThreadActivityStore, bound.activities),
+    );
+
+/**
+ * Core's internal thread reads and writes, for fixtures that write what no operation does. Provide
+ * it over a workspace's core; timelines resolve as core registers them.
+ */
+export const threadInternals = ThreadCommand.layer.pipe(
+  Layer.provideMerge(ThreadQuery.layer),
+  Layer.provide(
+    Layer.mergeAll(
+      GroupQuery.layer,
+      ThreadActivityResolvers.layer([
+        ThreadMessageTimeline.resolver,
+        ThreadParticipationTimeline.resolver,
+        TurnTimeline.resolver,
+        TaskTimeline.resolver,
+      ]),
+    ),
+  ),
+);
+
+/** Attribution for low-level fixture writes outside application operations. */
+export const testProvenance = (id = workspaceId): Event.Provenance => ({
+  workspaceId: id,
+  performedBy: { _tag: "System", id: Performer.SystemId.make("test-fixture") },
+  causedBy: null,
+  correlationId: Event.CorrelationId.make("test-operation"),
+  occurredAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
+});
+
+export const future = DateTime.now.pipe(Effect.map((now) => DateTime.add(now, { hours: 1 })));
+
+/** Run a program with the clock reading a fixed time; sleeping still uses the real clock. */
+export const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>) =>
+  Effect.clockWith((clock) =>
+    program.pipe(
+      Effect.provideService(Clock.Clock, {
+        currentTimeMillis: Effect.succeed(DateTime.toEpochMillis(time)),
+        currentTimeMillisUnsafe: () => DateTime.toEpochMillis(time),
+        currentTimeNanos: Effect.succeed(BigInt(DateTime.toEpochMillis(time)) * 1_000_000n),
+        currentTimeNanosUnsafe: () => BigInt(DateTime.toEpochMillis(time)) * 1_000_000n,
+        monotonicTimeNanos: clock.monotonicTimeNanos,
+        monotonicTimeNanosUnsafe: () => clock.monotonicTimeNanosUnsafe(),
+        sleep: (duration) => clock.sleep(duration),
+      }),
+    ),
+  );
+
+export const request = (
+  expiresAt: DateTime.Utc,
+  recipientId = bob.id,
+  roleId: Role.Id = BuiltinRoles.MemberId,
+): Invitation.IssueInput => ({ recipientId, expiresAt, roleId });
+
+/**
+ * Replace what a store's by-ID reads return for one ID, in both single and batch reads;
+ * `Option.none()` hides the record. Other IDs read through to the store.
+ */
+export const replacing = <Id, A, E>(
+  store: {
+    readonly get: (id: Id) => Effect.Effect<Option.Option<A>, E>;
+    readonly getMany: (ids: ReadonlyArray<Id>) => Effect.Effect<ReadonlyArray<A>, E>;
+  },
+  id: Id,
+  replacement: Option.Option<A>,
+) => ({
+  get: (requested: Id) => (requested === id ? Effect.succeed(replacement) : store.get(requested)),
+  getMany: (ids: ReadonlyArray<Id>) =>
+    Effect.map(store.getMany(ids.filter((requested) => requested !== id)), (rows) =>
+      ids.includes(id)
+        ? [...rows, ...(Option.isSome(replacement) ? [replacement.value] : [])]
+        : rows,
+    ),
+});

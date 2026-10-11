@@ -7,29 +7,29 @@
  *
  * @since 0.1.0
  */
-import * as Identity from "../identity/identity.ts";
+import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import * as AgentPermissions from "../agent/permissions.ts";
-import * as Authorization from "../authorization/authorization.ts";
-import * as Requirement from "../authorization/requirement.ts";
-import * as Actor from "../identity/actor.ts";
-import * as Group from "../group/group.ts";
-import * as GroupQuery from "../group/query.ts";
-import * as GroupMembershipStore from "../group/membership/store.ts";
-import * as Member from "../workspace/member/member.ts";
-import * as MemberStore from "../workspace/member/store.ts";
-import * as Journal from "../journal/journal.ts";
-import type * as Log from "../journal/log.ts";
-import type * as Projection from "../journal/projection.ts";
-import * as Publication from "../journal/publication.ts";
-import * as Store from "../journal/store.ts";
+import * as AgentPermissions from "../agent/AgentPermissions.ts";
+import * as Authorization from "../authorization/Authorization.ts";
+import * as Requirement from "../authorization/Requirement.ts";
+import * as Actor from "../identity/Actor.ts";
+import * as Group from "../group/Group.ts";
+import * as GroupQuery from "../group/GroupQuery.ts";
+import * as GroupMembershipStore from "../group/GroupMembershipStore.ts";
+import * as Member from "../workspace/Member.ts";
+import * as MemberStore from "../workspace/MemberStore.ts";
+import * as Journal from "../journal/Journal.ts";
+import type * as Log from "../journal/Log.ts";
+import type * as Projection from "../journal/Projection.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
 import * as Thread from "./Thread.ts";
 import * as ThreadStore from "./ThreadStore.ts";
 import * as ThreadCommand from "./ThreadCommand.ts";
-import * as GroupStore from "../group/store.ts";
-import * as GroupCommand from "../group/command.ts";
-import type * as GroupFollowStore from "../group/follow/store.ts";
+import * as GroupStore from "../group/GroupStore.ts";
+import * as GroupCommand from "../group/GroupCommand.ts";
+import type * as GroupFollowStore from "../group/GroupFollowStore.ts";
 import * as ThreadQuery from "./ThreadQuery.ts";
 import * as ThreadPermissions from "./ThreadPermissions.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
@@ -42,9 +42,9 @@ import * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
 import * as ThreadMessage from "./ThreadMessage.ts";
 import * as ThreadFacts from "./ThreadFacts.ts";
 import * as ThreadTitleActivity from "./ThreadTitleActivity.ts";
-import * as ReadStateCommand from "../read-state/command.ts";
-import type * as ReadState from "../read-state/read-state.ts";
-import * as Request from "../request/request.ts";
+import * as ReadStateCommand from "../read-state/ReadStateCommand.ts";
+import type * as ReadState from "../read-state/ReadState.ts";
+import * as Request from "../request/Request.ts";
 import * as Task from "../task/Task.ts";
 import * as TaskCommand from "../task/TaskCommand.ts";
 import * as TaskPermissions from "../task/TaskPermissions.ts";
@@ -57,7 +57,7 @@ import {
   NotFound,
   ParticipantUnavailable,
 } from "./ThreadErrors.ts";
-import * as Notification from "../notification/notification.ts";
+import * as Notification from "../notification/Notification.ts";
 export {
   Changed,
   DirectMembersRequired,

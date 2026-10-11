@@ -264,7 +264,7 @@ domain's step, which publishes the domain fact and returns the kind, details, an
 A kind appears in timelines through a resolver its domain registers, such as
 `ThreadMessageTimeline.resolver` or `TurnTimeline.resolver`. Each loads what its kinds reference in
 one batch per page and returns typed items, and adds its item type to `ThreadActivityKind.Item` by
-module augmentation. `src/core.ts` registers the resolvers, and `ThreadTimeline.Item` is the closed
+module augmentation. `src/index.ts` registers the resolvers, and `ThreadTimeline.Item` is the closed
 schema of every item, for protocols that encode timelines: a new kind adds its resolver to the first
 and its item schema to the second. Reading a kind without a resolver is a defect,
 `ThreadActivityResolvers.Unknown`.
@@ -526,7 +526,7 @@ its view. `Ready`'s cursor is null only for an empty journal.
 
 A reader sees an event when they hold a scope in its fact's
 [audience](../../docs/journal.md#fact-audiences), the workspace, their membership or identity, or a
-group they belong to, and any read permission the registry in `src/change-feed/events.ts` names for
+group they belong to, and any read permission the registry in `src/change-feed/ChangeFeedEvents.ts` names for
 it: `invitation.manage` for invitations, `member.read` and `assignment.read` for membership and
 access changes, `group.read` for group facts, and `thread.read` for thread facts. A registration can
 name the member a fact concerns, who sees it without the permission. Their membership, admissions,
@@ -616,31 +616,28 @@ subscribers present, through `SignalHub.makeLocal`; nothing is kept.
 A feature owns a domain concept, its rules, and its lifecycle, and keeps the models, operations,
 facts, projection, permissions, and store contract that evolve together in one directory. Add files
 when those responsibilities exist; a small feature needs no empty version of every module.
-Membership shows the layout:
+Membership, in the workspace feature, shows the layout: one module per namespace, named after it
+and flat in the feature directory, as the Effect repository lays its modules out.
 
 ```text
-src/workspace/member/
-  member.ts       domain schemas, value types, and pure functions
-  id.ts           the ID alone, where references would otherwise make a cycle
-  service.ts      the operations actors call, authorized
-  command.ts      the internal writes other operations share
-  errors.ts       outcomes a caller can act on, as schemas only
-  store.ts        the persistence contract adapters implement
-  facts.ts        versioned declarations of recorded changes
-  projection.ts   replays the facts into the store, exported as `definition`
-  permissions.ts  the permissions the feature owns
+src/workspace/
+  Member.ts             domain schemas, value types, and pure functions
+  MemberId.ts           the ID alone, where references would otherwise make a cycle
+  MemberService.ts      the operations actors call, authorized
+  MemberCommand.ts      the internal writes other operations share
+  MemberErrors.ts       outcomes a caller can act on, as schemas only
+  MemberStore.ts        the persistence contract adapters implement
+  MemberFacts.ts        versioned declarations of recorded changes
+  MemberProjection.ts   replays the facts into the store, exported as `definition`
+  MemberPermissions.ts  the permissions the feature owns
 ```
 
-The internal reads other operations share go in one `query.ts`. A command may read through the
-query; a query never writes; and a step with one caller stays a private function of that caller. Use
-short filenames within a feature and descriptive namespaces: `member/store.ts` exports
-`MemberStore`, and `member/service.ts` exports `MemberService`.
+The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
+the query; a query never writes; and a step with one caller stays a private function of that caller.
+Helpers no consumer imports go under `internal/`.
 
-The thread, task, and channel features are written as the published packages are, and the other
-domains follow when touched: one module per namespace, named after it and flat in the feature
-directory (`thread/ThreadMessageService.ts` exports `ThreadMessageService`), helpers no consumer
-imports under `internal/`, a header paragraph and `@since` on every module, `@category` and `@since`
-on every export, and a service key that names its module, such as
+Every module is written as the published packages are: a header paragraph and `@since` on every
+module, `@category` and `@since` on every export, and a service key that names its module, such as
 `@amends-dev/core/thread/ThreadStore`; see [threads](../../docs/threads.md#code-conventions).
 
 ### Dependencies and exports

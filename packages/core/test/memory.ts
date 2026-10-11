@@ -7,10 +7,10 @@ import { Context, Effect, Layer, Ref } from "effect";
 import { AssignmentStore, RoleStore } from "../src/authorization/index.ts";
 import type { Commit } from "../src/journal/index.ts";
 import { Checkpoint, Store } from "../src/journal/index.ts";
-import * as Binding from "../src/memory/binding.ts";
-import * as MemoryConnection from "../src/memory/connection.ts";
-import * as MemoryDatabase from "../src/memory/database.ts";
-import * as MemoryStores from "../src/memory/stores.ts";
+import * as Binding from "../src/memory/Binding.ts";
+import * as MemoryConnection from "../src/memory/MemoryConnection.ts";
+import * as MemoryDatabase from "../src/memory/MemoryDatabase.ts";
+import * as MemoryStores from "../src/memory/MemoryStores.ts";
 import { MemberStore, Workspace } from "../src/workspace/index.ts";
 
 /** A projection target: a number the transaction stages, like any projected record. */

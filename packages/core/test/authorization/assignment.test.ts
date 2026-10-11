@@ -1,16 +1,16 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
-import * as AssignmentFacts from "../../src/authorization/assignment/facts.ts";
-import * as Assignment from "../../src/authorization/assignment/assignment.ts";
-import * as Grant from "../../src/authorization/grant.ts";
-import * as Permission from "../../src/authorization/permission.ts";
-import * as Role from "../../src/authorization/role/role.ts";
-import * as Scope from "../../src/authorization/scope.ts";
-import * as Target from "../../src/authorization/target.ts";
-import * as Codec from "../../src/journal/codec.ts";
-import * as Member from "../../src/workspace/member/member.ts";
-import * as MemberPermissions from "../../src/workspace/member/permissions.ts";
-import * as Workspace from "../../src/workspace/workspace.ts";
+import * as AssignmentFacts from "../../src/authorization/AssignmentFacts.ts";
+import * as Assignment from "../../src/authorization/Assignment.ts";
+import * as Grant from "../../src/authorization/Grant.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as Role from "../../src/authorization/Role.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Codec from "../../src/journal/Codec.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-1");
 const recipientId = Member.Id.make("recipient");

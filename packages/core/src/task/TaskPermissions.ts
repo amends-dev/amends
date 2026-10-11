@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/permission.ts";
+import * as Permission from "../authorization/Permission.ts";
 
 /**
  * Create a task in a group: with its thread, or in one of the group's conversations.

@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { fileURLToPath } from "node:url";
-import * as ChangeFeedEvents from "../../src/change-feed/events.ts";
-import type * as Fact from "../../src/journal/fact.ts";
+import * as ChangeFeedEvents from "../../src/change-feed/ChangeFeedEvents.ts";
+import type * as Fact from "../../src/journal/Fact.ts";
 
 const isFact = (value: unknown): value is Fact.Definition =>
   typeof value === "object" &&
@@ -13,7 +13,7 @@ const isFact = (value: unknown): value is Fact.Definition =>
 it("the change feed delivers every fact with an audience, and only those", async () => {
   const source = fileURLToPath(new URL("../../src", import.meta.url));
   const facts: Array<Fact.Definition> = [];
-  for await (const path of new Bun.Glob("**/facts.ts").scan({ cwd: source }))
+  for await (const path of new Bun.Glob("**/*Facts.ts").scan({ cwd: source }))
     for (const value of Object.values(await import(`${source}/${path}`)))
       if (isFact(value)) facts.push(value);
   expect(facts.length).toBeGreaterThan(20);

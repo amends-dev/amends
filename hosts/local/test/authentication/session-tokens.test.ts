@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import { SessionTokens } from "@amends-dev/gateway";
 import { Identity } from "@amends-dev/core/identity";
 import { Effect, Redacted } from "effect";
-import * as DevelopmentSessionTokens from "../../src/authentication/session-tokens.ts";
+import * as DevelopmentSessionTokens from "../../src/DevelopmentSessionTokens.ts";
 
 it.effect.each(["make", "layer"] as const)(
   "development session tokens %s trust asserted human IDs and reject empty tokens",

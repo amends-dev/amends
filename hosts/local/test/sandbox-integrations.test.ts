@@ -4,7 +4,7 @@ import { BunServices } from "@effect/platform-bun";
 import { describe, expect, layer } from "@effect/vitest";
 import { Effect, Fiber, FileSystem, Path, Redacted } from "effect";
 import { TestClock } from "effect/testing";
-import * as SandboxIntegrations from "../src/sandbox-integrations.ts";
+import * as SandboxIntegrations from "../src/SandboxIntegrations.ts";
 import { serveDaytona } from "./fake-daytona.ts";
 
 const machine = (id: string): Connection.Connection => ({

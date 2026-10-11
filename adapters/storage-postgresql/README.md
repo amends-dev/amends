@@ -29,7 +29,7 @@ queries, and journal transactions all share it.
 
 ## Schema
 
-`src/schema.ts` gives every record field its own column, except a few whose shape varies by kind,
+`src/internal/schema.ts` gives every record field its own column, except a few whose shape varies by kind,
 stored as JSON: an activity's details, a session log entry's details, a connection's settings, a
 channel binding's conversation, and what a harness's agent returned of its session. Each table leads
 its primary key with `workspace_id`, and each reference between tables carries the workspace, so a
@@ -268,7 +268,7 @@ Follow the [adapter conventions](../README.md).
 
 ## Development
 
-To change the schema, edit `src/schema.ts`, remove the generated baseline in `drizzle/`, generate a
+To change the schema, edit `src/internal/schema.ts`, remove the generated baseline in `drizzle/`, generate a
 new one, commit it, and reset development databases:
 
 ```sh

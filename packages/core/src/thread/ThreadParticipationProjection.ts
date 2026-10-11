@@ -8,8 +8,8 @@
  * @since 0.1.0
  */
 import { Effect, Option } from "effect";
-import * as GroupMembershipFacts from "../group/membership/facts.ts";
-import * as Projection from "../journal/projection.ts";
+import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
+import * as Projection from "../journal/Projection.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 

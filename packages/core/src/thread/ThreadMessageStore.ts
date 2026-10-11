@@ -7,12 +7,12 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type * as Store from "../journal/store.ts";
+import type * as Store from "../journal/Store.ts";
 
 import * as ThreadMessage from "./ThreadMessage.ts";
 import * as ThreadId from "./ThreadId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * How many messages a thread holds whose content remains.

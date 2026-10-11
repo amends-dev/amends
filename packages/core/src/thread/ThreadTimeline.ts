@@ -9,7 +9,7 @@ import { Schema } from "effect";
 import * as ThreadMessageTimeline from "./ThreadMessageTimeline.ts";
 import * as ThreadParticipationTimeline from "./ThreadParticipationTimeline.ts";
 import * as ThreadTitleTimeline from "./ThreadTitleTimeline.ts";
-import * as TurnTimeline from "../turn/timeline.ts";
+import * as TurnTimeline from "../turn/TurnTimeline.ts";
 import * as TaskTimeline from "../task/TaskTimeline.ts";
 
 /**

@@ -7,7 +7,7 @@
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * The decoders, compiled once per schema.

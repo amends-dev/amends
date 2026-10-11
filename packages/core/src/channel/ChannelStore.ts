@@ -7,10 +7,10 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type * as Store from "../journal/store.ts";
+import type * as Store from "../journal/Store.ts";
 import * as Channel from "./Channel.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * Storage failed while reading or writing channels.

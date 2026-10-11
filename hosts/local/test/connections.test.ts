@@ -8,9 +8,9 @@ import { DateTime, Effect, Layer, Redacted } from "effect";
 import { Base64 } from "effect/encoding";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import * as DevelopmentAuthentication from "../src/authentication/authentication.ts";
-import * as LocalHost from "../src/host.ts";
-import * as LocalServer from "../src/server.ts";
+import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
+import * as LocalHost from "../src/LocalHost.ts";
+import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");

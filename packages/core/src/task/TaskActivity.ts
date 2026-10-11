@@ -8,7 +8,7 @@
 import { Schema } from "effect";
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
 import * as ThreadMessage from "../thread/ThreadMessage.ts";
-import * as MemberId from "../workspace/member/id.ts";
+import * as MemberId from "../workspace/MemberId.ts";
 import * as Task from "./Task.ts";
 
 /**

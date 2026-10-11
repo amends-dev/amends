@@ -1,8 +1,8 @@
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
-import * as PermissionCatalog from "../../src/authorization/permission-catalog.ts";
-import * as Permission from "../../src/authorization/permission.ts";
-import * as MemberPermissions from "../../src/workspace/member/permissions.ts";
+import * as PermissionCatalog from "../../src/authorization/PermissionCatalog.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
 
 it.effect(
   "the catalog layer resolves domain declarations and overrides through a stable service",

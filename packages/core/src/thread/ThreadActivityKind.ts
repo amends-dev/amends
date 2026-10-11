@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
-import * as Subject from "../journal/subject.ts";
+import * as Subject from "../journal/Subject.ts";
 import * as ThreadActivity from "./ThreadActivity.ts";
 import type * as ThreadId from "./ThreadId.ts";
 

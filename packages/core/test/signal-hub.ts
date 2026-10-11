@@ -1,6 +1,6 @@
 import { Effect, Layer, PubSub, Stream } from "effect";
-import type * as Signal from "../src/signal/signal.ts";
-import * as SignalHub from "../src/signal/hub.ts";
+import type * as Signal from "../src/signal/Signal.ts";
+import * as SignalHub from "../src/signal/SignalHub.ts";
 
 /** Signals within one test process: subscribers receive what is published after they register. */
 export const make = Effect.fnUntraced(function* () {

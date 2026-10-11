@@ -1,15 +1,15 @@
 import { expect, it } from "@effect/vitest";
 import { Context, Effect, Layer, Schema } from "effect";
-import * as Checkpoint from "../../src/journal/checkpoint.ts";
-import * as Fact from "../../src/journal/fact.ts";
-import * as Journal from "../../src/journal/journal.ts";
-import * as Log from "../../src/journal/log.ts";
-import * as Projection from "../../src/journal/projection.ts";
-import * as Publication from "../../src/journal/publication.ts";
-import type * as Reaction from "../../src/journal/reaction.ts";
-import * as Store from "../../src/journal/store.ts";
-import * as Subject from "../../src/journal/subject.ts";
-import * as WorkspaceId from "../../src/workspace/id.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Projection from "../../src/journal/Projection.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import type * as Reaction from "../../src/journal/Reaction.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Subject from "../../src/journal/Subject.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import { Counter, make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 

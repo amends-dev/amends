@@ -5,8 +5,8 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as Group from "../group/group.ts";
-import * as Member from "../workspace/member/member.ts";
+import * as Group from "../group/Group.ts";
+import * as Member from "../workspace/Member.ts";
 import * as Thread from "./Thread.ts";
 
 /**

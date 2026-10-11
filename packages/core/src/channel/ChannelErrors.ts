@@ -6,8 +6,8 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as Connection from "../connection/connection.ts";
-import * as GroupId from "../group/id.ts";
+import * as Connection from "../connection/Connection.ts";
+import * as GroupId from "../group/GroupId.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ChannelId from "./ChannelId.ts";
 

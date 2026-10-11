@@ -2,11 +2,11 @@ import { expect, it } from "@effect/vitest";
 import { Identity } from "@amends-dev/core/identity";
 import { Crypto, Effect, Layer, Option, Redacted } from "effect";
 import { Base64Url } from "effect/encoding";
-import * as Accounts from "../src/accounts.ts";
-import * as EmailSender from "../src/email-sender.ts";
-import * as EmailSignIn from "../src/email-sign-in.ts";
-import * as SignIn from "../src/sign-in.ts";
-import * as SignInStorage from "../src/sign-in-storage.ts";
+import * as Accounts from "../src/Accounts.ts";
+import * as EmailSender from "../src/EmailSender.ts";
+import * as EmailSignIn from "../src/EmailSignIn.ts";
+import * as SignIn from "../src/SignIn.ts";
+import * as SignInStorage from "../src/SignInStorage.ts";
 
 const ada = Accounts.Email.make("ada@example.com");
 const encoder = new TextEncoder();

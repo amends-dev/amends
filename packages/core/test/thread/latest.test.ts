@@ -15,12 +15,12 @@ import {
 import { Member } from "@amends-dev/core/workspace";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
-import * as Checkpoint from "../../src/journal/checkpoint.ts";
-import * as Journal from "../../src/journal/journal.ts";
-import * as Log from "../../src/journal/log.ts";
-import * as Publication from "../../src/journal/publication.ts";
-import * as Store from "../../src/journal/store.ts";
-import * as WorkspaceId from "../../src/workspace/id.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 

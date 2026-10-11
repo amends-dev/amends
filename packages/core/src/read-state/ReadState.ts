@@ -1,0 +1,36 @@
+import { Schema } from "effect";
+import * as GroupId from "../group/GroupId.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import type * as Notification from "../notification/Notification.ts";
+
+/** A person whose reading this is, as their notifications address them. Agents keep no read state. */
+export type Reader = Extract<Notification.Recipient, { readonly _tag: "Human" }>;
+
+/** How far a human member has read a thread, by timeline sequence. Private to that member. */
+export const ThreadPosition = Schema.Struct({
+  workspaceId: WorkspaceId.Id,
+  memberId: MemberId.Id,
+  threadId: ThreadId.Id,
+  readThrough: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export interface ThreadPosition extends Schema.Schema.Type<typeof ThreadPosition> {}
+
+/** When a human member last read a group's threads. Private to that member. */
+export const GroupRead = Schema.Struct({
+  workspaceId: WorkspaceId.Id,
+  memberId: MemberId.Id,
+  groupId: GroupId.Id,
+  readAt: Schema.DateTimeUtcFromString,
+});
+export interface GroupRead extends Schema.Schema.Type<typeof GroupRead> {}
+
+export const MarkThreadReadInput = Schema.Struct({
+  threadId: ThreadId.Id,
+  throughSequence: ThreadPosition.fields.readThrough,
+});
+export interface MarkThreadReadInput extends Schema.Schema.Type<typeof MarkThreadReadInput> {}
+
+export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.Id });
+export interface MarkGroupReadInput extends Schema.Schema.Type<typeof MarkGroupReadInput> {}

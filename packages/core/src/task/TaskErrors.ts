@@ -5,9 +5,9 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as GroupId from "../group/id.ts";
+import * as GroupId from "../group/GroupId.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
-import * as MemberId from "../workspace/member/id.ts";
+import * as MemberId from "../workspace/MemberId.ts";
 
 /**
  * The group is missing, or the actor is not a member of it; the two are not told apart.

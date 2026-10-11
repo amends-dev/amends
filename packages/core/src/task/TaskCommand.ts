@@ -20,9 +20,9 @@
  */
 import { Context, Effect, Layer, Option } from "effect";
 import type { DateTime } from "effect";
-import * as Journal from "../journal/journal.ts";
-import * as Publication from "../journal/publication.ts";
-import * as Store from "../journal/store.ts";
+import * as Journal from "../journal/Journal.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
 import type * as Thread from "../thread/Thread.ts";
 import type * as ThreadActivity from "../thread/ThreadActivity.ts";
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
@@ -31,9 +31,9 @@ import type * as ThreadMessage from "../thread/ThreadMessage.ts";
 import type * as ThreadParticipation from "../thread/ThreadParticipation.ts";
 import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as ThreadStore from "../thread/ThreadStore.ts";
-import * as TurnCommand from "../turn/command.ts";
-import * as TurnStore from "../turn/store.ts";
-import type * as Member from "../workspace/member/member.ts";
+import * as TurnCommand from "../turn/TurnCommand.ts";
+import * as TurnStore from "../turn/TurnStore.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as Task from "./Task.ts";
 import * as TaskActivity from "./TaskActivity.ts";
 import * as TaskFacts from "./TaskFacts.ts";

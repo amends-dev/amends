@@ -9,13 +9,13 @@
  * @since 0.1.0
  */
 import { Context, Effect, Layer, Schema } from "effect";
-import type * as Event from "../journal/event.ts";
-import type * as Reaction from "../journal/reaction.ts";
-import type * as Store from "../journal/store.ts";
-import * as Notification from "../notification/notification.ts";
+import type * as Event from "../journal/Event.ts";
+import type * as Reaction from "../journal/Reaction.ts";
+import type * as Store from "../journal/Store.ts";
+import * as Notification from "../notification/Notification.ts";
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
-import * as WorkspaceId from "../workspace/id.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * A delivery job: the deliveries of one bound thread.

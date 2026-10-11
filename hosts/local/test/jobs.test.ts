@@ -10,7 +10,7 @@ import { PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, Context, Duration, Effect, Exit, Layer, Option, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
-import * as LocalHost from "../src/host.ts";
+import * as LocalHost from "../src/LocalHost.ts";
 import { setup } from "./database.ts";
 
 const { available, withDatabase } = setup();

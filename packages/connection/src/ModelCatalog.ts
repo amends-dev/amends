@@ -12,7 +12,7 @@
  */
 import { ModelEndpoint } from "@amends-dev/harness";
 import { Context, Effect, Layer, Schema } from "effect";
-import { snapshot } from "./snapshot.ts";
+import { snapshot } from "./internal/snapshot.ts";
 
 /** A kind of content a model takes or gives. */
 export const Modality = Schema.Literals(["text", "image", "audio", "video", "pdf"]);

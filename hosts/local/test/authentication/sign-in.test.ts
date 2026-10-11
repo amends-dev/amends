@@ -4,9 +4,9 @@ import { Accounts, SessionTokens, SignIn } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Cause, Clock, Crypto, Deferred, Effect, Exit, Fiber, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
-import * as DevelopmentSignIn from "../../src/authentication/sign-in.ts";
-import * as DevelopmentSessionTokens from "../../src/authentication/session-tokens.ts";
-import * as DevelopmentAuthentication from "../../src/authentication/authentication.ts";
+import * as DevelopmentSignIn from "../../src/DevelopmentSignIn.ts";
+import * as DevelopmentSessionTokens from "../../src/DevelopmentSessionTokens.ts";
+import * as DevelopmentAuthentication from "../../src/DevelopmentAuthentication.ts";
 
 /** Accounts in memory: an address gets a random human ID the first time it comes up. */
 const inMemoryAccounts = Layer.sync(Accounts.Accounts, () => {

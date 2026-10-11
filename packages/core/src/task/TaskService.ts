@@ -7,21 +7,21 @@
  * @since 0.1.0
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import * as AgentPermissions from "../agent/permissions.ts";
-import * as Authorization from "../authorization/authorization.ts";
-import * as Requirement from "../authorization/requirement.ts";
-import type * as Group from "../group/group.ts";
-import type * as GroupQuery from "../group/query.ts";
-import * as Actor from "../identity/actor.ts";
-import * as Identity from "../identity/identity.ts";
-import * as Journal from "../journal/journal.ts";
-import * as Publication from "../journal/publication.ts";
-import * as Store from "../journal/store.ts";
+import * as AgentPermissions from "../agent/AgentPermissions.ts";
+import * as Authorization from "../authorization/Authorization.ts";
+import * as Requirement from "../authorization/Requirement.ts";
+import type * as Group from "../group/Group.ts";
+import type * as GroupQuery from "../group/GroupQuery.ts";
+import * as Actor from "../identity/Actor.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Journal from "../journal/Journal.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
 import * as Thread from "../thread/Thread.ts";
 import type * as ThreadCommand from "../thread/ThreadCommand.ts";
 import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as ThreadStore from "../thread/ThreadStore.ts";
-import type * as Member from "../workspace/member/member.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as Task from "./Task.ts";
 import * as TaskCommand from "./TaskCommand.ts";
 import {

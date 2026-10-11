@@ -1,17 +1,17 @@
 import { Subject } from "@amends-dev/core/journal";
-import * as Publication from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/Publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Ref, Schema, Stream } from "effect";
-import * as Checkpoint from "../../src/journal/checkpoint.ts";
-import * as Codec from "../../src/journal/codec.ts";
-import * as Fact from "../../src/journal/fact.ts";
-import * as Journal from "../../src/journal/journal.ts";
-import * as Log from "../../src/journal/log.ts";
-import * as Projection from "../../src/journal/projection.ts";
-import * as Store from "../../src/journal/store.ts";
-import * as WorkspaceId from "../../src/workspace/id.ts";
-import * as Transaction from "../../src/journal/transaction.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Codec from "../../src/journal/Codec.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Projection from "../../src/journal/Projection.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
+import * as Transaction from "../../src/journal/Transaction.ts";
 import { Counter, make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");

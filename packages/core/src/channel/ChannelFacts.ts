@@ -6,10 +6,10 @@
  *
  * @since 0.1.0
  */
-import * as Audience from "../journal/audience.ts";
-import * as Fact from "../journal/fact.ts";
-import * as Subject from "../journal/subject.ts";
-import * as Group from "../group/group.ts";
+import * as Audience from "../journal/Audience.ts";
+import * as Fact from "../journal/Fact.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as Group from "../group/Group.ts";
 import * as Channel from "./Channel.ts";
 import * as ChannelBinding from "./ChannelBinding.ts";
 import * as Contact from "./Contact.ts";

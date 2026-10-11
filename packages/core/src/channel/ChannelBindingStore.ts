@@ -8,12 +8,12 @@
 import { ChannelTransport } from "@amends-dev/channel";
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type * as Store from "../journal/store.ts";
+import type * as Store from "../journal/Store.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelId from "./ChannelId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * Storage failed while reading or writing bindings.

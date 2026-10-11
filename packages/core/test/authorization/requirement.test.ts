@@ -1,11 +1,11 @@
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema, SchemaIssue } from "effect";
-import * as Permission from "../../src/authorization/permission.ts";
-import * as Requirement from "../../src/authorization/requirement.ts";
-import * as Target from "../../src/authorization/target.ts";
-import * as Member from "../../src/workspace/member/member.ts";
-import * as MemberPermissions from "../../src/workspace/member/permissions.ts";
-import * as Workspace from "../../src/workspace/workspace.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as Requirement from "../../src/authorization/Requirement.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-1");
 const memberId = Member.Id.make("member-1");

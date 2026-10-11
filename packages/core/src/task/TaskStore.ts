@@ -7,11 +7,11 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import * as GroupId from "../group/id.ts";
-import type * as Store from "../journal/store.ts";
+import * as GroupId from "../group/GroupId.ts";
+import type * as Store from "../journal/Store.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Task from "./Task.ts";
 
 /**

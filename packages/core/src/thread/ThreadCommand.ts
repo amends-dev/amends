@@ -9,20 +9,20 @@
  *
  * @since 0.1.0
  */
-import * as Identity from "../identity/identity.ts";
-import * as Notification from "../notification/notification.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Notification from "../notification/Notification.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema, Predicate } from "effect";
 import { type DateTime, type PlatformError } from "effect";
-import * as Group from "../group/group.ts";
-import type * as Event from "../journal/event.ts";
-import * as Journal from "../journal/journal.ts";
-import type * as Log from "../journal/log.ts";
-import type * as Projection from "../journal/projection.ts";
-import * as Publication from "../journal/publication.ts";
-import * as Store from "../journal/store.ts";
+import * as Group from "../group/Group.ts";
+import type * as Event from "../journal/Event.ts";
+import * as Journal from "../journal/Journal.ts";
+import type * as Log from "../journal/Log.ts";
+import type * as Projection from "../journal/Projection.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
 import * as Task from "../task/Task.ts";
 import * as TaskStore from "../task/TaskStore.ts";
-import * as Member from "../workspace/member/member.ts";
+import * as Member from "../workspace/Member.ts";
 import * as Thread from "./Thread.ts";
 import * as ThreadFacts from "./ThreadFacts.ts";
 import * as ThreadQuery from "./ThreadQuery.ts";

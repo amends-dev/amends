@@ -1,8 +1,8 @@
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Schema } from "effect";
-import * as Codec from "../../src/journal/codec.ts";
-import * as Notification from "../../src/notification/notification.ts";
-import * as NotificationStore from "../../src/notification/store.ts";
+import * as Codec from "../../src/journal/Codec.ts";
+import * as Notification from "../../src/notification/Notification.ts";
+import * as NotificationStore from "../../src/notification/NotificationStore.ts";
 
 const wire = {
   id: "notification-one",

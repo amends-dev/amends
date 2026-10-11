@@ -22,7 +22,7 @@ import type {
 } from "@amends-dev/core/workspace";
 import { expectTypeOf, it } from "@effect/vitest";
 import type { Effect } from "effect";
-import type * as GatewayErrors from "../src/errors.ts";
+import type * as GatewayErrors from "../src/GatewayErrors.ts";
 
 /** What an operation, or an operation's result, can fail with. */
 type Failure<T> =

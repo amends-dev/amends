@@ -6,12 +6,12 @@
  * @since 0.1.0
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import * as Authorization from "../authorization/authorization.ts";
-import * as Requirement from "../authorization/requirement.ts";
-import * as Actor from "../identity/actor.ts";
-import * as Journal from "../journal/journal.ts";
-import * as Publication from "../journal/publication.ts";
-import * as Store from "../journal/store.ts";
+import * as Authorization from "../authorization/Authorization.ts";
+import * as Requirement from "../authorization/Requirement.ts";
+import * as Actor from "../identity/Actor.ts";
+import * as Journal from "../journal/Journal.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
 import * as Thread from "./Thread.ts";
 import * as ThreadCommand from "./ThreadCommand.ts";
 import * as ThreadQuery from "./ThreadQuery.ts";
@@ -20,7 +20,7 @@ import * as ThreadParticipation from "./ThreadParticipation.ts";
 import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";
-import * as GroupStore from "../group/store.ts";
+import * as GroupStore from "../group/GroupStore.ts";
 import {
   AlreadyEnded,
   FixedParticipation,

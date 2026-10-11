@@ -16,7 +16,7 @@ import {
   Redacted,
 } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
-import * as Binding from "../src/binding.ts";
+import * as Binding from "../src/Binding.ts";
 import { PostgresDatabase, PostgresWorkspaceStorage } from "../src/index.ts";
 import type { Bound } from "./support.ts";
 import { initialized, inDatabase, setup, views, workspaceId } from "./support.ts";

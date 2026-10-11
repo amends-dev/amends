@@ -9,11 +9,11 @@
  * The suites run on the live clock, as a source over a network takes real time. Each test makes a
  * source of its own, so that no test depends on another.
  */
-import { calls } from "./calls.ts";
-import { conditions } from "./conditions.ts";
-import { discovery } from "./discovery.ts";
+import { calls } from "./internal/calls.ts";
+import { conditions } from "./internal/conditions.ts";
+import { discovery } from "./internal/discovery.ts";
 import type { Fixture } from "./Fixture.ts";
-import { toolkit } from "./toolkit.ts";
+import { toolkit } from "./internal/toolkit.ts";
 
 export type { Condition, Fixture, Subject, ToolCase } from "./Fixture.ts";
 

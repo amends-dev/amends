@@ -7,10 +7,10 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as Fact from "../journal/fact.ts";
-import * as Subject from "../journal/subject.ts";
-import * as Group from "../group/group.ts";
-import * as Notification from "../notification/notification.ts";
+import * as Fact from "../journal/Fact.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as Group from "../group/Group.ts";
+import * as Notification from "../notification/Notification.ts";
 import * as Delivery from "./Delivery.ts";
 
 const audience = (payload: { readonly groupId: Group.Id }) => [Group.audienceOf(payload.groupId)];

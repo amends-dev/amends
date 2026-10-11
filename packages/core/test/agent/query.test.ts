@@ -7,16 +7,16 @@ import {
 import { Harness } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Option, Redacted, Result } from "effect";
-import * as Agent from "../../src/agent/agent.ts";
-import * as AgentQuery from "../../src/agent/query.ts";
-import * as AgentStore from "../../src/agent/store.ts";
-import * as Connection from "../../src/connection/connection.ts";
-import * as ConnectionCredentialStore from "../../src/connection/credential-store.ts";
-import * as ConnectionStore from "../../src/connection/store.ts";
-import * as Identity from "../../src/identity/identity.ts";
-import * as Member from "../../src/workspace/member/member.ts";
-import * as MemberStore from "../../src/workspace/member/store.ts";
-import * as Workspace from "../../src/workspace/workspace.ts";
+import * as Agent from "../../src/agent/Agent.ts";
+import * as AgentQuery from "../../src/agent/AgentQuery.ts";
+import * as AgentStore from "../../src/agent/AgentStore.ts";
+import * as Connection from "../../src/connection/Connection.ts";
+import * as ConnectionCredentialStore from "../../src/connection/ConnectionCredentialStore.ts";
+import * as ConnectionStore from "../../src/connection/ConnectionStore.ts";
+import * as Identity from "../../src/identity/Identity.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberStore from "../../src/workspace/MemberStore.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 

@@ -45,7 +45,7 @@ directory when its models, operations, facts, projections, or contracts need mod
 A core feature keeps the operations actors call in `service.ts`, the writes other operations
 share in `command.ts`, and its reads in `query.ts`, as far as it has each, as
 [AGENTS.md](../AGENTS.md) describes. An HTTP contract module and its handler share a filename, so
-`api-http/src/invitations.ts` leads to `server-http/src/invitations.ts`.
+`api-http/src/InvitationsGroup.ts` leads to `server-http/src/InvitationsHandlers.ts`.
 
 Each namespace module gives its concept one name, such as `ThreadErrors` or `ThreadActivityStore`.
 A package's index re-exports that name, and modules inside the package import the owning module

@@ -4,7 +4,7 @@ import { Scope, Target } from "@amends-dev/core/authorization";
 import { ThreadId } from "@amends-dev/core/thread";
 import { Group } from "@amends-dev/core/group";
 import { Member, Workspace } from "@amends-dev/core/workspace";
-import * as ScopeColumns from "../src/scope.ts";
+import * as ScopeColumns from "../src/ScopeColumns.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const decode = Schema.decodeUnknownOption(Scope.Value);

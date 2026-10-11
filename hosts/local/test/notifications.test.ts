@@ -10,9 +10,9 @@ import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import * as DevelopmentSignIn from "../src/authentication/sign-in.ts";
-import * as LocalHost from "../src/host.ts";
-import * as LocalServer from "../src/server.ts";
+import * as DevelopmentSignIn from "../src/DevelopmentSignIn.ts";
+import * as LocalHost from "../src/LocalHost.ts";
+import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });

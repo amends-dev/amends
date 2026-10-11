@@ -1,0 +1,104 @@
+import { Role, RoleStore } from "@amends-dev/core/authorization";
+import { and, eq, lt } from "drizzle-orm";
+import { Array, Effect, Layer, Schema } from "effect";
+import * as Binding from "./Binding.ts";
+import { storeError, storeFailure } from "./internal/errors.ts";
+import { builtinRoleRevisions, roles } from "./internal/schema.ts";
+
+/** The table's columns already have the record's names; decoding checks brands and uniqueness. */
+const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Record));
+
+/**
+ * Named permission bundles; edits keep the role's identity.
+ *
+ * @category constructors
+ */
+export const make = Effect.fn("Roles.make")(function* () {
+  const { workspaceId, database, guard } = yield* Binding.Binding;
+  const { db } = database;
+  const inWorkspace = eq(roles.workspaceId, workspaceId);
+  /** Apply an edit to one role, reporting a conflict when it does not exist. */
+  const edit = Effect.fn("Roles.edit")(function* (
+    operation: string,
+    id: Role.Id,
+    change: Partial<typeof roles.$inferInsert>,
+  ) {
+    const rows = yield* guard(
+      db
+        .update(roles)
+        .set(change)
+        .where(and(inWorkspace, eq(roles.id, id)))
+        .returning({ id: roles.id }),
+      true,
+    ).pipe(Effect.mapError(storeError(RoleStore, operation)));
+    if (rows.length === 0)
+      return yield* new RoleStore.Conflict({ operation, message: "Role does not exist" });
+  });
+  const driver: RoleStore.RoleStore["Service"] = {
+    get: (id) =>
+      guard(
+        db
+          .select()
+          .from(roles)
+          .where(and(inWorkspace, eq(roles.id, id))),
+      ).pipe(
+        Effect.flatMap(decode),
+        Effect.map(Array.head),
+        Effect.mapError(storeFailure(RoleStore, "get")),
+      ),
+    insert: Effect.fn("Roles.insert")(function* (record) {
+      yield* guard(
+        db.insert(roles).values({
+          workspaceId,
+          id: record.id,
+          name: record.name,
+          permissions: [...record.permissions],
+        }),
+        true,
+      ).pipe(Effect.mapError(storeError(RoleStore, "insert")));
+    }),
+    rename: Effect.fn("Roles.rename")(function* (id, validated) {
+      yield* edit("rename", id, { name: validated });
+    }),
+    setPermissions: Effect.fn("Roles.setPermissions")(function* (id, validated) {
+      yield* edit("setPermissions", id, { permissions: [...validated] });
+    }),
+    builtinRevision: guard(
+      db
+        .select({ revision: builtinRoleRevisions.revision })
+        .from(builtinRoleRevisions)
+        .where(eq(builtinRoleRevisions.workspaceId, workspaceId)),
+    ).pipe(
+      Effect.map((rows) => Array.head(rows.map(({ revision }) => revision))),
+      Effect.mapError(storeFailure(RoleStore, "builtinRevision")),
+    ),
+    recordBuiltinRevision: Effect.fn("Roles.recordBuiltinRevision")(function* (revision) {
+      // Only a later revision replaces the recorded one.
+      const rows = yield* guard(
+        db
+          .insert(builtinRoleRevisions)
+          .values({ workspaceId, revision })
+          .onConflictDoUpdate({
+            target: builtinRoleRevisions.workspaceId,
+            set: { revision },
+            setWhere: lt(builtinRoleRevisions.revision, revision),
+          })
+          .returning({ revision: builtinRoleRevisions.revision }),
+        true,
+      ).pipe(Effect.mapError(storeError(RoleStore, "recordBuiltinRevision")));
+      if (rows.length === 0)
+        return yield* new RoleStore.Conflict({
+          operation: "recordBuiltinRevision",
+          message: "Expected a later built-in revision",
+        });
+    }),
+  };
+  return RoleStore.make(workspaceId, driver);
+});
+
+/**
+ * Provide RoleStore.RoleStore using its constructor and the caller's dependencies.
+ *
+ * @category layers
+ */
+export const layer = Layer.effect(RoleStore.RoleStore, make());

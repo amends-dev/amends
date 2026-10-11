@@ -8,19 +8,19 @@
  * @since 0.1.0
  */
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import * as Authorization from "../authorization/authorization.ts";
-import * as Requirement from "../authorization/requirement.ts";
-import * as GroupFollowStore from "../group/follow/store.ts";
-import * as Group from "../group/group.ts";
-import * as GroupQuery from "../group/query.ts";
-import * as GroupMembership from "../group/membership/membership.ts";
-import * as GroupMembershipStore from "../group/membership/store.ts";
-import * as Actor from "../identity/actor.ts";
-import * as Store from "../journal/store.ts";
-import * as ReadStateStore from "../read-state/store.ts";
+import * as Authorization from "../authorization/Authorization.ts";
+import * as Requirement from "../authorization/Requirement.ts";
+import * as GroupFollowStore from "../group/GroupFollowStore.ts";
+import * as Group from "../group/Group.ts";
+import * as GroupQuery from "../group/GroupQuery.ts";
+import * as GroupMembership from "../group/GroupMembership.ts";
+import * as GroupMembershipStore from "../group/GroupMembershipStore.ts";
+import * as Actor from "../identity/Actor.ts";
+import * as Store from "../journal/Store.ts";
+import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as TaskStore from "../task/TaskStore.ts";
-import * as Member from "../workspace/member/member.ts";
-import * as MemberStore from "../workspace/member/store.ts";
+import * as Member from "../workspace/Member.ts";
+import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Thread from "./Thread.ts";
 import * as ThreadStore from "./ThreadStore.ts";
 import * as ThreadPermissions from "./ThreadPermissions.ts";

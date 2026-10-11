@@ -18,8 +18,8 @@ import {
   ShardingConfig,
 } from "effect/cluster";
 import { TestClock } from "effect/testing";
-import * as DeliveryJob from "../../src/jobs/delivery-job.ts";
-import * as JobRequests from "../../src/jobs/requests.ts";
+import * as DeliveryJob from "../../src/DeliveryJob.ts";
+import * as JobRequests from "../../src/JobRequests.ts";
 
 /** Cluster in memory, reading for due messages every second of the test clock. */
 const cluster = Sharding.layer.pipe(

@@ -6,7 +6,7 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as Member from "../workspace/member/member.ts";
+import * as Member from "../workspace/Member.ts";
 import * as ThreadId from "./ThreadId.ts";
 import * as ThreadMessageId from "./ThreadMessageId.ts";
 

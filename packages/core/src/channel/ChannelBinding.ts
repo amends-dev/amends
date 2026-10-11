@@ -8,9 +8,9 @@
  */
 import { ChannelTransport } from "@amends-dev/channel";
 import { Schema } from "effect";
-import * as GroupId from "../group/id.ts";
+import * as GroupId from "../group/GroupId.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
-import * as WorkspaceId from "../workspace/id.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as ChannelId from "./ChannelId.ts";
 
 /**

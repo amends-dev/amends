@@ -13,9 +13,9 @@ import {
   Integrations,
 } from "@amends-dev/connection";
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import * as Connection from "../connection/connection.ts";
-import * as ConnectionCredentialStore from "../connection/credential-store.ts";
-import * as ConnectionStore from "../connection/store.ts";
+import * as Connection from "../connection/Connection.ts";
+import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
+import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import * as Channel from "./Channel.ts";
 import { NotFound } from "./ChannelErrors.ts";
 import * as ChannelStore from "./ChannelStore.ts";

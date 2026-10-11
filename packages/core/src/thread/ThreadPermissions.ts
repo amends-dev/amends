@@ -6,7 +6,7 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/permission.ts";
+import * as Permission from "../authorization/Permission.ts";
 
 /**
  * Start a thread in a group.

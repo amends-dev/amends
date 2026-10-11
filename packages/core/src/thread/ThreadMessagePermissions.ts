@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/permission.ts";
+import * as Permission from "../authorization/Permission.ts";
 
 /**
  * Publish a message in a thread, or tell its readers one is being written. Replying needs no

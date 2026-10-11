@@ -6,22 +6,22 @@
  * `@effect/vitest`, an optional peer dependency of this package, which only an adapter's tests
  * install.
  */
-import { accounts } from "./accounts.ts";
-import { changeFeed } from "./change-feed.ts";
-import { contracts } from "./contracts.ts";
-import { factMetadata } from "./fact-metadata.ts";
-import type { Fixture } from "./fixture.ts";
-import { idempotency } from "./idempotency.ts";
-import { journal } from "./journal.ts";
-import { reads } from "./reads.ts";
-import { sessionLogs } from "./session-logs.ts";
-import { signInStorage } from "./sign-in-storage.ts";
-import { signals } from "./signals.ts";
-import { standaloneAppends } from "./standalone-appends.ts";
-import { transactions } from "./transactions.ts";
+import { accounts } from "./internal/accounts.ts";
+import { changeFeed } from "./internal/change-feed.ts";
+import { contracts } from "./internal/contracts.ts";
+import { factMetadata } from "./internal/fact-metadata.ts";
+import type { Fixture } from "./Fixture.ts";
+import { idempotency } from "./internal/idempotency.ts";
+import { journal } from "./internal/journal.ts";
+import { reads } from "./internal/reads.ts";
+import { sessionLogs } from "./internal/session-logs.ts";
+import { signInStorage } from "./internal/sign-in-storage.ts";
+import { signals } from "./internal/signals.ts";
+import { standaloneAppends } from "./internal/standalone-appends.ts";
+import { transactions } from "./internal/transactions.ts";
 
-export type { Fixture, Host, HostOptions, Storage } from "./fixture.ts";
-export * as Support from "./support.ts";
+export type { Fixture, Host, HostOptions, Storage } from "./Fixture.ts";
+export * as Support from "./Support.ts";
 
 /** Runs every suite against the storage `fixture` opens, in the test file that calls it. */
 export const run = (fixture: Fixture) => {

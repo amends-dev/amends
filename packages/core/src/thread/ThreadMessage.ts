@@ -8,15 +8,15 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as GroupId from "../group/id.ts";
+import * as GroupId from "../group/GroupId.ts";
 import * as ThreadId from "./ThreadId.ts";
 import * as ThreadMessageId from "./ThreadMessageId.ts";
-import * as WorkspaceId from "../workspace/id.ts";
-import * as MemberId from "../workspace/member/id.ts";
-import * as Identity from "../identity/identity.ts";
-import * as Characters from "../text/text.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Characters from "../text/Text.ts";
 import * as ChannelId from "../channel/ChannelId.ts";
-import * as TurnId from "../turn/id.ts";
+import * as TurnId from "../turn/TurnId.ts";
 
 /**
  * Names a message; `ThreadMessageId.Id`, where models that only refer to messages import it from.

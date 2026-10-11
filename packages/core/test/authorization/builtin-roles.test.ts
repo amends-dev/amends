@@ -1,8 +1,8 @@
 import { expect, it } from "@effect/vitest";
-import * as Core from "../../src/core.ts";
-import * as Permission from "../../src/authorization/permission.ts";
-import * as BuiltinRoles from "../../src/authorization/role/builtin.ts";
-import * as Workspace from "../../src/workspace/workspace.ts";
+import * as Core from "../../src/index.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as BuiltinRoles from "../../src/authorization/BuiltinRoles.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const read = Permission.make("it.read", {

@@ -6,7 +6,7 @@
  * @since 0.1.0
  */
 import { Effect, Option } from "effect";
-import * as Projection from "../journal/projection.ts";
+import * as Projection from "../journal/Projection.ts";
 import * as Delivery from "./Delivery.ts";
 import * as DeliveryFacts from "./DeliveryFacts.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";

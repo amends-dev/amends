@@ -1,14 +1,14 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import { TestClock } from "effect/testing";
-import * as ChangeFeedSource from "../../src/change-feed/source.ts";
-import * as Checkpoint from "../../src/journal/checkpoint.ts";
-import * as Fact from "../../src/journal/fact.ts";
-import * as Journal from "../../src/journal/journal.ts";
-import * as Log from "../../src/journal/log.ts";
-import * as Publication from "../../src/journal/publication.ts";
-import * as Store from "../../src/journal/store.ts";
-import * as Subject from "../../src/journal/subject.ts";
+import * as ChangeFeedSource from "../../src/change-feed/ChangeFeedSource.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Subject from "../../src/journal/Subject.ts";
 import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 

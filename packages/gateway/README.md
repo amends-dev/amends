@@ -219,7 +219,7 @@ error an HTTP route declares is public, so a new outcome fails the build until i
 
 The storage adapters map every failed `COMMIT` to `Uncertain`, including some definite failures; see
 [known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention). Import
-`GatewayErrors` from `@amends-dev/gateway/errors` in contracts, to avoid loading the gateway itself.
+`GatewayErrors` from `@amends-dev/gateway/GatewayErrors` in contracts, to avoid loading the gateway itself.
 
 ## Development
 

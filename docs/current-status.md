@@ -415,7 +415,7 @@ projections again, which then rebuild the commits they missed.
 
 ## Commit outcomes and PostgreSQL contention
 
-The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/binding.ts) returns
+The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/Binding.ts) returns
 `Store.CommitUncertain` for every failed COMMIT effect, even when a particular
 database error could establish that nothing committed. This over-reports uncertainty.
 The gateway exposes `Gateway.Uncertain` with the commit ID; there is no public
@@ -423,7 +423,7 @@ HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction 
 Creating operations accept a request key, so their retries return the first result; other
 operations settle a repeat by their own rules, such as `AlreadyRemoved`, rather than repeating it.
 
-PostgreSQL's [error mapping](../adapters/storage-postgresql/src/errors.ts) treats lock
+PostgreSQL's [error mapping](../adapters/storage-postgresql/src/internal/errors.ts) treats lock
 timeouts, serialization failures, and deadlocks as contention, a retryable conflict; during
 COMMIT they fall under the broad uncertain-outcome mapping above.
 
@@ -435,7 +435,7 @@ outside a transaction have no statement timeout.
 
 ## PostgreSQL isolation
 
-The [binding](../adapters/storage-postgresql/src/binding.ts) uses plain `BEGIN`,
+The [binding](../adapters/storage-postgresql/src/Binding.ts) uses plain `BEGIN`,
 then takes a transaction-scoped advisory lock for the workspace, and one for each log a
 commit touches; a standalone append takes only its log's. It does not pin the isolation
 level. The locks serialize cooperating writers, but the connection's isolation default still
@@ -449,7 +449,7 @@ An explicit isolation choice and coverage for changed defaults remain outstandin
 
 ## Edge resource controls
 
-The [local server](../hosts/local/src/server.ts) refuses request bodies over one mebibyte with
+The [local server](../hosts/local/src/LocalServer.ts) refuses request bodies over one mebibyte with
 413, through Bun's own limit. Each process serves at most a thousand live-update streams per
 workspace and twenty per member of it, refusing more with 429 (`Api.TooManyStreams`). Message
 text has no length limit of its own beyond the body limit, and no server-side control paces
@@ -457,7 +457,7 @@ clients that reconnect repeatedly.
 
 ## Payload-format compatibility
 
-[Codec.makeForSchema](../packages/core/src/journal/codec.ts) persists payloads through
+[Codec.makeForSchema](../packages/core/src/journal/Codec.ts) persists payloads through
 `SchemaBinary.toCodec` and copies output buffers. The [codec tests](../packages/core/test/journal/codec.test.ts)
 freeze representative workspace and message bytes captured with Effect 4.0.0-rc.115, and a turn
 step's bytes captured with 4.0.0, checking both decoding and identical encoding on 4.0.0. They cover dates,

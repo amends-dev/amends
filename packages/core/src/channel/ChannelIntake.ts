@@ -12,12 +12,12 @@
  */
 import type { ChannelTransport } from "@amends-dev/channel";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import * as Identity from "../identity/identity.ts";
-import * as Performer from "../identity/performer.ts";
-import * as Journal from "../journal/journal.ts";
-import * as Publication from "../journal/publication.ts";
-import * as Store from "../journal/store.ts";
-import * as Request from "../request/request.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Performer from "../identity/Performer.ts";
+import * as Journal from "../journal/Journal.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
+import * as Request from "../request/Request.ts";
 import * as Task from "../task/Task.ts";
 import * as TaskCommand from "../task/TaskCommand.ts";
 import * as Thread from "../thread/Thread.ts";

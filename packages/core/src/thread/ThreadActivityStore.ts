@@ -8,12 +8,12 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type * as Store from "../journal/store.ts";
+import type * as Store from "../journal/Store.ts";
 
 import * as ThreadActivity from "./ThreadActivity.ts";
 import * as ThreadId from "./ThreadId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * One page of a thread's timeline, always in ascending sequence order. The range lies strictly

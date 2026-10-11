@@ -13,8 +13,8 @@ import {
   ShardingConfig,
 } from "effect/cluster";
 import { TestClock } from "effect/testing";
-import * as JobRequests from "../../src/jobs/requests.ts";
-import * as TurnJob from "../../src/jobs/turn-job.ts";
+import * as JobRequests from "../../src/JobRequests.ts";
+import * as TurnJob from "../../src/TurnJob.ts";
 import {
   type FakeWorkspace,
   type FakeWorkspaceOptions,

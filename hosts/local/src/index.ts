@@ -1,10 +1,10 @@
 import { BunRuntime } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
-import * as DevelopmentAuthentication from "./authentication/authentication.ts";
-import * as EmailAuthentication from "./authentication/email.ts";
-import * as LocalConfig from "./config.ts";
-import * as LocalHost from "./host.ts";
-import * as LocalServer from "./server.ts";
+import * as DevelopmentAuthentication from "./DevelopmentAuthentication.ts";
+import * as EmailAuthentication from "./EmailAuthentication.ts";
+import * as LocalConfig from "./LocalConfig.ts";
+import * as LocalHost from "./LocalHost.ts";
+import * as LocalServer from "./LocalServer.ts";
 
 /**
  * Serve the application on the loopback interface over the AMENDS_DATABASE_URL database, signing

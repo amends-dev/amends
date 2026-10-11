@@ -14,9 +14,9 @@ import { Harness as AgentHarness } from "@amends-dev/harness";
 import type { Host, Storage } from "@amends-dev/gateway/conformance";
 import { Context, Crypto, Effect, Layer, Redacted, Result, Schema } from "effect";
 import { Gateway, WorkspaceStorage } from "../src/index.ts";
-import { bind } from "../src/conformance/support.ts";
+import { bind } from "../src/conformance/Support.ts";
 
-export * from "../src/conformance/support.ts";
+export * from "../src/conformance/Support.ts";
 
 /** The key the test models integration's check accepts; any other it refuses. */
 export const goodKey = "sk-good";

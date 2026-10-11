@@ -9,11 +9,11 @@
 import { Schema } from "effect";
 import * as ThreadId from "./ThreadId.ts";
 import * as ThreadParticipationId from "./ThreadParticipationId.ts";
-import * as WorkspaceId from "../workspace/id.ts";
-import * as MemberId from "../workspace/member/id.ts";
-import * as GroupMembership from "../group/membership/membership.ts";
-import * as Identity from "../identity/identity.ts";
-import * as Notification from "../notification/notification.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import * as GroupMembership from "../group/GroupMembership.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Notification from "../notification/Notification.ts";
 
 /**
  * Names a participation; `ThreadParticipationId.Id`, where models that only refer to

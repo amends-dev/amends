@@ -7,12 +7,12 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type * as Store from "../journal/store.ts";
+import type * as Store from "../journal/Store.ts";
 
 import * as Thread from "./Thread.ts";
-import * as GroupId from "../group/id.ts";
+import * as GroupId from "../group/GroupId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * Storage failed while reading or writing threads.

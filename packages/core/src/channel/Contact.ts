@@ -9,9 +9,9 @@
  */
 import { ChannelTransport } from "@amends-dev/channel";
 import { Schema } from "effect";
-import * as Identity from "../identity/identity.ts";
-import * as Text from "../text/text.ts";
-import * as WorkspaceId from "../workspace/id.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Text from "../text/Text.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as ChannelId from "./ChannelId.ts";
 
 /**

@@ -1,13 +1,13 @@
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Schema } from "effect";
-import * as Grant from "../../src/authorization/grant.ts";
-import * as Permission from "../../src/authorization/permission.ts";
-import * as Requirement from "../../src/authorization/requirement.ts";
-import * as Scope from "../../src/authorization/scope.ts";
-import * as Target from "../../src/authorization/target.ts";
-import * as Member from "../../src/workspace/member/member.ts";
-import * as MemberPermissions from "../../src/workspace/member/permissions.ts";
-import * as Workspace from "../../src/workspace/workspace.ts";
+import * as Grant from "../../src/authorization/Grant.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as Requirement from "../../src/authorization/Requirement.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 it("permission groups preserve existing member definitions and their specific target kind", () => {
   expect(MemberPermissions.Read).toEqual(

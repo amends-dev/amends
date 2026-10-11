@@ -70,10 +70,11 @@ first, begins the drain.
 
 ## Conventions
 
-Keep one handler module per contract group, with the contract's filename: `src/invitations.ts` here
-implements `api-http/src/invitations.ts`. `MembersHandlers` and the like name endpoint collections
-and `Routes` composes them. Each handler module exports `layer`, built with `HttpApiBuilder.group`,
-which checks that every declared endpoint is implemented; no constructor or service tag wraps it.
+Keep one handler module per contract group, named after its handlers: `src/InvitationsHandlers.ts`
+here implements `api-http/src/InvitationsGroup.ts`. `MembersHandlers` and the like name endpoint
+collections, and `Routes` composes them. Each handler module exports `layer`, built with
+`HttpApiBuilder.group`, which checks that every declared endpoint is implemented; no constructor
+or service tag wraps it.
 `Principal` is the authenticated human or agent; core's `Actor.Actor` is the member the gateway
 resolves for an operation. Handlers use the gateway's decoded field names, such as `humanId` and
 `activeMemberCount`, and the contract's codecs encode them.

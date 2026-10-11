@@ -9,11 +9,11 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as Connection from "../connection/connection.ts";
-import * as GroupId from "../group/id.ts";
-import * as Text from "../text/text.ts";
-import * as WorkspaceId from "../workspace/id.ts";
-import * as MemberId from "../workspace/member/id.ts";
+import * as Connection from "../connection/Connection.ts";
+import * as GroupId from "../group/GroupId.ts";
+import * as Text from "../text/Text.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
 import * as ChannelId from "./ChannelId.ts";
 
 /**

@@ -7,14 +7,14 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option, DateTime } from "effect";
-import type * as Store from "../journal/store.ts";
+import type * as Store from "../journal/Store.ts";
 
 import * as ThreadParticipation from "./ThreadParticipation.ts";
 
 import * as ThreadId from "./ThreadId.ts";
-import * as GroupMembership from "../group/membership/membership.ts";
+import * as GroupMembership from "../group/GroupMembership.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 
 /**
  * Storage failed while reading or writing participations.

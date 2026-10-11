@@ -1,16 +1,16 @@
 import { Subject } from "@amends-dev/core/journal";
 import { expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
-import * as Codec from "../../src/journal/codec.ts";
-import * as Checkpoint from "../../src/journal/checkpoint.ts";
-import * as Event from "../../src/journal/event.ts";
-import * as Fact from "../../src/journal/fact.ts";
-import * as Journal from "../../src/journal/journal.ts";
-import * as Log from "../../src/journal/log.ts";
-import * as Publication from "../../src/journal/publication.ts";
-import * as Store from "../../src/journal/store.ts";
-import * as Transaction from "../../src/journal/transaction.ts";
-import * as WorkspaceId from "../../src/workspace/id.ts";
+import * as Codec from "../../src/journal/Codec.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Event from "../../src/journal/Event.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Transaction from "../../src/journal/Transaction.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import { make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 

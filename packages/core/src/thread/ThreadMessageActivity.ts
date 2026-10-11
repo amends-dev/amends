@@ -5,7 +5,7 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import * as Subject from "../journal/subject.ts";
+import * as Subject from "../journal/Subject.ts";
 import * as ThreadActivityKind from "./ThreadActivityKind.ts";
 import * as ThreadMessage from "./ThreadMessage.ts";
 import * as ThreadMessageId from "./ThreadMessageId.ts";

@@ -227,9 +227,9 @@ Turn activity, task activity, and renames are never delivered.
 
 ## Code conventions
 
-The thread feature, and the task and channel features built on it, are written as the published
-packages are, `@amends-dev/harness` and `@amends-dev/sandbox`, which follow the Effect repository:
-they are read by developers outside this repository, and documentation is generated from them.
+Every package is written as the published ones, `@amends-dev/harness` and `@amends-dev/sandbox`,
+which follow the Effect repository: they are read by developers outside this repository, and
+documentation is generated from them.
 
 - **One module per namespace, named after it.** `ThreadMessageService.ts` exports
   `ThreadMessageService`, flat in the feature directory, as `effect/ai` is flat. Helpers no
@@ -251,8 +251,7 @@ they are read by developers outside this repository, and documentation is genera
   service key names its module: `@amends-dev/core/thread/ThreadStore`.
 - `@since` is `0.1.0`, the version core will first be published at.
 
-The rest of core follows when touched. [Core's guide](../packages/core/README.md) records the
-convention beside its schema vocabulary.
+[Core's guide](../packages/core/README.md) records the convention beside its schema vocabulary.
 
 ## What changes
 
