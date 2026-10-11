@@ -54,11 +54,6 @@ export * as ThreadCommand from "./ThreadCommand.ts";
 /**
  * @since 0.1.0
  */
-export * as ThreadErrors from "./ThreadErrors.ts";
-
-/**
- * @since 0.1.0
- */
 export * as ThreadFacts from "./ThreadFacts.ts";
 
 /**
@@ -75,11 +70,6 @@ export * as ThreadMessage from "./ThreadMessage.ts";
  * @since 0.1.0
  */
 export * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
-
-/**
- * @since 0.1.0
- */
-export * as ThreadMessageErrors from "./ThreadMessageErrors.ts";
 
 /**
  * @since 0.1.0
@@ -125,11 +115,6 @@ export * as ThreadParticipation from "./ThreadParticipation.ts";
  * @since 0.1.0
  */
 export * as ThreadParticipationActivity from "./ThreadParticipationActivity.ts";
-
-/**
- * @since 0.1.0
- */
-export * as ThreadParticipationErrors from "./ThreadParticipationErrors.ts";
 
 /**
  * @since 0.1.0

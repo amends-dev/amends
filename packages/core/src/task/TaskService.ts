@@ -30,7 +30,7 @@ import {
   GroupNotFound,
   NotFound,
   ParticipantUnavailable,
-} from "./TaskErrors.ts";
+} from "./internal/task-errors.ts";
 import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
 export {
@@ -70,7 +70,7 @@ export {
    * @since 0.1.0
    */
   ParticipantUnavailable,
-} from "./TaskErrors.ts";
+} from "./internal/task-errors.ts";
 
 /**
  * What creating a task in a conversation can fail with.

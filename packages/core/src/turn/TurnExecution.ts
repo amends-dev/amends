@@ -43,7 +43,7 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
-import { NotActive, NotFound } from "./TurnErrors.ts";
+import { NotActive, NotFound } from "./internal/turn-errors.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnCommand from "./TurnCommand.ts";
 import * as TurnFacts from "./TurnFacts.ts";
@@ -54,7 +54,7 @@ import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
 
 /**
- * What every execution operation can fail with: the turn's outcomes in `TurnErrors`, and the
+ * What every execution operation can fail with: the turn's outcomes above, and the
  * failures of the stores and commit each one writes through.
  *
  * @category errors

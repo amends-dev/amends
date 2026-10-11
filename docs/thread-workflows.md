@@ -6,7 +6,7 @@ them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadPartici
 `TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
 `Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
-failures remain failures. The [HTTP contract](../packages/api-http/README.md#conversations) exposes
+failures remain failures. The [HTTP contract](../packages/http/README.md#conversations) exposes
 each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
 
 ## Starting a conversation
@@ -191,7 +191,7 @@ up (`failed`). A message deleted before it was sent, a channel removed meanwhile
 that can no longer be reached fail the delivery as it stands. Edits and deletions of a sent message
 are not carried yet. Over HTTP, channels sit under `/workspaces/:workspaceId/channels`, and systems'
 requests arrive at `POST …/channels/:channelId/events` without a session
-([channels over HTTP](../packages/api-http/README.md#channels)).
+([channels over HTTP](../packages/http/README.md#channels)).
 
 ## Participation and recipients
 

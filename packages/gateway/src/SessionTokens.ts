@@ -1,6 +1,6 @@
 /**
  * How a host says who holds a session token. Sign-in issues the token, and this resolves it on
- * every request into the identity the gateway runs programs as: server-http's bearer
+ * every request into the identity the gateway runs programs as: the HTTP server's bearer
  * authentication calls `resolve`, and signing out calls `revoke`. `EmailSignIn` implements it over
  * `SignInStorage`; the local host's development sign-in has its own.
  *

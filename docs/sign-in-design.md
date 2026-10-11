@@ -157,7 +157,7 @@ using the existing safe return path.
 
 ### Contract and design
 
-The [HTTP contract](../packages/api-http/src/SessionGroup.ts) already provides
+The [HTTP contract](../packages/http/src/SessionGroup.ts) already provides
 `POST /session/email` → 202 and `POST /session/code` → session or a 403 rejection
 (`mismatch`, `expired`, `unknown`). Resend uses the email endpoint again. Sign-in
 belongs to the gateway/host; this slice needs no new core operation.

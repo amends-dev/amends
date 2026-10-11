@@ -30,40 +30,31 @@ import * as MemberPermissions from "./MemberPermissions.ts";
 import * as MemberStore from "./MemberStore.ts";
 import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
-import * as Workspace from "./Workspace.ts";
 
-/**
- * The member to remove was removed already; nothing more is recorded.
- *
- * @category errors
- * @since 0.1.0
- */
-export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
-  "MemberService.AlreadyRemoved",
-  { workspaceId: Workspace.Id, memberId: Member.Id },
-) {}
-
-/**
- * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("MemberService.NotFound", {
-  workspaceId: Workspace.Id,
-  memberId: Member.Id,
-}) {}
-
-/**
- * The member is the current owner, who cannot be removed; ownership must be transferred first.
- *
- * @category errors
- * @since 0.1.0
- */
-export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()(
-  "MemberService.OwnerProtected",
-  { workspaceId: Workspace.Id, memberId: Member.Id },
-) {}
+import { AlreadyRemoved, NotFound, OwnerProtected } from "./internal/member-errors.ts";
+export {
+  /**
+   * The member to remove was removed already; nothing more is recorded.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  AlreadyRemoved,
+  /**
+   * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+  /**
+   * The member is the current owner, who cannot be removed; ownership must be transferred first.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  OwnerProtected,
+} from "./internal/member-errors.ts";
 
 /**
  * What reading members can fail with: the outcome above, and the failures of what a

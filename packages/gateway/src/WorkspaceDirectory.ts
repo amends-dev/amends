@@ -1,7 +1,7 @@
 /**
  * One identity's routing table across a host's workspaces: its memberships, ended ones included,
  * and its pending invitations. Reading it spans workspaces, which core never does, so storage
- * adapters implement it over what they store, `layerMemory` in process memory. server-http
+ * adapters implement it over what they store, `layerMemory` in process memory. The HTTP server
  * serves it at `GET /me/workspaces`, and the HTTP contract imports its schemas from
  * `@amends-dev/gateway/WorkspaceDirectory`.
  *

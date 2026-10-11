@@ -1,18 +1,15 @@
 export { Identity };
+import * as ApiErrors from "@amends-dev/http/ApiErrors";
+import { Group, GroupMembership } from "@amends-dev/core/group";
+import { Identity } from "@amends-dev/core/identity";
+import { Notification, NotificationInbox } from "@amends-dev/core/notification";
 import {
-  Group,
-  GroupMembership,
-  Member,
-  Notification,
-  NotificationInbox,
   Thread,
   ThreadMessage,
   ThreadParticipation,
   ThreadTimeline,
-  Workspace,
-  Identity,
-  ApiErrors,
-} from "@amends-dev/api-http";
+} from "@amends-dev/core/thread";
+import { Member, Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/reactivity";
 import type { Api, ApiClient } from "../api/client.ts";

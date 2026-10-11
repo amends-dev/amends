@@ -3,7 +3,7 @@
  * `Agent.View`, and creating, configuring, and renaming them. An agent is a member, so creating
  * one adds its membership through `MemberCommand`, and its role is changed, and it is removed, by
  * members' and assignments' operations. Each operation authorizes the actor itself, writes inside
- * one journal commit, and reads outside any; the outcomes it reports are `AgentErrors`.
+ * one journal commit, and reads outside any; it exports the outcomes it reports.
  *
  * @since 0.1.0
  */
@@ -31,7 +31,7 @@ import * as MemberFacts from "../workspace/MemberFacts.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
-import { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./AgentErrors.ts";
+import { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./internal/agent-errors.ts";
 import * as AgentFacts from "./AgentFacts.ts";
 import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
@@ -66,7 +66,7 @@ export {
    * @since 0.1.0
    */
   NotFound,
-} from "./AgentErrors.ts";
+} from "./internal/agent-errors.ts";
 
 /**
  * What listing agents can fail with.

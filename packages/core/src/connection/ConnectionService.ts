@@ -31,7 +31,7 @@ import {
   Keyless,
   NotFound,
   UnknownIntegration,
-} from "./ConnectionErrors.ts";
+} from "./internal/connection-errors.ts";
 import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
@@ -80,7 +80,7 @@ export {
    * @since 0.1.0
    */
   UnknownIntegration,
-} from "./ConnectionErrors.ts";
+} from "./internal/connection-errors.ts";
 
 /**
  * What reading connections can fail with.

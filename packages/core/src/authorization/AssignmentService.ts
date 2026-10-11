@@ -27,49 +27,38 @@ import * as Assignment from "./Assignment.ts";
 import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
-
-/**
- * The member's workspace role assignments are no longer the ones the caller expected: someone
- * changed them meanwhile.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Changed extends Schema.TaggedError<Changed>()("AssignmentService.Changed", {
-  memberId: Member.Id,
-}) {}
-
-/**
- * The member has been removed; roles are given to and taken from active members only.
- *
- * @category errors
- * @since 0.1.0
- */
-export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
-  "AssignmentService.InactiveMember",
-  { memberId: Member.Id },
-) {}
-
-/**
- * No member with this ID is recorded in the workspace.
- *
- * @category errors
- * @since 0.1.0
- */
-export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
-  "AssignmentService.MemberNotFound",
-  { memberId: Member.Id },
-) {}
-
-/**
- * No assignment with this ID is recorded for the member.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("AssignmentService.NotFound", {
-  assignmentId: Assignment.Id,
-}) {}
+import { Changed, InactiveMember, MemberNotFound, NotFound } from "./internal/assignment-errors.ts";
+export {
+  /**
+   * The member's workspace role assignments are no longer the ones the caller expected: someone
+   * changed them meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Changed,
+  /**
+   * The member has been removed; roles are given to and taken from active members only.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  InactiveMember,
+  /**
+   * No member with this ID is recorded in the workspace.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  MemberNotFound,
+  /**
+   * No assignment with this ID is recorded for the member.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  NotFound,
+} from "./internal/assignment-errors.ts";
 
 /**
  * What the assignment operations can fail with: the outcomes above, delegation's,

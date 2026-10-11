@@ -1,0 +1,51 @@
+/**
+ * Implements `MeGroup` over the host's services alone, entering no workspace: `Accounts.findByIds`
+ * for the principal's account, `WorkspaceDirectory.list` for its memberships and pending
+ * invitations, and `SessionTokens.revoke` for the request's `Credential` on signing out. An agent
+ * asking for its account gets `ApiErrors.HumanRequired`, and a session no account holds
+ * `Unauthorized`.
+ *
+ * @since 0.1.0
+ */
+import * as Api from "./Api.ts";
+import * as ApiErrors from "./ApiErrors.ts";
+import * as Authentication from "./Authentication.ts";
+import { Identity } from "@amends-dev/core/identity";
+import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway";
+import { Array, Effect } from "effect";
+import { HttpApiBuilder } from "effect/http-api";
+
+/**
+ * Register the principal's own handlers over the host's accounts, directory, and session tokens,
+ * reading the principal per request.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layer = HttpApiBuilder.group(
+  Api.Api,
+  "me",
+  Effect.fn(function* (handlers) {
+    const accounts = yield* Accounts.Accounts;
+    const workspaceDirectory = yield* WorkspaceDirectory.WorkspaceDirectory;
+    const sessionTokens = yield* SessionTokens.SessionTokens;
+    return handlers.handleAll({
+      account: () =>
+        Effect.gen(function* () {
+          const principal = yield* Authentication.Principal;
+          if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
+            return yield* new ApiErrors.HumanRequired();
+          const found = Array.head(yield* accounts.findByIds([principal.id]));
+          if (found._tag === "None")
+            return yield* new Authentication.Unauthorized({
+              message: "No account holds this session",
+            });
+          return found.value;
+        }),
+      workspaces: () =>
+        Effect.flatMap(Authentication.Principal, (principal) => workspaceDirectory.list(principal)),
+      signOut: () =>
+        Effect.flatMap(Authentication.Credential, (credential) => sessionTokens.revoke(credential)),
+    });
+  }),
+);

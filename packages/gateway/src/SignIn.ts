@@ -1,8 +1,8 @@
 /**
  * How a host signs people in: the ways it offers, and the email-code flow that ends in a session.
- * server-http's session routes call it, and `SessionTokens` resolves the token a session carries
- * on every later request. `EmailSignIn` implements both; the local host's development sign-in
- * implements this one for tests and scripts. The HTTP contract imports its schemas from
+ * The HTTP server's session routes call it, and `SessionTokens` resolves the token a session
+ * carries on every later request. `EmailSignIn` implements both; the local host's development
+ * sign-in implements this one for tests and scripts. The HTTP contract imports its schemas from
  * `@amends-dev/gateway/SignIn`.
  *
  * @since 0.1.0

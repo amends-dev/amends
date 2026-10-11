@@ -1,6 +1,6 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { describe, expect, it } from "@effect/vitest";
-import { Api, Authentication } from "@amends-dev/api-http";
+import { Api, Authentication } from "@amends-dev/http";
 import { Identity } from "@amends-dev/core/identity";
 import { Member } from "@amends-dev/core/workspace";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
@@ -14,7 +14,7 @@ import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");
 const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server; codes are captured. */
@@ -95,7 +95,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const fixture = server(url);
           const outcome = yield* Effect.gen(function* () {
             const client = (token: string) =>
-              HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+              HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
             const asAlice = yield* client(alice);
             const workspace = yield* asAlice.workspaces.create({
               headers: {},
@@ -223,7 +223,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const fixture = server(url);
           const outcome = yield* Effect.gen(function* () {
-            const anonymous = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken("")));
+            const anonymous = yield* HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken("")));
             const methods = yield* anonymous.session.methods();
             const email = "jo@mercier.co";
             yield* anonymous.session.start({ payload: { email } });
@@ -248,7 +248,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               }),
               (response) => response.json,
             );
-            const client = yield* HttpApiClient.make(Api).pipe(
+            const client = yield* HttpApiClient.make(Api.Api).pipe(
               Effect.provide(asToken(session.token)),
             );
             const account = yield* client.me.account();
@@ -257,7 +257,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               headers: {},
               payload: { name: "Test workspace", memberName: "Jo" },
             });
-            const inviter = yield* HttpApiClient.make(Api).pipe(Effect.provide(asToken(alice)));
+            const inviter = yield* HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(alice)));
             const other = yield* inviter.workspaces.create({
               headers: {},
               payload: { name: "Test workspace", memberName: "alice" },

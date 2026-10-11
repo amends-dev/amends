@@ -33,7 +33,7 @@ import {
   NotAuthor,
   NotFound,
   ParticipantUnavailable,
-} from "./ThreadMessageErrors.ts";
+} from "./internal/thread-message-errors.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
@@ -91,10 +91,10 @@ export {
    * @since 0.1.0
    */
   ParticipantUnavailable,
-} from "./ThreadMessageErrors.ts";
+} from "./internal/thread-message-errors.ts";
 
 /**
- * What publishing can fail with: the outcomes in `ThreadMessageErrors`, and the failures of what
+ * What publishing can fail with: the outcomes above, and the failures of what
  * publishing depends on.
  *
  * @category errors

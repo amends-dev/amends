@@ -21,31 +21,25 @@ import * as GrantResolver from "./GrantResolver.ts";
 import * as PermissionCatalog from "./PermissionCatalog.ts";
 import * as Requirement from "./Requirement.ts";
 
+import { Denied, InvalidActor } from "./internal/authorization-errors.ts";
 import * as Store from "../journal/Store.ts";
-import * as Member from "../workspace/Member.ts";
-
-/**
- * No current grant of the member covers the requirement.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Denied extends Schema.TaggedError<Denied>()("Authorization.Denied", {
-  memberId: Member.Id,
-  requirement: Requirement.Requirement,
-}) {}
-
-/**
- * The actor is not an active member of the workspace: the membership is missing or removed, or
- * its identity is not the actor's.
- *
- * @category errors
- * @since 0.1.0
- */
-export class InvalidActor extends Schema.TaggedError<InvalidActor>()("Authorization.InvalidActor", {
-  memberId: Member.Id,
-  reason: Schema.Literals(["membership-missing", "membership-removed", "identity-mismatch"]),
-}) {}
+export {
+  /**
+   * No current grant of the member covers the requirement.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Denied,
+  /**
+   * The actor is not an active member of the workspace: the membership is missing or removed, or
+   * its identity is not the actor's.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  InvalidActor,
+} from "./internal/authorization-errors.ts";
 
 /**
  * The actor, or a requirement's target, belongs to another workspace than the one this core is

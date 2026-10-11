@@ -1,4 +1,4 @@
-import { Api, Authentication } from "@amends-dev/api-http";
+import { Api, Authentication, Streams } from "@amends-dev/http";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { ChangeFeed } from "@amends-dev/core/change-feed";
 import { GroupFacts } from "@amends-dev/core/group";
@@ -20,7 +20,6 @@ import {
   Scope,
   Stream,
 } from "effect";
-import { Streams } from "@amends-dev/server-http";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
@@ -29,10 +28,10 @@ import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
 
 const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
-const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 /**
  * The HTTP server over a host; the host's gateway stays available to seed what HTTP cannot. Limits
  * on open streams default to the server's own.

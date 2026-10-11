@@ -31,7 +31,7 @@ import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import { NotFound, Rejected, Unavailable } from "./ChannelErrors.ts";
+import { NotFound, Rejected, Unavailable } from "./internal/channel-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import type * as ChannelStore from "./ChannelStore.ts";
@@ -63,7 +63,7 @@ export {
    * @since 0.1.0
    */
   Unavailable,
-} from "./ChannelErrors.ts";
+} from "./internal/channel-errors.ts";
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or

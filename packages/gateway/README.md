@@ -221,7 +221,7 @@ keeps its cause for the host's logs; HTTP answers it with 500. Jobs get the same
 again after any failure. `GatewayErrors.PublicError` is the schema of these outcomes, and
 `GatewayErrors.PublicErrorOf<E>` computes a program's public error type. A domain error core adds
 reaches callers only once it is listed there: a type test checks that every error a core operation
-can fail with is public or one of the internal failures it names, and a server-http test that every
+can fail with is public or one of the internal failures it names, and an HTTP test that every
 error an HTTP route declares is public, so a new outcome fails the build until it is classified.
 
 The storage adapters map every failed `COMMIT` to `Uncertain`, including some definite failures; see

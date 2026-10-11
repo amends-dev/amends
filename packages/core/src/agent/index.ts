@@ -18,11 +18,6 @@ export * as Agent from "./Agent.ts";
 /**
  * @since 0.1.0
  */
-export * as AgentErrors from "./AgentErrors.ts";
-
-/**
- * @since 0.1.0
- */
 export * as AgentFacts from "./AgentFacts.ts";
 
 /**

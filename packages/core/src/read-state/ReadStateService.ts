@@ -23,58 +23,46 @@ import * as ReadStateStore from "./ReadStateStore.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import * as ReadStateCommand from "./ReadStateCommand.ts";
-
+import {
+  BeyondTimeline,
+  GroupNotFound,
+  HumanRequired,
+  ThreadNotFound,
+} from "./internal/read-state-errors.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as Store from "../journal/Store.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-
-/**
- * The requested position is past the thread's latest recorded activity.
- *
- * @category errors
- * @since 0.1.0
- */
-export class BeyondTimeline extends Schema.TaggedError<BeyondTimeline>()(
-  "ReadStateService.BeyondTimeline",
-  { threadId: ThreadId.Id, throughSequence: Schema.Int, latestSequence: Schema.Int },
-) {}
-
-/**
- * The group is missing, or the actor is not a member of it; the two are not told apart.
- *
- * @category errors
- * @since 0.1.0
- */
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "ReadStateService.GroupNotFound",
-  { groupId: GroupId.Id },
-) {}
-
-/**
- * The acting member is an agent: only people keep read state, and agents' turns track their input
- * progress.
- *
- * @category errors
- * @since 0.1.0
- */
-export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
-  "ReadStateService.HumanRequired",
-  { memberId: MemberId.Id },
-) {}
-
-/**
- * The thread is missing, in another workspace, or outside the actor's groups; the three are not
- * told apart.
- *
- * @category errors
- * @since 0.1.0
- */
-export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
-  "ReadStateService.ThreadNotFound",
-  { threadId: ThreadId.Id },
-) {}
+export {
+  /**
+   * The requested position is past the thread's latest recorded activity.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  BeyondTimeline,
+  /**
+   * The group is missing, or the actor is not a member of it; the two are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  GroupNotFound,
+  /**
+   * The acting member is an agent: only people keep read state, and agents' turns track their input
+   * progress.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  HumanRequired,
+  /**
+   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
+   * told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  ThreadNotFound,
+} from "./internal/read-state-errors.ts";
 
 /**
  * What marking a thread or a group read can fail with: the outcomes above, and the

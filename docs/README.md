@@ -21,8 +21,7 @@ remaining gaps with links to their owning code.
 | [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                                        |
 | [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                                 |
 | [Gateway](../packages/gateway/README.md)                             | Workspace boot, identity resolution, host contracts, and bus lifetime.                                                          |
-| [HTTP contract](../packages/api-http/README.md)                      | Endpoint groups, wire formats, authentication, and SSE semantics.                                                               |
-| [HTTP server](../packages/server-http/README.md)                     | Handler registration, request scopes, and authentication wiring.                                                                |
+| [HTTP](../packages/http/README.md)                                   | Endpoint groups, wire formats, authentication, SSE semantics, and handler registration.                                         |
 | [Adapters](../adapters/README.md)                                    | Store validation, construction, and migration conventions.                                                                      |
 | [Storage conformance](../packages/gateway/README.md#conformance)     | Test suites every storage adapter runs, and the fixture an adapter supplies.                                                    |
 | [Harness](../packages/harness/README.md)                             | The harness contract: an agent's sessions and turns in one stream format, and the bridge into sandboxes.                        |

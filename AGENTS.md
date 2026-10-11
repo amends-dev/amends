@@ -31,37 +31,37 @@ currently run through TypeScript. Check compatibility before changing this setup
 
 ## Workspace layout
 
-- `packages/*`: portable shared packages. Effect is their only external dependency,
-  besides `@effect/vitest` for test suites a package ships from the root catalog.
-  They may depend on other shared packages with `workspace:*`, but never hosts or
-  apps. This applies to all dependency sections; development tools live at the root.
-  `core` operates within one workspace with a trusted actor; its services are the
-  operations. Each core feature keeps the operations actors call in `service.ts`, the
-  internal writes other operations share in one `command.ts` service, and the internal
-  reads in one `query.ts` service; a command may read through the query, a query never
-  writes, and a step with one caller stays a private function of that caller. `gateway` is how a host enters core: it bootstraps
-  a workspace and resolves an authenticated identity into the actor, and it holds
-  the host contracts for storage, accounts, sign-in, session token resolution, and the
-  workspace directory. `api-http` is the HTTP contract shared by servers and clients, and
-  `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
-  over the same gateway rather than new gateway methods. The gateway's `conformance` module holds
-  the test suites every storage adapter runs against itself through a fixture: what the storage
-  contracts promise, from transactions and logs to accounts, across hosts over the same storage.
-  The gateway's tests run them over the memory implementation, and test core's operations as a
-  host runs them; adapter tests keep only what one adapter stores or fails differently. `harness` is the contract every harness implements: an agent's sessions
-  and turns, streamed in one format whichever agent runs them, and the bridge through which a host
-  drives an agent inside a sandbox. `sandbox` is the contract every sandbox provider implements,
-  with the suites each provider runs from `@amends-dev/sandbox/conformance`; a sandbox knows nothing
-  of what harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server
-  or an HTTP API, one shape. `channel` is the contract every channel transport implements: how one
+- `packages/*`: portable shared packages. Effect is their only external dependency, besides
+  `@effect/vitest` for test suites a package ships from the root catalog. They may depend on other
+  shared packages with `workspace:*`, but never hosts or apps. This applies to all dependency
+  sections; development tools live at the root. `core` operates within one workspace with a trusted
+  actor; its services are the operations. Each core feature keeps the operations actors call in
+  `service.ts`, the internal writes other operations share in one `command.ts` service, and the
+  internal reads in one `query.ts` service; a command may read through the query, a query never
+  writes, and a step with one caller stays a private function of that caller. `gateway` is how a
+  host enters core: it bootstraps a workspace and resolves an authenticated identity into the actor,
+  and it holds the host contracts for storage, accounts, sign-in, session token resolution, and the
+  workspace directory. `http` is the HTTP protocol: the contract clients call, which they import by
+  module, and the handlers that implement it over the gateway, including its authentication. Another
+  protocol adds its own package over the same gateway rather than new gateway methods. The gateway's
+  `conformance` module holds the test suites every storage adapter runs against itself through a
+  fixture: what the storage contracts promise, from transactions and logs to accounts, across hosts
+  over the same storage. The gateway's tests run them over the memory implementation, and test
+  core's operations as a host runs them; adapter tests keep only what one adapter stores or fails
+  differently. `harness` is the contract every harness implements: an agent's sessions and turns,
+  streamed in one format whichever agent runs them, and the bridge through which a host drives an
+  agent inside a sandbox. `sandbox` is the contract every sandbox provider implements, with the
+  suites each provider runs from `@amends-dev/sandbox/conformance`; a sandbox knows nothing of what
+  harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server or an
+  HTTP API, one shape. `channel` is the contract every channel transport implements: how one
   external system's conversations are received and replied to; an adapter implements it for one
   system, and the host declares that system's integration. `connection` holds the integrations a
-  host installs, what each gives a workspace's connections (models, tools, sandboxes, harnesses,
-  and channels), and the model catalog.
-  `cluster` runs jobs, the work outside requests, on Effect Cluster: entities whose requests a
-  commit stores, with their retries and pruning. Jobs enter workspaces through the gateway like
-  any other caller. Its turn job, one for each agent in each thread, runs the agent's turns on
-  `harness` and writes their session logs.
+  host installs, what each gives a workspace's connections
+  (models, tools, sandboxes, harnesses, and channels), and the model catalog. `cluster` runs jobs,
+  the work outside requests, on Effect Cluster: entities whose requests a commit stores, with their
+  retries and pruning. Jobs enter workspaces through the gateway like any other caller. Its turn
+  job, one for each agent in each thread, runs the agent's turns on `harness` and writes their
+  session logs.
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `harness-amends` is amends's own agent, a loop over Effect AI's
   `LanguageModel` with the model providers' clients, and `harness-opencode` runs opencode behind its
@@ -80,9 +80,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   the HTTP API over the PostgreSQL adapter at `AMENDS_DATABASE_URL`, with development
   sign-in and credentials.
   Hosts may install their runtime's dependencies and consume shared packages. A host
-  implements gateway contracts and serves protocol handler packages; it does not
-  depend on a protocol's contract package, which is for clients. A host's tests may
-  take a contract as a development dependency to act as a client.
+  implements gateway contracts and serves protocol packages' handlers; its tests act as a
+  client through the same package's contract.
 - `apps/*`: user-facing clients, the site, and shared UI. `icons` holds canonical drawings and
   generated Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume
   it. `ui` is the pattern-based design system built from the Lunacy mocks in

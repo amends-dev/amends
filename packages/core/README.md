@@ -626,18 +626,22 @@ and flat in the feature directory, as the Effect repository lays its modules out
 src/workspace/
   Member.ts             domain schemas, value types, and pure functions
   MemberId.ts           the ID alone, where references would otherwise make a cycle
-  MemberService.ts      the operations actors call, authorized, and the outcomes a caller can act on
+  MemberService.ts      the operations actors call, authorized, and the outcomes they report
   MemberCommand.ts      the internal writes other operations share
   MemberStore.ts        the persistence contract adapters implement
   MemberFacts.ts        versioned declarations of recorded changes
   MemberProjection.ts   replays the facts into the store, exported as `definition`
   MemberPermissions.ts  the permissions the feature owns
+  internal/member-errors.ts
+                        those outcomes, as schemas only
 ```
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
-An outcome a caller can act on is a schema in the module that fails with it; outcomes several
-modules share go in one `<Feature>Errors.ts`. Helpers no consumer imports go under `internal/`.
+The outcomes a caller can act on are schemas in an `internal/` errors module, apart from the
+services, so a protocol or a browser client carries them without loading an implementation; the
+service that reports them exports them under its name, which their tags carry, as
+`MemberService.NotFound`. Helpers no consumer imports go under `internal/` too.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

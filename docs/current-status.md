@@ -92,7 +92,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   is not stored. Keys are sealed with one host key, which nothing
   rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier keys.
 - [Agents](../packages/core/README.md#agents) are created, configured, renamed, and removed
-  over connections, in core, [over HTTP](../packages/api-http/README.md#agents), and on the
+  over connections, in core, [over HTTP](../packages/http/README.md#agents), and on the
   [Agents page](agents.md); roles are changed in workspace Members. A turn starts on what the
   agent's setup selects, kept for the agent's later turns in the thread: on `Auto`, the harness its
   previous turn there ran on while a connection still gives it, and otherwise the oldest connection

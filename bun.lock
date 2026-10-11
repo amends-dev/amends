@@ -112,8 +112,9 @@
       "name": "@amends-dev/client",
       "version": "0.0.0",
       "dependencies": {
-        "@amends-dev/api-http": "workspace:*",
+        "@amends-dev/core": "workspace:*",
         "@amends-dev/gateway": "workspace:*",
+        "@amends-dev/http": "workspace:*",
         "@effect/atom-solid": "catalog:",
         "effect": "catalog:",
       },
@@ -249,29 +250,18 @@
         "@amends-dev/harness": "workspace:*",
         "@amends-dev/harness-amends": "workspace:*",
         "@amends-dev/harness-opencode": "workspace:*",
+        "@amends-dev/http": "workspace:*",
         "@amends-dev/sandbox": "workspace:*",
         "@amends-dev/sandbox-daytona": "workspace:*",
         "@amends-dev/sandbox-local": "workspace:*",
-        "@amends-dev/server-http": "workspace:*",
         "@amends-dev/storage-postgresql": "workspace:*",
         "@daytona/sdk": "catalog:",
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends-dev/api-http": "workspace:*",
         "@amends-dev/toolkit": "workspace:*",
         "@effect/sql-pg": "catalog:",
-      },
-    },
-    "packages/api-http": {
-      "name": "@amends-dev/api-http",
-      "version": "0.0.0",
-      "dependencies": {
-        "@amends-dev/connection": "workspace:*",
-        "@amends-dev/core": "workspace:*",
-        "@amends-dev/gateway": "workspace:*",
-        "effect": "catalog:",
       },
     },
     "packages/channel": {
@@ -360,6 +350,16 @@
         "effect": "catalog:",
       },
     },
+    "packages/http": {
+      "name": "@amends-dev/http",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
+        "effect": "catalog:",
+      },
+    },
     "packages/sandbox": {
       "name": "@amends-dev/sandbox",
       "version": "0.1.0",
@@ -374,16 +374,6 @@
       "optionalPeers": [
         "@effect/vitest",
       ],
-    },
-    "packages/server-http": {
-      "name": "@amends-dev/server-http",
-      "version": "0.0.0",
-      "dependencies": {
-        "@amends-dev/api-http": "workspace:*",
-        "@amends-dev/core": "workspace:*",
-        "@amends-dev/gateway": "workspace:*",
-        "effect": "catalog:",
-      },
     },
     "packages/toolkit": {
       "name": "@amends-dev/toolkit",
@@ -429,8 +419,6 @@
 
     "@alchemy.run/sigil": ["@alchemy.run/sigil@0.1.0-alpha.1", "", { "peerDependencies": { "@types/react": ">=19.2.0", "react-devtools-core": ">=6.1.2" }, "optionalPeers": ["@types/react", "react-devtools-core"] }, "sha512-RtHELG2w+GluVewRsuKm66idtPzC+4STptMr/61X1Vy5uBkDzcCzjzV8G6jUa4iBv6Il0hHV7UL6wvv//9nD/Q=="],
 
-    "@amends-dev/api-http": ["@amends-dev/api-http@workspace:packages/api-http"],
-
     "@amends-dev/channel": ["@amends-dev/channel@workspace:packages/channel"],
 
     "@amends-dev/client": ["@amends-dev/client@workspace:apps/client"],
@@ -453,6 +441,8 @@
 
     "@amends-dev/host-local": ["@amends-dev/host-local@workspace:hosts/local"],
 
+    "@amends-dev/http": ["@amends-dev/http@workspace:packages/http"],
+
     "@amends-dev/icons": ["@amends-dev/icons@workspace:apps/icons"],
 
     "@amends-dev/sandbox": ["@amends-dev/sandbox@workspace:packages/sandbox"],
@@ -460,8 +450,6 @@
     "@amends-dev/sandbox-daytona": ["@amends-dev/sandbox-daytona@workspace:adapters/sandbox-daytona"],
 
     "@amends-dev/sandbox-local": ["@amends-dev/sandbox-local@workspace:adapters/sandbox-local"],
-
-    "@amends-dev/server-http": ["@amends-dev/server-http@workspace:packages/server-http"],
 
     "@amends-dev/site": ["@amends-dev/site@workspace:apps/site"],
 

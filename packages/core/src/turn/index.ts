@@ -44,11 +44,6 @@ export * as TurnCommand from "./TurnCommand.ts";
 /**
  * @since 0.1.0
  */
-export * as TurnErrors from "./TurnErrors.ts";
-
-/**
- * @since 0.1.0
- */
 export * as TurnExecution from "./TurnExecution.ts";
 
 /**

@@ -1,4 +1,4 @@
-import { Api, Authentication } from "@amends-dev/api-http";
+import { Api, Authentication } from "@amends-dev/http";
 import { Identity } from "@amends-dev/core/identity";
 import { Entry, Store } from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -20,10 +20,10 @@ const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("alice") });
 const outsider = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("outsider") });
 const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
-const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 
 /** Real HTTP, gateway and storage; explicit session tokens also exercise an agent principal. */
 const server = (url: string) => {

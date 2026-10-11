@@ -2,8 +2,8 @@
  * How a host enters core. Core runs one workspace with a trusted actor, and its services are the
  * operations; the gateway creates workspaces, prepares each one's core over `WorkspaceStorage`
  * through `WorkspaceRuntime`, and resolves an authenticated identity into `Actor.Actor`, so those
- * operations can run. Every protocol, such as server-http, and every host's jobs enter workspaces
- * through it, and fail only with the outcomes `GatewayErrors` makes public.
+ * operations can run. Every protocol, such as HTTP, and every host's jobs enter workspaces through
+ * it, and fail only with the outcomes `GatewayErrors` makes public.
  *
  * @since 0.1.0
  */

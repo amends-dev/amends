@@ -29,17 +29,17 @@ import * as WorkspaceFacts from "./WorkspaceFacts.ts";
 import * as Workspace from "./Workspace.ts";
 import * as WorkspaceSettings from "./WorkspaceSettings.ts";
 import * as WorkspaceSettingsPermissions from "./WorkspaceSettingsPermissions.ts";
-
-/**
- * The workspace's name is no longer the one the renamer expected: someone renamed it meanwhile,
- * and nothing was recorded.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Changed extends Schema.TaggedError<Changed>()("WorkspaceSettings.Changed", {
-  workspaceId: Workspace.Id,
-}) {}
+import { Changed } from "./internal/workspace-settings-errors.ts";
+export {
+  /**
+   * The workspace's name is no longer the one the renamer expected: someone renamed it meanwhile,
+   * and nothing was recorded.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
+  Changed,
+} from "./internal/workspace-settings-errors.ts";
 
 /**
  * What the settings operations can fail with: the outcome above, and the

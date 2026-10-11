@@ -9,7 +9,7 @@
     "packages/core/test/**/*.ts",
     "packages/gateway/test/**/*.ts",
     "packages/cluster/test/**/*.ts",
-    "packages/server-http/test/**/*.ts",
+    "packages/http/test/**/*.ts",
     "packages/toolkit/test/**/*.ts",
     "packages/connection/test/**/*.ts",
     "vitest.config.ts"

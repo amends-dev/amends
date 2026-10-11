@@ -24,11 +24,6 @@ export * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts";
 /**
  * @since 0.1.0
  */
-export * as ConnectionErrors from "./ConnectionErrors.ts";
-
-/**
- * @since 0.1.0
- */
 export * as ConnectionFacts from "./ConnectionFacts.ts";
 
 /**

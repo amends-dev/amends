@@ -26,7 +26,7 @@ import {
   FixedParticipation,
   NotFound,
   ThreadNotFound,
-} from "./ThreadParticipationErrors.ts";
+} from "./internal/thread-participation-errors.ts";
 export {
   /**
    * The actor's participation had already ended.
@@ -58,10 +58,10 @@ export {
    * @since 0.1.0
    */
   ThreadNotFound,
-} from "./ThreadParticipationErrors.ts";
+} from "./internal/thread-participation-errors.ts";
 
 /**
- * What following and unfollowing can fail with: the outcomes in `ThreadParticipationErrors`, and
+ * What following and unfollowing can fail with: the outcomes above, and
  * the failures of what they depend on.
  *
  * @category errors

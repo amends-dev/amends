@@ -1,12 +1,12 @@
 # @amends-dev/host-local
 
 The Bun host that runs amends over a PostgreSQL database: it serves the
-[HTTP API](../../packages/api-http/README.md), runs [jobs](../../packages/cluster/README.md) such as
+[HTTP API](../../packages/http/README.md), runs [jobs](../../packages/cluster/README.md) such as
 agents' turns, installs the integrations workspaces connect to, and signs people in with emailed codes.
 One process serves any number of workspaces, and several processes can share one database. It
 composes the [gateway](../../packages/gateway/README.md), the
 [PostgreSQL adapter](../../adapters/storage-postgresql/README.md), and the
-[HTTP server](../../packages/server-http/README.md), and implements no storage itself.
+[HTTP server](../../packages/http/README.md#serving-the-contract), and implements no storage itself.
 
 It has no email provider yet: it logs each email where it runs, so whoever reads its log can sign in
 as anyone who asks for a code. Do not expose it beyond your machine; see [sign-in](#sign-in). It is

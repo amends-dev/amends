@@ -1,5 +1,7 @@
 import { ThreadParticipation } from "@amends-dev/core/thread";
-import { Api, Authentication, Group, type ThreadTimeline } from "@amends-dev/api-http";
+import { Api, Authentication } from "@amends-dev/http";
+import { Group } from "@amends-dev/core/group";
+import { type ThreadTimeline } from "@amends-dev/core/thread";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Identity } from "@amends-dev/core/identity";
 import { Request } from "@amends-dev/core/request";
@@ -15,10 +17,10 @@ import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");
 const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
-const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server. */
 const server = (url: string) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(

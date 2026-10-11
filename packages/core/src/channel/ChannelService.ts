@@ -31,7 +31,12 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import { ConnectionUnavailable, GroupNotFound, NotBound, NotFound } from "./ChannelErrors.ts";
+import {
+  ConnectionUnavailable,
+  GroupNotFound,
+  NotBound,
+  NotFound,
+} from "./internal/channel-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelPermissions from "./ChannelPermissions.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
@@ -68,7 +73,7 @@ export {
    * @since 0.1.0
    */
   NotFound,
-} from "./ChannelErrors.ts";
+} from "./internal/channel-errors.ts";
 
 /**
  * What reading channels can fail with.

@@ -1,4 +1,7 @@
-import { ApiErrors, Workspace, Signal, ChangeFeed } from "@amends-dev/api-http";
+import * as ApiErrors from "@amends-dev/http/ApiErrors";
+import { ChangeFeed } from "@amends-dev/core/change-feed";
+import { Signal } from "@amends-dev/core/signal";
+import { Workspace } from "@amends-dev/core/workspace";
 import {
   Cause,
   Clock,

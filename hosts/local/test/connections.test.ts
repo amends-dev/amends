@@ -1,4 +1,4 @@
-import { Api, Authentication } from "@amends-dev/api-http";
+import { Api, Authentication } from "@amends-dev/http";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Identity } from "@amends-dev/core/identity";
 import { Request } from "@amends-dev/core/request";
@@ -18,10 +18,10 @@ const secret = "sk-mcp-connections-test";
 /** Where nothing listens, so checking a connection to it reaches nothing. */
 const nowhere = "http://127.0.0.1:1/mcp";
 const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
-const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 /** The real routes, gateway, integrations, and PostgreSQL storage behind a Bun test server. */
 const server = (url: string, credentialKey: Redacted.Redacted<string> | undefined) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(

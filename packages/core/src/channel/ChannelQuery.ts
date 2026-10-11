@@ -17,7 +17,7 @@ import * as Connection from "../connection/Connection.ts";
 import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import * as Channel from "./Channel.ts";
-import { NotFound } from "./ChannelErrors.ts";
+import { NotFound } from "./internal/channel-errors.ts";
 import * as ChannelStore from "./ChannelStore.ts";
 
 /**

@@ -27,11 +27,6 @@ export * as TaskCommand from "./TaskCommand.ts";
 /**
  * @since 0.1.0
  */
-export * as TaskErrors from "./TaskErrors.ts";
-
-/**
- * @since 0.1.0
- */
 export * as TaskFacts from "./TaskFacts.ts";
 
 /**

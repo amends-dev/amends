@@ -1,12 +1,12 @@
 /**
- * The local host's HTTP server: the routes and OpenAPI documentation of `@amends-dev/server-http`,
- * with the CORS policy the desktop app needs, served by Bun on the loopback interface over a host
- * layer and an authentication. As the server stops, open change streams end first, so it waits
- * only for ordinary requests.
+ * The local host's HTTP server: the routes and OpenAPI documentation of `@amends-dev/http`, with
+ * the CORS policy the desktop app needs, served by Bun on the loopback interface over a host layer
+ * and an authentication. As the server stops, open change streams end first, so it waits only for
+ * ordinary requests.
  *
  * @since 0.1.0
  */
-import { Draining, Routes } from "@amends-dev/server-http";
+import { Draining, Routes } from "@amends-dev/http";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import type { Accounts, SessionTokens, SignIn, SignInStorage } from "@amends-dev/gateway";
 import type { Crypto } from "effect";

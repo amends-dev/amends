@@ -1,10 +1,10 @@
 /**
  * The people a host knows across its workspaces. Core names a person by human ID alone; the host
  * keeps the address that ID belongs to here, so sign-in and invitations reach a person by address.
- * `EmailSignIn` finds or creates an account when sign-in completes, and server-http reads accounts
- * to resolve invitation addresses and to show a workspace's addresses. Storage adapters implement
- * `Accounts`, `layerMemory` in process memory, and the HTTP contract imports its schemas from
- * `@amends-dev/gateway/Accounts`.
+ * `EmailSignIn` finds or creates an account when sign-in completes, and the HTTP server reads
+ * accounts to resolve invitation addresses and to show a workspace's addresses. Storage adapters
+ * implement `Accounts`, `layerMemory` in process memory, and the HTTP contract imports its schemas
+ * from `@amends-dev/gateway/Accounts`.
  *
  * @since 0.1.0
  */

@@ -29,11 +29,6 @@ export * as ChannelBindingStore from "./ChannelBindingStore.ts";
 /**
  * @since 0.1.0
  */
-export * as ChannelErrors from "./ChannelErrors.ts";
-
-/**
- * @since 0.1.0
- */
 export * as ChannelFacts from "./ChannelFacts.ts";
 
 /**

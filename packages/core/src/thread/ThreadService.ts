@@ -56,7 +56,7 @@ import {
   HumanAuthorRequired,
   NotFound,
   ParticipantUnavailable,
-} from "./ThreadErrors.ts";
+} from "./internal/thread-errors.ts";
 import * as Notification from "../notification/Notification.ts";
 export {
   /**
@@ -103,10 +103,10 @@ export {
    * @since 0.1.0
    */
   ParticipantUnavailable,
-} from "./ThreadErrors.ts";
+} from "./internal/thread-errors.ts";
 
 /**
- * What starting a thread can fail with: the outcomes in `ThreadErrors`, and the failures of what
+ * What starting a thread can fail with: the outcomes above, and the failures of what
  * a start depends on.
  *
  * @category errors
@@ -137,7 +137,7 @@ export type Error =
   | TaskStore.Failure;
 
 /**
- * What renaming a thread can fail with: the outcomes in `ThreadErrors`, and the failures of what
+ * What renaming a thread can fail with: the outcomes above, and the failures of what
  * a rename depends on.
  *
  * @category errors

@@ -40,7 +40,7 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import type * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts";
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
-import { NotActive, NotFound, NotRetryable } from "./TurnErrors.ts";
+import { NotActive, NotFound, NotRetryable } from "./internal/turn-errors.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnCommand from "./TurnCommand.ts";
 import * as TurnFacts from "./TurnFacts.ts";
@@ -71,7 +71,7 @@ export {
    * @since 0.1.0
    */
   NotRetryable,
-} from "./TurnErrors.ts";
+} from "./internal/turn-errors.ts";
 
 /**
  * What reading a turn can fail with: `NotFound`, a denied `thread.read`, and the failures of what

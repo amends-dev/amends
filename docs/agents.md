@@ -42,7 +42,7 @@ asks for confirmation, and each completed change confirms itself with a toast.
 ## Boundaries and recovery
 
 Core keeps agents; see [core's agents](../packages/core/README.md#agents). The
-[HTTP contract](../packages/api-http/README.md#agents) serves them, and the models each
+[HTTP contract](../packages/http/README.md#agents) serves them, and the models each
 connection offers. Client's `useAgents` shapes them for the screens with the connections their
 setups name, offers each part's connections with the models each offers, keeps each draft with what
 it was made against, and reports failures by the change that failed: a connection the reader can't

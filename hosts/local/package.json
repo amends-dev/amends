@@ -16,17 +16,16 @@
     "@amends-dev/harness": "workspace:*",
     "@amends-dev/harness-amends": "workspace:*",
     "@amends-dev/harness-opencode": "workspace:*",
+    "@amends-dev/http": "workspace:*",
     "@amends-dev/sandbox": "workspace:*",
     "@amends-dev/sandbox-daytona": "workspace:*",
     "@amends-dev/sandbox-local": "workspace:*",
-    "@amends-dev/server-http": "workspace:*",
     "@amends-dev/storage-postgresql": "workspace:*",
     "@daytona/sdk": "catalog:",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends-dev/api-http": "workspace:*",
     "@amends-dev/toolkit": "workspace:*",
     "@effect/sql-pg": "catalog:"
   }

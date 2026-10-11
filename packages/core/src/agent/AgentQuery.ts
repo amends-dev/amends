@@ -17,7 +17,7 @@ import * as Identity from "../identity/Identity.ts";
 import * as MemberId from "../workspace/MemberId.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
-import { Incomplete } from "./AgentErrors.ts";
+import { Incomplete } from "./internal/agent-errors.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
 
