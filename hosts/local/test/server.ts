@@ -14,6 +14,8 @@ export const withServer = async <A>(
 ): Promise<A> => {
   const env: Record<string, string | undefined> = {
     ...process.env,
+    // Development tokens are human IDs, which tests present directly.
+    AMENDS_SIGN_IN: "development",
     ...options.env,
     AMENDS_DATABASE_URL: databaseUrl,
     AMENDS_PORT: "0",

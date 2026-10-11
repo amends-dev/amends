@@ -13,6 +13,10 @@ export class SessionGroup extends HttpApiGroup.make("session")
     HttpApiEndpoint.post("start", "/email", {
       payload: Schema.Struct({ email: Accounts.Email }),
       success: HttpApiSchema.Empty(202),
+      error: [
+        SignIn.Limited.pipe(HttpApiSchema.status(429)),
+        SignIn.Unavailable.pipe(HttpApiSchema.status(503)),
+      ],
     }),
     HttpApiEndpoint.post("complete", "/code", {
       payload: Schema.Struct({ email: Accounts.Email, code: SignIn.Code }),

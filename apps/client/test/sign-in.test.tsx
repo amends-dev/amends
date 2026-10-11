@@ -230,6 +230,27 @@ it.each(["http", "transport"] as const)(
     );
   },
 );
+it("says when too many codes were asked for, on the email and on resending", async () => {
+  const http = network(),
+    { controller } = mount(http.fetch);
+  const limited = () => json({ _tag: "SignIn.Limited" }, 429);
+  controller.requestCode("alice@example.com");
+  await waitFor(() => expect(http.calls).toHaveLength(1));
+  http.at(0).resolve(limited());
+  await waitFor(() =>
+    expect(controller.state()).toMatchObject({ _tag: "Email", error: "rate-limited" }),
+  );
+  controller.requestCode();
+  await waitFor(() => expect(http.calls).toHaveLength(2));
+  http.at(1).resolve(accepted());
+  await waitFor(() => expect(controller.state()._tag).toBe("Code"));
+  controller.resendCode();
+  await waitFor(() => expect(http.calls).toHaveLength(3));
+  http.at(2).resolve(limited());
+  await waitFor(() =>
+    expect(controller.state()).toMatchObject({ error: "resend-limited", pending: undefined }),
+  );
+});
 it("validates code drafts without requests and retains them for correction", async () => {
   const http = network(),
     { controller } = mount(http.fetch);

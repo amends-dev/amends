@@ -50,8 +50,8 @@ drawings, generation, and visual review in the UI workshop.
 ## Design and historical references
 
 - [Feature development](feature-development.md) records the agreed workflow and
-  connected-feature boundary. [Sign-in](sign-in-design.md) covers accounts, sessions, and
-  the designed production sign-in and identity providers, and records the first slice.
+  connected-feature boundary. [Sign-in](sign-in-design.md) covers accounts, sessions, email
+  sign-in, and the designed identity providers, and records the first slice.
   [Workspace entry](workspace-entry.md) describes picker/creation ownership and recovery.
   [Workspace shell](workspace-shell.md) covers nested routes, account controls, and appearance.
   [Workspace settings](workspace-settings.md) covers workspace, member, and invitation management.

@@ -102,6 +102,12 @@ export interface Interface {
   readonly sessionLogs: Map<string, ReadonlyArray<string>>;
   /** The host's accounts across its workspaces: each one's address by its human ID. */
   readonly accounts: Map<string, string>;
+  /** Each address's pending sign-in code, as the JSON of its encoded form. */
+  readonly signInCodes: Map<string, string>;
+  /** Held while a host changes a pending sign-in code, so changes apply one at a time. */
+  readonly signInCodesLock: Semaphore.Semaphore;
+  /** Signed-in sessions by their token's digest, as the JSON of their encoded form. */
+  readonly signInSessions: Map<string, string>;
   /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
   appended: Deferred.Deferred<void>;
   /** Every workspace's signals, across every host; signals themselves are never kept. */
@@ -240,6 +246,9 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
     logLocks: new Map(),
     sessionLogs: new Map(),
     accounts: new Map(),
+    signInCodes: new Map(),
+    signInCodesLock: yield* Semaphore.make(1),
+    signInSessions: new Map(),
     appended: yield* Deferred.make<void>(),
     signals: yield* SignalHub.makeLocal,
     nextId: (prefix) => `${prefix}-${++issued}`,

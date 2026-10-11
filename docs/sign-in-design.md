@@ -1,9 +1,9 @@
 # Sign-in
 
 How people sign in to a host and who they are once they have. Accounts, sessions, sign-out, and
-email codes are implemented, with the local host's development sign-in; production sign-in and
-identity providers are designed below and not built. The [first slice](#the-first-slice) records
-how the sign-in screens were introduced.
+email sign-in are implemented; identity providers are designed below and not built, and no email
+provider is configured yet, so the local host logs the emails it sends. The
+[first slice](#the-first-slice) records how the sign-in screens were introduced.
 
 ## Accounts
 
@@ -33,21 +33,34 @@ the identity providers it offers, each with an ID and a name to show. The email-
 `POST /session/email`, which sends a code to the address, then `POST /session/code`, which
 exchanges it for a session.
 
-The local host's development sign-in logs codes instead of sending them, and its tokens are the
-human ID itself, which it trusts from any caller and cannot revoke; see
+`POST /session/email` answers 429 with `SignIn.Limited` when too many codes were asked for lately,
+and 503 with `SignIn.Unavailable` when the host could not send one.
+
+## Email sign-in
+
+The gateway's [`EmailSignIn`](../packages/gateway/src/email-sign-in.ts) implements `SignIn` and
+`SessionTokens` over three host contracts: `SignInStorage`, which each storage adapter implements;
+`Accounts`; and `EmailSender`, the host's email provider.
+
+- A code is six random digits, sent to the address and stored only as an HMAC-SHA256 digest under
+  the host's code key. It works once, within ten minutes, and stops working after five wrong
+  tries. A new code replaces the last.
+- An address is sent a code at most every thirty seconds and five in an hour, across every host
+  over the storage. A client, by the network address its requests come from, may ask for twenty in
+  an hour, counted within one process. A code the provider did not send leaves the address as it
+  was, so asking again works at once.
+- Completing sign-in finds or creates the address's account and begins a session: a token of 32
+  random bytes, stored only as its SHA-256 digest. A session ends after thirty days unused and
+  ninety at most; using it moves its end at most once a day. Revoking deletes it.
+
+The policy's numbers are `EmailSignIn.defaultPolicy`, which a host may change. The storage suites
+run `EmailSignIn` over each adapter, so both stores keep these limits.
+
+The local host signs in by email unless `AMENDS_SIGN_IN=development`. Its code key derives from
+`AMENDS_CREDENTIAL_KEY`, so a code one process sent works on another; its emails go to its log until
+an email provider is chosen. Development sign-in remains for tests and scripts: it logs codes, and
+its tokens are human IDs, which it trusts from any caller and cannot revoke; see
 [development authentication](../hosts/local/README.md#development-authentication).
-
-## Production sign-in
-
-Designed, not built. A host implements `SignIn` and `SessionTokens` over an authentication library
-kept behind these contracts, so core, the HTTP contract, and the apps do not change with it:
-
-- Codes are emailed through a sender the host configures, single use, short-lived, rate limited by
-  address and by client.
-- Tokens are random values the host stores hashed, with an expiry it extends on use; revoking
-  deletes one. A token says nothing about its holder until the host resolves it.
-- The library's tables live beside the host's, applied by the same startup migrator, and its
-  secret comes from the deployment's configuration.
 
 ## Identity providers
 

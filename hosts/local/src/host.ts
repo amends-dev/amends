@@ -8,7 +8,12 @@ import {
   ToolIntegrations,
 } from "@amends-dev/connection";
 import { DeliveryJob, JobPruning, TurnJob } from "@amends-dev/cluster";
-import { type Accounts, Gateway, type WorkspaceDirectory } from "@amends-dev/gateway";
+import {
+  type Accounts,
+  Gateway,
+  type SignInStorage,
+  type WorkspaceDirectory,
+} from "@amends-dev/gateway";
 import { Models } from "@amends-dev/harness-amends";
 import {
   PostgresClusterStorage,
@@ -29,9 +34,9 @@ import type { SqlClient } from "effect/sql";
 import { HarnessIntegrations } from "./harness-integrations.ts";
 import { SandboxIntegrations } from "./sandbox-integrations.ts";
 
-/** Gateway, directory, and accounts owned by one host lifetime. */
+/** Gateway, directory, accounts, and sign-in storage owned by one host lifetime. */
 export type HostLayer = Layer.Layer<
-  Gateway.Service | WorkspaceDirectory.Service | Accounts.Service,
+  Gateway.Service | WorkspaceDirectory.Service | Accounts.Service | SignInStorage.Service,
   unknown
 >;
 
@@ -70,15 +75,18 @@ export interface Options {
 }
 
 /**
- * The secret opencode's bridge tokens are derived from: one made from the credential key, which
- * every host over the database shares, so that a host reaches a bridge another one launched; or,
- * without a credential key, this process's own.
+ * A secret for one purpose, such as opencode's bridge tokens: one made from the credential key,
+ * which every host over the database shares, so that hosts agree on it; or, without a credential
+ * key, this process's own.
  */
-const bridgeSecretOf = (credentialKey: Redacted.Redacted<string> | undefined) =>
+export const deriveSecret = (
+  credentialKey: Redacted.Redacted<string> | undefined,
+  purpose: string,
+) =>
   credentialKey === undefined
     ? randomBytes(32)
     : createHmac("sha256", Buffer.from(Redacted.value(credentialKey), "base64"))
-        .update("amends/opencode-bridge")
+        .update(purpose)
         .digest();
 
 /**
@@ -91,7 +99,8 @@ const bridgeSecretOf = (credentialKey: Redacted.Redacted<string> | undefined) =>
  */
 export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
-    const bridgeSecret = bridgeSecretOf(credentialKey);
+    // A host reaches a bridge another host launched.
+    const bridgeSecret = deriveSecret(credentialKey, "amends/opencode-bridge");
     const opencodeOptions: HarnessIntegrations.OpencodeOptions = {
       token: (sandboxId) =>
         Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url")),
@@ -150,7 +159,8 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 };
 
 /**
- * The gateway, the workspace directory, and the accounts over one PostgreSQL database, through
+ * The gateway, the workspace directory, the accounts, and sign-in's storage over one PostgreSQL
+ * database, through
  * the storage adapter, with the turn jobs that run agents' turns and the delivery jobs that carry messages to
  * channels, both on the integrations the host installs, and handled job requests pruned after
  * seven days. The HTTP server resolves bearer tokens before

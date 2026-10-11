@@ -52,8 +52,8 @@ their credentials; the [local host guide](hosts/local/README.md#run) lists every
 [desktop app](apps/desktop/README.md#run-and-verify) needs Rust and Tauri's prerequisites too. The
 API describes itself at `/openapi.json` and `/docs`.
 
-The local host's sign-in is for development only: it trusts whoever asks. Do not expose it beyond
-your machine.
+The local host has no email provider yet, so whoever reads its terminal can sign in as anyone. Do not
+expose it beyond your machine.
 
 ## Repository layout
 

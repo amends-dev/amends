@@ -50,8 +50,8 @@ it.effect.each(["make", "layer"] as const)(
         const alice = Accounts.Email.make("alice@example.com");
         const bob = Accounts.Email.make("bob@example.com");
         expect(delivered.size).toBe(0);
-        yield* signIn.start(alice);
-        yield* signIn.start(bob);
+        yield* signIn.start(alice, undefined);
+        yield* signIn.start(bob, undefined);
         const aliceCode = codeFor(alice);
         const wrong = SignIn.Code.make(aliceCode === "000000" ? "000001" : "000000");
         expect(yield* Effect.flip(signIn.complete(alice, wrong))).toMatchObject({
@@ -109,7 +109,7 @@ it.effect("each evaluation of the sign-in constructor owns its pending codes", (
       const first = yield* acquire;
       const second = yield* acquire;
       const email = Accounts.Email.make("alice@example.com");
-      yield* first.start(email);
+      yield* first.start(email, undefined);
       const code = delivered;
       if (code === undefined) throw new Error("No code was delivered");
       expect(yield* Effect.flip(second.complete(email, code))).toMatchObject({
@@ -138,7 +138,7 @@ it.effect("completing sign-in signs in as the address's account, the same one ea
     );
     const accounts = yield* Accounts.Service;
     const signInAs = Effect.fn(function* (email: Accounts.Email) {
-      yield* signIn.start(email);
+      yield* signIn.start(email, undefined);
       const code = delivered.get(email);
       if (code === undefined) return yield* Effect.die("No code was delivered");
       return yield* signIn.complete(email, code);
@@ -164,7 +164,7 @@ it.effect("concurrent completions consume a code once even when the clock suspen
       }),
     );
     const email = Accounts.Email.make("alice@example.com");
-    yield* signIn.start(email);
+    yield* signIn.start(email, undefined);
     const code = delivered;
     if (code === undefined) return yield* Effect.die("No code delivered");
     const gate = yield* Deferred.make<void>();
@@ -211,8 +211,8 @@ it.effect("a repeated request replaces the previous code", () =>
         }),
       );
       const email = Accounts.Email.make("alice@example.com");
-      yield* signIn.start(email);
-      yield* signIn.start(email);
+      yield* signIn.start(email, undefined);
+      yield* signIn.start(email, undefined);
       const [first, second] = delivered;
       if (first === undefined || second === undefined)
         return yield* Effect.die("Expected two codes");
@@ -235,14 +235,14 @@ it.effect("a failed delivery leaves no usable code and a later request can succe
       return Effect.void;
     });
     const email = Accounts.Email.make("alice@example.com");
-    expect(Exit.hasDies(yield* Effect.exit(signIn.start(email)))).toBe(true);
+    expect(Exit.hasDies(yield* Effect.exit(signIn.start(email, undefined)))).toBe(true);
     const failed = delivered[0];
     if (failed === undefined) return yield* Effect.die("Expected failed delivery");
     expect(yield* Effect.flip(signIn.complete(email, failed))).toMatchObject({
       reason: "unknown",
     });
     fail = false;
-    yield* signIn.start(email);
+    yield* signIn.start(email, undefined);
     const replacement = delivered[1];
     if (replacement === undefined) return yield* Effect.die("Expected replacement code");
     expect(yield* signIn.complete(email, replacement)).toEqual(yield* sessionFor(email));
@@ -267,13 +267,13 @@ it.effect.each(["failure", "interruption"] as const)(
         return Effect.void;
       });
       const email = Accounts.Email.make("alice@example.com");
-      const first = yield* Effect.forkScoped(signIn.start(email));
+      const first = yield* Effect.forkScoped(signIn.start(email, undefined));
       const firstCode = yield* Deferred.await(entered);
       // The delivery has started but has not succeeded yet.
       expect(yield* Effect.flip(signIn.complete(email, firstCode))).toMatchObject({
         reason: "unknown",
       });
-      yield* signIn.start(email);
+      yield* signIn.start(email, undefined);
       if (outcome === "interruption") yield* Fiber.interrupt(first);
       else {
         yield* Deferred.succeed(release, undefined);

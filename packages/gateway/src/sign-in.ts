@@ -30,14 +30,24 @@ export class Rejected extends Schema.TaggedError<Rejected>()("SignIn.Rejected", 
   reason: Schema.Literals(["unknown", "mismatch", "expired"]),
 }) {}
 
+/** Too many codes were asked for lately, for the address or from the client; try again later. */
+export class Limited extends Schema.TaggedError<Limited>()("SignIn.Limited", {}) {}
+
+/** The host could not send the code now; asking again may work. */
+export class Unavailable extends Schema.TaggedError<Unavailable>()("SignIn.Unavailable", {}) {}
+
 export interface Interface {
   /** The ways this host signs people in, which a sign-in page offers. */
   readonly methods: Methods;
   /**
-   * Send a one-time code to the address. Unknown addresses are accepted: completing
+   * Send a one-time code to the address, for a client at `remoteAddress`, the network address
+   * the request came from when the host knows it. Unknown addresses are accepted: completing
    * sign-in finds or creates the address's account.
    */
-  readonly start: (email: Accounts.Email) => Effect.Effect<void>;
+  readonly start: (
+    email: Accounts.Email,
+    remoteAddress: string | undefined,
+  ) => Effect.Effect<void, Limited | Unavailable>;
   /** Exchange a delivered code for a session as the address's account. A code works once. */
   readonly complete: (email: Accounts.Email, code: Code) => Effect.Effect<Session, Rejected>;
 }

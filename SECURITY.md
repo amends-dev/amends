@@ -22,9 +22,10 @@ API, workspace authorization, and the web and desktop apps.
 
 Some behavior is by design, and is not a vulnerability:
 
-- **The local host's development sign-in.** It trusts any bearer token as the person it names and
-  does not check that anyone controls an email address. It serves one machine; a host that others
-  reach must replace it, as the [local host guide](hosts/local/README.md) says.
+- **The local host's logged emails and development sign-in.** The local host has no email provider
+  yet, so it logs the sign-in codes it sends; whoever reads its log can sign in as anyone. With
+  `AMENDS_SIGN_IN=development`, it trusts any bearer token as the person it names. It serves one
+  machine, as the [local host guide](hosts/local/README.md) says.
 - **Local sandboxes isolate nothing.** A sandbox from `@amends-dev/sandbox-local` is a directory on
   your machine, and its processes run as you, on your network.
 - **Agents use their own tools without asking.** amends's agent reads, writes, edits, and runs

@@ -8,9 +8,14 @@ import { HttpApi } from "effect/http-api";
 const constructorOf = (ast: SchemaAST.AST): unknown => ast.annotations?.["~constructor"];
 /** Errors the HTTP layer raises itself, beside the gateway: authentication, sign-in, and limits. */
 const transport = new Set(
-  [Unauthorized, ApiErrors.HumanRequired, ApiErrors.TooManyStreams, SignIn.Rejected].map((error) =>
-    constructorOf(error.ast),
-  ),
+  [
+    Unauthorized,
+    ApiErrors.HumanRequired,
+    ApiErrors.TooManyStreams,
+    SignIn.Rejected,
+    SignIn.Limited,
+    SignIn.Unavailable,
+  ].map((error) => constructorOf(error.ast)),
 );
 
 it("every error a route declares reaches its client as declared, never as a defect", () => {

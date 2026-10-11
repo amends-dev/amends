@@ -143,3 +143,18 @@ it.effect.each(["", " ", "not-a-url", "https://user:secret@localhost/database"])
       expect(error.message).not.toContain("secret");
     }),
 );
+
+it.effect("people sign in with emailed codes unless development sign-in is asked for", () =>
+  Effect.gen(function* () {
+    expect((yield* load({ AMENDS_DATABASE_URL: databaseUrl })).signIn).toBe("email");
+    const options = yield* load({
+      AMENDS_DATABASE_URL: databaseUrl,
+      AMENDS_SIGN_IN: "development",
+    });
+    expect(options.signIn).toBe("development");
+    const error = yield* load({ AMENDS_DATABASE_URL: databaseUrl, AMENDS_SIGN_IN: "open" }).pipe(
+      Effect.flip,
+    );
+    expect(error.message).toContain("AMENDS_SIGN_IN");
+  }),
+);

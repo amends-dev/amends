@@ -6,8 +6,9 @@ workspaces, binds a workspace's storage, and resolves an authenticated identity 
 those services can run. Every protocol enters this way and then calls core directly, so nothing is
 declared twice; a host's jobs enter the same way, without an actor.
 
-The package also holds the contracts a host implements beside it: workspace storage, sign-in,
-session token resolution, and the workspace directory. It is internal to this repository and not
+The package also holds the contracts a host implements beside it: workspace storage, accounts,
+sign-in, session token resolution, and the workspace directory; and email sign-in, which implements
+sign-in and session tokens over three more of them. It is internal to this repository and not
 published to npm.
 
 ## Use
@@ -90,20 +91,49 @@ projection tables directly.
   the host's own and never the address. `Accounts.Email` trims and lowercases an address as it
   decodes, so one address is one account however it was typed.
 - `SignIn.Service` produces authenticated people: `methods` says how the host signs people in,
-  `start` delivers a one-time code to an address, and `complete` exchanges it for a
+  `start` delivers a one-time code to an address, failing with `SignIn.Limited` when too many were
+  asked for lately, for the address or from the client's network address, and with
+  `SignIn.Unavailable` when it could not send one; and `complete` exchanges the code for a
   `SignIn.Session`, a token the host's authentication accepts and the address's account.
 - `SessionTokens.Service` resolves a session token into an identity, and `revoke` stops honoring
   one, as signing out does.
 - `WorkspaceDirectory.Service` is one identity's routing table, `WorkspaceDirectory.Listing`: its
   memberships, ended ones included, each with its workspace's `activeMemberCount`, and its pending
   invitations.
+- `SignInStorage.Service` keeps email sign-in's pending codes and sessions across every host over
+  the storage: `modifyCode` replaces an address's `SignInStorage.PendingCode` with what a pure
+  decision makes of it, one change to an address at a time, and sessions, each a
+  `SignInStorage.SessionRecord` named by its token's digest, are inserted, found, extended, and
+  deleted. Storage adapters implement it.
+- `EmailSender.Service` hands an `EmailSender.Message` to the host's email provider, failing with
+  `EmailSender.Undelivered`.
 
-These span workspaces or issue credentials, which core never does, so hosts implement them; there is
-no default `make` or `layer` here. The `./accounts`, `./sign-in`, and `./directory` exports carry
+These span workspaces or issue credentials, which core never does, so hosts implement them, apart
+from sign-in and session tokens, which [email sign-in](#email-sign-in) implements. The `./accounts`, `./sign-in`, and `./directory` exports carry
 their schemas for contracts. On the wire, a membership's `activeMemberCount` is `people`.
 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces through
 `inWorkspace`, as [cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` do.
+
+## Email sign-in
+
+`EmailSignIn.layer({ codeKey, policy? })` provides `SignIn.Service` and `SessionTokens.Service` over
+`SignInStorage.Service`, `Accounts.Service`, `EmailSender.Service`, and `Crypto.Crypto`;
+`EmailSignIn.make` returns both. `codeKey` is a secret every host over the storage shares: codes are
+stored only as HMAC-SHA256 digests under it, and session tokens, 32 random bytes, only as SHA-256
+digests. `EmailSignIn.defaultPolicy`, which `policy` overrides in part:
+
+- a code works once, within ten minutes, and five wrong tries void it; a new code replaces the last;
+- an address is sent a code at most every thirty seconds and five in an hour, across every host;
+- a client, by the network address `start` is given, may ask for twenty codes in an hour, counted
+  within this process, by up to ten thousand addresses at once;
+- a session ends after thirty days unused and ninety at most, and using it moves its end at most
+  once a day.
+
+A code the email provider did not send leaves the address as it was, so asking again works at once.
+The decisions are pure functions, `decideSend`, `decideRedeem`, `withdrawUnsent`, and `renewalOf`,
+which `modifyCode` and `resolve` apply. The [storage suites](../storage-conformance/README.md) run
+email sign-in over each adapter.
 
 ## Public outcomes
 

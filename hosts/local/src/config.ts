@@ -21,6 +21,11 @@ export interface Options {
   readonly credentialKey: Redacted.Redacted<string> | undefined;
   /** The directory local sandboxes live in; the host's default when not set. */
   readonly sandboxDirectory: string | undefined;
+  /**
+   * How people sign in: with codes emailed to them, or, for tests and scripts, with development
+   * sign-in, whose bearer tokens are human IDs that the host trusts.
+   */
+  readonly signIn: "email" | "development";
 }
 
 const port = Config.schema(
@@ -100,6 +105,10 @@ const sandboxDirectory = Config.schema(Schema.NonEmptyString, "AMENDS_SANDBOX_DI
   Config.option,
 );
 
+const signIn = Config.schema(Schema.Literals(["email", "development"]), "AMENDS_SIGN_IN").pipe(
+  Config.withDefault("email" as const),
+);
+
 /** Read and validate startup options without opening a database or server. */
 export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return<
   Options,
@@ -114,6 +123,7 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
     runnerTakeover: yield* runnerTakeover,
     credentialKey: Option.getOrUndefined(yield* credentialKey),
     sandboxDirectory: Option.getOrUndefined(yield* sandboxDirectory),
+    signIn: yield* signIn,
   };
 });
 

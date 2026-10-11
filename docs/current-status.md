@@ -121,15 +121,20 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 ## Sign-in and accounts
 
 Each email address has one [account](sign-in-design.md#accounts), with an opaque human ID the host
-issues, created on the address's first sign-in or invitation. Only the local host's development
-sign-in exists: it logs codes instead of emailing them, nothing proves control of an address, and
-its tokens are the human ID itself, which it trusts from any caller and cannot revoke. Production
-sign-in and identity providers are [designed](sign-in-design.md#production-sign-in) but not built;
-`GET /session/methods` lists no providers, and the apps offer email codes without reading it. An
-account's address never changes, and accounts are never deleted. Invitations send no email.
-Issuing an invitation creates the address's account before the workspace checks that the issuer
-may invite, so a member without that permission can still create accounts for addresses, though
-nothing about the workspace is revealed or sent.
+issues, created on the address's first sign-in or invitation. [Email sign-in](sign-in-design.md#email-sign-in)
+is implemented, but no email provider is: the local host logs each email it sends, code included,
+where it runs, so whoever reads its log can sign in as anyone, and the apps' hint says to find the
+code in the host's terminal. Development sign-in remains behind `AMENDS_SIGN_IN=development`, for
+tests and scripts. The limit on codes per client counts within one process, by the address a request
+comes from; behind a proxy every client would share the proxy's address, and the host does not read
+forwarded addresses. Expired codes, and expired sessions nobody presents again, stay in the
+database; nothing prunes them. A person cannot list their sessions or end the others. Identity
+providers are [designed](sign-in-design.md#identity-providers) but not built; `GET /session/methods`
+lists no providers, and the apps offer email codes without reading it. An account's address never
+changes, and accounts are never deleted. Invitations send no email. Issuing an invitation creates
+the address's account before the workspace checks that the issuer may invite, so a member without
+that permission can still create accounts for addresses, though nothing about the workspace is
+revealed or sent.
 
 ## HTTP coverage
 

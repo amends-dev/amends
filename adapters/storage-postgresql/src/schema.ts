@@ -1066,3 +1066,29 @@ export const accounts = pgTable("accounts", {
   humanId: text("human_id").primaryKey(),
   email: text("email").notNull().unique(),
 });
+
+/**
+ * Each address's pending sign-in code, as its digest, with the sends counted against the address;
+ * outside every workspace, like the accounts.
+ */
+export const signInCodes = pgTable("sign_in_codes", {
+  email: text("email").primaryKey(),
+  digest: text("digest").notNull(),
+  expiresAt: instant("expires_at").notNull(),
+  failedAttempts: integer("failed_attempts").notNull(),
+  sentAt: instant("sent_at").notNull(),
+  windowStartedAt: instant("window_started_at").notNull(),
+  sendsInWindow: integer("sends_in_window").notNull(),
+});
+
+/** Signed-in sessions by their token's digest; outside every workspace, like the accounts. */
+export const signInSessions = pgTable(
+  "sign_in_sessions",
+  {
+    digest: text("digest").primaryKey(),
+    humanId: text("human_id").notNull(),
+    createdAt: instant("created_at").notNull(),
+    expiresAt: instant("expires_at").notNull(),
+  },
+  (table) => [index("sign_in_sessions_by_human").on(table.humanId)],
+);

@@ -1,7 +1,10 @@
 export { Accounts } from "./accounts.ts";
+export { EmailSender } from "./email-sender.ts";
+export { EmailSignIn } from "./email-sign-in.ts";
 export { SessionTokens } from "./session-tokens.ts";
 export { WorkspaceDirectory } from "./directory.ts";
 export { GatewayErrors } from "./errors.ts";
 export { Gateway } from "./gateway.ts";
 export { SignIn } from "./sign-in.ts";
+export { SignInStorage } from "./sign-in-storage.ts";
 export { WorkspaceStorage } from "./storage.ts";

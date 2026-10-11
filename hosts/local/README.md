@@ -2,15 +2,15 @@
 
 The Bun host that runs amends over a PostgreSQL database: it serves the
 [HTTP API](../../packages/api-http/README.md), runs [jobs](../../packages/cluster/README.md) such as
-agents' turns, installs the integrations workspaces connect to, and signs people in for development.
+agents' turns, installs the integrations workspaces connect to, and signs people in with emailed codes.
 One process serves any number of workspaces, and several processes can share one database. It
 composes the [gateway](../../packages/gateway/README.md), the
 [PostgreSQL adapter](../../adapters/storage-postgresql/README.md), and the
 [HTTP server](../../packages/server-http/README.md), and implements no storage itself.
 
-Its sign-in is for development: it trusts any bearer token as the person it names. Do not expose it
-beyond your machine; see [development authentication](#development-authentication). It is internal
-to this repository and not published to npm.
+It has no email provider yet: it logs each email where it runs, so whoever reads its log can sign in
+as anyone who asks for a code. Do not expose it beyond your machine; see [sign-in](#sign-in). It is
+internal to this repository and not published to npm.
 
 ## Run
 
@@ -36,6 +36,7 @@ app's development server proxies `/api` here, and the desktop app connects to it
 | `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.                                   |
 | `AMENDS_CREDENTIAL_KEY`     | Unset             | 32 bytes as base64, such as from `openssl rand -base64 32`.                     |
 | `AMENDS_SANDBOX_DIRECTORY`  | Temporary         | A directory; `amends-sandboxes` in the system's temporary directory by default. |
+| `AMENDS_SIGN_IN`            | `email`           | `email`, or `development` for tests and scripts.                                |
 
 The database must exist; startup applies the schema to it before serving, one process at a time when
 several start together. A missing or invalid URL fails startup before any connection, an explicitly
@@ -43,7 +44,9 @@ blank setting fails validation, and database URLs stay redacted in configuration
 
 `AMENDS_CREDENTIAL_KEY` seals connections' credentials at rest. Without it the host stores none, and
 setting a connection's key answers `CredentialsUnavailable`. Keep it secret and stable: a changed
-key cannot open credentials sealed with the old one, and nothing rotates them.
+key cannot open credentials sealed with the old one, and nothing rotates them. Email sign-in's code
+key derives from it too, so a code one process sent works on every process over the database;
+without it, a code works only on the process that sent it.
 
 The pool size is the most connections the host opens. Three stay held: the runner-address claim, the
 cluster's shard locks, and the change feed's listener once a stream opens. The minimum of five
@@ -117,26 +120,47 @@ authentication failures too, so clients can handle a 401. Other origins receive 
 header. Requests carry bearer tokens, not cookies, so a different web origin needs a same-origin
 proxy or a change to the host's CORS layer.
 
-## Development authentication
+## Sign-in
 
-`GET /session/methods` offers email codes alone. `POST /session/email` logs a six-digit code where
-the server runs, and `POST /session/code` exchanges it within ten minutes for a session: the
-address's account, which the host creates on the address's first sign-in or invitation, and a token
-that is the account's human ID. Development credentials trust any nonempty bearer token as the human
-ID it asserts, so signing out cannot revoke one:
+`AMENDS_SIGN_IN` chooses how people sign in. Either way, `GET /session/methods` offers email codes
+alone, `POST /session/email` sends a six-digit code, and `POST /session/code` exchanges it for a
+session as the address's account, which the host creates on the address's first sign-in or
+invitation.
+
+### Email sign-in
+
+The default runs the gateway's [`EmailSignIn`](../../packages/gateway/README.md#email-sign-in)
+over the database, so its limits and sessions hold across every process: a code works once, within
+ten minutes, and five wrong tries void it; an address is sent at most one code every thirty seconds
+and five an hour; a session's token is random, stored only as a digest, ends after thirty days
+unused and ninety at most, and signing out deletes it. A client may ask for twenty codes an hour,
+counted by the address its requests come from within one process; the host listens on loopback
+alone, so for now every request comes from the machine itself.
+
+Until an email provider is configured, the host logs each email it sends, code included, where it
+runs:
+
+```text
+Email to ada@example.com: Your sign-in code
+Your sign-in code is 042816. It works once, within 10 minutes. …
+```
+
+### Development authentication
+
+`AMENDS_SIGN_IN=development` keeps codes in the process's memory, logs them, and answers a session
+whose token is the account's human ID. Development credentials trust any nonempty bearer token as
+the human ID it asserts, so signing out cannot revoke one. Tests and scripts use it to act as anyone
+without signing in:
 
 ```bash
+AMENDS_SIGN_IN=development AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
   -d '{"name":"Design studio","memberName":"Alice"}' http://127.0.0.1:8787/workspaces
 ```
 
-Nothing verifies control of the address. Replace both development implementations before exposing
-the server beyond the local machine: a network host must authenticate callers and check that they
-may create workspaces before entering the gateway.
-
-Each sign-in implementation owns its pending codes. A new request replaces the previous pending code
-for that address. A code becomes usable after delivery succeeds, can be used once, and expires at
-the ten-minute deadline. A failed or interrupted delivery removes its own attempt without deleting a
+Nothing verifies control of the address. A new request replaces the previous pending code for that
+address. A code becomes usable after delivery succeeds, can be used once, and expires at the
+ten-minute deadline. A failed or interrupted delivery removes its own attempt without deleting a
 newer one, and restarting the server discards pending codes.
 
 Requests without a token receive 401. Non-members receive 403 with `Gateway.NotMember`, and core's
@@ -147,21 +171,22 @@ outcomes keep their tags, such as `MemberService.NotFound` with 404.
 Follow the [host conventions](../README.md). Importing any module but the entry point reads no
 configuration and starts nothing.
 
-| Module                             | Responsibility                                                                                                                                          |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                        |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                     |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                   |
-| `config.ts`                        | `LocalConfig.load()`, validating every setting before any resource is acquired.                                                                         |
-| `harness-integrations.ts`          | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                   |
-| `sandbox-integrations.ts`          | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                     |
-| `host.ts`                          | `LocalHost.layer(url, options?)`: the gateway, directory, and accounts over PostgreSQL, with jobs and pruning; `layerDatabase`; and `makeIntegrations`. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                |
-| `index.ts`                         | Loads configuration, builds the host layer, and launches through `BunRuntime.runMain`.                                                                  |
+| Module                             | Responsibility                                                                                                                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                         |
+| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                      |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                    |
+| `authentication/email.ts`          | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                 |
+| `config.ts`                        | `LocalConfig.load()`, validating every setting before any resource is acquired.                                                                                                          |
+| `harness-integrations.ts`          | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                    |
+| `sandbox-integrations.ts`          | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                      |
+| `host.ts`                          | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, and sign-in storage over PostgreSQL, with jobs and pruning; `layerDatabase`; `makeIntegrations`; and `deriveSecret`. |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                             |
+| `index.ts`                         | Loads configuration, builds the host layer and the authentication `AMENDS_SIGN_IN` names, and launches through `BunRuntime.runMain`.                                                     |
 
-Sign-in construction requires `Crypto.Crypto` and the host's `Accounts.Service`; session token
-construction is synchronous. Neither
-needs HTTP services or issues codes when built. Database and server resources belong to their layer
+Development sign-in requires `Crypto.Crypto` and the host's `Accounts.Service`, and email sign-in
+also its `SignInStorage.Service`; development session tokens are built synchronously. None needs
+HTTP services or sends codes when built. Database and server resources belong to their layer
 scopes. The gateway boots each workspace on first use and keeps it prepared while requests or
 streams use it and for five idle minutes afterwards; see the
 [gateway](../../packages/gateway/README.md#workspace-runtimes). See

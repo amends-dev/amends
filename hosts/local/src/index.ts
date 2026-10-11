@@ -1,10 +1,15 @@
 import { BunRuntime } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
+import { DevelopmentAuthentication } from "./authentication/authentication.ts";
+import { EmailAuthentication } from "./authentication/email.ts";
 import { LocalConfig } from "./config.ts";
 import { LocalHost } from "./host.ts";
 import { LocalServer } from "./server.ts";
 
-/** Serve the application on the loopback interface over the AMENDS_DATABASE_URL database. */
+/**
+ * Serve the application on the loopback interface over the AMENDS_DATABASE_URL database, signing
+ * people in as AMENDS_SIGN_IN says.
+ */
 const program = Effect.gen(function* () {
   const {
     port,
@@ -15,7 +20,12 @@ const program = Effect.gen(function* () {
     runnerTakeover,
     credentialKey,
     sandboxDirectory,
+    signIn,
   } = yield* LocalConfig.load();
+  const authentication =
+    signIn === "development"
+      ? DevelopmentAuthentication.layer()
+      : EmailAuthentication.layer(credentialKey);
   return yield* Layer.launch(
     LocalServer.layer(
       LocalHost.layer(databaseUrl, {
@@ -26,6 +36,7 @@ const program = Effect.gen(function* () {
         credentialKey,
         sandboxDirectory,
       }),
+      authentication,
       port,
     ),
   );

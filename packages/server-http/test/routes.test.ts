@@ -377,7 +377,9 @@ const signIn = Layer.succeed(
   SignIn.Service,
   SignIn.Service.of({
     methods,
-    start: record("start", () => Effect.void),
+    start: record("start", (email) =>
+      email === "busy@mercier.co" ? Effect.fail(new SignIn.Limited()) : Effect.void,
+    ),
     complete: record("complete", (_email, code) =>
       code === "419270"
         ? Effect.succeed({ token: jo.id, account: jo })
@@ -641,14 +643,18 @@ it.effect("sign-in needs no credential, and the directory answers for the princi
         const malformed = yield* Effect.flip(
           client.session.start({ payload: { email: "not-an-address" } }),
         );
-        return { rejected, session, malformed };
+        const limited = yield* Effect.flip(
+          client.session.start({ payload: { email: "busy@mercier.co" } }),
+        );
+        return { rejected, session, malformed, limited };
       }),
     );
     expect(outcome.rejected).toMatchObject({ _tag: "SignIn.Rejected", reason: "mismatch" });
     expect(outcome.session).toEqual({ token: jo.id, account: jo });
     // The client rejects a malformed address before any request is sent.
     expect(outcome.malformed._tag).toBe("SchemaError");
-    expect(calls.map((call) => call.operation)).toEqual(["start", "complete", "complete"]);
+    expect(outcome.limited).toMatchObject({ _tag: "SignIn.Limited" });
+    expect(calls.map((call) => call.operation)).toEqual(["start", "complete", "complete", "start"]);
     calls.length = 0;
     const listing = yield* run("alice", (client) => client.me.workspaces());
     expect(listing.memberships).toHaveLength(1);

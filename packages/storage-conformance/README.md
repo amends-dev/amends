@@ -1,6 +1,6 @@
 # @amends-dev/storage-conformance
 
-Test suites for the gateway's storage and signal hub contracts, which every storage adapter runs
+Test suites for the gateway's storage, signal hub, accounts, and sign-in storage contracts, which every storage adapter runs
 against itself. Behavior core relies on is specified once here and checked on each adapter, so an
 adapter for another database passes the same tests as those in this repository. Among the rules: a
 store keeps its workspace's data its own, refusing any record that names another workspace, and core
@@ -25,7 +25,7 @@ An adapter supplies a `Harness`, by convention in its `test/harness.ts`:
 `withStorage` gives the test a `Storage`:
 
 - `connect(options?)` opens another host over the same storage, with its own connection or pool,
-  closed with the test's scope: its storage, directory, accounts, and signal hub. `failFast` asks
+  closed with the test's scope: its storage, directory, accounts, sign-in storage, and signal hub. `failFast` asks
   for prompt contention where the adapter would otherwise wait.
 - `discardProjections` removes every projected record, live projection version, and checkpoint,
   keeping logs and read state, as rebuilding projections does before replay. No storage contract
@@ -83,6 +83,8 @@ enters a workspace through the gateway and runs one core operation as a protocol
 | `channels`            | Conversations received into bound threads, echoes and rejected requests, replies delivered and their edits, and managing channels.          |
 | `workspaceIsolation`  | Every store refusing a record that names another workspace, and keeping none of it.                                                         |
 | `accounts`            | One account per address, however typed and from any host, concurrent first requests sharing one, and accounts read back by ID.              |
+| `signInStorage`       | An address's pending code replaced and removed one change at a time from every host, and sessions found, extended, and deleted.             |
+| `emailSignIn`         | Email sign-in over the storage: codes used once, voided, and expired, limits per address and client, sessions renewed, ended, and revoked.  |
 
 ## Development
 

@@ -40,6 +40,7 @@ export interface EntryProps {
   readonly email?: string;
   readonly code?: string;
   readonly error?: SignInCodeError;
+  readonly emailError?: SignInEmailError;
   readonly providers?: boolean;
   readonly workspaces?: "some" | "invitations" | "none";
   readonly creating?: boolean;
@@ -50,7 +51,7 @@ export interface EntryProps {
 export function Entry(props: EntryProps) {
   const [step, setStep] = createSignal<EntryStep>(props.step ?? "email");
   const [email, setEmail] = createSignal(props.email ?? "");
-  const [emailError, setEmailError] = createSignal<SignInEmailError>();
+  const [emailError, setEmailError] = createSignal(props.emailError);
   const [code, setCode] = createSignal(props.code ?? "");
   const [codeError, setCodeError] = createSignal(props.error);
   const [codePending, setCodePending] = createSignal<"verifying" | "resending">();

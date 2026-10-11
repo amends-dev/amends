@@ -6,7 +6,8 @@ serves the protocols clients speak. It may install whatever its runtime needs; s
 never depend on a host.
 
 [`local`](local/README.md) is the only host so far: it serves the HTTP API on Bun over the
-PostgreSQL adapter, with development sign-in and credentials. Run it from the repository root with
+PostgreSQL adapter, with email sign-in, development sign-in for tests, and credentials. Run it from
+the repository root with
 `bun run start`, or `bun run dev` to restart it as its source changes.
 
 ## What a host depends on
@@ -26,12 +27,13 @@ Hosts follow the [shared construction conventions](../packages/README.md#constru
 `make` constructs an implementation and returns the gateway contract's `Service.of(...)`, and
 `layer` provides it. Related implementations share a directory: the local host's `authentication/`
 holds `DevelopmentSignIn`, `DevelopmentSessionTokens`, and `DevelopmentAuthentication`, which
-composes them. Their names say whom they trust, so another host supplies its own implementations of
-the same contracts.
+composes them, beside `EmailAuthentication`, which composes the gateway's email sign-in with the
+host's email sender and code key. Their names say whom they trust, so another host supplies its own
+implementations of the same contracts.
 
 Modules that only compose expose layers alone. The local host's `LocalHost.layer` composes the
-gateway, the storage adapter, the integrations, and the jobs, and `LocalServer.layer` adds sign-in,
-credentials, and the HTTP server. `LocalConfig.load()` reads and validates the configuration
+gateway, the storage adapter, the integrations, and the jobs, and `LocalServer.layer` adds the
+authentication the configuration chooses and the HTTP server. `LocalConfig.load()` reads and validates the configuration
 before anything is acquired, and `src/index.ts` alone launches the server, so importing any other
 module reads no setting and starts nothing.
 

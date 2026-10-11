@@ -12,6 +12,21 @@ type Story = StoryObj;
 /** The Lunacy "Sign in / Email" frame. */
 export const Email = { render: () => <Entry /> } satisfies Story;
 
+/** Too many codes were asked for: the email stays, and the host says to wait. */
+export const EmailLimited = {
+  render: () => <Entry email="alex@mercier.example" emailError="rate-limited" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("Too many codes were requested lately. Try again later."),
+    ).toBeVisible();
+    await expect(canvas.getByRole("textbox", { name: "Email" })).not.toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  },
+} satisfies Story;
+
 /** The Lunacy "Sign in / Verification code" frame. */
 export const Code = {
   render: () => <Entry step="code" email="alex@mercier.example" code="042816" />,
