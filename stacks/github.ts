@@ -2,12 +2,15 @@
  * What the repository's workflows need to deploy: a Cloudflare API token that may deploy Workers
  * and attach them to amends.dev, and the account it belongs to, as Actions secrets. Cloudflare's
  * OAuth cannot create tokens, so deploy this from the repository root with a separate profile
- * whose Cloudflare login is an API token allowed to create tokens, or the Global API Key, and whose
- * GitHub login is the gh CLI; deploy it again to rotate the token or change what it may do:
+ * whose Cloudflare login is the Global API Key, and whose GitHub login is the gh CLI; deploy it
+ * again to rotate the token or change what it may do:
  *
  *   bun alchemy profile create admin
  *   bun alchemy profile edit --profile admin
  *   bun alchemy deploy --config stacks/github.ts --profile admin
+ *
+ * An API token works in the key's place only with everything this run does: read the amends.dev
+ * zone, reach Alchemy's state store (Workers Scripts and Secrets Store), and create API tokens.
  */
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
@@ -27,8 +30,13 @@ export default Alchemy.Stack(
     const zone = yield* Cloudflare.Zone.findZoneByName({ accountId, name: "amends.dev" }).pipe(
       Effect.orDie,
     );
-    if (zone === undefined)
-      return yield* Effect.die(new Error("amends.dev is not in this account."));
+    if (zone === undefined) {
+      return yield* Effect.die(
+        new Error(
+          "amends.dev is not visible to this profile: its Cloudflare login cannot read the zone.",
+        ),
+      );
+    }
 
     const token = yield* Cloudflare.ApiToken.AccountApiToken("DeployToken", {
       name: "amends-deploy",
