@@ -13,7 +13,7 @@ import * as GroupId from "./GroupId.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import { storeFailure } from "../journal/internal/storeFailure.ts";
+import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**

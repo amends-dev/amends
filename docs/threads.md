@@ -233,7 +233,8 @@ documentation is generated from them.
 
 - **One module per namespace, named after it.** `ThreadMessageService.ts` exports
   `ThreadMessageService`, flat in the feature directory, as `effect/ai` is flat. Helpers no
-  consumer imports go in `internal/`. The barrel, `index.ts`, documents each export. A module does
+  consumer imports go in `internal/`. The barrel, `index.ts`, is written by `bun run barrels`, as
+  Effect's codegen writes its own: every module beside it, with the module's `@since`. A module does
   not re-export itself: the barrel exports it with `export * as`, and modules import one another
   with `import * as`, so a module's class can carry its name.
 - **A header on every module**: a paragraph saying what the module is for and how it relates to its

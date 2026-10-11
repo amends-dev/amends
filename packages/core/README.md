@@ -626,9 +626,8 @@ and flat in the feature directory, as the Effect repository lays its modules out
 src/workspace/
   Member.ts             domain schemas, value types, and pure functions
   MemberId.ts           the ID alone, where references would otherwise make a cycle
-  MemberService.ts      the operations actors call, authorized
+  MemberService.ts      the operations actors call, authorized, and the outcomes a caller can act on
   MemberCommand.ts      the internal writes other operations share
-  MemberErrors.ts       outcomes a caller can act on, as schemas only
   MemberStore.ts        the persistence contract adapters implement
   MemberFacts.ts        versioned declarations of recorded changes
   MemberProjection.ts   replays the facts into the store, exported as `definition`
@@ -637,7 +636,8 @@ src/workspace/
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
-Helpers no consumer imports go under `internal/`.
+An outcome a caller can act on is a schema in the module that fails with it; outcomes several
+modules share go in one `<Feature>Errors.ts`. Helpers no consumer imports go under `internal/`.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as
@@ -651,9 +651,11 @@ without re-evaluating authority or time; services coordinate authorization, stor
 A workflow may use another feature's models, facts, or stores when it owns their coordination, as
 removing a member revokes pending invitations and ends group admissions in the same commit.
 
-Inside core, import the owning leaf module directly, with `import * as`; public barrels give each
-module its namespace with `export * as`. The domain `index.ts` files define the public surface. Reserve `Schema.suspend` for schemas that need deferred construction, such as recursive
-data; ID leaves break model cycles.
+Inside core, import the owning leaf module directly, with `import * as`. Each feature's `index.ts`
+is a barrel that `bun run barrels` writes, as Effect's codegen writes its own: every module of the
+feature as its namespace, with `export * as`, and never what is under `internal/`. Reserve
+`Schema.suspend` for schemas that need deferred construction, such as recursive data; ID leaves
+break model cycles.
 
 ### Schema and type names
 
@@ -693,8 +695,9 @@ implementation exports `make`, which constructs it, and `layer`, which provides 
 inside the Effect, so evaluating one twice builds two implementations, and return `Service.of(...)`.
 Actor identity and the active transaction are resolved during each operation, never at construction.
 Contracts implemented elsewhere, such as stores, `SignalHub.SignalHub`, `Actor.Actor`,
-`Publication.Publication`, and `Store.Transaction`, have no `make` or `layer` here. `index.ts`
-composes the layers and implements nothing itself.
+`Publication.Publication`, and `Store.Transaction`, have no `layer` here: a store contract's `make`
+checks an adapter's driver, and its `layerMemory` is the reference implementation in process memory.
+`index.ts` composes the layers and implements nothing itself.
 
 ```ts
 import { Log, Transaction } from "@amends-dev/core/journal";

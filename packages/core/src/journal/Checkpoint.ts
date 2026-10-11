@@ -14,7 +14,7 @@ import * as Entry from "./Entry.ts";
 import * as Store from "./Store.ts";
 import * as StoreInput from "./StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import { storeFailure } from "./internal/storeFailure.ts";
+import { storeFailure } from "./internal/store-failure.ts";
 import * as MemoryDatabase from "./MemoryDatabase.ts";
 
 /**

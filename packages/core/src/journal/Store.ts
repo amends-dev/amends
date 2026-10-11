@@ -16,7 +16,7 @@ import * as Occurrence from "./Occurrence.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as StoreInput from "./StoreInput.ts";
 import * as MemoryDatabase from "./MemoryDatabase.ts";
-import { storeFailure } from "./internal/storeFailure.ts";
+import { storeFailure } from "./internal/store-failure.ts";
 
 /**
  * What an entry stores. Domain journals provide a fact header, `Event.Header`, beside the encoded

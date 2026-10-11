@@ -32,43 +32,57 @@ import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
-import { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./OwnershipErrors.ts";
-export {
-  /**
-   * The Owner assignment is no longer the one the caller reviewed: ownership moved meanwhile, and
-   * nothing was recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-  /**
-   * The member cannot become owner: they are the owner already, removed, or an agent, as `reason`
-   * says.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidRecipient,
-  /**
-   * No membership has the ID given as the recipient.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberNotFound,
-  /**
-   * The actor is not the current owner, or is not a person; only the owner transfers, whatever
-   * their grants.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotOwner,
-} from "./OwnershipErrors.ts";
 
 /**
- * What the ownership operations can fail with: the outcomes in `OwnershipErrors`, and the failures
+ * The Owner assignment is no longer the one the caller reviewed: ownership moved meanwhile, and
+ * nothing was recorded.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class Changed extends Schema.TaggedError<Changed>()("OwnershipService.Changed", {
+  workspaceId: Workspace.Id,
+}) {}
+
+/**
+ * The member cannot become owner: they are the owner already, removed, or an agent, as `reason`
+ * says.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class InvalidRecipient extends Schema.TaggedError<InvalidRecipient>()(
+  "OwnershipService.InvalidRecipient",
+  {
+    memberId: Member.Id,
+    reason: Schema.Literals(["same-owner", "removed", "agent"]),
+  },
+) {}
+
+/**
+ * No membership has the ID given as the recipient.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
+  "OwnershipService.MemberNotFound",
+  { memberId: Member.Id },
+) {}
+
+/**
+ * The actor is not the current owner, or is not a person; only the owner transfers, whatever
+ * their grants.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class NotOwner extends Schema.TaggedError<NotOwner>()("OwnershipService.NotOwner", {
+  workspaceId: Workspace.Id,
+}) {}
+
+/**
+ * What the ownership operations can fail with: the outcomes above, and the failures
  * of what they depend on.
  *
  * @category errors

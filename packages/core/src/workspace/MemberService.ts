@@ -30,34 +30,43 @@ import * as MemberPermissions from "./MemberPermissions.ts";
 import * as MemberStore from "./MemberStore.ts";
 import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
-
-import { AlreadyRemoved, NotFound, OwnerProtected } from "./MemberErrors.ts";
-export {
-  /**
-   * The member to remove was removed already; nothing more is recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyRemoved,
-  /**
-   * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * The member is the current owner, who cannot be removed; ownership must be transferred first.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  OwnerProtected,
-} from "./MemberErrors.ts";
+import * as Workspace from "./Workspace.ts";
 
 /**
- * What reading members can fail with: the outcome in `MemberErrors`, and the failures of what a
+ * The member to remove was removed already; nothing more is recorded.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
+  "MemberService.AlreadyRemoved",
+  { workspaceId: Workspace.Id, memberId: Member.Id },
+) {}
+
+/**
+ * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class NotFound extends Schema.TaggedError<NotFound>()("MemberService.NotFound", {
+  workspaceId: Workspace.Id,
+  memberId: Member.Id,
+}) {}
+
+/**
+ * The member is the current owner, who cannot be removed; ownership must be transferred first.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()(
+  "MemberService.OwnerProtected",
+  { workspaceId: Workspace.Id, memberId: Member.Id },
+) {}
+
+/**
+ * What reading members can fail with: the outcome above, and the failures of what a
  * read depends on.
  *
  * @category errors
@@ -74,7 +83,7 @@ export type Error = Authorization.Error | MemberStore.Failure | Schema.SchemaErr
 export type RenameError = Error | Projection.Error | Log.WriteError | PlatformError.PlatformError;
 
 /**
- * What removing a member can fail with: the outcomes in `MemberErrors`, the delegation rules, and
+ * What removing a member can fail with: the outcomes above, the delegation rules, and
  * the failures of the group departures, invitation revocations, and commit a removal includes.
  *
  * @category errors

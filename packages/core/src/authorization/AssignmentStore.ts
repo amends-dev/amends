@@ -14,7 +14,7 @@ import * as Assignment from "./Assignment.ts";
 import * as Role from "./Role.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import { storeFailure } from "../journal/internal/storeFailure.ts";
+import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**

@@ -10,75 +10,54 @@
  * @since 0.1.0
  */
 
+// @barrel: Auto-generated exports. Do not edit manually.
+
 /**
- * The one toolkit of a turn, made of the tools of every source a workspace has, with the host's
- * decision for each.
- *
  * @since 0.1.0
  */
 export * as Assembly from "./Assembly.ts";
 
 /**
- * A toolkit presented as one tool, `execute`, which runs code the model writes that calls the
- * tools as functions.
- *
  * @since 0.1.0
  */
-export * as CodeMode from "./code/index.ts";
+export * as CodeMode from "./CodeMode.ts";
 
 /**
- * An HTTP API as a tool source, each tool one request, kept as data a catalog stores.
- *
  * @since 0.1.0
  */
 export * as Http from "./Http.ts";
 
 /**
- * An MCP server as a tool source, reached over Streamable HTTP.
- *
  * @since 0.1.0
  */
-export * as Mcp from "./mcp/index.ts";
+export * as Mcp from "./Mcp.ts";
 
 /**
- * The operations of an HTTP API, read from its OpenAPI 3 document, for `Http` to run.
- *
  * @since 0.1.0
  */
 export * as OpenApi from "./OpenApi.ts";
 
 /**
- * What the ways to present a toolkit to a model share: running its tools, and making toolkits of
- * some of them.
- *
  * @since 0.1.0
  */
 export * as Presentation from "./Presentation.ts";
 
 /**
- * A tool as data, which a source reports and a catalog stores as JSON.
- *
  * @since 0.1.0
  */
 export * as ToolDefinition from "./ToolDefinition.ts";
 
 /**
- * A toolkit presented as two tools: one that finds tools by what they do, and one that runs them.
- *
  * @since 0.1.0
  */
 export * as ToolSearch from "./ToolSearch.ts";
 
 /**
- * What every kind of tool source implements, and the toolkit a model calls, built from one.
- *
  * @since 0.1.0
  */
 export * as ToolSource from "./ToolSource.ts";
 
 /**
- * The error every tool source fails with, and its reasons.
- *
  * @since 0.1.0
  */
 export * as ToolSourceError from "./ToolSourceError.ts";

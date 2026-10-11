@@ -19,7 +19,7 @@ import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Group from "../group/Group.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import { storeFailure } from "../journal/internal/storeFailure.ts";
+import { storeFailure } from "../journal/internal/store-failure.ts";
 
 /**
  * Where a page of a recipient's notifications ends, by recorded time and ID: an exclusive keyset

@@ -19,7 +19,8 @@ drop the database. The host tests also spawn the server entry point. Use
 `bun install` runs `effect-tsgo patch` and `lefthook install` through the `prepare`
 script. This enables Effect diagnostics in the TypeScript compiler and workspace
 language server, and installs the Git hooks. Before each commit, Lefthook runs
-dependency boundary, generated-icon, type, lint, and formatting checks in parallel across the working tree.
+dependency boundary, generated-barrel, generated-icon, type, lint, and formatting checks in parallel
+across the working tree.
 The hook checks files without modifying or staging them. Fix failures before
 committing; `bun run lefthook run pre-commit --force` runs the same checks manually,
 even when no files are staged. CI runs these checks, the tests, and the frontend builds
@@ -131,7 +132,9 @@ into an app page.
 
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links. Run `bun install` at the repository root after manifest changes.
-`bun run check:packages` checks shared-package dependency declarations.
+`bun run check:packages` checks shared-package dependency declarations. A barrel, an `index.ts`
+marked `// @barrel`, is generated as Effect's are: `bun run barrels` lists every module beside it,
+and `bun run check:barrels` fails when one is out of date.
 
 ## Design and review
 

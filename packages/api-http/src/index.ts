@@ -40,6 +40,17 @@ export {
 } from "./Api.ts";
 export {
   /**
+   * A member's access: the caller's own workspace-wide permissions, the built-in roles to choose
+   * from, one member's assignments, and adding a role, replacing the workspace roles as a whole
+   * against the assignments expected, and revoking one.
+   *
+   * @category models
+   * @since 0.1.0
+   */
+  AssignmentsGroup,
+} from "./AssignmentsGroup.ts";
+export {
+  /**
    * Live workspace changes the caller may see. Ready opens every subscription and says whether to
    * refresh; each commit carries a cursor that resumes after it, and signals such as typing arrive
    * between them.

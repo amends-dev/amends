@@ -31,9 +31,9 @@ import {
   Semaphore,
   Stream,
 } from "effect";
-import * as TurnAgent from "./TurnAgent.ts";
-import * as SessionLogWriter from "./SessionLogWriter.ts";
-import * as TurnWorkspace from "./TurnWorkspace.ts";
+import * as TurnAgent from "./internal/turn-agent.ts";
+import * as SessionLogWriter from "./internal/session-log-writer.ts";
+import * as TurnWorkspace from "./internal/turn-workspace.ts";
 
 /** The least time between two drafts of a step's text, in milliseconds. */
 const draftInterval = 100;

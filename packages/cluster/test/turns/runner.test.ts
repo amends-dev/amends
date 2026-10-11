@@ -5,7 +5,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option, Stream } from "effect";
 import { Prompt } from "effect/ai";
 import * as TurnRunner from "../../src/TurnRunner.ts";
-import * as SessionLogWriter from "../../src/SessionLogWriter.ts";
+import * as SessionLogWriter from "../../src/internal/session-log-writer.ts";
 import {
   type FakeWorkspace,
   type FakeWorkspaceOptions,

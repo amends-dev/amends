@@ -6,17 +6,12 @@
  * the client then sends the parameter's value as `Mcp-Param-Region` as well as in the body. A server
  * that has marked a parameter refuses a call that sends the value without the header. `Mcp.http`
  * finds the marks when it lists a server's tools, and sends the headers with each call.
- *
- * @since 0.1.0
  */
 import { Result, type Schema } from "effect";
 import { Base64 } from "effect/encoding";
 
 /**
  * A parameter of a tool that is also sent as a header.
- *
- * @category models
- * @since 0.1.0
  */
 export interface Binding {
   /** What follows `Mcp-Param-` in the name of the header. */
@@ -106,9 +101,6 @@ const declarationsIn = (
  * The parameters that the `inputSchema` of a tool marks as headers, or why the tool is not one a
  * client may use: a client has to leave out a tool whose marks the protocol does not allow, such as
  * a mark on a parameter that is an object, or two of the same name.
- *
- * @category utils
- * @since 0.1.0
  */
 export const findBindings = (
   inputSchema: Schema.JsonObject,
@@ -149,9 +141,6 @@ const sentinelEnd = "?=";
  * else its UTF-8 as base64 between `=?base64?` and `?=`, for a text with a character that is not
  * printable ASCII, one that ends in a space or a tab, which a header does not keep, or one that is
  * written as the base64 form is.
- *
- * @category utils
- * @since 0.1.0
  */
 export const encodeHeaderValue = (text: string): string => {
   const isPlain =
@@ -184,9 +173,6 @@ const textOf = (value: Json | undefined): string | undefined => {
 /**
  * The headers to send with a call of a tool, for the parameters it marks. A parameter the input
  * leaves out, or gives as `null`, has none, as the server does not look for one.
- *
- * @category utils
- * @since 0.1.0
  */
 export const headersOf = (
   bindings: ReadonlyArray<Binding>,

@@ -54,7 +54,7 @@ import { TestClock } from "effect/testing";
 import * as GatewayErrors from "../src/GatewayErrors.ts";
 import * as Gateway from "../src/Gateway.ts";
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
-import * as WorkspaceRuntime from "../src/WorkspaceRuntime.ts";
+import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });

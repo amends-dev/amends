@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./conformance/internal/*": null,
     "./*": "./src/*.ts",
+    "./internal/*": null,
     "./conformance": "./src/conformance/index.ts"
   },
   "scripts": {

@@ -4,9 +4,9 @@
  * @since 0.1.0
  */
 
+// @barrel: Auto-generated exports. Do not edit manually.
+
 /**
- * The key a client chooses for a creating request, and the record ID it derives.
- *
  * @since 0.1.0
  */
 export * as Request from "./Request.ts";

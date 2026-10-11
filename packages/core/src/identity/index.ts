@@ -6,23 +6,19 @@
  * @since 0.1.0
  */
 
+// @barrel: Auto-generated exports. Do not edit manually.
+
 /**
- * The member performing the current operation, and the service every operation reads it from.
- *
  * @since 0.1.0
  */
 export * as Actor from "./Actor.ts";
 
 /**
- * A human's, an agent's, or a contact's stable identity, independent of any workspace.
- *
  * @since 0.1.0
  */
 export * as Identity from "./Identity.ts";
 
 /**
- * Who a fact attributes an action to: a member, an identity, or the system.
- *
  * @since 0.1.0
  */
 export * as Performer from "./Performer.ts";

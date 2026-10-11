@@ -6,8 +6,6 @@
  * It speaks the stateless protocol of 2026-07-28 to a server that does, and otherwise the protocol
  * with sessions that older servers speak, which starts with `initialize`. It finds out which when it
  * first needs the server, and again when the server ends a session.
- *
- * @since 0.1.0
  */
 import { Data, Effect, Option, Ref, Schema, Semaphore, Stream } from "effect";
 import { McpSchema } from "effect/ai";
@@ -23,14 +21,11 @@ import {
   UnsupportedError,
   type ToolSourceErrorReason,
 } from "../ToolSourceError.ts";
-import { encodeHeaderValue } from "./Headers.ts";
+import { encodeHeaderValue } from "./mcp-headers.ts";
 
 /**
  * What `streamableHttp` and `Mcp.http` take: the source's name, the server's address, the client
  * that sends requests with the server's credentials, and who the client says it is.
- *
- * @category options
- * @since 0.1.0
  */
 export interface Options {
   /** Names the source, as `ToolSource.name` says. */
@@ -49,9 +44,6 @@ export interface Options {
 /**
  * The connection to one MCP server that `streamableHttp` makes, through which the source of
  * `Mcp.http` sends its requests. The first request settles how the server is spoken to.
- *
- * @category models
- * @since 0.1.0
  */
 export interface Transport {
   /**
@@ -104,9 +96,6 @@ class HeaderMismatch extends Data.TaggedError("HeaderMismatch") {}
 /**
  * Whether a request failed because the server found its headers did not match its body, which
  * `Mcp.http` answers by listing the tools again.
- *
- * @category utils
- * @since 0.1.0
  */
 export const isHeaderMismatch = (error: ToolSourceError) => error.cause instanceof HeaderMismatch;
 
@@ -128,9 +117,6 @@ const Initialized = Schema.Struct({ protocolVersion: Schema.String });
 /**
  * Makes the transport to the MCP server at `options.url`. Making it contacts nothing: the server
  * is first reached by the first request.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function* (
   options: Options,

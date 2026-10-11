@@ -25,7 +25,7 @@ import { Context, Crypto, Data, Effect, Layer, Option, Schema, Cause } from "eff
 import { type Scope } from "effect";
 import * as GatewayErrors from "./GatewayErrors.ts";
 import * as WorkspaceStorage from "./WorkspaceStorage.ts";
-import * as WorkspaceRuntime from "./WorkspaceRuntime.ts";
+import * as WorkspaceRuntime from "./internal/workspace-runtime.ts";
 
 /**
  * The gateway a host builds once, with `make` or `layer`: it creates workspaces and runs programs

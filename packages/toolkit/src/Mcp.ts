@@ -11,18 +11,18 @@
  */
 import { Effect, Ref, Result, Schema } from "effect";
 import { McpSchema } from "effect/ai";
-import type { ToolDefinition } from "../ToolDefinition.ts";
-import type { ToolSource } from "../ToolSource.ts";
+import type { ToolDefinition } from "./ToolDefinition.ts";
+import type { ToolSource } from "./ToolSource.ts";
 import {
   CallFailedError,
   InvalidResponseError,
   ToolSourceError,
   UnsupportedError,
   type ToolSourceErrorReason,
-} from "../ToolSourceError.ts";
-import { findBindings, headersOf, type Binding } from "./Headers.ts";
-import * as Transport from "./Transport.ts";
-import type { Options } from "./Transport.ts";
+} from "./ToolSourceError.ts";
+import { findBindings, headersOf, type Binding } from "./internal/mcp-headers.ts";
+import * as Transport from "./internal/mcp-transport.ts";
+import type { Options } from "./internal/mcp-transport.ts";
 
 export type {
   /**

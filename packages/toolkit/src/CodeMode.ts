@@ -20,9 +20,9 @@
  */
 import { Duration, Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/ai";
-import * as Presentation from "../Presentation.ts";
-import { Failure } from "../ToolSource.ts";
-import { declare } from "./Declarations.ts";
+import * as Presentation from "./Presentation.ts";
+import { Failure } from "./ToolSource.ts";
+import { declare } from "./internal/declarations.ts";
 
 /**
  * Why code did not finish: it threw, or the runtime could not run it. A `CodeRuntime` fails with

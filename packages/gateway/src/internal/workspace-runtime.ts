@@ -4,8 +4,6 @@
  * shares the runtime while a lease on it is open and for the idle time-to-live after the last one
  * closes. Only `Gateway` uses it, and restricts which of a runtime's services each program may
  * require.
- *
- * @since 0.1.0
  */
 import * as Core from "@amends-dev/core";
 import { BuiltinRoleUpgrade } from "@amends-dev/core/authorization";
@@ -27,23 +25,17 @@ import {
   Schedule,
   Scope,
 } from "effect";
-import * as WorkspaceStorage from "./WorkspaceStorage.ts";
+import * as WorkspaceStorage from "../WorkspaceStorage.ts";
 
 /**
  * What a prepared workspace provides: core's services and the host services it was built over.
  * The gateway's methods restrict which of them a program may require.
- *
- * @category models
- * @since 0.1.0
  */
 export type Services = Layer.Success<typeof Core.layer> | Core.HostServices;
 
 /**
  * How the gateway prepares workspaces: the integrations each workspace's core receives, and how
  * long an unused workspace stays prepared. `Gateway.Options` is this type.
- *
- * @category options
- * @since 0.1.0
  */
 export interface Options {
   /**
@@ -60,9 +52,6 @@ export interface Options {
 
 /**
  * What `make` returns: leases on prepared workspaces, and a way to stop sharing one.
- *
- * @category models
- * @since 0.1.0
  */
 export interface Interface {
   /**
@@ -87,9 +76,6 @@ export interface Interface {
  * are open and for the idle time-to-live after the last one closes; then it is released, and the
  * next request prepares it again. Request identity and transaction context must never enter
  * service construction.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage;

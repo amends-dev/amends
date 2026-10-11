@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/http";
-import * as Mcp from "../../src/mcp/index.ts";
+import * as Mcp from "../../src/Mcp.ts";
 
 interface Call {
   readonly id: number | undefined;

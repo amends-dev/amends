@@ -8,18 +8,14 @@
  * @since 0.1.0
  */
 
-/**
- * The agent over opencode 1's session API, what it is made with, and its sessions, each an
- * opencode session in the sandbox.
- *
- * @since 0.1.0
- */
-export * as OpencodeAgent from "./OpencodeAgent.ts";
+// @barrel: Auto-generated exports. Do not edit manually.
 
 /**
- * The agent over opencode 2's session API, what it is made with, and its sessions, each an
- * opencode session in the sandbox.
- *
  * @since 0.1.0
  */
 export * as Opencode2Agent from "./Opencode2Agent.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as OpencodeAgent from "./OpencodeAgent.ts";

@@ -9,17 +9,19 @@ what the thread's contacts were told to the conversation. Jobs enter workspaces 
 [gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an actor does. The
 [local host](../../hosts/local/README.md) runs them.
 
-| Module                | What it holds                                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `TurnJob.ts`          | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
-| `DeliveryJob.ts`      | `DeliveryJob`: the `amends/DeliveryJob` entity, its `Deliver` request, the requests commits store, and the worker for them. |
-| `JobRequests.ts`      | `JobRequests`: how every job handles a request that fails, tried again until it holds or is dropped.                        |
-| `DeliveryRunner.ts`   | `DeliveryRunner`: a bound thread's deliveries, accepted and posted one at a time; see [delivering](#delivering).            |
-| `TurnRunner.ts`       | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
-| `SessionLogWriter.ts` | `SessionLogWriter`: what a run writes to its participation's session log.                                                   |
-| `TurnAgent.ts`        | `TurnAgent`: starting the session of the agent a turn runs, built from what core gives with the host's integrations.        |
-| `TurnWorkspace.ts`    | `TurnWorkspace`: the workspace as a run calls it, each call entering it through the gateway for itself.                     |
-| `JobPruning.ts`       | `JobPruning`, the hourly job that removes handled requests.                                                                 |
+| Module              | What it holds                                                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `TurnJob.ts`        | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
+| `DeliveryJob.ts`    | `DeliveryJob`: the `amends/DeliveryJob` entity, its `Deliver` request, the requests commits store, and the worker for them. |
+| `JobRequests.ts`    | `JobRequests`: how every job handles a request that fails, tried again until it holds or is dropped.                        |
+| `DeliveryRunner.ts` | `DeliveryRunner`: a bound thread's deliveries, accepted and posted one at a time; see [delivering](#delivering).            |
+| `TurnRunner.ts`     | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
+| `JobPruning.ts`     | `JobPruning`, the hourly job that removes handled requests.                                                                 |
+
+`TurnRunner` keeps three steps of a run under `internal/`: `session-log-writer.ts`, what a run
+writes to its participation's session log; `turn-agent.ts`, starting the session of the agent a
+turn runs from what core gives and the host's integrations; and `turn-workspace.ts`, the workspace
+as a run calls it, each call entering it through the gateway for itself.
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and connection
 contracts. It knows no harness, model provider, sandbox platform, or channel's system: the host

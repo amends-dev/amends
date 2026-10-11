@@ -3,20 +3,15 @@
  * the log for the turn, then appends each entry after the one it wrote last, so a run that finds
  * the log past what it wrote, as one another run replaced after Cluster moved its job, writes
  * nothing more and stops: it is `Superseded`. `TurnRunner` opens one for each run of a turn.
- *
- * @since 0.1.0
  */
 import { SessionLog, Turn, type TurnExecution } from "@amends-dev/core/turn";
 import { Agent, type Session } from "@amends-dev/harness";
 import { Array, Effect, Ref, Schema } from "effect";
 import type { Prompt } from "effect/ai";
-import type * as TurnWorkspace from "./TurnWorkspace.ts";
+import type * as TurnWorkspace from "./turn-workspace.ts";
 
 /**
  * Another run of the turn wrote to its session log after this one: this one stops.
- *
- * @category errors
- * @since 0.1.0
  */
 export class Superseded extends Schema.TaggedError<Superseded>()("SessionLogWriter.Superseded", {
   turnId: Turn.Id,
@@ -24,17 +19,11 @@ export class Superseded extends Schema.TaggedError<Superseded>()("SessionLogWrit
 
 /**
  * A turn ready to run, as its job starts it: the `Ready` of `TurnExecution.Start`.
- *
- * @category models
- * @since 0.1.0
  */
 export type Ready = Extract<TurnExecution.Start, { readonly _tag: "Ready" }>;
 
 /**
  * What a turn's run starts from, and writes first to the log.
- *
- * @category models
- * @since 0.1.0
  */
 export interface Opening {
   /**
@@ -59,9 +48,6 @@ export interface Opening {
  * already, as a run cut short leaves it, runs again from that prompt, noting that the earlier run
  * stopped. Otherwise the turn's prompt follows, after `joined`, the conversation the agent joined,
  * when the log is new.
- *
- * @category utils
- * @since 0.1.0
  */
 export const openingOf = (
   entries: ReadonlyArray<SessionLog.Entry>,
@@ -170,9 +156,6 @@ interface Written {
  * after the run's last entry or fails with `Superseded`, writing none of it, and the turn's
  * entries, those read and those the run wrote so far, oldest first. An append is not cut short: a
  * run stopped meanwhile stops after it.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const open = Effect.fn("SessionLogWriter.open")(function* (
   workspace: TurnWorkspace.TurnWorkspace,
@@ -209,8 +192,5 @@ export const open = Effect.fn("SessionLogWriter.open")(function* (
 /**
  * What `open` returns: the run's `opening`, where it sits in the log (`openedAt`), `append`, and
  * `turnEntries`.
- *
- * @category models
- * @since 0.1.0
  */
 export type Writer = Effect.Success<ReturnType<typeof open>>;

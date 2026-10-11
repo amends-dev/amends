@@ -22,33 +22,44 @@ import * as NotificationInbox from "./NotificationInbox.ts";
 import type * as Thread from "../thread/Thread.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import { AlreadyHandled, HumanRecipientRequired, NotFound } from "./NotificationErrors.ts";
+
 import * as Store from "../journal/Store.ts";
-export {
-  /**
-   * The notification no longer waits for its recipient: it was discarded, or settled some other way,
-   * so it cannot be marked seen.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyHandled,
-  /**
-   * The acting member is not a person: only people mark their notifications seen.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanRecipientRequired,
-  /**
-   * The notification is missing, or is another recipient's; the two are deliberately not told
-   * apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-} from "./NotificationErrors.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+
+/**
+ * The notification no longer waits for its recipient: it was discarded, or settled some other way,
+ * so it cannot be marked seen.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class AlreadyHandled extends Schema.TaggedError<AlreadyHandled>()(
+  "NotificationService.AlreadyHandled",
+  { notificationId: Notification.Id },
+) {}
+
+/**
+ * The acting member is not a person: only people mark their notifications seen.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class HumanRecipientRequired extends Schema.TaggedError<HumanRecipientRequired>()(
+  "NotificationService.HumanRecipientRequired",
+  {},
+) {}
+
+/**
+ * The notification is missing, or is another recipient's; the two are deliberately not told
+ * apart.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class NotFound extends Schema.TaggedError<NotFound>()("NotificationService.NotFound", {
+  workspaceId: WorkspaceId.Id,
+  notificationId: Notification.Id,
+}) {}
 
 /**
  * What every notification operation can fail with: authorization, the store, and an input that

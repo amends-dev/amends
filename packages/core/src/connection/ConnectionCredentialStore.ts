@@ -13,7 +13,7 @@ import type { Option } from "effect";
 import * as Store from "../journal/Store.ts";
 import * as Connection from "./Connection.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import { storeFailure } from "../journal/internal/storeFailure.ts";
+import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
