@@ -25,7 +25,10 @@ const owner = {
 for (const replacement of [false, true])
   it(`cancels pending settings when ${replacement ? "credentials change" : "the feature unmounts"}`, async () => {
     const [shown, setShown] = createSignal(true);
-    let session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" }),
+    let session = Schema.decodeSync(Session)({
+        token: "alice",
+        account: { id: "alice", email: "alice@example.com" },
+      }),
       view!: WorkspaceSettingsView;
     const listeners = new Set<() => void>();
     const store: SessionStore = {
@@ -94,7 +97,10 @@ for (const replacement of [false, true])
       fetch.mock.calls.filter(([input, init]) => new Request(input, init).method === "PUT"),
     ).toHaveLength(1);
     if (replacement) {
-      session = Schema.decodeSync(Session)({ token: "bob", identity: "bob" });
+      session = Schema.decodeSync(Session)({
+        token: "bob",
+        account: { id: "bob", email: "bob@example.com" },
+      });
       listeners.forEach((fn) => fn());
     } else setShown(false);
     await waitFor(() => expect(mutation!.signal.aborted).toBe(true));
@@ -108,7 +114,10 @@ for (const replacement of [false, true])
   });
 
 it("retries at once after a failed request or invalid input, and waits for a refresh after a conflict", async () => {
-  const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
+  const session = Schema.decodeSync(Session)({
+    token: "alice",
+    account: { id: "alice", email: "alice@example.com" },
+  });
   const puts: Array<Request> = [];
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init),

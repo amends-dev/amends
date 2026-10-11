@@ -40,8 +40,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   reads in one `query.ts` service; a command may read through the query, a query never
   writes, and a step with one caller stays a private function of that caller. `gateway` is how a host enters core: it bootstraps
   a workspace and resolves an authenticated identity into the actor, and it holds
-  the host contracts for storage, sign-in, session token resolution, and the workspace
-  directory. `api-http` is the HTTP contract shared by servers and clients, and
+  the host contracts for storage, accounts, sign-in, session token resolution, and the
+  workspace directory. `api-http` is the HTTP contract shared by servers and clients, and
   `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
   over the same gateway rather than new gateway methods. `storage-conformance` holds
   the test suites every storage adapter runs against itself through a harness; behavior
@@ -66,8 +66,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   bridge in a sandbox; each gives the integration a host installs. `sandbox-local` and
   `sandbox-daytona` implement the sandbox contract over this machine's directories and over
   Daytona, and depend on it and their platform's SDK alone; the host declares their integrations.
-  `storage-postgresql` implements workspace storage and
-  the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
+  `storage-postgresql` implements workspace storage,
+  the workspace directory, and accounts over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
   per record field, except the kind-specific `details` of a thread activity or a session log
   entry, stored as JSON;
   `storage-memory` implements them in process memory as the reference

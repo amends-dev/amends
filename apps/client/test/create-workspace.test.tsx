@@ -44,7 +44,7 @@ function fixture() {
   });
   let stored: Session | undefined = Schema.decodeSync(Session)({
     token: "alice",
-    identity: "alice",
+    account: { id: "alice", email: "alice@example.com" },
   });
   const listeners = new Set<() => void>();
   const store: SessionStore = {
@@ -103,7 +103,10 @@ function fixture() {
     },
     hide: () => setShown(false),
     replace: () => {
-      stored = Schema.decodeSync(Session)({ token: "bob", identity: "bob" });
+      stored = Schema.decodeSync(Session)({
+        token: "bob",
+        account: { id: "bob", email: "bob@example.com" },
+      });
       listeners.forEach((fn) => fn());
     },
     ready: async () => {

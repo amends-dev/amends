@@ -1,5 +1,6 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
+import type { Redacted } from "effect";
 import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
 
 /**
@@ -9,6 +10,16 @@ import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
  */
 export class Principal extends Context.Service<Principal, Identity.MemberReference>()(
   "@amends-dev/api-http/authentication/Principal",
+) {}
+
+/**
+ * The credential the request presented, supplied by middleware with the principal, for an
+ * endpoint that acts on the credential itself, as signing out does.
+ *
+ * @category services
+ */
+export class Credential extends Context.Service<Credential, Redacted.Redacted<string>>()(
+  "@amends-dev/api-http/authentication/Credential",
 ) {}
 
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
@@ -26,7 +37,7 @@ export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
  */
 export class Authentication extends HttpApiMiddleware.Service<
   Authentication,
-  { provides: Principal }
+  { provides: Principal | Credential }
 >()("@amends-dev/api-http/authentication/Authentication", {
   requiredForClient: true,
   security: { bearer: HttpApiSecurity.bearer },

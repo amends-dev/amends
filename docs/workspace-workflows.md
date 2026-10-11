@@ -79,19 +79,24 @@ it returns their member record. The same name again records nothing. Each name i
 
 ## Invitations
 
-`POST /workspaces/:id/invitations` issues an invitation to an address with an
-ISO expiry in the future and a required built-in role:
+`POST /workspaces/:id/invitations` issues an invitation to an email address with an
+ISO expiry in the future and a required built-in role. The host resolves the address to its
+account, creating one with a new human ID the first time the address comes up, and the invitation
+names that human ID as its `recipientId`; the person signing in with the address later signs in as
+that account. With the local host's development tokens, the recipient's token is that human ID:
 
 ```bash
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
-  -d '{"recipientId":"bob","expiresAt":"<expiry-ISO>","roleId":"builtin:member"}' \
+  -d '{"email":"bob@example.com","expiresAt":"<expiry-ISO>","roleId":"builtin:member"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations
-curl -X POST -H 'Authorization: Bearer bob' -H 'content-type: application/json' \
+curl -X POST -H 'Authorization: Bearer <recipient-id>' -H 'content-type: application/json' \
   -d '{"name":"Bob Chen"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
 ```
 
-Acceptance takes the new member's `name`.
+Acceptance takes the new member's `name`. `GET /workspaces/:id/accounts` returns the addresses
+behind the workspace's human members and invitations to whoever may list invitations, which is
+how settings show them; nobody else in the workspace sees an address.
 
 The response carries the invitation ID under `details.id` and the selected role
 under `details.roleId`. Expiry must follow issuance; acceptance at the exact
@@ -107,7 +112,8 @@ inviter's active membership, permissions, and current authority to delegate the
 referenced role, then commits membership, a role assignment, acceptance, and the new member's
 admission to the workspace's [general group](group-workflows.md#the-general-group) together.
 The role's current stored permissions apply; they are not copied into direct grants.
-Invitations use stable human IDs; email delivery is outside this workflow.
+Invitations record human IDs, and no email is sent: the recipient finds the invitation after
+signing in with the address.
 
 Already-active members cannot be invited or accept a second invitation. Multiple
 pending invitations may exist, but only one can establish an active membership.

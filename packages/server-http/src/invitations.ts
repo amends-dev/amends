@@ -1,12 +1,13 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Api, ApiErrors, Principal } from "@amends-dev/api-http";
 import { InvitationService } from "@amends-dev/core/workspace";
-import { Gateway } from "@amends-dev/gateway";
+import { Accounts, Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register invitation handlers, capturing the gateway and reading the principal per request.
+ * Register invitation handlers, capturing the gateway and reading the principal per request. An
+ * invitation goes to the account of the address it names, which the host creates if it has none.
  *
  * @category layers
  */
@@ -15,6 +16,7 @@ export const layer = HttpApiBuilder.group(
   "invitations",
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
+    const accounts = yield* Accounts.Service;
     return handlers.handleAll({
       list: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
@@ -27,14 +29,19 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
-      issue: ({ params, headers, payload }) =>
+      issue: ({ params, headers, payload: { email, ...invitation } }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(InvitationService.Service, (invitationService) =>
-              invitationService.issue(payload, { requestKey: headers["idempotency-key"] }),
-            ),
+            Effect.gen(function* () {
+              const recipient = yield* accounts.findOrCreate(email);
+              const invitationService = yield* InvitationService.Service;
+              return yield* invitationService.issue(
+                { ...invitation, recipientId: recipient.id },
+                { requestKey: headers["idempotency-key"] },
+              );
+            }),
           ),
         ),
       accept: ({ params, payload }) =>

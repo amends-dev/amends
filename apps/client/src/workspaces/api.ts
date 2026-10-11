@@ -14,11 +14,11 @@ export const isWorkspaceName = Schema.is(Workspace.NewName);
  */
 export const isMemberName = (name: string) => Schema.is(Member.NewName)(name.trim());
 /**
- * A first suggestion for what people call someone, from their identity: an email's local part,
- * its first letter capitalized, or nothing when the identity is not an email.
+ * A first suggestion for what people call someone, from the address they sign in with: its local
+ * part, each word capitalized.
  */
-export const suggestedName = (identity: string | undefined) => {
-  const local = identity?.includes("@") ? identity.slice(0, identity.indexOf("@")) : "";
+export const suggestedName = (email: string | undefined) => {
+  const local = email?.includes("@") ? email.slice(0, email.indexOf("@")) : "";
   const words = local.split(/[._+-]+/u).filter(Boolean);
   const name = words.map((word) => word.charAt(0).toLocaleUpperCase() + word.slice(1)).join(" ");
   return isMemberName(name) ? name : "";

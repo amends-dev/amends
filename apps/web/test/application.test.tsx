@@ -9,7 +9,8 @@ import { ApplicationRoutes } from "../src/routes.tsx";
 import { Session, type SessionStore } from "@amends-dev/client";
 import { committed, notificationsSeen, withChangeFeed, type Sidebar } from "./change-feed.ts";
 
-const session = (token: string) => Schema.decodeSync(Session)({ token, identity: token });
+const session = (token: string) =>
+  Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } });
 function memoryStore(initial?: Session) {
   let value = initial;
   const listeners = new Set<() => void>();
@@ -81,7 +82,7 @@ it("validates a restored credential before mounting protected content and suppor
   const history = mount("/workspaces", fixture.store, fetch);
   expect(screen.getByRole("heading", { name: "Checking your session" })).toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent("Connecting to your workspace host…");
-  expect(screen.getByText("alice")).toBeInTheDocument();
+  expect(screen.getByText("alice@example.com")).toBeInTheDocument();
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   const call = fetch.mock.calls[0];
   if (!call) throw new Error("Missing request");
@@ -136,10 +137,12 @@ it("denies unknown workspaces without treating membership loss as logout", async
   await screen.findByRole("heading", { name: "That workspace is closed to you" });
   expect(fixture.store.read()?.token).toBe("alice");
   expect(
-    screen.getByText("This workspace doesn’t exist, or it hasn’t been shared with alice."),
+    screen.getByText(
+      "This workspace doesn’t exist, or it hasn’t been shared with alice@example.com.",
+    ),
   ).toBeInTheDocument();
   // The same account header as the picker, and a way back to it.
-  expect(screen.getByText("alice")).toBeInTheDocument();
+  expect(screen.getByText("alice@example.com")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
   await screen.findByRole("heading", { name: "Choose a workspace" });
 });
@@ -172,7 +175,7 @@ it("offers a signed-in reader their workspaces from an unknown address", async (
     Promise.resolve(response(directory)),
   );
   await screen.findByRole("heading", { name: "Nothing at this address" });
-  expect(screen.getByText("alice")).toBeInTheDocument();
+  expect(screen.getByText("alice@example.com")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
   await screen.findByRole("heading", { name: "Choose a workspace" });
@@ -299,7 +302,12 @@ it("signs in through the composed page and validates before resuming the intende
   const fetch = vi
     .fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(new Response(null, { status: 202 }))
-    .mockResolvedValueOnce(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }))
+    .mockResolvedValueOnce(
+      response({
+        token: "jo@mercier.co",
+        account: { id: "jo@mercier.co", email: "jo@mercier.co" },
+      }),
+    )
     .mockImplementation(() => checked.promise);
   const fixture = memoryStore();
   const history = mount("/workspaces/one/tasks?filter=mine", fixture.store, fetch);
@@ -331,7 +339,12 @@ it("ignores an external return destination after signing in", async () => {
   const fetch = vi
     .fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(new Response(null, { status: 202 }))
-    .mockResolvedValueOnce(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }))
+    .mockResolvedValueOnce(
+      response({
+        token: "jo@mercier.co",
+        account: { id: "jo@mercier.co", email: "jo@mercier.co" },
+      }),
+    )
     .mockResolvedValue(response(directory));
   const history = mount(
     "/sign-in?returnTo=https%3A%2F%2Fother.invalid",
@@ -358,7 +371,9 @@ it("disposes sign-in when navigation leaves the page, even if verification resol
   history.set({ value: "/missing", scroll: false });
   await screen.findByRole("heading", { name: "Nothing at this address" });
   await waitFor(() => expect(signal?.aborted).toBe(true));
-  pending.resolve(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }));
+  pending.resolve(
+    response({ token: "jo@mercier.co", account: { id: "jo@mercier.co", email: "jo@mercier.co" } }),
+  );
   await pending.promise;
   expect(fixture.store.read()).toBeUndefined();
   expect(history.get()).toBe("/missing");
@@ -379,7 +394,7 @@ it("lists only active workspaces and opens creation at its own address", async (
   expect(screen.queryByRole("link", { name: /Former studio/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Create workspace" }));
   const dialog = await screen.findByRole("dialog", { name: "Create workspace" });
-  expect(within(dialog).getByRole("textbox", { name: "Your name" })).toHaveValue("");
+  expect(within(dialog).getByRole("textbox", { name: "Your name" })).toHaveValue("Alice");
   expect(history.get()).toBe("/workspaces/new");
   fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -549,7 +564,7 @@ it("invites someone and removes a member from the Members tab, confirming each w
   const ada = {
     ...owner,
     id: "ada",
-    identity: { _tag: "Human", id: "ada@example.test" },
+    identity: { _tag: "Human", id: "human-ada" },
     name: "Ada",
   };
   const roles = [
@@ -577,6 +592,10 @@ it("invites someone and removes a member from the Members tab, confirming each w
   });
   let adaStatus = "active";
   const invitations: unknown[] = [];
+  const accounts = [
+    { id: "alice", email: "alice@example.com" },
+    { id: "human-ada", email: "ada@example.test" },
+  ];
   const requests: string[] = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
@@ -616,11 +635,13 @@ it("invites someone and removes a member from the Members tab, confirming each w
     }
     if (path === "/workspaces/one/invitations" && request.method === "POST") {
       const body = (await request.json()) as Record<string, string>;
+      const recipient = { id: "account-new", email: body.email ?? "" };
+      accounts.push(recipient);
       const created = {
         details: {
           id: "invitation-one",
           workspaceId: "one",
-          recipientId: body.recipientId,
+          recipientId: recipient.id,
           roleId: body.roleId,
           inviterMemberId: "owner",
           issuedAt: new Date().toISOString(),
@@ -632,6 +653,7 @@ it("invites someone and removes a member from the Members tab, confirming each w
       return response(created, 201);
     }
     if (path === "/workspaces/one/invitations") return response(invitations);
+    if (path === "/workspaces/one/accounts") return response(accounts);
     return response([]);
   });
   const history = mount(
@@ -810,7 +832,7 @@ it("points an invited identity to its invitation instead of reporting no access"
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
   fireEvent.click(await screen.findByRole("button", { name: "Accept invite to Fold Studio" }));
   const dialog = await screen.findByRole("dialog", { name: "Join Fold Studio" });
-  expect(within(dialog).getByRole("textbox", { name: "Your name" })).toHaveValue("");
+  expect(within(dialog).getByRole("textbox", { name: "Your name" })).toHaveValue("Alice");
 });
 /** A group with one thread and its reply, as the host answers them. */
 const at = "2026-09-25T12:00:00.000Z";

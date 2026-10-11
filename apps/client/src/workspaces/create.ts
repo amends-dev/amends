@@ -49,7 +49,7 @@ export function useCreateWorkspace(): CreateWorkspaceController {
   const [state, setState] = createSignal<CreateWorkspaceState>(
     CreateWorkspaceState.Form({
       name: "",
-      memberName: suggestedName(session.session?.humanId),
+      memberName: suggestedName(session.session?.account.email),
       pending: false,
       error: undefined,
     }),

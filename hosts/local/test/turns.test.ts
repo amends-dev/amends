@@ -29,9 +29,11 @@ const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uin
 const server = (url: string) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
-      Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url), { credentialKey, pollInterval: "100 millis" }),
-        DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer)),
+      DevelopmentAuthentication.layer(() => Effect.void).pipe(
+        Layer.provide(BunCrypto.layer),
+        Layer.provideMerge(
+          LocalHost.layer(Redacted.make(url), { credentialKey, pollInterval: "100 millis" }),
+        ),
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),

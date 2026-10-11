@@ -14,7 +14,6 @@ import { LocalServer } from "../src/server.ts";
 import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");
-const bob = Identity.HumanId.make("bob");
 const secret = "sk-mcp-connections-test";
 /** Where nothing listens, so checking a connection to it reaches nothing. */
 const nowhere = "http://127.0.0.1:1/mcp";
@@ -27,9 +26,9 @@ const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(as
 const server = (url: string, credentialKey: Redacted.Redacted<string> | undefined) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
-      Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url), { credentialKey }),
-        DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer)),
+      DevelopmentAuthentication.layer(() => Effect.void).pipe(
+        Layer.provide(BunCrypto.layer),
+        Layer.provideMerge(LocalHost.layer(Redacted.make(url), { credentialKey })),
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
@@ -38,7 +37,6 @@ const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uin
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
   const asAlice = yield* client(alice);
-  const asBob = yield* client(bob);
   const workspace = yield* asAlice.workspaces.create({
     headers: {},
     payload: { name: "Studio", memberName: "alice" },
@@ -47,11 +45,13 @@ const workspaceWithBob = Effect.gen(function* () {
     headers: {},
     params: { workspaceId: workspace.id },
     payload: {
-      recipientId: bob,
+      email: "bob@example.com",
       expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
       roleId: BuiltinRoles.MemberId,
     },
   });
+  // Development tokens are human IDs: Bob's is his account's, which the invitation names.
+  const asBob = yield* client(invitation.details.recipientId);
   yield* asBob.invitations.accept({
     params: { workspaceId: workspace.id, invitationId: invitation.details.id },
     payload: { name: "bob" },

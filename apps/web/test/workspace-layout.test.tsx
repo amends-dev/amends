@@ -56,7 +56,11 @@ it("retains the shell and an open account menu through directory refresh and rec
     <Application
       apiBaseUrl="https://host.test"
       sessionStore={{
-        read: () => Schema.decodeSync(Session)({ token: "alice", identity: "alice" }),
+        read: () =>
+          Schema.decodeSync(Session)({
+            token: "alice",
+            account: { id: "alice", email: "alice@example.com" },
+          }),
         write: () => {},
         subscribe: () => () => {},
       }}

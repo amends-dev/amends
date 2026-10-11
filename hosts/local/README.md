@@ -119,13 +119,15 @@ proxy or a change to the host's CORS layer.
 
 ## Development authentication
 
-`POST /session/email` logs a six-digit code where the server runs, and `POST /session/code`
-exchanges it within ten minutes for a session whose token is the address itself. Development
-credentials trust any nonempty bearer token as the human ID it asserts:
+`GET /session/methods` offers email codes alone. `POST /session/email` logs a six-digit code where
+the server runs, and `POST /session/code` exchanges it within ten minutes for a session: the
+address's account, which the host creates on the address's first sign-in or invitation, and a token
+that is the account's human ID. Development credentials trust any nonempty bearer token as the human
+ID it asserts, so signing out cannot revoke one:
 
 ```bash
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
-  -d '{"name":"Design studio"}' http://127.0.0.1:8787/workspaces
+  -d '{"name":"Design studio","memberName":"Alice"}' http://127.0.0.1:8787/workspaces
 ```
 
 Nothing verifies control of the address. Replace both development implementations before exposing
@@ -145,19 +147,20 @@ outcomes keep their tags, such as `MemberService.NotFound` with 404.
 Follow the [host conventions](../README.md). Importing any module but the entry point reads no
 configuration and starts nothing.
 
-| Module                             | Responsibility                                                                                                                                                         |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition.                                                                          |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                           |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                  |
-| `config.ts`                        | `LocalConfig.load()`, validating every setting before any resource is acquired.                                                                                        |
-| `harness-integrations.ts`          | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                  |
-| `sandbox-integrations.ts`          | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                    |
-| `host.ts`                          | `LocalHost.layer(url, options?)`: the gateway and directory over PostgreSQL, with jobs and pruning; `layerDatabase`, the database and cluster; and `makeIntegrations`. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                               |
-| `index.ts`                         | Loads configuration, builds the host layer, and launches through `BunRuntime.runMain`.                                                                                 |
+| Module                             | Responsibility                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                        |
+| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                     |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                   |
+| `config.ts`                        | `LocalConfig.load()`, validating every setting before any resource is acquired.                                                                         |
+| `harness-integrations.ts`          | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                   |
+| `sandbox-integrations.ts`          | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                     |
+| `host.ts`                          | `LocalHost.layer(url, options?)`: the gateway, directory, and accounts over PostgreSQL, with jobs and pruning; `layerDatabase`; and `makeIntegrations`. |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                |
+| `index.ts`                         | Loads configuration, builds the host layer, and launches through `BunRuntime.runMain`.                                                                  |
 
-Sign-in construction requires `Crypto.Crypto`; session token construction is synchronous. Neither
+Sign-in construction requires `Crypto.Crypto` and the host's `Accounts.Service`; session token
+construction is synchronous. Neither
 needs HTTP services or issues codes when built. Database and server resources belong to their layer
 scopes. The gateway boots each workspace on first use and keeps it prepared while requests or
 streams use it and for five idle minutes afterwards; see the

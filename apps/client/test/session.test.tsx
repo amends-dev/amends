@@ -8,7 +8,11 @@ import { createBrowserSessionStore, type SessionStore } from "../src/session/sto
 import { resolveApiBaseUrl } from "../src/configuration.ts";
 import { paths, returnPath } from "../src/routing/paths.ts";
 
-const session = (token: string) => Schema.decodeSync(SignIn.Session)({ token, identity: token });
+const session = (token: string) =>
+  Schema.decodeSync(SignIn.Session)({
+    token,
+    account: { id: token, email: `${token}@example.com` },
+  });
 function memoryStore(initial?: SignIn.Session) {
   let value = initial;
   const listeners = new Set<() => void>();
@@ -104,7 +108,7 @@ it("continues in memory when browser storage is blocked", () => {
     const current = useSession();
     return (
       <button onClick={() => current.signIn(session("alice"))}>
-        {current.session?.humanId ?? "anonymous"}
+        {current.session?.account.id ?? "anonymous"}
       </button>
     );
   }

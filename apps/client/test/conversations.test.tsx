@@ -45,7 +45,10 @@ import { Signal, affectedKeys, signalKeys } from "../src/live/api.ts";
 afterEach(cleanup);
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
-const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
+const session = Schema.decodeSync(Session)({
+  token: "alice",
+  account: { id: "alice", email: "alice@example.com" },
+});
 const store: SessionStore = { read: () => session, write: () => {}, subscribe: () => () => {} };
 const minute = (index: number) => new Date(Date.UTC(2026, 8, 25, 12, index)).toISOString();
 const author = { _tag: "Member", memberId: "owner" };

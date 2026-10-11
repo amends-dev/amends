@@ -15,8 +15,8 @@ items and member rows are links, so browser and hash history work. The screens f
   side panel with their role, their access, and removal. Changing the workspace role keeps any
   separate assignments. Removed members rejoin through a new invitation and a new membership.
 - **Invitations** are modals reached from Members: Invite people issues one for a sign-in email
-  and an assignable role, valid for seven days, which appears in that identity's workspace
-  picker. No email or transferable link is sent. View history lists every invitation as
+  and an assignable role, valid for seven days, which appears in the workspace picker of whoever
+  signs in with that address. No email or transferable link is sent. View history lists every invitation as
   Pending, Accepted, Expired, or Revoked; only pending ones can be revoked.
 
 Rename, invite, role editing, removal, and transfer show only where the reader is allowed.
@@ -57,5 +57,6 @@ The UI workshop plays the settings flows over a local fixture. Client tests cove
 shaping, stale drafts, invitation retries, and refresh recovery over a scripted transport; app
 tests cover the routes, inviting, and removing. Conformance tests cover rename permissions, stale
 writes, rollback, directory updates, and replay on both adapters. Members are listed by the name
-they chose, with the identity they sign in as in their details. Profile photos, mark
+they chose, with the address they sign in with in their details and invitations listed by
+address, for a reader who may manage invitations. Profile photos, mark
 customization, recipient decline, and direct/scoped grant editing remain outside this slice.

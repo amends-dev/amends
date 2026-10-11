@@ -3,7 +3,7 @@ import { DevelopmentSessionTokens } from "./session-tokens.ts";
 import { DevelopmentSignIn } from "./sign-in.ts";
 
 /**
- * Compose development sign-in and session tokens over the caller's cryptography.
+ * Compose development sign-in and session tokens over the caller's cryptography and accounts.
  *
  * @category layers
  */

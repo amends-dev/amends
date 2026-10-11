@@ -90,6 +90,15 @@ export const delegation = [
   Delegation.UnsupportedRole.pipe(HttpApiSchema.status(400)),
   Delegation.RoleNotFound.pipe(HttpApiSchema.status(404)),
 ] as const;
+/** Invitation outcomes, with the delegation rules issuing one checks. */
+export const invitation = [
+  ...delegation,
+  InvitationNotFound,
+  NotRecipient,
+  AlreadyMember,
+  InvitationUnavailable,
+  InvitationInvalidExpiry,
+] as const;
 export const assignment = [
   ...delegation,
   AssignmentService.NotFound.pipe(HttpApiSchema.status(404)),

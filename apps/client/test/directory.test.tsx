@@ -12,7 +12,10 @@ import {
   type SessionStore,
 } from "../src/index.ts";
 
-const alice = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
+const alice = Schema.decodeSync(Session)({
+  token: "alice",
+  account: { id: "alice", email: "alice@example.com" },
+});
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 function mount(credential: Session | undefined, fetch: typeof globalThis.fetch) {

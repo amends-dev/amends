@@ -70,7 +70,7 @@ function fixture() {
   });
   const stored = Schema.decodeSync(Session)({
     token: "ada",
-    identity: "ada.lovelace@example.com",
+    account: { id: "ada.lovelace@example.com", email: "ada.lovelace@example.com" },
   });
   const store: SessionStore = { read: () => stored, write: () => {}, subscribe: () => () => {} };
   const [workspaceId, setWorkspaceId] = createSignal("fold");

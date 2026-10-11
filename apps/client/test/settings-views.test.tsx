@@ -15,7 +15,10 @@ import type { SettingsTab } from "@amends-dev/ui/screens/settings";
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
+const session = Schema.decodeSync(Session)({
+  token: "alice",
+  account: { id: "alice", email: "alice@example.com" },
+});
 const store: SessionStore = { read: () => session, write: () => {}, subscribe: () => () => {} };
 const day = 86_400_000;
 const at = (offset: number) => new Date(Date.now() + offset).toISOString();
@@ -30,9 +33,9 @@ const member = (id: string, identity: string, name: string, rest: object = {}) =
   ...rest,
 });
 const owner = member("owner", "alice", "Alice");
-const ada = member("ada", "ada@example.test", "Ada");
+const ada = member("ada", "human-ada", "Ada");
 const bot = member("bot", "agent-1", "Bot", { identity: { _tag: "Agent", id: "agent-1" } });
-const gone = member("gone", "gone@example.test", "Gone", { status: "removed" });
+const gone = member("gone", "human-gone", "Gone", { status: "removed" });
 const role = (id: string, name: string, assignable: boolean) => ({
   role: { id, workspaceId: "one", name, permissions: [] },
   assignable,
@@ -53,7 +56,7 @@ const invitation = (id: string, issued: number, state: object = { _tag: "Pending
   details: {
     id,
     workspaceId: "one",
-    recipientId: `${id}@example.test`,
+    recipientId: `human-${id}`,
     roleId: "builtin:member",
     inviterMemberId: "owner",
     issuedAt: at(issued),
@@ -78,6 +81,14 @@ function fixture(section: SettingsTab = "members") {
     roleAnswers: [] as Response[],
     inviteAnswers: [] as Response[],
     invitationsDown: false,
+    /** Each person's address: members', and every invitation's recipient's. */
+    accounts: [
+      { id: "alice", email: "alice@example.com" },
+      ...["ada", "gone", "expired", "accepted", "pending"].map((id) => ({
+        id: `human-${id}`,
+        email: `${id}@example.test`,
+      })),
+    ],
   };
   const changes: Array<{ body: unknown }> = [];
   const issues: Array<{ key: string | null; body: unknown }> = [];
@@ -128,7 +139,7 @@ function fixture(section: SettingsTab = "members") {
       );
     }
     if (path === "/workspaces/one/invitations" && request.method === "POST") {
-      const body = (await request.json()) as { recipientId: string; expiresAt: string };
+      const body = (await request.json()) as { email: string; expiresAt: string };
       issues.push({ key: request.headers.get("idempotency-key"), body });
       const answer = server.inviteAnswers.shift();
       if (answer) return answer;
@@ -136,10 +147,11 @@ function fixture(section: SettingsTab = "members") {
         ...invitation("created", 0),
         details: {
           ...invitation("created", 0).details,
-          recipientId: body.recipientId,
+          recipientId: "human-created",
           expiresAt: body.expiresAt,
         },
       };
+      server.accounts.push({ id: "human-created", email: body.email });
       server.invitations.push(created);
       return json(created, 201);
     }
@@ -147,6 +159,7 @@ function fixture(section: SettingsTab = "members") {
       return server.invitationsDown
         ? new Response("Down", { status: 503 })
         : json(server.invitations);
+    if (path === "/workspaces/one/accounts") return json(server.accounts);
     return json({}, 404);
   });
   const done: SettingsDone[] = [];
@@ -273,7 +286,7 @@ it("retries an invitation whose response was lost with the same request key", as
   expect(f.issues).toHaveLength(2);
   expect(f.issues[0]?.key).toBeTruthy();
   expect(f.issues[1]?.key).toBe(f.issues[0]?.key);
-  expect(f.issues[1]?.body).toMatchObject({ recipientId: "new@example.test" });
+  expect(f.issues[1]?.body).toMatchObject({ email: "new@example.test" });
   // The draft starts over for the next invitation.
   expect(f.view.invite.recipient()).toBe("");
   await waitFor(() => expect(f.view.invitations()[0]?.id).toBe("created"));

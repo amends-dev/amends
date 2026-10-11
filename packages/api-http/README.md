@@ -18,17 +18,25 @@ client app's does through Effect's `AtomHttpApi` and the local host's tests' thr
 `HttpApiClient`, and a server registers handlers for each group with `HttpApiBuilder`.
 
 `Authentication` is bearer middleware that provides `Principal`, the authenticated human or agent
-identity. A server implements it by verifying the credential, and a client by attaching one with
-`HttpApiMiddleware.layerClient`. Endpoints only a person may call fail with `HumanRequired` when the
+identity, and `Credential`, the token the request presented. A server implements it by verifying
+the credential, and a client by attaching one with `HttpApiMiddleware.layerClient`. Endpoints only a person may call fail with `HumanRequired` when the
 principal is an agent, and a request without a credential the host accepts fails with
 `Unauthorized`. The contract does not define how credentials are issued; the `session` group asks
 the host's sign-in for one.
 
 ## Endpoints
 
-- `session`: `POST /session/email` requests a one-time code for an address and `POST /session/code`
-  exchanges it for a session. Neither needs a credential.
-- `me`: `GET /me/workspaces` lists the principal's memberships and pending invitations.
+- `session`: `GET /session/methods` lists the ways the host signs people in, `SignIn.Methods`:
+  whether it sends email codes, and its identity providers. `POST /session/email` requests a
+  one-time code for an address and `POST /session/code` exchanges it for a `SignIn.Session`, a token
+  and the account it signs in as. None needs a credential.
+- `me`: `GET /me` returns the principal's `Accounts.Account`, its human ID and address; an agent
+  gets 403 `HumanRequired`, and a session no account holds 401. `GET /me/workspaces` lists the
+  principal's memberships and pending invitations. `DELETE /me/session` signs out: the host stops
+  honoring the presented token.
+- `accounts`: `GET /workspaces/:workspaceId/accounts` returns the accounts of the workspace's human
+  members and of its invitations' recipients, to someone who may manage invitations, so settings can
+  show addresses beside names.
 - `workspaces`: `POST /workspaces` accepts `Workspace.CreateInput`
   (`{ "name": "Design studio", "memberName": "Alice" }`) and creates a workspace owned by the
   authenticated human, with the creator's membership named `memberName`. Both names are required,
@@ -53,7 +61,9 @@ the host's sign-in for one.
   `PUT …/assignments` atomically replaces workspace roles with an expected assignment-ID set;
   `DELETE …/members/:memberId/assignments/:assignmentId` revokes access.
 - `invitations`: `GET /workspaces/:workspaceId/invitations` lists invitations; `POST` to the same
-  path issues one with required `recipientId`, `roleId`, and `expiresAt`.
+  path issues one to an `email`, with required `roleId` and `expiresAt`. The host resolves the
+  address to its account, creating one the first time, and the invitation records that account's
+  human ID as `recipientId`.
   `POST …/:invitationId/accept` and `POST …/:invitationId/revoke` change state; accepting in a
   workspace that was never created returns 404 with `Gateway.WorkspaceNotFound`. Acceptance takes
   `{ name }`, the new member's name.

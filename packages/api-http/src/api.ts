@@ -1,4 +1,5 @@
 import { HttpApi, OpenApi } from "effect/http-api";
+import { AccountsGroup } from "./accounts.ts";
 import { InvitationsGroup } from "./invitations.ts";
 import { AssignmentsGroup } from "./assignments.ts";
 import { MeGroup } from "./me.ts";
@@ -19,6 +20,7 @@ import { TurnsGroup } from "./turns.ts";
 export class Api extends HttpApi.make("amends")
   .add(SessionGroup)
   .add(MeGroup)
+  .add(AccountsGroup)
   .add(WorkspacesGroup)
   .add(MembersGroup)
   .add(InvitationsGroup)

@@ -102,7 +102,7 @@ export function useWorkspacePicker(): WorkspacePickerController {
     retry: directory.retry,
     accepting,
     accept: (invitationId, name) => void accept(invitationId, name),
-    suggestedName: () => suggestedName(session.session?.humanId),
+    suggestedName: () => suggestedName(session.session?.account.email),
   };
 }
 

@@ -1,5 +1,4 @@
-import { Identity } from "@amends-dev/core/identity";
-import { type Accounts, SignIn } from "@amends-dev/gateway";
+import { Accounts, SignIn } from "@amends-dev/gateway";
 import { Crypto, DateTime, Duration, Effect, Exit, Layer, Schema } from "effect";
 
 interface PendingCode {
@@ -17,18 +16,22 @@ export const logCode: DeliverCode = (email, code) =>
 /** Codes expire ten minutes after issuance. */
 export const codeLifetime = Duration.minutes(10);
 
+/** Development offers email codes alone. */
+export const methods: SignIn.Methods = { emailCode: true, providers: [] };
+
 /**
  * Development sign-in. Codes live in memory and expire after ten minutes; the
- * session token is the address itself, which development session tokens
- * trust as the human ID. Nothing here verifies that the person controls the
+ * session token is the human ID of the address's account, which development
+ * session tokens trust. Nothing here verifies that the person controls the
  * address.
  *
  * @category constructors
  */
 export const make = Effect.fn("DevelopmentSignIn.make")(function* (
   deliver: DeliverCode = logCode,
-): Effect.fn.Return<SignIn.Interface, never, Crypto.Crypto> {
+): Effect.fn.Return<SignIn.Interface, never, Crypto.Crypto | Accounts.Service> {
   const crypto = yield* Crypto.Crypto;
+  const accounts = yield* Accounts.Service;
   const pending = new Map<Accounts.Email, PendingCode>();
   const start: SignIn.Interface["start"] = Effect.fn("DevelopmentSignIn.start")(function* (email) {
     const bytes = yield* Effect.orDie(crypto.randomBytes(4));
@@ -68,10 +71,11 @@ export const make = Effect.fn("DevelopmentSignIn.make")(function* (
       }
       if (found.code !== code) return yield* new SignIn.Rejected({ reason: "mismatch" });
       pending.delete(email);
-      return { token: email, humanId: Identity.HumanId.make(email) };
+      const account = yield* accounts.findOrCreate(email);
+      return { token: account.id, account };
     },
   );
-  return SignIn.Service.of({ start, complete });
+  return SignIn.Service.of({ methods, start, complete });
 });
 
 /**

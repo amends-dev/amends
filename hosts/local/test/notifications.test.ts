@@ -42,6 +42,7 @@ const server = (url: string) => {
           ? Effect.fail(new SessionTokens.Rejected({ reason: "unknown" }))
           : Effect.succeed(identity);
       },
+      revoke: () => Effect.void,
     }),
   );
   return HttpRouter.serve(LocalServer.layerRoutes, {
@@ -49,9 +50,11 @@ const server = (url: string) => {
     disableListenLog: true,
   }).pipe(
     Layer.provide(
-      Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url)),
-        DevelopmentSignIn.layer().pipe(Layer.provide(BunCrypto.layer)),
+      Layer.merge(
+        DevelopmentSignIn.layer().pipe(
+          Layer.provide(BunCrypto.layer),
+          Layer.provideMerge(LocalHost.layer(Redacted.make(url))),
+        ),
         sessionTokens,
       ),
     ),

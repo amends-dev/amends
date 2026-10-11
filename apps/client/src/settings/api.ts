@@ -12,6 +12,7 @@ import {
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import type { Api, ApiClient } from "../api/client.ts";
+import { Accounts } from "../api/contracts.ts";
 import { directoryQuery } from "../api/directory.ts";
 import { command } from "../api/failures.ts";
 import { refreshResult } from "../api/refresh.ts";
@@ -20,12 +21,16 @@ import { newWorkspaceRequestKey } from "../workspaces/api.ts";
 
 export { Assignment, Scope, Invitation, Identity };
 
-/** The Workspace tab reads settings and ownership; Members adds the roster and invitations. */
+/**
+ * The Workspace tab reads settings and ownership; Members adds the roster and invitations, with
+ * the addresses of the people in them for a reader who manages invitations.
+ */
 export interface SettingsData {
   readonly settings: WorkspaceSettings.View;
   readonly ownership: Ownership.View;
   readonly members: ReadonlyArray<WorkspaceSettings.MemberEntry>;
   readonly invitations: ReadonlyArray<Invitation.Record>;
+  readonly accounts: ReadonlyArray<Accounts.Account>;
 }
 /** A change the reader makes in settings. */
 export type SettingsCommand =
@@ -35,15 +40,15 @@ export type SettingsCommand =
   | { kind: "remove"; memberId: string }
   | {
       kind: "invite";
-      recipientId: string;
+      email: string;
       roleId: string;
       expiresAt: DateTime.Utc;
       key: ReturnType<typeof newWorkspaceRequestKey>;
     }
   | { kind: "revoke"; invitationId: string };
-export const invitationIntent = (recipientId: string, roleId: string) => ({
+export const invitationIntent = (email: string, roleId: string) => ({
   kind: "invite" as const,
-  recipientId: recipientId.trim(),
+  email: email.trim(),
   roleId,
   expiresAt: DateTime.add(DateTime.makeUnsafe(Date.now()), { days: 7 }),
   key: newWorkspaceRequestKey(),
@@ -61,8 +66,17 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
     params,
     reactivityKeys: [workspaceKey(workspaceId, "invitations")],
   });
+  // Whom the roster and the invitations name changes with either.
+  const accounts = client.query("accounts", "list", {
+    params,
+    reactivityKeys: [
+      workspaceKey(workspaceId, "members"),
+      workspaceKey(workspaceId, "invitations"),
+    ],
+  });
   const idleMembers = idle(members),
-    idleInvitations = idle(invitations);
+    idleInvitations = idle(invitations),
+    idleAccounts = idle(accounts);
   return {
     settings: client.query("workspaces", "settings", {
       params,
@@ -74,6 +88,7 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
     }),
     members: (enabled: boolean) => (enabled ? members : idleMembers),
     invitations: (enabled: boolean) => (enabled ? invitations : idleInvitations),
+    accounts: (enabled: boolean) => (enabled ? accounts : idleAccounts),
   };
 };
 /**
@@ -118,7 +133,11 @@ export const changeSettings = (workspace: string) => (api: Api, change: Settings
       case "invite": {
         const issued = yield* api.invitations.issue({
           params,
-          payload: yield* command(Schema.toType(Invitation.IssueInput))(change),
+          payload: {
+            email: yield* command(Accounts.Email)(change.email),
+            roleId: yield* command(Invitation.IssueInput.fields.roleId)(change.roleId),
+            expiresAt: change.expiresAt,
+          },
           headers: { "idempotency-key": change.key },
         });
         return issued.details.id as string;
@@ -143,5 +162,10 @@ export const reloadSettings = (client: ApiClient, reads: SettingsReads, section:
       { concurrency: "unbounded" },
     );
     if (section === "members" && settings.canReadInvitations)
-      yield* refreshResult(reads.invitations(true));
+      yield* Effect.all(
+        [refreshResult(reads.invitations(true)), refreshResult(reads.accounts(true))],
+        {
+          concurrency: "unbounded",
+        },
+      );
   });

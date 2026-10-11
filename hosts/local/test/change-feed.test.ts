@@ -43,9 +43,11 @@ const server = (url: string, limits?: Context.Service.Shape<typeof Streams.Limit
     disableListenLog: true,
   }).pipe(
     Layer.provideMerge(
-      Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url)),
-        DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer)),
+      Layer.merge(
+        DevelopmentAuthentication.layer().pipe(
+          Layer.provide(BunCrypto.layer),
+          Layer.provideMerge(LocalHost.layer(Redacted.make(url))),
+        ),
         limits === undefined ? Layer.empty : Layer.succeed(Streams.Limits, limits),
       ),
     ),
@@ -83,7 +85,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
       withDatabase((url) =>
         Effect.gen(function* () {
           const alice = yield* client("alice");
-          const bob = yield* client("bob");
           const workspace = yield* alice.workspaces.create({
             headers: {},
             payload: { name: "First", memberName: "alice" },
@@ -95,12 +96,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const first = yield* listen(alice, workspace.id);
           const second = yield* listen(alice, workspace.id);
           const foreign = yield* listen(alice, other.id);
-          const issue = (workspaceId: Workspace.Id, recipientId = "bob") =>
+          const issue = (workspaceId: Workspace.Id, name = "bob") =>
             alice.invitations.issue({
               headers: {},
               params: { workspaceId },
               payload: {
-                recipientId: Identity.HumanId.make(recipientId),
+                email: `${name}@example.com`,
                 roleId: BuiltinRoles.MemberId,
                 expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), {
                   days: 1,
@@ -108,6 +109,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
               },
             });
           const invitation = yield* issue(workspace.id);
+          // Development tokens are human IDs: each invitee's is their account's.
+          const bob = yield* client(invitation.details.recipientId);
           const received = yield* first.next;
           expect(yield* second.next).toEqual(received);
           if (!ChangeFeed.Message.isAnyOf(["Committed"])(received))
@@ -173,7 +176,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* resumed.next).toEqual(afterEvent);
           // A viewer never sees invitations, which only invitation managers may list, but sees
           // the member an acceptance adds and their access.
-          const eve = yield* client("eve");
+          const eve = yield* client(after.details.recipientId);
           yield* eve.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: after.details.id },
             payload: { name: "eve" },
@@ -232,7 +235,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
     withDatabase((url) =>
       Effect.gen(function* () {
         const alice = yield* client("alice");
-        const bob = yield* client("bob");
         const workspace = yield* alice.workspaces.create({
           headers: {},
           payload: { name: "Typing", memberName: "alice" },
@@ -241,11 +243,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           headers: {},
           params: { workspaceId: workspace.id },
           payload: {
-            recipientId: Identity.HumanId.make("bob"),
+            email: "bob@example.com",
             roleId: BuiltinRoles.MemberId,
             expiresAt: DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"),
           },
         });
+        const bob = yield* client(invitation.details.recipientId);
         const member = yield* bob.invitations.accept({
           params: { workspaceId: workspace.id, invitationId: invitation.details.id },
           payload: { name: "bob" },
@@ -335,30 +338,29 @@ describe.skipIf(!available)("PostgreSQL", () => {
     withDatabase((url) =>
       Effect.gen(function* () {
         const alice = yield* client("alice");
-        const bob = yield* client("bob");
-        const carol = yield* client("carol");
         const workspace = yield* alice.workspaces.create({
           headers: {},
           payload: { name: "Busy", memberName: "alice" },
         });
-        for (const [api, id] of [
-          [bob, "bob"],
-          [carol, "carol"],
-        ] as const) {
+        const admitMember = Effect.fn(function* (name: string) {
           const invitation = yield* alice.invitations.issue({
             headers: {},
             params: { workspaceId: workspace.id },
             payload: {
-              recipientId: Identity.HumanId.make(id),
+              email: `${name}@example.com`,
               roleId: BuiltinRoles.MemberId,
               expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), { days: 1 }),
             },
           });
+          const api = yield* client(invitation.details.recipientId);
           yield* api.invitations.accept({
             params: { workspaceId: workspace.id, invitationId: invitation.details.id },
-            payload: { name: id },
+            payload: { name },
           });
-        }
+          return api;
+        });
+        const bob = yield* admitMember("bob");
+        const carol = yield* admitMember("carol");
         const refused = (api: typeof alice) =>
           Effect.flip(
             Effect.scoped(

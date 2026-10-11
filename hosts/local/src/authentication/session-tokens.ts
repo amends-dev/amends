@@ -3,7 +3,8 @@ import { SessionTokens } from "@amends-dev/gateway";
 import { Effect, Layer, Redacted, Schema } from "effect";
 
 /**
- * Construct development session tokens that trust a nonempty bearer token as a human ID.
+ * Construct development session tokens that trust a nonempty bearer token as a human ID. Such a
+ * token cannot be revoked: signing out forgets it in the client alone.
  *
  * @category constructors
  */
@@ -14,6 +15,7 @@ export const make = (): SessionTokens.Interface =>
         Effect.mapError(() => new SessionTokens.Rejected({ reason: "malformed" })),
         Effect.map((id) => Identity.Reference.cases.Human.make({ id })),
       ),
+    revoke: () => Effect.void,
   });
 
 /**

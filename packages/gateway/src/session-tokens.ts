@@ -16,6 +16,11 @@ export interface Interface {
   readonly resolve: (
     token: Redacted.Redacted<string>,
   ) => Effect.Effect<Identity.MemberReference, Rejected>;
+  /**
+   * Stop honoring a token, as signing out does. A token the host does not honor already is left
+   * as it is.
+   */
+  readonly revoke: (token: Redacted.Redacted<string>) => Effect.Effect<void>;
 }
 
 /**

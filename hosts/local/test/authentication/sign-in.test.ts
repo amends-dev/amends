@@ -8,6 +8,28 @@ import { DevelopmentSignIn } from "../../src/authentication/sign-in.ts";
 import { DevelopmentSessionTokens } from "../../src/authentication/session-tokens.ts";
 import { DevelopmentAuthentication } from "../../src/authentication/authentication.ts";
 
+/** Accounts in memory: an address gets a random human ID the first time it comes up. */
+const inMemoryAccounts = Layer.sync(Accounts.Service, () => {
+  const ids = new Map<Accounts.Email, Identity.HumanId>();
+  return Accounts.Service.of({
+    findOrCreate: (email) =>
+      Effect.sync(() => {
+        const id = ids.get(email) ?? Identity.HumanId.make(crypto.randomUUID());
+        ids.set(email, id);
+        return { id, email };
+      }),
+    findByIds: (wanted) =>
+      Effect.sync(() =>
+        [...ids].flatMap(([email, id]) => (wanted.includes(id) ? [{ id, email }] : [])),
+      ),
+  });
+});
+/** The session completing sign-in gives an address: its account, whose ID is the token. */
+const sessionFor = (email: Accounts.Email) =>
+  Effect.flatMap(Accounts.Service, (accounts) => accounts.findOrCreate(email)).pipe(
+    Effect.map((account): SignIn.Session => ({ token: account.id, account })),
+  );
+
 it.effect.each(["make", "layer"] as const)(
   "sign-in %s issues usable session tokens and enforces one-time codes and expiry",
   (construction) =>
@@ -39,9 +61,9 @@ it.effect.each(["make", "layer"] as const)(
 
         yield* TestClock.adjust("599999 millis");
         const session = yield* signIn.complete(alice, aliceCode);
-        expect(session).toEqual({ token: alice, humanId: Identity.HumanId.make(alice) });
+        expect(session).toEqual(yield* sessionFor(alice));
         expect(yield* sessionTokens.resolve(Redacted.make(session.token))).toEqual(
-          Identity.Reference.cases.Human.make({ id: session.humanId }),
+          Identity.Reference.cases.Human.make({ id: session.account.id }),
         );
         expect(yield* Effect.flip(signIn.complete(alice, aliceCode))).toMatchObject({
           _tag: "SignIn.Rejected",
@@ -71,7 +93,7 @@ it.effect.each(["make", "layer"] as const)(
               ),
             )
           : program.pipe(Effect.provide(DevelopmentAuthentication.layer(deliver)));
-      yield* configured.pipe(Effect.provide(BunCrypto.layer));
+      yield* configured.pipe(Effect.provide([inMemoryAccounts, BunCrypto.layer]));
     }),
 );
 
@@ -94,11 +116,8 @@ it.effect("each evaluation of the sign-in constructor owns its pending codes", (
         _tag: "SignIn.Rejected",
         reason: "unknown",
       });
-      expect(yield* first.complete(email, code)).toEqual({
-        token: email,
-        humanId: Identity.HumanId.make(email),
-      });
-    }).pipe(Effect.provide(BunCrypto.layer));
+      expect(yield* first.complete(email, code)).toEqual(yield* sessionFor(email));
+    }).pipe(Effect.provide([inMemoryAccounts, BunCrypto.layer]));
   }),
 );
 const deterministicCrypto = Layer.sync(Crypto.Crypto, () => {
@@ -108,6 +127,34 @@ const deterministicCrypto = Layer.sync(Crypto.Crypto, () => {
     digest: () => Effect.die("Unexpected digest in sign-in test"),
   });
 });
+
+it.effect("completing sign-in signs in as the address's account, the same one each time", () =>
+  Effect.gen(function* () {
+    const delivered = new Map<Accounts.Email, SignIn.Code>();
+    const signIn = yield* DevelopmentSignIn.make((email, code) =>
+      Effect.sync(() => {
+        delivered.set(email, code);
+      }),
+    );
+    const accounts = yield* Accounts.Service;
+    const signInAs = Effect.fn(function* (email: Accounts.Email) {
+      yield* signIn.start(email);
+      const code = delivered.get(email);
+      if (code === undefined) return yield* Effect.die("No code was delivered");
+      return yield* signIn.complete(email, code);
+    });
+    const alice = Accounts.Email.make("alice@example.com");
+    const first = yield* signInAs(alice);
+    // The token is the account's human ID, which says nothing of the address.
+    expect(first.token).toBe(first.account.id);
+    expect(first.account).toEqual({ id: first.account.id, email: alice });
+    expect(first.account.id).not.toBe(alice);
+    expect(yield* accounts.findByIds([first.account.id])).toEqual([first.account]);
+    expect(yield* signInAs(alice)).toEqual(first);
+    const bob = yield* signInAs(Accounts.Email.make("bob@example.com"));
+    expect(bob.account.id).not.toBe(first.account.id);
+  }).pipe(Effect.provide([deterministicCrypto, inMemoryAccounts])),
+);
 it.effect("concurrent completions consume a code once even when the clock suspends", () =>
   Effect.gen(function* () {
     let delivered: SignIn.Code | undefined;
@@ -151,7 +198,7 @@ it.effect("concurrent completions consume a code once even when the clock suspen
       _tag: "Some",
       value: { _tag: "SignIn.Rejected", reason: "unknown" },
     });
-  }).pipe(Effect.provide(deterministicCrypto)),
+  }).pipe(Effect.provide([deterministicCrypto, inMemoryAccounts])),
 );
 
 it.effect("a repeated request replaces the previous code", () =>
@@ -173,10 +220,8 @@ it.effect("a repeated request replaces the previous code", () =>
       expect(yield* Effect.flip(signIn.complete(email, first))).toMatchObject({
         reason: "mismatch",
       });
-      expect(yield* signIn.complete(email, second)).toMatchObject({
-        humanId: "alice@example.com",
-      });
-    }).pipe(Effect.provide(deterministicCrypto));
+      expect(yield* signIn.complete(email, second)).toEqual(yield* sessionFor(email));
+    }).pipe(Effect.provide([deterministicCrypto, inMemoryAccounts]));
   }),
 );
 
@@ -200,10 +245,8 @@ it.effect("a failed delivery leaves no usable code and a later request can succe
     yield* signIn.start(email);
     const replacement = delivered[1];
     if (replacement === undefined) return yield* Effect.die("Expected replacement code");
-    expect(yield* signIn.complete(email, replacement)).toMatchObject({
-      humanId: "alice@example.com",
-    });
-  }).pipe(Effect.provide(deterministicCrypto)),
+    expect(yield* signIn.complete(email, replacement)).toEqual(yield* sessionFor(email));
+  }).pipe(Effect.provide([deterministicCrypto, inMemoryAccounts])),
 );
 
 it.effect.each(["failure", "interruption"] as const)(
@@ -238,10 +281,9 @@ it.effect.each(["failure", "interruption"] as const)(
       }
       const code = replacement;
       if (code === undefined) return yield* Effect.die("Expected replacement code");
-      const result = yield* signIn.complete(email, code);
-      expect(result.humanId).toBe(Identity.HumanId.make(email));
+      expect(yield* signIn.complete(email, code)).toEqual(yield* sessionFor(email));
       expect(yield* Effect.flip(signIn.complete(email, code))).toMatchObject({
         reason: "unknown",
       });
-    }).pipe(Effect.scoped, Effect.provide(deterministicCrypto)),
+    }).pipe(Effect.scoped, Effect.provide([deterministicCrypto, inMemoryAccounts])),
 );

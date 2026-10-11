@@ -150,7 +150,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         person.status === filter() &&
         (!words ||
           person.name.toLowerCase().includes(words) ||
-          person.signIn.toLowerCase().includes(words)),
+          person.signIn?.toLowerCase().includes(words) === true),
     );
   });
   const pending = () => invitations().filter((entry) => entry.status === "pending");

@@ -1,4 +1,4 @@
-import { Authentication, Principal, Unauthorized } from "@amends-dev/api-http";
+import { Authentication, Credential, Principal, Unauthorized } from "@amends-dev/api-http";
 import { SessionTokens } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 
@@ -20,7 +20,12 @@ export const make = Effect.fn("BearerAuthentication.make")(function* () {
     bearer: (httpEffect, { credential }) =>
       sessionTokens.resolve(credential).pipe(
         Effect.mapError((rejected) => new Unauthorized({ message: messages[rejected.reason] })),
-        Effect.flatMap((principal) => Effect.provideService(httpEffect, Principal, principal)),
+        Effect.flatMap((principal) =>
+          httpEffect.pipe(
+            Effect.provideService(Principal, principal),
+            Effect.provideService(Credential, credential),
+          ),
+        ),
       ),
   });
 });

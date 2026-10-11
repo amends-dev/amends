@@ -51,7 +51,7 @@ export function useMemberName(workspaceId: string, saved: () => void): MemberNam
     error,
     save: () => void save(),
     reset: () => {
-      setName(current() ?? suggestedName(session.session?.humanId));
+      setName(current() ?? suggestedName(session.session?.account.email));
       setError(undefined);
     },
   };

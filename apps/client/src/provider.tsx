@@ -1,5 +1,5 @@
 import { RegistryProvider } from "@effect/atom-solid";
-import type { Layer } from "effect";
+import { Effect, type Layer } from "effect";
 import type { HttpClient } from "effect/http";
 import {
   createContext,
@@ -10,7 +10,7 @@ import {
   useContext,
   type ParentProps,
 } from "solid-js";
-import { createApiClient, type ApiClient } from "./api/client.ts";
+import { createApiClient, revokeSession, type ApiClient } from "./api/client.ts";
 import type { SignIn } from "./api/contracts.ts";
 import type { SessionStore } from "./session/store.ts";
 
@@ -29,7 +29,10 @@ export interface SessionScope {
   readonly signedOut: boolean;
   /** Keep the credential sign-in returned; everything under the provider remounts for it. */
   readonly signIn: (session: SignIn.Session) => void;
-  /** Clear the credential, so that the next sign-in starts afresh. */
+  /**
+   * Clear the credential, so that the next sign-in starts afresh, and ask the host to stop
+   * honoring it.
+   */
   readonly signOut: () => void;
 }
 interface Scope {
@@ -52,7 +55,7 @@ export function ClientProvider(props: ParentProps<ClientProviderProps>) {
       store.subscribe(() => {
         const next = store.read();
         const current = scope().session;
-        if (next?.token !== current?.token || next?.humanId !== current?.humanId)
+        if (next?.token !== current?.token || next?.account.id !== current?.account.id)
           // Another window cleared the credential: its person signed out.
           setScope({ session: next, signedOut: next === undefined && current !== undefined });
       }),
@@ -92,7 +95,18 @@ export function ClientProvider(props: ParentProps<ClientProviderProps>) {
               session: current.session,
               signedOut: current.signedOut,
               signIn: (session) => change(session, false),
-              signOut: () => change(undefined, true),
+              signOut: () => {
+                const signedIn = current.session;
+                change(undefined, true);
+                if (signedIn)
+                  void Effect.runPromise(
+                    revokeSession({
+                      baseUrl: props.apiBaseUrl,
+                      transport: props.transport,
+                      session: signedIn,
+                    }),
+                  );
+              },
             }}
           >
             <ApiContext.Provider value={client}>

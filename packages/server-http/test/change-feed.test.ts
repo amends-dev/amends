@@ -50,7 +50,7 @@ const gateway = Layer.succeed(
 );
 const credentials = Layer.succeed(
   SessionTokens.Service,
-  SessionTokens.Service.of({ resolve: () => Effect.succeed(alice) }),
+  SessionTokens.Service.of({ resolve: () => Effect.succeed(alice), revoke: () => Effect.void }),
 );
 const client = HttpApiTest.groups(Api, ["changeFeed"]).pipe(
   Effect.provide(

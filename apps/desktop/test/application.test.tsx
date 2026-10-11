@@ -20,7 +20,9 @@ function mount(
   sidebar?: Sidebar,
 ) {
   window.history.replaceState(null, "", `/#${path}`);
-  let stored = token ? Schema.decodeSync(Session)({ token, identity: token }) : undefined;
+  let stored = token
+    ? Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } })
+    : undefined;
   const store: SessionStore = {
     read: () => stored,
     write: (next) => {
@@ -92,7 +94,12 @@ it("signs in from the desktop page and resumes the workspace query through hash 
   const fetch = vi
     .fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(new Response(null, { status: 202 }))
-    .mockResolvedValueOnce(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }))
+    .mockResolvedValueOnce(
+      response({
+        token: "jo@mercier.co",
+        account: { id: "jo@mercier.co", email: "jo@mercier.co" },
+      }),
+    )
     .mockResolvedValue(
       response({
         memberships: [
@@ -136,7 +143,12 @@ it("keeps a new credential through directory failure and safely resumes after re
   const fetch = vi
     .fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(new Response(null, { status: 202 }))
-    .mockResolvedValueOnce(response({ token: "jo@mercier.co", identity: "jo@mercier.co" }))
+    .mockResolvedValueOnce(
+      response({
+        token: "jo@mercier.co",
+        account: { id: "jo@mercier.co", email: "jo@mercier.co" },
+      }),
+    )
     .mockResolvedValueOnce(response({}, 503))
     .mockResolvedValue(response({ memberships: [], invitations: [] }));
   const store = mount("/sign-in?returnTo=%2F%2Fevil.invalid", undefined, fetch);
@@ -349,7 +361,7 @@ it("explains an unavailable workspace under the account header and returns to th
   );
   const store = mount("/workspaces/missing/settings", "jo", fetch);
   await screen.findByRole("heading", { name: "That workspace is closed to you" });
-  expect(screen.getByText("jo")).toBeInTheDocument();
+  expect(screen.getByText("jo@example.com")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Your workspaces" }));
   await screen.findByRole("heading", { name: "Choose a workspace" });

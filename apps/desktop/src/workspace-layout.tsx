@@ -224,7 +224,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
             account={{
               name: ownName(),
               menu: {
-                identity: session.session?.humanId ?? "",
+                identity: session.session?.account.email ?? "",
                 appearance: appearance.preference(),
                 onAppearanceChange: appearance.setPreference,
                 palette: appearance.palette(),
