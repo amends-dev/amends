@@ -12,7 +12,8 @@ import { Gateway } from "../index.ts";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Stream } from "effect";
 import type { Fixture } from "./fixture.ts";
-import { alice, boundTo, forWorkspace, Support } from "./support.ts";
+import * as Support from "./support.ts";
+import { alice, boundTo, forWorkspace } from "./support.ts";
 
 /** Reads outside transactions, which never wait for writers. */
 export const reads = (fixture: Fixture) => {
@@ -25,7 +26,7 @@ export const reads = (fixture: Fixture) => {
           Effect.gen(function* () {
             const host = yield* storage.connect({ failFast: true });
             yield* Effect.gen(function* () {
-              const gateway = yield* Gateway.Service;
+              const gateway = yield* Gateway.Gateway;
               // Creating the workspace also completes boot; this test exercises warm requests.
               const workspace = yield* gateway.createWorkspace(alice.id, {
                 name: "Read concurrency",
@@ -57,21 +58,21 @@ export const reads = (fixture: Fixture) => {
                     expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(
                       true,
                     );
-                    const memberService = yield* MemberService.Service;
+                    const memberService = yield* MemberService.MemberService;
                     expect((yield* memberService.get(workspace.ownerMemberId)).identity).toEqual(
                       alice,
                     );
                     expect(yield* memberService.list).toHaveLength(1);
-                    expect(yield* (yield* InvitationService.Service).list).toEqual([]);
-                    const assignmentService = yield* AssignmentService.Service;
+                    expect(yield* (yield* InvitationService.InvitationService).list).toEqual([]);
+                    const assignmentService = yield* AssignmentService.AssignmentService;
                     expect(yield* assignmentService.roles).toHaveLength(3);
                     expect(
                       (yield* assignmentService.list(workspace.ownerMemberId)).assignments,
                     ).toHaveLength(1);
-                    expect((yield* (yield* OwnershipService.Service).get).workspace).toEqual(
-                      workspace,
-                    );
-                    const notificationService = yield* NotificationService.Service;
+                    expect(
+                      (yield* (yield* OwnershipService.OwnershipService).get).workspace,
+                    ).toEqual(workspace);
+                    const notificationService = yield* NotificationService.NotificationService;
                     expect(yield* notificationService.inbox({ limit: 10 })).toEqual([]);
                     expect(
                       yield* notificationService.inbox({ limit: 10, pendingOnly: true }),
@@ -82,7 +83,7 @@ export const reads = (fixture: Fixture) => {
                         notificationService.markSeen(Notification.Id.make("missing")),
                       ),
                     ).toMatchObject({ _tag: "NotificationService.NotFound" });
-                    const stream = yield* (yield* ChangeFeedService.Service).watch();
+                    const stream = yield* (yield* ChangeFeedService.ChangeFeedService).watch();
                     expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
                       { _tag: "Ready", workspaceId: workspace.id, reset: true },
                     ]);
@@ -94,7 +95,7 @@ export const reads = (fixture: Fixture) => {
                     gateway.asMember(
                       workspace.id,
                       alice,
-                      Effect.flatMap(MemberService.Service, (memberService) =>
+                      Effect.flatMap(MemberService.MemberService, (memberService) =>
                         memberService.remove(Member.Id.make("missing")),
                       ),
                     ),

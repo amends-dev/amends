@@ -14,8 +14,8 @@ import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer, PrimaryKey, Ref, Schema } from "effect";
 import { ClusterSchema, Entity, Sharding } from "effect/cluster";
 import { Rpc } from "effect/rpc";
-import { TurnRunner } from "../turns/runner.ts";
-import { JobRequests } from "./requests.ts";
+import * as TurnRunner from "../turns/runner.ts";
+import * as JobRequests from "./requests.ts";
 
 /**
  * Which request this is among the job's: Cluster keeps one request per key, so a commit that asks
@@ -76,12 +76,12 @@ export type Request = Run | Stop;
  * @category layers
  */
 export const layerRequests = Layer.effect(
-  TurnJobs.Service,
+  TurnJobs.TurnJobs,
   Effect.gen(function* () {
     const sharding = yield* Sharding.Sharding;
     const turnJobClient = yield* entity.client;
     const failure = (cause: unknown) => new Store.Failure({ operation: "request turn job", cause });
-    return TurnJobs.Service.of({
+    return TurnJobs.TurnJobs.of({
       requestRun: Effect.fnUntraced(function* ({ workspaceId, memberId, threadId }) {
         const storeTransaction = yield* Store.Transaction;
         const run = new Run({ workspaceId, memberId, threadId, key: `run:${storeTransaction.id}` });
@@ -174,5 +174,3 @@ export const layerWorker = entity.toLayer(
 
 /** Stored requests and the worker that handles them, over the host's Cluster. @category layers */
 export const layer = Layer.merge(layerWorker, layerRequests);
-
-export * as TurnJob from "./turn-job.ts";

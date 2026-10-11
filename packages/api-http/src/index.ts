@@ -5,7 +5,7 @@ export { ChangeFeedGroup } from "./change-feed.ts";
 export { ChannelEventsGroup, ChannelsGroup } from "./channels.ts";
 export { ConnectionsGroup } from "./connections.ts";
 export { Authentication, Credential, Principal, Unauthorized } from "./authentication.ts";
-export { ApiErrors } from "./errors.ts";
+export * as ApiErrors from "./errors.ts";
 export { GroupsGroup } from "./groups.ts";
 export { InvitationsGroup } from "./invitations.ts";
 export { MeGroup } from "./me.ts";

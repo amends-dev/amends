@@ -32,11 +32,11 @@ agent examples below illustrate consumers rather than available application oper
   held, never after a rollback; hosts use it to tell a reader that something the commit stored,
   such as a Cluster request, can be read now.
 
-The core imports Effect only. Hosts choose storage and provide `Store.Service`,
-`Checkpoint.Service`, and the domain store services used by projection handlers.
+The core imports Effect only. Hosts choose storage and provide `Store.Store`,
+`Checkpoint.Checkpoint`, and the domain store services used by projection handlers.
 `Log.layer` builds the common log service and transaction coordinator from that
 store, which is bound to one workspace.
-`Journal.layer({ logId, projections })` builds `Journal.Service`, whose
+`Journal.layer({ logId, projections })` builds `Journal.Journal`, whose
 interface stays the same as projections are added. `Journal.make` remains available
 as its constructor and returns that same interface.
 
@@ -59,7 +59,7 @@ const JournalLive = Journal.layer({
 }).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostServices));
 ```
 
-Domains obtain the configured implementation with `yield* Journal.Service`.
+Domains obtain the configured implementation with `yield* Journal.Journal`.
 All normal writers to a domain log must use the same projection registrations.
 
 ## Storage envelope
@@ -196,7 +196,7 @@ const rename = Effect.gen(function* () {
 `Log.append` and `Log.appendAll` continue to accept explicit keys because execution
 entries have no fact definition. Calls without a derived or explicit key append
 every time. The application still authorizes the operation and supplies
-`Publication.Service`. Reuse the occurrence inputs or explicit key on retry; a new
+`Publication.Publication`. Reuse the occurrence inputs or explicit key on retry; a new
 UUID on every attempt identifies a different occurrence. Correlation IDs can group
 several facts and must not automatically become their shared idempotency key.
 
@@ -275,7 +275,7 @@ separate receipt is recorded. Logs written before this change still hold interna
 
 ## Event provenance
 
-Every new `journal.publish(fact, payload)` requires `Publication.Service` in its
+Every new `journal.publish(fact, payload)` requires `Publication.Publication` in its
 Effect context. This service holds the operation's `Event.Provenance`. The journal
 reads it at publication time, validates and snapshots it, then persists it as
 structured event metadata and exposes it on decoded
@@ -305,7 +305,7 @@ the existing context, including any explicit overrides. Publishing another fact
 does not regenerate the correlation or timestamp.
 
 Services capture cryptography during construction and provide it to
-the wrapper; identity is resolved when the operation runs. `Publication.Service`
+the wrapper; identity is resolved when the operation runs. `Publication.Publication`
 belongs around the operation's effect, never in a shared application layer.
 `Journal.make` and `Journal.layer` do not capture it. A direct publication without
 the service is a missing dependency at compile time and a defect at runtime;
@@ -342,7 +342,7 @@ parent. Events in one commit are not automatically causes of one another.
 
 For bootstrap and invitation acceptance, call `Publication.make(workspaceId,
 performer, occurredAt?)` with the authenticated identity and provide the result
-around the publication block using `Effect.provideService(Publication.Service,
+around the publication block using `Effect.provideService(Publication.Publication,
 provenance)`. These operations explicitly establish their authenticated performer's
 context because membership may not exist yet. Acceptance records the
 recipient even though its authority check temporarily evaluates the inviter.
@@ -507,7 +507,7 @@ domain events. For a consumer-owned `handleBatch` effect:
 
 ```ts
 const followJournal = Effect.gen(function* () {
-  const journal = yield* Journal.Service;
+  const journal = yield* Journal.Journal;
   yield* journal.log.tail({ limit: 32 }).pipe(Stream.runForEach(handleBatch));
 });
 ```
@@ -570,7 +570,7 @@ registered projection that is not live. For example, using the host layer above:
 
 ```ts
 const initialize = Effect.gen(function* () {
-  const journal = yield* Journal.Service;
+  const journal = yield* Journal.Journal;
   yield* journal.replay;
 }).pipe(Effect.provide(JournalLive));
 ```

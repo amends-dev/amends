@@ -28,6 +28,7 @@ import { Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect
 
 import { TestClock } from "effect/testing";
 
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
@@ -36,7 +37,6 @@ import {
   otherWorkspaceId,
   placed,
   runHost,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -67,19 +67,19 @@ describe("marking notifications seen", () => {
     identity: { _tag: "Human", id: Identity.HumanId.make("writer") },
   };
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
+    effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Service, testProvenance()),
+      Effect.provideService(Publication.Publication, testProvenance()),
       Effect.provide(core(bound)),
     );
   const markSeen = (id: Notification.Id) =>
-    Effect.flatMap(NotificationService.Service, (notificationService) =>
+    Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
       notificationService.markSeen(id),
     );
   /** What the actor's inbox shows a notification pointing to, or undefined without a source. */
   const sourceOf = (id: Notification.Id) =>
-    Effect.flatMap(NotificationService.Service, (notificationService) =>
+    Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
       Effect.map(
         notificationService.inbox({ limit: 50 }),
         (items) => items.find((item) => item.notification.id === id)?.source,
@@ -106,7 +106,7 @@ describe("marking notifications seen", () => {
     };
     yield* facts(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.forEach([human, agent, writer], (actor) =>
             journal.publish(MemberFacts.Added, {
@@ -135,7 +135,7 @@ describe("marking notifications seen", () => {
     const group = yield* run(
       bound,
       owner,
-      Effect.flatMap(GroupService.Service, (groupService) =>
+      Effect.flatMap(GroupService.GroupService, (groupService) =>
         groupService.createTeam({
           name: "Team",
           memberIds: [owner.memberId, human.memberId, agent.memberId, writer.memberId],
@@ -145,7 +145,7 @@ describe("marking notifications seen", () => {
     const first = yield* run(
       bound,
       writer,
-      Effect.flatMap(ThreadService.Service, (threadService) =>
+      Effect.flatMap(ThreadService.ThreadService, (threadService) =>
         // Mentioning the three others enrolls and notifies them; the writer is not notified.
         threadService.startInGroup({
           groupId: group.id,
@@ -176,7 +176,7 @@ describe("marking notifications seen", () => {
           ),
     );
     return Object.assign({}, bound, {
-      context: Context.add(bound.context, NotificationStore.Service, {
+      context: Context.add(bound.context, NotificationStore.NotificationStore, {
         ...bound.notifications,
         markSeen: (ids, at) => Effect.andThen(before, bound.notifications.markSeen(ids, at)),
       }),
@@ -242,9 +242,11 @@ describe("marking notifications seen", () => {
             const service =
               (actor: Actor.Value) =>
               <A, E>(
-                use: (s: NotificationService.Interface) => Effect.Effect<A, E, Actor.Service>,
+                use: (
+                  s: NotificationService.NotificationService["Service"],
+                ) => Effect.Effect<A, E, Actor.Actor>,
               ) =>
-                run(p.bound, actor, Effect.flatMap(NotificationService.Service, use));
+                run(p.bound, actor, Effect.flatMap(NotificationService.NotificationService, use));
             const asHuman = service(human);
             const pending = () =>
               p.bound.notifications.listPendingByRecipient(
@@ -256,7 +258,7 @@ describe("marking notifications seen", () => {
             yield* run(
               p.bound,
               writer,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.publish({
                   threadId: p.first.thread.id,
                   text: "Any thoughts?",
@@ -326,11 +328,11 @@ describe("marking notifications seen", () => {
               p.bound,
               human,
               Effect.gen(function* () {
-                const notificationService = yield* NotificationService.Service;
+                const notificationService = yield* NotificationService.NotificationService;
                 yield* run(
                   p.bound,
                   p.owner,
-                  Effect.flatMap(MemberService.Service, (memberService) =>
+                  Effect.flatMap(MemberService.MemberService, (memberService) =>
                     memberService.remove(human.memberId),
                   ),
                 );
@@ -367,7 +369,7 @@ describe("marking notifications seen", () => {
             const before = yield* snapshot(p);
             const bound = {
               ...p.bound,
-              context: Context.add(p.bound.context, Store.Service, {
+              context: Context.add(p.bound.context, Store.Store, {
                 ...p.bound.store,
                 getEntry: () => Effect.die("Marking seen must not read the source"),
               }),
@@ -382,11 +384,13 @@ describe("marking notifications seen", () => {
             yield* run(
               p.bound,
               human,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.leave({
-                  groupId: p.group.id,
-                  membershipId: admission.id,
-                }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.leave({
+                    groupId: p.group.id,
+                    membershipId: admission.id,
+                  }),
               ),
             );
             expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
@@ -410,7 +414,7 @@ describe("marking notifications seen", () => {
         Effect.gen(function* () {
           const p = yield* prepare();
           const before = yield* snapshot(p);
-          const context = Context.add(p.bound.context, NotificationStore.Service, {
+          const context = Context.add(p.bound.context, NotificationStore.NotificationStore, {
             ...p.bound.notifications,
             markSeen: () =>
               Effect.fail(
@@ -440,7 +444,7 @@ describe("marking notifications seen", () => {
             const elsewhere = yield* run(
               p.bound,
               p.owner,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.createTeam({
                   name: "Elsewhere",
                   memberIds: [p.owner.memberId, human.memberId],
@@ -450,7 +454,7 @@ describe("marking notifications seen", () => {
             yield* run(
               p.bound,
               p.owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startInGroup({
                   groupId: elsewhere.id,
                   mentions: [human.memberId],
@@ -467,8 +471,10 @@ describe("marking notifications seen", () => {
               run(
                 p.bound,
                 human,
-                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                  groupMembershipService.leave({ groupId: p.group.id, membershipId }),
+                Effect.flatMap(
+                  GroupMembershipService.GroupMembershipService,
+                  (groupMembershipService) =>
+                    groupMembershipService.leave({ groupId: p.group.id, membershipId }),
                 ),
               );
             // The human leaves Team after the notification was read as pending, before Seen.
@@ -483,14 +489,16 @@ describe("marking notifications seen", () => {
             yield* run(
               p.bound,
               p.owner,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.add({ groupId: p.group.id, memberId: human.memberId }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: p.group.id, memberId: human.memberId }),
               ),
             );
             yield* run(
               p.bound,
               writer,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.publish({
                   threadId: p.first.thread.id,
                   mentions: [human.memberId],
@@ -512,7 +520,7 @@ describe("marking notifications seen", () => {
               yield* run(
                 racingSeen(p.bound, leave(rejoined.id)),
                 human,
-                Effect.flatMap(NotificationService.Service, (notificationService) =>
+                Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
                   notificationService.markSeenThrough({
                     recordedAt: through.recordedAt,
                     id: through.id,
@@ -547,7 +555,7 @@ describe("marking notifications seen", () => {
             release = yield* Deferred.make<void>();
           // The departure pauses once it has settled the human's notifications, before committing.
           const pausing = Object.assign({}, p.bound, {
-            context: Context.add(p.bound.context, NotificationStore.Service, {
+            context: Context.add(p.bound.context, NotificationStore.NotificationStore, {
               ...p.bound.notifications,
               discardPendingForGroup: (memberId, groupId) =>
                 p.bound.notifications
@@ -561,11 +569,13 @@ describe("marking notifications seen", () => {
           const leaving = yield* run(
             pausing,
             human,
-            Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-              groupMembershipService.leave({
-                groupId: p.group.id,
-                membershipId: admission.id,
-              }),
+            Effect.flatMap(
+              GroupMembershipService.GroupMembershipService,
+              (groupMembershipService) =>
+                groupMembershipService.leave({
+                  groupId: p.group.id,
+                  membershipId: admission.id,
+                }),
             ),
           ).pipe(Effect.forkChild);
           yield* Deferred.await(reached);
@@ -582,7 +592,7 @@ describe("marking notifications seen", () => {
           yield* storage.discardProjections;
           yield* facts(
             p.bound,
-            Effect.flatMap(Journal.Service, (journal) => journal.replay),
+            Effect.flatMap(Journal.Journal, (journal) => journal.replay),
           );
           expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(live);
         }),
@@ -605,7 +615,7 @@ describe("marking notifications seen", () => {
             });
             const operation = facts(
               p.bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
                   Effect.gen(function* () {
                     yield* p.bound.notifications.insert(staged);
@@ -613,9 +623,7 @@ describe("marking notifications seen", () => {
                     expect(yield* p.bound.notifications.get(staged.id)).toEqual(
                       Option.some(changed(staged, { state: seenState(seenAt) })),
                     );
-                    yield* markSeen(p.humanNote.id).pipe(
-                      Effect.provideService(Actor.Service, human),
-                    );
+                    yield* markSeen(p.humanNote.id).pipe(Effect.provideService(Actor.Actor, human));
                     return yield* Effect.fail("rollback");
                   }),
                 ),
@@ -642,14 +650,14 @@ describe("marking notifications seen", () => {
           const operation = run(
             p.bound,
             p.owner,
-            Effect.flatMap(Journal.Service, (journal) =>
+            Effect.flatMap(Journal.Journal, (journal) =>
               journal.commit(
                 Effect.gen(function* () {
-                  yield* Effect.flatMap(MemberService.Service, (memberService) =>
+                  yield* Effect.flatMap(MemberService.MemberService, (memberService) =>
                     memberService.remove(human.memberId),
                   );
                   return yield* markSeen(p.humanNote.id).pipe(
-                    Effect.provideService(Actor.Service, human),
+                    Effect.provideService(Actor.Actor, human),
                   );
                 }),
               ),
@@ -682,17 +690,19 @@ describe("marking notifications seen", () => {
                 yield* run(
                   p.bound,
                   agent,
-                  Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
-                    threadParticipationService.unfollow({
-                      threadId: p.first.thread.id,
-                      participationId: participant.id,
-                    }),
+                  Effect.flatMap(
+                    ThreadParticipationService.ThreadParticipationService,
+                    (threadParticipationService) =>
+                      threadParticipationService.unfollow({
+                        threadId: p.first.thread.id,
+                        participationId: participant.id,
+                      }),
                   ),
                 );
                 yield* run(
                   p.bound,
                   p.owner,
-                  Effect.flatMap(MemberService.Service, (memberService) =>
+                  Effect.flatMap(MemberService.MemberService, (memberService) =>
                     memberService.remove(human.memberId),
                   ),
                 );
@@ -714,7 +724,7 @@ describe("marking notifications seen", () => {
                 yield* TestClock.adjust("2 hours");
                 yield* facts(
                   bound,
-                  Effect.flatMap(Journal.Service, (journal) => journal.replay),
+                  Effect.flatMap(Journal.Journal, (journal) => journal.replay),
                 );
                 expect(yield* notes(bound, human)).toEqual([saved.result]);
                 expect(yield* notes(bound, agent)).toEqual(saved.agent);
@@ -729,7 +739,7 @@ describe("marking notifications seen", () => {
                 const live = yield* bound.checkpoints.listLive(journalLog);
                 yield* facts(
                   bound,
-                  Effect.flatMap(Journal.Service, (journal) => journal.replay),
+                  Effect.flatMap(Journal.Journal, (journal) => journal.replay),
                 );
                 expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
                 expect(yield* history(bound)).toEqual(saved.history);
@@ -881,7 +891,7 @@ describe("marking notifications seen", () => {
           Effect.gen(function* () {
             const p = yield* prepare();
             const before = yield* snapshot(p);
-            const context = Context.add(p.bound.context, NotificationStore.Service, {
+            const context = Context.add(p.bound.context, NotificationStore.NotificationStore, {
               ...p.bound.notifications,
               get: () => Effect.succeedSome(changed(p.agentNote, { id: p.humanNote.id })),
             });
@@ -903,7 +913,7 @@ describe("marking notifications seen", () => {
           yield* runGateway(
             storage,
             Effect.gen(function* () {
-              const gateway = yield* Gateway.Service;
+              const gateway = yield* Gateway.Gateway;
               const result = yield* gateway.asMember(
                 workspaceId,
                 human.identity,

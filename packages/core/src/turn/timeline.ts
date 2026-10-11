@@ -1,9 +1,9 @@
 import { Effect, Schema } from "effect";
-import type { Thread } from "../thread/Thread.ts";
-import type { ThreadActivity } from "../thread/ThreadActivity.ts";
-import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
-import { ThreadActivityResolvers } from "../thread/ThreadActivityResolvers.ts";
-import { TurnActivity } from "./activity.ts";
+import type * as Thread from "../thread/Thread.ts";
+import type * as ThreadActivity from "../thread/ThreadActivity.ts";
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
+import * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts";
+import * as TurnActivity from "./activity.ts";
 
 /** A turn accepted here: where its row shows. */
 export const CreatedItem = Schema.Struct({ activity: TurnActivity.Created.Activity });
@@ -63,5 +63,3 @@ export const resolver = Effect.succeed({
     );
   }),
 } satisfies ThreadActivityResolvers.Resolver);
-
-export * as TurnTimeline from "./timeline.ts";

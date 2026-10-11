@@ -1,7 +1,7 @@
 import { Group, GroupStore } from "@amends-dev/core/group";
 import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { groups } from "./schema.ts";
@@ -52,9 +52,9 @@ const toRow = (record: Group.Record): typeof groups.$inferInsert => ({
 
 /** Group records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Groups.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
-  const driver: GroupStore.Interface = {
+  const driver: GroupStore.GroupStore["Service"] = {
     get: Effect.fn("Groups.get")(
       function* (id) {
         return yield* guard(
@@ -201,6 +201,4 @@ export const make = Effect.fn("Groups.make")(function* () {
 });
 
 /** Provide group storage over the caller's binding. @category layers */
-export const layer = Layer.effect(GroupStore.Service, make());
-
-export * as Groups from "./groups.ts";
+export const layer = Layer.effect(GroupStore.GroupStore, make());

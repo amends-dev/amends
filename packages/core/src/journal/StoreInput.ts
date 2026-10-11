@@ -7,7 +7,7 @@
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
-import type { WorkspaceId } from "../workspace/id.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * The decoders, compiled once per schema.
@@ -65,5 +65,3 @@ export const write =
         () => new Conflict({ operation, message: "Expected a record in this workspace" }),
       ),
     );
-
-export * as StoreInput from "./StoreInput.ts";

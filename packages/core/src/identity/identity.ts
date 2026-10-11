@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Audience } from "../journal/audience.ts";
+import * as Audience from "../journal/audience.ts";
 
 export const HumanId = Schema.NonEmptyString.pipe(Schema.brand("HumanId"));
 export type HumanId = typeof HumanId.Type;
@@ -28,5 +28,3 @@ export type Reference = typeof Reference.Type;
 /** A human or agent in person, across their memberships. */
 export const audienceOf = (identity: MemberReference): Audience.Scope =>
   Audience.make(MemberReference.isAnyOf(["Human"])(identity) ? "human" : "agent", identity.id);
-
-export * as Identity from "./identity.ts";

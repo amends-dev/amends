@@ -26,7 +26,7 @@ import {
 } from "effect";
 import { LanguageModel, McpProtocol, McpServer, type Response, Tool, Toolkit } from "effect/ai";
 import { FetchHttpClient, HttpRouter } from "effect/http";
-import { HarnessIntegrations } from "../src/harness-integrations.ts";
+import * as HarnessIntegrations from "../src/harness-integrations.ts";
 
 /** A connection as a workspace stores it. */
 const connectionTo = (

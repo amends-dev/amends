@@ -7,10 +7,10 @@ import { Context, Effect, Layer, Ref } from "effect";
 import { AssignmentStore, RoleStore } from "../src/authorization/index.ts";
 import type { Commit } from "../src/journal/index.ts";
 import { Checkpoint, Store } from "../src/journal/index.ts";
-import { Binding } from "../src/memory/binding.ts";
-import { MemoryConnection } from "../src/memory/connection.ts";
-import { MemoryDatabase } from "../src/memory/database.ts";
-import { MemoryStores } from "../src/memory/stores.ts";
+import * as Binding from "../src/memory/binding.ts";
+import * as MemoryConnection from "../src/memory/connection.ts";
+import * as MemoryDatabase from "../src/memory/database.ts";
+import * as MemoryStores from "../src/memory/stores.ts";
 import { MemberStore, Workspace } from "../src/workspace/index.ts";
 
 /** A projection target: a number the transaction stages, like any projected record. */
@@ -28,23 +28,23 @@ export const make = Effect.fn("JournalTest.memory")(function* (
 ) {
   const database = yield* MemoryDatabase.make();
   const memoryConnection = yield* MemoryConnection.make().pipe(
-    Effect.provideService(MemoryDatabase.Service, database),
+    Effect.provideService(MemoryDatabase.MemoryDatabase, database),
   );
   /** The stores bound to one workspace over this host's connection. */
   const bind = Effect.fn("JournalTest.bind")(function* (id: Workspace.Id) {
     const context = yield* Layer.build(
       Layer.merge(MemoryStores.layer(id), Binding.layer(id)).pipe(
-        Layer.provide(Layer.succeed(MemoryConnection.Service, memoryConnection)),
+        Layer.provide(Layer.succeed(MemoryConnection.MemoryConnection, memoryConnection)),
       ),
     );
     return {
       context,
-      binding: Context.get(context, Binding.Service),
-      store: Context.get(context, Store.Service),
-      checkpoints: Context.get(context, Checkpoint.Service),
-      members: Context.get(context, MemberStore.Service),
-      roles: Context.get(context, RoleStore.Service),
-      assignments: Context.get(context, AssignmentStore.Service),
+      binding: Context.get(context, Binding.Binding),
+      store: Context.get(context, Store.Store),
+      checkpoints: Context.get(context, Checkpoint.Checkpoint),
+      members: Context.get(context, MemberStore.MemberStore),
+      roles: Context.get(context, RoleStore.RoleStore),
+      assignments: Context.get(context, AssignmentStore.AssignmentStore),
     };
   });
   const bound = yield* bind(workspaceId);
@@ -71,7 +71,7 @@ export const make = Effect.fn("JournalTest.memory")(function* (
    * The store, counting what it is asked, and reporting the next commit as uncertain when asked:
    * it commits, but what its program asked to run afterwards never runs.
    */
-  const store = Store.Service.of({
+  const store = Store.Store.of({
     ...inner,
     transaction: <A, E, R>(program: Effect.Effect<A, E, R>) =>
       Effect.gen(function* () {

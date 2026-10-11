@@ -1,9 +1,9 @@
 import { SessionLog, SessionLogStore } from "../turn/index.ts";
 import { Array, DateTime, Deferred, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
-import { MemoryDatabase } from "./database.ts";
+import * as Binding from "./binding.ts";
+import * as MemoryDatabase from "./database.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 /** An entry as JSON, where and when its log recorded it. */
 const rows = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SessionLog.Recorded)));
@@ -15,11 +15,11 @@ const rows = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SessionLog.Recor
  * @category constructors
  */
 export const make = Effect.fn("SessionLogs.make")(function* () {
-  const { workspaceId, connection } = yield* Binding.Service;
+  const { workspaceId, connection } = yield* Binding.Binding;
   const { database } = connection;
   const keyOf = (participationId: string) => Rows.keyOf(workspaceId, participationId);
   const logOf = (participationId: string) => database.sessionLogs.get(keyOf(participationId)) ?? [];
-  const driver: SessionLogStore.Interface = {
+  const driver: SessionLogStore.SessionLogStore["Service"] = {
     head: (participationId) => Effect.sync(() => logOf(participationId).length),
     append: Effect.fn("SessionLogs.append")(function* (participationId, entries, after) {
       const log = logOf(participationId);
@@ -58,6 +58,4 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
 });
 
 /** Provide session logs over the caller's binding. @category layers */
-export const layer = Layer.effect(SessionLogStore.Service, make());
-
-export * as SessionLogs from "./session-logs.ts";
+export const layer = Layer.effect(SessionLogStore.SessionLogStore, make());

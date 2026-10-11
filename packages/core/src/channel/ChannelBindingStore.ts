@@ -8,12 +8,12 @@
 import { ChannelTransport } from "@amends-dev/channel";
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ChannelBinding } from "./ChannelBinding.ts";
-import { ChannelId } from "./ChannelId.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import type * as Store from "../journal/store.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ChannelBinding from "./ChannelBinding.ts";
+import * as ChannelId from "./ChannelId.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing bindings.
@@ -39,43 +39,38 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ChannelBindingStor
 }) {}
 
 /**
- * What a storage adapter implements for bindings.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  /** The thread's binding, if it came through a channel. */
-  readonly get: (
-    threadId: ThreadId.Id,
-  ) => Effect.Effect<Option.Option<ChannelBinding.Record>, Failure>;
-  /** The binding of an external conversation on a channel, if the conversation has a thread. */
-  readonly findByConversation: (
-    channelId: ChannelId.Id,
-    conversationId: ChannelTransport.ExternalId,
-  ) => Effect.Effect<Option.Option<ChannelBinding.Record>, Failure>;
-  /**
-   * Reject a thread bound already, and a conversation bound to
-   * another thread of the channel.
-   */
-  readonly insert: (
-    record: ChannelBinding.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The binding store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for bindings.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/ChannelBindingStore",
-) {}
+export class ChannelBindingStore extends Context.Service<
+  ChannelBindingStore,
+  {
+    /** The thread's binding, if it came through a channel. */
+    readonly get: (
+      threadId: ThreadId.Id,
+    ) => Effect.Effect<Option.Option<ChannelBinding.Record>, Failure>;
+    /** The binding of an external conversation on a channel, if the conversation has a thread. */
+    readonly findByConversation: (
+      channelId: ChannelId.Id,
+      conversationId: ChannelTransport.ExternalId,
+    ) => Effect.Effect<Option.Option<ChannelBinding.Record>, Failure>;
+    /**
+     * Reject a thread bound already, and a conversation bound to
+     * another thread of the channel.
+     */
+    readonly insert: (
+      record: ChannelBinding.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/channel/ChannelBindingStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -84,7 +79,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: ChannelBindingStore["Service"],
+): ChannelBindingStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -101,5 +99,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       Effect.flatMap(write("insert", ChannelBinding.Record, record), driver.insert),
   };
 };
-
-export * as ChannelBindingStore from "./ChannelBindingStore.ts";

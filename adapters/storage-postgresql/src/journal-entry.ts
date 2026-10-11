@@ -165,5 +165,3 @@ export const toColumns = (entry: Store.Content) => {
     occurredAt: provenance === undefined ? null : DateTime.toDate(provenance.occurredAt),
   };
 };
-
-export * as JournalEntry from "./journal-entry.ts";

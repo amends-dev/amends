@@ -45,5 +45,3 @@ export const compareBinary = (left: string, right: string): number => {
 
 /** A composite key for maps, unambiguous whatever its parts contain. */
 export const keyOf = (...parts: ReadonlyArray<string | number>): string => JSON.stringify(parts);
-
-export * as Rows from "./rows.ts";

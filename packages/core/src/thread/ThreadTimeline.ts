@@ -6,11 +6,11 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { ThreadMessageTimeline } from "./ThreadMessageTimeline.ts";
-import { ThreadParticipationTimeline } from "./ThreadParticipationTimeline.ts";
-import { ThreadTitleTimeline } from "./ThreadTitleTimeline.ts";
-import { TurnTimeline } from "../turn/timeline.ts";
-import { TaskTimeline } from "../task/TaskTimeline.ts";
+import * as ThreadMessageTimeline from "./ThreadMessageTimeline.ts";
+import * as ThreadParticipationTimeline from "./ThreadParticipationTimeline.ts";
+import * as ThreadTitleTimeline from "./ThreadTitleTimeline.ts";
+import * as TurnTimeline from "../turn/timeline.ts";
+import * as TaskTimeline from "../task/TaskTimeline.ts";
 
 /**
  * Every kind of timeline item: the schema of `Thread.TimelineItem`. Each item holds its activity,
@@ -39,5 +39,3 @@ export const Item = Schema.Union([
  * @since 0.1.0
  */
 export type Item = typeof Item.Type;
-
-export * as ThreadTimeline from "./ThreadTimeline.ts";

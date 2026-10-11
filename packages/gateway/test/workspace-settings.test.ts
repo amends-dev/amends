@@ -7,7 +7,8 @@ import { Gateway, WorkspaceDirectory } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Tracer } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -17,27 +18,26 @@ import {
   future,
   journalLog,
   request,
-  Support,
 } from "./support.ts";
 
 const read = (id: Workspace.Id, identity: Identity.MemberReference) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       id,
       identity,
       Effect.flatMap(
-        WorkspaceSettingsService.Service,
+        WorkspaceSettingsService.WorkspaceSettingsService,
         (workspaceSettingsService) => workspaceSettingsService.get,
       ),
     ),
   );
 const listing = (id: Workspace.Id, identity: Identity.MemberReference) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       id,
       identity,
       Effect.flatMap(
-        WorkspaceSettingsService.Service,
+        WorkspaceSettingsService.WorkspaceSettingsService,
         (workspaceSettingsService) => workspaceSettingsService.members,
       ),
     ),
@@ -48,12 +48,13 @@ const rename = (
   name: string,
   expectedName: string,
 ) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       id,
       identity,
-      Effect.flatMap(WorkspaceSettingsService.Service, (workspaceSettingsService) =>
-        workspaceSettingsService.rename({ name, expectedName }),
+      Effect.flatMap(
+        WorkspaceSettingsService.WorkspaceSettingsService,
+        (workspaceSettingsService) => workspaceSettingsService.rename({ name, expectedName }),
       ),
     ),
   );
@@ -82,12 +83,12 @@ describe("workspace settings", () => {
           expect(
             yield* Effect.flip(rename(workspace.id, alice, "Stale", workspace.name)),
           ).toMatchObject({ _tag: "WorkspaceSettings.Changed" });
-          const workspaceDirectory = yield* WorkspaceDirectory.Service;
+          const workspaceDirectory = yield* WorkspaceDirectory.WorkspaceDirectory;
           expect((yield* workspaceDirectory.list(alice)).memberships[0]?.workspace.name).toBe(
             "Studio",
           );
           yield* storage.discardProjections;
-          yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+          yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
             Effect.provide(core(bound)),
           );
           expect(yield* bound.workspace.get).toEqual(Option.some(renamed));
@@ -293,14 +294,16 @@ describe("workspace settings", () => {
           const broken = failingLate(bound, failure);
           expect(
             yield* Effect.flip(
-              Effect.flatMap(WorkspaceSettingsService.Service, (workspaceSettingsService) =>
-                workspaceSettingsService.rename({
-                  name: "Studio",
-                  expectedName: workspace.name,
-                }),
+              Effect.flatMap(
+                WorkspaceSettingsService.WorkspaceSettingsService,
+                (workspaceSettingsService) =>
+                  workspaceSettingsService.rename({
+                    name: "Studio",
+                    expectedName: workspace.name,
+                  }),
               ).pipe(
                 Effect.provide(core(broken)),
-                Effect.provideService(Actor.Service, {
+                Effect.provideService(Actor.Actor, {
                   workspaceId: workspace.id,
                   memberId: workspace.ownerMemberId,
                   identity: alice,

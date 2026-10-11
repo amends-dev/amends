@@ -21,36 +21,36 @@ import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
   boundTo,
   future,
   request,
-  Support,
   takeDeliveryJobs,
   takePosted,
   takeTurnJobs,
   testTransport,
 } from "./support.ts";
 
-const as = <A, E, R extends Core.Operations | Actor.Service>(
+const as = <A, E, R extends Core.Operations | Actor.Actor>(
   id: Workspace.Id,
   identity: Identity.MemberReference,
   program: Effect.Effect<A, E, R>,
-) => Effect.flatMap(Gateway.Service, (gateway) => gateway.asMember(id, identity, program));
+) => Effect.flatMap(Gateway.Gateway, (gateway) => gateway.asMember(id, identity, program));
 /** Run a step of a job service in the workspace, as a host does for what its channels receive. */
 const asHost = <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, Core.JobServices>) =>
-  Effect.flatMap(Gateway.Service, (gateway) => Effect.scoped(gateway.inWorkspace(id, program)));
+  Effect.flatMap(Gateway.Gateway, (gateway) => Effect.scoped(gateway.inWorkspace(id, program)));
 const intake = <A, E>(
   id: Workspace.Id,
-  step: (channelIntake: ChannelIntake.Interface) => Effect.Effect<A, E>,
-) => asHost(id, Effect.flatMap(ChannelIntake.Service, step));
+  step: (channelIntake: ChannelIntake.ChannelIntake["Service"]) => Effect.Effect<A, E>,
+) => asHost(id, Effect.flatMap(ChannelIntake.ChannelIntake, step));
 const deliver = <A, E>(
   id: Workspace.Id,
-  step: (deliveryExecution: DeliveryExecution.Interface) => Effect.Effect<A, E>,
-) => asHost(id, Effect.flatMap(DeliveryExecution.Service, step));
+  step: (deliveryExecution: DeliveryExecution.DeliveryExecution["Service"]) => Effect.Effect<A, E>,
+) => asHost(id, Effect.flatMap(DeliveryExecution.DeliveryExecution, step));
 
 /** The external system's conversation, as its transport identifies it. */
 const conversation = { id: "conv-1", details: { room: "C1" } };
@@ -117,7 +117,7 @@ describe("channels", () => {
     yield* as(
       workspace.id,
       alice,
-      Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+      Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
         groupFollowService.follow({
           groupId: Group.GeneralId,
           memberId: workspace.ownerMemberId,
@@ -127,7 +127,7 @@ describe("channels", () => {
     const connection = yield* as(
       workspace.id,
       alice,
-      Effect.flatMap(ConnectionService.Service, (connectionService) =>
+      Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
         connectionService.create({
           integration: "test-channels",
           name: "Support desk",
@@ -139,7 +139,7 @@ describe("channels", () => {
     const channel = yield* as(
       workspace.id,
       alice,
-      Effect.flatMap(ChannelService.Service, (channelService) =>
+      Effect.flatMap(ChannelService.ChannelService, (channelService) =>
         channelService.create({
           connectionId: connection.id,
           groupId: Group.GeneralId,
@@ -191,12 +191,14 @@ describe("channels", () => {
             const thread = yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(ThreadService.Service, (threadService) => threadService.get(threadId)),
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
+                threadService.get(threadId),
+              ),
             );
             const binding = yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(ChannelService.Service, (channelService) =>
+              Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                 channelService.getBinding(threadId),
               ),
             );
@@ -236,7 +238,7 @@ describe("channels", () => {
             const task = yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(TaskService.Service, (taskService) => taskService.get(threadId)),
+              Effect.flatMap(TaskService.TaskService, (taskService) => taskService.get(threadId)),
             );
             expect(task).toMatchObject({
               status: "triage",
@@ -328,7 +330,7 @@ describe("channels", () => {
             const reply = yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.publish({
                   threadId,
                   text: "It ships tomorrow.",
@@ -471,7 +473,7 @@ describe("channels", () => {
             const late = yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.publish({ threadId, text: "Never mind.", mentions: [] }),
               ),
             );
@@ -481,7 +483,7 @@ describe("channels", () => {
             yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.delete(late.id),
               ),
             );
@@ -514,14 +516,17 @@ describe("channels", () => {
               as(
                 workspace.id,
                 identity,
-                Effect.flatMap(ChannelService.Service, (channelService) => channelService.list),
+                Effect.flatMap(
+                  ChannelService.ChannelService,
+                  (channelService) => channelService.list,
+                ),
               );
             expect(yield* channels(bob)).toEqual([channel]);
             expect(
               yield* as(
                 workspace.id,
                 bob,
-                Effect.flatMap(ChannelService.Service, (channelService) =>
+                Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                   channelService.get(channel.id),
                 ),
               ),
@@ -533,7 +538,7 @@ describe("channels", () => {
                 as(
                   workspace.id,
                   bob,
-                  Effect.flatMap(ChannelService.Service, (channelService) =>
+                  Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                     channelService.create({
                       connectionId: connection.id,
                       groupId: Group.GeneralId,
@@ -547,7 +552,7 @@ describe("channels", () => {
             const team = yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.createTeam({
                   name: "Sales",
                   memberIds: [workspace.ownerMemberId],
@@ -560,7 +565,7 @@ describe("channels", () => {
                 as(
                   workspace.id,
                   bob,
-                  Effect.flatMap(ChannelService.Service, (channelService) =>
+                  Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                     channelService.redirect({ channelId: channel.id, groupId: team.id }),
                   ),
                 ),
@@ -569,7 +574,7 @@ describe("channels", () => {
             const models = yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(ConnectionService.Service, (connectionService) =>
+              Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
                 connectionService.create({
                   integration: "test-tools",
                   name: "Tools",
@@ -583,7 +588,7 @@ describe("channels", () => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(ChannelService.Service, (channelService) =>
+                  Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                     channelService.create({
                       connectionId: models.id,
                       groupId: Group.GeneralId,
@@ -597,7 +602,7 @@ describe("channels", () => {
             const redirected = yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(ChannelService.Service, (channelService) =>
+              Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                 channelService.redirect({ channelId: channel.id, groupId: team.id }),
               ),
             );
@@ -619,7 +624,7 @@ describe("channels", () => {
             const plain = yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startInGroup({
                   groupId: Group.GeneralId,
                   text: "Hello",
@@ -632,7 +637,7 @@ describe("channels", () => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(ChannelService.Service, (channelService) =>
+                  Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                     channelService.getBinding(plain.thread.id),
                   ),
                 ),
@@ -642,7 +647,7 @@ describe("channels", () => {
             yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(ChannelService.Service, (channelService) =>
+              Effect.flatMap(ChannelService.ChannelService, (channelService) =>
                 channelService.remove(channel.id),
               ),
             );

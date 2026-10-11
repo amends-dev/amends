@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Connection } from "./connection.ts";
+import * as Connection from "./connection.ts";
 
 /** The outcomes `ConnectionService` reports that a caller can act on; schemas only. */
 
@@ -38,5 +38,3 @@ export class CredentialsUnavailable extends Schema.TaggedError<CredentialsUnavai
   "ConnectionService.CredentialsUnavailable",
   { reason: Schema.String },
 ) {}
-
-export * as ConnectionErrors from "./errors.ts";

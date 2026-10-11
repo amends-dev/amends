@@ -7,11 +7,11 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Subject } from "../journal/subject.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadParticipationId } from "./ThreadParticipationId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { Notification } from "../notification/notification.ts";
+import * as Subject from "../journal/subject.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadParticipationId from "./ThreadParticipationId.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as Notification from "../notification/notification.ts";
 
 /**
  * Names an activity.
@@ -109,5 +109,3 @@ export const Recipient = Schema.Struct({
  * @since 0.1.0
  */
 export interface Recipient extends Schema.Schema.Type<typeof Recipient> {}
-
-export * as ThreadActivity from "./ThreadActivity.ts";

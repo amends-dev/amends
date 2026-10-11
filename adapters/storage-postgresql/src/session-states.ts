@@ -1,7 +1,7 @@
 import { SessionStateStore } from "@amends-dev/core/turn";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
 import { sessionStates } from "./schema.ts";
 
@@ -39,14 +39,14 @@ const agentStateColumn = (agentState: Schema.Json | undefined) =>
  * @category constructors
  */
 export const make = Effect.fn("SessionStates.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const ofParticipation = (participationId: string) =>
     and(
       eq(sessionStates.workspaceId, workspaceId),
       eq(sessionStates.participationId, participationId),
     );
-  const driver: SessionStateStore.Interface = {
+  const driver: SessionStateStore.SessionStateStore["Service"] = {
     get: Effect.fn("SessionStates.get")(
       function* (participationId) {
         const rows = yield* guard(
@@ -89,6 +89,4 @@ export const make = Effect.fn("SessionStates.make")(function* () {
 });
 
 /** Provide session storage over the caller's binding. @category layers */
-export const layer = Layer.effect(SessionStateStore.Service, make());
-
-export * as SessionStates from "./session-states.ts";
+export const layer = Layer.effect(SessionStateStore.SessionStateStore, make());

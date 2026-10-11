@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Workspace } from "../workspace/workspace.ts";
-import { Role } from "./role/role.ts";
+import * as Workspace from "../workspace/workspace.ts";
+import * as Role from "./role/role.ts";
 
 /** The outcomes `Delegation` reports that a caller can act on; schemas only, for contracts. */
 export class Denied extends Schema.TaggedError<Denied>()("Delegation.Denied", {
@@ -19,5 +19,3 @@ export class UnsupportedRole extends Schema.TaggedError<UnsupportedRole>()(
   "Delegation.UnsupportedRole",
   { roleId: Role.Id },
 ) {}
-
-export * as DelegationErrors from "./delegation-errors.ts";

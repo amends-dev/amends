@@ -3,7 +3,8 @@ import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema, Result } from "effect";
 import type { Fixture } from "./fixture.ts";
-import { forWorkspace, otherWorkspaceId, Support, testProvenance, workspaceId } from "./support.ts";
+import * as Support from "./support.ts";
+import { forWorkspace, otherWorkspaceId, testProvenance, workspaceId } from "./support.ts";
 
 const key = Log.IdempotencyKey.make("occurrence/one");
 const executionId = Log.Id.make("execution");
@@ -19,8 +20,8 @@ export const idempotency = (fixture: Fixture) => {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           yield* initialized(bound);
           yield* Effect.gen(function* () {
-            const journal = yield* Journal.Service;
-            const log = (yield* Log.Service).open({ id: executionId, schema: Schema.String });
+            const journal = yield* Journal.Journal;
+            const log = (yield* Log.Log).open({ id: executionId, schema: Schema.String });
             const keyOf = (index: number) => Log.IdempotencyKey.make(`output/${index}`);
             const count = 6_000;
             yield* journal.commit(
@@ -49,7 +50,7 @@ export const idempotency = (fixture: Fixture) => {
                 const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
                 yield* initialized(bound);
                 return yield* Effect.gen(function* () {
-                  const journal = yield* Journal.Service;
+                  const journal = yield* Journal.Journal;
                   const payload = {
                     workspaceId,
                     roleId: Role.Id.make("keyed-role"),
@@ -66,7 +67,7 @@ export const idempotency = (fixture: Fixture) => {
                     _tag: "Some",
                     value: { id: payload.roleId, name: "Keyed" },
                   });
-                  const log = (yield* Log.Service).open({
+                  const log = (yield* Log.Log).open({
                     id: executionId,
                     schema: Schema.String,
                   });
@@ -82,7 +83,7 @@ export const idempotency = (fixture: Fixture) => {
                   expect(batch.map((entry) => entry.index)).toEqual([1, 2]);
                   return { first, batch, payload };
                 }).pipe(
-                  Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                  Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
                   Effect.provide(core(bound)),
                 );
               }),
@@ -90,11 +91,11 @@ export const idempotency = (fixture: Fixture) => {
             const host = yield* storage.connect();
             const bound = yield* forWorkspace(host, workspaceId);
             yield* Effect.gen(function* () {
-              const journal = yield* Journal.Service;
+              const journal = yield* Journal.Journal;
               expect(yield* journal.publish(RoleFacts.Created, original.payload)).toEqual(
                 original.first,
               );
-              const log = (yield* Log.Service).open({ id: executionId, schema: Schema.String });
+              const log = (yield* Log.Log).open({ id: executionId, schema: Schema.String });
               expect(yield* log.getAppend(key)).toEqual(Option.some(original.batch));
               expect(
                 yield* log.appendAll(["one", "two"], { ...options, expectedAfter: Option.none() }),
@@ -112,12 +113,12 @@ export const idempotency = (fixture: Fixture) => {
                 ))._tag,
               ).toBe("JournalStore.Conflict");
             }).pipe(
-              Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+              Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
               Effect.provide(core(bound)),
             );
             const other = yield* forWorkspace(host, otherWorkspaceId);
             yield* Effect.gen(function* () {
-              const log = (yield* Log.Service).open({ id: executionId, schema: Schema.String });
+              const log = (yield* Log.Log).open({ id: executionId, schema: Schema.String });
               expect(yield* log.getAppend(key)).toEqual(Option.none());
               yield* log.append("other workspace", options);
             }).pipe(Effect.provide(core(other)));

@@ -233,12 +233,14 @@ they are read by developers outside this repository, and documentation is genera
 
 - **One module per namespace, named after it.** `ThreadMessageService.ts` exports
   `ThreadMessageService`, flat in the feature directory, as `effect/ai` is flat. Helpers no
-  consumer imports go in `internal/`. The barrel, `index.ts`, documents each export.
+  consumer imports go in `internal/`. The barrel, `index.ts`, documents each export. A module does
+  not re-export itself: the barrel exports it with `export * as`, and modules import one another
+  with `import * as`, so a module's class can carry its name.
 - **A header on every module**: a paragraph saying what the module is for and how it relates to its
   neighbours, then `@since`.
 - **`@category` and `@since` on every export**, with a sentence or more on what it is, except a
-  type that twins a schema, which carries only the tags. A service's `Interface` methods are
-  documented one by one. The categories are `schemas`, `options` for operation inputs and options,
+  type that twins a schema, which carries only the tags. A service is a class named after its
+  module, `ThreadStore.ThreadStore`, with its methods documented one by one in its shape. The categories are `schemas`, `options` for operation inputs and options,
   `models` for types that are not schemas, `errors`, `services`, `constructors`, `layers`,
   `utils`, `facts`, `projections`, `permissions`, and `kinds` for activity kinds.
 - **Examples** where a reader would otherwise have to find a caller: `**Example** (Title)` and a

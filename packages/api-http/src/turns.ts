@@ -3,7 +3,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
-import { ApiErrors } from "./errors.ts";
+import * as ApiErrors from "./errors.ts";
 import { limit } from "./paging.ts";
 
 const turn = { workspaceId: Workspace.Id, turnId: Turn.Id };

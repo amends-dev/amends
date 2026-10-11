@@ -1,14 +1,14 @@
 import { Schema } from "effect";
 import type { DateTime } from "effect";
-import { Identity } from "../identity/identity.ts";
-import { Entry } from "../journal/entry.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { TurnId } from "../turn/id.ts";
-import { DeliveryId } from "../channel/DeliveryId.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Entry from "../journal/entry.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as TurnId from "../turn/id.ts";
+import * as DeliveryId from "../channel/DeliveryId.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
 export type Id = typeof Id.Type;
@@ -152,5 +152,3 @@ export const fromActivity = (
       ? { _tag: "Informational" }
       : { _tag: "Pending" },
 });
-
-export * as Notification from "./notification.ts";

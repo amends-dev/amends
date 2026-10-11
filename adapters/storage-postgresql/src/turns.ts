@@ -6,7 +6,7 @@
 import { Effect, Semaphore } from "effect";
 import type { Duration } from "effect";
 
-export interface Interface {
+export interface PostgresTurns {
   /**
    * Run the effect in its turn among this process's writers with the same key, failing with
    * `onTimeout` instead when its turn does not start within `patience`. Once started, it runs to
@@ -26,7 +26,7 @@ interface Lane {
 }
 
 /** @category constructors */
-export const make = (): Interface => {
+export const make = (): PostgresTurns => {
   // A lane lives while it has writers, so keys never accumulate.
   const lanes = new Map<string, Lane>();
   const join = (key: string) =>
@@ -79,5 +79,3 @@ export const make = (): Interface => {
 
   return { run };
 };
-
-export * as PostgresTurns from "./turns.ts";

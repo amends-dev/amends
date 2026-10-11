@@ -1,7 +1,7 @@
 import { Accounts } from "@amends-dev/gateway";
 import { inArray } from "drizzle-orm";
 import { Crypto, Effect, Layer, Schema } from "effect";
-import { PostgresDatabase } from "./database.ts";
+import * as PostgresDatabase from "./database.ts";
 import { accounts } from "./schema.ts";
 
 const decodeAccounts = Schema.decodeUnknownEffect(Schema.Array(Accounts.Account));
@@ -13,11 +13,11 @@ const decodeAccounts = Schema.decodeUnknownEffect(Schema.Array(Accounts.Account)
  * @category constructors
  */
 export const make = Effect.fn("PostgresAccounts.make")(function* () {
-  const { db } = yield* PostgresDatabase.Service;
+  const { db } = yield* PostgresDatabase.PostgresDatabase;
   const crypto = yield* Crypto.Crypto;
   const toAccounts = (rows: ReadonlyArray<typeof accounts.$inferSelect>) =>
     decodeAccounts(rows.map((row) => ({ id: row.humanId, email: row.email })));
-  return Accounts.Service.of({
+  return Accounts.Accounts.of({
     findOrCreate: Effect.fn("PostgresAccounts.findOrCreate")(function* (email) {
       const humanId = yield* crypto.randomUUIDv4;
       // Updating the address to itself on conflict makes the statement return the existing row.
@@ -42,10 +42,8 @@ export const make = Effect.fn("PostgresAccounts.make")(function* () {
 });
 
 /**
- * Provide Accounts.Service using its constructor and the caller's dependencies.
+ * Provide Accounts.Accounts using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(Accounts.Service, make());
-
-export * as PostgresAccounts from "./accounts.ts";
+export const layer = Layer.effect(Accounts.Accounts, make());

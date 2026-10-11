@@ -53,6 +53,7 @@ import {
 } from "@amends-dev/core/thread";
 import { Gateway } from "@amends-dev/gateway";
 import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema } from "effect";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
@@ -62,7 +63,6 @@ import {
   placedIn,
   replacing,
   runHost,
-  Support,
   testProvenance,
   threadInternals,
   workspaceId,
@@ -90,38 +90,38 @@ describe("thread reads", () => {
   const actorFor = (memberId: Member.Id, workspace = workspaceId) =>
     Actor.Value.make({ workspaceId: workspace, memberId, identity: identityFor(memberId) });
   const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Value) =>
-    effect.pipe(Effect.provideService(Actor.Service, actor));
+    effect.pipe(Effect.provideService(Actor.Actor, actor));
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
     asActor(effect, actor).pipe(Effect.provide(core(bound)));
   const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
   const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
   const get = (id: Thread.Id) =>
-    Effect.flatMap(ThreadService.Service, (threadService) => threadService.get(id));
+    Effect.flatMap(ThreadService.ThreadService, (threadService) => threadService.get(id));
   /** Readable threads of a group as records in ID order; listing order has its own test. */
   const list = (id: Group.Id) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       Effect.map(threadService.listInGroup(id, { limit: 100 }), (items) =>
         items.map((item) => item.thread).toSorted((a, b) => (a.id < b.id ? -1 : 1)),
       ),
     );
   const timeline = (id: Thread.Id, options: ThreadActivityStore.ReadOptions = { limit: 10 }) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.readTimeline(id, options),
     );
   const participants = (id: Thread.Id, options: ThreadParticipation.ListOptions = { limit: 100 }) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.listParticipants(id, options),
     );
   const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
-    Effect.flatMap(GroupService.Service, (groupService) =>
+    Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name, memberIds }),
     );
   const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, mentions, text: "Opening proposal" }),
     );
   const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
@@ -139,7 +139,7 @@ describe("thread reads", () => {
   ) =>
     publish(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
           assignmentId: Assignment.Id.make(
@@ -161,7 +161,7 @@ describe("thread reads", () => {
   const seed = (bound: Bound) =>
     publish(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.gen(function* () {
             for (const memberId of [readerId, otherId, agentId])
@@ -215,7 +215,7 @@ describe("thread reads", () => {
   const append = (bound: Bound, thread: Thread.Record, sequence: number) =>
     publish(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.gen(function* () {
             const time = DateTime.makeUnsafe(10_000 - sequence * 1000);
@@ -279,7 +279,7 @@ describe("thread reads", () => {
             const { bound, reader, group, first, second } = yield* prepare();
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
                   assignmentId: Assignment.Id.make("viewer"),
@@ -376,7 +376,7 @@ describe("thread reads", () => {
             });
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Revoked, {
                   workspaceId,
                   assignmentId: assignment.payload.assignmentId,
@@ -405,7 +405,7 @@ describe("thread reads", () => {
                   Effect.Effect<
                     unknown,
                     ThreadService.ReadError,
-                    ThreadService.Service | Actor.Service
+                    ThreadService.ThreadService | Actor.Actor
                   >
                 > = [get(id), timeline(id), participants(id)];
                 for (const call of calls)
@@ -418,7 +418,7 @@ describe("thread reads", () => {
             );
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(RoleFacts.PermissionsChanged, {
                   workspaceId,
                   roleId: BuiltinRoles.OwnerId,
@@ -561,16 +561,18 @@ describe("thread reads", () => {
               bound,
               reader,
               Effect.gen(function* () {
-                const threadService = yield* ThreadService.Service;
+                const threadService = yield* ThreadService.ThreadService;
                 expect(yield* threadService.get(first.thread.id)).toEqual(first.thread);
                 const admission = Option.getOrThrow(
                   yield* bound.groupMemberships.findActive(group.id, readerId),
                 );
-                yield* Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                  groupMembershipService.leave({
-                    groupId: group.id,
-                    membershipId: admission.id,
-                  }),
+                yield* Effect.flatMap(
+                  GroupMembershipService.GroupMembershipService,
+                  (groupMembershipService) =>
+                    groupMembershipService.leave({
+                      groupId: group.id,
+                      membershipId: admission.id,
+                    }),
                 );
                 expect(yield* Effect.flip(threadService.get(first.thread.id))).toEqual(
                   new ThreadService.NotFound({ threadId: first.thread.id }),
@@ -581,8 +583,10 @@ describe("thread reads", () => {
                   _tag: "ThreadService.GroupNotFound",
                 });
                 yield* asActor(
-                  Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                    groupMembershipService.add({ groupId: group.id, memberId: readerId }),
+                  Effect.flatMap(
+                    GroupMembershipService.GroupMembershipService,
+                    (groupMembershipService) =>
+                      groupMembershipService.add({ groupId: group.id, memberId: readerId }),
                   ),
                   owner,
                 );
@@ -595,13 +599,13 @@ describe("thread reads", () => {
                   })).some((p) => ThreadParticipation.memberOf(p.participant) === readerId),
                 ).toBe(false);
                 yield* asActor(
-                  Effect.flatMap(MemberService.Service, (memberService) =>
+                  Effect.flatMap(MemberService.MemberService, (memberService) =>
                     memberService.remove(readerId),
                   ),
                   owner,
                 );
                 const calls: ReadonlyArray<
-                  Effect.Effect<unknown, ThreadService.ReadError, Actor.Service>
+                  Effect.Effect<unknown, ThreadService.ReadError, Actor.Actor>
                 > = [
                   threadService.get(first.thread.id),
                   threadService.listInGroup(group.id, { limit: 100 }),
@@ -630,7 +634,7 @@ describe("thread reads", () => {
             const roleId = Role.Id.make("conversation-reader");
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
                   Effect.gen(function* () {
                     yield* journal.publish(RoleFacts.Created, {
@@ -653,11 +657,11 @@ describe("thread reads", () => {
             const readOnly = {
               ...bound,
               context: bound.context.pipe(
-                Context.add(Store.Service, {
+                Context.add(Store.Store, {
                   ...bound.store,
                   transaction: () => Effect.die("Read opened a transaction"),
                 }),
-                Context.add(Checkpoint.Service, {
+                Context.add(Checkpoint.Checkpoint, {
                   ...bound.checkpoints,
                   set: () => Effect.die("Read advanced a checkpoint"),
                 }),
@@ -668,11 +672,13 @@ describe("thread reads", () => {
               reader,
               Effect.gen(function* () {
                 expectTypeOf<
-                  Effect.Services<ReturnType<ThreadService.Interface["get"]>>
-                >().toEqualTypeOf<Actor.Service>();
+                  Effect.Services<ReturnType<ThreadService.ThreadService["Service"]["get"]>>
+                >().toEqualTypeOf<Actor.Actor>();
                 expectTypeOf<
-                  Effect.Services<ReturnType<ThreadService.Interface["readTimeline"]>>
-                >().toEqualTypeOf<Actor.Service>();
+                  Effect.Services<
+                    ReturnType<ThreadService.ThreadService["Service"]["readTimeline"]>
+                  >
+                >().toEqualTypeOf<Actor.Actor>();
                 yield* get(first.thread.id);
                 yield* list(group.id);
                 yield* timeline(first.thread.id);
@@ -684,10 +690,10 @@ describe("thread reads", () => {
               bound,
               reader,
               Effect.gen(function* () {
-                const threadService = yield* ThreadService.Service;
+                const threadService = yield* ThreadService.ThreadService;
                 yield* publish(
                   bound,
-                  Effect.flatMap(Journal.Service, (journal) =>
+                  Effect.flatMap(Journal.Journal, (journal) =>
                     journal.publish(RoleFacts.PermissionsChanged, {
                       workspaceId,
                       roleId,
@@ -719,7 +725,7 @@ describe("thread reads", () => {
             const admission = Option.getOrThrow(
               yield* bound.groupMemberships.findActive(group.id, readerId),
             );
-            const outer = Effect.flatMap(Journal.Service, (journal) =>
+            const outer = Effect.flatMap(Journal.Journal, (journal) =>
               journal.commit(
                 Effect.gen(function* () {
                   const message: ThreadMessage.Record = {
@@ -802,7 +808,7 @@ describe("thread reads", () => {
             });
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(MemberFacts.Added, {
                   workspaceId,
                   memberId,
@@ -819,8 +825,10 @@ describe("thread reads", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.add({ groupId: group.id, memberId }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId }),
               ),
             );
             expect(yield* run(bound, visitor, timeline(first.thread.id))).toHaveLength(1);
@@ -853,7 +861,7 @@ describe("thread reads", () => {
             const { bound, owner, first, second } = yield* prepare();
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(MemberFacts.Removed, { workspaceId, memberId: agentId }),
               ),
             );
@@ -891,7 +899,7 @@ describe("thread reads", () => {
         runGateway(
           storage,
           Effect.gen(function* () {
-            const gateway = yield* Gateway.Service;
+            const gateway = yield* Gateway.Gateway;
             const workspace = yield* gateway.createWorkspace(Identity.HumanId.make("owner"), {
               name: "Workspace",
               memberName: "owner",
@@ -964,7 +972,7 @@ describe("thread reads", () => {
           const before = yield* history(bound);
           const failing = {
             ...bound,
-            context: Context.add(bound.context, ThreadActivityStore.Service, {
+            context: Context.add(bound.context, ThreadActivityStore.ThreadActivityStore, {
               ...bound.activities,
               readPage: () =>
                 Effect.fail(
@@ -1120,11 +1128,13 @@ describe("thread reads", () => {
             yield* run(
               bound,
               reader,
-              Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
-                threadParticipationService.unfollow({
-                  threadId: second.thread.id,
-                  participationId: own.id,
-                }),
+              Effect.flatMap(
+                ThreadParticipationService.ThreadParticipationService,
+                (threadParticipationService) =>
+                  threadParticipationService.unfollow({
+                    threadId: second.thread.id,
+                    participationId: own.id,
+                  }),
               ),
             );
             const active = byId((yield* all()).filter((p) => p.status === "active"));
@@ -1176,11 +1186,13 @@ describe("thread reads", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.remove({
-                  groupId: group.id,
-                  membershipId: admission.id,
-                }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.remove({
+                    groupId: group.id,
+                    membershipId: admission.id,
+                  }),
               ),
             );
             const current = (yield* bound.groupMemberships.listByGroup(group.id)).filter(
@@ -1220,7 +1232,7 @@ describe("thread reads", () => {
           );
           const oldAdmission = {
             ...bound,
-            context: Context.add(bound.context, GroupMembershipStore.Service, {
+            context: Context.add(bound.context, GroupMembershipStore.GroupMembershipStore, {
               ...bound.groupMemberships,
               ...replacing(
                 bound.groupMemberships,
@@ -1268,7 +1280,7 @@ describe("thread reads", () => {
           );
           const firstLapsed = {
             ...bound,
-            context: Context.add(bound.context, GroupMembershipStore.Service, {
+            context: Context.add(bound.context, GroupMembershipStore.GroupMembershipStore, {
               ...bound.groupMemberships,
               ...replacing(
                 bound.groupMemberships,
@@ -1323,9 +1335,9 @@ describe("thread reads", () => {
               details: K["details"]["Type"],
               expectedSequence?: number,
             ) =>
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
-                  Effect.flatMap(ThreadCommand.Service, (threadCommand) =>
+                  Effect.flatMap(ThreadCommand.ThreadCommand, (threadCommand) =>
                     threadCommand.publishActivity({
                       thread: first.thread,
                       occurredAt: DateTime.makeUnsafe("2026-09-24T12:00:00.000Z"),
@@ -1342,7 +1354,7 @@ describe("thread reads", () => {
                   ),
                 ),
               ).pipe(
-                Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
                 Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
               );
             const at = DateTime.makeUnsafe("2026-09-24T11:00:00.000Z");
@@ -1412,9 +1424,9 @@ describe("thread reads", () => {
               ),
               Layer.provideMerge(core(bound)),
             );
-            const items = yield* Effect.flatMap(ThreadQuery.Service, (threadQuery) =>
+            const items = yield* Effect.flatMap(ThreadQuery.ThreadQuery, (threadQuery) =>
               threadQuery.readTimeline(first.thread.id, { limit: 10 }),
-            ).pipe(Effect.provideService(Actor.Service, owner), Effect.provide(reading));
+            ).pipe(Effect.provideService(Actor.Actor, owner), Effect.provide(reading));
             expect(items.map((item) => item.activity.kind)).toEqual([
               ThreadMessageActivity.Published.name,
               "test.noted",
@@ -1431,7 +1443,7 @@ describe("thread reads", () => {
             // Rebuilding restores the same rows from the recorded facts.
             const rows = yield* bound.activities.listByThread(first.thread.id);
             yield* storage.discardProjections;
-            yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+            yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
               Effect.provide(core(bound)),
             );
             expect(yield* bound.activities.listByThread(first.thread.id)).toEqual(rows);

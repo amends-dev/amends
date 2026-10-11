@@ -9,13 +9,13 @@
  * messages, which its session log keeps as it was told.
  */
 import { Prompt } from "effect/ai";
-import type { Identity } from "../identity/identity.ts";
-import { Task } from "../task/Task.ts";
-import type { Thread } from "../thread/Thread.ts";
-import type { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
-import { ThreadMessage } from "../thread/ThreadMessage.ts";
-import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
-import type { Member } from "../workspace/member/member.ts";
+import type * as Identity from "../identity/identity.ts";
+import * as Task from "../task/Task.ts";
+import type * as Thread from "../thread/Thread.ts";
+import type * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
+import * as ThreadMessage from "../thread/ThreadMessage.ts";
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
+import type * as Member from "../workspace/member/member.ts";
 
 /** A message of the thread as the agent is told it, for the conversation it joins. */
 export interface Input {
@@ -284,5 +284,3 @@ const userMessageOf = (texts: ReadonlyArray<string>): Prompt.UserMessage =>
 /** What the agent said, as its answer, each text one part. */
 const assistantMessageOf = (texts: ReadonlyArray<string>): Prompt.AssistantMessage =>
   Prompt.makeMessage("assistant", { content: textParts(texts) });
-
-export * as TurnPrompt from "./prompt.ts";

@@ -9,12 +9,12 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Connection } from "../connection/connection.ts";
-import { GroupId } from "../group/id.ts";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { ChannelId } from "./ChannelId.ts";
+import * as Connection from "../connection/connection.ts";
+import * as GroupId from "../group/id.ts";
+import * as Text from "../text/text.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as ChannelId from "./ChannelId.ts";
 
 /**
  * Names a channel; `ChannelId.Id`, where models that only refer to channels import it from.
@@ -167,5 +167,3 @@ export const Reference = Schema.Struct({ workspaceId: WorkspaceId.Id, channelId:
  * @since 0.1.0
  */
 export interface Reference extends Schema.Schema.Type<typeof Reference> {}
-
-export * as Channel from "./Channel.ts";

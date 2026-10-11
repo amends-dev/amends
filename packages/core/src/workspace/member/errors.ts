@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Member } from "./member.ts";
-import { Workspace } from "../workspace.ts";
+import * as Member from "./member.ts";
+import * as Workspace from "../workspace.ts";
 
 /** The outcomes `MemberService` reports that a caller can act on; schemas only, for contracts. */
 export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
@@ -15,5 +15,3 @@ export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()(
   "MemberService.OwnerProtected",
   { workspaceId: Workspace.Id, memberId: Member.Id },
 ) {}
-
-export * as MemberErrors from "./errors.ts";

@@ -1,11 +1,11 @@
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../../journal/store.ts";
+import type * as Store from "../../journal/store.ts";
 
-import { Role } from "./role.ts";
-import { StoreInput } from "../../journal/StoreInput.ts";
-import type { WorkspaceId } from "../../workspace/id.ts";
-import { BuiltinRoles } from "./builtin.ts";
+import * as Role from "./role.ts";
+import * as StoreInput from "../../journal/StoreInput.ts";
+import type * as WorkspaceId from "../../workspace/id.ts";
+import * as BuiltinRoles from "./builtin.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("RoleStore.Failure", {
   operation: Schema.String,
@@ -28,53 +28,52 @@ export class Conflict extends Schema.TaggedError<Conflict>()("RoleStore.Conflict
  * Permission definitions, affected assignments, and grant authority are checked
  * by services before publication.
  *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  /** Find a role in this workspace; None if absent. */
-  readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Record>, Failure>;
+export class RoleStore extends Context.Service<
+  RoleStore,
+  {
+    /** Find a role in this workspace; None if absent. */
+    readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Record>, Failure>;
 
-  /**
-   * Fail with Conflict for a reused role ID. Never upsert.
-   */
-  readonly insert: (
-    record: Role.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Fail with Conflict for a reused role ID. Never upsert.
+     */
+    readonly insert: (
+      record: Role.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
-  /**
-   * Change only the display name. Fail with Conflict if the role is absent in this workspace.
-   */
-  readonly rename: (
-    roleId: Role.Id,
-    name: Role.Record["name"],
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Change only the display name. Fail with Conflict if the role is absent in this workspace.
+     */
+    readonly rename: (
+      roleId: Role.Id,
+      name: Role.Record["name"],
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
-  /**
-   * Replace the complete permission list, retaining the ID, workspace, and name.
-   * An empty list is valid. Fail with Conflict if the role is absent in this workspace.
-   */
-  readonly setPermissions: (
-    roleId: Role.Id,
-    permissions: Role.Record["permissions"],
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Replace the complete permission list, retaining the ID, workspace, and name.
+     * An empty list is valid. Fail with Conflict if the role is absent in this workspace.
+     */
+    readonly setPermissions: (
+      roleId: Role.Id,
+      permissions: Role.Record["permissions"],
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
-  /** The built-in bundle revision the workspace's roles hold; None before one is recorded. */
-  readonly builtinRevision: Effect.Effect<Option.Option<number>, Failure>;
+    /** The built-in bundle revision the workspace's roles hold; None before one is recorded. */
+    readonly builtinRevision: Effect.Effect<Option.Option<number>, Failure>;
 
-  /**
-   * Record a later built-in bundle revision. Fail with Conflict for one not later than the
-   * recorded revision.
-   */
-  readonly recordBuiltinRevision: (
-    revision: number,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/authorization/role-store/Service",
-) {}
+    /**
+     * Record a later built-in bundle revision. Fail with Conflict for one not later than the
+     * recorded revision.
+     */
+    readonly recordBuiltinRevision: (
+      revision: number,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/authorization/role-store/Service") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -83,7 +82,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: RoleStore["Service"],
+): RoleStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -109,5 +111,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       ),
   };
 };
-
-export * as RoleStore from "./store.ts";

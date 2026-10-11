@@ -1,10 +1,10 @@
 import { Connection as ConnectionContract } from "@amends-dev/connection";
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
+import type * as Store from "../journal/store.ts";
 
-import { Connection } from "./connection.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
+import * as Connection from "./connection.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("ConnectionCredentialStore.Failure", {
   operation: Schema.String,
@@ -23,27 +23,28 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()(
  * stored together or not at all. An adapter protects credentials at rest as its storage allows,
  * bound to the connection they belong to; reads return them only to the server.
  *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  /** Store the connection's credential, in place of any it had. */
-  readonly set: (
-    connectionId: Connection.Id,
-    credential: ConnectionContract.Credential,
-  ) => Effect.Effect<void, Failure | Unavailable, Store.Transaction>;
-  /** The connection's credential, for using it. No operation returns one to a reader. */
-  readonly get: (
-    connectionId: Connection.Id,
-  ) => Effect.Effect<Option.Option<ConnectionContract.Credential>, Failure | Unavailable>;
-  /** Delete the connection's credential; one already gone is left so. */
-  readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, Failure, Store.Transaction>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/connection/credential-store/Service",
-) {}
+export class ConnectionCredentialStore extends Context.Service<
+  ConnectionCredentialStore,
+  {
+    /** Store the connection's credential, in place of any it had. */
+    readonly set: (
+      connectionId: Connection.Id,
+      credential: ConnectionContract.Credential,
+    ) => Effect.Effect<void, Failure | Unavailable, Store.Transaction>;
+    /** The connection's credential, for using it. No operation returns one to a reader. */
+    readonly get: (
+      connectionId: Connection.Id,
+    ) => Effect.Effect<Option.Option<ConnectionContract.Credential>, Failure | Unavailable>;
+    /** Delete the connection's credential; one already gone is left so. */
+    readonly remove: (
+      connectionId: Connection.Id,
+    ) => Effect.Effect<void, Failure, Store.Transaction>;
+  }
+>()("@amends-dev/core/connection/credential-store/Service") {}
 
 /**
  * The store over a driver: each input is checked against its schema before the driver sees it.
@@ -51,7 +52,9 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (driver: Interface): Interface => {
+export const make = (
+  driver: ConnectionCredentialStore["Service"],
+): ConnectionCredentialStore["Service"] => {
   const read = StoreInput.read(Failure);
   return {
     set: Effect.fn("ConnectionCredentialStore.set")(function* (connectionId, credential) {
@@ -65,5 +68,3 @@ export const make = (driver: Interface): Interface => {
       Effect.flatMap(read("remove", Connection.Id, connectionId), driver.remove),
   };
 };
-
-export * as ConnectionCredentialStore from "./credential-store.ts";

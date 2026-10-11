@@ -1,4 +1,4 @@
-import { Permission } from "../authorization/permission.ts";
+import * as Permission from "../authorization/permission.ts";
 
 /**
  * Adding an agent adds its membership, so the actor must also be able to grant the role it starts
@@ -26,5 +26,3 @@ export const Configure = Permission.make("agent.configure", {
  * group, and retrying its turns. It keeps the name it had before agents, as it means the same.
  */
 export const Use = Permission.make("agent.use", { targetKind: "Member", builtinTier: "member" });
-
-export * as AgentPermissions from "./permissions.ts";

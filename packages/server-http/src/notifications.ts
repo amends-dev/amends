@@ -14,14 +14,14 @@ export const layer = HttpApiBuilder.group(
   Api,
   "notifications",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
+    const gateway = yield* Gateway.Gateway;
     return handlers.handleAll({
       inbox: ({ params, query }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
+            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
               notificationService.inbox(query),
             ),
           ),
@@ -31,7 +31,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
+            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
               Effect.map(notificationService.countPending, (pending) => ({ pending })),
             ),
           ),
@@ -41,7 +41,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
+            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
               Effect.map(notificationService.markSeenThrough(payload.through), (marked) => ({
                 marked,
               })),
@@ -53,7 +53,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
+            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
               notificationService.markSeen(params.notificationId),
             ),
           ),
@@ -61,5 +61,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 );
-
-export * as NotificationsHandlers from "./notifications.ts";

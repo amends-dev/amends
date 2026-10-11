@@ -4,8 +4,8 @@ import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option, Stream } from "effect";
 import { Prompt } from "effect/ai";
-import { TurnRunner } from "../../src/turns/runner.ts";
-import { SessionLogWriter } from "../../src/turns/session-log-writer.ts";
+import * as TurnRunner from "../../src/turns/runner.ts";
+import * as SessionLogWriter from "../../src/turns/session-log-writer.ts";
 import {
   type FakeWorkspace,
   type FakeWorkspaceOptions,
@@ -40,7 +40,7 @@ const runnerFor = (
       agentOptions,
     );
     const services = Layer.merge(
-      Layer.succeed(Gateway.Service, workspace.gateway),
+      Layer.succeed(Gateway.Gateway, workspace.gateway),
       integrationsFor(scripted.agent),
     );
     const turnRunner = yield* Effect.provide(TurnRunner.make(job), services);

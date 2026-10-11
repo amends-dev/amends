@@ -1,8 +1,8 @@
 import { Schema } from "effect";
-import { GroupId } from "../id.ts";
-import { GroupMembership } from "../membership/membership.ts";
-import { MemberId } from "../../workspace/member/id.ts";
-import { WorkspaceId } from "../../workspace/id.ts";
+import * as GroupId from "../id.ts";
+import * as GroupMembership from "../membership/membership.ts";
+import * as MemberId from "../../workspace/member/id.ts";
+import * as WorkspaceId from "../../workspace/id.ts";
 
 /** Identifies one period of following; following again after unfollowing uses a fresh ID. */
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupFollowId"));
@@ -47,5 +47,3 @@ export const Ending = Schema.Struct({
 });
 
 export interface Ending extends Schema.Schema.Type<typeof Ending> {}
-
-export * as GroupFollow from "./follow.ts";

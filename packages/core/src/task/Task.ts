@@ -8,14 +8,14 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { Notification } from "../notification/notification.ts";
-import type { ThreadActivity } from "../thread/ThreadActivity.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadMessage } from "../thread/ThreadMessage.ts";
-import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
+import * as GroupId from "../group/id.ts";
+import * as Notification from "../notification/notification.ts";
+import type * as ThreadActivity from "../thread/ThreadActivity.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadMessage from "../thread/ThreadMessage.ts";
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
 
 /**
  * Where a task stands: awaiting a decision in `triage`, being worked in `todo` and `doing`, set
@@ -286,5 +286,3 @@ export const recipients = (
     ];
   });
 };
-
-export * as Task from "./Task.ts";

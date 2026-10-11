@@ -8,15 +8,15 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadMessageId } from "./ThreadMessageId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { Identity } from "../identity/identity.ts";
-import { Text as Characters } from "../text/text.ts";
-import { ChannelId } from "../channel/ChannelId.ts";
-import { TurnId } from "../turn/id.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadMessageId from "./ThreadMessageId.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Characters from "../text/text.ts";
+import * as ChannelId from "../channel/ChannelId.ts";
+import * as TurnId from "../turn/id.ts";
 
 /**
  * Names a message; `ThreadMessageId.Id`, where models that only refer to messages import it from.
@@ -283,5 +283,3 @@ export const Deleted = Schema.Struct({
  * @since 0.1.0
  */
 export interface Deleted extends Schema.Schema.Type<typeof Deleted> {}
-
-export * as ThreadMessage from "./ThreadMessage.ts";

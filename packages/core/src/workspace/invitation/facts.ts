@@ -1,9 +1,9 @@
-import { Subject } from "../../journal/subject.ts";
+import * as Subject from "../../journal/subject.ts";
 import { Schema } from "effect";
-import { Audience } from "../../journal/audience.ts";
-import { Fact } from "../../journal/fact.ts";
-import { Invitation } from "./invitation.ts";
-import { Workspace } from "../workspace.ts";
+import * as Audience from "../../journal/audience.ts";
+import * as Fact from "../../journal/fact.ts";
+import * as Invitation from "./invitation.ts";
+import * as Workspace from "../workspace.ts";
 
 export const Issued = Fact.make("workspace.invitation.issued", {
   audience: () => [Audience.workspace],
@@ -34,5 +34,3 @@ export const Revoked = Fact.make("workspace.invitation.revoked", {
   }),
   occurrence: (payload) => [payload.invitationId],
 });
-
-export * as InvitationFacts from "./facts.ts";

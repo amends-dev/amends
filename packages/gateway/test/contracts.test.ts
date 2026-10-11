@@ -1,8 +1,8 @@
 import { expect, it } from "@effect/vitest";
 import { Identity } from "@amends-dev/core/identity";
 import { Schema } from "effect";
-import { WorkspaceDirectory } from "../src/directory.ts";
-import { SignIn } from "../src/sign-in.ts";
+import * as WorkspaceDirectory from "../src/directory.ts";
+import * as SignIn from "../src/sign-in.ts";
 
 it("saved sessions round-trip their token and account through JSON", () => {
   const stored = { token: "session-token", account: { id: "human-one", email: "jo@mercier.co" } };

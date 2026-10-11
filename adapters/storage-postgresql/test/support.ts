@@ -47,25 +47,27 @@ export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
-  context: Context.Context<WorkspaceStorage.Bindings | TurnJobs.Service | DeliveryJobs.Service>,
+  context: Context.Context<
+    WorkspaceStorage.Bindings | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs
+  >,
 ) => ({
   context,
-  threads: Context.get(context, ThreadStore.Service),
-  participations: Context.get(context, ThreadParticipationStore.Service),
-  messages: Context.get(context, ThreadMessageStore.Service),
-  activities: Context.get(context, ThreadActivityStore.Service),
-  store: Context.get(context, Store.Service),
-  checkpoints: Context.get(context, Checkpoint.Service),
-  workspace: Context.get(context, WorkspaceStore.Service),
-  members: Context.get(context, MemberStore.Service),
-  roles: Context.get(context, RoleStore.Service),
-  assignments: Context.get(context, AssignmentStore.Service),
-  invitations: Context.get(context, InvitationStore.Service),
-  notifications: Context.get(context, NotificationStore.Service),
-  groups: Context.get(context, GroupStore.Service),
-  groupMemberships: Context.get(context, GroupMembershipStore.Service),
-  groupFollows: Context.get(context, GroupFollowStore.Service),
-  readStates: Context.get(context, ReadStateStore.Service),
+  threads: Context.get(context, ThreadStore.ThreadStore),
+  participations: Context.get(context, ThreadParticipationStore.ThreadParticipationStore),
+  messages: Context.get(context, ThreadMessageStore.ThreadMessageStore),
+  activities: Context.get(context, ThreadActivityStore.ThreadActivityStore),
+  store: Context.get(context, Store.Store),
+  checkpoints: Context.get(context, Checkpoint.Checkpoint),
+  workspace: Context.get(context, WorkspaceStore.WorkspaceStore),
+  members: Context.get(context, MemberStore.MemberStore),
+  roles: Context.get(context, RoleStore.RoleStore),
+  assignments: Context.get(context, AssignmentStore.AssignmentStore),
+  invitations: Context.get(context, InvitationStore.InvitationStore),
+  notifications: Context.get(context, NotificationStore.NotificationStore),
+  groups: Context.get(context, GroupStore.GroupStore),
+  groupMemberships: Context.get(context, GroupMembershipStore.GroupMembershipStore),
+  groupFollows: Context.get(context, GroupFollowStore.GroupFollowStore),
+  readStates: Context.get(context, ReadStateStore.ReadStateStore),
 });
 export type Bound = ReturnType<typeof bind>;
 /** Workspace views over the database in context, each with its signals. */
@@ -77,8 +79,8 @@ export const views = (options: PostgresWorkspaceStorage.Options = {}) =>
         Effect.map(service.forWorkspace(workspaceId), (context) =>
           bind(
             context.pipe(
-              Context.add(TurnJobs.Service, TurnJobs.noRunner),
-              Context.add(DeliveryJobs.Service, DeliveryJobs.noRunner),
+              Context.add(TurnJobs.TurnJobs, TurnJobs.noRunner),
+              Context.add(DeliveryJobs.DeliveryJobs, DeliveryJobs.noRunner),
             ),
           ),
         ),
@@ -98,7 +100,7 @@ export const core = (bound: Bound) =>
   );
 export const inDatabase = <A, E>(
   url: string,
-  program: Effect.Effect<A, E, PostgresDatabase.Service | SqlClient.SqlClient>,
+  program: Effect.Effect<A, E, PostgresDatabase.PostgresDatabase | SqlClient.SqlClient>,
 ) => program.pipe(Effect.provide(database(url)));
 export const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator, {

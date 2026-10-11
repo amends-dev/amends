@@ -10,7 +10,7 @@ import { PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, Context, Duration, Effect, Exit, Layer, Option, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
-import { LocalHost } from "../src/host.ts";
+import * as LocalHost from "../src/host.ts";
 import { setup } from "./database.ts";
 
 const { available, withDatabase } = setup();
@@ -26,15 +26,15 @@ const job: TurnJobs.Job = {
  */
 const acceptingNothing = (ran: (workspaceId: Workspace.Id) => void) => {
   const unexpected = () => Effect.die("Only accepting work is expected");
-  return Gateway.Service.of({
+  return Gateway.Gateway.of({
     createWorkspace: unexpected,
     asMember: unexpected,
     inWorkspace: (workspaceId, program) =>
       Effect.provideContext(
         program,
         Context.make(
-          TurnExecution.Service,
-          TurnExecution.Service.of({
+          TurnExecution.TurnExecution,
+          TurnExecution.TurnExecution.of({
             accept: () => Effect.sync(() => ran(workspaceId)).pipe(Effect.as(Option.none())),
             start: unexpected,
             joinedConversation: unexpected,
@@ -45,8 +45,8 @@ const acceptingNothing = (ran: (workspaceId: Workspace.Id) => void) => {
           }),
         ).pipe(
           Context.add(
-            SessionLogStore.Service,
-            SessionLogStore.Service.of({
+            SessionLogStore.SessionLogStore,
+            SessionLogStore.SessionLogStore.of({
               head: unexpected,
               append: unexpected,
               read: unexpected,
@@ -60,13 +60,13 @@ const acceptingNothing = (ran: (workspaceId: Workspace.Id) => void) => {
 
 /** Turn jobs over the host's database and cluster, through `gateway`. */
 const turnJobs = (
-  gateway: Gateway.Interface,
+  gateway: Gateway.Gateway["Service"],
   database: ReturnType<typeof LocalHost.layerDatabase>,
 ) =>
   TurnJob.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
-        Layer.succeed(Gateway.Service, gateway),
+        Layer.succeed(Gateway.Gateway, gateway),
         Layer.effect(Integrations.Integrations, Integrations.make([])),
         BunCrypto.layer,
       ),
@@ -90,8 +90,8 @@ describe.skipIf(!available)("jobs on the local host", () => {
             ),
           );
           const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provide(context));
-          const store = Context.get(yield* storage.forWorkspace(job.workspaceId), Store.Service);
-          const requests = Context.get(context, TurnJobs.Service);
+          const store = Context.get(yield* storage.forWorkspace(job.workspaceId), Store.Store);
+          const requests = Context.get(context, TurnJobs.TurnJobs);
           const stored = Effect.flatMap(
             SqlClient.SqlClient,
             (sql) => sql<{ readonly count: number }>`
@@ -136,8 +136,8 @@ describe.skipIf(!available)("jobs on the local host", () => {
             ),
           );
           const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provide(context));
-          const store = Context.get(yield* storage.forWorkspace(job.workspaceId), Store.Service);
-          const requests = Context.get(context, TurnJobs.Service);
+          const store = Context.get(yield* storage.forWorkspace(job.workspaceId), Store.Store);
+          const requests = Context.get(context, TurnJobs.TurnJobs);
           // A commit goes on after it makes a request, as a real one does with its later facts
           // and staged writes, so Cluster's own look comes before the request is there to find.
           for (let commit = 1; commit <= 5; commit++) {
@@ -194,7 +194,7 @@ describe.skipIf(!available)("jobs on the local host", () => {
             );
           const first = yield* Layer.build(runner("first", 34471));
           yield* Layer.build(runner("second", 34472));
-          const requests = Context.get(first, TurnJobs.Service);
+          const requests = Context.get(first, TurnJobs.TurnJobs);
           const workspaces = Array.from({ length: 20 }, (_, index) =>
             Workspace.Id.make(`workspace-${index}`),
           );

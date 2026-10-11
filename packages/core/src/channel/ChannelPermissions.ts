@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Permission } from "../authorization/permission.ts";
+import * as Permission from "../authorization/permission.ts";
 
 /**
  * Create a channel: give a connection's channel transport a destination group in the workspace.
@@ -38,5 +38,3 @@ export const Manage = Permission.make("channel.manage", {
   targetKind: "Channel",
   builtinTier: "administrator",
 });
-
-export * as ChannelPermissions from "./ChannelPermissions.ts";

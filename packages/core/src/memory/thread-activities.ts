@@ -1,8 +1,8 @@
 import { Thread, ThreadActivity, ThreadActivityStore } from "../thread/index.ts";
 import { Array, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(ThreadActivity.Record));
 const bySequence = (left: ThreadActivity.Record, right: ThreadActivity.Record) =>
@@ -10,12 +10,12 @@ const bySequence = (left: ThreadActivity.Record, right: ThreadActivity.Record) =
 
 /** Workspace-bound thread-activities projection storage. @category constructors */
 export const make = Effect.fn("ThreadActivities.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const inThread = Effect.fnUntraced(function* (threadId: Thread.Id) {
     const records = yield* rows.all((yield* read).records.of("threadActivities"));
     return records.filter((record) => record.threadId === threadId).toSorted(bySequence);
   });
-  const driver: ThreadActivityStore.Interface = {
+  const driver: ThreadActivityStore.ThreadActivityStore["Service"] = {
     get: Effect.fn("ThreadActivities.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("threadActivities"), id);
@@ -90,5 +90,4 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
   return ThreadActivityStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadActivityStore.Service, make());
-export * as ThreadActivities from "./thread-activities.ts";
+export const layer = Layer.effect(ThreadActivityStore.ThreadActivityStore, make());

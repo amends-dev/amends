@@ -1,4 +1,4 @@
-import { Permission } from "../authorization/permission.ts";
+import * as Permission from "../authorization/permission.ts";
 
 /** Adding a connection gives the workspace access to an external system. */
 export const Create = Permission.make("connection.create", {
@@ -29,5 +29,3 @@ export const Use = Permission.make("connection.use", {
   targetKind: "Connection",
   builtinTier: "member",
 });
-
-export * as ConnectionPermissions from "./permissions.ts";

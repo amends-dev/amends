@@ -10,9 +10,10 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Result } from "effect";
 
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
 
-import { alice, bob, boundTo, charlie, failingLate, future, request, Support } from "./support.ts";
+import * as Support from "./support.ts";
+import { alice, bob, boundTo, charlie, failingLate, future, request } from "./support.ts";
 
 /** Assigning, changing, and revoking access, and delegation limits. */
 
@@ -194,7 +195,7 @@ describe("assignments", () => {
             const ownerAssignment = ownerAccess.assignments[0];
             const adminAssignment = adminAccess.assignments[0];
             if (!ownerAssignment || !adminAssignment) throw new Error("Missing initial assignment");
-            const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Gateway.Service>> = [
+            const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Gateway.Gateway>> = [
               Operations.assign(workspace.id, charlie, {
                 memberId: viewer.id,
                 roleId: BuiltinRoles.AdministratorId,
@@ -316,15 +317,17 @@ describe("assignments", () => {
             cause: "injected late failure",
           });
           const broken = failingLate(bound, failure);
-          const rejected = yield* Effect.flatMap(AssignmentService.Service, (assignmentService) =>
-            assignmentService.change({
-              memberId: viewer.id,
-              roleId: BuiltinRoles.AdministratorId,
-              expectedAssignmentIds: active.map(({ id }) => id),
-            }),
+          const rejected = yield* Effect.flatMap(
+            AssignmentService.AssignmentService,
+            (assignmentService) =>
+              assignmentService.change({
+                memberId: viewer.id,
+                roleId: BuiltinRoles.AdministratorId,
+                expectedAssignmentIds: active.map(({ id }) => id),
+              }),
           ).pipe(
             Effect.provide(core(broken)),
-            Effect.provideService(Actor.Service, {
+            Effect.provideService(Actor.Actor, {
               workspaceId: workspace.id,
               memberId: workspace.ownerMemberId,
               identity: alice,

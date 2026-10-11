@@ -2,7 +2,7 @@ import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { inIds } from "./id-list.ts";
 import { insertChunked } from "./parameters.ts";
@@ -91,7 +91,7 @@ const inboxOf = (recipient: Notification.Recipient) =>
  * @category constructors
  */
 export const make = Effect.fn("Notifications.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(notifications.workspaceId, workspaceId);
   const orderedId = sql`${notifications.id} COLLATE "C"`;
@@ -197,7 +197,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
     ).pipe(Effect.mapError(storeError(NotificationStore, operation)));
   });
 
-  const driver: NotificationStore.Interface = {
+  const driver: NotificationStore.NotificationStore["Service"] = {
     get: Effect.fn("Notifications.get")(
       function* (requestedId) {
         return yield* guard(
@@ -433,10 +433,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
 });
 
 /**
- * Provide NotificationStore.Service using its constructor and the caller's dependencies.
+ * Provide NotificationStore.NotificationStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(NotificationStore.Service, make());
-
-export * as Notifications from "./notifications.ts";
+export const layer = Layer.effect(NotificationStore.NotificationStore, make());

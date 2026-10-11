@@ -1,16 +1,16 @@
 import { Subject } from "@amends-dev/core/journal";
-import { Publication } from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Cause, Context, Effect, Exit, Layer, Option, Ref, Schema } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Store } from "../../src/journal/store.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Fact from "../../src/journal/fact.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Projection from "../../src/journal/projection.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
+import * as Transaction from "../../src/journal/transaction.ts";
 import { Counter, make } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
@@ -61,16 +61,16 @@ it.effect.each(["make", "layer"] as const)(
       expectTypeOf<Layer.Services<typeof fromArray>>().toEqualTypeOf<
         Layer.Services<typeof configured>
       >();
-      expectTypeOf<Layer.Success<typeof configured>>().toEqualTypeOf<Journal.Service>();
+      expectTypeOf<Layer.Success<typeof configured>>().toEqualTypeOf<Journal.Journal>();
       expectTypeOf<Layer.Services<typeof configured>>().toEqualTypeOf<
-        Log.Service | Transaction.Service | Checkpoint.Service | Counter | Audit
+        Log.Log | Transaction.Transaction | Checkpoint.Checkpoint | Counter | Audit
       >();
-      expectTypeOf<
-        Effect.Success<ReturnType<typeof Journal.make>>
-      >().toEqualTypeOf<Journal.Interface>();
+      expectTypeOf<Effect.Success<ReturnType<typeof Journal.make>>>().toEqualTypeOf<
+        Journal.Journal["Service"]
+      >();
       const host = Layer.mergeAll(
-        Layer.succeed(Store.Service, fixture.store),
-        Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+        Layer.succeed(Store.Store, fixture.store),
+        Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
         Layer.succeed(Counter, fixture.counter),
         Layer.succeed(Audit, {
           check: Ref.get(reject).pipe(
@@ -81,7 +81,7 @@ it.effect.each(["make", "layer"] as const)(
       const live = configured.pipe(Layer.provide(Log.layer), Layer.provide(host));
       expectTypeOf<Layer.Services<typeof live>>().toEqualTypeOf<never>();
       const consume = Effect.gen(function* () {
-        const journal = yield* Journal.Service;
+        const journal = yield* Journal.Journal;
         expect(Option.isNone(yield* Effect.serviceOption(Counter))).toBe(true);
         expect(Option.isNone(yield* Effect.serviceOption(Audit))).toBe(true);
         yield* journal.commit(
@@ -111,7 +111,7 @@ it.effect.each(["make", "layer"] as const)(
         expect((yield* fixture.snapshot).logs.get(journal.log.id)).toHaveLength(1);
       });
       expectTypeOf<Effect.Services<typeof consume>>().toEqualTypeOf<
-        Journal.Service | Publication.Service
+        Journal.Journal | Publication.Publication
       >();
       expectTypeOf<Effect.Error<typeof consume>>().toEqualTypeOf<
         Projection.Error | Log.WriteError
@@ -119,27 +119,27 @@ it.effect.each(["make", "layer"] as const)(
       const acquire = Effect.gen(function* () {
         const transaction = yield* Transaction.make();
         const logs = yield* Log.make().pipe(
-          Effect.provideService(Transaction.Service, transaction),
+          Effect.provideService(Transaction.Transaction, transaction),
         );
         return yield* Journal.make({
           logId: Log.Id.make("domain"),
           projections: [counter, audit],
         }).pipe(
-          Effect.provideService(Log.Service, logs),
-          Effect.provideService(Transaction.Service, transaction),
+          Effect.provideService(Log.Log, logs),
+          Effect.provideService(Transaction.Transaction, transaction),
         );
       }).pipe(Effect.provide(host));
       const direct = Effect.flatMap(acquire, (journal) =>
         consume.pipe(
-          Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-          Effect.provideService(Journal.Service, journal),
+          Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+          Effect.provideService(Journal.Journal, journal),
         ),
       );
       expectTypeOf<Effect.Services<typeof direct>>().toEqualTypeOf<never>();
       yield* construction === "make"
         ? direct
         : consume.pipe(
-            Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+            Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
             Effect.provide(live),
           );
     }),
@@ -149,11 +149,13 @@ it.effect("each evaluation of the transaction constructor owns a separate coordi
   Effect.gen(function* () {
     const fixture = yield* make();
     const acquire = Transaction.make();
-    expectTypeOf<Effect.Success<typeof acquire>>().toEqualTypeOf<Transaction.Interface>();
-    expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<Store.Service>();
-    expectTypeOf<Effect.Success<ReturnType<typeof Log.make>>>().toEqualTypeOf<Log.Interface>();
+    expectTypeOf<Effect.Success<typeof acquire>>().toEqualTypeOf<
+      Transaction.Transaction["Service"]
+    >();
+    expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<Store.Store>();
+    expectTypeOf<Effect.Success<ReturnType<typeof Log.make>>>().toEqualTypeOf<Log.Log["Service"]>();
     expectTypeOf<Effect.Services<ReturnType<typeof Log.make>>>().toEqualTypeOf<
-      Store.Service | Transaction.Service
+      Store.Store | Transaction.Transaction
     >();
     yield* Effect.gen(function* () {
       const first = yield* acquire;
@@ -163,7 +165,7 @@ it.effect("each evaluation of the transaction constructor owns a separate coordi
       expect(yield* fixture.attempts).toBe(1);
       yield* second.run(second.run(Effect.void));
       expect(yield* fixture.attempts).toBe(2);
-    }).pipe(Effect.provideService(Store.Service, fixture.store));
+    }).pipe(Effect.provideService(Store.Store, fixture.store));
   }),
 );
 
@@ -180,7 +182,7 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       }),
     );
     yield* Effect.gen(function* () {
-      const log = yield* Log.Service;
+      const log = yield* Log.Log;
       const journal = yield* log.commit(
         Effect.gen(function* () {
           boundIn.add((yield* Store.Transaction).id);
@@ -189,13 +191,13 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       );
       yield* journal
         .publish(Changed, 1)
-        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+        .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
       expect(yield* Ref.get(finalized)).toBe(1);
       yield* journal.commit(
         Effect.forEach([2, 3], (amount) =>
           journal
             .publish(Changed, amount)
-            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
+            .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId))),
         ),
       );
       expect(yield* Ref.get(finalized)).toBe(3);
@@ -204,7 +206,7 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       const source = yield* Journal.make({ logId: Log.Id.make("history"), projections: [] });
       yield* source
         .publish(Changed, 4)
-        .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+        .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
       const bound = yield* log.commit(
         Effect.gen(function* () {
           boundIn.add((yield* Store.Transaction).id);
@@ -217,8 +219,8 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       expect(yield* Ref.get(finalized)).toBe(4);
     }).pipe(
       Effect.provide(Log.layer),
-      Effect.provideService(Store.Service, fixture.store),
-      Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+      Effect.provideService(Store.Store, fixture.store),
+      Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
       Effect.provideService(Counter, fixture.counter),
     );
   }),
@@ -232,18 +234,18 @@ it.effect("projection defects remain defects and still roll back the publication
       Layer.provide(Log.layer),
       Layer.provide(
         Layer.mergeAll(
-          Layer.succeed(Store.Service, fixture.store),
-          Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+          Layer.succeed(Store.Store, fixture.store),
+          Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
           Layer.succeed(Counter, fixture.counter),
         ),
       ),
     );
     yield* Effect.gen(function* () {
-      const journal = yield* Journal.Service;
+      const journal = yield* Journal.Journal;
       const exit = yield* Effect.exit(
         journal
           .publish(Changed, 1)
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId))),
       );
       if (!Exit.isFailure(exit)) throw new Error("Expected defect");
       expect(Cause.hasDies(exit.cause)).toBe(true);

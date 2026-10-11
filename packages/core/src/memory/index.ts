@@ -1,4 +1,4 @@
-export { MemoryConnection } from "./connection.ts";
-export { MemoryDatabase } from "./database.ts";
-export { MemoryStores } from "./stores.ts";
-export { Rows } from "./rows.ts";
+export * as MemoryConnection from "./connection.ts";
+export * as MemoryDatabase from "./database.ts";
+export * as MemoryStores from "./stores.ts";
+export * as Rows from "./rows.ts";

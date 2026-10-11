@@ -1,8 +1,8 @@
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
-import { PermissionCatalog } from "../../src/authorization/permission-catalog.ts";
-import { Permission } from "../../src/authorization/permission.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
+import * as PermissionCatalog from "../../src/authorization/permission-catalog.ts";
+import * as Permission from "../../src/authorization/permission.ts";
+import * as MemberPermissions from "../../src/workspace/member/permissions.ts";
 
 it.effect(
   "the catalog layer resolves domain declarations and overrides through a stable service",
@@ -18,16 +18,18 @@ it.effect(
         MemberPermissions.Remove,
         Create,
       ]);
-      expectTypeOf<Layer.Success<typeof configured>>().toEqualTypeOf<PermissionCatalog.Service>();
+      expectTypeOf<
+        Layer.Success<typeof configured>
+      >().toEqualTypeOf<PermissionCatalog.PermissionCatalog>();
       expectTypeOf<Layer.Services<typeof configured>>().toEqualTypeOf<never>();
       expectTypeOf<Layer.Error<typeof configured>>().toEqualTypeOf<
         PermissionCatalog.Duplicate | Schema.SchemaError
       >();
-      expectTypeOf<
-        Effect.Success<ReturnType<typeof PermissionCatalog.make>>
-      >().toEqualTypeOf<PermissionCatalog.Interface>();
+      expectTypeOf<Effect.Success<ReturnType<typeof PermissionCatalog.make>>>().toEqualTypeOf<
+        PermissionCatalog.PermissionCatalog["Service"]
+      >();
       const consume = Effect.gen(function* () {
-        const permissionCatalog = yield* PermissionCatalog.Service;
+        const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
         expect(yield* permissionCatalog.get(MemberPermissions.Read.name)).toEqual(
           MemberPermissions.Read,
         );
@@ -41,7 +43,9 @@ it.effect(
           Create,
         ]);
       });
-      expectTypeOf<Effect.Services<typeof consume>>().toEqualTypeOf<PermissionCatalog.Service>();
+      expectTypeOf<
+        Effect.Services<typeof consume>
+      >().toEqualTypeOf<PermissionCatalog.PermissionCatalog>();
       expectTypeOf<Effect.Error<typeof consume>>().toEqualTypeOf<PermissionCatalog.Unknown>();
       yield* consume.pipe(Effect.provide(configured));
     }),

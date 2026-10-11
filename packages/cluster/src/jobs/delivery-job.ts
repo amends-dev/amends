@@ -13,8 +13,8 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, Entity, Sharding } from "effect/cluster";
 import { Rpc } from "effect/rpc";
-import { DeliveryRunner } from "../deliveries/runner.ts";
-import { JobRequests } from "./requests.ts";
+import * as DeliveryRunner from "../deliveries/runner.ts";
+import * as JobRequests from "./requests.ts";
 
 /** A request to deliver what the thread's contacts were told; Cluster keeps one per key. */
 export class Deliver extends Schema.Class<Deliver>("amends/DeliveryJob/Deliver")({
@@ -50,11 +50,11 @@ const jobOf = (entityId: string): DeliveryJobs.Job => {
  * @category layers
  */
 export const layerRequests = Layer.effect(
-  DeliveryJobs.Service,
+  DeliveryJobs.DeliveryJobs,
   Effect.gen(function* () {
     const sharding = yield* Sharding.Sharding;
     const deliveryJobClient = yield* entity.client;
-    return DeliveryJobs.Service.of({
+    return DeliveryJobs.DeliveryJobs.of({
       requestDeliver: Effect.fnUntraced(function* ({ workspaceId, threadId }) {
         const storeTransaction = yield* Store.Transaction;
         const deliver = new Deliver({
@@ -121,5 +121,3 @@ export const layerWorker = entity.toLayer(
 
 /** Stored requests and the worker that handles them, over the host's Cluster. @category layers */
 export const layer = Layer.merge(layerWorker, layerRequests);
-
-export * as DeliveryJob from "./delivery-job.ts";

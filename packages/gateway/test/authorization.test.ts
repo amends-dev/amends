@@ -5,7 +5,8 @@ import { MemberService, MemberPermissions } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { withStorage } from "./fixture.ts";
-import { alice, forWorkspace, Support, testProvenance, workspaceId } from "./support.ts";
+import * as Support from "./support.ts";
+import { alice, forWorkspace, testProvenance, workspaceId } from "./support.ts";
 
 /** Stored roles and assignments as authorization reads them. */
 const { core, initialized } = Support;
@@ -18,8 +19,11 @@ describe("authorization", () => {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const workspace = yield* initialized(bound);
           yield* Effect.gen(function* () {
-            const journal = yield* Journal.Service;
-            const publish = Effect.provideService(Publication.Service, testProvenance(workspaceId));
+            const journal = yield* Journal.Journal;
+            const publish = Effect.provideService(
+              Publication.Publication,
+              testProvenance(workspaceId),
+            );
             const roleId = Role.Id.make("reader");
             yield* journal
               .publish(RoleFacts.Created, {
@@ -57,9 +61,9 @@ describe("authorization", () => {
               identity: alice,
             });
             expect(
-              yield* (yield* MemberService.Service)
+              yield* (yield* MemberService.MemberService)
                 .get(workspace.ownerMemberId)
-                .pipe(Effect.provideService(Actor.Service, actor), Effect.flip),
+                .pipe(Effect.provideService(Actor.Actor, actor), Effect.flip),
             ).toMatchObject({ _tag: "Authorization.Denied" });
             expect(yield* bound.roles.get(roleId)).toMatchObject({
               _tag: "Some",

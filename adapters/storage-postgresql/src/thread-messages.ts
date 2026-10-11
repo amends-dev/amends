@@ -3,7 +3,7 @@ import { ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, count, eq } from "drizzle-orm";
 import { threadMessages } from "./schema.ts";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.Record));
@@ -106,7 +106,7 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
   );
 /** Workspace-bound thread-messages projection storage. @category constructors */
 export const make = Effect.fn("ThreadMessages.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(threadMessages.workspaceId, workspaceId);
   /** Replace a message's content, which must have text; nothing updated means no such message. */
@@ -142,7 +142,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
             : "Expected a message with text at the revision before",
       });
   });
-  const driver: ThreadMessageStore.Interface = {
+  const driver: ThreadMessageStore.ThreadMessageStore["Service"] = {
     get: Effect.fn("ThreadMessages.get")(
       function* (id) {
         return yield* guard(
@@ -225,5 +225,4 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
   return ThreadMessageStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadMessageStore.Service, make());
-export * as ThreadMessages from "./thread-messages.ts";
+export const layer = Layer.effect(ThreadMessageStore.ThreadMessageStore, make());

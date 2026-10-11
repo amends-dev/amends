@@ -1,7 +1,7 @@
 import { Channel, ChannelStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { channels } from "./schema.ts";
 
@@ -22,11 +22,11 @@ const toRow = (record: Channel.Record): typeof channels.$inferInsert => ({
 
 /** Channel records in the workspace's database. @category constructors */
 export const make = Effect.fn("Channels.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = (id: Channel.Id) =>
     and(eq(channels.workspaceId, workspaceId), eq(channels.id, id));
-  const driver: ChannelStore.Interface = {
+  const driver: ChannelStore.ChannelStore["Service"] = {
     get: Effect.fn("Channels.get")(
       function* (id) {
         return yield* guard(db.select().from(channels).where(inWorkspace(id))).pipe(
@@ -67,6 +67,4 @@ export const make = Effect.fn("Channels.make")(function* () {
 });
 
 /** Provide channel storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ChannelStore.Service, make());
-
-export * as Channels from "./channels.ts";
+export const layer = Layer.effect(ChannelStore.ChannelStore, make());

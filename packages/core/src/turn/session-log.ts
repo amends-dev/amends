@@ -8,8 +8,8 @@
 import { Session, StreamPart } from "@amends-dev/harness";
 import { Schema } from "effect";
 import { Prompt } from "effect/ai";
-import type { ThreadMessageId } from "../thread/ThreadMessageId.ts";
-import { Turn } from "./turn.ts";
+import type * as ThreadMessageId from "../thread/ThreadMessageId.ts";
+import * as Turn from "./turn.ts";
 
 export const Entry = Schema.TaggedUnion({
   /** The agent joined the thread under way, and its session started with the conversation so far. */
@@ -188,5 +188,3 @@ export const changesSince = (
     const had = before[index];
     return had !== undefined && isSameItem(had, item) ? [] : [{ index, item }];
   });
-
-export * as SessionLog from "./session-log.ts";

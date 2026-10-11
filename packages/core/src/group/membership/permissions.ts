@@ -1,4 +1,4 @@
-import { Permission } from "../../authorization/permission.ts";
+import * as Permission from "../../authorization/permission.ts";
 
 /**
  * Adding people to a team group the actor belongs to, and removing them from a private one.
@@ -14,5 +14,3 @@ export const Join = Permission.make("group.join", {
   targetKind: "Group",
   builtinTier: "member",
 });
-
-export * as GroupMembershipPermissions from "./permissions.ts";

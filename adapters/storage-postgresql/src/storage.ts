@@ -1,8 +1,8 @@
 import { Layer } from "effect";
-import { PostgresAccounts } from "./accounts.ts";
-import { PostgresDirectory } from "./directory.ts";
-import { PostgresSignInStorage } from "./sign-in-storage.ts";
-import { PostgresWorkspaceStorage } from "./workspace-storage.ts";
+import * as PostgresAccounts from "./accounts.ts";
+import * as PostgresDirectory from "./directory.ts";
+import * as PostgresSignInStorage from "./sign-in-storage.ts";
+import * as PostgresWorkspaceStorage from "./workspace-storage.ts";
 
 export type Options = PostgresWorkspaceStorage.Options;
 
@@ -20,5 +20,3 @@ export const layer = (options: Options = {}) =>
     PostgresAccounts.layer,
     PostgresSignInStorage.layer,
   );
-
-export * as PostgresStorage from "./storage.ts";

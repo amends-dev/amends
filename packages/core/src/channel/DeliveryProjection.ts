@@ -6,17 +6,17 @@
  * @since 0.1.0
  */
 import { Effect, Option } from "effect";
-import { Projection } from "../journal/projection.ts";
-import { Delivery } from "./Delivery.ts";
-import { DeliveryFacts } from "./DeliveryFacts.ts";
-import { DeliveryStore } from "./DeliveryStore.ts";
+import * as Projection from "../journal/projection.ts";
+import * as Delivery from "./Delivery.ts";
+import * as DeliveryFacts from "./DeliveryFacts.ts";
+import * as DeliveryStore from "./DeliveryStore.ts";
 
 /** Change the stored delivery a fact names, as `changes` says. */
 const update = Effect.fnUntraced(function* (
   deliveryId: Delivery.Id,
   changes: Partial<Delivery.Record>,
 ) {
-  const deliveryStore = yield* DeliveryStore.Service;
+  const deliveryStore = yield* DeliveryStore.DeliveryStore;
   const found = yield* deliveryStore.get(deliveryId);
   if (Option.isNone(found)) return yield* Effect.die("A changed delivery is missing");
   yield* deliveryStore.update(Delivery.change(found.value, changes));
@@ -32,7 +32,7 @@ export const definition = Projection.make("channel-delivery", { version: 1 })
   .on(
     DeliveryFacts.Created,
     Effect.fn("DeliveryProjection.created")(function* ({ payload }) {
-      const deliveryStore = yield* DeliveryStore.Service;
+      const deliveryStore = yield* DeliveryStore.DeliveryStore;
       const { notificationIds: _, ...record } = payload;
       yield* deliveryStore.insert(record);
     }),
@@ -59,5 +59,3 @@ export const definition = Projection.make("channel-delivery", { version: 1 })
       });
     }),
   );
-
-export * as DeliveryProjection from "./DeliveryProjection.ts";

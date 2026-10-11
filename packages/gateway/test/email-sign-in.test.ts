@@ -2,11 +2,11 @@ import { expect, it } from "@effect/vitest";
 import { Identity } from "@amends-dev/core/identity";
 import { Crypto, Effect, Layer, Option, Redacted } from "effect";
 import { Base64Url } from "effect/encoding";
-import { Accounts } from "../src/accounts.ts";
-import { EmailSender } from "../src/email-sender.ts";
-import { EmailSignIn } from "../src/email-sign-in.ts";
-import { SignIn } from "../src/sign-in.ts";
-import { SignInStorage } from "../src/sign-in-storage.ts";
+import * as Accounts from "../src/accounts.ts";
+import * as EmailSender from "../src/email-sender.ts";
+import * as EmailSignIn from "../src/email-sign-in.ts";
+import * as SignIn from "../src/sign-in.ts";
+import * as SignInStorage from "../src/sign-in-storage.ts";
 
 const ada = Accounts.Email.make("ada@example.com");
 const encoder = new TextEncoder();
@@ -42,8 +42,8 @@ const signInOver = (codeKey: Uint8Array) => {
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(
-          SignInStorage.Service,
-          SignInStorage.Service.of({
+          SignInStorage.SignInStorage,
+          SignInStorage.SignInStorage.of({
             modifyCode: (_email, decide) =>
               Effect.sync(() => {
                 const [answer, next] = decide(stored.pending);
@@ -57,16 +57,16 @@ const signInOver = (codeKey: Uint8Array) => {
           }),
         ),
         Layer.succeed(
-          Accounts.Service,
-          Accounts.Service.of({
+          Accounts.Accounts,
+          Accounts.Accounts.of({
             findOrCreate: (email) =>
               Effect.succeed({ id: Identity.HumanId.make("human-ada"), email }),
             findByIds: () => Effect.succeed([]),
           }),
         ),
         Layer.succeed(
-          EmailSender.Service,
-          EmailSender.Service.of({
+          EmailSender.EmailSender,
+          EmailSender.EmailSender.of({
             send: (message) => Effect.sync(() => void stored.sent.push(message)),
           }),
         ),
@@ -83,7 +83,7 @@ it.effect.each([32, 100])(
     const codeKey = crypto.getRandomValues(new Uint8Array(keyLength));
     const { stored, layer } = signInOver(codeKey);
     return Effect.gen(function* () {
-      const signIn = yield* SignIn.Service;
+      const signIn = yield* SignIn.SignIn;
       yield* signIn.start(ada, undefined);
       const code = /\b\d{6}\b/.exec(Redacted.value(stored.sent[0]!.text))![0];
       const expected = yield* Effect.promise(() => hmacSha256(codeKey, `${ada}\n${code}`));

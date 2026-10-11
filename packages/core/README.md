@@ -79,13 +79,13 @@ error. Core validates what crosses into it instead: callers' input, an actor or 
 workspace, and what a turn's runner or harness reports.
 
 A host binds the journal store to one workspace, and that binding is the only place a service learns
-which workspace it serves: services that need the workspace ID read it from `Store.Service`.
+which workspace it serves: services that need the workspace ID read it from `Store.Store`.
 Projection stores and signals are bound the same way. Job requests name their workspace, taken from
 the fact that asks for them, since the host runs every workspace's jobs.
 
 ### Publication
 
-Every `Journal.publish(fact, payload)` reads `Publication.Service` when it runs: workspace,
+Every `Journal.publish(fact, payload)` reads `Publication.Publication` when it runs: workspace,
 performer, immediate cause, correlation ID, and occurrence time. `Publication.withActor` establishes
 that context when it is absent and reuses it in nested operations; `Publication.make` supports
 explicit context for authenticated identities before membership and for system performers;
@@ -496,7 +496,7 @@ stored fails the commit, and neither replay nor a retried publication asks again
   carries what the thread's contacts were told to the conversation, through `DeliveryExecution`.
   Activity that tells a contact something requests it.
 
-`TurnJobs.Service` and `DeliveryJobs.Service` are host services, shared by every workspace, which
+`TurnJobs.TurnJobs` and `DeliveryJobs.DeliveryJobs` are host services, shared by every workspace, which
 deliver each request to whatever runs the jobs; each one's `layerNoRunner` accepts requests and runs
 nothing. A host's jobs reach `JobServices` through the gateway's `inWorkspace`.
 [Cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` run them, as the local host does.
@@ -552,7 +552,7 @@ gives each its audience on the change feed: typing reaches the thread's group wi
 the three read-state signals only the member whose state changed, so their other sessions stay
 current, and a turn's drafts nobody there, only readers following the turn's log.
 
-`SignalHub.Service` is the workspace's delivery, which storage binds with the stores: `publish`
+`SignalHub.SignalHub` is the workspace's delivery, which storage binds with the stores: `publish`
 offers a signal to the subscribers present at that moment, in every process over the same storage,
 and `subscribe` returns those published until its scope closes. Delivery is best effort: publishing
 never fails the operation, and a subscriber that falls behind or loses its connection misses
@@ -663,17 +663,17 @@ Name an exported schema for its domain meaning and role, read with its module qu
 and a same-name interface; unions and scalar schemas use a same-name type. Typed errors keep tagged
 error schemas.
 
-| Name                 | Meaning and examples                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| `Record`             | A complete domain record with its identity: `Member.Record`, `Event.Record`.           |
-| `Value`              | The primary value object of a focused module: `Actor.Value`, `Grant.Value`.            |
-| `Reference`          | Enough to identify an entity or target: `Identity.Reference`, `Target.Reference`.      |
-| `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.    |
-| `<Operation>Input`   | Data supplied to one operation: `Invitation.IssueInput`, `Store.AppendInput`.          |
-| `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`.                              |
-| `State`              | A lifecycle variant with data: `Invitation.State`.                                     |
-| `Status`             | A simple lifecycle label: `Member.Status`.                                             |
-| `Interface`          | The contract of a context service: `MemberService.Interface`, `MemberStore.Interface`. |
+| Name                 | Meaning and examples                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Record`             | A complete domain record with its identity: `Member.Record`, `Event.Record`.                                                                                    |
+| `Value`              | The primary value object of a focused module: `Actor.Value`, `Grant.Value`.                                                                                     |
+| `Reference`          | Enough to identify an entity or target: `Identity.Reference`, `Target.Reference`.                                                                               |
+| `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.                                                                             |
+| `<Operation>Input`   | Data supplied to one operation: `Invitation.IssueInput`, `Store.AppendInput`.                                                                                   |
+| `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`.                                                                                                       |
+| `State`              | A lifecycle variant with data: `Invitation.State`.                                                                                                              |
+| `Status`             | A simple lifecycle label: `Member.Status`.                                                                                                                      |
+| `Foo["Service"]`     | The shape of a context service, read off its class, which is named after its module: `MemberStore.MemberStore["Service"]` is what a storage adapter implements. |
 
 Inline payload structs can stay inside their fact declarations; read their types through
 `Fact.Payload<typeof MemberFacts.Added>`. Schemas used as public HTTP models carry stable
@@ -692,8 +692,8 @@ implementation exports `make`, which constructs it, and `layer`, which provides 
 `make`. Core's constructors use `Effect.fn("Module.make")`, acquire their state and dependencies
 inside the Effect, so evaluating one twice builds two implementations, and return `Service.of(...)`.
 Actor identity and the active transaction are resolved during each operation, never at construction.
-Contracts implemented elsewhere, such as stores, `SignalHub.Service`, `Actor.Service`,
-`Publication.Service`, and `Store.Transaction`, have no `make` or `layer` here. `core.ts` composes
+Contracts implemented elsewhere, such as stores, `SignalHub.SignalHub`, `Actor.Actor`,
+`Publication.Publication`, and `Store.Transaction`, have no `make` or `layer` here. `core.ts` composes
 the layers and implements nothing itself.
 
 ```ts
@@ -702,7 +702,7 @@ import { Effect } from "effect";
 
 const makeLogs = Effect.gen(function* () {
   const transaction = yield* Transaction.make();
-  return yield* Log.make().pipe(Effect.provideService(Transaction.Service, transaction));
+  return yield* Log.make().pipe(Effect.provideService(Transaction.Transaction, transaction));
 });
 ```
 

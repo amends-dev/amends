@@ -1,7 +1,7 @@
 import { Connection, ConnectionStore } from "@amends-dev/core/connection";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { connections } from "./schema.ts";
 
@@ -24,11 +24,11 @@ const toRow = (record: Connection.Record): typeof connections.$inferInsert => ({
 
 /** Connection records in the workspace's database. @category constructors */
 export const make = Effect.fn("Connections.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = (id: Connection.Id) =>
     and(eq(connections.workspaceId, workspaceId), eq(connections.id, id));
-  const driver: ConnectionStore.Interface = {
+  const driver: ConnectionStore.ConnectionStore["Service"] = {
     get: Effect.fn("Connections.get")(
       function* (id) {
         return yield* guard(db.select().from(connections).where(inWorkspace(id))).pipe(
@@ -72,6 +72,4 @@ export const make = Effect.fn("Connections.make")(function* () {
 });
 
 /** Provide connection storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ConnectionStore.Service, make());
-
-export * as Connections from "./connections.ts";
+export const layer = Layer.effect(ConnectionStore.ConnectionStore, make());

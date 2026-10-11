@@ -2,9 +2,9 @@ import type { StreamPart } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
 import { Prompt } from "effect/ai";
-import { SessionLog } from "../../src/turn/session-log.ts";
-import { ThreadMessage } from "../../src/thread/ThreadMessage.ts";
-import { Turn } from "../../src/turn/turn.ts";
+import * as SessionLog from "../../src/turn/session-log.ts";
+import * as ThreadMessage from "../../src/thread/ThreadMessage.ts";
+import * as Turn from "../../src/turn/turn.ts";
 
 const at = DateTime.makeUnsafe("2026-10-06T12:00:00.000Z");
 /** A user message with the text `text`. */

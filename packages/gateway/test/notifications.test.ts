@@ -15,6 +15,7 @@ import { Member } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { Array, Context, DateTime, Effect, Layer, Option } from "effect";
 import { acceptInvitation, createWorkspace, invite, removeMember } from "./operations.ts";
+import * as Support from "./support.ts";
 import {
   boundTo,
   future,
@@ -23,7 +24,6 @@ import {
   listOldestFirst,
   otherWorkspaceId,
   runHost,
-  Support,
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
@@ -730,7 +730,7 @@ describe("notifications", () => {
               workspaceId,
               humanIdentity,
               Effect.gen(function* () {
-                const notificationService = yield* NotificationService.Service;
+                const notificationService = yield* NotificationService.NotificationService;
                 expect(yield* notificationService.inbox({ limit: 1 })).toEqual(inboxOf(second));
                 expect(yield* notificationService.inbox(page)).toEqual(inboxOf(second, first));
                 expect(yield* notificationService.inbox({ ...page, pendingOnly: true })).toEqual(
@@ -747,8 +747,9 @@ describe("notifications", () => {
                 expect(yield* notificationService.countPending).toBe(2);
               }),
             );
-            const list = Effect.flatMap(NotificationService.Service, (notificationService) =>
-              notificationService.inbox(page),
+            const list = Effect.flatMap(
+              NotificationService.NotificationService,
+              (notificationService) => notificationService.inbox(page),
             );
             expect(yield* gateway.asMember(workspaceId, agentIdentity, list)).toEqual(
               inboxOf(forAgent),
@@ -762,8 +763,9 @@ describe("notifications", () => {
               earlier.id,
               Notification.Id.make("missing"),
             ]) {
-              const markSeen = Effect.flatMap(NotificationService.Service, (notificationService) =>
-                notificationService.markSeen(id),
+              const markSeen = Effect.flatMap(
+                NotificationService.NotificationService,
+                (notificationService) => notificationService.markSeen(id),
               );
               expect(
                 yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, markSeen)),
@@ -809,8 +811,8 @@ describe("notifications", () => {
             recipient: Notification.ofMember(actor.memberId, humanIdentity),
           });
           yield* Effect.gen(function* () {
-            const notificationService = yield* NotificationService.Service;
-            const journal = yield* Journal.Service;
+            const notificationService = yield* NotificationService.NotificationService;
+            const journal = yield* Journal.Journal;
             expect(
               yield* Effect.flip(
                 journal.commit(
@@ -832,7 +834,7 @@ describe("notifications", () => {
             });
             yield* journal.commit(bound.notifications.insert(value));
             expect(yield* notificationService.inbox(page)).toEqual(inboxOf(value));
-          }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Service, actor));
+          }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Actor, actor));
         }),
       ),
     ),
@@ -966,16 +968,16 @@ describe("notifications", () => {
       runGateway(
         storage,
         Effect.gen(function* () {
-          const gateway = yield* Gateway.Service;
+          const gateway = yield* Gateway.Gateway;
           const alice = Identity.Reference.cases.Human.make({
             id: Identity.HumanId.make("alice"),
           });
           const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
           const workspace = yield* createWorkspace(alice.id);
-          const asAlice = <A, E, R extends Core.Operations | Actor.Service>(
+          const asAlice = <A, E, R extends Core.Operations | Actor.Actor>(
             program: Effect.Effect<A, E, R>,
           ) => gateway.asMember(workspace.id, alice, program);
-          const asBob = <A, E, R extends Core.Operations | Actor.Service>(
+          const asBob = <A, E, R extends Core.Operations | Actor.Actor>(
             program: Effect.Effect<A, E, R>,
           ) => gateway.asMember(workspace.id, bob, program);
           const invitation = yield* invite(workspace.id, alice, {
@@ -986,18 +988,20 @@ describe("notifications", () => {
           const member = yield* acceptInvitation(workspace.id, bob.id, invitation.details.id);
           const create = (name: string) =>
             asAlice(
-              GroupService.Service.use((groups) =>
+              GroupService.GroupService.use((groups) =>
                 groups.createTeam({ name, memberIds: [workspace.ownerMemberId, member.id] }),
               ),
             );
           const mention = (groupId: Group.Id) =>
             asAlice(
-              ThreadService.Service.use((threads) =>
+              ThreadService.ThreadService.use((threads) =>
                 threads.startInGroup({ groupId, text: "Bob?", mentions: [member.id] }),
               ),
             );
           const count = asBob(
-            NotificationService.Service.use((notifications) => notifications.countPending),
+            NotificationService.NotificationService.use(
+              (notifications) => notifications.countPending,
+            ),
           );
           const left = yield* create("Left");
           const kept = yield* create("Kept");
@@ -1006,19 +1010,19 @@ describe("notifications", () => {
           yield* mention(kept.id);
           expect(yield* count).toBe(3);
           const [admission] = (yield* asBob(
-            GroupMembershipService.Service.use((memberships) =>
+            GroupMembershipService.GroupMembershipService.use((memberships) =>
               memberships.listCurrent(left.id, page),
             ),
           )).filter((value) => value.memberId === member.id);
           yield* asBob(
-            GroupMembershipService.Service.use((memberships) =>
+            GroupMembershipService.GroupMembershipService.use((memberships) =>
               memberships.leave({ groupId: left.id, membershipId: admission!.id }),
             ),
           );
           // What he can no longer open stops waiting for him, and stays as history.
           expect(yield* count).toBe(1);
           const all = yield* asBob(
-            NotificationService.Service.use((notifications) =>
+            NotificationService.NotificationService.use((notifications) =>
               Effect.map(notifications.inbox(page), (items) =>
                 items.map((item) => item.notification),
               ),
@@ -1041,16 +1045,16 @@ describe("notifications", () => {
       runGateway(
         storage,
         Effect.gen(function* () {
-          const gateway = yield* Gateway.Service;
+          const gateway = yield* Gateway.Gateway;
           const alice = Identity.Reference.cases.Human.make({
             id: Identity.HumanId.make("alice"),
           });
           const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
           const workspace = yield* createWorkspace(alice.id);
-          const asAlice = <A, E, R extends Core.Operations | Actor.Service>(
+          const asAlice = <A, E, R extends Core.Operations | Actor.Actor>(
             program: Effect.Effect<A, E, R>,
           ) => gateway.asMember(workspace.id, alice, program);
-          const asBob = <A, E, R extends Core.Operations | Actor.Service>(
+          const asBob = <A, E, R extends Core.Operations | Actor.Actor>(
             program: Effect.Effect<A, E, R>,
           ) => gateway.asMember(workspace.id, bob, program);
           const join = Effect.gen(function* () {
@@ -1063,21 +1067,21 @@ describe("notifications", () => {
           });
           const mention = (groupId: Group.Id, memberId: Member.Id) =>
             asAlice(
-              ThreadService.Service.use((threads) =>
+              ThreadService.ThreadService.use((threads) =>
                 threads.startInGroup({ groupId, text: "Bob?", mentions: [memberId] }),
               ),
             );
           const pending = asBob(
-            NotificationService.Service.use((notifications) =>
+            NotificationService.NotificationService.use((notifications) =>
               Effect.map(notifications.inbox({ ...page, pendingOnly: true }), (items) =>
                 items.map((item) => item.notification),
               ),
             ),
           );
-          const sidebar = asBob(GroupService.Service.use((groups) => groups.listMine(page)));
+          const sidebar = asBob(GroupService.GroupService.use((groups) => groups.listMine(page)));
           const first = yield* join;
           const group = yield* asAlice(
-            GroupService.Service.use((groups) =>
+            GroupService.GroupService.use((groups) =>
               groups.createTeam({
                 name: "Private",
                 memberIds: [workspace.ownerMemberId, first.id],
@@ -1092,7 +1096,7 @@ describe("notifications", () => {
           expect(second.id).not.toBe(first.id);
           expect(yield* pending).toEqual([]);
           yield* asAlice(
-            GroupMembershipService.Service.use((memberships) =>
+            GroupMembershipService.GroupMembershipService.use((memberships) =>
               memberships.add({ groupId: group.id, memberId: second.id }),
             ),
           );

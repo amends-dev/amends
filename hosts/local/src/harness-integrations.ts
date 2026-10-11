@@ -101,5 +101,3 @@ const makeOpencodeIntegration = Effect.fn("HarnessIntegrations.makeOpencodeInteg
     check: healthy,
   });
 });
-
-export * as HarnessIntegrations from "./harness-integrations.ts";

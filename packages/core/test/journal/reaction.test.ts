@@ -1,15 +1,15 @@
 import { expect, it } from "@effect/vitest";
 import { Context, Effect, Layer, Schema } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import type { Reaction } from "../../src/journal/reaction.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Subject } from "../../src/journal/subject.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Fact from "../../src/journal/fact.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Projection from "../../src/journal/projection.ts";
+import * as Publication from "../../src/journal/publication.ts";
+import type * as Reaction from "../../src/journal/reaction.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as Subject from "../../src/journal/subject.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
 import { Counter, make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
@@ -74,8 +74,8 @@ const counter = Projection.make("counter", { version: 1 }).on(
 const journalWith = Effect.fnUntraced(function* (requests: Context.Service.Shape<typeof Requests>) {
   const fixture = yield* make();
   const host = Layer.mergeAll(
-    Layer.succeed(Store.Service, fixture.store),
-    Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+    Layer.succeed(Store.Store, fixture.store),
+    Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
     Layer.succeed(Counter, fixture.counter),
     Layer.succeed(Requests, requests),
   );
@@ -93,14 +93,14 @@ const journalWith = Effect.fnUntraced(function* (requests: Context.Service.Shape
 });
 
 const publishing = <A, E, R>(program: Effect.Effect<A, E, R>) =>
-  Effect.provideService(program, Publication.Service, testProvenance(workspaceId));
+  Effect.provideService(program, Publication.Publication, testProvenance(workspaceId));
 
 it.effect("a commit runs the reactions to each fact it publishes, in that commit", () =>
   Effect.gen(function* () {
     const requests = recordedRequests();
     const { plain } = yield* journalWith(requests.service);
     const commits = yield* Effect.gen(function* () {
-      const journal = yield* Journal.Service;
+      const journal = yield* Journal.Journal;
       const first = yield* journal.commit(
         Effect.gen(function* () {
           const noted = yield* journal.publish(Noted, { important: true });
@@ -128,7 +128,7 @@ it.effect("a reaction that fails fails the commit, which publishes nothing", () 
     requests.state.refusing = true;
     const { plain } = yield* journalWith(requests.service);
     const outcome = yield* Effect.gen(function* () {
-      const journal = yield* Journal.Service;
+      const journal = yield* Journal.Journal;
       const failure = yield* Effect.flip(journal.commit(journal.publish(Counted, 1)));
       return { failure, entries: yield* journal.log.read({ limit: 10 }) };
     }).pipe(publishing, Effect.provide(plain));
@@ -146,13 +146,13 @@ it.effect("a retried publication and a projection's rebuild run no reaction agai
     const { plain, counting, fixture } = yield* journalWith(requests.service);
     const once = { idempotencyKey: Store.IdempotencyKey.make("count-once") };
     yield* Effect.gen(function* () {
-      const journal = yield* Journal.Service;
+      const journal = yield* Journal.Journal;
       yield* journal.commit(journal.publish(Counted, 2, once));
       yield* journal.commit(journal.publish(Counted, 2, once));
     }).pipe(publishing, Effect.provide(plain));
     expect(requests.requested.map(({ request }) => request)).toEqual(["tally"]);
     // A journal that also runs a counter rebuilds it from the log, applying the count again.
-    yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+    yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
       Effect.provide(counting),
     );
     expect(yield* fixture.counter.get).toBe(2);

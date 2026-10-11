@@ -119,7 +119,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
       endings.push(ending);
       active = false;
     });
-  const turnExecution = TurnExecution.Service.of({
+  const turnExecution = TurnExecution.TurnExecution.of({
     accept: () => Effect.succeed(active ? Option.some(turn) : Option.none()),
     start: () =>
       ++starts <= (options.failedStarts ?? 0)
@@ -148,7 +148,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
   /** Append to the log as another writer, after its latest entry. */
   const appendElsewhere = (entry: SessionLog.Entry) =>
     Effect.sync(() => void log.push({ position: log.length + 1, recordedAt: at, entry }));
-  const sessionLogStore = SessionLogStore.Service.of({
+  const sessionLogStore = SessionLogStore.SessionLogStore.of({
     head: () => Effect.sync(() => log.length),
     append: (_, entries, after) =>
       Effect.suspend(() => {
@@ -167,11 +167,11 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     read: (_, { after, limit }) => Effect.sync(() => log.slice(after, after + limit)),
     waitForAppend: () => Effect.never,
   });
-  const services = Context.make(TurnExecution.Service, turnExecution).pipe(
-    Context.add(SessionLogStore.Service, sessionLogStore),
+  const services = Context.make(TurnExecution.TurnExecution, turnExecution).pipe(
+    Context.add(SessionLogStore.SessionLogStore, sessionLogStore),
   );
   let entered = 0;
-  const gateway = Gateway.Service.of({
+  const gateway = Gateway.Gateway.of({
     createWorkspace: () => Effect.die("The fake workspace is never created"),
     asMember: () => Effect.die("The job runs as no member"),
     inWorkspace: (_, program) =>

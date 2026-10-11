@@ -1,7 +1,7 @@
 import { Agent, AgentStore } from "@amends-dev/core/agent";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { agents } from "./schema.ts";
 
@@ -50,10 +50,10 @@ const toRow = (record: Agent.Record): typeof agents.$inferInsert => ({
 
 /** Agent records in the workspace's database. @category constructors */
 export const make = Effect.fn("Agents.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = (id: Agent.Id) => and(eq(agents.workspaceId, workspaceId), eq(agents.id, id));
-  const driver: AgentStore.Interface = {
+  const driver: AgentStore.AgentStore["Service"] = {
     get: Effect.fn("Agents.get")(
       function* (id) {
         return yield* guard(db.select().from(agents).where(inWorkspace(id))).pipe(
@@ -92,6 +92,4 @@ export const make = Effect.fn("Agents.make")(function* () {
 });
 
 /** Provide agent storage over the caller's binding. @category layers */
-export const layer = Layer.effect(AgentStore.Service, make());
-
-export * as Agents from "./agents.ts";
+export const layer = Layer.effect(AgentStore.AgentStore, make());

@@ -1,8 +1,8 @@
 import { Schema } from "effect";
-import { Fact } from "../../journal/fact.ts";
-import { Subject } from "../../journal/subject.ts";
-import { Member } from "../../workspace/member/member.ts";
-import { GroupFollow } from "./follow.ts";
+import * as Fact from "../../journal/fact.ts";
+import * as Subject from "../../journal/subject.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as GroupFollow from "./follow.ts";
 
 /** Following is personal: only the follower learns of it. */
 export const Started = Fact.make("group.follow.started", {
@@ -25,5 +25,3 @@ export const Ended = Fact.make("group.follow.ended", {
   occurrence: (payload) => [payload.followId],
   payload: GroupFollow.Ending,
 });
-
-export * as GroupFollowFacts from "./facts.ts";

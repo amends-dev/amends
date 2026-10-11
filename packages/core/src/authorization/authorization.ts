@@ -1,17 +1,17 @@
-import { Target } from "./target.ts";
+import * as Target from "./target.ts";
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import { Actor } from "../identity/actor.ts";
-import { Identity } from "../identity/identity.ts";
-import { MemberStore } from "../workspace/member/store.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Identity from "../identity/identity.ts";
+import * as MemberStore from "../workspace/member/store.ts";
 
-import { Workspace } from "../workspace/workspace.ts";
-import { Grant } from "./grant.ts";
-import { GrantResolver } from "./grant-resolver.ts";
-import { PermissionCatalog } from "./permission-catalog.ts";
-import { Requirement } from "./requirement.ts";
+import * as Workspace from "../workspace/workspace.ts";
+import * as Grant from "./grant.ts";
+import * as GrantResolver from "./grant-resolver.ts";
+import * as PermissionCatalog from "./permission-catalog.ts";
+import * as Requirement from "./requirement.ts";
 
 import { Denied, InvalidActor } from "./errors.ts";
-import { Store } from "../journal/store.ts";
+import * as Store from "../journal/store.ts";
 export { Denied, InvalidActor } from "./errors.ts";
 
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
@@ -27,30 +27,29 @@ export type Error =
   | InvalidActor
   | Denied;
 
-export interface Interface {
-  /**
-   * Check the current actor and require every declared permission on its target.
-   * Reads check current state without opening a transaction. Write operations
-   * must run this check and their mutation inside the same commit. An empty list
-   * checks active membership only. Target existence and business rules belong to
-   * the application operation.
-   */
-  readonly require: (
-    requirements: ReadonlyArray<Requirement.Value>,
-  ) => Effect.Effect<void, Error, Actor.Service>;
-  /**
-   * The same actor check, then whether a current grant covers each requirement, in order, from
-   * one grant resolution. Lists use it to keep only permitted items instead of failing on the
-   * first; an invalid actor still fails.
-   */
-  readonly permitted: (
-    requirements: ReadonlyArray<Requirement.Value>,
-  ) => Effect.Effect<ReadonlyArray<boolean>, Exclude<Error, Denied>, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/authorization/authorization/Service",
-) {}
+export class Authorization extends Context.Service<
+  Authorization,
+  {
+    /**
+     * Check the current actor and require every declared permission on its target.
+     * Reads check current state without opening a transaction. Write operations
+     * must run this check and their mutation inside the same commit. An empty list
+     * checks active membership only. Target existence and business rules belong to
+     * the application operation.
+     */
+    readonly require: (
+      requirements: ReadonlyArray<Requirement.Value>,
+    ) => Effect.Effect<void, Error, Actor.Actor>;
+    /**
+     * The same actor check, then whether a current grant covers each requirement, in order, from
+     * one grant resolution. Lists use it to keep only permitted items instead of failing on the
+     * first; an invalid actor still fails.
+     */
+    readonly permitted: (
+      requirements: ReadonlyArray<Requirement.Value>,
+    ) => Effect.Effect<ReadonlyArray<boolean>, Exclude<Error, Denied>, Actor.Actor>;
+  }
+>()("@amends-dev/core/authorization/authorization/Service") {}
 
 const sameIdentity = Schema.toEquivalence(Identity.Reference);
 const requireWorkspace = Effect.fnUntraced(function* (
@@ -68,20 +67,23 @@ const requireWorkspace = Effect.fnUntraced(function* (
  * @category constructors
  */
 export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Return<
-  Interface,
+  Authorization["Service"],
   never,
-  MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service | Store.Service
+  | MemberStore.MemberStore
+  | GrantResolver.GrantResolver
+  | PermissionCatalog.PermissionCatalog
+  | Store.Store
 > {
-  const memberStore = yield* MemberStore.Service;
-  const grantResolver = yield* GrantResolver.Service;
-  const permissionCatalog = yield* PermissionCatalog.Service;
-  const { workspaceId } = yield* Store.Service;
+  const memberStore = yield* MemberStore.MemberStore;
+  const grantResolver = yield* GrantResolver.GrantResolver;
+  const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
+  const { workspaceId } = yield* Store.Store;
 
   /** Validate the actor, and that each requirement names a declared permission in this workspace. */
   const validateRequirements = Effect.fnUntraced(function* (
     requirements: ReadonlyArray<Requirement.Value>,
   ) {
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     yield* requireWorkspace(workspaceId, actor.workspaceId);
     const found = yield* memberStore.get(actor.memberId);
     if (Option.isNone(found)) {
@@ -126,7 +128,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     return checked.map((requirement) => Grant.anyCovers(grants, requirement));
   });
 
-  return Service.of({ require: requirePermissions, permitted });
+  return Authorization.of({ require: requirePermissions, permitted });
 });
 
 /**
@@ -134,7 +136,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
+export const layer = Layer.effect(Authorization, make());
 
 /**
  * Require an action on a target the actor may read, in one grant resolution. A target they can't
@@ -142,7 +144,7 @@ export const layer = Layer.effect(Service, make());
  * denied.
  */
 export const requireVisible = Effect.fnUntraced(function* <E>(
-  authorization: Interface,
+  authorization: Authorization["Service"],
   read: Requirement.Value,
   action: Requirement.Value,
   hidden: () => E,
@@ -151,5 +153,3 @@ export const requireVisible = Effect.fnUntraced(function* <E>(
   if (!readable) return yield* Effect.fail(hidden());
   if (!permitted) yield* authorization.require([action]);
 });
-
-export * as Authorization from "./authorization.ts";

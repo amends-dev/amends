@@ -1,32 +1,32 @@
 import { Integrations } from "@amends-dev/connection";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import { Delegation } from "../authorization/delegation.ts";
-import type { Permission } from "../authorization/permission.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { Target } from "../authorization/target.ts";
-import type { Connection } from "../connection/connection.ts";
-import { ConnectionPermissions } from "../connection/permissions.ts";
-import { ConnectionStore } from "../connection/store.ts";
-import { Actor } from "../identity/actor.ts";
-import { Identity } from "../identity/identity.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Request } from "../request/request.ts";
-import { MemberCommand } from "../workspace/member/command.ts";
-import { MemberFacts } from "../workspace/member/facts.ts";
-import type { Member } from "../workspace/member/member.ts";
-import { MemberStore } from "../workspace/member/store.ts";
-import { Agent } from "./agent.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Delegation from "../authorization/delegation.ts";
+import type * as Permission from "../authorization/permission.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as Target from "../authorization/target.ts";
+import type * as Connection from "../connection/connection.ts";
+import * as ConnectionPermissions from "../connection/permissions.ts";
+import * as ConnectionStore from "../connection/store.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Request from "../request/request.ts";
+import * as MemberCommand from "../workspace/member/command.ts";
+import * as MemberFacts from "../workspace/member/facts.ts";
+import type * as Member from "../workspace/member/member.ts";
+import * as MemberStore from "../workspace/member/store.ts";
+import * as Agent from "./agent.ts";
 import { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./errors.ts";
-import { AgentFacts } from "./facts.ts";
-import { AgentPermissions } from "./permissions.ts";
-import { AgentReadiness } from "./readiness.ts";
-import { AgentStore } from "./store.ts";
+import * as AgentFacts from "./facts.ts";
+import * as AgentPermissions from "./permissions.ts";
+import * as AgentReadiness from "./readiness.ts";
+import * as AgentStore from "./store.ts";
 export { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./errors.ts";
 
 export type ListError =
@@ -49,46 +49,45 @@ export type RenameError = Error | Changed;
  * The workspace's agents. An agent is a member, so its role is changed, and it is removed, as any
  * member's is, by members' and assignments' operations.
  */
-export interface Interface {
-  /** The workspace's agents the actor may read, by name; those whose membership ended are gone. */
-  readonly list: Effect.Effect<ReadonlyArray<Agent.View>, ListError, Actor.Service>;
-  readonly get: (agentId: Agent.Id) => Effect.Effect<Agent.View, ReadError, Actor.Service>;
-  /**
-   * Add an agent: a membership, with its name and the role it starts with, which the actor must be
-   * able to grant, and how it is set up. The actor must be able to read and use each connection
-   * the setup names, and an agent set up so must be able to run, except that one on `Auto` may
-   * have no harness to choose yet.
-   */
-  readonly create: (
-    input: Agent.CreateInput,
-    options?: Request.Options,
-  ) => Effect.Effect<Agent.View, CreateError, Actor.Service>;
-  /** Replace how the agent is set up, as a whole, checked as creating checks it. */
-  readonly configure: (
-    input: Agent.ConfigureInput,
-  ) => Effect.Effect<Agent.View, ConfigureError, Actor.Service>;
-  /** Rename its membership; a rename made meanwhile conflicts. */
-  readonly rename: (
-    input: Agent.RenameInput,
-  ) => Effect.Effect<Agent.View, RenameError, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/agent/service/Service",
-) {}
+export class AgentService extends Context.Service<
+  AgentService,
+  {
+    /** The workspace's agents the actor may read, by name; those whose membership ended are gone. */
+    readonly list: Effect.Effect<ReadonlyArray<Agent.View>, ListError, Actor.Actor>;
+    readonly get: (agentId: Agent.Id) => Effect.Effect<Agent.View, ReadError, Actor.Actor>;
+    /**
+     * Add an agent: a membership, with its name and the role it starts with, which the actor must be
+     * able to grant, and how it is set up. The actor must be able to read and use each connection
+     * the setup names, and an agent set up so must be able to run, except that one on `Auto` may
+     * have no harness to choose yet.
+     */
+    readonly create: (
+      input: Agent.CreateInput,
+      options?: Request.Options,
+    ) => Effect.Effect<Agent.View, CreateError, Actor.Actor>;
+    /** Replace how the agent is set up, as a whole, checked as creating checks it. */
+    readonly configure: (
+      input: Agent.ConfigureInput,
+    ) => Effect.Effect<Agent.View, ConfigureError, Actor.Actor>;
+    /** Rename its membership; a rename made meanwhile conflicts. */
+    readonly rename: (
+      input: Agent.RenameInput,
+    ) => Effect.Effect<Agent.View, RenameError, Actor.Actor>;
+  }
+>()("@amends-dev/core/agent/service/Service") {}
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("AgentService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const delegation = yield* Delegation.Service;
-  const memberCommand = yield* MemberCommand.Service;
-  const agentStore = yield* AgentStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const connectionStore = yield* ConnectionStore.Service;
+  const authorization = yield* Authorization.Authorization;
+  const delegation = yield* Delegation.Delegation;
+  const memberCommand = yield* MemberCommand.MemberCommand;
+  const agentStore = yield* AgentStore.AgentStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const connectionStore = yield* ConnectionStore.ConnectionStore;
   const integrations = yield* Integrations.Integrations;
-  const journal = yield* Journal.Service;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   const memberTarget = (memberId: Member.Id) =>
     Target.Reference.cases.Member.make({ workspaceId, memberId });
@@ -220,7 +219,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
         Requirement.make(AgentPermissions.Create, { _tag: "Workspace", workspaceId }),
       ]);
       yield* delegation.requireGrant(request.roleId);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const agentId = Agent.Id.make(
         yield* Request.idFor(options.requestKey, ["agent.create", workspaceId, actor.memberId]),
       );
@@ -310,10 +309,8 @@ export const make = Effect.fn("AgentService.make")(function* () {
     journal.commit,
   );
 
-  return Service.of({ list, get, create, configure, rename });
+  return AgentService.of({ list, get, create, configure, rename });
 });
 
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as AgentService from "./service.ts";
+export const layer = Layer.effect(AgentService, make());

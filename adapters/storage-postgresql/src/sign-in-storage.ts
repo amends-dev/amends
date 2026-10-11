@@ -1,7 +1,7 @@
 import { SignInStorage } from "@amends-dev/gateway";
 import { eq } from "drizzle-orm";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
-import { PostgresDatabase } from "./database.ts";
+import * as PostgresDatabase from "./database.ts";
 import { signInCodes, signInSessions } from "./schema.ts";
 
 const PendingCodeRow = Schema.Struct({
@@ -26,8 +26,8 @@ const decodeSession = Schema.decodeUnknownEffect(SessionRow);
  * @category constructors
  */
 export const make = Effect.fn("PostgresSignInStorage.make")(function* () {
-  const { db, sql } = yield* PostgresDatabase.Service;
-  return SignInStorage.Service.of({
+  const { db, sql } = yield* PostgresDatabase.PostgresDatabase;
+  return SignInStorage.SignInStorage.of({
     modifyCode: (email, decide) =>
       sql
         .withTransaction(
@@ -88,10 +88,8 @@ export const make = Effect.fn("PostgresSignInStorage.make")(function* () {
 });
 
 /**
- * Provide SignInStorage.Service using its constructor and the caller's dependencies.
+ * Provide SignInStorage.SignInStorage using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(SignInStorage.Service, make());
-
-export * as PostgresSignInStorage from "./sign-in-storage.ts";
+export const layer = Layer.effect(SignInStorage.SignInStorage, make());

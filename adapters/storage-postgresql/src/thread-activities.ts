@@ -3,7 +3,7 @@ import { ThreadActivity, ThreadActivityStore } from "@amends-dev/core/thread";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { threadActivities } from "./schema.ts";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.Record));
@@ -18,10 +18,10 @@ const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =
   );
 /** Workspace-bound thread-activities projection storage. @category constructors */
 export const make = Effect.fn("ThreadActivities.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(threadActivities.workspaceId, workspaceId);
-  const driver: ThreadActivityStore.Interface = {
+  const driver: ThreadActivityStore.ThreadActivityStore["Service"] = {
     get: Effect.fn("ThreadActivities.get")(
       function* (id) {
         return yield* guard(
@@ -126,5 +126,4 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
   return ThreadActivityStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadActivityStore.Service, make());
-export * as ThreadActivities from "./thread-activities.ts";
+export const layer = Layer.effect(ThreadActivityStore.ThreadActivityStore, make());

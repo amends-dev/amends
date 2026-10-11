@@ -31,12 +31,15 @@ import {
 } from "effect/cluster";
 import { FetchHttpClient } from "effect/http";
 import type { SqlClient } from "effect/sql";
-import { HarnessIntegrations } from "./harness-integrations.ts";
-import { SandboxIntegrations } from "./sandbox-integrations.ts";
+import * as HarnessIntegrations from "./harness-integrations.ts";
+import * as SandboxIntegrations from "./sandbox-integrations.ts";
 
 /** Gateway, directory, accounts, and sign-in storage owned by one host lifetime. */
 export type HostLayer = Layer.Layer<
-  Gateway.Service | WorkspaceDirectory.Service | Accounts.Service | SignInStorage.Service,
+  | Gateway.Gateway
+  | WorkspaceDirectory.WorkspaceDirectory
+  | Accounts.Accounts
+  | SignInStorage.SignInStorage,
   unknown
 >;
 
@@ -192,5 +195,3 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     Layer.provide(layerDatabase(url, options)),
   );
 };
-
-export * as LocalHost from "./host.ts";

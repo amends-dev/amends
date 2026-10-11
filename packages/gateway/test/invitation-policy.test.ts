@@ -4,18 +4,9 @@ import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
-import {
-  alice,
-  at,
-  bob,
-  boundTo,
-  charlie,
-  future,
-  request,
-  Support,
-  testProvenance,
-} from "./support.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
+import { alice, at, bob, boundTo, charlie, future, request, testProvenance } from "./support.ts";
 
 /** Who may invite whom, with which role, until when, and rechecks at acceptance. */
 
@@ -146,23 +137,27 @@ describe("invitation policy", () => {
                   source.roleId === BuiltinRoles.OwnerId,
               );
               if (assignment === undefined) throw new Error("Missing Owner assignment");
-              yield* Effect.flatMap(Journal.Service, (journal) =>
+              yield* Effect.flatMap(Journal.Journal, (journal) =>
                 journal
                   .publish(AssignmentFacts.Revoked, {
                     workspaceId: workspace.id,
                     assignmentId: assignment.id,
                     memberId: assignment.memberId,
                   })
-                  .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
+                  .pipe(
+                    Effect.provideService(Publication.Publication, testProvenance(workspace.id)),
+                  ),
               ).pipe(Effect.provide(core(bound)));
             } else if (change === "membership") {
-              yield* Effect.flatMap(Journal.Service, (journal) =>
+              yield* Effect.flatMap(Journal.Journal, (journal) =>
                 journal
                   .publish(MemberFacts.Removed, {
                     workspaceId: workspace.id,
                     memberId: workspace.ownerMemberId,
                   })
-                  .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
+                  .pipe(
+                    Effect.provideService(Publication.Publication, testProvenance(workspace.id)),
+                  ),
               ).pipe(Effect.provide(core(bound)));
             } else {
               // Only the stored owner changes; the inviter keeps their membership and grants.

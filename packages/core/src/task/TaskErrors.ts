@@ -5,9 +5,9 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { MemberId } from "../workspace/member/id.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as MemberId from "../workspace/member/id.ts";
 
 /**
  * The group is missing, or the actor is not a member of it; the two are not told apart.
@@ -63,5 +63,3 @@ export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavai
   "TaskService.ParticipantUnavailable",
   { memberId: MemberId.Id },
 ) {}
-
-export * as TaskErrors from "./TaskErrors.ts";

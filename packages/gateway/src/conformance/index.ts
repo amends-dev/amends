@@ -21,7 +21,7 @@ import { standaloneAppends } from "./standalone-appends.ts";
 import { transactions } from "./transactions.ts";
 
 export type { Fixture, Host, HostOptions, Storage } from "./fixture.ts";
-export { Support } from "./support.ts";
+export * as Support from "./support.ts";
 
 /** Runs every suite against the storage `fixture` opens, in the test file that calls it. */
 export const run = (fixture: Fixture) => {

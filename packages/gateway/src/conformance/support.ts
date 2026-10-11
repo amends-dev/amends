@@ -78,40 +78,40 @@ export const journalLog = Log.Id.make("journal");
 export const bind = (
   context: Context.Context<
     | WorkspaceStorage.Bindings
-    | TurnJobs.Service
-    | DeliveryJobs.Service
+    | TurnJobs.TurnJobs
+    | DeliveryJobs.DeliveryJobs
     | Integrations.Integrations
     | Crypto.Crypto
   >,
 ) => ({
   context,
-  threads: Context.get(context, ThreadStore.Service),
-  participations: Context.get(context, ThreadParticipationStore.Service),
-  messages: Context.get(context, ThreadMessageStore.Service),
-  activities: Context.get(context, ThreadActivityStore.Service),
-  tasks: Context.get(context, TaskStore.Service),
-  channels: Context.get(context, ChannelStore.Service),
-  channelBindings: Context.get(context, ChannelBindingStore.Service),
-  contacts: Context.get(context, ContactStore.Service),
-  deliveries: Context.get(context, DeliveryStore.Service),
-  store: Context.get(context, Store.Service),
-  checkpoints: Context.get(context, Checkpoint.Service),
-  workspace: Context.get(context, WorkspaceStore.Service),
-  members: Context.get(context, MemberStore.Service),
-  roles: Context.get(context, RoleStore.Service),
-  assignments: Context.get(context, AssignmentStore.Service),
-  invitations: Context.get(context, InvitationStore.Service),
-  notifications: Context.get(context, NotificationStore.Service),
-  groups: Context.get(context, GroupStore.Service),
-  groupMemberships: Context.get(context, GroupMembershipStore.Service),
-  groupFollows: Context.get(context, GroupFollowStore.Service),
-  readStates: Context.get(context, ReadStateStore.Service),
-  connections: Context.get(context, ConnectionStore.Service),
-  connectionCredentials: Context.get(context, ConnectionCredentialStore.Service),
-  agents: Context.get(context, AgentStore.Service),
-  turns: Context.get(context, TurnStore.Service),
-  sessionStates: Context.get(context, SessionStateStore.Service),
-  sessionLogs: Context.get(context, SessionLogStore.Service),
+  threads: Context.get(context, ThreadStore.ThreadStore),
+  participations: Context.get(context, ThreadParticipationStore.ThreadParticipationStore),
+  messages: Context.get(context, ThreadMessageStore.ThreadMessageStore),
+  activities: Context.get(context, ThreadActivityStore.ThreadActivityStore),
+  tasks: Context.get(context, TaskStore.TaskStore),
+  channels: Context.get(context, ChannelStore.ChannelStore),
+  channelBindings: Context.get(context, ChannelBindingStore.ChannelBindingStore),
+  contacts: Context.get(context, ContactStore.ContactStore),
+  deliveries: Context.get(context, DeliveryStore.DeliveryStore),
+  store: Context.get(context, Store.Store),
+  checkpoints: Context.get(context, Checkpoint.Checkpoint),
+  workspace: Context.get(context, WorkspaceStore.WorkspaceStore),
+  members: Context.get(context, MemberStore.MemberStore),
+  roles: Context.get(context, RoleStore.RoleStore),
+  assignments: Context.get(context, AssignmentStore.AssignmentStore),
+  invitations: Context.get(context, InvitationStore.InvitationStore),
+  notifications: Context.get(context, NotificationStore.NotificationStore),
+  groups: Context.get(context, GroupStore.GroupStore),
+  groupMemberships: Context.get(context, GroupMembershipStore.GroupMembershipStore),
+  groupFollows: Context.get(context, GroupFollowStore.GroupFollowStore),
+  readStates: Context.get(context, ReadStateStore.ReadStateStore),
+  connections: Context.get(context, ConnectionStore.ConnectionStore),
+  connectionCredentials: Context.get(context, ConnectionCredentialStore.ConnectionCredentialStore),
+  agents: Context.get(context, AgentStore.AgentStore),
+  turns: Context.get(context, TurnStore.TurnStore),
+  sessionStates: Context.get(context, SessionStateStore.SessionStateStore),
+  sessionLogs: Context.get(context, SessionLogStore.SessionLogStore),
 });
 export type Bound = ReturnType<typeof bind>;
 
@@ -120,7 +120,7 @@ export type Bound = ReturnType<typeof bind>;
  * page, reversed.
  */
 export const listOldestFirst = (
-  notificationStore: NotificationStore.Interface,
+  notificationStore: NotificationStore.NotificationStore["Service"],
   recipient: Notification.Recipient,
   options: { readonly limit: number },
 ) =>
@@ -140,8 +140,8 @@ const withHostServices = (
     bind(
       context.pipe(
         Context.add(Crypto.Crypto, crypto),
-        Context.add(TurnJobs.Service, TurnJobs.noRunner),
-        Context.add(DeliveryJobs.Service, DeliveryJobs.noRunner),
+        Context.add(TurnJobs.TurnJobs, TurnJobs.noRunner),
+        Context.add(DeliveryJobs.DeliveryJobs, DeliveryJobs.noRunner),
         Context.add(Integrations.Integrations, integrations),
       ),
     ),
@@ -149,13 +149,13 @@ const withHostServices = (
 
 /** One workspace's stores and signals on a host. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
-  Effect.flatMap(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
+  Effect.flatMap(Context.get(host, WorkspaceStorage.WorkspaceStorage).forWorkspace(id), (context) =>
     withHostServices(context, Context.get(host, Crypto.Crypto)),
   );
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
 export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
-  const workspaceStorage = yield* WorkspaceStorage.Service;
+  const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage;
   const crypto = yield* Crypto.Crypto;
   return yield* withHostServices(yield* workspaceStorage.forWorkspace(id), crypto);
 });
@@ -168,8 +168,8 @@ export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
   Object.assign({}, bound, {
     context: Context.add(
       bound.context,
-      Store.Service,
-      Store.Service.of(
+      Store.Store,
+      Store.Store.of(
         Object.assign({}, bound.store, {
           transaction: <A, E, R>(program: Effect.Effect<A, E, R>) =>
             bound.store.transaction(Effect.andThen(program, Effect.fail(failure))),
@@ -211,7 +211,7 @@ export const seed = (
   members: ReadonlyArray<Actor.Value>,
   viewers: ReadonlyArray<Actor.Value>,
 ) =>
-  Effect.flatMap(Journal.Service, (journal) =>
+  Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
       Effect.gen(function* () {
         for (const member of members)
@@ -235,7 +235,7 @@ export const seed = (
       }),
     ),
   ).pipe(
-    Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
     Effect.provide(core(bound)),
   );
 
@@ -256,7 +256,7 @@ export const publishedMessage = (activity: ThreadActivity.Record) =>
 export const placed = Effect.fnUntraced(function* <
   A extends { readonly message: ThreadMessage.Record },
 >(result: A) {
-  const threadActivityStore = yield* ThreadActivityStore.Service;
+  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
   const found = (yield* threadActivityStore.listByThread(result.message.threadId)).find(
     (activity) => publishedMessage(activity) === result.message.id,
   );
@@ -271,7 +271,9 @@ export const placed = Effect.fnUntraced(function* <
 export const placedIn =
   (bound: Bound) =>
   <A extends { readonly message: ThreadMessage.Record }>(result: A) =>
-    placed(result).pipe(Effect.provideService(ThreadActivityStore.Service, bound.activities));
+    placed(result).pipe(
+      Effect.provideService(ThreadActivityStore.ThreadActivityStore, bound.activities),
+    );
 
 /**
  * Core's internal thread reads and writes, for fixtures that write what no operation does. Provide
@@ -345,5 +347,3 @@ export const replacing = <Id, A, E>(
         : rows,
     ),
 });
-
-export * as Support from "./support.ts";

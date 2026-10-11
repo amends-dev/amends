@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Workspace } from "../workspace/workspace.ts";
-import { Target } from "./target.ts";
+import * as Workspace from "../workspace/workspace.ts";
+import * as Target from "./target.ts";
 
 /** The resources a grant covers: a whole workspace or one exact target. */
 export const Value = Schema.TaggedUnion({
@@ -20,5 +20,3 @@ export const covers = (scope: Value, target: Target.Reference): boolean =>
     Workspace: ({ workspaceId }) => workspaceId === target.workspaceId,
     Target: ({ target: exact }) => equivalentTarget(exact, target),
   });
-
-export * as Scope from "./scope.ts";

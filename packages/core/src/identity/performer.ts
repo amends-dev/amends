@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { MemberId } from "../workspace/member/id.ts";
-import { Identity } from "./identity.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as Identity from "./identity.ts";
 
 export const SystemId = Schema.NonEmptyString.check(Schema.isTrimmed()).pipe(
   Schema.brand("SystemPerformerId"),
@@ -14,5 +14,3 @@ export const Reference = Schema.TaggedUnion({
   System: { id: SystemId },
 });
 export type Reference = typeof Reference.Type;
-
-export * as Performer from "./performer.ts";

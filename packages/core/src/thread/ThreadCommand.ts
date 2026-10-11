@@ -9,33 +9,33 @@
  *
  * @since 0.1.0
  */
-import { Identity } from "../identity/identity.ts";
-import { Notification } from "../notification/notification.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Notification from "../notification/notification.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema, Predicate } from "effect";
 import { type DateTime, type PlatformError } from "effect";
-import { Group } from "../group/group.ts";
-import type { Event } from "../journal/event.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Task } from "../task/Task.ts";
-import { TaskStore } from "../task/TaskStore.ts";
-import { Member } from "../workspace/member/member.ts";
-import { Thread } from "./Thread.ts";
-import { ThreadFacts } from "./ThreadFacts.ts";
-import { ThreadQuery } from "./ThreadQuery.ts";
-import { ThreadStore } from "./ThreadStore.ts";
-import { ThreadActivity } from "./ThreadActivity.ts";
-import { ThreadActivityFacts } from "./ThreadActivityFacts.ts";
-import { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { ThreadActivityStore } from "./ThreadActivityStore.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
-import { ThreadMessageActivity } from "./ThreadMessageActivity.ts";
-import { ThreadMessageFacts } from "./ThreadMessageFacts.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
-import { ThreadParticipationFacts } from "./ThreadParticipationFacts.ts";
+import * as Group from "../group/group.ts";
+import type * as Event from "../journal/event.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Task from "../task/Task.ts";
+import * as TaskStore from "../task/TaskStore.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as Thread from "./Thread.ts";
+import * as ThreadFacts from "./ThreadFacts.ts";
+import * as ThreadQuery from "./ThreadQuery.ts";
+import * as ThreadStore from "./ThreadStore.ts";
+import * as ThreadActivity from "./ThreadActivity.ts";
+import * as ThreadActivityFacts from "./ThreadActivityFacts.ts";
+import * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as ThreadActivityStore from "./ThreadActivityStore.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
+import * as ThreadMessageFacts from "./ThreadMessageFacts.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
+import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 
 /**
  * A member to admit has no current group admission or active workspace membership.
@@ -275,67 +275,67 @@ export interface ActivityPublished<A> {
 }
 
 /**
+ * The shared writes of threads. Internal: not among `Core.Operations`.
+ *
+ * @effect-expect-leaking Transaction
+ *
  * The shared writes.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Create a thread, as every workflow that opens one does: record the thread, admit its starting
-   * participants at the first position, and publish the opening message with its recipients, so
-   * no thread exists without participants or activity. A workflow that creates the thread as
-   * something more, such as a task, records that next in the same commit. The caller owns
-   * authorization and the choice of participants.
-   */
-  readonly create: (
-    input: CreateInput,
-  ) => Effect.Effect<Created, Error, Store.Transaction | Publication.Service>;
-  /**
-   * Publish a message, admitting the participants it selects. The caller authorizes the workflow,
-   * its author, and the selected participants; rules such as requiring a human author belong to
-   * that caller.
-   */
-  readonly publishMessage: (
-    input: MessageInput,
-  ) => Effect.Effect<MessagePublished, Error, Store.Transaction | Publication.Service>;
-  /**
-   * Replace a message's text and mentions at its next revision, admitting the members it newly
-   * mentions and telling them, and them alone; on a task's thread, editing the opening message
-   * changes the task's description, so every participant is told and the assignee asked to work on
-   * it anew. The caller authorizes the editor, checks the revision the editor last saw, and gives a
-   * message that still has text.
-   */
-  readonly editMessage: (
-    input: EditInput,
-  ) => Effect.Effect<MessageEdited, Error, Store.Transaction | Publication.Service>;
-  /**
-   * Delete a message: its text is gone, its place in the thread stays, and no one is told. The
-   * caller authorizes the deletion and gives a message not yet deleted.
-   */
-  readonly deleteMessage: (
-    input: DeleteInput,
-  ) => Effect.Effect<MessageDeleted, Error, Store.Transaction | Publication.Service>;
-  /**
-   * Publish one activity in the caller's commit: take the thread's next position, admit the
-   * participants asked for, run the owning domain's step, and record the activity it returns
-   * there, caused by the fact the step published. The caller authorizes the operation.
-   */
-  readonly publishActivity: <A, K extends ThreadActivityKind.Definition, E, R>(
-    input: ActivityInput<A, K, E, R>,
-  ) => Effect.Effect<ActivityPublished<A>, E | Error, R | Store.Transaction | Publication.Service>;
-}
-
-/**
- * The shared writes of threads. Internal: not among `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- * @effect-expect-leaking Transaction
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadCommand",
-) {}
+export class ThreadCommand extends Context.Service<
+  ThreadCommand,
+  {
+    /**
+     * Create a thread, as every workflow that opens one does: record the thread, admit its starting
+     * participants at the first position, and publish the opening message with its recipients, so
+     * no thread exists without participants or activity. A workflow that creates the thread as
+     * something more, such as a task, records that next in the same commit. The caller owns
+     * authorization and the choice of participants.
+     */
+    readonly create: (
+      input: CreateInput,
+    ) => Effect.Effect<Created, Error, Store.Transaction | Publication.Publication>;
+    /**
+     * Publish a message, admitting the participants it selects. The caller authorizes the workflow,
+     * its author, and the selected participants; rules such as requiring a human author belong to
+     * that caller.
+     */
+    readonly publishMessage: (
+      input: MessageInput,
+    ) => Effect.Effect<MessagePublished, Error, Store.Transaction | Publication.Publication>;
+    /**
+     * Replace a message's text and mentions at its next revision, admitting the members it newly
+     * mentions and telling them, and them alone; on a task's thread, editing the opening message
+     * changes the task's description, so every participant is told and the assignee asked to work on
+     * it anew. The caller authorizes the editor, checks the revision the editor last saw, and gives a
+     * message that still has text.
+     */
+    readonly editMessage: (
+      input: EditInput,
+    ) => Effect.Effect<MessageEdited, Error, Store.Transaction | Publication.Publication>;
+    /**
+     * Delete a message: its text is gone, its place in the thread stays, and no one is told. The
+     * caller authorizes the deletion and gives a message not yet deleted.
+     */
+    readonly deleteMessage: (
+      input: DeleteInput,
+    ) => Effect.Effect<MessageDeleted, Error, Store.Transaction | Publication.Publication>;
+    /**
+     * Publish one activity in the caller's commit: take the thread's next position, admit the
+     * participants asked for, run the owning domain's step, and record the activity it returns
+     * there, caused by the fact the step published. The caller authorizes the operation.
+     */
+    readonly publishActivity: <A, K extends ThreadActivityKind.Definition, E, R>(
+      input: ActivityInput<A, K, E, R>,
+    ) => Effect.Effect<
+      ActivityPublished<A>,
+      E | Error,
+      R | Store.Transaction | Publication.Publication
+    >;
+  }
+>()("@amends-dev/core/thread/ThreadCommand") {}
 
 /** The participant an author publishes as. */
 const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.Reference =>
@@ -388,13 +388,13 @@ const recipientsOf = (
  * @since 0.1.0
  */
 export const make = Effect.fn("ThreadCommand.make")(function* () {
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadStore = yield* ThreadStore.Service;
-  const threadActivityStore = yield* ThreadActivityStore.Service;
-  const taskStore = yield* TaskStore.Service;
-  const journal = yield* Journal.Service;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadStore = yield* ThreadStore.ThreadStore;
+  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
+  const taskStore = yield* TaskStore.TaskStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   /** The position the thread's next activity takes, read in the caller's transaction. */
   const nextSequence = Effect.fn("ThreadCommand.nextSequence")(function* (threadId: Thread.Id) {
@@ -726,7 +726,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     return { thread, message: published.message, activity: published.activity } satisfies Created;
   });
 
-  return Service.of({ create, publishMessage, editMessage, deleteMessage, publishActivity });
+  return ThreadCommand.of({ create, publishMessage, editMessage, deleteMessage, publishActivity });
 });
 
 /**
@@ -735,6 +735,4 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as ThreadCommand from "./ThreadCommand.ts";
+export const layer = Layer.effect(ThreadCommand, make());

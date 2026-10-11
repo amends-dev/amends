@@ -22,5 +22,3 @@ export const isName = Schema.makeFilter(
 
 /** The most characters a name may have, as people choose one. */
 export const nameLength = 80;
-
-export * as Text from "./text.ts";

@@ -1,9 +1,10 @@
 import { Group } from "../group/index.ts";
 import { Thread, ThreadStore } from "../thread/index.ts";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Thread.Record));
 const latestRows = Rows.make(Schema.fromJsonString(Thread.Latest));
@@ -16,12 +17,12 @@ const newestFirst = (
 
 /** Workspace-bound threads projection storage. @category constructors */
 export const make = Effect.fn("Threads.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const inGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const records = yield* rows.all((yield* read).records.of("threads"));
     return records.filter((record) => record.groupId === groupId);
   });
-  const driver: ThreadStore.Interface = {
+  const driver: ThreadStore.ThreadStore["Service"] = {
     get: Effect.fn("Threads.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("threads"), id);
@@ -144,5 +145,4 @@ export const make = Effect.fn("Threads.make")(function* () {
   return ThreadStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadStore.Service, make());
-export * as Threads from "./threads.ts";
+export const layer = Layer.effect(ThreadStore.ThreadStore, make());

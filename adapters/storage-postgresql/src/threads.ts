@@ -2,7 +2,7 @@ import { Thread, ThreadStore, ThreadMessage } from "@amends-dev/core/thread";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
 import { threads } from "./schema.ts";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(Thread.Record));
@@ -43,10 +43,10 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
   );
 /** Workspace-bound threads projection storage. @category constructors */
 export const make = Effect.fn("Threads.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(threads.workspaceId, workspaceId);
-  const driver: ThreadStore.Interface = {
+  const driver: ThreadStore.ThreadStore["Service"] = {
     get: Effect.fn("Threads.get")(
       function* (id) {
         return yield* guard(
@@ -208,5 +208,4 @@ export const make = Effect.fn("Threads.make")(function* () {
   return ThreadStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadStore.Service, make());
-export * as Threads from "./threads.ts";
+export const layer = Layer.effect(ThreadStore.ThreadStore, make());

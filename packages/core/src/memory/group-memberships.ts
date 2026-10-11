@@ -1,8 +1,9 @@
 import { Group, GroupMembership, GroupMembershipStore } from "../group/index.ts";
 import { Array, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(GroupMembership.Record));
 const byId = (left: GroupMembership.Record, right: GroupMembership.Record) =>
@@ -10,9 +11,9 @@ const byId = (left: GroupMembership.Record, right: GroupMembership.Record) =>
 
 /** Recorded group admissions; one active admission per group and workspace membership. @category constructors */
 export const make = Effect.fn("GroupMemberships.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("groupMemberships")));
-  const driver: GroupMembershipStore.Interface = {
+  const driver: GroupMembershipStore.GroupMembershipStore["Service"] = {
     get: Effect.fn("GroupMemberships.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("groupMemberships"), id);
@@ -165,6 +166,4 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
 });
 
 /** Provide group admission storage over the caller's binding. @category layers */
-export const layer = Layer.effect(GroupMembershipStore.Service, make());
-
-export * as GroupMemberships from "./group-memberships.ts";
+export const layer = Layer.effect(GroupMembershipStore.GroupMembershipStore, make());

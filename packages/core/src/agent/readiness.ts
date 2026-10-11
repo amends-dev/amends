@@ -9,8 +9,8 @@ import type {
   Integrations,
 } from "@amends-dev/connection";
 import { Array, DateTime, Effect, Option, Order } from "effect";
-import { Connection } from "../connection/connection.ts";
-import type { Agent } from "./agent.ts";
+import * as Connection from "../connection/connection.ts";
+import type * as Agent from "./agent.ts";
 
 /** How an agent is set up, as far as whether it can run depends on it. */
 export type Setup = Pick<Agent.Record, "harness" | "model" | "sandbox">;
@@ -181,5 +181,3 @@ export const chooseHarness = (
   previous: Connection.Id | undefined,
 ): Connection.Id | undefined =>
   previous !== undefined && harnesses.includes(previous) ? previous : harnesses[0];
-
-export * as AgentReadiness from "./readiness.ts";

@@ -20,23 +20,23 @@
  */
 import { Context, Effect, Layer, Option } from "effect";
 import type { DateTime } from "effect";
-import { Journal } from "../journal/journal.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import type { Thread } from "../thread/Thread.ts";
-import type { ThreadActivity } from "../thread/ThreadActivity.ts";
-import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
-import { ThreadCommand } from "../thread/ThreadCommand.ts";
-import type { ThreadMessage } from "../thread/ThreadMessage.ts";
-import type { ThreadParticipation } from "../thread/ThreadParticipation.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
-import { ThreadStore } from "../thread/ThreadStore.ts";
-import { TurnCommand } from "../turn/command.ts";
-import { TurnStore } from "../turn/store.ts";
-import type { Member } from "../workspace/member/member.ts";
-import { Task } from "./Task.ts";
-import { TaskActivity } from "./TaskActivity.ts";
-import { TaskFacts } from "./TaskFacts.ts";
+import * as Journal from "../journal/journal.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import type * as Thread from "../thread/Thread.ts";
+import type * as ThreadActivity from "../thread/ThreadActivity.ts";
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
+import * as ThreadCommand from "../thread/ThreadCommand.ts";
+import type * as ThreadMessage from "../thread/ThreadMessage.ts";
+import type * as ThreadParticipation from "../thread/ThreadParticipation.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
+import * as ThreadStore from "../thread/ThreadStore.ts";
+import * as TurnCommand from "../turn/command.ts";
+import * as TurnStore from "../turn/store.ts";
+import type * as Member from "../workspace/member/member.ts";
+import * as Task from "./Task.ts";
+import * as TaskActivity from "./TaskActivity.ts";
+import * as TaskFacts from "./TaskFacts.ts";
 
 /**
  * What the writes can fail with.
@@ -96,39 +96,35 @@ export interface Updated {
 }
 
 /**
+ * The shared writes of tasks. Internal: not among `Core.Operations`.
+ *
+ * @effect-expect-leaking Transaction
+ *
  * The shared writes.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Make the thread a task, at its next position, in the caller's commit. The caller authorizes
-   * the creation and gives a thread without a task.
-   */
-  readonly create: (
-    input: CreateInput,
-  ) => Effect.Effect<Created, Error, Store.Transaction | Publication.Service>;
-  /**
-   * Change a task in one way, at its thread's next position, in the caller's commit. An agent
-   * taken off the task, by reassignment or by a status that asks no work, has its turn there
-   * stopped. The caller authorizes the change and checks it replaces the task's value as it is.
-   */
-  readonly update: (
-    input: UpdateInput,
-  ) => Effect.Effect<Updated, Error, Store.Transaction | Publication.Service>;
-}
-
-/**
- * The shared writes of tasks. Internal: not among `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- * @effect-expect-leaking Transaction
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/task/TaskCommand",
-) {}
+export class TaskCommand extends Context.Service<
+  TaskCommand,
+  {
+    /**
+     * Make the thread a task, at its next position, in the caller's commit. The caller authorizes
+     * the creation and gives a thread without a task.
+     */
+    readonly create: (
+      input: CreateInput,
+    ) => Effect.Effect<Created, Error, Store.Transaction | Publication.Publication>;
+    /**
+     * Change a task in one way, at its thread's next position, in the caller's commit. An agent
+     * taken off the task, by reassignment or by a status that asks no work, has its turn there
+     * stopped. The caller authorizes the change and checks it replaces the task's value as it is.
+     */
+    readonly update: (
+      input: UpdateInput,
+    ) => Effect.Effect<Updated, Error, Store.Transaction | Publication.Publication>;
+  }
+>()("@amends-dev/core/task/TaskCommand") {}
 
 const member = (memberId: Member.Id): ThreadParticipation.Reference => ({
   _tag: "Member",
@@ -184,13 +180,13 @@ const leftBy = (task: Task.Record, change: Task.Change): Member.Id | null =>
  * @since 0.1.0
  */
 export const make = Effect.fn("TaskCommand.make")(function* () {
-  const journal = yield* Journal.Service;
-  const threadCommand = yield* ThreadCommand.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadStore = yield* ThreadStore.Service;
-  const turnCommand = yield* TurnCommand.Service;
-  const turnStore = yield* TurnStore.Service;
-  const { workspaceId } = yield* Store.Service;
+  const journal = yield* Journal.Journal;
+  const threadCommand = yield* ThreadCommand.ThreadCommand;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadStore = yield* ThreadStore.ThreadStore;
+  const turnCommand = yield* TurnCommand.TurnCommand;
+  const turnStore = yield* TurnStore.TurnStore;
+  const { workspaceId } = yield* Store.Store;
 
   /** The thread a task belongs to, which a task cannot outlive. */
   const threadOf = Effect.fnUntraced(function* (task: Task.Record) {
@@ -294,7 +290,7 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
     return { task: next, activity } satisfies Updated;
   });
 
-  return Service.of({ create, update });
+  return TaskCommand.of({ create, update });
 });
 
 /**
@@ -304,6 +300,4 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as TaskCommand from "./TaskCommand.ts";
+export const layer = Layer.effect(TaskCommand, make());

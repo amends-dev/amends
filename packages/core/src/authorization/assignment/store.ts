@@ -1,12 +1,12 @@
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../../journal/store.ts";
-import { Member } from "../../workspace/member/member.ts";
+import type * as Store from "../../journal/store.ts";
+import * as Member from "../../workspace/member/member.ts";
 
-import { Assignment } from "./assignment.ts";
-import { Role } from "../role/role.ts";
-import { StoreInput } from "../../journal/StoreInput.ts";
-import type { WorkspaceId } from "../../workspace/id.ts";
+import * as Assignment from "./assignment.ts";
+import * as Role from "../role/role.ts";
+import * as StoreInput from "../../journal/StoreInput.ts";
+import type * as WorkspaceId from "../../workspace/id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("AssignmentStore.Failure", {
   operation: Schema.String,
@@ -31,47 +31,46 @@ export class Conflict extends Schema.TaggedError<Conflict>()("AssignmentStore.Co
  * Membership, role ownership, permission compatibility, and grant authority are
  * checked by services before publication.
  *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  /** Find an active or revoked assignment in this workspace; None if absent. */
-  readonly get: (
-    assignmentId: Assignment.Id,
-  ) => Effect.Effect<Option.Option<Assignment.Record>, Failure>;
+export class AssignmentStore extends Context.Service<
+  AssignmentStore,
+  {
+    /** Find an active or revoked assignment in this workspace; None if absent. */
+    readonly get: (
+      assignmentId: Assignment.Id,
+    ) => Effect.Effect<Option.Option<Assignment.Record>, Failure>;
 
-  /** All active role and direct grant assignments for this member in this workspace. */
-  readonly listActiveByMember: (
-    memberId: Member.Id,
-  ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Failure>;
+    /** All active role and direct grant assignments for this member in this workspace. */
+    readonly listActiveByMember: (
+      memberId: Member.Id,
+    ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Failure>;
 
-  /** All active Role-source assignments referencing this role in this workspace. */
-  readonly listActiveByRole: (
-    roleId: Role.Id,
-  ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Failure>;
+    /** All active Role-source assignments referencing this role in this workspace. */
+    readonly listActiveByRole: (
+      roleId: Role.Id,
+    ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Failure>;
 
-  /**
-   * Insert an active assignment. Fail with Conflict for a reused assignment ID, including
-   * revoked IDs. Overlapping grants remain separate assignments. Never upsert.
-   */
-  readonly insert: (
-    record: Assignment.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Insert an active assignment. Fail with Conflict for a reused assignment ID, including
+     * revoked IDs. Overlapping grants remain separate assignments. Never upsert.
+     */
+    readonly insert: (
+      record: Assignment.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
-  /**
-   * Change an active assignment to revoked, retaining its ID, workspace, member,
-   * and source. Fail with Conflict if absent or already revoked. Assigning access
-   * again requires a fresh ID.
-   */
-  readonly markRevoked: (
-    assignmentId: Assignment.Id,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/authorization/assignment-store/Service",
-) {}
+    /**
+     * Change an active assignment to revoked, retaining its ID, workspace, member,
+     * and source. Fail with Conflict if absent or already revoked. Assigning access
+     * again requires a fresh ID.
+     */
+    readonly markRevoked: (
+      assignmentId: Assignment.Id,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/authorization/assignment-store/Service") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -80,7 +79,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: AssignmentStore["Service"],
+): AssignmentStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -101,5 +103,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       Effect.flatMap(write("markRevoked", Assignment.Id, assignmentId), driver.markRevoked),
   };
 };
-
-export * as AssignmentStore from "./store.ts";

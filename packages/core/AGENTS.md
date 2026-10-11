@@ -11,11 +11,12 @@ module dependencies, schema names, and construction conventions.
   `@since` on every export, as [threads](../../docs/threads.md#code-conventions) states.
 - Keep models independent of services and projections. Separate fact
   declarations from projection handlers and application workflows.
-- Import owning leaf modules inside core. Public domain barrels relay canonical
-  module namespaces; internal modules do not import through those barrels.
+- Import owning leaf modules inside core, with `import * as`; no module re-exports itself.
+  Public domain barrels relay module namespaces with `export * as`; internal modules do not
+  import through those barrels.
 - Use ID-only leaf modules when references between models would create a cycle.
 - Follow the documented meanings of `Record`, `Value`, `Reference`, `Definition`,
-  operation inputs/options, `State`, `Status`, and service `Interface`.
+  operation inputs/options, `State`, `Status`, and a service's shape, `Foo["Service"]`.
 - Preserve serialized contracts and service keys when moving or renaming source.
 - Keep tests grouped by domain and feature under `test/`.
 - Read operations authorize and query current state without opening a transaction.

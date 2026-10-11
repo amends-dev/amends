@@ -1,18 +1,19 @@
 import { GroupFollow, GroupFollowStore } from "../group/index.ts";
 import { Array, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(GroupFollow.Record));
 
 /** Group follows, active and ended; one active follow per group admission. @category constructors */
 export const make = Effect.fn("GroupFollows.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const active = Effect.flatMap(read, (space) => rows.all(space.records.of("groupFollows"))).pipe(
     Effect.map((records) => records.filter((record) => record.status === "active")),
   );
-  const driver: GroupFollowStore.Interface = {
+  const driver: GroupFollowStore.GroupFollowStore["Service"] = {
     get: Effect.fn("GroupFollows.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("groupFollows"), id);
@@ -87,6 +88,4 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
 });
 
 /** Provide group follow storage over the caller's binding. @category layers */
-export const layer = Layer.effect(GroupFollowStore.Service, make());
-
-export * as GroupFollows from "./group-follows.ts";
+export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make());

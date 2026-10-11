@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Permission } from "../authorization/permission.ts";
+import * as Permission from "../authorization/permission.ts";
 
 /**
  * Create a task in a group: with its thread, or in one of the group's conversations.
@@ -27,5 +27,3 @@ export const Update = Permission.make("task.update", {
   targetKind: "Thread",
   builtinTier: "member",
 });
-
-export * as TaskPermissions from "./TaskPermissions.ts";

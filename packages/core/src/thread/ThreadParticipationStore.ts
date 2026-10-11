@@ -7,14 +7,14 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option, DateTime } from "effect";
-import type { Store } from "../journal/store.ts";
+import type * as Store from "../journal/store.ts";
 
-import { ThreadParticipation } from "./ThreadParticipation.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
 
-import { ThreadId } from "./ThreadId.ts";
-import { GroupMembership } from "../group/membership/membership.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as GroupMembership from "../group/membership/membership.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing participations.
@@ -40,83 +40,78 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadParticipatio
 }) {}
 
 /**
- * What a storage adapter implements for participations.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  readonly get: (
-    id: ThreadParticipation.Id,
-  ) => Effect.Effect<Option.Option<ThreadParticipation.Record>, Failure>;
-  /**
-   * Find several participations, active or ended, in one read. Absent IDs are omitted and each
-   * found record appears once; order is unspecified, so callers index results by ID. An empty
-   * request reads nothing.
-   */
-  readonly getMany: (
-    ids: ReadonlyArray<ThreadParticipation.Id>,
-  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
-  /**
-   * Every participation the thread has had, active or ended, in stable ID order. A history read
-   * for inspection; operations use the bounded reads below.
-   */
-  readonly listByThread: (
-    id: ThreadId.Id,
-  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
-  /**
-   * A page of the thread's active participations in binary participation-ID order, after the
-   * exclusive cursor.
-   */
-  readonly pageActiveByThread: (
-    id: ThreadId.Id,
-    options: ThreadParticipation.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
-  /**
-   * The thread's active participations of these participants, in one read. Each found record
-   * appears once; order is unspecified, so callers index results by participant. An empty
-   * request reads nothing.
-   */
-  readonly findActive: (
-    id: ThreadId.Id,
-    participants: ReadonlyArray<ThreadParticipation.Reference>,
-  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
-  /**
-   * End every active participation held through this group admission at `endedAt`, however many
-   * there are, in one write; ended ones keep their time. A departure from the group ends them all.
-   */
-  readonly endByAdmission: (
-    id: GroupMembership.Id,
-    endedAt: DateTime.Utc,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** End exactly the addressed active participation; mismatched or terminal records conflict. */
-  readonly end: (
-    departure: ThreadParticipation.Departure,
-    endedAt: DateTime.Utc,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Reject reused IDs and a second active
-   * participation for one participant in the thread. The thread and admission are recorded as
-   * given, checked when the participant is admitted. Preserve historical values on replay.
-   */
-  readonly insert: (
-    record: ThreadParticipation.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The participation store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for participations.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadParticipationStore",
-) {}
+export class ThreadParticipationStore extends Context.Service<
+  ThreadParticipationStore,
+  {
+    readonly get: (
+      id: ThreadParticipation.Id,
+    ) => Effect.Effect<Option.Option<ThreadParticipation.Record>, Failure>;
+    /**
+     * Find several participations, active or ended, in one read. Absent IDs are omitted and each
+     * found record appears once; order is unspecified, so callers index results by ID. An empty
+     * request reads nothing.
+     */
+    readonly getMany: (
+      ids: ReadonlyArray<ThreadParticipation.Id>,
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    /**
+     * Every participation the thread has had, active or ended, in stable ID order. A history read
+     * for inspection; operations use the bounded reads below.
+     */
+    readonly listByThread: (
+      id: ThreadId.Id,
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    /**
+     * A page of the thread's active participations in binary participation-ID order, after the
+     * exclusive cursor.
+     */
+    readonly pageActiveByThread: (
+      id: ThreadId.Id,
+      options: ThreadParticipation.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    /**
+     * The thread's active participations of these participants, in one read. Each found record
+     * appears once; order is unspecified, so callers index results by participant. An empty
+     * request reads nothing.
+     */
+    readonly findActive: (
+      id: ThreadId.Id,
+      participants: ReadonlyArray<ThreadParticipation.Reference>,
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, Failure>;
+    /**
+     * End every active participation held through this group admission at `endedAt`, however many
+     * there are, in one write; ended ones keep their time. A departure from the group ends them all.
+     */
+    readonly endByAdmission: (
+      id: GroupMembership.Id,
+      endedAt: DateTime.Utc,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /** End exactly the addressed active participation; mismatched or terminal records conflict. */
+    readonly end: (
+      departure: ThreadParticipation.Departure,
+      endedAt: DateTime.Utc,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Reject reused IDs and a second active
+     * participation for one participant in the thread. The thread and admission are recorded as
+     * given, checked when the participant is admitted. Preserve historical values on replay.
+     */
+    readonly insert: (
+      record: ThreadParticipation.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/thread/ThreadParticipationStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -125,7 +120,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: ThreadParticipationStore["Service"],
+): ThreadParticipationStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -170,5 +168,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       ),
   };
 };
-
-export * as ThreadParticipationStore from "./ThreadParticipationStore.ts";

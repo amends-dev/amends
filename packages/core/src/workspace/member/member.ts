@@ -1,9 +1,9 @@
 import { Schema } from "effect";
-import { Audience } from "../../journal/audience.ts";
-import { Identity } from "../../identity/identity.ts";
-import { WorkspaceId } from "../id.ts";
-import { MemberId } from "./id.ts";
-import { Text } from "../../text/text.ts";
+import * as Audience from "../../journal/audience.ts";
+import * as Identity from "../../identity/identity.ts";
+import * as WorkspaceId from "../id.ts";
+import * as MemberId from "./id.ts";
+import * as Text from "../../text/text.ts";
 
 /** Identifies one admission to a workspace; rejoining creates a new membership. */
 export const Id = MemberId.Id;
@@ -35,5 +35,3 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
 
 /** One workspace membership alone. */
 export const audienceOf = (memberId: Id): Audience.Scope => Audience.make("member", memberId);
-
-export * as Member from "./member.ts";

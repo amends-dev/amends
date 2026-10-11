@@ -7,12 +7,12 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
+import type * as Store from "../journal/store.ts";
 
-import { Thread } from "./Thread.ts";
-import { GroupId } from "../group/id.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import * as Thread from "./Thread.ts";
+import * as GroupId from "../group/id.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing threads.
@@ -38,84 +38,79 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadStore.Confli
 }) {}
 
 /**
- * What a storage adapter implements for threads.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Record>, Failure>;
-  /**
-   * Several threads in one read. Absent IDs are omitted and each found thread appears once; order
-   * is unspecified, so callers index results by ID. An empty request reads nothing.
-   */
-  readonly getMany: (
-    ids: ReadonlyArray<Thread.Id>,
-  ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
-  /**
-   * Every thread of a group in stable ID order. A history read for inspection; operations read
-   * pages.
-   */
-  readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
-  /**
-   * A group's threads with recorded activity, newest latest activity first, then ID in descending
-   * binary order, after the exclusive `before` cursor and up to `limit`.
-   */
-  readonly listByLatest: (
-    id: GroupId.Id,
-    options: Thread.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
-  /**
-   * A group's threads, newest start first, then ID in descending binary order, after the exclusive
-   * `before` cursor and up to `limit`.
-   */
-  readonly listByStart: (
-    id: GroupId.Id,
-    options: Thread.OpeningOptions,
-  ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
-  /**
-   * Reject reused IDs. The group and creator are recorded as
-   * given, checked when the thread starts. Preserve historical values on replay.
-   */
-  readonly insert: (
-    record: Thread.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Projection write that sets a thread's title. A missing thread conflicts;
-   * the same title again changes nothing.
-   */
-  readonly rename: (
-    renamed: Thread.Renamed,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Latest content activity of several threads in one read. Threads without any, and absent IDs,
-   * are omitted; order is unspecified.
-   */
-  readonly getLatest: (
-    ids: ReadonlyArray<Thread.Id>,
-  ) => Effect.Effect<ReadonlyArray<Thread.Latest>, Failure>;
-  /**
-   * Projection write that advances a thread's latest content activity. A position at or before the
-   * recorded one changes nothing; a missing thread conflicts.
-   */
-  readonly recordLatest: (
-    latest: Thread.Latest,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The thread store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for threads.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadStore",
-) {}
+export class ThreadStore extends Context.Service<
+  ThreadStore,
+  {
+    readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Record>, Failure>;
+    /**
+     * Several threads in one read. Absent IDs are omitted and each found thread appears once; order
+     * is unspecified, so callers index results by ID. An empty request reads nothing.
+     */
+    readonly getMany: (
+      ids: ReadonlyArray<Thread.Id>,
+    ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    /**
+     * Every thread of a group in stable ID order. A history read for inspection; operations read
+     * pages.
+     */
+    readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    /**
+     * A group's threads with recorded activity, newest latest activity first, then ID in descending
+     * binary order, after the exclusive `before` cursor and up to `limit`.
+     */
+    readonly listByLatest: (
+      id: GroupId.Id,
+      options: Thread.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    /**
+     * A group's threads, newest start first, then ID in descending binary order, after the exclusive
+     * `before` cursor and up to `limit`.
+     */
+    readonly listByStart: (
+      id: GroupId.Id,
+      options: Thread.OpeningOptions,
+    ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+    /**
+     * Reject reused IDs. The group and creator are recorded as
+     * given, checked when the thread starts. Preserve historical values on replay.
+     */
+    readonly insert: (
+      record: Thread.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Projection write that sets a thread's title. A missing thread conflicts;
+     * the same title again changes nothing.
+     */
+    readonly rename: (
+      renamed: Thread.Renamed,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Latest content activity of several threads in one read. Threads without any, and absent IDs,
+     * are omitted; order is unspecified.
+     */
+    readonly getLatest: (
+      ids: ReadonlyArray<Thread.Id>,
+    ) => Effect.Effect<ReadonlyArray<Thread.Latest>, Failure>;
+    /**
+     * Projection write that advances a thread's latest content activity. A position at or before the
+     * recorded one changes nothing; a missing thread conflicts.
+     */
+    readonly recordLatest: (
+      latest: Thread.Latest,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/thread/ThreadStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -124,7 +119,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: ThreadStore["Service"],
+): ThreadStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -151,5 +149,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       Effect.flatMap(write("recordLatest", Thread.Latest, latest), driver.recordLatest),
   };
 };
-
-export * as ThreadStore from "./ThreadStore.ts";

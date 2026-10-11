@@ -6,13 +6,13 @@
  *
  * @since 0.1.0
  */
-import { Audience } from "../journal/audience.ts";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { Channel } from "./Channel.ts";
-import { ChannelBinding } from "./ChannelBinding.ts";
-import { Contact } from "./Contact.ts";
+import * as Audience from "../journal/audience.ts";
+import * as Fact from "../journal/fact.ts";
+import * as Subject from "../journal/subject.ts";
+import * as Group from "../group/group.ts";
+import * as Channel from "./Channel.ts";
+import * as ChannelBinding from "./ChannelBinding.ts";
+import * as Contact from "./Contact.ts";
 
 const workspace = () => [Audience.workspace];
 
@@ -97,5 +97,3 @@ export const ContactRenamed = Fact.make("channel.contact.renamed", {
   audience: workspace,
   payload: Contact.Renamed,
 });
-
-export * as ChannelFacts from "./ChannelFacts.ts";

@@ -7,13 +7,13 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadParticipationId } from "./ThreadParticipationId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { GroupMembership } from "../group/membership/membership.ts";
-import { Identity } from "../identity/identity.ts";
-import { Notification } from "../notification/notification.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadParticipationId from "./ThreadParticipationId.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as GroupMembership from "../group/membership/membership.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Notification from "../notification/notification.ts";
 
 /**
  * Names a participation; `ThreadParticipationId.Id`, where models that only refer to
@@ -271,5 +271,3 @@ export const EndReason = Schema.Literals([
  * @since 0.1.0
  */
 export type EndReason = typeof EndReason.Type;
-
-export * as ThreadParticipation from "./ThreadParticipation.ts";

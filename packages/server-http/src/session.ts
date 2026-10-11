@@ -13,7 +13,7 @@ export const layer = HttpApiBuilder.group(
   Api,
   "session",
   Effect.fn(function* (handlers) {
-    const signIn = yield* SignIn.Service;
+    const signIn = yield* SignIn.SignIn;
     return handlers.handleAll({
       methods: () => Effect.succeed(signIn.methods),
       start: ({ payload, request }) =>
@@ -22,5 +22,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 );
-
-export * as SessionHandlers from "./session.ts";

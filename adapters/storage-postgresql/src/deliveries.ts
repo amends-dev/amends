@@ -1,7 +1,7 @@
 import { Delivery, DeliveryStore } from "@amends-dev/core/channel";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { channelDeliveries } from "./schema.ts";
 
@@ -33,10 +33,10 @@ const toRow = (record: Delivery.Record): typeof channelDeliveries.$inferInsert =
 
 /** Delivery records in the workspace's database. @category constructors */
 export const make = Effect.fn("Deliveries.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(channelDeliveries.workspaceId, workspaceId);
-  const driver: DeliveryStore.Interface = {
+  const driver: DeliveryStore.DeliveryStore["Service"] = {
     get: Effect.fn("Deliveries.get")(
       function* (id) {
         return yield* guard(
@@ -112,6 +112,4 @@ export const make = Effect.fn("Deliveries.make")(function* () {
 });
 
 /** Provide delivery storage over the caller's binding. @category layers */
-export const layer = Layer.effect(DeliveryStore.Service, make());
-
-export * as Deliveries from "./deliveries.ts";
+export const layer = Layer.effect(DeliveryStore.DeliveryStore, make());

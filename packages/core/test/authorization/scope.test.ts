@@ -1,9 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import { ThreadId } from "@amends-dev/core/thread";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Scope from "../../src/authorization/scope.ts";
+import * as Target from "../../src/authorization/target.ts";
+import * as Member from "../../src/workspace/member/member.ts";
+import * as Workspace from "../../src/workspace/workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-1");
 const otherWorkspaceId = Workspace.Id.make("workspace-2");

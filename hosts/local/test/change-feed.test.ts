@@ -23,9 +23,9 @@ import {
 import { Streams } from "@amends-dev/server-http";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
-import { LocalHost } from "../src/host.ts";
-import { LocalServer } from "../src/server.ts";
+import * as DevelopmentAuthentication from "../src/authentication/authentication.ts";
+import * as LocalHost from "../src/host.ts";
+import * as LocalServer from "../src/server.ts";
 import { setup } from "./database.ts";
 
 const asToken = (token: string) =>
@@ -254,11 +254,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
           payload: { name: "bob" },
         });
         // No HTTP endpoint starts threads yet; the host's gateway does it as alice.
-        const gateway = yield* Gateway.Service;
+        const gateway = yield* Gateway.Gateway;
         const started = yield* gateway.asMember(
           workspace.id,
           { _tag: "Human", id: Identity.HumanId.make("alice") },
-          Effect.flatMap(ThreadService.Service, (threadService) =>
+          Effect.flatMap(ThreadService.ThreadService, (threadService) =>
             threadService.startDirect({ memberIds: [member.id], mentions: [], text: "Hello" }),
           ),
         );

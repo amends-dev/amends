@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import { GroupId } from "../id.ts";
-import { MemberId } from "../../workspace/member/id.ts";
-import { WorkspaceId } from "../../workspace/id.ts";
+import * as GroupId from "../id.ts";
+import * as MemberId from "../../workspace/member/id.ts";
+import * as WorkspaceId from "../../workspace/id.ts";
 
 /** Identifies one admission; a later readmission uses a fresh ID. */
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupMembershipId"));
@@ -68,5 +68,3 @@ export const Removal = Schema.Struct({
 });
 
 export interface Removal extends Schema.Schema.Type<typeof Removal> {}
-
-export * as GroupMembership from "./membership.ts";

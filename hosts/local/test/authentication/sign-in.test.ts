@@ -4,14 +4,14 @@ import { Accounts, SessionTokens, SignIn } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Cause, Clock, Crypto, Deferred, Effect, Exit, Fiber, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
-import { DevelopmentSignIn } from "../../src/authentication/sign-in.ts";
-import { DevelopmentSessionTokens } from "../../src/authentication/session-tokens.ts";
-import { DevelopmentAuthentication } from "../../src/authentication/authentication.ts";
+import * as DevelopmentSignIn from "../../src/authentication/sign-in.ts";
+import * as DevelopmentSessionTokens from "../../src/authentication/session-tokens.ts";
+import * as DevelopmentAuthentication from "../../src/authentication/authentication.ts";
 
 /** Accounts in memory: an address gets a random human ID the first time it comes up. */
-const inMemoryAccounts = Layer.sync(Accounts.Service, () => {
+const inMemoryAccounts = Layer.sync(Accounts.Accounts, () => {
   const ids = new Map<Accounts.Email, Identity.HumanId>();
-  return Accounts.Service.of({
+  return Accounts.Accounts.of({
     findOrCreate: (email) =>
       Effect.sync(() => {
         const id = ids.get(email) ?? Identity.HumanId.make(crypto.randomUUID());
@@ -26,7 +26,7 @@ const inMemoryAccounts = Layer.sync(Accounts.Service, () => {
 });
 /** The session completing sign-in gives an address: its account, whose ID is the token. */
 const sessionFor = (email: Accounts.Email) =>
-  Effect.flatMap(Accounts.Service, (accounts) => accounts.findOrCreate(email)).pipe(
+  Effect.flatMap(Accounts.Accounts, (accounts) => accounts.findOrCreate(email)).pipe(
     Effect.map((account): SignIn.Session => ({ token: account.id, account })),
   );
 
@@ -45,8 +45,8 @@ it.effect.each(["make", "layer"] as const)(
         return code;
       };
       const program = Effect.gen(function* () {
-        const signIn = yield* SignIn.Service;
-        const sessionTokens = yield* SessionTokens.Service;
+        const signIn = yield* SignIn.SignIn;
+        const sessionTokens = yield* SessionTokens.SessionTokens;
         const alice = Accounts.Email.make("alice@example.com");
         const bob = Accounts.Email.make("bob@example.com");
         expect(delivered.size).toBe(0);
@@ -88,8 +88,8 @@ it.effect.each(["make", "layer"] as const)(
         construction === "make"
           ? Effect.flatMap(DevelopmentSignIn.make(deliver), (signIn) =>
               program.pipe(
-                Effect.provideService(SignIn.Service, signIn),
-                Effect.provideService(SessionTokens.Service, DevelopmentSessionTokens.make()),
+                Effect.provideService(SignIn.SignIn, signIn),
+                Effect.provideService(SessionTokens.SessionTokens, DevelopmentSessionTokens.make()),
               ),
             )
           : program.pipe(Effect.provide(DevelopmentAuthentication.layer(deliver)));
@@ -136,7 +136,7 @@ it.effect("completing sign-in signs in as the address's account, the same one ea
         delivered.set(email, code);
       }),
     );
-    const accounts = yield* Accounts.Service;
+    const accounts = yield* Accounts.Accounts;
     const signInAs = Effect.fn(function* (email: Accounts.Email) {
       yield* signIn.start(email, undefined);
       const code = delivered.get(email);

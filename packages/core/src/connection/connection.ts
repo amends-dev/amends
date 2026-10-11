@@ -7,9 +7,9 @@
  */
 import { Connection, Integration, ModelCatalog } from "@amends-dev/connection";
 import { Schema } from "effect";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
+import * as Text from "../text/text.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
 
 export const Id = Connection.ConnectionId;
 export type Id = Connection.ConnectionId;
@@ -221,5 +221,3 @@ export const Models = Schema.Struct({
   unlisted: Schema.Boolean,
 });
 export interface Models extends Schema.Schema.Type<typeof Models> {}
-
-export * as Connection from "./connection.ts";

@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Target } from "./target.ts";
+import * as Target from "./target.ts";
 
 /** Stable identifier referenced by action requirements and permission assignments. */
 export const Name = Schema.NonEmptyString.pipe(Schema.brand("PermissionName"));
@@ -83,5 +83,3 @@ export const makeGroup = <const K extends Target.Kind>(
 
   return { make: makePermission };
 };
-
-export * as Permission from "./permission.ts";

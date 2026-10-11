@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Member } from "../../workspace/member/member.ts";
-import { Group } from "../group.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as Group from "../group.ts";
 
 /** The outcomes `GroupFollowService` reports that a caller can act on; schemas only, for contracts. */
 /** Only an agent can be made to follow by another member; people follow for themselves. */
@@ -26,5 +26,3 @@ export class NotFollowable extends Schema.TaggedError<NotFollowable>()(
   "GroupFollowService.NotFollowable",
   { groupId: Group.Id },
 ) {}
-
-export * as GroupFollowErrors from "./errors.ts";

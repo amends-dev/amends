@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
-import { Member } from "../workspace/member/member.ts";
-import { Workspace } from "../workspace/workspace.ts";
-import { Identity } from "./identity.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as Workspace from "../workspace/workspace.ts";
+import * as Identity from "./identity.ts";
 
 /** The resolved workspace member performing the current application operation. */
 export const Value = Schema.Struct({
@@ -22,8 +22,6 @@ export interface Value extends Schema.Schema.Type<typeof Value> {}
  *
  * @effect-leakable-service
  */
-export class Service extends Context.Service<Service, Value>()(
+export class Actor extends Context.Service<Actor, Value>()(
   "@amends-dev/core/identity/actor/Service",
 ) {}
-
-export * as Actor from "./actor.ts";

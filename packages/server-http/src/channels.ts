@@ -16,14 +16,20 @@ export const layerChannels = HttpApiBuilder.group(
   Api,
   "channels",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
+    const gateway = yield* Gateway.Gateway;
     /** Run a channel operation as the principal, a member of the workspace. */
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
-      operation: (channelService: ChannelService.Interface) => Effect.Effect<A, E, Actor.Service>,
+      operation: (
+        channelService: ChannelService.ChannelService["Service"],
+      ) => Effect.Effect<A, E, Actor.Actor>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
-        gateway.asMember(workspaceId, principal, Effect.flatMap(ChannelService.Service, operation)),
+        gateway.asMember(
+          workspaceId,
+          principal,
+          Effect.flatMap(ChannelService.ChannelService, operation),
+        ),
       );
     return handlers.handleAll({
       list: ({ params }) => asMember(params.workspaceId, (channelService) => channelService.list),
@@ -57,14 +63,14 @@ export const layerEvents = HttpApiBuilder.group(
   Api,
   "channelEvents",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
+    const gateway = yield* Gateway.Gateway;
     return handlers.handleAll({
       receive: ({ params, payload }) =>
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest;
           const received = yield* gateway.inWorkspace(
             params.workspaceId,
-            Effect.flatMap(ChannelIntake.Service, (channelIntake) =>
+            Effect.flatMap(ChannelIntake.ChannelIntake, (channelIntake) =>
               channelIntake.receive(params.channelId, {
                 headers: { ...request.headers },
                 body: payload,
@@ -79,5 +85,3 @@ export const layerEvents = HttpApiBuilder.group(
 
 /** Both channel groups' handlers. @category layers */
 export const layer = Layer.merge(layerChannels, layerEvents);
-
-export * as ChannelsHandlers from "./channels.ts";

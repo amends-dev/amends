@@ -1,12 +1,12 @@
 import { expect, it } from "@effect/vitest";
 import { DateTime, Schema } from "effect";
-import { Group } from "../../src/group/group.ts";
-import { GroupMembership } from "../../src/group/membership/membership.ts";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { ThreadId } from "../../src/thread/ThreadId.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Member } from "../../src/workspace/member/member.ts";
+import * as Group from "../../src/group/group.ts";
+import * as GroupMembership from "../../src/group/membership/membership.ts";
+import * as Scope from "../../src/authorization/scope.ts";
+import * as Target from "../../src/authorization/target.ts";
+import * as ThreadId from "../../src/thread/ThreadId.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
+import * as Member from "../../src/workspace/member/member.ts";
 
 it("creation accepts an explicit empty audience but rejects duplicate members and blank or untrimmed names", () => {
   const decode = Schema.decodeUnknownOption(Group.CreateTeamInput);

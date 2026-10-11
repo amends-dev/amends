@@ -9,10 +9,10 @@
  */
 import { ChannelTransport } from "@amends-dev/channel";
 import { Schema } from "effect";
-import { Identity } from "../identity/identity.ts";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { ChannelId } from "./ChannelId.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Text from "../text/text.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as ChannelId from "./ChannelId.ts";
 
 /**
  * Names a contact; `Identity.ContactId`, derived from the channel and the external user, so that
@@ -109,5 +109,3 @@ export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, contactId: I
  * @since 0.1.0
  */
 export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
-
-export * as Contact from "./Contact.ts";

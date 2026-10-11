@@ -1,8 +1,8 @@
 import { Thread, ThreadMessage, ThreadMessageStore } from "../thread/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(ThreadMessage.Record));
 const hasText = (record: ThreadMessage.Record) =>
@@ -10,8 +10,8 @@ const hasText = (record: ThreadMessage.Record) =>
 
 /** Workspace-bound thread-messages projection storage. @category constructors */
 export const make = Effect.fn("ThreadMessages.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: ThreadMessageStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: ThreadMessageStore.ThreadMessageStore["Service"] = {
     get: Effect.fn("ThreadMessages.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("threadMessages"), id);
@@ -94,5 +94,4 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
   return ThreadMessageStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadMessageStore.Service, make());
-export * as ThreadMessages from "./thread-messages.ts";
+export const layer = Layer.effect(ThreadMessageStore.ThreadMessageStore, make());

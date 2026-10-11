@@ -64,5 +64,3 @@ export const drop = (job: string, named: Record<string, unknown>, error: unknown
       : `${job} request dropped: it kept failing`,
     { ...named, error },
   );
-
-export * as JobRequests from "./requests.ts";

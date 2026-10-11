@@ -3,7 +3,7 @@ import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
-import { ApiErrors } from "./errors.ts";
+import * as ApiErrors from "./errors.ts";
 
 const params = { workspaceId: Workspace.Id };
 const member = { ...params, memberId: Member.Id };

@@ -2,17 +2,9 @@ import { Event } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
-import {
-  alice,
-  bob,
-  boundTo,
-  forWorkspace,
-  future,
-  journalLog,
-  request,
-  Support,
-} from "./support.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
+import { alice, bob, boundTo, forWorkspace, future, journalLog, request } from "./support.ts";
 
 /** Attribution recorded with each operation's facts. */
 const { gateway } = Support;

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Member } from "../workspace/member/member.ts";
-import { Group } from "./group.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as Group from "./group.ts";
 
 /** The outcomes `GroupService` reports that a caller can act on; schemas only, for contracts. */
 export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
@@ -31,5 +31,3 @@ export class Changed extends Schema.TaggedError<Changed>()("GroupService.Changed
 export class NotRenamable extends Schema.TaggedError<NotRenamable>()("GroupService.NotRenamable", {
   groupId: Group.Id,
 }) {}
-
-export * as GroupErrors from "./errors.ts";

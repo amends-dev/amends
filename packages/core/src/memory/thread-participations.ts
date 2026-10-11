@@ -1,8 +1,9 @@
 import { ThreadParticipation, ThreadParticipationStore } from "../thread/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 export const rows = Rows.make(Schema.fromJsonString(ThreadParticipation.Record));
 const byId = (left: ThreadParticipation.Record, right: ThreadParticipation.Record) =>
@@ -10,10 +11,10 @@ const byId = (left: ThreadParticipation.Record, right: ThreadParticipation.Recor
 
 /** Workspace-bound thread-participations projection storage. @category constructors */
 export const make = Effect.fn("ThreadParticipations.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("threadParticipations")));
 
-  const driver: ThreadParticipationStore.Interface = {
+  const driver: ThreadParticipationStore.ThreadParticipationStore["Service"] = {
     get: Effect.fn("ThreadParticipations.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("threadParticipations"), id);
@@ -128,5 +129,4 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
   return ThreadParticipationStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadParticipationStore.Service, make());
-export * as ThreadParticipations from "./thread-participations.ts";
+export const layer = Layer.effect(ThreadParticipationStore.ThreadParticipationStore, make());

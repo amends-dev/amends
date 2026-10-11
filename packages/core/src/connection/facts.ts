@@ -1,7 +1,7 @@
-import { Audience } from "../journal/audience.ts";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Connection } from "./connection.ts";
+import * as Audience from "../journal/audience.ts";
+import * as Fact from "../journal/fact.ts";
+import * as Subject from "../journal/subject.ts";
+import * as Connection from "./connection.ts";
 
 /** Connections are workspace configuration: every member may learn of changes to them. */
 const workspace = () => [Audience.workspace];
@@ -48,5 +48,3 @@ export const Removed = Fact.make("connection.removed", {
   occurrence: (payload) => [payload.connectionId],
   payload: Connection.Reference,
 });
-
-export * as ConnectionFacts from "./facts.ts";

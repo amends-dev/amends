@@ -1,17 +1,17 @@
 import { Connection } from "@amends-dev/connection";
 import { ConnectionCredentialStore } from "../connection/index.ts";
 import { Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 /** A credential as JSON, its key as it is: this adapter is for tests. */
 const rows = Rows.make(Schema.fromJsonString(Schema.toCodecJson(Connection.Credential)));
 
 /** Each connection's credential in the workspace's memory, written in its transactions. @category constructors */
 export const make = Effect.fn("ConnectionCredentials.make")(function* () {
-  const { read, write } = yield* Binding.Service;
-  const driver: ConnectionCredentialStore.Interface = {
+  const { read, write } = yield* Binding.Binding;
+  const driver: ConnectionCredentialStore.ConnectionCredentialStore["Service"] = {
     set: Effect.fn("ConnectionCredentials.set")(
       function* (connectionId, credential) {
         const row = yield* rows.encode(credential);
@@ -36,6 +36,4 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
 });
 
 /** Provide credential storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ConnectionCredentialStore.Service, make());
-
-export * as ConnectionCredentials from "./connection-credentials.ts";
+export const layer = Layer.effect(ConnectionCredentialStore.ConnectionCredentialStore, make());

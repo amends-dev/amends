@@ -1,8 +1,8 @@
-import { Target } from "./target.ts";
+import * as Target from "./target.ts";
 import { Schema } from "effect";
-import { Permission } from "./permission.ts";
-import type { Requirement } from "./requirement.ts";
-import { Scope } from "./scope.ts";
+import * as Permission from "./permission.ts";
+import type * as Requirement from "./requirement.ts";
+import * as Scope from "./scope.ts";
 
 /**
  * A scoped allowance, with its recipient assigned separately. This schema checks
@@ -55,5 +55,3 @@ export const anyCovers = (grants: ReadonlyArray<Value>, requirement: Requirement
       grant.permission === requirement.permission.name &&
       Scope.covers(grant.scope, requirement.target),
   );
-
-export * as Grant from "./grant.ts";

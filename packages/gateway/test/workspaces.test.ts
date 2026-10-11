@@ -29,7 +29,8 @@ import { Gateway, GatewayErrors, WorkspaceDirectory } from "@amends-dev/gateway"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Layer, Option } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -37,7 +38,6 @@ import {
   forWorkspace,
   future,
   journalLog,
-  Support,
   testProvenance,
 } from "./support.ts";
 
@@ -51,9 +51,9 @@ describe("gateway", () => {
         Effect.gen(function* () {
           expectTypeOf<
             Effect.Services<ReturnType<typeof Operations.getMember>>
-          >().toEqualTypeOf<Gateway.Service>();
+          >().toEqualTypeOf<Gateway.Gateway>();
           expectTypeOf<
-            Effect.Services<ReturnType<Gateway.Interface["createWorkspace"]>>
+            Effect.Services<ReturnType<Gateway.Gateway["Service"]["createWorkspace"]>>
           >().toEqualTypeOf<never>();
           const workspaces = yield* Effect.scoped(
             runGateway(
@@ -195,7 +195,7 @@ describe("gateway", () => {
           runGateway(
             storage,
             Effect.gen(function* () {
-              const gateway = yield* Gateway.Service;
+              const gateway = yield* Gateway.Gateway;
               const a = yield* gateway.createWorkspace(alice.id, {
                 name: "Alice workspace",
                 memberName: "alice",
@@ -208,7 +208,7 @@ describe("gateway", () => {
                 gateway.asMember(
                   workspace.id,
                   identity,
-                  Effect.flatMap(MemberService.Service, (memberService) =>
+                  Effect.flatMap(MemberService.MemberService, (memberService) =>
                     memberService.get(workspace.ownerMemberId),
                   ),
                 );
@@ -223,7 +223,7 @@ describe("gateway", () => {
               const invitation = yield* gateway.asMember(
                 a.id,
                 alice,
-                Effect.flatMap(InvitationService.Service, (invitationService) =>
+                Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
                   invitationService.issue({
                     recipientId: bob.id,
                     expiresAt,
@@ -231,33 +231,33 @@ describe("gateway", () => {
                   }),
                 ),
               );
-              const listing = yield* (yield* WorkspaceDirectory.Service).list(bob);
+              const listing = yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(bob);
               const joined = yield* gateway.inWorkspace(
                 a.id,
-                Effect.flatMap(InvitationService.Service, (invitationService) =>
+                Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
                   invitationService.accept(invitation.details.id, bob.id, Member.Name.make("bob")),
                 ),
               );
-              const afterJoin = yield* (yield* WorkspaceDirectory.Service).list(bob);
+              const afterJoin = yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(bob);
               const stored = yield* gateway.asMember(
                 a.id,
                 alice,
                 Effect.flatMap(
-                  InvitationService.Service,
+                  InvitationService.InvitationService,
                   (invitationService) => invitationService.list,
                 ),
               );
               const removed = yield* gateway.asMember(
                 a.id,
                 alice,
-                Effect.flatMap(MemberService.Service, (memberService) =>
+                Effect.flatMap(MemberService.MemberService, (memberService) =>
                   memberService.remove(joined.id),
                 ),
               );
               const members = yield* gateway.asMember(
                 a.id,
                 alice,
-                Effect.flatMap(MemberService.Service, (memberService) => memberService.list),
+                Effect.flatMap(MemberService.MemberService, (memberService) => memberService.list),
               );
               return {
                 a,
@@ -335,11 +335,11 @@ describe("gateway", () => {
           const host = yield* Layer.build(gatewayOn(yield* storage.connect()));
           const workspace = yield* Operations.createWorkspace(alice.id).pipe(Effect.provide(host));
           const createGroup = (name: string) =>
-            Effect.flatMap(Gateway.Service, (gateway) =>
+            Effect.flatMap(Gateway.Gateway, (gateway) =>
               gateway.asMember(
                 workspace.id,
                 alice,
-                Effect.flatMap(GroupService.Service, (groupService) =>
+                Effect.flatMap(GroupService.GroupService, (groupService) =>
                   groupService.createTeam({ name, memberIds: [workspace.ownerMemberId] }),
                 ),
               ),
@@ -379,11 +379,11 @@ describe("gateway", () => {
         runGateway(
           storage,
           Effect.gen(function* () {
-            const gateway = yield* Gateway.Service;
+            const gateway = yield* Gateway.Gateway;
             const workspace = yield* Operations.createWorkspace(alice.id);
             const threadId = Thread.Id.make("thread");
             // A member that is no agent has no work to accept.
-            const acceptWork = Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+            const acceptWork = Effect.flatMap(TurnExecution.TurnExecution, (turnExecution) =>
               turnExecution.accept(workspace.ownerMemberId, threadId),
             );
             expect(yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork))).toEqual(
@@ -393,9 +393,11 @@ describe("gateway", () => {
             expect(
               yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, acceptWork))),
             ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: missing }));
-            expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toMatchObject({
-              memberships: [{ workspace }],
-            });
+            expect(yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(alice)).toMatchObject(
+              {
+                memberships: [{ workspace }],
+              },
+            );
           }),
         ),
       ),
@@ -406,13 +408,13 @@ describe("gateway", () => {
       runGateway(
         storage,
         Effect.gen(function* () {
-          const gateway = yield* Gateway.Service;
+          const gateway = yield* Gateway.Gateway;
           for (const name of ["", " \t\n"]) {
             expect(
               yield* Effect.flip(gateway.createWorkspace(alice.id, { name, memberName: "alice" })),
             ).toMatchObject({ _tag: "Gateway.InvalidInput" });
           }
-          expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toEqual({
+          expect(yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(alice)).toEqual({
             memberships: [],
             invitations: [],
           });
@@ -421,7 +423,7 @@ describe("gateway", () => {
             memberName: "alice",
           });
           expect(workspace.name).toBe("Studio");
-          const listing = yield* (yield* WorkspaceDirectory.Service).list(alice);
+          const listing = yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(alice);
           expect(listing.memberships.map((membership) => membership.workspace)).toEqual([
             workspace,
           ]);
@@ -512,13 +514,13 @@ describe("gateway", () => {
       runGateway(
         storage,
         Effect.gen(function* () {
-          const workspace = yield* (yield* Gateway.Service).createWorkspace(alice.id, {
+          const workspace = yield* (yield* Gateway.Gateway).createWorkspace(alice.id, {
             name: "Archive",
             memberName: "alice",
           });
           // Applications keep an owner; a direct fact reaches the empty state the directory must list.
           const bound = yield* boundTo(workspace.id);
-          yield* Effect.flatMap(Journal.Service, (journal) =>
+          yield* Effect.flatMap(Journal.Journal, (journal) =>
             journal.commit(
               journal.publish(MemberFacts.Removed, {
                 workspaceId: workspace.id,
@@ -526,10 +528,10 @@ describe("gateway", () => {
               }),
             ),
           ).pipe(
-            Effect.provideService(Publication.Service, testProvenance(workspace.id)),
+            Effect.provideService(Publication.Publication, testProvenance(workspace.id)),
             Effect.provide(core(bound)),
           );
-          expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toEqual({
+          expect(yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(alice)).toEqual({
             memberships: [
               {
                 workspace,

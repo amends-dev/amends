@@ -29,25 +29,22 @@ export const Account = Schema.Struct({ id: Identity.HumanId, email: Email }).ann
 });
 export interface Account extends Schema.Schema.Type<typeof Account> {}
 
-export interface Interface {
-  /**
-   * The account an address belongs to, created with a new human ID the first time the address
-   * comes up: when its owner first signs in, or when a workspace first invites it.
-   */
-  readonly findOrCreate: (email: Email) => Effect.Effect<Account>;
-  /** The accounts among `ids`, leaving out an ID no account has. */
-  readonly findByIds: (
-    ids: ReadonlyArray<Identity.HumanId>,
-  ) => Effect.Effect<ReadonlyArray<Account>>;
-}
-
 /**
  * The people a host knows, across its workspaces. Core names a person by human ID only; the host
  * keeps who that is, and sign-in and invitations reach a person by address through it. Storage
  * failures are defects.
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/gateway/accounts/Service",
-) {}
-
-export * as Accounts from "./accounts.ts";
+export class Accounts extends Context.Service<
+  Accounts,
+  {
+    /**
+     * The account an address belongs to, created with a new human ID the first time the address
+     * comes up: when its owner first signs in, or when a workspace first invites it.
+     */
+    readonly findOrCreate: (email: Email) => Effect.Effect<Account>;
+    /** The accounts among `ids`, leaving out an ID no account has. */
+    readonly findByIds: (
+      ids: ReadonlyArray<Identity.HumanId>,
+    ) => Effect.Effect<ReadonlyArray<Account>>;
+  }
+>()("@amends-dev/gateway/accounts/Service") {}

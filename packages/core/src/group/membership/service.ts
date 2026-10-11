@@ -1,25 +1,25 @@
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Authorization } from "../../authorization/authorization.ts";
-import { Requirement } from "../../authorization/requirement.ts";
-import { Target } from "../../authorization/target.ts";
-import { Actor } from "../../identity/actor.ts";
-import { Journal } from "../../journal/journal.ts";
-import type { Log } from "../../journal/log.ts";
-import type { Projection } from "../../journal/projection.ts";
-import { Publication } from "../../journal/publication.ts";
-import { Store } from "../../journal/store.ts";
+import * as Authorization from "../../authorization/authorization.ts";
+import * as Requirement from "../../authorization/requirement.ts";
+import * as Target from "../../authorization/target.ts";
+import * as Actor from "../../identity/actor.ts";
+import * as Journal from "../../journal/journal.ts";
+import type * as Log from "../../journal/log.ts";
+import type * as Projection from "../../journal/projection.ts";
+import * as Publication from "../../journal/publication.ts";
+import * as Store from "../../journal/store.ts";
 
-import { Member } from "../../workspace/member/member.ts";
-import { MemberStore } from "../../workspace/member/store.ts";
-import { Group } from "../group.ts";
-import { GroupCommand } from "../command.ts";
-import { GroupQuery } from "../query.ts";
-import { GroupPermissions } from "../permissions.ts";
-import { GroupStore } from "../store.ts";
-import { GroupMembership } from "./membership.ts";
-import { GroupMembershipPermissions } from "./permissions.ts";
-import { GroupMembershipStore } from "./store.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as MemberStore from "../../workspace/member/store.ts";
+import * as Group from "../group.ts";
+import * as GroupCommand from "../command.ts";
+import * as GroupQuery from "../query.ts";
+import * as GroupPermissions from "../permissions.ts";
+import * as GroupStore from "../store.ts";
+import * as GroupMembership from "./membership.ts";
+import * as GroupMembershipPermissions from "./permissions.ts";
+import * as GroupMembershipStore from "./store.ts";
 import {
   AlreadyMember,
   AlreadyRemoved,
@@ -69,63 +69,62 @@ export type ReadError =
   | Schema.SchemaError
   | GroupNotFound;
 
-export interface Interface {
-  /**
-   * Require group.membership.manage on this group and membership of it, validate its active
-   * workspace member, and publish a fresh admission in one commit. An active admission is
-   * rejected without another fact. No workspace role reaches a group from outside it: to a
-   * non-member, a group is GroupNotFound, as a missing one is. Adding, removing, and leaving apply
-   * to team groups; direct groups reject them as fixed.
-   */
-  readonly add: (
-    input: GroupMembership.AddInput,
-  ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /**
-   * End this team-group admission, requiring group.membership.manage on its group and membership
-   * of it. Any member may remove others from a private group; removing someone else from a public
-   * one also requires group.moderate. Nobody is removed from the general group.
-   */
-  readonly remove: (
-    input: GroupMembership.RemoveInput,
-  ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /**
-   * Join a public team group as the actor, under group.join on it. Private and direct groups are
-   * GroupNotFound like missing ones, so joining discloses nothing about them. Joining again
-   * returns the actor's current admission and records nothing.
-   */
-  readonly join: (groupId: Group.Id) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /**
-   * End only the actor's own team-group admission; active workspace membership is sufficient.
-   * Nobody leaves the general group.
-   */
-  readonly leave: (
-    input: GroupMembership.LeaveInput,
-  ) => Effect.Effect<GroupMembership.Record, Error, Actor.Service>;
-  /**
-   * A page of current admissions of active workspace members, in admission-ID order; require
-   * group.read and audience membership.
-   */
-  readonly listCurrent: (
-    groupId: Group.Id,
-    options: GroupMembership.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/group/membership/service/Service",
-) {}
+export class GroupMembershipService extends Context.Service<
+  GroupMembershipService,
+  {
+    /**
+     * Require group.membership.manage on this group and membership of it, validate its active
+     * workspace member, and publish a fresh admission in one commit. An active admission is
+     * rejected without another fact. No workspace role reaches a group from outside it: to a
+     * non-member, a group is GroupNotFound, as a missing one is. Adding, removing, and leaving apply
+     * to team groups; direct groups reject them as fixed.
+     */
+    readonly add: (
+      input: GroupMembership.AddInput,
+    ) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    /**
+     * End this team-group admission, requiring group.membership.manage on its group and membership
+     * of it. Any member may remove others from a private group; removing someone else from a public
+     * one also requires group.moderate. Nobody is removed from the general group.
+     */
+    readonly remove: (
+      input: GroupMembership.RemoveInput,
+    ) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    /**
+     * Join a public team group as the actor, under group.join on it. Private and direct groups are
+     * GroupNotFound like missing ones, so joining discloses nothing about them. Joining again
+     * returns the actor's current admission and records nothing.
+     */
+    readonly join: (groupId: Group.Id) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    /**
+     * End only the actor's own team-group admission; active workspace membership is sufficient.
+     * Nobody leaves the general group.
+     */
+    readonly leave: (
+      input: GroupMembership.LeaveInput,
+    ) => Effect.Effect<GroupMembership.Record, Error, Actor.Actor>;
+    /**
+     * A page of current admissions of active workspace members, in admission-ID order; require
+     * group.read and audience membership.
+     */
+    readonly listCurrent: (
+      groupId: Group.Id,
+      options: GroupMembership.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<GroupMembership.Record>, ReadError, Actor.Actor>;
+  }
+>()("@amends-dev/core/group/membership/service/Service") {}
 
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
 export const make = Effect.fn("GroupMembershipService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const groupStore = yield* GroupStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const groupMembershipStore = yield* GroupMembershipStore.Service;
-  const groupCommand = yield* GroupCommand.Service;
-  const groupQuery = yield* GroupQuery.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const groupStore = yield* GroupStore.GroupStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
+  const groupCommand = yield* GroupCommand.GroupCommand;
+  const groupQuery = yield* GroupQuery.GroupQuery;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   /** Management needs the grant and membership of the group; to anyone outside it, it is missing. */
   const requireManagement = Effect.fnUntraced(function* (groupId: Group.Id) {
@@ -187,7 +186,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
           Target.Reference.cases.Group.make({ workspaceId, groupId }),
         ),
       ]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const group = yield* requireGroup(groupId);
       if (group.kind !== "Team" || group.visibility !== "Public")
         return yield* new GroupNotFound({ groupId });
@@ -240,7 +239,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
       const membership = yield* requireMembership(checked);
       if (Group.isGeneral(group)) return yield* new GeneralMembership({ groupId: group.id });
       // Removing someone from a public group is moderation; a private one is its members' to tidy.
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       if (group.visibility === "Public" && membership.memberId !== actor.memberId)
         yield* authorization.require([
           Requirement.make(
@@ -259,7 +258,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     function* (input: GroupMembership.LeaveInput) {
       const checked = yield* Schema.decodeEffect(GroupMembership.LeaveInput)(input);
       yield* authorization.require([]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const membership = yield* requireMembership(checked);
       // Do not disclose another member's admission or departure state through self-service.
       if (membership.memberId !== actor.memberId) return yield* new NotFound(checked);
@@ -316,7 +315,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     ]);
     return yield* pageCurrentMemberships(id, options);
   });
-  return Service.of({
+  return GroupMembershipService.of({
     add,
     join,
     remove,
@@ -326,6 +325,4 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
 });
 
 /** Provide membership operations over the workspace's existing stores and journal. @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as GroupMembershipService from "./service.ts";
+export const layer = Layer.effect(GroupMembershipService, make());

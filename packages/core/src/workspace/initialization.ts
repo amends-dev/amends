@@ -1,23 +1,23 @@
 import { Crypto, DateTime, Effect, Option, Schema } from "effect";
 
-import { PermissionCatalog } from "../authorization/permission-catalog.ts";
-import { BuiltinRoles } from "../authorization/role/builtin.ts";
-import { AssignmentCommand } from "../authorization/assignment/command.ts";
-import { RoleFacts } from "../authorization/role/facts.ts";
+import * as PermissionCatalog from "../authorization/permission-catalog.ts";
+import * as BuiltinRoles from "../authorization/role/builtin.ts";
+import * as AssignmentCommand from "../authorization/assignment/command.ts";
+import * as RoleFacts from "../authorization/role/facts.ts";
 
-import { GroupFacts } from "../group/facts.ts";
-import { Group } from "../group/group.ts";
-import { GroupMembershipFacts } from "../group/membership/facts.ts";
-import { GroupMembership } from "../group/membership/membership.ts";
-import { Identity } from "../identity/identity.ts";
-import { Journal } from "../journal/journal.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { WorkspaceFacts } from "./facts.ts";
-import { MemberFacts } from "./member/facts.ts";
-import { Member } from "./member/member.ts";
-import { WorkspaceStore } from "./store.ts";
-import { Workspace } from "./workspace.ts";
+import * as GroupFacts from "../group/facts.ts";
+import * as Group from "../group/group.ts";
+import * as GroupMembershipFacts from "../group/membership/facts.ts";
+import * as GroupMembership from "../group/membership/membership.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Journal from "../journal/journal.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as WorkspaceFacts from "./facts.ts";
+import * as MemberFacts from "./member/facts.ts";
+import * as Member from "./member/member.ts";
+import * as WorkspaceStore from "./store.ts";
+import * as Workspace from "./workspace.ts";
 
 export class AlreadyInitialized extends Schema.TaggedError<AlreadyInitialized>()(
   "WorkspaceInitialization.AlreadyInitialized",
@@ -41,11 +41,11 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
 ) {
   const createdBy = yield* Schema.decodeEffect(Identity.HumanId)(creator);
   const { name, memberName } = yield* Schema.decodeEffect(Workspace.CreateInput)(input);
-  const workspaceStore = yield* WorkspaceStore.Service;
-  const { workspaceId } = yield* Store.Service;
-  const journal = yield* Journal.Service;
+  const workspaceStore = yield* WorkspaceStore.WorkspaceStore;
+  const { workspaceId } = yield* Store.Store;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const permissionCatalog = yield* PermissionCatalog.Service;
+  const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
   // Creation runs before the workspace's operations exist, so it builds the command it shares.
   const assignmentCommand = yield* AssignmentCommand.make();
   const provenance = yield* Publication.make(workspaceId, {
@@ -106,8 +106,6 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         })
         .pipe(Publication.withOccurredAt(createdAt));
       return record;
-    }).pipe(Effect.provideService(Publication.Service, provenance)),
+    }).pipe(Effect.provideService(Publication.Publication, provenance)),
   );
 });
-
-export * as WorkspaceInitialization from "./initialization.ts";

@@ -14,13 +14,13 @@ import {
   Stream,
 } from "effect";
 import type { Scope } from "effect";
-import type { Commit } from "../journal/commit.ts";
-import type { Entry } from "../journal/entry.ts";
-import type { Event } from "../journal/event.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import { ChangeFeed } from "./change-feed.ts";
-import { ChangeFeedEvents } from "./events.ts";
+import type * as Commit from "../journal/commit.ts";
+import type * as Entry from "../journal/entry.ts";
+import type * as Event from "../journal/event.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import * as ChangeFeed from "./change-feed.ts";
+import * as ChangeFeedEvents from "./events.ts";
 
 /** One committed batch of the journal, with the events the feed may deliver from it. */
 export interface Delivery {
@@ -42,21 +42,20 @@ export interface Subscription {
   readonly deliveries: Stream.Stream<Delivery, ChangeFeed.Unavailable>;
 }
 
-export interface Interface {
-  /**
-   * Register for commits after a position, before reading the journal, so none is missed. A
-   * cursor at or before the head replays the commits after it, up to the replay limit;
-   * beyond it, and without a cursor or with one past the head, delivery resets at the head.
-   * Hold the scope while consuming.
-   */
-  readonly subscribe: (
-    after: Option.Option<Entry.Position>,
-  ) => Effect.Effect<Subscription, ChangeFeed.Unavailable, Scope.Scope>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/change-feed/source/Service",
-) {}
+export class ChangeFeedSource extends Context.Service<
+  ChangeFeedSource,
+  {
+    /**
+     * Register for commits after a position, before reading the journal, so none is missed. A
+     * cursor at or before the head replays the commits after it, up to the replay limit;
+     * beyond it, and without a cursor or with one past the head, delivery resets at the head.
+     * Hold the scope while consuming.
+     */
+    readonly subscribe: (
+      after: Option.Option<Entry.Position>,
+    ) => Effect.Effect<Subscription, ChangeFeed.Unavailable, Scope.Scope>;
+  }
+>()("@amends-dev/core/change-feed/source/Service") {}
 
 export const Options = Schema.Struct({
   /** Deliveries buffered for each subscriber; a slower subscriber catches up from the log. */
@@ -125,7 +124,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
   input: Options = { capacity: 256, replayLimit: 500, pageSize: 100 },
 ) {
   const { capacity, replayLimit, pageSize } = yield* Schema.decodeEffect(Options)(input);
-  const log = (yield* Journal.Service).log;
+  const log = (yield* Journal.Journal).log;
 
   const prepareBatch = Effect.fnUntraced(function* (batch: Log.Batch<Event.Envelope>) {
     const events: Array<ChangeFeedEvents.Prepared> = [];
@@ -294,7 +293,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     } satisfies Subscription;
   });
 
-  return Service.of({ subscribe });
+  return ChangeFeedSource.of({ subscribe });
 });
 
 /**
@@ -302,6 +301,4 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
  *
  * @category layers
  */
-export const layer = (options?: Options) => Layer.effect(Service, make(options));
-
-export * as ChangeFeedSource from "./source.ts";
+export const layer = (options?: Options) => Layer.effect(ChangeFeedSource, make(options));

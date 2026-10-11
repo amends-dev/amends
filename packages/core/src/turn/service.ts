@@ -13,31 +13,31 @@ import {
   Struct,
 } from "effect";
 import type { PlatformError, Scope } from "effect";
-import { AgentPermissions } from "../agent/permissions.ts";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { ChangeFeedSource } from "../change-feed/source.ts";
-import { Actor } from "../identity/actor.ts";
-import type { ChangeFeedSource as Source } from "../change-feed/source.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Request } from "../request/request.ts";
-import { Signal } from "../signal/signal.ts";
-import { SignalHub } from "../signal/hub.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
-import type { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadParticipationStore } from "../thread/ThreadParticipationStore.ts";
-import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
+import * as AgentPermissions from "../agent/permissions.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as ChangeFeedSource from "../change-feed/source.ts";
+import * as Actor from "../identity/actor.ts";
+import type * as Source from "../change-feed/source.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Request from "../request/request.ts";
+import * as Signal from "../signal/signal.ts";
+import * as SignalHub from "../signal/hub.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
+import type * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts";
+import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
 import { NotActive, NotFound, NotRetryable } from "./errors.ts";
-import { TurnActivity } from "./activity.ts";
-import { TurnCommand } from "./command.ts";
-import { TurnFacts } from "./facts.ts";
-import { SessionLog } from "./session-log.ts";
-import { SessionLogStore } from "./session-log-store.ts";
-import { TurnStore } from "./store.ts";
-import { Turn } from "./turn.ts";
+import * as TurnActivity from "./activity.ts";
+import * as TurnCommand from "./command.ts";
+import * as TurnFacts from "./facts.ts";
+import * as SessionLog from "./session-log.ts";
+import * as SessionLogStore from "./session-log-store.ts";
+import * as TurnStore from "./store.ts";
+import * as Turn from "./turn.ts";
 export { NotActive, NotFound, NotRetryable } from "./errors.ts";
 
 export type ReadError =
@@ -58,54 +58,53 @@ export type ChangeError =
 export type CancelError = ChangeError | NotActive;
 export type RetryError = ChangeError | NotRetryable;
 
-export interface Interface {
-  /**
-   * A turn in a thread the reader may read: in its group's audience, with `thread.read` on it, as
-   * its timeline requires. Outside the audience it is NotFound; without the permission, Denied.
-   */
-  readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Service>;
-  /**
-   * The workspace's active turns in threads the reader may read, oldest first, among at most
-   * `limit` active turns in the workspace.
-   */
-  readonly listActive: (
-    limit: number,
-  ) => Effect.Effect<ReadonlyArray<Turn.View>, ActiveError, Actor.Service>;
-  /**
-   * Follow a turn's log, for a reader who may read its thread: its items as they stand, then
-   * those its session log adds as the turn works, with the step it is writing, until the turn's
-   * end commits and every item is delivered. The caller owns the subscription scope. The stream fails with
-   * LogUnavailable when following cannot go on, including once the reader may no longer read the
-   * thread, which it checks with each batch and whenever a commit changes their groups or grants;
-   * following again starts from the items as they stand.
-   */
-  readonly watchLog: (
-    turnId: Turn.Id,
-  ) => Effect.Effect<
-    Stream.Stream<Turn.LogMessage, Turn.LogUnavailable>,
-    WatchError,
-    Actor.Service | Scope.Scope
-  >;
-  /**
-   * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
-   * queued turn stops at once, since nothing runs it yet; a running one stops once its job
-   * confirms it. A turn already stopping stays as it is; a finished one is NotActive.
-   */
-  readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Service>;
-  /**
-   * Run a failed or stopped turn again, for a reader who may open its thread and direct its
-   * agent: a new turn for the same agent and input, which continues the session that turn left
-   * and tells the agent who asked, on what the agent is set up with now. Only the agent's latest
-   * turn on the thread can be retried, while the agent still takes part there; otherwise it is
-   * NotRetryable. A turn is retried at most once, so asking again returns the turn its retry
-   * created.
-   */
-  readonly retry: (turnId: Turn.Id) => Effect.Effect<Turn.View, RetryError, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/turn/service/Service",
-) {}
+export class TurnService extends Context.Service<
+  TurnService,
+  {
+    /**
+     * A turn in a thread the reader may read: in its group's audience, with `thread.read` on it, as
+     * its timeline requires. Outside the audience it is NotFound; without the permission, Denied.
+     */
+    readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Actor>;
+    /**
+     * The workspace's active turns in threads the reader may read, oldest first, among at most
+     * `limit` active turns in the workspace.
+     */
+    readonly listActive: (
+      limit: number,
+    ) => Effect.Effect<ReadonlyArray<Turn.View>, ActiveError, Actor.Actor>;
+    /**
+     * Follow a turn's log, for a reader who may read its thread: its items as they stand, then
+     * those its session log adds as the turn works, with the step it is writing, until the turn's
+     * end commits and every item is delivered. The caller owns the subscription scope. The stream fails with
+     * LogUnavailable when following cannot go on, including once the reader may no longer read the
+     * thread, which it checks with each batch and whenever a commit changes their groups or grants;
+     * following again starts from the items as they stand.
+     */
+    readonly watchLog: (
+      turnId: Turn.Id,
+    ) => Effect.Effect<
+      Stream.Stream<Turn.LogMessage, Turn.LogUnavailable>,
+      WatchError,
+      Actor.Actor | Scope.Scope
+    >;
+    /**
+     * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
+     * queued turn stops at once, since nothing runs it yet; a running one stops once its job
+     * confirms it. A turn already stopping stays as it is; a finished one is NotActive.
+     */
+    readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Actor>;
+    /**
+     * Run a failed or stopped turn again, for a reader who may open its thread and direct its
+     * agent: a new turn for the same agent and input, which continues the session that turn left
+     * and tells the agent who asked, on what the agent is set up with now. Only the agent's latest
+     * turn on the thread can be retried, while the agent still takes part there; otherwise it is
+     * NotRetryable. A turn is retried at most once, so asking again returns the turn its retry
+     * created.
+     */
+    readonly retry: (turnId: Turn.Id) => Effect.Effect<Turn.View, RetryError, Actor.Actor>;
+  }
+>()("@amends-dev/core/turn/service/Service") {}
 
 /** Entries of a session log read at a time. */
 const logPage = 100;
@@ -128,17 +127,17 @@ const endsTurn = (delivery: Source.Delivery, turnId: Turn.Id) =>
 
 /** @category constructors */
 export const make = Effect.fn("TurnService.make")(function* () {
-  const turnStore = yield* TurnStore.Service;
-  const threadParticipationStore = yield* ThreadParticipationStore.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const authorization = yield* Authorization.Service;
-  const turnCommand = yield* TurnCommand.Service;
-  const journal = yield* Journal.Service;
-  const sessionLogStore = yield* SessionLogStore.Service;
-  const signalHub = yield* SignalHub.Service;
-  const changeFeedSource = yield* ChangeFeedSource.Service;
+  const turnStore = yield* TurnStore.TurnStore;
+  const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const authorization = yield* Authorization.Authorization;
+  const turnCommand = yield* TurnCommand.TurnCommand;
+  const journal = yield* Journal.Journal;
+  const sessionLogStore = yield* SessionLogStore.SessionLogStore;
+  const signalHub = yield* SignalHub.SignalHub;
+  const changeFeedSource = yield* ChangeFeedSource.ChangeFeedSource;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   const readThreadRequirement = (threadId: ThreadId.Id) =>
     Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId });
@@ -242,10 +241,10 @@ export const make = Effect.fn("TurnService.make")(function* () {
       .pipe(Effect.mapError(toLogUnavailable));
     const turn = yield* requireReadableTurn(id);
     // Following outlasts the request that opened it, so its access checks name the reader.
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     /** The reader still may read the thread, or following ends. */
     const checkStillReadable = requireReadableThread(turn.threadId).pipe(
-      Effect.provideService(Actor.Service, actor),
+      Effect.provideService(Actor.Actor, actor),
       Effect.mapError(toLogUnavailable),
     );
 
@@ -399,7 +398,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       // The same input, in the same session, created after the turn it retries, even on a clock
       // that has not moved, so it is the agent's latest there.
       const now = yield* DateTime.now;
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const created = Turn.queued({
         id: retryId,
         workspaceId,
@@ -429,10 +428,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
     journal.commit,
   );
 
-  return Service.of({ get, listActive, watchLog, cancel, retry });
+  return TurnService.of({ get, listActive, watchLog, cancel, retry });
 });
 
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as TurnService from "./service.ts";
+export const layer = Layer.effect(TurnService, make());

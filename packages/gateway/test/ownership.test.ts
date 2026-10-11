@@ -23,8 +23,9 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Result } from "effect";
 
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
 
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -34,7 +35,6 @@ import {
   future,
   journalLog,
   request,
-  Support,
   testProvenance,
 } from "./support.ts";
 
@@ -77,7 +77,7 @@ describe("ownership", () => {
               roleId: BuiltinRoles.AdministratorId,
             });
             const preservedId = Assignment.Id.make("separate-access");
-            yield* Effect.flatMap(Journal.Service, (journal) =>
+            yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(AssignmentFacts.Created, {
                   workspaceId: workspace.id,
@@ -95,7 +95,7 @@ describe("ownership", () => {
                     }),
                   },
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspace.id))),
             ).pipe(Effect.provide(core(bound)));
             const preserved = yield* bound.assignments.get(preservedId);
             const changed = yield* Operations.transferOwnership(workspace.id, alice, {
@@ -158,7 +158,7 @@ describe("ownership", () => {
           Effect.gen(function* () {
             const { workspace, recipient, other, view, bound } = yield* setup;
             const agentId = Member.Id.make("agent");
-            yield* Effect.flatMap(Journal.Service, (journal) =>
+            yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(MemberFacts.Added, {
                   workspaceId: workspace.id,
@@ -166,7 +166,7 @@ describe("ownership", () => {
                   identity: { _tag: "Agent", id: Identity.AgentId.make("agent") },
                   name: Member.Name.make("agent"),
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspace.id))),
             ).pipe(Effect.provide(core(bound)));
             yield* Operations.removeMember(workspace.id, alice, other.id);
             const elsewhere = yield* Operations.createWorkspace(alice.id);
@@ -199,7 +199,7 @@ describe("ownership", () => {
               ),
             ).toMatchObject({ _tag: "Authorization.Denied" });
             // Having the action permission alone does not confer ownership.
-            yield* Effect.flatMap(Journal.Service, (journal) =>
+            yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(AssignmentFacts.Created, {
                   workspaceId: workspace.id,
@@ -213,7 +213,7 @@ describe("ownership", () => {
                     }),
                   },
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspace.id))),
             ).pipe(Effect.provide(core(bound)));
             expect(
               yield* Effect.flip(
@@ -223,14 +223,14 @@ describe("ownership", () => {
                 }),
               ),
             ).toMatchObject({ _tag: "OwnershipService.NotOwner" });
-            yield* Effect.flatMap(Journal.Service, (journal) =>
+            yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(RoleFacts.PermissionsChanged, {
                   workspaceId: workspace.id,
                   roleId: BuiltinRoles.OwnerId,
                   permissions: [MemberPermissions.Read.name],
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspace.id))),
             ).pipe(Effect.provide(core(bound)));
             expect((yield* Operations.ownership(workspace.id, alice)).canTransfer).toBe(false);
             expect(
@@ -307,14 +307,14 @@ describe("ownership", () => {
           });
           const broken = failingLate(bound, failure);
           expect(
-            yield* Effect.flatMap(OwnershipService.Service, (ownershipService) =>
+            yield* Effect.flatMap(OwnershipService.OwnershipService, (ownershipService) =>
               ownershipService.transfer({
                 memberId: recipient.id,
                 expectedOwnerAssignmentId: view.ownerAssignmentId,
               }),
             ).pipe(
               Effect.provide(core(broken)),
-              Effect.provideService(Actor.Service, {
+              Effect.provideService(Actor.Actor, {
                 workspaceId: workspace.id,
                 memberId: workspace.ownerMemberId,
                 identity: alice,
@@ -358,7 +358,7 @@ describe("ownership", () => {
               expect(view.workspace).toEqual(saved.workspace);
               yield* storage.discardProjections;
               const bound = yield* boundTo(saved.workspace.id);
-              yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+              yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
                 Effect.provide(core(bound)),
               );
               const replayed = yield* Operations.ownership(saved.workspace.id, bob);

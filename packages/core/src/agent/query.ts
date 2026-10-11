@@ -1,15 +1,15 @@
 import { Integrations } from "@amends-dev/connection";
 import { Array, Context, Effect, Layer, Option, Schema } from "effect";
-import { Connection } from "../connection/connection.ts";
-import { ConnectionCredentialStore } from "../connection/credential-store.ts";
-import { ConnectionStore } from "../connection/store.ts";
-import { Identity } from "../identity/identity.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { MemberStore } from "../workspace/member/store.ts";
-import { Agent } from "./agent.ts";
+import * as Connection from "../connection/connection.ts";
+import * as ConnectionCredentialStore from "../connection/credential-store.ts";
+import * as ConnectionStore from "../connection/store.ts";
+import * as Identity from "../identity/identity.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as MemberStore from "../workspace/member/store.ts";
+import * as Agent from "./agent.ts";
 import { Incomplete } from "./errors.ts";
-import { AgentReadiness } from "./readiness.ts";
-import { AgentStore } from "./store.ts";
+import * as AgentReadiness from "./readiness.ts";
+import * as AgentStore from "./store.ts";
 
 /** The member is not one of the workspace's agents: it is a person, or its membership ended. */
 export class NotFound extends Schema.TaggedError<NotFound>()("AgentQuery.NotFound", {
@@ -37,32 +37,31 @@ export const Runnable = Schema.Struct({
 });
 export interface Runnable extends Schema.Schema.Type<typeof Runnable> {}
 
-export interface Interface {
-  /**
-   * The harness, model, and sandbox the agent of `memberId` runs a turn on now, as it is set up.
-   * On `Auto`, the harness is that of `previous`, the selection of its last turn in the
-   * conversation, while it can still run on it, and otherwise the oldest it can run on.
-   */
-  readonly select: (
-    memberId: MemberId.Id,
-    previous: Agent.Selection | undefined,
-  ) => Effect.Effect<Agent.Selection, SelectError>;
+export class AgentQuery extends Context.Service<
+  AgentQuery,
+  {
+    /**
+     * The harness, model, and sandbox the agent of `memberId` runs a turn on now, as it is set up.
+     * On `Auto`, the harness is that of `previous`, the selection of its last turn in the
+     * conversation, while it can still run on it, and otherwise the oldest it can run on.
+     */
+    readonly select: (
+      memberId: MemberId.Id,
+      previous: Agent.Selection | undefined,
+    ) => Effect.Effect<Agent.Selection, SelectError>;
 
-  /**
-   * The agent of `memberId` ready to run on `selection`: its instructions, and each connection of
-   * the selection with the key it holds. Fails with `Incomplete` when a connection of the selection
-   * can no longer give its part, as when it was removed since the selection was made, or it has no
-   * key.
-   */
-  readonly buildRunnable: (
-    memberId: MemberId.Id,
-    selection: Agent.Selection,
-  ) => Effect.Effect<Runnable, BuildError>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/agent/query/Service",
-) {}
+    /**
+     * The agent of `memberId` ready to run on `selection`: its instructions, and each connection of
+     * the selection with the key it holds. Fails with `Incomplete` when a connection of the selection
+     * can no longer give its part, as when it was removed since the selection was made, or it has no
+     * key.
+     */
+    readonly buildRunnable: (
+      memberId: MemberId.Id,
+      selection: Agent.Selection,
+    ) => Effect.Effect<Runnable, BuildError>;
+  }
+>()("@amends-dev/core/agent/query/Service") {}
 
 /** `selection` as the setup whose readiness says whether it can run. */
 const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
@@ -77,10 +76,10 @@ const invalid = (part: Agent.Part, description: string) =>
 
 /** @category constructors */
 export const make = Effect.fn("AgentQuery.make")(function* () {
-  const memberStore = yield* MemberStore.Service;
-  const agentStore = yield* AgentStore.Service;
-  const connectionStore = yield* ConnectionStore.Service;
-  const connectionCredentialStore = yield* ConnectionCredentialStore.Service;
+  const memberStore = yield* MemberStore.MemberStore;
+  const agentStore = yield* AgentStore.AgentStore;
+  const connectionStore = yield* ConnectionStore.ConnectionStore;
+  const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore;
   const integrations = yield* Integrations.Integrations;
 
   /** The agent whose membership `memberId` is, while it lasts. */
@@ -190,10 +189,8 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     return runnable;
   });
 
-  return Service.of({ select, buildRunnable });
+  return AgentQuery.of({ select, buildRunnable });
 });
 
 /** Internal reads that turns share. @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as AgentQuery from "./query.ts";
+export const layer = Layer.effect(AgentQuery, make());

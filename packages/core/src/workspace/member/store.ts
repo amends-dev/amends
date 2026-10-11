@@ -1,10 +1,10 @@
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import { Identity } from "../../identity/identity.ts";
-import type { Store } from "../../journal/store.ts";
-import { Member } from "./member.ts";
-import { StoreInput } from "../../journal/StoreInput.ts";
-import type { WorkspaceId } from "../id.ts";
+import * as Identity from "../../identity/identity.ts";
+import type * as Store from "../../journal/store.ts";
+import * as Member from "./member.ts";
+import * as StoreInput from "../../journal/StoreInput.ts";
+import type * as WorkspaceId from "../id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("MemberStore.Failure", {
   operation: Schema.String,
@@ -25,61 +25,60 @@ export class Conflict extends Schema.TaggedError<Conflict>()("MemberStore.Confli
  * checkpoints. Enforce constraints atomically across concurrent writers. Reject
  * expired or foreign transaction handles and never retry the program internally.
  *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  /** Find an active or removed membership in this workspace; None if absent. */
-  readonly get: (memberId: Member.Id) => Effect.Effect<Option.Option<Member.Record>, Failure>;
+export class MemberStore extends Context.Service<
+  MemberStore,
+  {
+    /** Find an active or removed membership in this workspace; None if absent. */
+    readonly get: (memberId: Member.Id) => Effect.Effect<Option.Option<Member.Record>, Failure>;
 
-  /**
-   * Find several active or removed memberships in one read. Absent IDs are omitted and each found
-   * record appears once; order is unspecified, so callers index results by ID. An empty request
-   * reads nothing.
-   */
-  readonly getMany: (
-    memberIds: ReadonlyArray<Member.Id>,
-  ) => Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
+    /**
+     * Find several active or removed memberships in one read. Absent IDs are omitted and each found
+     * record appears once; order is unspecified, so callers index results by ID. An empty request
+     * reads nothing.
+     */
+    readonly getMany: (
+      memberIds: ReadonlyArray<Member.Id>,
+    ) => Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
 
-  /** Match both the identity kind and ID, returning only an active membership. */
-  readonly findActive: (
-    identity: Identity.MemberReference,
-  ) => Effect.Effect<Option.Option<Member.Record>, Failure>;
+    /** Match both the identity kind and ID, returning only an active membership. */
+    readonly findActive: (
+      identity: Identity.MemberReference,
+    ) => Effect.Effect<Option.Option<Member.Record>, Failure>;
 
-  /** Every membership in this workspace, active and removed, in a stable order. */
-  readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
+    /** Every membership in this workspace, active and removed, in a stable order. */
+    readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Failure>;
 
-  /**
-   * Insert an active membership. Fail with Conflict for a reused member ID, including removed
-   * memberships, or an identity with an existing active membership. Never upsert.
-   */
-  readonly insert: (
-    record: Member.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Insert an active membership. Fail with Conflict for a reused member ID, including removed
+     * memberships, or an identity with an existing active membership. Never upsert.
+     */
+    readonly insert: (
+      record: Member.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
-  /**
-   * Projection write that sets an active membership's name. Fail with Conflict if absent or
-   * removed; the same name again changes nothing.
-   */
-  readonly rename: (
-    memberId: Member.Id,
-    name: Member.Name,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Projection write that sets an active membership's name. Fail with Conflict if absent or
+     * removed; the same name again changes nothing.
+     */
+    readonly rename: (
+      memberId: Member.Id,
+      name: Member.Name,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 
-  /**
-   * Change an active membership to removed, retaining its ID, workspace, and
-   * identity. Fail with Conflict if absent or already removed. A later admission
-   * for this identity must use a fresh member ID.
-   */
-  readonly markRemoved: (
-    memberId: Member.Id,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/workspace/member-store/Service",
-) {}
+    /**
+     * Change an active membership to removed, retaining its ID, workspace, and
+     * identity. Fail with Conflict if absent or already removed. A later admission
+     * for this identity must use a fresh member ID.
+     */
+    readonly markRemoved: (
+      memberId: Member.Id,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/workspace/member-store/Service") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -88,7 +87,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: MemberStore["Service"],
+): MemberStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -116,5 +118,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       Effect.flatMap(write("markRemoved", Member.Id, memberId), driver.markRemoved),
   };
 };
-
-export * as MemberStore from "./store.ts";

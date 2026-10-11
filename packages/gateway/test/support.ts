@@ -190,13 +190,13 @@ const keepOnceCommitted = (workspaceId: Workspace.Id, request: TurnJobRequest) =
  * `takeTurnJobs` hands them to the suite, which runs the turns through turn execution as a host's
  * turn jobs would.
  */
-export const recordedTurnJobs = TurnJobs.Service.of({
+export const recordedTurnJobs = TurnJobs.TurnJobs.of({
   requestRun: ({ workspaceId, memberId, threadId }) =>
     keepOnceCommitted(workspaceId, { kind: "run", memberId, threadId }),
   requestStop: ({ workspaceId, memberId, threadId, turnId }) =>
     keepOnceCommitted(workspaceId, { kind: "stop", memberId, threadId, turnId }),
 });
-export const layerRecordedTurnJobs = Layer.succeed(TurnJobs.Service, recordedTurnJobs);
+export const layerRecordedTurnJobs = Layer.succeed(TurnJobs.TurnJobs, recordedTurnJobs);
 
 /** The delivery job requests each workspace's commits made and no suite has taken yet, in order. */
 const requestedDeliveryJobs = new Map<Workspace.Id, Array<Thread.Id>>();
@@ -206,7 +206,7 @@ const requestedDeliveryJobs = new Map<Workspace.Id, Array<Thread.Id>>();
  * `takeDeliveryJobs` hands the threads to the suite, which delivers through delivery execution as a
  * host's delivery jobs would.
  */
-export const recordedDeliveryJobs = DeliveryJobs.Service.of({
+export const recordedDeliveryJobs = DeliveryJobs.DeliveryJobs.of({
   requestDeliver: ({ workspaceId, threadId }) =>
     Effect.flatMap(Store.Transaction, (storeTransaction) =>
       storeTransaction.afterCommit(
@@ -218,7 +218,10 @@ export const recordedDeliveryJobs = DeliveryJobs.Service.of({
       ),
     ),
 });
-export const layerRecordedDeliveryJobs = Layer.succeed(DeliveryJobs.Service, recordedDeliveryJobs);
+export const layerRecordedDeliveryJobs = Layer.succeed(
+  DeliveryJobs.DeliveryJobs,
+  recordedDeliveryJobs,
+);
 
 /** The threads whose delivery the workspace's commits requested since the last take, in order. */
 export const takeDeliveryJobs = (id: Workspace.Id) =>
@@ -248,8 +251,8 @@ const withHostServices = (
     bind(
       context.pipe(
         Context.add(Crypto.Crypto, crypto),
-        Context.add(TurnJobs.Service, recordedTurnJobs),
-        Context.add(DeliveryJobs.Service, recordedDeliveryJobs),
+        Context.add(TurnJobs.TurnJobs, recordedTurnJobs),
+        Context.add(DeliveryJobs.DeliveryJobs, recordedDeliveryJobs),
         Context.add(Integrations.Integrations, integrations),
       ),
     ),
@@ -257,13 +260,13 @@ const withHostServices = (
 
 /** One workspace's stores and signals on a host, with the test integrations and recorded jobs. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
-  Effect.flatMap(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
+  Effect.flatMap(Context.get(host, WorkspaceStorage.WorkspaceStorage).forWorkspace(id), (context) =>
     withHostServices(context, Context.get(host, Crypto.Crypto)),
   );
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
 export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
-  const workspaceStorage = yield* WorkspaceStorage.Service;
+  const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage;
   const crypto = yield* Crypto.Crypto;
   return yield* withHostServices(yield* workspaceStorage.forWorkspace(id), crypto);
 });
@@ -279,5 +282,3 @@ export const gateway = (host: Context.Context<Host>, options: Gateway.Options = 
 /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */
 export const runGateway = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host))));
-
-export * as Support from "./support.ts";

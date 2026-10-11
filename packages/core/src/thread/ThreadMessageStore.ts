@@ -7,12 +7,12 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
+import type * as Store from "../journal/store.ts";
 
-import { ThreadMessage } from "./ThreadMessage.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * How many messages a thread holds whose content remains.
@@ -55,66 +55,61 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadMessageStore
 }) {}
 
 /**
- * What a storage adapter implements for messages.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  readonly get: (
-    id: ThreadMessage.Id,
-  ) => Effect.Effect<Option.Option<ThreadMessage.Record>, Failure>;
-  /**
-   * Find several messages in one read. Absent IDs are omitted and each found record appears once;
-   * order is unspecified, so callers index results by ID. An empty request reads nothing.
-   */
-  readonly getMany: (
-    ids: ReadonlyArray<ThreadMessage.Id>,
-  ) => Effect.Effect<ReadonlyArray<ThreadMessage.Record>, Failure>;
-  /**
-   * How many messages whose content remains each of several threads holds, in one read. Threads
-   * with none, and absent IDs, are omitted; order is unspecified.
-   */
-  readonly countByThread: (
-    ids: ReadonlyArray<ThreadId.Id>,
-  ) => Effect.Effect<ReadonlyArray<Count>, Failure>;
-  /**
-   * Reject reused IDs. The author and mentions are recorded as
-   * given: publication checks that they take part. Preserve historical values on replay.
-   */
-  readonly insert: (
-    record: ThreadMessage.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Projection write that replaces a message's text and mentions at the edit's revision, the
-   * next after the current one. A missing or deleted message, or another revision,
-   * conflicts.
-   */
-  readonly edit: (
-    edited: ThreadMessage.Edited,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Projection write that replaces a message's content with its deletion. A missing or already deleted
-   * message conflicts.
-   */
-  readonly delete: (
-    deleted: ThreadMessage.Deleted,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The message store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for messages.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadMessageStore",
-) {}
+export class ThreadMessageStore extends Context.Service<
+  ThreadMessageStore,
+  {
+    readonly get: (
+      id: ThreadMessage.Id,
+    ) => Effect.Effect<Option.Option<ThreadMessage.Record>, Failure>;
+    /**
+     * Find several messages in one read. Absent IDs are omitted and each found record appears once;
+     * order is unspecified, so callers index results by ID. An empty request reads nothing.
+     */
+    readonly getMany: (
+      ids: ReadonlyArray<ThreadMessage.Id>,
+    ) => Effect.Effect<ReadonlyArray<ThreadMessage.Record>, Failure>;
+    /**
+     * How many messages whose content remains each of several threads holds, in one read. Threads
+     * with none, and absent IDs, are omitted; order is unspecified.
+     */
+    readonly countByThread: (
+      ids: ReadonlyArray<ThreadId.Id>,
+    ) => Effect.Effect<ReadonlyArray<Count>, Failure>;
+    /**
+     * Reject reused IDs. The author and mentions are recorded as
+     * given: publication checks that they take part. Preserve historical values on replay.
+     */
+    readonly insert: (
+      record: ThreadMessage.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Projection write that replaces a message's text and mentions at the edit's revision, the
+     * next after the current one. A missing or deleted message, or another revision,
+     * conflicts.
+     */
+    readonly edit: (
+      edited: ThreadMessage.Edited,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Projection write that replaces a message's content with its deletion. A missing or already deleted
+     * message conflicts.
+     */
+    readonly delete: (
+      deleted: ThreadMessage.Deleted,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/thread/ThreadMessageStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -123,7 +118,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: ThreadMessageStore["Service"],
+): ThreadMessageStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -139,5 +137,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       Effect.flatMap(write("delete", ThreadMessage.Deleted, deleted), driver.delete),
   };
 };
-
-export * as ThreadMessageStore from "./ThreadMessageStore.ts";

@@ -1,24 +1,24 @@
-import { Scope } from "../scope.ts";
+import * as Scope from "../scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Actor } from "../../identity/actor.ts";
-import { Journal } from "../../journal/journal.ts";
-import { Publication } from "../../journal/publication.ts";
-import type { Log } from "../../journal/log.ts";
-import type { Projection } from "../../journal/projection.ts";
-import { Store } from "../../journal/store.ts";
-import { Member } from "../../workspace/member/member.ts";
-import { MemberStore } from "../../workspace/member/store.ts";
-import { Authorization } from "../authorization.ts";
-import { Delegation } from "../delegation.ts";
-import type { Permission } from "../permission.ts";
-import { PermissionCatalog } from "../permission-catalog.ts";
-import { Requirement } from "../requirement.ts";
-import { BuiltinRoles } from "../role/builtin.ts";
-import { Assignment } from "./assignment.ts";
-import { AssignmentCommand } from "./command.ts";
-import { AssignmentPermissions } from "./permissions.ts";
-import { AssignmentStore } from "./store.ts";
+import * as Actor from "../../identity/actor.ts";
+import * as Journal from "../../journal/journal.ts";
+import * as Publication from "../../journal/publication.ts";
+import type * as Log from "../../journal/log.ts";
+import type * as Projection from "../../journal/projection.ts";
+import * as Store from "../../journal/store.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as MemberStore from "../../workspace/member/store.ts";
+import * as Authorization from "../authorization.ts";
+import * as Delegation from "../delegation.ts";
+import type * as Permission from "../permission.ts";
+import * as PermissionCatalog from "../permission-catalog.ts";
+import * as Requirement from "../requirement.ts";
+import * as BuiltinRoles from "../role/builtin.ts";
+import * as Assignment from "./assignment.ts";
+import * as AssignmentCommand from "./command.ts";
+import * as AssignmentPermissions from "./permissions.ts";
+import * as AssignmentStore from "./store.ts";
 import { Changed, InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
 export { Changed, InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
 
@@ -34,57 +34,57 @@ export type Error =
   | Changed;
 /** Reading one's own permissions needs only active membership. */
 export type PermissionsError = Exclude<Authorization.Error, Authorization.Denied>;
-export interface Interface {
-  /**
-   * What the acting member may do across the whole workspace: each declared workspace permission
-   * a current grant covers, in declaration order. Clients offer only the actions it names; the
-   * operations still check their own requirements.
-   */
-  readonly permissions: Effect.Effect<
-    ReadonlyArray<Permission.Name>,
-    PermissionsError,
-    Actor.Service
-  >;
-  readonly roles: Effect.Effect<ReadonlyArray<Assignment.RoleChoice>, Error, Actor.Service>;
-  readonly list: (memberId: Member.Id) => Effect.Effect<Assignment.Access, Error, Actor.Service>;
-  readonly assign: (
-    input: Assignment.AssignInput,
-  ) => Effect.Effect<Assignment.Record, Error, Actor.Service>;
-  readonly revoke: (
-    memberId: Member.Id,
-    assignmentId: Assignment.Id,
-  ) => Effect.Effect<Assignment.Record, Error, Actor.Service>;
-  readonly change: (
-    input: Assignment.ChangeInput,
-  ) => Effect.Effect<Assignment.Record, Error, Actor.Service>;
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/authorization/assignment/service/Service",
-) {}
+export class AssignmentService extends Context.Service<
+  AssignmentService,
+  {
+    /**
+     * What the acting member may do across the whole workspace: each declared workspace permission
+     * a current grant covers, in declaration order. Clients offer only the actions it names; the
+     * operations still check their own requirements.
+     */
+    readonly permissions: Effect.Effect<
+      ReadonlyArray<Permission.Name>,
+      PermissionsError,
+      Actor.Actor
+    >;
+    readonly roles: Effect.Effect<ReadonlyArray<Assignment.RoleChoice>, Error, Actor.Actor>;
+    readonly list: (memberId: Member.Id) => Effect.Effect<Assignment.Access, Error, Actor.Actor>;
+    readonly assign: (
+      input: Assignment.AssignInput,
+    ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+    readonly revoke: (
+      memberId: Member.Id,
+      assignmentId: Assignment.Id,
+    ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+    readonly change: (
+      input: Assignment.ChangeInput,
+    ) => Effect.Effect<Assignment.Record, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/authorization/assignment/service/Service") {}
 
 /** @category constructors */
 export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.Return<
-  Interface,
+  AssignmentService["Service"],
   never,
-  | AssignmentStore.Service
-  | MemberStore.Service
-  | Authorization.Service
-  | Delegation.Service
-  | AssignmentCommand.Service
-  | Journal.Service
+  | AssignmentStore.AssignmentStore
+  | MemberStore.MemberStore
+  | Authorization.Authorization
+  | Delegation.Delegation
+  | AssignmentCommand.AssignmentCommand
+  | Journal.Journal
   | Crypto.Crypto
-  | PermissionCatalog.Service
-  | Store.Service
+  | PermissionCatalog.PermissionCatalog
+  | Store.Store
 > {
-  const assignmentStore = yield* AssignmentStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const authorization = yield* Authorization.Service;
-  const delegation = yield* Delegation.Service;
-  const assignmentCommand = yield* AssignmentCommand.Service;
-  const journal = yield* Journal.Service;
+  const assignmentStore = yield* AssignmentStore.AssignmentStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const authorization = yield* Authorization.Authorization;
+  const delegation = yield* Delegation.Delegation;
+  const assignmentCommand = yield* AssignmentCommand.AssignmentCommand;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const permissionCatalog = yield* PermissionCatalog.Service;
-  const { workspaceId } = yield* Store.Service;
+  const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
+  const { workspaceId } = yield* Store.Store;
   const manageRequirement = Requirement.make(AssignmentPermissions.Manage, {
     _tag: "Workspace",
     workspaceId,
@@ -216,9 +216,15 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ permissions, roles: listRoleChoices, list, assign, revoke, change });
+  return AssignmentService.of({
+    permissions,
+    roles: listRoleChoices,
+    list,
+    assign,
+    revoke,
+    change,
+  });
 });
 
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-export * as AssignmentService from "./service.ts";
+export const layer = Layer.effect(AssignmentService, make());

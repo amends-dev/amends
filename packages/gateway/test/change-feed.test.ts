@@ -9,15 +9,8 @@ import { Member } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Queue, Stream } from "effect";
 import { withStorage } from "./fixture.ts";
-import {
-  alice,
-  type Bound,
-  boundTo,
-  runHost,
-  Support,
-  testProvenance,
-  workspaceId,
-} from "./support.ts";
+import * as Support from "./support.ts";
+import { alice, type Bound, boundTo, runHost, testProvenance, workspaceId } from "./support.ts";
 
 /** Buffer a subscription's messages for the enclosing scope. */
 const listen = <E, R>(
@@ -38,7 +31,7 @@ const committed = (message: ChangeFeed.Message) => {
   return message;
 };
 const watch = (options?: ChangeFeed.WatchOptions) =>
-  Effect.flatMap(ChangeFeedService.Service, (changeFeedService) =>
+  Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) =>
     changeFeedService.watch(options),
   );
 const human = (name: string) => Identity.HumanId.make(name);
@@ -53,7 +46,7 @@ const memberActor = (name: string) =>
 const { core, initialized, seed } = Support;
 /** Record a role every member may see, as a trusted fixture would. */
 const marker = (bound: Bound) =>
-  Effect.flatMap(Journal.Service, (journal) =>
+  Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
       journal.publish(RoleFacts.Created, {
         roleId: Role.Id.make("marker"),
@@ -63,7 +56,7 @@ const marker = (bound: Bound) =>
       }),
     ),
   ).pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(core(bound)),
   );
 describe("change feed", () => {
@@ -86,14 +79,14 @@ describe("change feed", () => {
           // One core for the workspace, as one runtime serves every subscriber in a process.
           const services = yield* Layer.build(core(bound));
           const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-            program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(services));
+            program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(services));
           const feeds = yield* Effect.forEach([reader, outsider, unpermitted], (actor) =>
             as(actor, listen(watch())),
           );
           for (const next of feeds) expect(yield* next).toMatchObject({ reset: true });
           const group = yield* as(
             owner,
-            Effect.flatMap(GroupService.Service, (groupService) =>
+            Effect.flatMap(GroupService.GroupService, (groupService) =>
               groupService.createTeam({
                 name: "Private",
                 memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
@@ -102,7 +95,7 @@ describe("change feed", () => {
           );
           yield* as(
             owner,
-            Effect.flatMap(ThreadService.Service, (threadService) =>
+            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
               threadService.startInGroup({
                 groupId: group.id,
                 mentions: [],
@@ -151,10 +144,10 @@ describe("change feed", () => {
           yield* seed(bound, [mentioned, bystander], [mentioned, bystander]);
           const services = yield* Layer.build(core(bound));
           const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-            program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(services));
+            program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(services));
           const group = yield* as(
             owner,
-            Effect.flatMap(GroupService.Service, (groupService) =>
+            Effect.flatMap(GroupService.GroupService, (groupService) =>
               groupService.createTeam({
                 name: "Team",
                 memberIds: [owner.memberId, mentioned.memberId, bystander.memberId],
@@ -169,7 +162,7 @@ describe("change feed", () => {
           for (const next of [mentionedFeed, bystanderFeed]) yield* next;
           yield* as(
             owner,
-            Effect.flatMap(ThreadService.Service, (threadService) =>
+            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
               threadService.startInGroup({
                 groupId: group.id,
                 mentions: [mentioned.memberId],
@@ -180,7 +173,7 @@ describe("change feed", () => {
           const started = committed(yield* mentionedFeed);
           const inbox = yield* as(
             mentioned,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
+            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
               Effect.map(notificationService.inbox({ limit: 10 }), (items) =>
                 items.map((item) => item.notification),
               ),

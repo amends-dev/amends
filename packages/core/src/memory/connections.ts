@@ -1,15 +1,15 @@
 import { Connection, ConnectionStore } from "../connection/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Connection.Record));
 
 /** Connection records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Connections.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: ConnectionStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: ConnectionStore.ConnectionStore["Service"] = {
     get: Effect.fn("Connections.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("connections"), id);
@@ -52,6 +52,4 @@ export const make = Effect.fn("Connections.make")(function* () {
 });
 
 /** Provide connection storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ConnectionStore.Service, make());
-
-export * as Connections from "./connections.ts";
+export const layer = Layer.effect(ConnectionStore.ConnectionStore, make());

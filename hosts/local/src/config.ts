@@ -126,5 +126,3 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
     signIn: yield* signIn,
   };
 });
-
-export * as LocalConfig from "./config.ts";

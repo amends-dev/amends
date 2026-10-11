@@ -1,16 +1,16 @@
 import { Context, Crypto, type DateTime, Effect, Layer, Option } from "effect";
-import { AssignmentCommand } from "../../authorization/assignment/command.ts";
-import type { Role } from "../../authorization/role/role.ts";
-import { Group } from "../../group/group.ts";
-import { GroupMembershipFacts } from "../../group/membership/facts.ts";
-import { GroupMembership } from "../../group/membership/membership.ts";
-import { GroupStore } from "../../group/store.ts";
-import type { Identity } from "../../identity/identity.ts";
-import { Journal } from "../../journal/journal.ts";
-import type { Publication } from "../../journal/publication.ts";
-import { Store } from "../../journal/store.ts";
-import { MemberFacts } from "./facts.ts";
-import { Member } from "./member.ts";
+import * as AssignmentCommand from "../../authorization/assignment/command.ts";
+import type * as Role from "../../authorization/role/role.ts";
+import * as Group from "../../group/group.ts";
+import * as GroupMembershipFacts from "../../group/membership/facts.ts";
+import * as GroupMembership from "../../group/membership/membership.ts";
+import * as GroupStore from "../../group/store.ts";
+import type * as Identity from "../../identity/identity.ts";
+import * as Journal from "../../journal/journal.ts";
+import type * as Publication from "../../journal/publication.ts";
+import * as Store from "../../journal/store.ts";
+import * as MemberFacts from "./facts.ts";
+import * as Member from "./member.ts";
 
 export type Error = AssignmentCommand.Error | GroupStore.Failure;
 
@@ -28,28 +28,30 @@ export interface NewMember {
   readonly joinedAt: DateTime.Utc;
 }
 
-export interface Interface {
-  /**
-   * Add a member, as a person accepting an invitation or an agent being created joins: a new
-   * membership, its role across the workspace, and its place in the general group, which every
-   * member joins. The caller owns authorization and delegation, and the commit.
-   */
-  readonly add: (
-    member: NewMember,
-  ) => Effect.Effect<Member.Record, Error, Store.Transaction | Publication.Service>;
-}
-/** @effect-expect-leaking Transaction */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/workspace/member/command/Service",
-) {}
+/**
+ * @effect-expect-leaking Transaction
+ */
+export class MemberCommand extends Context.Service<
+  MemberCommand,
+  {
+    /**
+     * Add a member, as a person accepting an invitation or an agent being created joins: a new
+     * membership, its role across the workspace, and its place in the general group, which every
+     * member joins. The caller owns authorization and delegation, and the commit.
+     */
+    readonly add: (
+      member: NewMember,
+    ) => Effect.Effect<Member.Record, Error, Store.Transaction | Publication.Publication>;
+  }
+>()("@amends-dev/core/workspace/member/command/Service") {}
 
 /** @category constructors */
 export const make = Effect.fn("MemberCommand.make")(function* () {
-  const assignmentCommand = yield* AssignmentCommand.Service;
-  const groupStore = yield* GroupStore.Service;
-  const journal = yield* Journal.Service;
+  const assignmentCommand = yield* AssignmentCommand.AssignmentCommand;
+  const groupStore = yield* GroupStore.GroupStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   const add = Effect.fn("MemberCommand.add")(function* (member: NewMember) {
     const added: Member.Record = {
@@ -79,10 +81,8 @@ export const make = Effect.fn("MemberCommand.make")(function* () {
     return added;
   });
 
-  return Service.of({ add });
+  return MemberCommand.of({ add });
 });
 
 /** Internal writes shared by accepting invitations and creating agents. @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as MemberCommand from "./command.ts";
+export const layer = Layer.effect(MemberCommand, make());

@@ -12,32 +12,32 @@
  */
 import type { ChannelTransport } from "@amends-dev/channel";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Identity } from "../identity/identity.ts";
-import { Performer } from "../identity/performer.ts";
-import { Journal } from "../journal/journal.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Request } from "../request/request.ts";
-import { Task } from "../task/Task.ts";
-import { TaskCommand } from "../task/TaskCommand.ts";
-import { Thread } from "../thread/Thread.ts";
-import { ThreadCommand } from "../thread/ThreadCommand.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadMessage } from "../thread/ThreadMessage.ts";
-import { ThreadMessageStore } from "../thread/ThreadMessageStore.ts";
-import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
-import { ThreadStore } from "../thread/ThreadStore.ts";
-import type { Channel } from "./Channel.ts";
-import type { ChannelBinding } from "./ChannelBinding.ts";
-import { ChannelBindingStore } from "./ChannelBindingStore.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Performer from "../identity/performer.ts";
+import * as Journal from "../journal/journal.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Request from "../request/request.ts";
+import * as Task from "../task/Task.ts";
+import * as TaskCommand from "../task/TaskCommand.ts";
+import * as Thread from "../thread/Thread.ts";
+import * as ThreadCommand from "../thread/ThreadCommand.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadMessage from "../thread/ThreadMessage.ts";
+import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts";
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
+import * as ThreadStore from "../thread/ThreadStore.ts";
+import type * as Channel from "./Channel.ts";
+import type * as ChannelBinding from "./ChannelBinding.ts";
+import * as ChannelBindingStore from "./ChannelBindingStore.ts";
 import { NotFound, Rejected, Unavailable } from "./ChannelErrors.ts";
-import { ChannelFacts } from "./ChannelFacts.ts";
-import { ChannelQuery } from "./ChannelQuery.ts";
-import type { ChannelStore } from "./ChannelStore.ts";
-import { Contact } from "./Contact.ts";
-import { ContactStore } from "./ContactStore.ts";
-import { DeliveryStore } from "./DeliveryStore.ts";
+import * as ChannelFacts from "./ChannelFacts.ts";
+import * as ChannelQuery from "./ChannelQuery.ts";
+import type * as ChannelStore from "./ChannelStore.ts";
+import * as Contact from "./Contact.ts";
+import * as ContactStore from "./ContactStore.ts";
+import * as DeliveryStore from "./DeliveryStore.ts";
 export { NotFound, Rejected, Unavailable } from "./ChannelErrors.ts";
 
 /**
@@ -110,38 +110,33 @@ export type IntakeError =
 export type ReceiveError = IntakeError | Rejected;
 
 /**
+ * Intake, one of `Core.JobServices`: a host calls it for what its channels receive, as no actor.
+ *
  * Intake, as a host calls it.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Take in a request the external system sent the host for the channel: the channel's transport
-   * makes events of it, each taken in as `intake` does, in a commit of its own. A request the
-   * transport rejects is `Rejected`, and a channel whose system cannot be reached `Unavailable`; a
-   * channel missing or removed is `NotFound`.
-   */
-  readonly receive: (
-    channelId: Channel.Id,
-    inbound: ChannelTransport.Inbound,
-  ) => Effect.Effect<Received, ReceiveError>;
-  /** Take in one event the channel's system sent, in a commit of its own. */
-  readonly intake: (
-    channelId: Channel.Id,
-    event: ChannelTransport.Event,
-  ) => Effect.Effect<Intake, IntakeError>;
-}
-
-/**
- * Intake, one of `Core.JobServices`: a host calls it for what its channels receive, as no actor.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/ChannelIntake",
-) {}
+export class ChannelIntake extends Context.Service<
+  ChannelIntake,
+  {
+    /**
+     * Take in a request the external system sent the host for the channel: the channel's transport
+     * makes events of it, each taken in as `intake` does, in a commit of its own. A request the
+     * transport rejects is `Rejected`, and a channel whose system cannot be reached `Unavailable`; a
+     * channel missing or removed is `NotFound`.
+     */
+    readonly receive: (
+      channelId: Channel.Id,
+      inbound: ChannelTransport.Inbound,
+    ) => Effect.Effect<Received, ReceiveError>;
+    /** Take in one event the channel's system sent, in a commit of its own. */
+    readonly intake: (
+      channelId: Channel.Id,
+      event: ChannelTransport.Event,
+    ) => Effect.Effect<Intake, IntakeError>;
+  }
+>()("@amends-dev/core/channel/ChannelIntake") {}
 
 /** Why intake took nothing in. */
 type IgnoredReason = Extract<Intake, { readonly _tag: "Ignored" }>["reason"];
@@ -155,18 +150,18 @@ const ignored = (reason: IgnoredReason) => Intake.cases.Ignored.make({ reason })
  * @since 0.1.0
  */
 export const make = Effect.fn("ChannelIntake.make")(function* () {
-  const channelQuery = yield* ChannelQuery.Service;
-  const channelBindingStore = yield* ChannelBindingStore.Service;
-  const contactStore = yield* ContactStore.Service;
-  const deliveryStore = yield* DeliveryStore.Service;
-  const threadStore = yield* ThreadStore.Service;
-  const threadMessageStore = yield* ThreadMessageStore.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadCommand = yield* ThreadCommand.Service;
-  const taskCommand = yield* TaskCommand.Service;
-  const journal = yield* Journal.Service;
+  const channelQuery = yield* ChannelQuery.ChannelQuery;
+  const channelBindingStore = yield* ChannelBindingStore.ChannelBindingStore;
+  const contactStore = yield* ContactStore.ContactStore;
+  const deliveryStore = yield* DeliveryStore.DeliveryStore;
+  const threadStore = yield* ThreadStore.ThreadStore;
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadCommand = yield* ThreadCommand.ThreadCommand;
+  const taskCommand = yield* TaskCommand.TaskCommand;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   /** Run `step` in its own commit, attributed to the contact `contactId`. */
   const asContact = <A, E, R>(contactId: Contact.Id, step: Effect.Effect<A, E, R>) =>
@@ -175,7 +170,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         workspaceId,
         Performer.Reference.cases.Identity.make({ identity: { _tag: "Contact", id: contactId } }),
       ),
-      (provenance) => step.pipe(Effect.provideService(Publication.Service, provenance)),
+      (provenance) => step.pipe(Effect.provideService(Publication.Publication, provenance)),
     ).pipe(journal.commit);
 
   /** The thread a binding names, which a binding cannot outlive. */
@@ -444,7 +439,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         ),
       );
 
-  const receive: Interface["receive"] = Effect.fn("ChannelIntake.receive")(
+  const receive: ChannelIntake["Service"]["receive"] = Effect.fn("ChannelIntake.receive")(
     function* (channelId, inbound) {
       const channel = yield* channelQuery.requireActive(channelId);
       const transport = yield* transportOf(channel);
@@ -466,7 +461,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     },
   );
 
-  const intake: Interface["intake"] = Effect.fn("ChannelIntake.intake")(
+  const intake: ChannelIntake["Service"]["intake"] = Effect.fn("ChannelIntake.intake")(
     function* (channelId, event) {
       const channel = yield* channelQuery.requireActive(channelId);
       const transport = yield* transportOf(channel);
@@ -474,7 +469,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     },
   );
 
-  return Service.of({ receive, intake });
+  return ChannelIntake.of({ receive, intake });
 });
 
 /**
@@ -484,6 +479,4 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as ChannelIntake from "./ChannelIntake.ts";
+export const layer = Layer.effect(ChannelIntake, make());

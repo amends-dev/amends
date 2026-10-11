@@ -29,36 +29,38 @@ export const methods: SignIn.Methods = { emailCode: true, providers: [] };
  */
 export const make = Effect.fn("DevelopmentSignIn.make")(function* (
   deliver: DeliverCode = logCode,
-): Effect.fn.Return<SignIn.Interface, never, Crypto.Crypto | Accounts.Service> {
+): Effect.fn.Return<SignIn.SignIn["Service"], never, Crypto.Crypto | Accounts.Accounts> {
   const crypto = yield* Crypto.Crypto;
-  const accounts = yield* Accounts.Service;
+  const accounts = yield* Accounts.Accounts;
   const pending = new Map<Accounts.Email, PendingCode>();
-  const start: SignIn.Interface["start"] = Effect.fn("DevelopmentSignIn.start")(function* (email) {
-    const bytes = yield* Effect.orDie(crypto.randomBytes(4));
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    const code = yield* Schema.decodeEffect(SignIn.Code)(
-      String(view.getUint32(0) % 1_000_000).padStart(6, "0"),
-    ).pipe(Effect.orDie);
-    const entry: PendingCode = {
-      code,
-      expiresAt: DateTime.addDuration(yield* DateTime.now, codeLifetime),
-      delivered: false,
-    };
-    yield* Effect.uninterruptibleMask((restore) =>
-      Effect.gen(function* () {
-        pending.set(email, entry);
-        yield* restore(Effect.suspend(() => deliver(email, code))).pipe(
-          Effect.onExit((exit) =>
-            Effect.sync(() => {
-              if (Exit.isSuccess(exit)) entry.delivered = true;
-              else if (pending.get(email) === entry) pending.delete(email);
-            }),
-          ),
-        );
-      }),
-    );
-  });
-  const complete: SignIn.Interface["complete"] = Effect.fn("DevelopmentSignIn.complete")(
+  const start: SignIn.SignIn["Service"]["start"] = Effect.fn("DevelopmentSignIn.start")(
+    function* (email) {
+      const bytes = yield* Effect.orDie(crypto.randomBytes(4));
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const code = yield* Schema.decodeEffect(SignIn.Code)(
+        String(view.getUint32(0) % 1_000_000).padStart(6, "0"),
+      ).pipe(Effect.orDie);
+      const entry: PendingCode = {
+        code,
+        expiresAt: DateTime.addDuration(yield* DateTime.now, codeLifetime),
+        delivered: false,
+      };
+      yield* Effect.uninterruptibleMask((restore) =>
+        Effect.gen(function* () {
+          pending.set(email, entry);
+          yield* restore(Effect.suspend(() => deliver(email, code))).pipe(
+            Effect.onExit((exit) =>
+              Effect.sync(() => {
+                if (Exit.isSuccess(exit)) entry.delivered = true;
+                else if (pending.get(email) === entry) pending.delete(email);
+              }),
+            ),
+          );
+        }),
+      );
+    },
+  );
+  const complete: SignIn.SignIn["Service"]["complete"] = Effect.fn("DevelopmentSignIn.complete")(
     function* (email, code) {
       // Reading time can suspend. Look up and consume the code together afterwards.
       const now = yield* DateTime.now;
@@ -75,7 +77,7 @@ export const make = Effect.fn("DevelopmentSignIn.make")(function* (
       return { token: account.id, account };
     },
   );
-  return SignIn.Service.of({ methods, start, complete });
+  return SignIn.SignIn.of({ methods, start, complete });
 });
 
 /**
@@ -83,6 +85,4 @@ export const make = Effect.fn("DevelopmentSignIn.make")(function* (
  *
  * @category layers
  */
-export const layer = (deliver?: DeliverCode) => Layer.effect(SignIn.Service, make(deliver));
-
-export * as DevelopmentSignIn from "./sign-in.ts";
+export const layer = (deliver?: DeliverCode) => Layer.effect(SignIn.SignIn, make(deliver));

@@ -6,7 +6,7 @@
  *
  * @since 0.1.0
  */
-import { Permission } from "../authorization/permission.ts";
+import * as Permission from "../authorization/permission.ts";
 
 /**
  * Start a thread in a group.
@@ -40,5 +40,3 @@ export const Rename = Permission.make("thread.rename", {
   targetKind: "Thread",
   builtinTier: "member",
 });
-
-export * as ThreadPermissions from "./ThreadPermissions.ts";

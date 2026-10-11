@@ -10,7 +10,7 @@ import {
   OwnershipService,
   WorkspaceSettingsService,
 } from "@amends-dev/core/workspace";
-import { GatewayErrors } from "@amends-dev/gateway/errors";
+import * as GatewayErrors from "@amends-dev/gateway/errors";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
 import { AgentService } from "@amends-dev/core/agent";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
@@ -290,5 +290,3 @@ export const channelEvents = [
   ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
   ChannelIntake.Unavailable.pipe(HttpApiSchema.status(503)),
 ] as const;
-
-export * as ApiErrors from "./errors.ts";

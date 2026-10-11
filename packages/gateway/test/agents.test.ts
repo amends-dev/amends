@@ -16,7 +16,8 @@ import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Redacted } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -26,7 +27,6 @@ import {
   installed,
   journalLog,
   request,
-  Support,
   testIntegrations,
   testProvenance,
   type Bound,
@@ -35,19 +35,19 @@ import {
 const as = <A, E>(
   workspaceId: Workspace.Id,
   identity: Identity.MemberReference,
-  use: (agentService: AgentService.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (agentService: AgentService.AgentService["Service"]) => Effect.Effect<A, E, Actor.Actor>,
 ) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(workspaceId, identity, Effect.flatMap(AgentService.Service, use)),
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
+    gateway.asMember(workspaceId, identity, Effect.flatMap(AgentService.AgentService, use)),
   );
 
 /** A connection alice creates in the workspace. */
 const connect = (workspaceId: Workspace.Id, input: Connection.CreateInput) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       workspaceId,
       alice,
-      Effect.flatMap(ConnectionService.Service, (connectionService) =>
+      Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
         connectionService.create(input),
       ),
     ),
@@ -55,11 +55,11 @@ const connect = (workspaceId: Workspace.Id, input: Connection.CreateInput) =>
 
 /** A connection alice removes from the workspace. */
 const disconnect = (workspaceId: Workspace.Id, connectionId: Connection.Id) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       workspaceId,
       alice,
-      Effect.flatMap(ConnectionService.Service, (connectionService) =>
+      Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
         connectionService.remove(connectionId),
       ),
     ),
@@ -154,14 +154,14 @@ const configurationOf = (agentId: Agent.Id, input: Agent.CreateInput) => ({
 
 /** An operation a test runs as some member, whatever it answers. */
 type Operation = (
-  agentService: AgentService.Interface,
-) => Effect.Effect<unknown, unknown, Actor.Service>;
+  agentService: AgentService.AgentService["Service"],
+) => Effect.Effect<unknown, unknown, Actor.Actor>;
 
 const { core, gateway, runGateway } = Support;
 let directGrants = 0;
 /** Give the member each of `grants` directly, which no operation does. */
 const grant = (bound: Bound, memberId: Member.Id, grants: ReadonlyArray<Grant.Value>) =>
-  Effect.flatMap(Journal.Service, (journal) =>
+  Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
       Effect.forEach(
         grants,
@@ -176,7 +176,7 @@ const grant = (bound: Bound, memberId: Member.Id, grants: ReadonlyArray<Grant.Va
       ),
     ),
   ).pipe(
-    Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
     Effect.provide(core(bound)),
   );
 /** Take every role the member has away, as alice. */
@@ -781,7 +781,7 @@ describe("agents", () => {
 
           yield* storage.discardProjections;
           expect(yield* bound.agents.list).toEqual([]);
-          yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+          yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
             Effect.provide(core(bound)),
           );
           expect(yield* storedAgents(bound)).toEqual(records);

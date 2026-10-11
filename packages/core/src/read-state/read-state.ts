@@ -1,9 +1,9 @@
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import type { Notification } from "../notification/notification.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import type * as Notification from "../notification/notification.ts";
 
 /** A person whose reading this is, as their notifications address them. Agents keep no read state. */
 export type Reader = Extract<Notification.Recipient, { readonly _tag: "Human" }>;
@@ -34,5 +34,3 @@ export interface MarkThreadReadInput extends Schema.Schema.Type<typeof MarkThrea
 
 export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.Id });
 export interface MarkGroupReadInput extends Schema.Schema.Type<typeof MarkGroupReadInput> {}
-
-export * as ReadState from "./read-state.ts";

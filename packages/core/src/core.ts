@@ -1,93 +1,93 @@
-import { AgentPermissions } from "./agent/permissions.ts";
-import { AgentProjection } from "./agent/projection.ts";
-import { AgentService } from "./agent/service.ts";
-import { TurnCommand } from "./turn/command.ts";
-import { TurnService } from "./turn/service.ts";
-import { TurnJobs } from "./turn/jobs.ts";
-import type { TurnStore } from "./turn/store.ts";
-import type { Reaction } from "./journal/reaction.ts";
-import { TurnExecution } from "./turn/execution.ts";
-import type { SessionLogStore } from "./turn/session-log-store.ts";
-import { AgentQuery } from "./agent/query.ts";
-import { TurnProjection } from "./turn/projection.ts";
-import { ConnectionService } from "./connection/service.ts";
-import { ConnectionPermissions } from "./connection/permissions.ts";
-import { ConnectionProjection } from "./connection/projection.ts";
-import { ThreadService } from "./thread/ThreadService.ts";
-import { ThreadCommand } from "./thread/ThreadCommand.ts";
-import { GroupCommand } from "./group/command.ts";
-import { ThreadQuery } from "./thread/ThreadQuery.ts";
-import { ThreadMessageService } from "./thread/ThreadMessageService.ts";
-import { ThreadMessagePermissions } from "./thread/ThreadMessagePermissions.ts";
-import { ThreadParticipationService } from "./thread/ThreadParticipationService.ts";
-import { ThreadParticipationPermissions } from "./thread/ThreadParticipationPermissions.ts";
-import { ThreadActivityResolvers } from "./thread/ThreadActivityResolvers.ts";
-import { ThreadMessageTimeline } from "./thread/ThreadMessageTimeline.ts";
-import { ThreadParticipationTimeline } from "./thread/ThreadParticipationTimeline.ts";
-import { ThreadTitleTimeline } from "./thread/ThreadTitleTimeline.ts";
-import { TurnTimeline } from "./turn/timeline.ts";
-import { ThreadPermissions } from "./thread/ThreadPermissions.ts";
-import { ThreadProjection } from "./thread/ThreadProjection.ts";
-import { ThreadParticipationProjection } from "./thread/ThreadParticipationProjection.ts";
-import { ThreadMessageProjection } from "./thread/ThreadMessageProjection.ts";
-import { ThreadActivityProjection } from "./thread/ThreadActivityProjection.ts";
-import { TaskCommand } from "./task/TaskCommand.ts";
-import { TaskPermissions } from "./task/TaskPermissions.ts";
-import { TaskProjection } from "./task/TaskProjection.ts";
-import { TaskService } from "./task/TaskService.ts";
-import { TaskTimeline } from "./task/TaskTimeline.ts";
-import { ChannelIntake } from "./channel/ChannelIntake.ts";
-import { ChannelPermissions } from "./channel/ChannelPermissions.ts";
-import { ChannelProjection } from "./channel/ChannelProjection.ts";
-import { ChannelQuery } from "./channel/ChannelQuery.ts";
-import { ChannelService } from "./channel/ChannelService.ts";
-import { DeliveryExecution } from "./channel/DeliveryExecution.ts";
-import { DeliveryJobs } from "./channel/DeliveryJobs.ts";
-import { DeliveryProjection } from "./channel/DeliveryProjection.ts";
+import * as AgentPermissions from "./agent/permissions.ts";
+import * as AgentProjection from "./agent/projection.ts";
+import * as AgentService from "./agent/service.ts";
+import * as TurnCommand from "./turn/command.ts";
+import * as TurnService from "./turn/service.ts";
+import * as TurnJobs from "./turn/jobs.ts";
+import type * as TurnStore from "./turn/store.ts";
+import type * as Reaction from "./journal/reaction.ts";
+import * as TurnExecution from "./turn/execution.ts";
+import type * as SessionLogStore from "./turn/session-log-store.ts";
+import * as AgentQuery from "./agent/query.ts";
+import * as TurnProjection from "./turn/projection.ts";
+import * as ConnectionService from "./connection/service.ts";
+import * as ConnectionPermissions from "./connection/permissions.ts";
+import * as ConnectionProjection from "./connection/projection.ts";
+import * as ThreadService from "./thread/ThreadService.ts";
+import * as ThreadCommand from "./thread/ThreadCommand.ts";
+import * as GroupCommand from "./group/command.ts";
+import * as ThreadQuery from "./thread/ThreadQuery.ts";
+import * as ThreadMessageService from "./thread/ThreadMessageService.ts";
+import * as ThreadMessagePermissions from "./thread/ThreadMessagePermissions.ts";
+import * as ThreadParticipationService from "./thread/ThreadParticipationService.ts";
+import * as ThreadParticipationPermissions from "./thread/ThreadParticipationPermissions.ts";
+import * as ThreadActivityResolvers from "./thread/ThreadActivityResolvers.ts";
+import * as ThreadMessageTimeline from "./thread/ThreadMessageTimeline.ts";
+import * as ThreadParticipationTimeline from "./thread/ThreadParticipationTimeline.ts";
+import * as ThreadTitleTimeline from "./thread/ThreadTitleTimeline.ts";
+import * as TurnTimeline from "./turn/timeline.ts";
+import * as ThreadPermissions from "./thread/ThreadPermissions.ts";
+import * as ThreadProjection from "./thread/ThreadProjection.ts";
+import * as ThreadParticipationProjection from "./thread/ThreadParticipationProjection.ts";
+import * as ThreadMessageProjection from "./thread/ThreadMessageProjection.ts";
+import * as ThreadActivityProjection from "./thread/ThreadActivityProjection.ts";
+import * as TaskCommand from "./task/TaskCommand.ts";
+import * as TaskPermissions from "./task/TaskPermissions.ts";
+import * as TaskProjection from "./task/TaskProjection.ts";
+import * as TaskService from "./task/TaskService.ts";
+import * as TaskTimeline from "./task/TaskTimeline.ts";
+import * as ChannelIntake from "./channel/ChannelIntake.ts";
+import * as ChannelPermissions from "./channel/ChannelPermissions.ts";
+import * as ChannelProjection from "./channel/ChannelProjection.ts";
+import * as ChannelQuery from "./channel/ChannelQuery.ts";
+import * as ChannelService from "./channel/ChannelService.ts";
+import * as DeliveryExecution from "./channel/DeliveryExecution.ts";
+import * as DeliveryJobs from "./channel/DeliveryJobs.ts";
+import * as DeliveryProjection from "./channel/DeliveryProjection.ts";
 /**
  * Compose one workspace's core from its domains. Hosts bind storage to a
  * workspace and supply cryptography; a gateway resolves the acting member and
  * runs the application operations.
  */
 import { Layer } from "effect";
-import { ChangeFeedService } from "./change-feed/service.ts";
-import { ChangeFeedSource } from "./change-feed/source.ts";
-import { GroupService } from "./group/service.ts";
-import { GroupQuery } from "./group/query.ts";
-import { GroupProjection } from "./group/projection.ts";
-import { GroupMembershipProjection } from "./group/membership/projection.ts";
-import { GroupFollowService } from "./group/follow/service.ts";
-import { GroupFollowProjection } from "./group/follow/projection.ts";
-import { ReadStateService } from "./read-state/service.ts";
-import { ReadStateCommand } from "./read-state/command.ts";
-import { GroupMembershipService } from "./group/membership/service.ts";
-import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
-import { GroupPermissions } from "./group/permissions.ts";
-import { AssignmentProjection } from "./authorization/assignment/projection.ts";
-import { AssignmentService } from "./authorization/assignment/service.ts";
-import { AssignmentCommand } from "./authorization/assignment/command.ts";
-import { AssignmentPermissions } from "./authorization/assignment/permissions.ts";
-import { Delegation } from "./authorization/delegation.ts";
-import { Authorization } from "./authorization/authorization.ts";
-import { GrantResolver } from "./authorization/grant-resolver.ts";
-import { PermissionCatalog } from "./authorization/permission-catalog.ts";
-import { RoleProjection } from "./authorization/role/projection.ts";
-import { Journal } from "./journal/journal.ts";
-import { Log } from "./journal/log.ts";
-import { NotificationService } from "./notification/service.ts";
-import { NotificationProjection } from "./notification/projection.ts";
-import { InvitationService } from "./workspace/invitation/service.ts";
-import { InvitationPermissions } from "./workspace/invitation/permissions.ts";
-import { InvitationProjection } from "./workspace/invitation/projection.ts";
-import { MemberCommand } from "./workspace/member/command.ts";
-import { MemberService } from "./workspace/member/service.ts";
-import { MemberPermissions } from "./workspace/member/permissions.ts";
-import { MemberProjection } from "./workspace/member/projection.ts";
-import { WorkspaceProjection } from "./workspace/projection.ts";
-import { OwnershipService } from "./workspace/ownership/service.ts";
-import { OwnershipPermissions } from "./workspace/ownership/permissions.ts";
-import { WorkspaceSettingsService } from "./workspace/settings/service.ts";
-import { WorkspaceSettingsPermissions } from "./workspace/settings/permissions.ts";
+import * as ChangeFeedService from "./change-feed/service.ts";
+import * as ChangeFeedSource from "./change-feed/source.ts";
+import * as GroupService from "./group/service.ts";
+import * as GroupQuery from "./group/query.ts";
+import * as GroupProjection from "./group/projection.ts";
+import * as GroupMembershipProjection from "./group/membership/projection.ts";
+import * as GroupFollowService from "./group/follow/service.ts";
+import * as GroupFollowProjection from "./group/follow/projection.ts";
+import * as ReadStateService from "./read-state/service.ts";
+import * as ReadStateCommand from "./read-state/command.ts";
+import * as GroupMembershipService from "./group/membership/service.ts";
+import * as GroupMembershipPermissions from "./group/membership/permissions.ts";
+import * as GroupPermissions from "./group/permissions.ts";
+import * as AssignmentProjection from "./authorization/assignment/projection.ts";
+import * as AssignmentService from "./authorization/assignment/service.ts";
+import * as AssignmentCommand from "./authorization/assignment/command.ts";
+import * as AssignmentPermissions from "./authorization/assignment/permissions.ts";
+import * as Delegation from "./authorization/delegation.ts";
+import * as Authorization from "./authorization/authorization.ts";
+import * as GrantResolver from "./authorization/grant-resolver.ts";
+import * as PermissionCatalog from "./authorization/permission-catalog.ts";
+import * as RoleProjection from "./authorization/role/projection.ts";
+import * as Journal from "./journal/journal.ts";
+import * as Log from "./journal/log.ts";
+import * as NotificationService from "./notification/service.ts";
+import * as NotificationProjection from "./notification/projection.ts";
+import * as InvitationService from "./workspace/invitation/service.ts";
+import * as InvitationPermissions from "./workspace/invitation/permissions.ts";
+import * as InvitationProjection from "./workspace/invitation/projection.ts";
+import * as MemberCommand from "./workspace/member/command.ts";
+import * as MemberService from "./workspace/member/service.ts";
+import * as MemberPermissions from "./workspace/member/permissions.ts";
+import * as MemberProjection from "./workspace/member/projection.ts";
+import * as WorkspaceProjection from "./workspace/projection.ts";
+import * as OwnershipService from "./workspace/ownership/service.ts";
+import * as OwnershipPermissions from "./workspace/ownership/permissions.ts";
+import * as WorkspaceSettingsService from "./workspace/settings/service.ts";
+import * as WorkspaceSettingsPermissions from "./workspace/settings/permissions.ts";
 
 /**
  * Projections registered for journal publication, applied in this order. Each derives its records
@@ -179,7 +179,7 @@ export const journalLog = Log.Id.make("journal");
  * tells a contact something requests the thread's delivery job.
  */
 const reactions: ReadonlyArray<
-  Reaction.Definition<TurnJobs.Service | TurnStore.Service | DeliveryJobs.Service>
+  Reaction.Definition<TurnJobs.TurnJobs | TurnStore.TurnStore | DeliveryJobs.DeliveryJobs>
 > = [...TurnJobs.reactions, ...DeliveryJobs.reactions];
 const journal = Journal.layer({ logId: journalLog, projections, reactions }).pipe(
   Layer.provideMerge(Log.layer),
@@ -318,4 +318,4 @@ export type Operations = Layer.Success<typeof operations>;
  *
  * @category models
  */
-export type JobServices = Layer.Success<typeof jobServices> | SessionLogStore.Service;
+export type JobServices = Layer.Success<typeof jobServices> | SessionLogStore.SessionLogStore;

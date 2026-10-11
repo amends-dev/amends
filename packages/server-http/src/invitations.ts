@@ -15,8 +15,8 @@ export const layer = HttpApiBuilder.group(
   Api,
   "invitations",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
-    const accounts = yield* Accounts.Service;
+    const gateway = yield* Gateway.Gateway;
+    const accounts = yield* Accounts.Accounts;
     return handlers.handleAll({
       list: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
@@ -24,7 +24,7 @@ export const layer = HttpApiBuilder.group(
             params.workspaceId,
             principal,
             Effect.flatMap(
-              InvitationService.Service,
+              InvitationService.InvitationService,
               (invitationService) => invitationService.list,
             ),
           ),
@@ -36,7 +36,7 @@ export const layer = HttpApiBuilder.group(
             principal,
             Effect.gen(function* () {
               const recipient = yield* accounts.findOrCreate(email);
-              const invitationService = yield* InvitationService.Service;
+              const invitationService = yield* InvitationService.InvitationService;
               return yield* invitationService.issue(
                 { ...invitation, recipientId: recipient.id },
                 { requestKey: headers["idempotency-key"] },
@@ -51,7 +51,7 @@ export const layer = HttpApiBuilder.group(
             return yield* new ApiErrors.HumanRequired();
           return yield* gateway.inWorkspace(
             params.workspaceId,
-            Effect.flatMap(InvitationService.Service, (invitationService) =>
+            Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
               invitationService.accept(params.invitationId, principal.id, payload.name),
             ),
           );
@@ -61,7 +61,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(InvitationService.Service, (invitationService) =>
+            Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
               invitationService.revoke(params.invitationId),
             ),
           ),
@@ -69,5 +69,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 );
-
-export * as InvitationsHandlers from "./invitations.ts";

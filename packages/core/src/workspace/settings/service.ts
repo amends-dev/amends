@@ -1,25 +1,25 @@
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Assignment } from "../../authorization/assignment/assignment.ts";
-import { AssignmentService } from "../../authorization/assignment/service.ts";
-import { AssignmentPermissions } from "../../authorization/assignment/permissions.ts";
-import { Authorization } from "../../authorization/authorization.ts";
-import { Delegation } from "../../authorization/delegation.ts";
-import { Requirement } from "../../authorization/requirement.ts";
-import { Actor } from "../../identity/actor.ts";
-import { Journal } from "../../journal/journal.ts";
-import { Publication } from "../../journal/publication.ts";
-import type { Log } from "../../journal/log.ts";
-import type { Projection } from "../../journal/projection.ts";
-import { Store } from "../../journal/store.ts";
-import { MemberService } from "../member/service.ts";
-import { MemberPermissions } from "../member/permissions.ts";
-import { InvitationPermissions } from "../invitation/permissions.ts";
-import { WorkspaceStore } from "../store.ts";
-import { WorkspaceFacts } from "../facts.ts";
-import { Workspace } from "../workspace.ts";
-import { WorkspaceSettings } from "./settings.ts";
-import { WorkspaceSettingsPermissions } from "./permissions.ts";
+import * as Assignment from "../../authorization/assignment/assignment.ts";
+import * as AssignmentService from "../../authorization/assignment/service.ts";
+import * as AssignmentPermissions from "../../authorization/assignment/permissions.ts";
+import * as Authorization from "../../authorization/authorization.ts";
+import * as Delegation from "../../authorization/delegation.ts";
+import * as Requirement from "../../authorization/requirement.ts";
+import * as Actor from "../../identity/actor.ts";
+import * as Journal from "../../journal/journal.ts";
+import * as Publication from "../../journal/publication.ts";
+import type * as Log from "../../journal/log.ts";
+import type * as Projection from "../../journal/projection.ts";
+import * as Store from "../../journal/store.ts";
+import * as MemberService from "../member/service.ts";
+import * as MemberPermissions from "../member/permissions.ts";
+import * as InvitationPermissions from "../invitation/permissions.ts";
+import * as WorkspaceStore from "../store.ts";
+import * as WorkspaceFacts from "../facts.ts";
+import * as Workspace from "../workspace.ts";
+import * as WorkspaceSettings from "./settings.ts";
+import * as WorkspaceSettingsPermissions from "./permissions.ts";
 import { Changed } from "./errors.ts";
 export { Changed } from "./errors.ts";
 export type Error =
@@ -31,30 +31,30 @@ export type Error =
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError;
-export interface Interface {
-  readonly get: Effect.Effect<WorkspaceSettings.View, Error, Actor.Service>;
-  readonly members: Effect.Effect<
-    ReadonlyArray<WorkspaceSettings.MemberEntry>,
-    Error,
-    Actor.Service
-  >;
-  readonly rename: (
-    input: WorkspaceSettings.RenameInput,
-  ) => Effect.Effect<Workspace.Record, Error, Actor.Service>;
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/workspace/settings/Service",
-) {}
+export class WorkspaceSettingsService extends Context.Service<
+  WorkspaceSettingsService,
+  {
+    readonly get: Effect.Effect<WorkspaceSettings.View, Error, Actor.Actor>;
+    readonly members: Effect.Effect<
+      ReadonlyArray<WorkspaceSettings.MemberEntry>,
+      Error,
+      Actor.Actor
+    >;
+    readonly rename: (
+      input: WorkspaceSettings.RenameInput,
+    ) => Effect.Effect<Workspace.Record, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/workspace/settings/Service") {}
 /** @category constructors */
 export const make = Effect.fn("WorkspaceSettings.make")(function* () {
-  const workspaceStore = yield* WorkspaceStore.Service,
-    authorization = yield* Authorization.Service,
-    delegation = yield* Delegation.Service,
-    assignmentService = yield* AssignmentService.Service,
-    memberService = yield* MemberService.Service,
-    journal = yield* Journal.Service,
+  const workspaceStore = yield* WorkspaceStore.WorkspaceStore,
+    authorization = yield* Authorization.Authorization,
+    delegation = yield* Delegation.Delegation,
+    assignmentService = yield* AssignmentService.AssignmentService,
+    memberService = yield* MemberService.MemberService,
+    journal = yield* Journal.Journal,
     crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
   const isAllowedBy = <A, R>(effect: Effect.Effect<A, Error, R>) =>
     effect.pipe(
       Effect.as(true),
@@ -91,7 +91,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   const listing = Effect.gen(function* () {
     const visible = yield* memberService.list;
     const workspace = yield* readWorkspace;
-    const actorId = (yield* Actor.Service).memberId;
+    const actorId = (yield* Actor.Actor).memberId;
     // One grant resolution answers every permission, and role choices load once, so the reads
     // grow with the member count only by each member's assignments.
     const [canManageAny = false, ...permissions] = yield* authorization.permitted([
@@ -157,8 +157,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ get, members: listing, rename });
+  return WorkspaceSettingsService.of({ get, members: listing, rename });
 });
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-export * as WorkspaceSettingsService from "./service.ts";
+export const layer = Layer.effect(WorkspaceSettingsService, make());

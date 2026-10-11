@@ -1,20 +1,20 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import { Actor } from "../identity/actor.ts";
-import { Member } from "../workspace/member/member.ts";
-import { Workspace } from "../workspace/workspace.ts";
-import { WorkspaceStore } from "../workspace/store.ts";
-import { Assignment } from "./assignment/assignment.ts";
-import { AssignmentPermissions } from "./assignment/permissions.ts";
-import { AssignmentStore } from "./assignment/store.ts";
-import { Authorization } from "./authorization.ts";
-import { Grant } from "./grant.ts";
-import { PermissionCatalog } from "./permission-catalog.ts";
-import { Requirement } from "./requirement.ts";
-import { BuiltinRoles } from "./role/builtin.ts";
-import { Role } from "./role/role.ts";
-import { RoleStore } from "./role/store.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as Workspace from "../workspace/workspace.ts";
+import * as WorkspaceStore from "../workspace/store.ts";
+import * as Assignment from "./assignment/assignment.ts";
+import * as AssignmentPermissions from "./assignment/permissions.ts";
+import * as AssignmentStore from "./assignment/store.ts";
+import * as Authorization from "./authorization.ts";
+import * as Grant from "./grant.ts";
+import * as PermissionCatalog from "./permission-catalog.ts";
+import * as Requirement from "./requirement.ts";
+import * as BuiltinRoles from "./role/builtin.ts";
+import * as Role from "./role/role.ts";
+import * as RoleStore from "./role/store.ts";
 import { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
-import { Store } from "../journal/store.ts";
+import * as Store from "../journal/store.ts";
 export { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
 
 export type Error =
@@ -28,22 +28,24 @@ export type Error =
   | OwnerProtected
   | UnsupportedRole
   | RoleNotFound;
-export interface Interface {
-  readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error>;
-  readonly assignmentsFor: (
-    memberId: Member.Id,
-  ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Error>;
-  /** Requires assignment.manage. Only current ownership allows delegating Administrator. */
-  readonly requireGrant: (roleId: Role.Id) => Effect.Effect<Role.Record, Error, Actor.Service>;
-  /** Operation permissions are checked by the caller. Owners are always protected. */
-  readonly requireRecipient: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Service>;
-  /** Authorized non-owners may leave without gaining authority to change their own roles. */
-  readonly requireRemoval: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Service>;
-}
-/** Read screens check current policy; write operations check it inside their commit. */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/authorization/delegation/Service",
-) {}
+/**
+ * Read screens check current policy; write operations check it inside their commit.
+ */
+export class Delegation extends Context.Service<
+  Delegation,
+  {
+    readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error>;
+    readonly assignmentsFor: (
+      memberId: Member.Id,
+    ) => Effect.Effect<ReadonlyArray<Assignment.Record>, Error>;
+    /** Requires assignment.manage. Only current ownership allows delegating Administrator. */
+    readonly requireGrant: (roleId: Role.Id) => Effect.Effect<Role.Record, Error, Actor.Actor>;
+    /** Operation permissions are checked by the caller. Owners are always protected. */
+    readonly requireRecipient: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Actor>;
+    /** Authorized non-owners may leave without gaining authority to change their own roles. */
+    readonly requireRemoval: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/authorization/delegation/Service") {}
 
 /** One member an actor would change the roles of, or remove when `selfRemoval` is set. */
 export interface Recipient {
@@ -81,21 +83,21 @@ export const recipientDenial = (
 
 /** @category constructors */
 export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
-  Interface,
+  Delegation["Service"],
   never,
-  | WorkspaceStore.Service
-  | AssignmentStore.Service
-  | RoleStore.Service
-  | Authorization.Service
-  | PermissionCatalog.Service
-  | Store.Service
+  | WorkspaceStore.WorkspaceStore
+  | AssignmentStore.AssignmentStore
+  | RoleStore.RoleStore
+  | Authorization.Authorization
+  | PermissionCatalog.PermissionCatalog
+  | Store.Store
 > {
-  const workspaceStore = yield* WorkspaceStore.Service;
-  const assignmentStore = yield* AssignmentStore.Service;
-  const roleStore = yield* RoleStore.Service;
-  const authorization = yield* Authorization.Service;
-  const permissionCatalog = yield* PermissionCatalog.Service;
-  const { workspaceId } = yield* Store.Service;
+  const workspaceStore = yield* WorkspaceStore.WorkspaceStore;
+  const assignmentStore = yield* AssignmentStore.AssignmentStore;
+  const roleStore = yield* RoleStore.RoleStore;
+  const authorization = yield* Authorization.Authorization;
+  const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
+  const { workspaceId } = yield* Store.Store;
   const readOwnerId = Effect.fn("Delegation.readOwnerId")(function* () {
     const found = yield* workspaceStore.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
@@ -138,7 +140,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     const role = yield* loadRole(roleId);
     if (
       roleId === BuiltinRoles.AdministratorId &&
-      (yield* Actor.Service).memberId !== (yield* readOwnerId())
+      (yield* Actor.Actor).memberId !== (yield* readOwnerId())
     )
       return yield* new Denied({ reason: "administrator-role" });
     return role;
@@ -152,7 +154,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
       workspaceId,
       memberId,
       ownerId: yield* readOwnerId(),
-      actorId: (yield* Actor.Service).memberId,
+      actorId: (yield* Actor.Actor).memberId,
       selfRemoval,
     };
     const denial = recipientDenial(
@@ -164,7 +166,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   const requireRemoval = Effect.fn("Delegation.requireRemoval")(function* (memberId: Member.Id) {
     yield* requireRecipient(memberId, true);
   });
-  return Service.of({
+  return Delegation.of({
     loadRole,
     assignmentsFor,
     requireGrant,
@@ -174,5 +176,4 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
 });
 
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-export * as Delegation from "./delegation.ts";
+export const layer = Layer.effect(Delegation, make());

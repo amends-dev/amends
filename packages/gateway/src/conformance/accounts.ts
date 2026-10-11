@@ -9,9 +9,9 @@ const alice = Accounts.Email.make("alice@example.com");
 const bob = Accounts.Email.make("bob@example.com");
 
 const findOrCreate = (email: Accounts.Email) =>
-  Effect.flatMap(Accounts.Service, (accounts) => accounts.findOrCreate(email));
+  Effect.flatMap(Accounts.Accounts, (accounts) => accounts.findOrCreate(email));
 const findByIds = (ids: ReadonlyArray<Identity.HumanId>) =>
-  Effect.flatMap(Accounts.Service, (accounts) => accounts.findByIds(ids));
+  Effect.flatMap(Accounts.Accounts, (accounts) => accounts.findByIds(ids));
 
 /** The host's accounts: one for each address, whichever host asks, found again by human ID. */
 export const accounts = (fixture: Fixture) => {

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import { Assignment } from "../../authorization/assignment/assignment.ts";
-import { Member } from "../member/member.ts";
-import { Workspace } from "../workspace.ts";
+import * as Assignment from "../../authorization/assignment/assignment.ts";
+import * as Member from "../member/member.ts";
+import * as Workspace from "../workspace.ts";
 export const RenameInput = Schema.Struct({
   name: Workspace.NewName,
   expectedName: Workspace.Name,
@@ -27,4 +27,3 @@ export const MemberEntry = Schema.Struct({
   canRemove: Schema.Boolean,
 }).annotate({ identifier: "WorkspaceMemberManagementEntry" });
 export interface MemberEntry extends Schema.Schema.Type<typeof MemberEntry> {}
-export * as WorkspaceSettings from "./settings.ts";

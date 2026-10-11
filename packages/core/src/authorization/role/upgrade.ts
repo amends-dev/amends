@@ -1,14 +1,14 @@
 import { Effect, Option } from "effect";
-import { Performer } from "../../identity/performer.ts";
-import { Journal } from "../../journal/journal.ts";
-import { Publication } from "../../journal/publication.ts";
-import { Store } from "../../journal/store.ts";
-import { WorkspaceStore } from "../../workspace/store.ts";
-import { PermissionCatalog } from "../permission-catalog.ts";
-import type { Permission } from "../permission.ts";
-import { BuiltinRoles } from "./builtin.ts";
-import { RoleFacts } from "./facts.ts";
-import { RoleStore } from "./store.ts";
+import * as Performer from "../../identity/performer.ts";
+import * as Journal from "../../journal/journal.ts";
+import * as Publication from "../../journal/publication.ts";
+import * as Store from "../../journal/store.ts";
+import * as WorkspaceStore from "../../workspace/store.ts";
+import * as PermissionCatalog from "../permission-catalog.ts";
+import type * as Permission from "../permission.ts";
+import * as BuiltinRoles from "./builtin.ts";
+import * as RoleFacts from "./facts.ts";
+import * as RoleStore from "./store.ts";
 
 /** Who upgrades built-in roles: the product, not a member. */
 export const performer = Performer.Reference.cases.System.make({
@@ -33,11 +33,11 @@ const haveSamePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<s
  * Returns whether it upgraded.
  */
 export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target?: Target) {
-  const roleStore = yield* RoleStore.Service;
-  const workspaceStore = yield* WorkspaceStore.Service;
-  const journal = yield* Journal.Service;
-  const permissionCatalog = yield* PermissionCatalog.Service;
-  const { workspaceId } = yield* Store.Service;
+  const roleStore = yield* RoleStore.RoleStore;
+  const workspaceStore = yield* WorkspaceStore.WorkspaceStore;
+  const journal = yield* Journal.Journal;
+  const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
+  const { workspaceId } = yield* Store.Store;
   const revision = yield* BuiltinRoles.Revision.makeEffect(
     target?.revision ?? BuiltinRoles.revision,
   );
@@ -79,8 +79,6 @@ export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target
       }
       yield* journal.publish(RoleFacts.BuiltinsRevised, { workspaceId, revision });
       return true;
-    }).pipe(Effect.provideService(Publication.Service, provenance)),
+    }).pipe(Effect.provideService(Publication.Publication, provenance)),
   );
 });
-
-export * as BuiltinRoleUpgrade from "./upgrade.ts";

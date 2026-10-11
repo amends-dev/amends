@@ -8,8 +8,8 @@ class Unavailable {
 
 /** Streams as a host that can drain serves them, with the drain it would complete. */
 const served = Effect.gen(function* () {
-  const streams = yield* Streams.Service;
-  const draining = yield* Draining.Service;
+  const streams = yield* Streams.Streams;
+  const draining = yield* Draining.Draining;
   return { streams, draining };
 }).pipe(Effect.provide(Streams.layer.pipe(Layer.provideMerge(Draining.layer))));
 

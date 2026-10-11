@@ -1,8 +1,8 @@
 import { DateTime, Schema } from "effect";
-import { Role } from "../../authorization/role/role.ts";
-import { Identity } from "../../identity/identity.ts";
-import { Member } from "../member/member.ts";
-import { Workspace } from "../workspace.ts";
+import * as Role from "../../authorization/role/role.ts";
+import * as Identity from "../../identity/identity.ts";
+import * as Member from "../member/member.ts";
+import * as Workspace from "../workspace.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceInvitationId"));
 export type Id = typeof Id.Type;
@@ -44,5 +44,3 @@ export const Record = Schema.Struct({ details: Issuance, state: State }).annotat
   identifier: "WorkspaceInvitation",
 });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
-
-export * as Invitation from "./invitation.ts";

@@ -11,34 +11,34 @@
 import { ChannelTransport } from "@amends-dev/channel";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Connection } from "../connection/connection.ts";
-import { Performer } from "../identity/performer.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import type { Notification } from "../notification/notification.ts";
-import { NotificationStore } from "../notification/store.ts";
-import { Request } from "../request/request.ts";
-import type { Thread } from "../thread/Thread.ts";
-import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
-import { ThreadActivityStore } from "../thread/ThreadActivityStore.ts";
-import { ThreadMessage } from "../thread/ThreadMessage.ts";
-import { ThreadMessageActivity } from "../thread/ThreadMessageActivity.ts";
-import { ThreadMessageStore } from "../thread/ThreadMessageStore.ts";
-import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
-import { ThreadStore } from "../thread/ThreadStore.ts";
-import { MemberStore } from "../workspace/member/store.ts";
-import type { Channel } from "./Channel.ts";
-import type { ChannelBinding } from "./ChannelBinding.ts";
-import { ChannelBindingStore } from "./ChannelBindingStore.ts";
-import { ChannelQuery } from "./ChannelQuery.ts";
-import { ChannelStore } from "./ChannelStore.ts";
-import { Delivery } from "./Delivery.ts";
-import { DeliveryFacts } from "./DeliveryFacts.ts";
-import { DeliveryStore } from "./DeliveryStore.ts";
+import * as Connection from "../connection/connection.ts";
+import * as Performer from "../identity/performer.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import type * as Notification from "../notification/notification.ts";
+import * as NotificationStore from "../notification/store.ts";
+import * as Request from "../request/request.ts";
+import type * as Thread from "../thread/Thread.ts";
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
+import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts";
+import * as ThreadMessage from "../thread/ThreadMessage.ts";
+import * as ThreadMessageActivity from "../thread/ThreadMessageActivity.ts";
+import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts";
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
+import * as ThreadStore from "../thread/ThreadStore.ts";
+import * as MemberStore from "../workspace/member/store.ts";
+import type * as Channel from "./Channel.ts";
+import type * as ChannelBinding from "./ChannelBinding.ts";
+import * as ChannelBindingStore from "./ChannelBindingStore.ts";
+import * as ChannelQuery from "./ChannelQuery.ts";
+import * as ChannelStore from "./ChannelStore.ts";
+import * as Delivery from "./Delivery.ts";
+import * as DeliveryFacts from "./DeliveryFacts.ts";
+import * as DeliveryStore from "./DeliveryStore.ts";
 
 /**
  * What a delivery's job posts: nothing, since the delivery is no longer requested or was failed as
@@ -135,48 +135,43 @@ export type StartError =
 export type RecordError = CommitError | DeliveryStore.Failure;
 
 /**
+ * What the job asks of the workspace, one of `Core.JobServices`.
+ *
  * What the job asks.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Accept what the thread's contacts were told and have not been delivered into deliveries, one
-   * for each message, settling their notifications, in one commit; then the thread's deliveries
-   * still requested, in the order of their messages. A thread bound to no conversation has none.
-   */
-  readonly accept: (
-    threadId: Thread.Id,
-  ) => Effect.Effect<ReadonlyArray<Delivery.Record>, AcceptError>;
-  /**
-   * Ready the delivery: `Ready` with what to post and how to reach the system, or `Idle` for a
-   * delivery no longer requested, or one failed here and now because its message was deleted
-   * before it was sent, its channel was removed, or the channel's system cannot be reached as the
-   * channel stands.
-   */
-  readonly start: (deliveryId: Delivery.Id) => Effect.Effect<Start, StartError>;
-  /** Record that the message was posted; a delivery no longer requested is left as it is. */
-  readonly recordSent: (
-    deliveryId: Delivery.Id,
-    sent: SentInput,
-  ) => Effect.Effect<void, RecordError>;
-  /** Record that the job gave the delivery up; one no longer requested is left as it is. */
-  readonly recordFailed: (
-    deliveryId: Delivery.Id,
-    failed: FailedInput,
-  ) => Effect.Effect<void, RecordError>;
-}
-
-/**
- * What the job asks of the workspace, one of `Core.JobServices`.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/DeliveryExecution",
-) {}
+export class DeliveryExecution extends Context.Service<
+  DeliveryExecution,
+  {
+    /**
+     * Accept what the thread's contacts were told and have not been delivered into deliveries, one
+     * for each message, settling their notifications, in one commit; then the thread's deliveries
+     * still requested, in the order of their messages. A thread bound to no conversation has none.
+     */
+    readonly accept: (
+      threadId: Thread.Id,
+    ) => Effect.Effect<ReadonlyArray<Delivery.Record>, AcceptError>;
+    /**
+     * Ready the delivery: `Ready` with what to post and how to reach the system, or `Idle` for a
+     * delivery no longer requested, or one failed here and now because its message was deleted
+     * before it was sent, its channel was removed, or the channel's system cannot be reached as the
+     * channel stands.
+     */
+    readonly start: (deliveryId: Delivery.Id) => Effect.Effect<Start, StartError>;
+    /** Record that the message was posted; a delivery no longer requested is left as it is. */
+    readonly recordSent: (
+      deliveryId: Delivery.Id,
+      sent: SentInput,
+    ) => Effect.Effect<void, RecordError>;
+    /** Record that the job gave the delivery up; one no longer requested is left as it is. */
+    readonly recordFailed: (
+      deliveryId: Delivery.Id,
+      failed: FailedInput,
+    ) => Effect.Effect<void, RecordError>;
+  }
+>()("@amends-dev/core/channel/DeliveryExecution") {}
 
 /** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
@@ -193,24 +188,24 @@ const performer = Performer.Reference.cases.System.make({
  * @since 0.1.0
  */
 export const make = Effect.fn("DeliveryExecution.make")(function* () {
-  const channelStore = yield* ChannelStore.Service;
-  const channelBindingStore = yield* ChannelBindingStore.Service;
-  const deliveryStore = yield* DeliveryStore.Service;
-  const notificationStore = yield* NotificationStore.Service;
-  const threadStore = yield* ThreadStore.Service;
-  const threadActivityStore = yield* ThreadActivityStore.Service;
-  const threadMessageStore = yield* ThreadMessageStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const channelQuery = yield* ChannelQuery.Service;
-  const journal = yield* Journal.Service;
+  const channelStore = yield* ChannelStore.ChannelStore;
+  const channelBindingStore = yield* ChannelBindingStore.ChannelBindingStore;
+  const deliveryStore = yield* DeliveryStore.DeliveryStore;
+  const notificationStore = yield* NotificationStore.NotificationStore;
+  const threadStore = yield* ThreadStore.ThreadStore;
+  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const channelQuery = yield* ChannelQuery.ChannelQuery;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   /** Run `step` in its own commit, as delivery itself. */
   const asDelivery = <A, E, R>(step: Effect.Effect<A, E, R>) =>
     Effect.flatMap(Publication.make(workspaceId, performer), (provenance) =>
-      step.pipe(Effect.provideService(Publication.Service, provenance)),
+      step.pipe(Effect.provideService(Publication.Publication, provenance)),
     ).pipe(Effect.provideService(Crypto.Crypto, crypto), journal.commit);
 
   /** The messages published at these positions of the thread, by position. */
@@ -310,16 +305,18 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
     }
   });
 
-  const accept: Interface["accept"] = Effect.fn("DeliveryExecution.accept")(function* (threadId) {
-    const binding = yield* channelBindingStore.get(threadId);
-    if (Option.isNone(binding)) return [];
-    const thread = yield* threadStore.get(threadId);
-    if (Option.isNone(thread)) return yield* Effect.die("A bound thread is missing");
-    const channel = yield* channelStore.get(binding.value.channelId);
-    if (Option.isNone(channel)) return yield* Effect.die("A binding's channel is missing");
-    yield* asDelivery(acceptPending(thread.value, binding.value, channel.value));
-    return yield* deliveryStore.listRequestedByThread(threadId);
-  });
+  const accept: DeliveryExecution["Service"]["accept"] = Effect.fn("DeliveryExecution.accept")(
+    function* (threadId) {
+      const binding = yield* channelBindingStore.get(threadId);
+      if (Option.isNone(binding)) return [];
+      const thread = yield* threadStore.get(threadId);
+      if (Option.isNone(thread)) return yield* Effect.die("A bound thread is missing");
+      const channel = yield* channelStore.get(binding.value.channelId);
+      if (Option.isNone(channel)) return yield* Effect.die("A binding's channel is missing");
+      yield* asDelivery(acceptPending(thread.value, binding.value, channel.value));
+      return yield* deliveryStore.listRequestedByThread(threadId);
+    },
+  );
 
   /** What a message's author is called, as the post names them. */
   const authorOf = Effect.fnUntraced(function* (author: ThreadMessage.Author) {
@@ -347,76 +344,81 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
     });
   });
 
-  const start: Interface["start"] = Effect.fn("DeliveryExecution.start")(function* (deliveryId) {
-    return yield* asDelivery(
-      Effect.gen(function* () {
-        const found = yield* deliveryStore.get(deliveryId);
-        if (Option.isNone(found) || found.value.status !== "requested")
-          return Start.cases.Idle.make({});
-        const delivery = found.value;
-        /** Fail the delivery here and now, for `reason`, so the job has nothing to post. */
-        const failed = (reason: string) =>
-          Effect.as(publishFailed(delivery, reason, delivery.attempts), Start.cases.Idle.make({}));
-        const message = yield* threadMessageStore.get(delivery.messageId);
-        if (Option.isNone(message)) return yield* Effect.die("A delivery's message is missing");
-        const { content } = message.value;
-        if (!ThreadMessage.Content.isAnyOf(["Text"])(content))
-          return yield* failed("The message was deleted before it was sent.");
-        const binding = yield* channelBindingStore.get(delivery.threadId);
-        if (Option.isNone(binding)) return yield* Effect.die("A delivery's binding is missing");
-        const channel = yield* channelStore.get(delivery.channelId);
-        if (Option.isNone(channel)) return yield* Effect.die("A delivery's channel is missing");
-        if (channel.value.status !== "active") return yield* failed("The channel was removed.");
-        const reached = yield* channelQuery.access(channel.value).pipe(
-          Effect.map(Result.succeed),
-          Effect.catchTag("ChannelQuery.Unavailable", (error) =>
-            Effect.succeed(Result.fail(error.description)),
-          ),
-        );
-        if (Result.isFailure(reached)) return yield* failed(reached.failure);
-        return Start.cases.Ready.make({
-          delivery,
-          conversation: binding.value.conversation,
-          outgoing: { text: content.text, author: yield* authorOf(message.value.author) },
-          access: reached.success,
-        });
-      }),
-    );
-  });
-
-  const recordSent: Interface["recordSent"] = Effect.fn("DeliveryExecution.recordSent")(
-    function* (deliveryId, sent) {
-      yield* asDelivery(
+  const start: DeliveryExecution["Service"]["start"] = Effect.fn("DeliveryExecution.start")(
+    function* (deliveryId) {
+      return yield* asDelivery(
         Effect.gen(function* () {
           const found = yield* deliveryStore.get(deliveryId);
-          if (Option.isNone(found) || found.value.status !== "requested") return;
-          yield* journal.publish(DeliveryFacts.Sent, {
-            workspaceId,
-            deliveryId,
-            threadId: found.value.threadId,
-            groupId: found.value.groupId,
-            externalMessageId: sent.externalMessageId,
-            attempts: sent.attempts,
-            sentAt: yield* DateTime.now,
+          if (Option.isNone(found) || found.value.status !== "requested")
+            return Start.cases.Idle.make({});
+          const delivery = found.value;
+          /** Fail the delivery here and now, for `reason`, so the job has nothing to post. */
+          const failed = (reason: string) =>
+            Effect.as(
+              publishFailed(delivery, reason, delivery.attempts),
+              Start.cases.Idle.make({}),
+            );
+          const message = yield* threadMessageStore.get(delivery.messageId);
+          if (Option.isNone(message)) return yield* Effect.die("A delivery's message is missing");
+          const { content } = message.value;
+          if (!ThreadMessage.Content.isAnyOf(["Text"])(content))
+            return yield* failed("The message was deleted before it was sent.");
+          const binding = yield* channelBindingStore.get(delivery.threadId);
+          if (Option.isNone(binding)) return yield* Effect.die("A delivery's binding is missing");
+          const channel = yield* channelStore.get(delivery.channelId);
+          if (Option.isNone(channel)) return yield* Effect.die("A delivery's channel is missing");
+          if (channel.value.status !== "active") return yield* failed("The channel was removed.");
+          const reached = yield* channelQuery.access(channel.value).pipe(
+            Effect.map(Result.succeed),
+            Effect.catchTag("ChannelQuery.Unavailable", (error) =>
+              Effect.succeed(Result.fail(error.description)),
+            ),
+          );
+          if (Result.isFailure(reached)) return yield* failed(reached.failure);
+          return Start.cases.Ready.make({
+            delivery,
+            conversation: binding.value.conversation,
+            outgoing: { text: content.text, author: yield* authorOf(message.value.author) },
+            access: reached.success,
           });
         }),
       );
     },
   );
 
-  const recordFailed: Interface["recordFailed"] = Effect.fn("DeliveryExecution.recordFailed")(
-    function* (deliveryId, failed) {
-      yield* asDelivery(
-        Effect.gen(function* () {
-          const found = yield* deliveryStore.get(deliveryId);
-          if (Option.isNone(found) || found.value.status !== "requested") return;
-          yield* publishFailed(found.value, failed.reason, failed.attempts);
-        }),
-      );
-    },
-  );
+  const recordSent: DeliveryExecution["Service"]["recordSent"] = Effect.fn(
+    "DeliveryExecution.recordSent",
+  )(function* (deliveryId, sent) {
+    yield* asDelivery(
+      Effect.gen(function* () {
+        const found = yield* deliveryStore.get(deliveryId);
+        if (Option.isNone(found) || found.value.status !== "requested") return;
+        yield* journal.publish(DeliveryFacts.Sent, {
+          workspaceId,
+          deliveryId,
+          threadId: found.value.threadId,
+          groupId: found.value.groupId,
+          externalMessageId: sent.externalMessageId,
+          attempts: sent.attempts,
+          sentAt: yield* DateTime.now,
+        });
+      }),
+    );
+  });
 
-  return Service.of({ accept, start, recordSent, recordFailed });
+  const recordFailed: DeliveryExecution["Service"]["recordFailed"] = Effect.fn(
+    "DeliveryExecution.recordFailed",
+  )(function* (deliveryId, failed) {
+    yield* asDelivery(
+      Effect.gen(function* () {
+        const found = yield* deliveryStore.get(deliveryId);
+        if (Option.isNone(found) || found.value.status !== "requested") return;
+        yield* publishFailed(found.value, failed.reason, failed.attempts);
+      }),
+    );
+  });
+
+  return DeliveryExecution.of({ accept, start, recordSent, recordFailed });
 });
 
 /**
@@ -426,6 +428,4 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as DeliveryExecution from "./DeliveryExecution.ts";
+export const layer = Layer.effect(DeliveryExecution, make());

@@ -7,16 +7,16 @@ import {
 import { Harness } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Option, Redacted, Result } from "effect";
-import { Agent } from "../../src/agent/agent.ts";
-import { AgentQuery } from "../../src/agent/query.ts";
-import { AgentStore } from "../../src/agent/store.ts";
-import { Connection } from "../../src/connection/connection.ts";
-import { ConnectionCredentialStore } from "../../src/connection/credential-store.ts";
-import { ConnectionStore } from "../../src/connection/store.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberStore } from "../../src/workspace/member/store.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Agent from "../../src/agent/agent.ts";
+import * as AgentQuery from "../../src/agent/query.ts";
+import * as AgentStore from "../../src/agent/store.ts";
+import * as Connection from "../../src/connection/connection.ts";
+import * as ConnectionCredentialStore from "../../src/connection/credential-store.ts";
+import * as ConnectionStore from "../../src/connection/store.ts";
+import * as Identity from "../../src/identity/identity.ts";
+import * as Member from "../../src/workspace/member/member.ts";
+import * as MemberStore from "../../src/workspace/member/store.ts";
+import * as Workspace from "../../src/workspace/workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 
@@ -150,7 +150,7 @@ const queryIn = (world: World = {}) => {
   const keys = world.keys ?? new Map([[models.id, "sk-models"]]);
   const unused = (what: string) => () => Effect.die(`No test ${what}`);
   const stores = Layer.mergeAll(
-    Layer.succeed(MemberStore.Service, {
+    Layer.succeed(MemberStore.MemberStore, {
       get: (memberId) => Effect.succeed(Option.fromUndefinedOr(members.get(memberId))),
       getMany: unused("reads several members"),
       findActive: unused("finds a membership"),
@@ -159,20 +159,20 @@ const queryIn = (world: World = {}) => {
       rename: unused("renames a member"),
       markRemoved: unused("removes a member"),
     }),
-    Layer.succeed(AgentStore.Service, {
+    Layer.succeed(AgentStore.AgentStore, {
       get: (id) => Effect.succeed(id === record.id ? Option.some(record) : Option.none()),
       list: Effect.succeed([record]),
       insert: unused("adds an agent"),
       update: unused("changes an agent"),
     }),
-    Layer.succeed(ConnectionStore.Service, {
+    Layer.succeed(ConnectionStore.ConnectionStore, {
       get: (id) =>
         Effect.succeed(Option.fromUndefinedOr(connections.find((found) => found.id === id))),
       listActive: Effect.succeed(connections),
       insert: unused("adds a connection"),
       update: unused("changes a connection"),
     }),
-    Layer.succeed(ConnectionCredentialStore.Service, {
+    Layer.succeed(ConnectionCredentialStore.ConnectionCredentialStore, {
       set: unused("stores a key"),
       get: (connectionId) => {
         if (world.credentialsUnavailable !== undefined) {

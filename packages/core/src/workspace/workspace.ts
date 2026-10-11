@@ -1,9 +1,9 @@
 import { Schema } from "effect";
-import { Identity } from "../identity/identity.ts";
-import { WorkspaceId } from "./id.ts";
-import { MemberId } from "./member/id.ts";
-import { Member } from "./member/member.ts";
-import { Text } from "../text/text.ts";
+import * as Identity from "../identity/identity.ts";
+import * as WorkspaceId from "./id.ts";
+import * as MemberId from "./member/id.ts";
+import * as Member from "./member/member.ts";
+import * as Text from "../text/text.ts";
 
 export const Id = WorkspaceId.Id;
 export type Id = WorkspaceId.Id;
@@ -31,5 +31,3 @@ export const Record = Schema.Struct({
   ownerMemberId: MemberId.Id,
 }).annotate({ identifier: "Workspace" });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
-
-export * as Workspace from "./workspace.ts";

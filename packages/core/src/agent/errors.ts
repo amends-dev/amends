@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Connection } from "../connection/connection.ts";
-import { Agent } from "./agent.ts";
+import * as Connection from "../connection/connection.ts";
+import * as Agent from "./agent.ts";
 
 /** The outcomes `AgentService` reports that a caller can act on; schemas only. */
 
@@ -27,5 +27,3 @@ export class ConnectionUnavailable extends Schema.TaggedError<ConnectionUnavaila
 export class Incomplete extends Schema.TaggedError<Incomplete>()("AgentService.Incomplete", {
   issues: Schema.NonEmptyArray(Agent.Issue),
 }) {}
-
-export * as AgentErrors from "./errors.ts";

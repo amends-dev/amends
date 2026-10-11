@@ -1,29 +1,29 @@
-import { Identity } from "../../identity/identity.ts";
-import { Assignment } from "../../authorization/assignment/assignment.ts";
-import { Scope } from "../../authorization/scope.ts";
+import * as Identity from "../../identity/identity.ts";
+import * as Assignment from "../../authorization/assignment/assignment.ts";
+import * as Scope from "../../authorization/scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-import { AssignmentStore } from "../../authorization/assignment/store.ts";
-import { Authorization } from "../../authorization/authorization.ts";
-import { Delegation } from "../../authorization/delegation.ts";
-import { AssignmentCommand } from "../../authorization/assignment/command.ts";
-import { Requirement } from "../../authorization/requirement.ts";
-import { BuiltinRoles } from "../../authorization/role/builtin.ts";
+import * as AssignmentStore from "../../authorization/assignment/store.ts";
+import * as Authorization from "../../authorization/authorization.ts";
+import * as Delegation from "../../authorization/delegation.ts";
+import * as AssignmentCommand from "../../authorization/assignment/command.ts";
+import * as Requirement from "../../authorization/requirement.ts";
+import * as BuiltinRoles from "../../authorization/role/builtin.ts";
 
-import { Actor } from "../../identity/actor.ts";
-import { Journal } from "../../journal/journal.ts";
-import { Publication } from "../../journal/publication.ts";
-import type { Log } from "../../journal/log.ts";
-import type { Projection } from "../../journal/projection.ts";
-import { Store } from "../../journal/store.ts";
-import { WorkspaceFacts } from "../facts.ts";
-import { Member } from "../member/member.ts";
-import { MemberStore } from "../member/store.ts";
-import { WorkspaceStore } from "../store.ts";
-import { Workspace } from "../workspace.ts";
-import { Ownership } from "./ownership.ts";
-import { OwnershipPermissions } from "./permissions.ts";
+import * as Actor from "../../identity/actor.ts";
+import * as Journal from "../../journal/journal.ts";
+import * as Publication from "../../journal/publication.ts";
+import type * as Log from "../../journal/log.ts";
+import type * as Projection from "../../journal/projection.ts";
+import * as Store from "../../journal/store.ts";
+import * as WorkspaceFacts from "../facts.ts";
+import * as Member from "../member/member.ts";
+import * as MemberStore from "../member/store.ts";
+import * as WorkspaceStore from "../store.ts";
+import * as Workspace from "../workspace.ts";
+import * as Ownership from "./ownership.ts";
+import * as OwnershipPermissions from "./permissions.ts";
 import { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./errors.ts";
 export { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./errors.ts";
 
@@ -38,39 +38,39 @@ export type Error =
   | MemberNotFound
   | InvalidRecipient
   | Changed;
-export interface Interface {
-  readonly get: Effect.Effect<Ownership.View, Error, Actor.Service>;
-  readonly transfer: (
-    input: Ownership.TransferInput,
-  ) => Effect.Effect<Workspace.Record, Error, Actor.Service>;
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/workspace/ownership-application/Service",
-) {}
+export class OwnershipService extends Context.Service<
+  OwnershipService,
+  {
+    readonly get: Effect.Effect<Ownership.View, Error, Actor.Actor>;
+    readonly transfer: (
+      input: Ownership.TransferInput,
+    ) => Effect.Effect<Workspace.Record, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/workspace/ownership-application/Service") {}
 
 /** Construct ownership operations over one workspace's journal and access policy. @category constructors */
 export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.Return<
-  Interface,
+  OwnershipService["Service"],
   never,
-  | WorkspaceStore.Service
-  | MemberStore.Service
-  | AssignmentStore.Service
-  | Authorization.Service
-  | Delegation.Service
-  | AssignmentCommand.Service
-  | Journal.Service
+  | WorkspaceStore.WorkspaceStore
+  | MemberStore.MemberStore
+  | AssignmentStore.AssignmentStore
+  | Authorization.Authorization
+  | Delegation.Delegation
+  | AssignmentCommand.AssignmentCommand
+  | Journal.Journal
   | Crypto.Crypto
-  | Store.Service
+  | Store.Store
 > {
-  const workspaceStore = yield* WorkspaceStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const assignmentStore = yield* AssignmentStore.Service;
-  const authorization = yield* Authorization.Service;
-  const delegation = yield* Delegation.Service;
-  const assignmentCommand = yield* AssignmentCommand.Service;
-  const journal = yield* Journal.Service;
+  const workspaceStore = yield* WorkspaceStore.WorkspaceStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const assignmentStore = yield* AssignmentStore.AssignmentStore;
+  const authorization = yield* Authorization.Authorization;
+  const delegation = yield* Delegation.Delegation;
+  const assignmentCommand = yield* AssignmentCommand.AssignmentCommand;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
   const requirement = Requirement.make(OwnershipPermissions.Transfer, {
     _tag: "Workspace",
     workspaceId,
@@ -94,7 +94,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   const get = Effect.gen(function* () {
     yield* authorization.require([]);
     const state = yield* readCurrentOwnership;
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     const canTransfer =
       actor.memberId === state.owner.id &&
       Identity.MemberReference.isAnyOf(["Human"])(actor.identity) &&
@@ -124,7 +124,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       yield* authorization.require([requirement]);
       const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input);
       const state = yield* readCurrentOwnership;
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       if (
         actor.memberId !== state.owner.id ||
         !Identity.MemberReference.isAnyOf(["Human"])(actor.identity)
@@ -170,9 +170,8 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ get, transfer });
+  return OwnershipService.of({ get, transfer });
 });
 
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-export * as OwnershipService from "./service.ts";
+export const layer = Layer.effect(OwnershipService, make());

@@ -1,10 +1,10 @@
 import { Schema } from "effect";
-import { Commit } from "../journal/commit.ts";
-import { Entry } from "../journal/entry.ts";
-import { Event as JournalEvent } from "../journal/event.ts";
-import { Notification } from "../notification/notification.ts";
-import { Signal } from "../signal/signal.ts";
-import { WorkspaceId } from "../workspace/id.ts";
+import * as Commit from "../journal/commit.ts";
+import * as Entry from "../journal/entry.ts";
+import * as JournalEvent from "../journal/event.ts";
+import * as Notification from "../notification/notification.ts";
+import * as Signal from "../signal/signal.ts";
+import * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * An opaque resume point: the feed resumes after the commit that carried it. Clients store and
@@ -70,5 +70,3 @@ export interface WatchOptions extends Schema.Schema.Type<typeof WatchOptions> {}
 
 /** The consumer must open a new subscription and refresh its current view. */
 export class Unavailable extends Schema.TaggedError<Unavailable>()("ChangeFeed.Unavailable", {}) {}
-
-export * as ChangeFeed from "./change-feed.ts";

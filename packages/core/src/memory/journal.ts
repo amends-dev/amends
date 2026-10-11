@@ -1,7 +1,7 @@
 import { Commit, Entry, Store } from "../journal/index.ts";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
-import { MemoryDatabase } from "./database.ts";
+import * as Binding from "./binding.ts";
+import * as MemoryDatabase from "./database.ts";
 import { storeFailure } from "./errors.ts";
 import { keyOf } from "./rows.ts";
 
@@ -23,7 +23,7 @@ const isAfter = (entry: Store.Cursor, cursor: Store.Cursor) =>
  * @category constructors
  */
 export const make = Effect.fn("Journal.make")(function* () {
-  const { workspaceId, connection, read, transaction } = yield* Binding.Service;
+  const { workspaceId, connection, read, transaction } = yield* Binding.Binding;
   const { database } = connection;
 
   /** A log's batch as the contract returns it, with its commit and copied entries. */
@@ -155,7 +155,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     return yield* copyEntries(written).pipe(Effect.mapError(storeFailure(Store, "append")));
   });
 
-  const driver: Store.Interface = {
+  const driver: Store.Store["Service"] = {
     workspaceId,
     getEntry: Effect.fn("Journal.getEntry")(
       function* (logId, entryId) {
@@ -275,10 +275,8 @@ export const make = Effect.fn("Journal.make")(function* () {
 });
 
 /**
- * Provide Store.Service using its constructor and the caller's dependencies.
+ * Provide Store.Store using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(Store.Service, make());
-
-export * as Journal from "./journal.ts";
+export const layer = Layer.effect(Store.Store, make());

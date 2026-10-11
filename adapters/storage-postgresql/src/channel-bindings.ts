@@ -1,7 +1,7 @@
 import { ChannelBinding, ChannelBindingStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { channelBindings } from "./schema.ts";
 
@@ -24,10 +24,10 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
 
 /** Channel bindings in the workspace's database, keyed by thread. @category constructors */
 export const make = Effect.fn("ChannelBindings.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(channelBindings.workspaceId, workspaceId);
-  const driver: ChannelBindingStore.Interface = {
+  const driver: ChannelBindingStore.ChannelBindingStore["Service"] = {
     get: Effect.fn("ChannelBindings.get")(
       function* (threadId) {
         return yield* guard(
@@ -75,6 +75,4 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
 });
 
 /** Provide channel binding storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ChannelBindingStore.Service, make());
-
-export * as ChannelBindings from "./channel-bindings.ts";
+export const layer = Layer.effect(ChannelBindingStore.ChannelBindingStore, make());

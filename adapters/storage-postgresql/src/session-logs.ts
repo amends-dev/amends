@@ -2,9 +2,9 @@ import { Store } from "@amends-dev/core/journal";
 import { SessionLog, SessionLogStore } from "@amends-dev/core/turn";
 import { and, asc, eq, gt, max } from "drizzle-orm";
 import { Array, Context, DateTime, Deferred, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { isConstraintViolation, storeFailure } from "./errors.ts";
-import { PostgresNotices } from "./notices.ts";
+import * as PostgresNotices from "./notices.ts";
 import { sessionLogEntries } from "./schema.ts";
 
 const EntryJson = Schema.toCodecJson(SessionLog.Entry);
@@ -44,7 +44,7 @@ const recordedOf = ({ position, recordedAt, kind, turnId, details }: Row) => ({
  * @category constructors
  */
 export const make = Effect.fn("SessionLogs.make")(function* () {
-  const { workspaceId, database, guard, pollInterval } = yield* Binding.Service;
+  const { workspaceId, database, guard, pollInterval } = yield* Binding.Binding;
   const { db, notices } = database;
   /** Run a statement outside the caller's transaction, if any. */
   const apart = <A, E>(statement: Effect.Effect<A, E>) =>
@@ -70,7 +70,7 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
       Effect.map((rows) => rows[0]?.head ?? 0),
       Effect.mapError(storeFailure(SessionLogStore, "head")),
     );
-  const driver: SessionLogStore.Interface = {
+  const driver: SessionLogStore.SessionLogStore["Service"] = {
     head: readHead,
     append: Effect.fn("SessionLogs.append")(function* (participationId, entries, after) {
       const conflict = new SessionLogStore.Conflict({ participationId, after });
@@ -136,6 +136,4 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
 });
 
 /** Provide session logs over the caller's binding. @category layers */
-export const layer = Layer.effect(SessionLogStore.Service, make());
-
-export * as SessionLogs from "./session-logs.ts";
+export const layer = Layer.effect(SessionLogStore.SessionLogStore, make());

@@ -19,8 +19,8 @@ import {
   Schema,
 } from "effect";
 import type { SqlError } from "effect/sql";
-import { PostgresDatabase } from "./database.ts";
-import { PostgresNotices } from "./notices.ts";
+import * as PostgresDatabase from "./database.ts";
+import * as PostgresNotices from "./notices.ts";
 import { isContention } from "./errors.ts";
 
 export interface Options {
@@ -101,7 +101,7 @@ export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>;
 
 /** One open native transaction, closed when its program ends. */
 export interface TransactionState {
-  readonly owner: PostgresDatabase.Interface;
+  readonly owner: PostgresDatabase.PostgresDatabase["Service"];
   readonly workspaceId: Workspace.Id;
   readonly commit: Commit.Record;
   active: boolean;
@@ -136,39 +136,38 @@ export class CurrentTransaction extends Context.Service<CurrentTransaction, Tran
   "@amends-dev/storage-postgresql/binding/Current",
 ) {}
 
-export interface Interface {
-  readonly workspaceId: Workspace.Id;
-  readonly database: PostgresDatabase.Interface;
-  readonly pollInterval: Duration.Duration;
-  /**
-   * Run a statement outside any transaction, or inside a live transaction of
-   * this workspace on this database; anything else is a foreign or expired
-   * handle. Writes additionally require a transaction.
-   */
-  readonly guard: <A, E, R>(
-    program: Effect.Effect<A, E, R>,
-    write?: boolean,
-  ) => Effect.Effect<A, E | Store.Failure, R>;
-  /**
-   * The store's transaction primitive, given how to expose the native handle
-   * for the session it opens. See Store.Interface for the contract. With `log`
-   * it skips the workspace's writer lock, for a standalone append that locks only
-   * that log, and takes turns with this process's other appends to it.
-   */
-  readonly transaction: <A, E, R>(
-    program: Effect.Effect<A, E, R>,
-    native: (session: TransactionState) => TransactionHandle,
-    options?: { readonly log?: Entry.LogId },
-  ) => Effect.Effect<
-    A,
-    E | Store.Failure | Store.Conflict | Store.CommitUncertain,
-    Exclude<R, Store.Transaction>
-  >;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/storage-postgresql/binding/Service",
-) {}
+export class Binding extends Context.Service<
+  Binding,
+  {
+    readonly workspaceId: Workspace.Id;
+    readonly database: PostgresDatabase.PostgresDatabase["Service"];
+    readonly pollInterval: Duration.Duration;
+    /**
+     * Run a statement outside any transaction, or inside a live transaction of
+     * this workspace on this database; anything else is a foreign or expired
+     * handle. Writes additionally require a transaction.
+     */
+    readonly guard: <A, E, R>(
+      program: Effect.Effect<A, E, R>,
+      write?: boolean,
+    ) => Effect.Effect<A, E | Store.Failure, R>;
+    /**
+     * The store's transaction primitive, given how to expose the native handle
+     * for the session it opens. See `Store.Store` for the contract. With `log`
+     * it skips the workspace's writer lock, for a standalone append that locks only
+     * that log, and takes turns with this process's other appends to it.
+     */
+    readonly transaction: <A, E, R>(
+      program: Effect.Effect<A, E, R>,
+      native: (session: TransactionState) => TransactionHandle,
+      options?: { readonly log?: Entry.LogId },
+    ) => Effect.Effect<
+      A,
+      E | Store.Failure | Store.Conflict | Store.CommitUncertain,
+      Exclude<R, Store.Transaction>
+    >;
+  }
+>()("@amends-dev/storage-postgresql/binding/Service") {}
 
 /** Contention is a conflict the caller may retry; anything else failed the transaction. */
 const transactionError = (cause: SqlError.SqlError) =>
@@ -188,7 +187,7 @@ export const make = Effect.fn("Binding.make")(function* (
   workspaceId: Workspace.Id,
   options: Options = {},
 ) {
-  const postgresDatabase = yield* PostgresDatabase.Service;
+  const postgresDatabase = yield* PostgresDatabase.PostgresDatabase;
   const { sql, turns, reads } = postgresDatabase;
   const { lockTimeout, statementTimeout, transactionTimeout, pollInterval, readConnections } =
     yield* settings(options);
@@ -222,7 +221,7 @@ export const make = Effect.fn("Binding.make")(function* (
   });
   const readKey = JSON.stringify(["reads", workspaceId]);
   // Outside a transaction a statement takes its own pooled connection, within the workspace's cap.
-  const guard: Interface["guard"] = (program, write = false) =>
+  const guard: Binding["Service"]["guard"] = (program, write = false) =>
     check(write).pipe(
       Effect.andThen(Effect.serviceOption(CurrentTransaction)),
       Effect.flatMap((current) =>
@@ -230,174 +229,175 @@ export const make = Effect.fn("Binding.make")(function* (
       ),
     );
 
-  const transaction: Interface["transaction"] = Effect.fn("Binding.transaction")(function* <
-    A,
-    E,
-    R,
-  >(
-    program: Effect.Effect<A, E, R>,
-    native: (session: TransactionState) => TransactionHandle,
-    options: { readonly log?: Entry.LogId } = {},
-  ) {
-    yield* check(false);
-    if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
-      return yield* new Store.Failure({
-        operation: "transaction",
-        cause: "Native transactions cannot nest; use journal.commit",
-      });
-    const standalone = options.log !== undefined;
-    const held = standalone ? "log" : "workspace";
-    const committed: Array<Effect.Effect<void>> = [];
-    const busy = (waitingFor: string) =>
-      new Store.Conflict({
-        operation: "transaction",
-        message: `Waited longer than the lock timeout for ${waitingFor}`,
-      });
-    // Waiting in this process's queue, for a connection, and for the lock share one budget.
-    const began = yield* Clock.currentTimeMillis;
-    const remaining = Effect.map(Clock.currentTimeMillis, (now) =>
-      Math.max(1, Math.ceil(lockMillis - (now - began))),
-    );
-    // Reserve a pooled connection, but own the commit boundary: the generic
-    // SqlClient wrapper turns COMMIT errors into defects and cannot report CommitUncertain.
-    const run = Effect.scoped(
-      Effect.uninterruptibleMask((restore) =>
-        Effect.gen(function* () {
-          const reserved = yield* restore(sql.reserve).pipe(
-            Effect.timeoutOption(Duration.millis(yield* remaining)),
-            Effect.mapError(transactionError),
-          );
-          if (Option.isNone(reserved)) return yield* busy("a database connection");
-          const connection = reserved.value;
-          const control = (statement: string, params: ReadonlyArray<unknown> = []) =>
-            connection.executeUnprepared(statement, params, undefined);
-          yield* control("BEGIN").pipe(Effect.mapError(transactionError));
-          // Writers to one workspace take turns, so projections and checkpoints
-          // serialize without serializable isolation. A workspace's key is a
-          // hash of its ID; a collision only over-serializes. The lock timeout also
-          // bounds waiting for a log's lock, and the idle timeout ends the session,
-          // releasing its locks, if the process stops sending statements.
-          const limited = control(
-            "SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true), set_config('idle_in_transaction_session_timeout', $3, true)",
-            [String(yield* remaining), ...limits],
-          );
-          const locked = yield* Effect.exit(
-            standalone
-              ? limited
-              : limited.pipe(
-                  Effect.andThen(
-                    control("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [workspaceId]),
-                  ),
-                ),
-          );
-          if (Exit.isFailure(locked)) {
-            yield* Effect.ignore(control("ROLLBACK"));
-            return yield* Effect.failCause(Cause.map(locked.cause, transactionError));
-          }
-          // Recorded once the writer holds the workspace, so commit times follow their order.
-          const session: TransactionState = {
-            owner: postgresDatabase,
-            workspaceId,
-            active: true,
-            commit: {
-              id: Commit.Id.make(crypto.randomUUID()),
-              recordedAt: yield* DateTime.now,
-              entryCount: 0,
-            },
-            beforeCommit: Effect.void,
-            notices: new Set(),
-            afterCommit: committed,
-          };
-          const exit = yield* Effect.exit(
-            restore(
-              program.pipe(
-                // Staged writes land inside the transaction, with the program's services.
-                Effect.tap(() => Effect.suspend(() => session.beforeCommit)),
-                Effect.updateContext((context: Context.Context<R>) =>
-                  Context.add(context, CurrentTransaction, session),
-                ),
-                Effect.provideService(Store.Transaction, native(session)),
-                Effect.provideService(sql.transactionService, [connection, 0]),
-                Effect.timeoutOrElse({
-                  duration: transactionTimeout,
-                  orElse: () =>
-                    Effect.fail(
-                      new Store.Failure({
-                        operation: "transaction",
-                        cause: `The transaction ran longer than ${Duration.format(transactionTimeout)}`,
-                      }),
+  const transaction: Binding["Service"]["transaction"] = Effect.fn("Binding.transaction")(
+    function* <A, E, R>(
+      program: Effect.Effect<A, E, R>,
+      native: (session: TransactionState) => TransactionHandle,
+      options: { readonly log?: Entry.LogId } = {},
+    ) {
+      yield* check(false);
+      if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
+        return yield* new Store.Failure({
+          operation: "transaction",
+          cause: "Native transactions cannot nest; use journal.commit",
+        });
+      const standalone = options.log !== undefined;
+      const held = standalone ? "log" : "workspace";
+      const committed: Array<Effect.Effect<void>> = [];
+      const busy = (waitingFor: string) =>
+        new Store.Conflict({
+          operation: "transaction",
+          message: `Waited longer than the lock timeout for ${waitingFor}`,
+        });
+      // Waiting in this process's queue, for a connection, and for the lock share one budget.
+      const began = yield* Clock.currentTimeMillis;
+      const remaining = Effect.map(Clock.currentTimeMillis, (now) =>
+        Math.max(1, Math.ceil(lockMillis - (now - began))),
+      );
+      // Reserve a pooled connection, but own the commit boundary: the generic
+      // SqlClient wrapper turns COMMIT errors into defects and cannot report CommitUncertain.
+      const run = Effect.scoped(
+        Effect.uninterruptibleMask((restore) =>
+          Effect.gen(function* () {
+            const reserved = yield* restore(sql.reserve).pipe(
+              Effect.timeoutOption(Duration.millis(yield* remaining)),
+              Effect.mapError(transactionError),
+            );
+            if (Option.isNone(reserved)) return yield* busy("a database connection");
+            const connection = reserved.value;
+            const control = (statement: string, params: ReadonlyArray<unknown> = []) =>
+              connection.executeUnprepared(statement, params, undefined);
+            yield* control("BEGIN").pipe(Effect.mapError(transactionError));
+            // Writers to one workspace take turns, so projections and checkpoints
+            // serialize without serializable isolation. A workspace's key is a
+            // hash of its ID; a collision only over-serializes. The lock timeout also
+            // bounds waiting for a log's lock, and the idle timeout ends the session,
+            // releasing its locks, if the process stops sending statements.
+            const limited = control(
+              "SELECT set_config('lock_timeout', $1, true), set_config('statement_timeout', $2, true), set_config('idle_in_transaction_session_timeout', $3, true)",
+              [String(yield* remaining), ...limits],
+            );
+            const locked = yield* Effect.exit(
+              standalone
+                ? limited
+                : limited.pipe(
+                    Effect.andThen(
+                      control("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+                        workspaceId,
+                      ]),
                     ),
-                }),
-              ),
-            ),
-          );
-          session.active = false;
-          if (Exit.isFailure(exit)) {
-            // A connection that cannot roll back is dropped by the pool on its
-            // socket error; the failure below is the outcome callers see.
-            const rollback = yield* Effect.exit(control("ROLLBACK"));
-            if (Exit.isFailure(rollback))
-              return yield* Effect.failCause(
-                Cause.combine(
-                  exit.cause,
-                  Cause.fail(new Store.Failure({ operation: "rollback", cause: rollback.cause })),
+                  ),
+            );
+            if (Exit.isFailure(locked)) {
+              yield* Effect.ignore(control("ROLLBACK"));
+              return yield* Effect.failCause(Cause.map(locked.cause, transactionError));
+            }
+            // Recorded once the writer holds the workspace, so commit times follow their order.
+            const session: TransactionState = {
+              owner: postgresDatabase,
+              workspaceId,
+              active: true,
+              commit: {
+                id: Commit.Id.make(crypto.randomUUID()),
+                recordedAt: yield* DateTime.now,
+                entryCount: 0,
+              },
+              beforeCommit: Effect.void,
+              notices: new Set(),
+              afterCommit: committed,
+            };
+            const exit = yield* Effect.exit(
+              restore(
+                program.pipe(
+                  // Staged writes land inside the transaction, with the program's services.
+                  Effect.tap(() => Effect.suspend(() => session.beforeCommit)),
+                  Effect.updateContext((context: Context.Context<R>) =>
+                    Context.add(context, CurrentTransaction, session),
+                  ),
+                  Effect.provideService(Store.Transaction, native(session)),
+                  Effect.provideService(sql.transactionService, [connection, 0]),
+                  Effect.timeoutOrElse({
+                    duration: transactionTimeout,
+                    orElse: () =>
+                      Effect.fail(
+                        new Store.Failure({
+                          operation: "transaction",
+                          cause: `The transaction ran longer than ${Duration.format(transactionTimeout)}`,
+                        }),
+                      ),
+                  }),
                 ),
-              );
-            return yield* Effect.failCause(exit.cause);
-          }
-          const commit = yield* Effect.exit(connection.executeRaw("COMMIT", []));
-          if (Exit.isFailure(commit)) {
-            yield* Effect.ignore(control("ROLLBACK"));
-            return yield* new Store.CommitUncertain({
-              commitId: session.commit.id,
-              cause: commit.cause,
-            });
-          }
-          // A statement that failed earlier aborted the transaction, and the
-          // program went on regardless: PostgreSQL answers COMMIT with a
-          // rollback rather than an error, which must not pass for success.
-          if (!isCommitted(commit.value))
-            return yield* new Store.Failure({
-              operation: "commit",
-              cause: "An earlier failed statement aborted the transaction; nothing was committed",
-            });
-          // Committed: tell waiting readers in every process, in one statement of its own. A notice
-          // lost to a failure here leaves them to find the commit at their next poll.
-          if (session.notices.size > 0)
-            yield* control("SELECT pg_notify($1, notice) FROM unnest($2::text[]) AS notice", [
-              PostgresNotices.channel,
-              [...session.notices],
-            ]).pipe(
-              Effect.catchCause((cause) =>
-                Effect.logWarning("Commit notice not sent; readers will find it by polling", cause),
               ),
             );
-          return exit.value;
-        }),
-      ),
-    );
-    // This process's writers to the workspace, or to a standalone append's log, queue here, so
-    // only the one at the front holds a connection while PostgreSQL makes it wait for the lock.
-    const result = yield* turns.run(
-      JSON.stringify(standalone ? [workspaceId, options.log] : [workspaceId]),
-      lockTimeout,
-      () => busy(`this process's other writers to the ${held}`),
-      run,
-    );
-    // Committed, with its connection back in the pool and the next writer free to go.
-    yield* Store.runAfterCommit(committed);
-    return result;
-  });
+            session.active = false;
+            if (Exit.isFailure(exit)) {
+              // A connection that cannot roll back is dropped by the pool on its
+              // socket error; the failure below is the outcome callers see.
+              const rollback = yield* Effect.exit(control("ROLLBACK"));
+              if (Exit.isFailure(rollback))
+                return yield* Effect.failCause(
+                  Cause.combine(
+                    exit.cause,
+                    Cause.fail(new Store.Failure({ operation: "rollback", cause: rollback.cause })),
+                  ),
+                );
+              return yield* Effect.failCause(exit.cause);
+            }
+            const commit = yield* Effect.exit(connection.executeRaw("COMMIT", []));
+            if (Exit.isFailure(commit)) {
+              yield* Effect.ignore(control("ROLLBACK"));
+              return yield* new Store.CommitUncertain({
+                commitId: session.commit.id,
+                cause: commit.cause,
+              });
+            }
+            // A statement that failed earlier aborted the transaction, and the
+            // program went on regardless: PostgreSQL answers COMMIT with a
+            // rollback rather than an error, which must not pass for success.
+            if (!isCommitted(commit.value))
+              return yield* new Store.Failure({
+                operation: "commit",
+                cause: "An earlier failed statement aborted the transaction; nothing was committed",
+              });
+            // Committed: tell waiting readers in every process, in one statement of its own. A notice
+            // lost to a failure here leaves them to find the commit at their next poll.
+            if (session.notices.size > 0)
+              yield* control("SELECT pg_notify($1, notice) FROM unnest($2::text[]) AS notice", [
+                PostgresNotices.channel,
+                [...session.notices],
+              ]).pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning(
+                    "Commit notice not sent; readers will find it by polling",
+                    cause,
+                  ),
+                ),
+              );
+            return exit.value;
+          }),
+        ),
+      );
+      // This process's writers to the workspace, or to a standalone append's log, queue here, so
+      // only the one at the front holds a connection while PostgreSQL makes it wait for the lock.
+      const result = yield* turns.run(
+        JSON.stringify(standalone ? [workspaceId, options.log] : [workspaceId]),
+        lockTimeout,
+        () => busy(`this process's other writers to the ${held}`),
+        run,
+      );
+      // Committed, with its connection back in the pool and the next writer free to go.
+      yield* Store.runAfterCommit(committed);
+      return result;
+    },
+  );
 
-  return Service.of({ workspaceId, database: postgresDatabase, pollInterval, guard, transaction });
+  return Binding.of({ workspaceId, database: postgresDatabase, pollInterval, guard, transaction });
 });
 
 /**
- * Provide Service using its constructor and the caller's dependencies.
+ * Provide Binding using its constructor and the caller's dependencies.
  *
  * @category layers
  */
 export const layer = (workspaceId: Workspace.Id, options: Options = {}) =>
-  Layer.effect(Service, make(workspaceId, options));
-
-export * as Binding from "./binding.ts";
+  Layer.effect(Binding, make(workspaceId, options));

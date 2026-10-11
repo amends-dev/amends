@@ -29,9 +29,9 @@ import {
   Semaphore,
   Stream,
 } from "effect";
-import { TurnAgent } from "./agent.ts";
-import { SessionLogWriter } from "./session-log-writer.ts";
-import { TurnWorkspace } from "./workspace.ts";
+import * as TurnAgent from "./agent.ts";
+import * as SessionLogWriter from "./session-log-writer.ts";
+import * as TurnWorkspace from "./workspace.ts";
 
 /** The least time between two drafts of a step's text, in milliseconds. */
 const draftInterval = 100;
@@ -385,5 +385,3 @@ const releaseSession = (started: TurnAgent.Started | undefined) => {
 };
 
 export type TurnRunner = Effect.Success<ReturnType<typeof make>>;
-
-export * as TurnRunner from "./runner.ts";

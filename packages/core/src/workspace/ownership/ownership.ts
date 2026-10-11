@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import { Assignment } from "../../authorization/assignment/assignment.ts";
-import { Member } from "../member/member.ts";
-import { Workspace } from "../workspace.ts";
+import * as Assignment from "../../authorization/assignment/assignment.ts";
+import * as Member from "../member/member.ts";
+import * as Workspace from "../workspace.ts";
 
 export const TransferInput = Schema.Struct({
   memberId: Member.Id,
@@ -32,5 +32,3 @@ export const View = Schema.Struct({
   candidates: Schema.Array(Member.Record),
 }).annotate({ identifier: "WorkspaceOwnership" });
 export interface View extends Schema.Schema.Type<typeof View> {}
-
-export * as Ownership from "./ownership.ts";

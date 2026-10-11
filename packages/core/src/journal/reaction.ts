@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
-import type { Event } from "./event.ts";
-import type { Store } from "./store.ts";
+import type * as Event from "./event.ts";
+import type * as Store from "./store.ts";
 
 /**
  * What a commit does, in that same commit, when it publishes a fact, such as requesting a job.
@@ -15,5 +15,3 @@ export interface Definition<R = never> {
     event: Event.Record,
   ) => Effect.Effect<void, Store.Failure, R | Store.Transaction>;
 }
-
-export * as Reaction from "./reaction.ts";

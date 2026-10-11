@@ -6,9 +6,9 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Member } from "../workspace/member/member.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadMessageId } from "./ThreadMessageId.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadMessageId from "./ThreadMessageId.ts";
 
 /**
  * The message's revision is no longer the one the editor expected: someone edited it meanwhile.
@@ -89,5 +89,3 @@ export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavai
     memberId: Member.Id,
   },
 ) {}
-
-export * as ThreadMessageErrors from "./ThreadMessageErrors.ts";

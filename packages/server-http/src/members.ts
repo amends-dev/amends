@@ -13,14 +13,14 @@ export const layer = HttpApiBuilder.group(
   Api,
   "members",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
+    const gateway = yield* Gateway.Gateway;
     return handlers.handleAll({
       list: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberService.Service, (memberService) => memberService.list),
+            Effect.flatMap(MemberService.MemberService, (memberService) => memberService.list),
           ),
         ),
       get: ({ params }) =>
@@ -28,7 +28,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberService.Service, (memberService) =>
+            Effect.flatMap(MemberService.MemberService, (memberService) =>
               memberService.get(params.memberId),
             ),
           ),
@@ -38,7 +38,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberService.Service, (memberService) =>
+            Effect.flatMap(MemberService.MemberService, (memberService) =>
               memberService.rename(payload.name),
             ),
           ),
@@ -48,7 +48,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberService.Service, (memberService) =>
+            Effect.flatMap(MemberService.MemberService, (memberService) =>
               memberService.remove(params.memberId),
             ),
           ),
@@ -56,5 +56,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 );
-
-export * as MembersHandlers from "./members.ts";

@@ -52,5 +52,3 @@ export const idFor = Effect.fnUntraced(function* (
   if (key === undefined) return yield* (yield* Crypto.Crypto).randomUUIDv4;
   return yield* derivedId([...parts, key]);
 });
-
-export * as Request from "./request.ts";

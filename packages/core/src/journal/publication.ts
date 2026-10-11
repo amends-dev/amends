@@ -1,8 +1,8 @@
 import { Context, Crypto, DateTime, Effect, Option, Schema } from "effect";
-import { Actor } from "../identity/actor.ts";
-import { Performer } from "../identity/performer.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
-import { Event } from "./event.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Performer from "../identity/performer.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
+import * as Event from "./event.ts";
 
 /**
  * Trusted attribution for the current operation. Supply it around an effect, never in a
@@ -10,13 +10,13 @@ import { Event } from "./event.ts";
  * There is intentionally no default performer or correlation.
  * @effect-leakable-service
  */
-export class Service extends Context.Service<Service, Event.Provenance>()(
+export class Publication extends Context.Service<Publication, Event.Provenance>()(
   "@amends-dev/core/journal/publication/Service",
 ) {}
 
 /**
  * Create root attribution once per trusted application operation. Reuse it for sibling
- * facts through Publication.Service. A correlation ID is not an idempotency key.
+ * facts through Publication.Publication. A correlation ID is not an idempotency key.
  * @category constructors
  */
 export const make = Effect.fn("Publication.make")(function* (
@@ -40,7 +40,7 @@ export const make = Effect.fn("Publication.make")(function* (
 export const makeForActor = Effect.fn("Publication.makeForActor")(function* (
   occurredAt?: DateTime.Utc,
 ) {
-  const actor = yield* Actor.Service;
+  const actor = yield* Actor.Actor;
   return yield* make(
     actor.workspaceId,
     Performer.Reference.cases.Member.make({ memberId: actor.memberId, identity: actor.identity }),
@@ -69,15 +69,15 @@ export const makeCausedBy = Effect.fn("Publication.makeCausedBy")(function* (
 export const withActor = Effect.fn("Publication.withActor")(function* <A, E, R>(
   program: Effect.Effect<A, E, R>,
 ) {
-  const current = yield* Effect.serviceOption(Service);
+  const current = yield* Effect.serviceOption(Publication);
   const provenance = Option.isSome(current) ? current.value : yield* makeForActor();
-  return yield* Effect.provideService(program, Service, provenance);
+  return yield* Effect.provideService(program, Publication, provenance);
 });
 
 /** Override only this effect's immediate cause and correlation, retaining its current performer. */
 export const withCause = (event: Event.Record, occurredAt?: DateTime.Utc) =>
   Effect.fn("Publication.withCause")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Service;
+    const current = yield* Publication;
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))({
       workspaceId: current.workspaceId,
       performedBy: current.performedBy,
@@ -85,27 +85,25 @@ export const withCause = (event: Event.Record, occurredAt?: DateTime.Utc) =>
       correlationId: event.provenance.correlationId,
       occurredAt: occurredAt ?? (yield* DateTime.now),
     });
-    return yield* Effect.provideService(program, Service, Event.snapshotProvenance(provenance));
+    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance));
   });
 
 /** Override the performer for one trusted operation without changing its causal history. */
 export const withPerformer = (performedBy: Performer.Reference) =>
   Effect.fn("Publication.withPerformer")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Service;
+    const current = yield* Publication;
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))(
       Object.assign({}, current, { performedBy }),
     );
-    return yield* Effect.provideService(program, Service, Event.snapshotProvenance(provenance));
+    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance));
   });
 
 /** Use the domain action's timestamp for one publication or a block of related publications. */
 export const withOccurredAt = (occurredAt: DateTime.Utc) =>
   Effect.fn("Publication.withOccurredAt")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Service;
+    const current = yield* Publication;
     const provenance = yield* Schema.decodeEffect(Schema.toType(Event.Provenance))(
       Object.assign({}, current, { occurredAt }),
     );
-    return yield* Effect.provideService(program, Service, Event.snapshotProvenance(provenance));
+    return yield* Effect.provideService(program, Publication, Event.snapshotProvenance(provenance));
   });
-
-export * as Publication from "./publication.ts";

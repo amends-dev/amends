@@ -15,14 +15,14 @@ the endpoints only a person may call.
 
 ## Use
 
-A host supplies `Gateway.Service`, `Accounts.Service`, `SignIn.Service`, `SessionTokens.Service`,
-`WorkspaceDirectory.Service`, and its platform's HTTP services, then mounts the routes with
+A host supplies `Gateway.Gateway`, `Accounts.Accounts`, `SignIn.SignIn`, `SessionTokens.SessionTokens`,
+`WorkspaceDirectory.WorkspaceDirectory`, and its platform's HTTP services, then mounts the routes with
 `HttpRouter.serve` or `HttpRouter.toWebHandler`:
 
 - `Routes.layer` registers every group, with the OpenAPI document at `/openapi.json`.
 - `Routes.layerDocs` serves interactive documentation at `/docs`.
 - `Routes.layerHandlers` is the group layers and authentication alone, for tests.
-- `BearerAuthentication.make()` builds the contract's `Authentication` from `SessionTokens.Service`,
+- `BearerAuthentication.make()` builds the contract's `Authentication` from `SessionTokens.SessionTokens`,
   and `BearerAuthentication.layer` provides it. Each request resolves its own bearer token and
   supplies its own `Principal` and `Credential`.
 
@@ -62,7 +62,7 @@ by default, and a host provides its own to change them. A stream holds its place
 gateway admits it until its response ends, and a stream beyond either limit fails with
 `Api.TooManyStreams` (429), naming the limit it met.
 
-`Draining.Service` is the server beginning to shut down. Where a host provides it, open streams end
+`Draining.Draining` is the server beginning to shut down. Where a host provides it, open streams end
 with their `Unavailable` error as it completes, so their clients reconnect, to another process if
 one runs, and the HTTP server's graceful stop waits only for ordinary requests. `Draining.layer`
 creates it, and a host builds `Draining.layerOnRelease` after its HTTP server so that releasing it,
@@ -74,7 +74,7 @@ Keep one handler module per contract group, with the contract's filename: `src/i
 implements `api-http/src/invitations.ts`. `MembersHandlers` and the like name endpoint collections
 and `Routes` composes them. Each handler module exports `layer`, built with `HttpApiBuilder.group`,
 which checks that every declared endpoint is implemented; no constructor or service tag wraps it.
-`Principal` is the authenticated human or agent; core's `Actor.Service` is the member the gateway
+`Principal` is the authenticated human or agent; core's `Actor.Actor` is the member the gateway
 resolves for an operation. Handlers use the gateway's decoded field names, such as `humanId` and
 `activeMemberCount`, and the contract's codecs encode them.
 

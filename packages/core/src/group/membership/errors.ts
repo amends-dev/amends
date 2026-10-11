@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import { Member } from "../../workspace/member/member.ts";
-import { Group } from "../group.ts";
-import { GroupMembership } from "./membership.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as Group from "../group.ts";
+import * as GroupMembership from "./membership.ts";
 
 /** The outcomes `GroupMembershipService` reports that a caller can act on; schemas only, for contracts. */
 export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
@@ -48,5 +48,3 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
   "GroupMembershipService.NotFound",
   GroupMembership.RemoveInput.fields,
 ) {}
-
-export * as GroupMembershipErrors from "./errors.ts";

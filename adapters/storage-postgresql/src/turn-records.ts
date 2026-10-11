@@ -3,7 +3,7 @@ import { Turn, TurnStore } from "@amends-dev/core/turn";
 import { Member } from "@amends-dev/core/workspace";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { turns } from "./schema.ts";
 
@@ -80,13 +80,13 @@ const activeStatuses = ["queued", "running", "cancelling"] as const;
 
 /** Turn records in the workspace's database. @category constructors */
 export const make = Effect.fn("TurnRecords.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(turns.workspaceId, workspaceId);
   const orderedId = sql`${turns.id} COLLATE "C"`;
   const ofAgent = (memberId: Member.Id, threadId: Thread.Id) =>
     and(inWorkspace, eq(turns.memberId, memberId), eq(turns.threadId, threadId));
-  const driver: TurnStore.Interface = {
+  const driver: TurnStore.TurnStore["Service"] = {
     get: Effect.fn("TurnRecords.get")(
       function* (id) {
         return yield* guard(
@@ -178,6 +178,4 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
 });
 
 /** Provide turn storage over the caller's binding. @category layers */
-export const layer = Layer.effect(TurnStore.Service, make());
-
-export * as TurnRecords from "./turn-records.ts";
+export const layer = Layer.effect(TurnStore.TurnStore, make());

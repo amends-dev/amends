@@ -39,7 +39,7 @@ membership, and the thread, whose requests ask it to run the agent's next turn (
 turn (`Stop`). Its runs take turns, while a stop reaches the run in progress, so the entity takes
 its requests side by side and its [turn runner](#running-a-turn) runs one turn at a time.
 
-`TurnJob.layerRequests` provides core's `TurnJobs.Service`, through which core's reactions request a
+`TurnJob.layerRequests` provides core's `TurnJobs.TurnJobs`, through which core's reactions request a
 run or a stop in the commit whose facts ask for it, keyed by the commit, so a commit that asks twice
 asks once. Sent inside the commit, a request is stored in the commit's transaction when Cluster's
 message storage uses the same SQL client as the workspace's storage; the host composing them owns
@@ -63,7 +63,7 @@ Failures are logged.
 
 A delivery job is one bound thread: an entity, `amends/DeliveryJob`, keyed by workspace and thread,
 whose one request, `Deliver`, asks it to carry what the thread's contacts were told to the
-conversation. `DeliveryJob.layerRequests` provides core's `DeliveryJobs.Service`, storing requests
+conversation. `DeliveryJob.layerRequests` provides core's `DeliveryJobs.DeliveryJobs`, storing requests
 as `TurnJob`'s does, keyed by the commit; `DeliveryJob.layerWorker` handles them one at a time, so a
 thread's messages reach its conversation in order, and `DeliveryJob.layer` provides both. A request
 that fails is tried again as above; then the delivery its runs could not post is given up, which
@@ -81,7 +81,7 @@ not yet handled are kept however old.
 ## Delivering
 
 `DeliveryRunner.make(job)` carries one bound thread's messages to its conversation over
-`Gateway.Service` and the host's `Integrations`, each call entering the workspace through the
+`Gateway.Gateway` and the host's `Integrations`, each call entering the workspace through the
 gateway for itself. `deliver` asks core's `DeliveryExecution` to `accept` what the thread's contacts
 were told into deliveries, then for each still requested, in the order of the messages: `start` it,
 which answers `Idle` for one no longer requested or failed as it stood, and otherwise `Ready` with
@@ -94,7 +94,7 @@ trying. The runner counts the tries it made of each delivery, which the delivery
 
 ## Running a turn
 
-`TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Service` and the host's
+`TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Gateway` and the host's
 `Integrations`. It calls the workspace through `TurnWorkspace`: core's `TurnExecution` and the
 session log store as a run calls them, each call entering the workspace through the gateway for
 itself, so the runner holds the workspace only while a call runs. `runNextTurn` runs one turn at a

@@ -128,5 +128,3 @@ const checkOrganization = (config: DaytonaConfig, url: string): Effect.Effect<Co
     ),
     Effect.scoped,
   );
-
-export * as SandboxIntegrations from "./sandbox-integrations.ts";

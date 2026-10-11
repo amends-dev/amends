@@ -1,23 +1,23 @@
 import { expect, it } from "@effect/vitest";
 import { Context, Crypto, DateTime, Effect, Layer } from "effect";
 import { TestClock } from "effect/testing";
-import { Authorization } from "../../src/authorization/authorization.ts";
-import type { Requirement } from "../../src/authorization/requirement.ts";
-import { Group } from "../../src/group/group.ts";
-import { Actor } from "../../src/identity/actor.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Store } from "../../src/journal/store.ts";
-import { ReadStateCommand } from "../../src/read-state/command.ts";
-import { SignalHub } from "../../src/signal/hub.ts";
-import { Signal } from "../../src/signal/signal.ts";
-import { ThreadCommand } from "../../src/thread/ThreadCommand.ts";
-import { ThreadMessageService } from "../../src/thread/ThreadMessageService.ts";
-import { ThreadMessageStore } from "../../src/thread/ThreadMessageStore.ts";
-import { ThreadQuery } from "../../src/thread/ThreadQuery.ts";
-import { Thread } from "../../src/thread/Thread.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Authorization from "../../src/authorization/authorization.ts";
+import type * as Requirement from "../../src/authorization/requirement.ts";
+import * as Group from "../../src/group/group.ts";
+import * as Actor from "../../src/identity/actor.ts";
+import * as Identity from "../../src/identity/identity.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as ReadStateCommand from "../../src/read-state/command.ts";
+import * as SignalHub from "../../src/signal/hub.ts";
+import * as Signal from "../../src/signal/signal.ts";
+import * as ThreadCommand from "../../src/thread/ThreadCommand.ts";
+import * as ThreadMessageService from "../../src/thread/ThreadMessageService.ts";
+import * as ThreadMessageStore from "../../src/thread/ThreadMessageStore.ts";
+import * as ThreadQuery from "../../src/thread/ThreadQuery.ts";
+import * as Thread from "../../src/thread/Thread.ts";
+import * as Member from "../../src/workspace/member/member.ts";
+import * as Workspace from "../../src/workspace/workspace.ts";
 import { make } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
@@ -49,14 +49,14 @@ const unused = <I, S extends object>(key: Context.Key<I, S>) =>
 const run = <A, E>(
   use: (
     published: ReadonlyArray<Signal.Value>,
-  ) => Effect.Effect<A, E, ThreadMessageService.Service | Actor.Service>,
+  ) => Effect.Effect<A, E, ThreadMessageService.ThreadMessageService | Actor.Actor>,
   options: { readonly deny?: boolean } = {},
 ) =>
   Effect.gen(function* () {
     const published: Array<Signal.Value> = [];
     const requirements: Array<Requirement.Value> = [];
     const unexpected = () => Effect.die("Typing reads nothing but thread access");
-    const threadQuery = ThreadQuery.Service.of({
+    const threadQuery = ThreadQuery.ThreadQuery.of({
       requireAccess: (threadId) =>
         readable.has(threadId)
           ? Effect.succeed(thread(threadId))
@@ -71,7 +71,7 @@ const run = <A, E>(
       readTimeline: unexpected,
       readTimelineItem: unexpected,
     });
-    const authorization = Authorization.Service.of({
+    const authorization = Authorization.Authorization.of({
       require: (needed) =>
         Effect.suspend(() => {
           requirements.push(...needed);
@@ -83,7 +83,7 @@ const run = <A, E>(
         }),
       permitted: () => Effect.die("Unexpected permitted check"),
     });
-    const signalHub = SignalHub.Service.of({
+    const signalHub = SignalHub.SignalHub.of({
       publish: (signal) =>
         Effect.sync(() => {
           published.push(signal);
@@ -95,25 +95,25 @@ const run = <A, E>(
         ThreadMessageService.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
-              Layer.succeed(ThreadQuery.Service, threadQuery),
-              Layer.succeed(Authorization.Service, authorization),
-              Layer.succeed(SignalHub.Service, signalHub),
-              Layer.succeed(Store.Service, (yield* make(workspaceId)).store),
-              unused(ThreadCommand.Service),
-              unused(ReadStateCommand.Service),
-              unused(ThreadMessageStore.Service),
-              unused(Journal.Service),
+              Layer.succeed(ThreadQuery.ThreadQuery, threadQuery),
+              Layer.succeed(Authorization.Authorization, authorization),
+              Layer.succeed(SignalHub.SignalHub, signalHub),
+              Layer.succeed(Store.Store, (yield* make(workspaceId)).store),
+              unused(ThreadCommand.ThreadCommand),
+              unused(ReadStateCommand.ReadStateCommand),
+              unused(ThreadMessageStore.ThreadMessageStore),
+              unused(Journal.Journal),
               unused(Crypto.Crypto),
             ),
           ),
         ),
       ),
-      Effect.provideService(Actor.Service, actor),
+      Effect.provideService(Actor.Actor, actor),
     );
     return { result, requirements };
   });
 const typing = (threadId: string) =>
-  Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+  Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
     threadMessageService.typing(Thread.Id.make(threadId)),
   );
 

@@ -1,9 +1,9 @@
 import { Schema } from "effect";
-import { Member } from "../../workspace/member/member.ts";
-import { Workspace } from "../../workspace/workspace.ts";
-import { Grant } from "../grant.ts";
-import { Role } from "../role/role.ts";
-import { Scope } from "../scope.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as Workspace from "../../workspace/workspace.ts";
+import * as Grant from "../grant.ts";
+import * as Role from "../role/role.ts";
+import * as Scope from "../scope.ts";
 
 /** Identifies one assignment; assigning access again after revocation uses a fresh ID. */
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceAssignmentId"));
@@ -66,5 +66,3 @@ export const Access = Schema.Struct({
   canManage: Schema.Boolean,
 });
 export interface Access extends Schema.Schema.Type<typeof Access> {}
-
-export * as Assignment from "./assignment.ts";

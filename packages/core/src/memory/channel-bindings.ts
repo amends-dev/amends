@@ -1,15 +1,15 @@
 import { ChannelBinding, ChannelBindingStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(ChannelBinding.Record));
 
 /** Channel bindings over the current workspace transaction, keyed by thread. @category constructors */
 export const make = Effect.fn("ChannelBindings.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: ChannelBindingStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: ChannelBindingStore.ChannelBindingStore["Service"] = {
     get: Effect.fn("ChannelBindings.get")(
       function* (threadId) {
         return yield* rows.get((yield* read).records.of("channelBindings"), threadId);
@@ -54,6 +54,4 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
 });
 
 /** Provide channel binding storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ChannelBindingStore.Service, make());
-
-export * as ChannelBindings from "./channel-bindings.ts";
+export const layer = Layer.effect(ChannelBindingStore.ChannelBindingStore, make());

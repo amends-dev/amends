@@ -1,24 +1,24 @@
-import { Identity } from "../../identity/identity.ts";
+import * as Identity from "../../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { AgentPermissions } from "../../agent/permissions.ts";
-import { Authorization } from "../../authorization/authorization.ts";
-import { Requirement } from "../../authorization/requirement.ts";
-import { Actor } from "../../identity/actor.ts";
-import { Journal } from "../../journal/journal.ts";
-import type { Log } from "../../journal/log.ts";
-import type { Projection } from "../../journal/projection.ts";
-import { Publication } from "../../journal/publication.ts";
-import { Store } from "../../journal/store.ts";
+import * as AgentPermissions from "../../agent/permissions.ts";
+import * as Authorization from "../../authorization/authorization.ts";
+import * as Requirement from "../../authorization/requirement.ts";
+import * as Actor from "../../identity/actor.ts";
+import * as Journal from "../../journal/journal.ts";
+import type * as Log from "../../journal/log.ts";
+import type * as Projection from "../../journal/projection.ts";
+import * as Publication from "../../journal/publication.ts";
+import * as Store from "../../journal/store.ts";
 
-import { MemberStore } from "../../workspace/member/store.ts";
-import { GroupQuery } from "../query.ts";
-import { GroupPermissions } from "../permissions.ts";
-import { GroupStore } from "../store.ts";
-import { GroupMembershipStore } from "../membership/store.ts";
-import { GroupFollow } from "./follow.ts";
-import { GroupFollowFacts } from "./facts.ts";
-import { GroupFollowStore } from "./store.ts";
+import * as MemberStore from "../../workspace/member/store.ts";
+import * as GroupQuery from "../query.ts";
+import * as GroupPermissions from "../permissions.ts";
+import * as GroupStore from "../store.ts";
+import * as GroupMembershipStore from "../membership/store.ts";
+import * as GroupFollow from "./follow.ts";
+import * as GroupFollowFacts from "./facts.ts";
+import * as GroupFollowStore from "./store.ts";
 import { AgentRequired, GroupNotFound, MemberUnavailable, NotFollowable } from "./errors.ts";
 export { AgentRequired, GroupNotFound, MemberUnavailable, NotFollowable } from "./errors.ts";
 
@@ -37,36 +37,35 @@ export type Error =
   | MemberUnavailable
   | AgentRequired;
 
-export interface Interface {
-  /**
-   * Follow a team group, so that threads started there afterwards admit the member. Members follow
-   * for themselves under `group.follow`; making an agent member follow needs `agent.use` for it.
-   * The actor must belong to the group. Following again while following changes nothing.
-   */
-  readonly follow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Service>;
-  /**
-   * Stop following a team group; current thread participation is unchanged. Members unfollow for
-   * themselves without an action grant; an agent member needs `agent.use` for it. Unfollowing
-   * while not following changes nothing.
-   */
-  readonly unfollow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/group/follow/service/Service",
-) {}
+export class GroupFollowService extends Context.Service<
+  GroupFollowService,
+  {
+    /**
+     * Follow a team group, so that threads started there afterwards admit the member. Members follow
+     * for themselves under `group.follow`; making an agent member follow needs `agent.use` for it.
+     * The actor must belong to the group. Following again while following changes nothing.
+     */
+    readonly follow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Actor>;
+    /**
+     * Stop following a team group; current thread participation is unchanged. Members unfollow for
+     * themselves without an action grant; an agent member needs `agent.use` for it. Unfollowing
+     * while not following changes nothing.
+     */
+    readonly unfollow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/group/follow/service/Service") {}
 
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
 export const make = Effect.fn("GroupFollowService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const groupQuery = yield* GroupQuery.Service;
-  const groupStore = yield* GroupStore.Service;
-  const groupMembershipStore = yield* GroupMembershipStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const groupFollowStore = yield* GroupFollowStore.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const groupQuery = yield* GroupQuery.GroupQuery;
+  const groupStore = yield* GroupStore.GroupStore;
+  const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const groupFollowStore = yield* GroupFollowStore.GroupFollowStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   /** The admission whose follow changes, after the checks that apply to the actor and target. */
   const authorizeFollowChange = Effect.fnUntraced(function* (
@@ -86,7 +85,7 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
     const group = foundGroup.value;
     if (group.kind === "Direct") return yield* new NotFollowable({ groupId: group.id });
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     if (request.memberId === actor.memberId) {
       // People follow for themselves under group.follow; unfollowing needs no grant.
       if (following)
@@ -159,10 +158,8 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ follow, unfollow });
+  return GroupFollowService.of({ follow, unfollow });
 });
 
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as GroupFollowService from "./service.ts";
+export const layer = Layer.effect(GroupFollowService, make());

@@ -1,7 +1,7 @@
 import { Member, MemberStore } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { members } from "./schema.ts";
@@ -22,7 +22,7 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Record));
  * @category constructors
  */
 export const make = Effect.fn("Members.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(members.workspaceId, workspaceId);
   const select = (operation: string, where: SQL | undefined) =>
@@ -30,7 +30,7 @@ export const make = Effect.fn("Members.make")(function* () {
       Effect.flatMap(decode),
       Effect.mapError(storeFailure(MemberStore, operation)),
     );
-  const driver: MemberStore.Interface = {
+  const driver: MemberStore.MemberStore["Service"] = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(members.id, id))), Array.head),
     getMany: Effect.fn("Members.getMany")(function* (ids) {
       if (ids.length === 0) return [];
@@ -98,10 +98,8 @@ export const make = Effect.fn("Members.make")(function* () {
 });
 
 /**
- * Provide MemberStore.Service using its constructor and the caller's dependencies.
+ * Provide MemberStore.MemberStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(MemberStore.Service, make());
-
-export * as Members from "./members.ts";
+export const layer = Layer.effect(MemberStore.MemberStore, make());

@@ -22,7 +22,7 @@ const connectSignIn = (storage: Storage) =>
   Effect.gen(function* () {
     const sent: Array<EmailSender.Message> = [];
     const provider = { refusing: false };
-    const emailSender = EmailSender.Service.of({
+    const emailSender = EmailSender.EmailSender.of({
       send: (message) =>
         provider.refusing
           ? Effect.fail(new EmailSender.Undelivered({ description: "The provider is down." }))
@@ -34,13 +34,13 @@ const connectSignIn = (storage: Storage) =>
         Layer.provide(
           Layer.mergeAll(
             Layer.succeedContext(host),
-            Layer.succeed(EmailSender.Service, emailSender),
+            Layer.succeed(EmailSender.EmailSender, emailSender),
           ),
         ),
       ),
     );
-    const signIn = Context.get(context, SignIn.Service);
-    const sessionTokens = Context.get(context, SessionTokens.Service);
+    const signIn = Context.get(context, SignIn.SignIn);
+    const sessionTokens = Context.get(context, SessionTokens.SessionTokens);
     /** The code in the last email this host sent to the address. */
     const lastCode = (email: Accounts.Email) => {
       const text = Redacted.value(sent.findLast((message) => message.to === email)!.text);

@@ -1,9 +1,9 @@
 import { Context, Effect, Schema } from "effect";
-import { Agent } from "../agent/agent.ts";
+import * as Agent from "../agent/agent.ts";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
-import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
+import type * as Store from "../journal/store.ts";
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("SessionStateStore.Failure", {
   operation: Schema.String,
@@ -39,25 +39,24 @@ export interface Saved extends Schema.Schema.Type<typeof Saved> {}
  * so a reply and the session it came from are stored together or not at all. A participation that
  * ended keeps its session, and taking part again starts another.
  *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  /** The participation's session as its last turn left it, or none before its first ended. */
-  readonly get: (
-    participationId: ThreadParticipationId.Id,
-  ) => Effect.Effect<Option.Option<Saved>, Failure>;
-  /** Store the participation's session, in place of any it had. */
-  readonly set: (
-    participationId: ThreadParticipationId.Id,
-    saved: Saved,
-  ) => Effect.Effect<void, Failure, Store.Transaction>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/turn/session-state-store/Service",
-) {}
+export class SessionStateStore extends Context.Service<
+  SessionStateStore,
+  {
+    /** The participation's session as its last turn left it, or none before its first ended. */
+    readonly get: (
+      participationId: ThreadParticipationId.Id,
+    ) => Effect.Effect<Option.Option<Saved>, Failure>;
+    /** Store the participation's session, in place of any it had. */
+    readonly set: (
+      participationId: ThreadParticipationId.Id,
+      saved: Saved,
+    ) => Effect.Effect<void, Failure, Store.Transaction>;
+  }
+>()("@amends-dev/core/turn/session-state-store/Service") {}
 
 /**
  * The store over a driver: each input is checked against its schema before the driver sees it.
@@ -65,7 +64,7 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (driver: Interface): Interface => {
+export const make = (driver: SessionStateStore["Service"]): SessionStateStore["Service"] => {
   const read = StoreInput.read(Failure);
   return {
     get: (participationId) =>
@@ -78,5 +77,3 @@ export const make = (driver: Interface): Interface => {
     }),
   };
 };
-
-export * as SessionStateStore from "./session-state-store.ts";

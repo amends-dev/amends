@@ -25,12 +25,12 @@ import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 import { ThreadService } from "@amends-dev/core/thread";
 import { Gateway } from "@amends-dev/gateway";
 import { Context, Effect, Option } from "effect";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
   otherWorkspaceId,
   runHost,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -56,49 +56,49 @@ describe("group reads", () => {
           : { _tag: "Human", id: Identity.HumanId.make(memberId) },
     });
   const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Value) =>
-    effect.pipe(Effect.provideService(Actor.Service, actor));
+    effect.pipe(Effect.provideService(Actor.Actor, actor));
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
     asActor(effect, actor).pipe(Effect.provide(core(bound)));
   const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
   const get = (id: Group.Id) =>
-    Effect.flatMap(GroupService.Service, (groupService) => groupService.get(id));
+    Effect.flatMap(GroupService.GroupService, (groupService) => groupService.get(id));
   const rename = (id: Group.Id, name: string, expectedName: string) =>
-    Effect.flatMap(GroupService.Service, (groupService) =>
+    Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.rename({ groupId: id, name, expectedName }),
     );
-  const publicGroups = Effect.flatMap(GroupService.Service, (groupService) =>
+  const publicGroups = Effect.flatMap(GroupService.GroupService, (groupService) =>
     groupService.listPublic({ limit: 100 }),
   );
   /** The actor's readable groups as records; activity and following have their own tests. */
-  const mine = Effect.flatMap(GroupService.Service, (groupService) =>
+  const mine = Effect.flatMap(GroupService.GroupService, (groupService) =>
     Effect.map(groupService.listMine({ limit: 100 }), (items) => items.map((item) => item.group)),
   );
   const roster = (id: Group.Id) =>
-    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+    Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.listCurrent(id, { limit: 100 }),
     );
   const join = (id: Group.Id) =>
-    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+    Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.join(id),
     );
   const removeMember = (groupId: Group.Id, membershipId: GroupMembership.Id) =>
-    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+    Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.remove({ groupId, membershipId }),
     );
   const create = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
-    Effect.flatMap(GroupService.Service, (groupService) =>
+    Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name, memberIds }),
     );
   const add = (groupId: Group.Id, memberId: Member.Id) =>
-    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+    Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.add({ groupId, memberId }),
     );
   const leave = (membership: GroupMembership.Record) =>
-    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+    Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.leave({
         groupId: membership.groupId,
         membershipId: membership.id,
@@ -108,7 +108,7 @@ describe("group reads", () => {
   const seed = (bound: Bound) =>
     publish(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.gen(function* () {
             for (const memberId of [readerId, otherId, agentId])
@@ -130,7 +130,7 @@ describe("group reads", () => {
   ) =>
     publish(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
           assignmentId: Assignment.Id.make(
@@ -185,7 +185,7 @@ describe("group reads", () => {
             const { bound, owner, reader, first, second, hidden } = yield* prepare();
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
                   assignmentId: Assignment.Id.make("viewer"),
@@ -330,10 +330,10 @@ describe("group reads", () => {
         runHost(
           storage,
           Effect.gen(function* () {
-            expectTypeOf<Extract<Core.Operations, GroupQuery.Service>>().toEqualTypeOf<never>();
+            expectTypeOf<Extract<Core.Operations, GroupQuery.GroupQuery>>().toEqualTypeOf<never>();
             expectTypeOf<
-              Effect.Services<ReturnType<GroupQuery.Interface["requireAudience"]>>
-            >().toEqualTypeOf<Actor.Service>();
+              Effect.Services<ReturnType<GroupQuery.GroupQuery["Service"]["requireAudience"]>>
+            >().toEqualTypeOf<Actor.Actor>();
             const { bound, reader, owner, first, hidden } = yield* prepare();
             yield* run(
               bound,
@@ -363,7 +363,7 @@ describe("group reads", () => {
         runGateway(
           storage,
           Effect.gen(function* () {
-            const gateway = yield* Gateway.Service;
+            const gateway = yield* Gateway.Gateway;
             const workspace = yield* gateway.createWorkspace(Identity.HumanId.make("owner"), {
               name: "Workspace",
               memberName: "owner",
@@ -421,7 +421,7 @@ describe("group reads", () => {
             const roleId = Role.Id.make("group-reader");
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
                   Effect.gen(function* () {
                     yield* journal.publish(RoleFacts.Created, {
@@ -444,11 +444,11 @@ describe("group reads", () => {
               bound,
               reader,
               Effect.gen(function* () {
-                const groupService = yield* GroupService.Service;
-                const groupMembershipService = yield* GroupMembershipService.Service;
-                const memberService = yield* MemberService.Service;
+                const groupService = yield* GroupService.GroupService;
+                const groupMembershipService = yield* GroupMembershipService.GroupMembershipService;
+                const memberService = yield* MemberService.MemberService;
                 const groupQuery = yield* GroupQuery.make();
-                const journal = yield* Journal.Service;
+                const journal = yield* Journal.Journal;
                 const original = yield* groupQuery.requireAudience(first.id);
                 expect(yield* groupService.get(first.id)).toEqual(first);
                 yield* groupMembershipService.leave({
@@ -504,7 +504,7 @@ describe("group reads", () => {
                     | GroupService.ReadError
                     | GroupMembershipService.ReadError
                     | GroupQuery.AudienceError,
-                    Actor.Service
+                    Actor.Actor
                   >
                 > = [
                   groupService.listMine({ limit: 100 }),
@@ -537,11 +537,11 @@ describe("group reads", () => {
             const readsOnly = {
               ...bound,
               context: bound.context.pipe(
-                Context.add(Store.Service, {
+                Context.add(Store.Store, {
                   ...bound.store,
                   transaction: () => Effect.die("Read opened a transaction"),
                 }),
-                Context.add(Checkpoint.Service, {
+                Context.add(Checkpoint.Checkpoint, {
                   ...bound.checkpoints,
                   set: () => Effect.die("Read advanced a checkpoint"),
                 }),
@@ -552,14 +552,18 @@ describe("group reads", () => {
               reader,
               Effect.gen(function* () {
                 expectTypeOf<
-                  Effect.Services<ReturnType<GroupService.Interface["get"]>>
-                >().toEqualTypeOf<Actor.Service>();
+                  Effect.Services<ReturnType<GroupService.GroupService["Service"]["get"]>>
+                >().toEqualTypeOf<Actor.Actor>();
                 expectTypeOf<
-                  Effect.Services<ReturnType<GroupService.Interface["listMine"]>>
-                >().toEqualTypeOf<Actor.Service>();
+                  Effect.Services<ReturnType<GroupService.GroupService["Service"]["listMine"]>>
+                >().toEqualTypeOf<Actor.Actor>();
                 expectTypeOf<
-                  Effect.Services<ReturnType<GroupMembershipService.Interface["listCurrent"]>>
-                >().toEqualTypeOf<Actor.Service>();
+                  Effect.Services<
+                    ReturnType<
+                      GroupMembershipService.GroupMembershipService["Service"]["listCurrent"]
+                    >
+                  >
+                >().toEqualTypeOf<Actor.Actor>();
                 yield* get(first.id);
                 yield* mine;
                 yield* roster(first.id);
@@ -591,7 +595,7 @@ describe("group reads", () => {
                 run(
                   bound,
                   reader,
-                  Effect.flatMap(Journal.Service, (journal) =>
+                  Effect.flatMap(Journal.Journal, (journal) =>
                     journal.commit(
                       Effect.gen(function* () {
                         yield* leave(old);
@@ -655,7 +659,7 @@ describe("group reads", () => {
             // Replay/storage may contain an admission whose member was independently removed.
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(MemberFacts.Removed, { workspaceId, memberId: agentId }),
               ),
             );
@@ -685,7 +689,7 @@ describe("group reads", () => {
             run(
               bound,
               actor,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 Effect.map(groupService.listMine({ limit: 100 }), (items) =>
                   Object.fromEntries(
                     items.map((item) => [
@@ -707,7 +711,7 @@ describe("group reads", () => {
           const renamable = run(
             bound,
             reader,
-            Effect.flatMap(GroupService.Service, (groupService) =>
+            Effect.flatMap(GroupService.GroupService, (groupService) =>
               Effect.map(groupService.listMine({ limit: 100 }), (items) =>
                 items.map((item) => item.renamable),
               ),
@@ -720,7 +724,7 @@ describe("group reads", () => {
           yield* run(
             bound,
             owner,
-            Effect.flatMap(ThreadService.Service, (threadService) =>
+            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
               threadService.startDirect({
                 memberIds: [readerId],
                 text: "Hello",
@@ -731,7 +735,7 @@ describe("group reads", () => {
           const listed = yield* run(
             bound,
             owner,
-            Effect.flatMap(GroupService.Service, (groupService) =>
+            Effect.flatMap(GroupService.GroupService, (groupService) =>
               groupService.listMine({ limit: 100 }),
             ),
           );
@@ -756,12 +760,12 @@ describe("group reads", () => {
             bound,
             reader,
             Effect.gen(function* () {
-              const groupService = yield* GroupService.Service;
-              const groupMembershipService = yield* GroupMembershipService.Service;
+              const groupService = yield* GroupService.GroupService;
+              const groupMembershipService = yield* GroupMembershipService.GroupMembershipService;
               expect(yield* groupService.get(first.id)).toEqual(first);
               yield* publish(
                 bound,
-                Effect.flatMap(Journal.Service, (journal) =>
+                Effect.flatMap(Journal.Journal, (journal) =>
                   journal.publish(AssignmentFacts.Revoked, {
                     workspaceId,
                     assignmentId: Assignment.Id.make(
@@ -788,7 +792,7 @@ describe("group reads", () => {
                   | GroupService.ReadError
                   | GroupMembershipService.ReadError
                   | GroupQuery.AudienceError,
-                  Actor.Service
+                  Actor.Actor
                 >
               > = [
                 groupService.listMine({ limit: 100 }),
@@ -823,7 +827,7 @@ describe("group reads", () => {
           const before = yield* history(bound);
           const failed = {
             ...bound,
-            context: Context.add(bound.context, GroupStore.Service, {
+            context: Context.add(bound.context, GroupStore.GroupStore, {
               ...bound.groups,
               get: () =>
                 Effect.fail(new GroupStore.Failure({ operation: "get", cause: "failed storage" })),
@@ -858,7 +862,7 @@ describe("group reads", () => {
             run(
               bound,
               reader,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 Effect.map(groupService.listMine(options), (items) =>
                   items.map((item) => item.group.id),
                 ),
@@ -879,10 +883,12 @@ describe("group reads", () => {
             run(
               bound,
               reader,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                Effect.map(groupMembershipService.listCurrent(third.id, options), (items) =>
-                  items.map((item) => item.id),
-                ),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  Effect.map(groupMembershipService.listCurrent(third.id, options), (items) =>
+                    items.map((item) => item.id),
+                  ),
               ),
             );
           const admissionIds = admissions.map((admission) => admission.id);
@@ -894,7 +900,9 @@ describe("group reads", () => {
           yield* run(
             bound,
             owner,
-            Effect.flatMap(MemberService.Service, (memberService) => memberService.remove(otherId)),
+            Effect.flatMap(MemberService.MemberService, (memberService) =>
+              memberService.remove(otherId),
+            ),
           );
           expect(yield* rosterPage({ limit: 3 })).toEqual(
             admissions

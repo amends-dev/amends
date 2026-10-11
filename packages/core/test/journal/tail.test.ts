@@ -1,41 +1,41 @@
 import { Subject } from "@amends-dev/core/journal";
-import { Publication } from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Ref, Schema, Stream } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Codec } from "../../src/journal/codec.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Store } from "../../src/journal/store.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Codec from "../../src/journal/codec.ts";
+import * as Fact from "../../src/journal/fact.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Projection from "../../src/journal/projection.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
+import * as Transaction from "../../src/journal/transaction.ts";
 import { Counter, make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const logId = Log.Id.make("turn/one");
-const open = Effect.map(Log.Service, (log) => log.open({ id: logId, schema: Schema.String }));
+const open = Effect.map(Log.Log, (log) => log.open({ id: logId, schema: Schema.String }));
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
     A,
     E,
-    Publication.Service | Log.Service | Transaction.Service | Counter | Checkpoint.Service
+    Publication.Publication | Log.Log | Transaction.Transaction | Counter | Checkpoint.Checkpoint
   >,
 ) =>
   program.pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter),
   );
 const observeWait = (fixture: Fixture, ready: Deferred.Deferred<void>): Fixture => ({
   ...fixture,
-  store: Store.Service.of({
+  store: Store.Store.of({
     ...fixture.store,
     waitForAppend: (id, after) =>
       Deferred.succeed(ready, undefined).pipe(
@@ -80,7 +80,7 @@ it.effect("a commit between the empty read and wait registration is not lost", (
     let waits = 0;
     const raced: Fixture = {
       ...fixture,
-      store: Store.Service.of({
+      store: Store.Store.of({
         ...fixture.store,
         read: Effect.fn("TailTest.racedRead")(function* (id, options) {
           const batches = yield* fixture.store.read(id, options);
@@ -126,7 +126,7 @@ it.effect("short pages and a slow consumer preserve order without reading ahead"
     let reads = 0;
     const short: Fixture = {
       ...fixture,
-      store: Store.Service.of({
+      store: Store.Store.of({
         ...fixture.store,
         read: Effect.fn("TailTest.shortRead")(function* (id, options) {
           reads++;
@@ -284,7 +284,7 @@ it.effect("consumers wait independently and interruption releases the host wait"
     let active = 0;
     const watched: Fixture = {
       ...fixture,
-      store: Store.Service.of({
+      store: Store.Store.of({
         ...fixture.store,
         waitForAppend: (id, after) =>
           Effect.acquireUseRelease(
@@ -314,7 +314,7 @@ it.effect("consumers wait independently and interruption releases the host wait"
         yield* Deferred.await(ready);
         yield* Fiber.interrupt(first);
         expect(active).toBe(1);
-        const other = (yield* Log.Service).open({
+        const other = (yield* Log.Log).open({
           id: Log.Id.make("unrelated"),
           schema: Schema.String,
         });
@@ -339,7 +339,7 @@ it.effect("spurious wakeups re-read storage and failures terminate the tail unch
     let reads = 0;
     const broken: Fixture = {
       ...fixture,
-      store: Store.Service.of({
+      store: Store.Store.of({
         ...fixture.store,
         read: (id, options) =>
           Effect.sync(() => {
@@ -372,7 +372,7 @@ it.effect("tail consumption inside a transaction is rejected before reading or w
     let reads = 0;
     const watched: Fixture = {
       ...fixture,
-      store: Store.Service.of({
+      store: Store.Store.of({
         ...fixture.store,
         read: (id, options) =>
           Effect.sync(() => {
@@ -384,7 +384,7 @@ it.effect("tail consumption inside a transaction is rejected before reading or w
     yield* run(
       watched,
       Effect.gen(function* () {
-        const log = yield* Log.Service;
+        const log = yield* Log.Log;
         const watchedLog = yield* open;
         const tail = watchedLog.tail({ limit: 1 });
         const failure = yield* Effect.flip(

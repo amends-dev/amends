@@ -28,5 +28,3 @@ export type Value = typeof Value.Type;
 
 /** No reader: the fact stays internal. */
 export const internal: Value = [];
-
-export * as Audience from "./audience.ts";

@@ -1,8 +1,9 @@
 import { Checkpoint, Store } from "../journal/index.ts";
 import { Effect, Layer, Schema, Option } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, keyOf, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary, keyOf } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Checkpoint.Cursor));
 /** A log's live versions, stored together as one row. */
@@ -16,8 +17,8 @@ const idOf = (key: Checkpoint.Key) => keyOf(key.logId, key.name, key.version);
  * @category constructors
  */
 export const make = Effect.fn("Checkpoints.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: Checkpoint.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: Checkpoint.Checkpoint["Service"] = {
     get: Effect.fn("Checkpoints.get")(
       function* (key) {
         return yield* rows.get((yield* read).records.of("checkpoints"), idOf(key));
@@ -54,10 +55,8 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
 });
 
 /**
- * Provide Checkpoint.Service using its constructor and the caller's dependencies.
+ * Provide Checkpoint.Checkpoint using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(Checkpoint.Service, make());
-
-export * as Checkpoints from "./checkpoints.ts";
+export const layer = Layer.effect(Checkpoint.Checkpoint, make());

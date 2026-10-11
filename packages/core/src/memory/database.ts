@@ -75,40 +75,39 @@ export interface Space {
   readonly sessionStates: Map<string, string>;
 }
 
-export interface Interface {
-  /** Committed state of each workspace that has any. */
-  readonly spaces: Map<Workspace.Id, Space>;
-  /**
-   * The host whose transaction is writing each workspace. Writers to one workspace take turns:
-   * a host's own writers wait for each other, and another host's writer reports contention.
-   */
-  readonly writers: Map<Workspace.Id, object>;
-  /**
-   * Each participation's session log by workspace and participation: its entries' JSON in position
-   * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
-   */
-  readonly sessionLogs: Map<string, ReadonlyArray<string>>;
-  /**
-   * Tables beside the workspaces' state, by name, each created on first use: what a host stores
-   * across its workspaces, such as its accounts, as JSON rows by ID.
-   */
-  readonly tables: Map<string, Table>;
-  /**
-   * Locks by key across every host, each created on first use: a log's writer lock, held by a
-   * transaction until it ends, and whatever else changes one at a time.
-   */
-  readonly locks: Map<string, Semaphore.Semaphore>;
-  /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
-  appended: Deferred.Deferred<void>;
-  /** Every workspace's signals, across every host; signals themselves are never kept. */
-  readonly signals: SignalHub.Local;
-  /** Issue an identifier unique within this storage, for commits and entries. */
-  readonly nextId: (prefix: string) => string;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/memory/MemoryDatabase",
-) {}
+export class MemoryDatabase extends Context.Service<
+  MemoryDatabase,
+  {
+    /** Committed state of each workspace that has any. */
+    readonly spaces: Map<Workspace.Id, Space>;
+    /**
+     * The host whose transaction is writing each workspace. Writers to one workspace take turns:
+     * a host's own writers wait for each other, and another host's writer reports contention.
+     */
+    readonly writers: Map<Workspace.Id, object>;
+    /**
+     * Each participation's session log by workspace and participation: its entries' JSON in position
+     * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
+     */
+    readonly sessionLogs: Map<string, ReadonlyArray<string>>;
+    /**
+     * Tables beside the workspaces' state, by name, each created on first use: what a host stores
+     * across its workspaces, such as its accounts, as JSON rows by ID.
+     */
+    readonly tables: Map<string, Table>;
+    /**
+     * Locks by key across every host, each created on first use: a log's writer lock, held by a
+     * transaction until it ends, and whatever else changes one at a time.
+     */
+    readonly locks: Map<string, Semaphore.Semaphore>;
+    /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
+    appended: Deferred.Deferred<void>;
+    /** Every workspace's signals, across every host; signals themselves are never kept. */
+    readonly signals: SignalHub.Local;
+    /** Issue an identifier unique within this storage, for commits and entries. */
+    readonly nextId: (prefix: string) => string;
+  }
+>()("@amends-dev/core/memory/MemoryDatabase") {}
 
 /** A workspace with nothing stored. */
 export const empty = (): Space => ({
@@ -137,11 +136,11 @@ export const copy = (space: Space): Space => ({
 });
 
 /** Committed state of one workspace, without creating any. */
-export const committed = (database: Interface, workspaceId: Workspace.Id): Space =>
+export const committed = (database: MemoryDatabase["Service"], workspaceId: Workspace.Id): Space =>
   database.spaces.get(workspaceId) ?? empty();
 
 /** Committed state of one workspace, created on first write. */
-export const writable = (database: Interface, workspaceId: Workspace.Id): Space => {
+export const writable = (database: MemoryDatabase["Service"], workspaceId: Workspace.Id): Space => {
   const existing = database.spaces.get(workspaceId);
   if (existing !== undefined) return existing;
   const created = empty();
@@ -150,7 +149,7 @@ export const writable = (database: Interface, workspaceId: Workspace.Id): Space 
 };
 
 /** A table beside the workspaces' state, created on first use. */
-export const table = (database: Interface, name: string): Table => {
+export const table = (database: MemoryDatabase["Service"], name: string): Table => {
   const existing = database.tables.get(name);
   if (existing !== undefined) return existing;
   const created: Table = new Map();
@@ -159,7 +158,7 @@ export const table = (database: Interface, name: string): Table => {
 };
 
 /** A lock by key across every host, created on first use. */
-export const lock = (database: Interface, key: string): Semaphore.Semaphore => {
+export const lock = (database: MemoryDatabase["Service"], key: string): Semaphore.Semaphore => {
   const existing = database.locks.get(key);
   if (existing !== undefined) return existing;
   const created = Semaphore.makeUnsafe(1);
@@ -194,7 +193,7 @@ export interface Written {
  * state keeps the later value of each key, or the earlier first time for Seen.
  */
 export const commit = (
-  database: Interface,
+  database: MemoryDatabase["Service"],
   workspaceId: Workspace.Id,
   staged: Space,
   written: Written,
@@ -223,11 +222,14 @@ export const commit = (
 };
 
 /** A log's writer lock, created on first use. */
-export const logLock = (database: Interface, workspaceId: Workspace.Id, logId: string) =>
-  lock(database, JSON.stringify(["log", workspaceId, logId]));
+export const logLock = (
+  database: MemoryDatabase["Service"],
+  workspaceId: Workspace.Id,
+  logId: string,
+) => lock(database, JSON.stringify(["log", workspaceId, logId]));
 
 /** Wake every reader waiting for an append. */
-export const wakeAppendReaders = (database: Interface) => {
+export const wakeAppendReaders = (database: MemoryDatabase["Service"]) => {
   const previous = database.appended;
   database.appended = Deferred.makeUnsafe<void>();
   Deferred.doneUnsafe(previous, Effect.void);
@@ -240,7 +242,7 @@ export const wakeAppendReaders = (database: Interface) => {
  */
 export const make = Effect.fn("MemoryDatabase.make")(function* () {
   let issued = 0;
-  return Service.of({
+  return MemoryDatabase.of({
     spaces: new Map(),
     writers: new Map(),
     sessionLogs: new Map(),
@@ -257,6 +259,4 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
-
-export * as MemoryDatabase from "./database.ts";
+export const layer = Layer.effect(MemoryDatabase, make());

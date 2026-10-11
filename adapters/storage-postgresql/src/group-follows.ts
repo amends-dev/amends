@@ -1,7 +1,7 @@
 import { GroupFollow, GroupFollowStore } from "@amends-dev/core/group";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { groupFollows } from "./schema.ts";
@@ -18,10 +18,10 @@ const decode = Schema.decodeUnknownEffect(
 
 /** Group follows, active and ended; one active follow per group admission. @category constructors */
 export const make = Effect.fn("GroupFollows.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(groupFollows.workspaceId, workspaceId);
-  const driver: GroupFollowStore.Interface = {
+  const driver: GroupFollowStore.GroupFollowStore["Service"] = {
     get: Effect.fn("GroupFollows.get")(
       function* (id) {
         return yield* guard(
@@ -125,6 +125,4 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
 });
 
 /** Provide group follow storage over the caller's binding. @category layers */
-export const layer = Layer.effect(GroupFollowStore.Service, make());
-
-export * as GroupFollows from "./group-follows.ts";
+export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make());

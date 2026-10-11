@@ -18,7 +18,7 @@ import {
   Schedule,
   Scope,
 } from "effect";
-import { WorkspaceStorage } from "./storage.ts";
+import * as WorkspaceStorage from "./storage.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
 export type Services = Layer.Success<typeof Core.layer> | Core.HostServices;
@@ -62,9 +62,9 @@ export interface Interface {
  * @category constructors
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
-  const workspaceStorage = yield* WorkspaceStorage.Service;
-  const turnJobs = yield* TurnJobs.Service;
-  const deliveryJobs = yield* DeliveryJobs.Service;
+  const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage;
+  const turnJobs = yield* TurnJobs.TurnJobs;
+  const deliveryJobs = yield* DeliveryJobs.DeliveryJobs;
   const crypto = yield* Crypto.Crypto;
   const hostContext = yield* Effect.context<never>();
   const integrations = yield* Integrations.make(options.integrations ?? []);
@@ -78,15 +78,15 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
         Layer.mergeAll(
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
-          Layer.succeed(TurnJobs.Service, turnJobs),
-          Layer.succeed(DeliveryJobs.Service, deliveryJobs),
+          Layer.succeed(TurnJobs.TurnJobs, turnJobs),
+          Layer.succeed(DeliveryJobs.DeliveryJobs, deliveryJobs),
           Layer.succeed(Integrations.Integrations, integrations),
         ),
       ),
       Layer.orDie,
     );
     const context = yield* Layer.build(services);
-    yield* Effect.orDie(Context.get(context, Journal.Service).replay);
+    yield* Effect.orDie(Context.get(context, Journal.Journal).replay);
     // Bring built-in roles recorded by older code to this host's bundles. Recorded roles still
     // serve if it cannot run now, such as while another host writes; it then tries again in the
     // background, backing off to once a minute, for as long as the workspace stays prepared.
@@ -140,5 +140,3 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
 
   return { lease, isPrepared, invalidate } satisfies Interface;
 });
-
-export * as WorkspaceRuntime from "./workspace-runtime.ts";

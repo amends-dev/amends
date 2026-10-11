@@ -8,12 +8,12 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
+import type * as Store from "../journal/store.ts";
 
-import { ThreadActivity } from "./ThreadActivity.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import * as ThreadActivity from "./ThreadActivity.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * One page of a thread's timeline, always in ascending sequence order. The range lies strictly
@@ -70,64 +70,59 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadActivityStor
 }) {}
 
 /**
- * What a storage adapter implements for activity.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  readonly get: (
-    id: ThreadActivity.Id,
-  ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
-  /**
-   * A thread's whole timeline in sequence order. A history read for inspection; operations read
-   * pages.
-   */
-  readonly listByThread: (
-    id: ThreadId.Id,
-  ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
-  /** Latest activity in this thread, using the caller's transaction when present. */
-  readonly latest: (
-    id: ThreadId.Id,
-  ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
-  /**
-   * The first activity of several threads in one read. Absent IDs are omitted and each thread
-   * appears once; order is unspecified.
-   */
-  readonly getFirst: (
-    ids: ReadonlyArray<ThreadId.Id>,
-  ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
-  /**
-   * At most limit activities of the requested range, from its requested end, in ascending
-   * sequence order. No shared snapshot across pages.
-   */
-  readonly readPage: (
-    id: ThreadId.Id,
-    options: ReadOptions,
-  ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
-  /**
-   * Reject reused IDs, a position other than the thread's next, and a
-   * second activity with one occurrence key. The subject is recorded as given, checked when the
-   * activity is recorded. Preserve historical values on replay.
-   */
-  readonly insert: (
-    record: ThreadActivity.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The activity store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for activity.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadActivityStore",
-) {}
+export class ThreadActivityStore extends Context.Service<
+  ThreadActivityStore,
+  {
+    readonly get: (
+      id: ThreadActivity.Id,
+    ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
+    /**
+     * A thread's whole timeline in sequence order. A history read for inspection; operations read
+     * pages.
+     */
+    readonly listByThread: (
+      id: ThreadId.Id,
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+    /** Latest activity in this thread, using the caller's transaction when present. */
+    readonly latest: (
+      id: ThreadId.Id,
+    ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;
+    /**
+     * The first activity of several threads in one read. Absent IDs are omitted and each thread
+     * appears once; order is unspecified.
+     */
+    readonly getFirst: (
+      ids: ReadonlyArray<ThreadId.Id>,
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+    /**
+     * At most limit activities of the requested range, from its requested end, in ascending
+     * sequence order. No shared snapshot across pages.
+     */
+    readonly readPage: (
+      id: ThreadId.Id,
+      options: ReadOptions,
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
+    /**
+     * Reject reused IDs, a position other than the thread's next, and a
+     * second activity with one occurrence key. The subject is recorded as given, checked when the
+     * activity is recorded. Preserve historical values on replay.
+     */
+    readonly insert: (
+      record: ThreadActivity.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/thread/ThreadActivityStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -136,7 +131,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: ThreadActivityStore["Service"],
+): ThreadActivityStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -156,5 +154,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       Effect.flatMap(write("insert", ThreadActivity.Record, record), driver.insert),
   };
 };
-
-export * as ThreadActivityStore from "./ThreadActivityStore.ts";

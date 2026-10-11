@@ -12,21 +12,18 @@ import type { Crypto, Effect } from "effect";
  */
 export type Bindings = Exclude<
   Core.HostServices,
-  Crypto.Crypto | Integrations.Integrations | TurnJobs.Service | DeliveryJobs.Service
+  Crypto.Crypto | Integrations.Integrations | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs
 >;
 
-export interface Interface {
-  /**
-   * Bind isolated storage views for one workspace, and its signal hub. Binding creates no
-   * workspace, membership, or connection. Every view interprets IDs within that workspace, and
-   * views for different workspaces must never observe each other's rows or signals. The hub
-   * reaches every process over the same storage.
-   */
-  readonly forWorkspace: (workspaceId: Workspace.Id) => Effect.Effect<Context.Context<Bindings>>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/gateway/storage/Service",
-) {}
-
-export * as WorkspaceStorage from "./storage.ts";
+export class WorkspaceStorage extends Context.Service<
+  WorkspaceStorage,
+  {
+    /**
+     * Bind isolated storage views for one workspace, and its signal hub. Binding creates no
+     * workspace, membership, or connection. Every view interprets IDs within that workspace, and
+     * views for different workspaces must never observe each other's rows or signals. The hub
+     * reaches every process over the same storage.
+     */
+    readonly forWorkspace: (workspaceId: Workspace.Id) => Effect.Effect<Context.Context<Bindings>>;
+  }
+>()("@amends-dev/gateway/storage/Service") {}

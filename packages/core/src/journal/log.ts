@@ -1,9 +1,9 @@
 import { Array, Context, Effect, Layer, Option, Schema, Stream } from "effect";
-import { Codec } from "./codec.ts";
-import { Commit } from "./commit.ts";
-import { Entry as StoredEntry } from "./entry.ts";
-import { Store } from "./store.ts";
-import { Transaction } from "./transaction.ts";
+import * as Codec from "./codec.ts";
+import * as Commit from "./commit.ts";
+import * as StoredEntry from "./entry.ts";
+import * as Store from "./store.ts";
+import * as Transaction from "./transaction.ts";
 
 export const Id = StoredEntry.LogId;
 export type Id = StoredEntry.LogId;
@@ -95,18 +95,18 @@ export type Reader<S extends Schema.Constraint> = Pick<
   "id" | "schema" | "get" | "getEntry" | "getAppend" | "read" | "head" | "stream" | "tail"
 >;
 
-export interface Interface {
-  /** Opens a typed handle. Empty logs are created lazily by their first append. */
-  readonly open: <S extends Schema.Constraint>(options: {
-    readonly id: Id;
-    readonly schema: S;
-    readonly storageCodec?: Codec.EntryCodec<S>;
-  }) => Handle<S>;
-  readonly commit: Transaction.Interface["run"];
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/journal/log/Service",
-) {}
+export class Log extends Context.Service<
+  Log,
+  {
+    /** Opens a typed handle. Empty logs are created lazily by their first append. */
+    readonly open: <S extends Schema.Constraint>(options: {
+      readonly id: Id;
+      readonly schema: S;
+      readonly storageCodec?: Codec.EntryCodec<S>;
+    }) => Handle<S>;
+    readonly commit: Transaction.Transaction["Service"]["run"];
+  }
+>()("@amends-dev/core/journal/log/Service") {}
 
 const batchSchema = Schema.toType(Store.Batch).check(
   Schema.makeFilter(({ logId, position, commit, entries }) => {
@@ -140,12 +140,12 @@ const validateCommitId = Schema.decodeEffect(Commit.Id);
  * @category constructors
  */
 export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
-  Interface,
+  Log["Service"],
   never,
-  Store.Service | Transaction.Service
+  Store.Store | Transaction.Transaction
 > {
-  const store = yield* Store.Service;
-  const transaction = yield* Transaction.Service;
+  const store = yield* Store.Store;
+  const transaction = yield* Transaction.Transaction;
 
   const open = <S extends Schema.Constraint>({
     id,
@@ -432,7 +432,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
     };
   };
 
-  return Service.of({ open, commit: transaction.run });
+  return Log.of({ open, commit: transaction.run });
 });
 
 /**
@@ -440,6 +440,4 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make()).pipe(Layer.provideMerge(Transaction.layer));
-
-export * as Log from "./log.ts";
+export const layer = Layer.effect(Log, make()).pipe(Layer.provideMerge(Transaction.layer));

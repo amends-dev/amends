@@ -1,7 +1,7 @@
-import { Audience } from "../journal/audience.ts";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Agent } from "./agent.ts";
+import * as Audience from "../journal/audience.ts";
+import * as Fact from "../journal/fact.ts";
+import * as Subject from "../journal/subject.ts";
+import * as Agent from "./agent.ts";
 
 /** Agents are workspace configuration: every member may learn of changes to them. */
 const workspace = () => [Audience.workspace];
@@ -22,5 +22,3 @@ export const Configured = Fact.make("agent.configured", {
   subject: (payload) => Subject.make("agent", payload.agentId),
   payload: Agent.Configured,
 });
-
-export * as AgentFacts from "./facts.ts";

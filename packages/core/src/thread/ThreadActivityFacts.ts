@@ -6,11 +6,11 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { GroupId } from "../group/id.ts";
-import { ThreadActivity } from "./ThreadActivity.ts";
+import * as Fact from "../journal/fact.ts";
+import * as Subject from "../journal/subject.ts";
+import * as Group from "../group/group.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadActivity from "./ThreadActivity.ts";
 
 /**
  * An activity was recorded at its position in a thread, with the recipients it selected, each
@@ -37,5 +37,3 @@ export const Recorded = Fact.make("thread.activity.recorded", {
     ),
   }),
 });
-
-export * as ThreadActivityFacts from "./ThreadActivityFacts.ts";

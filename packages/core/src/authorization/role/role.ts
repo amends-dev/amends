@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Workspace } from "../../workspace/workspace.ts";
-import { Permission } from "../permission.ts";
+import * as Workspace from "../../workspace/workspace.ts";
+import * as Permission from "../permission.ts";
 
 /** Stable identity retained when the role's display name or permissions change. */
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceRoleId"));
@@ -18,5 +18,3 @@ export const Record = Schema.Struct({
   permissions: Schema.UniqueArray(Permission.Name),
 });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
-
-export * as Role from "./role.ts";

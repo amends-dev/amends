@@ -3,7 +3,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
-import { ApiErrors } from "./errors.ts";
+import * as ApiErrors from "./errors.ts";
 
 const record = Notification.Record.annotate({ identifier: "Notification" });
 

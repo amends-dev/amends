@@ -1,15 +1,15 @@
 import { Agent, AgentStore } from "../agent/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
-import type { MemoryDatabase } from "./database.ts";
+import * as Binding from "./binding.ts";
+import type * as MemoryDatabase from "./database.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Agent.Record));
 
 /** Agent records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Agents.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   /** Fails when another agent than `record` has its membership, as PostgreSQL's unique index does. */
   const requireOwnMembership = (
     operation: string,
@@ -26,7 +26,7 @@ export const make = Effect.fn("Agents.make")(function* () {
           message: "Another agent has this membership",
         });
     });
-  const driver: AgentStore.Interface = {
+  const driver: AgentStore.AgentStore["Service"] = {
     get: Effect.fn("Agents.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("agents"), id);
@@ -70,6 +70,4 @@ export const make = Effect.fn("Agents.make")(function* () {
 });
 
 /** Provide agent storage over the caller's binding. @category layers */
-export const layer = Layer.effect(AgentStore.Service, make());
-
-export * as Agents from "./agents.ts";
+export const layer = Layer.effect(AgentStore.AgentStore, make());

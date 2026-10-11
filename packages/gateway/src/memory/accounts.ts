@@ -1,7 +1,7 @@
 import { Identity } from "@amends-dev/core/identity";
 import { MemoryDatabase } from "@amends-dev/core/memory";
 import { Crypto, Effect, Layer } from "effect";
-import { Accounts } from "../accounts.ts";
+import * as Accounts from "../accounts.ts";
 
 /**
  * The host's accounts, in a table beside every workspace's state: each one's address by its human
@@ -10,13 +10,13 @@ import { Accounts } from "../accounts.ts";
  * @category constructors
  */
 export const make = Effect.fn("MemoryAccounts.make")(function* () {
-  const accounts = MemoryDatabase.table(yield* MemoryDatabase.Service, "accounts");
+  const accounts = MemoryDatabase.table(yield* MemoryDatabase.MemoryDatabase, "accounts");
   const crypto = yield* Crypto.Crypto;
   const accountOf = (id: string, email: string): Accounts.Account => ({
     id: Identity.HumanId.make(id),
     email: Accounts.Email.make(email),
   });
-  return Accounts.Service.of({
+  return Accounts.Accounts.of({
     findOrCreate: Effect.fn("MemoryAccounts.findOrCreate")(function* (email) {
       const issued = yield* crypto.randomUUIDv4;
       return yield* Effect.sync(() => {
@@ -36,10 +36,8 @@ export const make = Effect.fn("MemoryAccounts.make")(function* () {
 });
 
 /**
- * Provide Accounts.Service using its constructor and the caller's dependencies.
+ * Provide Accounts.Accounts using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(Accounts.Service, make());
-
-export * as MemoryAccounts from "./accounts.ts";
+export const layer = Layer.effect(Accounts.Accounts, make());

@@ -1,15 +1,15 @@
 import { Effect, Option } from "effect";
-import { Projection } from "../journal/projection.ts";
-import { TurnFacts } from "./facts.ts";
-import { TurnStore } from "./store.ts";
-import { Turn } from "./turn.ts";
+import * as Projection from "../journal/projection.ts";
+import * as TurnFacts from "./facts.ts";
+import * as TurnStore from "./store.ts";
+import * as Turn from "./turn.ts";
 
 /** Change the stored turn a fact names, as `changes` says of it as it stands. */
 const update = Effect.fnUntraced(function* (
   turnId: Turn.Id,
   changes: (turn: Turn.Record) => Partial<Turn.Record>,
 ) {
-  const turnStore = yield* TurnStore.Service;
+  const turnStore = yield* TurnStore.TurnStore;
   const found = yield* turnStore.get(turnId);
   if (Option.isNone(found)) return yield* Effect.die("A changed turn is missing");
   yield* turnStore.update(Turn.change(found.value, changes(found.value)));
@@ -19,7 +19,7 @@ export const definition = Projection.make("turns", { version: 4 })
   .on(
     TurnFacts.Created,
     Effect.fn("TurnProjection.created")(function* ({ payload }) {
-      const turnStore = yield* TurnStore.Service;
+      const turnStore = yield* TurnStore.TurnStore;
       const { notificationIds: _, ...record } = payload;
       yield* turnStore.insert(record);
     }),
@@ -27,7 +27,7 @@ export const definition = Projection.make("turns", { version: 4 })
   .on(
     TurnFacts.Retried,
     Effect.fn("TurnProjection.retried")(function* ({ payload }) {
-      const turnStore = yield* TurnStore.Service;
+      const turnStore = yield* TurnStore.TurnStore;
       yield* turnStore.insert(payload);
     }),
   )
@@ -77,5 +77,3 @@ export const definition = Projection.make("turns", { version: 4 })
       }));
     }),
   );
-
-export * as TurnProjection from "./projection.ts";

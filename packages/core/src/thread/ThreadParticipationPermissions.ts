@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Permission } from "../authorization/permission.ts";
+import * as Permission from "../authorization/permission.ts";
 
 /**
  * Follow a thread: take part in it, and be notified of what it addresses to everyone.
@@ -16,5 +16,3 @@ export const Follow = Permission.make("thread.follow", {
   targetKind: "Thread",
   builtinTier: "member",
 });
-
-export * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";

@@ -1,16 +1,16 @@
 import { Subject } from "@amends-dev/core/journal";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Schema } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Event } from "../../src/journal/event.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Event from "../../src/journal/event.ts";
+import * as Fact from "../../src/journal/fact.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Projection from "../../src/journal/projection.ts";
+import * as Publication from "../../src/journal/publication.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as Transaction from "../../src/journal/transaction.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
 import { Counter, make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
@@ -32,27 +32,27 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    | Log.Service
-    | Transaction.Service
-    | Journal.Service
+    | Log.Log
+    | Transaction.Transaction
+    | Journal.Journal
     | Counter
-    | Checkpoint.Service
-    | Publication.Service
+    | Checkpoint.Checkpoint
+    | Publication.Publication
   >,
 ) =>
   Effect.gen(function* () {
     const journal = yield* setup;
-    return yield* program.pipe(Effect.provideService(Journal.Service, journal));
+    return yield* program.pipe(Effect.provideService(Journal.Journal, journal));
   }).pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter),
     Effect.scoped,
   );
 /** How many entries each committed batch holds, in log order. */
-const committed = Effect.flatMap(Journal.Service, (journal) =>
+const committed = Effect.flatMap(Journal.Journal, (journal) =>
   Effect.map(journal.log.read({ limit: 10 }), (batches) =>
     batches.map((batch) => batch.entries.length),
   ),
@@ -65,7 +65,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const journal = yield* Journal.Service;
+          const journal = yield* Journal.Journal;
           const first = yield* journal.publish(Changed, 2, {
             idempotencyKey: key,
             expectedAfter: Option.none(),
@@ -78,7 +78,7 @@ it.effect(
                 .pipe(
                   Publication.withOccurredAt(DateTime.makeUnsafe("2030-01-01T00:00:00Z")),
                   Effect.provideService(
-                    Publication.Service,
+                    Publication.Publication,
                     Object.assign({}, testProvenance(workspaceId), {
                       correlationId: Event.CorrelationId.make("another-operation"),
                     }),
@@ -105,7 +105,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const journal = yield* Journal.Service;
+          const journal = yield* Journal.Journal;
           yield* fixture.loseNextAcknowledgment;
           const failure = yield* Effect.flip(journal.publish(Changed, 7, { idempotencyKey: key }));
           if (!Schema.is(Store.CommitUncertain)(failure))
@@ -125,7 +125,7 @@ it.effect("retries in one commit publish and project only one keyed occurrence",
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const journal = yield* Journal.Service;
+        const journal = yield* Journal.Journal;
         const events = yield* journal.commit(
           Effect.all(
             Array.from({ length: 8 }, () => journal.publish(Changed, 2, { idempotencyKey: key })),
@@ -147,7 +147,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const journal = yield* Journal.Service;
+          const journal = yield* Journal.Journal;
           yield* journal.publish(Changed, 1, { idempotencyKey: key });
           const second = Log.IdempotencyKey.make("operation/two");
           const error = yield* Effect.flip(
@@ -193,7 +193,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const log = yield* Log.Service;
+          const log = yield* Log.Log;
           const executionLog = log.open({ id: Log.Id.make("execution"), schema: Schema.String });
           const first = yield* log.commit(
             Effect.gen(function* () {
@@ -271,7 +271,7 @@ it.effect(
       yield* run(
         broken,
         Effect.gen(function* () {
-          const log = (yield* Log.Service).open({
+          const log = (yield* Log.Log).open({
             id: Log.Id.make("guarded"),
             schema: Schema.String,
           });
@@ -290,7 +290,7 @@ it.effect(
       yield* run(
         unavailable,
         Effect.gen(function* () {
-          const log = (yield* Log.Service).open({
+          const log = (yield* Log.Log).open({
             id: Log.Id.make("guarded"),
             schema: Schema.String,
           });

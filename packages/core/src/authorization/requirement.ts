@@ -1,10 +1,10 @@
 import { Schema } from "effect";
-import { Permission } from "./permission.ts";
-import { Target } from "./target.ts";
+import * as Permission from "./permission.ts";
+import * as Target from "./target.ts";
 
 /**
  * A core-declared permission required on a concrete target. An operation's
- * requirements must all be satisfied; the acting member comes from Actor.Service.
+ * requirements must all be satisfied; the acting member comes from Actor.Actor.
  * Construction validates the pairing, not resource existence or authorization.
  */
 export const Value = Schema.Struct({
@@ -35,5 +35,3 @@ export const make = <K extends Target.Kind>(
     permission: { name: permission.name, targetKind: permission.targetKind },
     target,
   });
-
-export * as Requirement from "./requirement.ts";

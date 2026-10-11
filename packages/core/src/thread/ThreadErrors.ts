@@ -5,9 +5,9 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Group } from "../group/group.ts";
-import { Member } from "../workspace/member/member.ts";
-import { Thread } from "./Thread.ts";
+import * as Group from "../group/group.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as Thread from "./Thread.ts";
 
 /**
  * The thread's title is no longer the one the renamer expected: someone renamed it meanwhile.
@@ -74,5 +74,3 @@ export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavai
   "ThreadService.ParticipantUnavailable",
   { memberId: Member.Id },
 ) {}
-
-export * as ThreadErrors from "./ThreadErrors.ts";

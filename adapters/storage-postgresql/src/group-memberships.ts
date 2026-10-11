@@ -1,7 +1,7 @@
 import { Group, GroupMembership, GroupMembershipStore } from "@amends-dev/core/group";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { groupMemberships } from "./schema.ts";
@@ -16,10 +16,10 @@ const decodeSummaries = Schema.decodeUnknownEffect(Schema.Array(Group.Summary));
 
 /** Recorded group admissions; one active admission per group and workspace membership. @category constructors */
 export const make = Effect.fn("GroupMemberships.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(groupMemberships.workspaceId, workspaceId);
-  const driver: GroupMembershipStore.Interface = {
+  const driver: GroupMembershipStore.GroupMembershipStore["Service"] = {
     get: Effect.fn("GroupMemberships.get")(
       function* (id) {
         return yield* guard(
@@ -212,6 +212,4 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
 });
 
 /** Provide group admission storage over the caller's binding. @category layers */
-export const layer = Layer.effect(GroupMembershipStore.Service, make());
-
-export * as GroupMemberships from "./group-memberships.ts";
+export const layer = Layer.effect(GroupMembershipStore.GroupMembershipStore, make());

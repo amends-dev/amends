@@ -1,8 +1,9 @@
 import { Task, TaskStore } from "../task/index.ts";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Task.Record));
 
@@ -14,8 +15,8 @@ const newestFirst = (
 
 /** Tasks by thread, over one workspace's binding. @category constructors */
 export const make = Effect.fn("Tasks.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: TaskStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: TaskStore.TaskStore["Service"] = {
     get: Effect.fn("Tasks.get")(
       function* (threadId) {
         return yield* rows.get((yield* read).records.of("tasks"), threadId);
@@ -81,5 +82,4 @@ export const make = Effect.fn("Tasks.make")(function* () {
   return TaskStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(TaskStore.Service, make());
-export * as Tasks from "./tasks.ts";
+export const layer = Layer.effect(TaskStore.TaskStore, make());

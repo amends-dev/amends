@@ -6,18 +6,9 @@ import { Invitation, InvitationService, Member } from "@amends-dev/core/workspac
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Result } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
-import {
-  alice,
-  bob,
-  boundTo,
-  charlie,
-  future,
-  request,
-  runHost,
-  Support,
-  workspaceId,
-} from "./support.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
+import { alice, bob, boundTo, charlie, future, request, runHost, workspaceId } from "./support.ts";
 
 /** Invitation lifecycle: acceptance, revocation, competition, and stored settlement. */
 
@@ -98,7 +89,7 @@ describe("invitations", () => {
               Effect.gen(function* () {
                 const bound = yield* boundTo(saved.workspaceId);
                 yield* storage.discardProjections;
-                yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+                yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
                   Effect.provide(core(bound)),
                 );
                 expect(yield* bound.members.list).toEqual(saved.members);
@@ -115,11 +106,11 @@ describe("invitations", () => {
       withStorage((storage) =>
         Effect.gen(function* () {
           expectTypeOf<
-            Effect.Services<ReturnType<InvitationService.Interface["accept"]>>
+            Effect.Services<ReturnType<InvitationService.InvitationService["Service"]["accept"]>>
           >().toEqualTypeOf<never>();
           expectTypeOf<
-            Effect.Services<ReturnType<InvitationService.Interface["issue"]>>
-          >().toEqualTypeOf<Actor.Service>();
+            Effect.Services<ReturnType<InvitationService.InvitationService["Service"]["issue"]>>
+          >().toEqualTypeOf<Actor.Actor>();
           yield* Effect.scoped(
             runGateway(
               storage,

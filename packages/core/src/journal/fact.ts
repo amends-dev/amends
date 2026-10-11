@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
-import { Audience } from "./audience.ts";
-import { Occurrence } from "./occurrence.ts";
-import { Subject } from "./subject.ts";
+import * as Audience from "./audience.ts";
+import * as Occurrence from "./occurrence.ts";
+import * as Subject from "./subject.ts";
 
 /** A domain fact's contract, before the journal adds publication metadata. */
 export interface Definition<
@@ -88,5 +88,3 @@ export const makeAudience = Effect.fn("Fact.makeAudience")(function* <F extends 
   const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload);
   return yield* Schema.decodeEffect(Audience.Value)(fact.audience(validated));
 });
-
-export * as Fact from "./fact.ts";

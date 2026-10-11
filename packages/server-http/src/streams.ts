@@ -19,7 +19,7 @@ import {
 } from "effect";
 
 import { HttpBody, HttpEffect, HttpServerResponse } from "effect/http";
-import { Draining } from "./draining.ts";
+import * as Draining from "./draining.ts";
 
 const heartbeat = Stream.tick("5 seconds").pipe(
   Stream.map(() => ": keepalive\n\n"),
@@ -58,33 +58,32 @@ export const Limits = Context.Reference<{
   defaultValue: () => ({ perWorkspace: 1000, perMember: 20 }),
 });
 
-export interface Interface {
-  /** Hold a place for a stream within the limits, for as long as the scope lasts. */
-  readonly hold: (
-    workspaceId: Workspace.Id,
-    principal: Identity.MemberReference,
-  ) => Effect.Effect<void, ApiErrors.TooManyStreams, Scope.Scope>;
-  /**
-   * End a stream as the server starts shutting down, failing it with `unavailable` so its client
-   * reconnects, while a stream that ends on its own, as a turn's log does, just ends; and contain
-   * its failures: the SSE encoder sends a stream's whole failure cause,
-   * defects included, so an unexpected one is logged here and reaches the client as `unavailable`
-   * alone.
-   */
-  readonly serve: <A, E, R>(
-    stream: Stream.Stream<A, E, R>,
-    unavailable: () => E,
-  ) => Stream.Stream<A, E, R>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/server-http/streams/Service",
-) {}
+export class Streams extends Context.Service<
+  Streams,
+  {
+    /** Hold a place for a stream within the limits, for as long as the scope lasts. */
+    readonly hold: (
+      workspaceId: Workspace.Id,
+      principal: Identity.MemberReference,
+    ) => Effect.Effect<void, ApiErrors.TooManyStreams, Scope.Scope>;
+    /**
+     * End a stream as the server starts shutting down, failing it with `unavailable` so its client
+     * reconnects, while a stream that ends on its own, as a turn's log does, just ends; and contain
+     * its failures: the SSE encoder sends a stream's whole failure cause,
+     * defects included, so an unexpected one is logged here and reaches the client as `unavailable`
+     * alone.
+     */
+    readonly serve: <A, E, R>(
+      stream: Stream.Stream<A, E, R>,
+      unavailable: () => E,
+    ) => Stream.Stream<A, E, R>;
+  }
+>()("@amends-dev/server-http/streams/Service") {}
 
 /** @category constructors */
 export const make = Effect.gen(function* () {
   const limits = yield* Limits;
-  const draining = yield* Effect.serviceOption(Draining.Service);
+  const draining = yield* Effect.serviceOption(Draining.Draining);
   const workspaces = new Map<string, number>();
   const members = new Map<string, number>();
   const adjust = (counts: Map<string, number>, key: string, by: number) => {
@@ -92,7 +91,7 @@ export const make = Effect.gen(function* () {
     if (next === 0) counts.delete(key);
     else counts.set(key, next);
   };
-  const hold: Interface["hold"] = (workspaceId, principal) => {
+  const hold: Streams["Service"]["hold"] = (workspaceId, principal) => {
     const member = JSON.stringify([workspaceId, principal._tag, principal.id]);
     return Effect.acquireRelease(
       Effect.suspend(() => {
@@ -111,7 +110,7 @@ export const make = Effect.gen(function* () {
         }),
     );
   };
-  const serve: Interface["serve"] = (stream, unavailable) => {
+  const serve: Streams["Service"]["serve"] = (stream, unavailable) => {
     const contained = stream.pipe(
       Stream.catchCauseIf(Cause.hasDies, (cause) =>
         Stream.unwrap(
@@ -135,7 +134,7 @@ export const make = Effect.gen(function* () {
         ),
     });
   };
-  return Service.of({ hold, serve });
+  return Streams.of({ hold, serve });
 });
 
 /**
@@ -144,6 +143,4 @@ export const make = Effect.gen(function* () {
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make);
-
-export * as Streams from "./streams.ts";
+export const layer = Layer.effect(Streams, make);

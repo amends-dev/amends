@@ -36,7 +36,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         withDatabase((url) =>
           Effect.gen(function* () {
             const program = Effect.gen(function* () {
-              const postgresDatabase = yield* PostgresDatabase.Service;
+              const postgresDatabase = yield* PostgresDatabase.PostgresDatabase;
               expect(postgresDatabase.sql).toBe(yield* SqlClient.SqlClient);
               const bound = yield* (yield* views()).forWorkspace(workspaceId);
               const record = yield* initialized(bound);
@@ -46,7 +46,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const configured =
               construction === "make"
                 ? Effect.flatMap(PostgresDatabase.make(), (database) =>
-                    program.pipe(Effect.provideService(PostgresDatabase.Service, database)),
+                    program.pipe(
+                      Effect.provideService(PostgresDatabase.PostgresDatabase, database),
+                    ),
                   ).pipe(
                     Effect.provide(PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })),
                   )
@@ -73,7 +75,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           Array.range(1, 4),
           () =>
             Effect.flatMap(
-              PostgresDatabase.Service,
+              PostgresDatabase.PostgresDatabase,
               (postgresDatabase) => postgresDatabase.sql`SELECT 1`,
             ).pipe(Effect.provide(database(url)), Effect.exit),
           { concurrency: "unbounded" },
@@ -102,7 +104,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const bound = yield* (yield* views()).forWorkspace(workspaceId);
           yield* initialized(bound);
           const batches = yield* Effect.gen(function* () {
-            const journal = yield* Journal.Service;
+            const journal = yield* Journal.Journal;
             return yield* Effect.forEach(Array.range(1, 20), (batch) =>
               journal.commit(
                 Effect.forEach(Array.range(1, 10), (entry) =>
@@ -111,7 +113,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               ),
             );
           }).pipe(
-            Effect.provideService(Publication.Service, testProvenance()),
+            Effect.provideService(Publication.Publication, testProvenance()),
             Effect.provide(core(bound)),
           );
           const commitId = batches[10]![0]!.commitId;
@@ -160,7 +162,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           const memberIds = Array.makeBy(20, (index) => Member.Id.make(`member-${index}`));
           const threads = yield* Effect.gen(function* () {
-            const journal = yield* Journal.Service;
+            const journal = yield* Journal.Journal;
             yield* journal
               .commit(
                 Effect.forEach(memberIds, (memberId) =>
@@ -172,9 +174,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
                   }),
                 ),
               )
-              .pipe(Effect.provideService(Publication.Service, testProvenance()));
-            const groupService = yield* GroupService.Service;
-            const threadService = yield* ThreadService.Service;
+              .pipe(Effect.provideService(Publication.Publication, testProvenance()));
+            const groupService = yield* GroupService.GroupService;
+            const threadService = yield* ThreadService.ThreadService;
             return yield* Effect.forEach([memberIds.slice(0, 10), memberIds.slice(10)], (members) =>
               Effect.gen(function* () {
                 const group = yield* groupService.createTeam({
@@ -189,7 +191,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                   }),
                 );
               }),
-            ).pipe(Effect.map(Array.flatten), Effect.provideService(Actor.Service, owner));
+            ).pipe(Effect.map(Array.flatten), Effect.provideService(Actor.Actor, owner));
           }).pipe(Effect.provide(core(bound)));
           const thread = threads[0]!.thread;
           const [admission] = yield* bound.groupMemberships.listActiveByMember(memberIds[0]!);
@@ -201,7 +203,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             }),
             { limit: 2 },
           );
-          const facts = yield* Effect.flatMap(Journal.Service, (journal) =>
+          const facts = yield* Effect.flatMap(Journal.Journal, (journal) =>
             journal.read({ name: "thread.created", limit: 1 }),
           ).pipe(Effect.provide(core(bound)));
           const sql = yield* SqlClient.SqlClient;

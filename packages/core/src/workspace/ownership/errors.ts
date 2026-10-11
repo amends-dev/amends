@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Member } from "../member/member.ts";
-import { Workspace } from "../workspace.ts";
+import * as Member from "../member/member.ts";
+import * as Workspace from "../workspace.ts";
 
 /** The outcomes `OwnershipService` reports that a caller can act on; schemas only, for contracts. */
 export class Changed extends Schema.TaggedError<Changed>()("OwnershipService.Changed", {
@@ -20,5 +20,3 @@ export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
 export class NotOwner extends Schema.TaggedError<NotOwner>()("OwnershipService.NotOwner", {
   workspaceId: Workspace.Id,
 }) {}
-
-export * as OwnershipErrors from "./errors.ts";

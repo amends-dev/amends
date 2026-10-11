@@ -1,25 +1,24 @@
 import { Context, Effect, Option, PubSub, RcMap, Stream } from "effect";
 import type { Scope } from "effect";
-import type { WorkspaceId } from "../workspace/id.ts";
-import type { Signal } from "./signal.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
+import type * as Signal from "./signal.ts";
 
 /**
  * One workspace's signals, across every process sharing its storage. Storage binds it to the
  * workspace; it holds nothing durable and takes no part in the journal or its write order.
  */
-export interface Interface {
-  /**
-   * Offer a signal to the workspace's current subscribers, best effort: it never fails the caller,
-   * and a subscriber too slow to keep up, or disconnected, misses it.
-   */
-  readonly publish: (signal: Signal.Value) => Effect.Effect<void>;
-  /** The signals published after this registers, until the scope closes. */
-  readonly subscribe: Effect.Effect<Stream.Stream<Signal.Value>, never, Scope.Scope>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/signal/hub/Service",
-) {}
+export class SignalHub extends Context.Service<
+  SignalHub,
+  {
+    /**
+     * Offer a signal to the workspace's current subscribers, best effort: it never fails the caller,
+     * and a subscriber too slow to keep up, or disconnected, misses it.
+     */
+    readonly publish: (signal: Signal.Value) => Effect.Effect<void>;
+    /** The signals published after this registers, until the scope closes. */
+    readonly subscribe: Effect.Effect<Stream.Stream<Signal.Value>, never, Scope.Scope>;
+  }
+>()("@amends-dev/core/signal/hub/Service") {}
 
 /** Signals a subscriber may fall behind by before it misses the oldest. */
 const capacity = 256;
@@ -53,5 +52,3 @@ export const makeLocal = Effect.gen(function* () {
 });
 
 export type Local = Effect.Success<typeof makeLocal>;
-
-export * as SignalHub from "./hub.ts";

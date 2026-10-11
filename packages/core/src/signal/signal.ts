@@ -1,16 +1,16 @@
 import { Schema } from "effect";
-import { Requirement } from "../authorization/requirement.ts";
-import { Group } from "../group/group.ts";
-import { GroupId } from "../group/id.ts";
-import { Audience } from "../journal/audience.ts";
-import { Notification } from "../notification/notification.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
-import { TurnId } from "../turn/id.ts";
-import { Turn } from "../turn/turn.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { Member } from "../workspace/member/member.ts";
-import { MemberId } from "../workspace/member/id.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as Group from "../group/group.ts";
+import * as GroupId from "../group/id.ts";
+import * as Audience from "../journal/audience.ts";
+import * as Notification from "../notification/notification.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
+import * as TurnId from "../turn/id.ts";
+import * as Turn from "../turn/turn.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as MemberId from "../workspace/member/id.ts";
 
 /**
  * Something happening now, for the readers connected at the time. Signals are never stored:
@@ -106,5 +106,3 @@ export const changeFeedReachOf = (signal: Value): Reach | undefined =>
       requirement: undefined,
     }),
   });
-
-export * as Signal from "./signal.ts";

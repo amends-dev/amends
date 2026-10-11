@@ -184,8 +184,8 @@ configuration and starts nothing.
 | `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                             |
 | `index.ts`                         | Loads configuration, builds the host layer and the authentication `AMENDS_SIGN_IN` names, and launches through `BunRuntime.runMain`.                                                     |
 
-Development sign-in requires `Crypto.Crypto` and the host's `Accounts.Service`, and email sign-in
-also its `SignInStorage.Service`; development session tokens are built synchronously. None needs
+Development sign-in requires `Crypto.Crypto` and the host's `Accounts.Accounts`, and email sign-in
+also its `SignInStorage.SignInStorage`; development session tokens are built synchronously. None needs
 HTTP services or sends codes when built. Database and server resources belong to their layer
 scopes. The gateway boots each workspace on first use and keeps it prepared while requests or
 streams use it and for five idle minutes afterwards; see the

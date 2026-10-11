@@ -30,7 +30,8 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Redacted, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -39,28 +40,27 @@ import {
   goodKey,
   placedIn,
   request,
-  Support,
   takeTurnJobs,
 } from "./support.ts";
 
-const as = <A, E, R extends Core.Operations | Actor.Service>(
+const as = <A, E, R extends Core.Operations | Actor.Actor>(
   id: Workspace.Id,
   identity: Identity.MemberReference,
   program: Effect.Effect<A, E, R>,
-) => Effect.flatMap(Gateway.Service, (gateway) => gateway.asMember(id, identity, program));
+) => Effect.flatMap(Gateway.Gateway, (gateway) => gateway.asMember(id, identity, program));
 /** Run a step of turn execution in the workspace, as a turn's job does. */
 const execute = <A, E>(
   id: Workspace.Id,
-  step: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>,
+  step: (turnExecution: TurnExecution.TurnExecution["Service"]) => Effect.Effect<A, E>,
 ) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
-    Effect.scoped(gateway.inWorkspace(id, Effect.flatMap(TurnExecution.Service, step))),
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
+    Effect.scoped(gateway.inWorkspace(id, Effect.flatMap(TurnExecution.TurnExecution, step))),
   );
 const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
   as(
     id,
     alice,
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.readTimeline(threadId, { limit: 50 }),
     ),
   );
@@ -92,11 +92,11 @@ const logStep = (id: Workspace.Id, turn: Turn.Record, stepId: string, step: Stre
  */
 const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberReference = alice) =>
   Effect.gen(function* () {
-    const gateway = yield* Gateway.Service;
+    const gateway = yield* Gateway.Gateway;
     const stream = yield* gateway.asMember(
       id,
       reader,
-      Effect.flatMap(TurnService.Service, (turnService) => turnService.watchLog(turnId)),
+      Effect.flatMap(TurnService.TurnService, (turnService) => turnService.watchLog(turnId)),
     );
     const queue = yield* Queue.unbounded<Turn.LogMessage | "done" | "unavailable">();
     yield* stream.pipe(
@@ -167,11 +167,13 @@ const resume: SessionStateStore.Resume = { agent: "test-in-process", agentState:
  */
 const workspaceWithAgent = Effect.gen(function* () {
   const workspace = yield* Operations.createWorkspace(alice.id, "Alice");
-  const connect = (input: Parameters<ConnectionService.Interface["create"]>[0]) =>
+  const connect = (
+    input: Parameters<ConnectionService.ConnectionService["Service"]["create"]>[0],
+  ) =>
     as(
       workspace.id,
       alice,
-      Effect.flatMap(ConnectionService.Service, (connectionService) =>
+      Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
         connectionService.create(input),
       ),
     );
@@ -191,7 +193,7 @@ const workspaceWithAgent = Effect.gen(function* () {
   const agent = yield* as(
     workspace.id,
     alice,
-    Effect.flatMap(AgentService.Service, (agentService) =>
+    Effect.flatMap(AgentService.AgentService, (agentService) =>
       agentService.create({
         name: "Planner",
         roleId: BuiltinRoles.MemberId,
@@ -232,7 +234,7 @@ const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Member.Id
   as(
     id,
     alice,
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId: Group.GeneralId, text, mentions: [...mentions] }),
     ),
   ).pipe(Effect.flatMap((started) => withPlace(id, started)));
@@ -245,7 +247,7 @@ const reply = (
   as(
     id,
     alice,
-    Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+    Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
       threadMessageService.publish({ threadId, text, mentions: [...mentions] }),
     ),
   ).pipe(Effect.flatMap((message) => withPlace(id, { message })));
@@ -260,7 +262,7 @@ const unfollow = (
     const participants = yield* as(
       id,
       identity,
-      Effect.flatMap(ThreadService.Service, (threadService) =>
+      Effect.flatMap(ThreadService.ThreadService, (threadService) =>
         threadService.listParticipants(threadId, { limit: 10 }),
       ),
     );
@@ -272,8 +274,10 @@ const unfollow = (
     yield* as(
       id,
       identity,
-      Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
-        threadParticipationService.unfollow({ threadId, participationId: mine!.id }),
+      Effect.flatMap(
+        ThreadParticipationService.ThreadParticipationService,
+        (threadParticipationService) =>
+          threadParticipationService.unfollow({ threadId, participationId: mine!.id }),
       ),
     );
   });
@@ -286,7 +290,7 @@ const channelInto = (id: Workspace.Id) =>
     const connection = yield* as(
       id,
       alice,
-      Effect.flatMap(ConnectionService.Service, (connectionService) =>
+      Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
         connectionService.create({
           integration: "test-channels",
           name: "Support desk",
@@ -298,7 +302,7 @@ const channelInto = (id: Workspace.Id) =>
     const channel = yield* as(
       id,
       alice,
-      Effect.flatMap(ChannelService.Service, (channelService) =>
+      Effect.flatMap(ChannelService.ChannelService, (channelService) =>
         channelService.create({
           connectionId: connection.id,
           groupId: Group.GeneralId,
@@ -308,11 +312,11 @@ const channelInto = (id: Workspace.Id) =>
       ),
     );
     const receive = (messageId: string, text: string) =>
-      Effect.flatMap(Gateway.Service, (gateway) =>
+      Effect.flatMap(Gateway.Gateway, (gateway) =>
         Effect.scoped(
           gateway.inWorkspace(
             id,
-            Effect.flatMap(ChannelIntake.Service, (channelIntake) =>
+            Effect.flatMap(ChannelIntake.ChannelIntake, (channelIntake) =>
               channelIntake.receive(channel.id, {
                 headers: {},
                 body: JSON.stringify({
@@ -448,7 +452,7 @@ describe("turns", () => {
             const active = yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(TurnService.Service, (turnService) => turnService.listActive(10)),
+              Effect.flatMap(TurnService.TurnService, (turnService) => turnService.listActive(10)),
             );
             expect(active.map(({ id }) => id)).toEqual([turn.id]);
 
@@ -649,7 +653,9 @@ describe("turns", () => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnService.Service, (turnService) => turnService.cancel(turnId)),
+                  Effect.flatMap(TurnService.TurnService, (turnService) =>
+                    turnService.cancel(turnId),
+                  ),
                 );
               // A turn that failed, and its retry, which waits queued until its job starts it.
               const { turn: first } = yield* startReady(workspace.id, agent.memberId, threadId);
@@ -660,7 +666,9 @@ describe("turns", () => {
               const retried = yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnService.Service, (turnService) => turnService.retry(first.id)),
+                Effect.flatMap(TurnService.TurnService, (turnService) =>
+                  turnService.retry(first.id),
+                ),
               );
               expect(retried.status).toBe("queued");
               expect(yield* takeTurnJobs(workspace.id)).toEqual([
@@ -781,7 +789,7 @@ describe("turns", () => {
               as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnService.Service, (turnService) => turnService.retry(turnId)),
+                Effect.flatMap(TurnService.TurnService, (turnService) => turnService.retry(turnId)),
               );
             const { turn } = yield* startReady(workspace.id, agent.memberId, threadId);
             yield* execute(workspace.id, (turnExecution) =>
@@ -790,7 +798,7 @@ describe("turns", () => {
             const failed = yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(TurnService.Service, (turnService) => turnService.get(turn.id)),
+              Effect.flatMap(TurnService.TurnService, (turnService) => turnService.get(turn.id)),
             );
             expect(failed).toMatchObject({ status: "failed", retryable: true, stoppable: false });
             yield* takeTurnJobs(workspace.id);
@@ -844,7 +852,7 @@ describe("turns", () => {
           yield* as(
             workspace.id,
             alice,
-            Effect.flatMap(ConnectionService.Service, (connectionService) =>
+            Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
               connectionService.remove(models.id),
             ),
           );
@@ -924,7 +932,7 @@ describe("turns", () => {
           const stopped = yield* as(
             workspace.id,
             alice,
-            Effect.flatMap(TurnService.Service, (turnService) => turnService.get(turn.id)),
+            Effect.flatMap(TurnService.TurnService, (turnService) => turnService.get(turn.id)),
           );
           expect(stopped).toMatchObject({
             status: "cancelled",
@@ -944,7 +952,9 @@ describe("turns", () => {
               as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnService.Service, (turnService) => turnService.retry(turn.id)),
+                Effect.flatMap(TurnService.TurnService, (turnService) =>
+                  turnService.retry(turn.id),
+                ),
               ),
             ),
           ).toMatchObject({ _tag: "TurnService.NotRetryable", reason: "departed" });
@@ -965,7 +975,7 @@ describe("turns", () => {
             const started = yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startInGroup({
                   groupId: Group.GeneralId,
                   text: "Plan the launch.",
@@ -981,11 +991,13 @@ describe("turns", () => {
             yield* reply(workspace.id, threadId, "Planner, start with the budget.");
             yield* takeTurnJobs(workspace.id);
             const { turn } = yield* startReady(workspace.id, agent.memberId, threadId);
-            const change = (change: Parameters<TaskService.Interface["update"]>[0]["change"]) =>
+            const change = (
+              change: Parameters<TaskService.TaskService["Service"]["update"]>[0]["change"],
+            ) =>
               as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TaskService.Service, (taskService) =>
+                Effect.flatMap(TaskService.TaskService, (taskService) =>
                   taskService.update({ threadId, change }),
                 ),
               );
@@ -1048,10 +1060,10 @@ describe("turns", () => {
           storage,
           Effect.gen(function* () {
             const { workspace, agent } = yield* workspaceWithAgent;
-            const asAlice = <A, E>(program: Effect.Effect<A, E, Core.Operations | Actor.Service>) =>
+            const asAlice = <A, E>(program: Effect.Effect<A, E, Core.Operations | Actor.Actor>) =>
               as(workspace.id, alice, program);
             const started = yield* asAlice(
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startInGroup({
                   groupId: Group.GeneralId,
                   title: Thread.Title.make("Launch plan"),
@@ -1063,7 +1075,7 @@ describe("turns", () => {
             const threadId = started.thread.id;
             // Making the thread a task assigned to the agent asks it to work, though no message does.
             yield* asAlice(
-              Effect.flatMap(TaskService.Service, (taskService) =>
+              Effect.flatMap(TaskService.TaskService, (taskService) =>
                 taskService.create({ threadId, assignee: agent.memberId, priority: "high" }),
               ),
             );
@@ -1088,7 +1100,7 @@ describe("turns", () => {
             // The thread is renamed, its opening message edited, and the task started; a message
             // said and deleted before the turn tells nothing.
             yield* asAlice(
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.rename({
                   threadId,
                   title: Thread.Title.make("Launch plan, revised"),
@@ -1097,7 +1109,7 @@ describe("turns", () => {
               ),
             );
             yield* asAlice(
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.edit({
                   messageId: started.message.id,
                   text: "Plan the launch by Friday.",
@@ -1107,7 +1119,7 @@ describe("turns", () => {
               ),
             );
             yield* asAlice(
-              Effect.flatMap(TaskService.Service, (taskService) =>
+              Effect.flatMap(TaskService.TaskService, (taskService) =>
                 taskService.update({
                   threadId,
                   change: { _tag: "Status", from: "todo", to: "doing" },
@@ -1116,7 +1128,7 @@ describe("turns", () => {
             );
             const aside = yield* reply(workspace.id, threadId, "Mind the budget.");
             yield* asAlice(
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.delete(aside.message.id),
               ),
             );
@@ -1152,7 +1164,7 @@ describe("turns", () => {
             yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(TaskService.Service, (taskService) =>
+              Effect.flatMap(TaskService.TaskService, (taskService) =>
                 taskService.update({
                   threadId,
                   change: { _tag: "Assignee", from: null, to: agent.memberId },
@@ -1287,11 +1299,13 @@ describe("turns", () => {
           const started = yield* start(workspace.id, "Planner, look into this.", [agent.memberId]);
           const { turn } = yield* startReady(workspace.id, agent.memberId, started.thread.id);
           const reads: ReadonlyArray<
-            (turns: TurnService.Interface) => Effect.Effect<unknown, unknown, Actor.Service>
+            (
+              turns: TurnService.TurnService["Service"],
+            ) => Effect.Effect<unknown, unknown, Actor.Actor>
           > = [(turns) => turns.get(turn.id), (turns) => Effect.scoped(turns.watchLog(turn.id))];
           const asBob = <A, E>(
-            read: (turns: TurnService.Interface) => Effect.Effect<A, E, Actor.Service>,
-          ) => as(workspace.id, bob, Effect.flatMap(TurnService.Service, read));
+            read: (turns: TurnService.TurnService["Service"]) => Effect.Effect<A, E, Actor.Actor>,
+          ) => as(workspace.id, bob, Effect.flatMap(TurnService.TurnService, read));
           for (const read of reads) yield* asBob(read);
           expect((yield* asBob((turns) => turns.listActive(10))).map(({ id }) => id)).toEqual([
             turn.id,
@@ -1322,8 +1336,8 @@ describe("turns", () => {
               workspace.id,
               alice,
               Effect.gen(function* () {
-                const { memberId } = yield* Actor.Service;
-                const groupService = yield* GroupService.Service;
+                const { memberId } = yield* Actor.Actor;
+                const groupService = yield* GroupService.GroupService;
                 return yield* groupService.createTeam({
                   name: "Planning",
                   memberIds: [memberId, reader.id, agent.memberId],
@@ -1335,7 +1349,7 @@ describe("turns", () => {
               const started = yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(ThreadService.Service, (threadService) =>
+                Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                   threadService.startInGroup({
                     groupId,
                     text: "Planner, draft the plan.",
@@ -1365,18 +1379,22 @@ describe("turns", () => {
             const [membership] = (yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.listCurrent(team.id, { limit: 10 }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.listCurrent(team.id, { limit: 10 }),
               ),
             )).filter((admission) => admission.memberId === reader.id);
             yield* as(
               workspace.id,
               bob,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.leave({
-                  groupId: team.id,
-                  membershipId: membership!.id,
-                }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.leave({
+                    groupId: team.id,
+                    membershipId: membership!.id,
+                  }),
               ),
             );
             expect(yield* left).toBe("unavailable");

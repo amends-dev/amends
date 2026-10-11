@@ -20,13 +20,13 @@ import {
 } from "@amends-dev/core/thread";
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option } from "effect";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
   listOldestFirst,
   otherWorkspaceId,
   runHost,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -47,23 +47,23 @@ describe("group follows", () => {
   const actorFor = (memberId: Member.Id) =>
     Actor.Value.make({ workspaceId, memberId, identity: identityOf(memberId) });
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-    program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
+    program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
   const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
   const follow = (groupId: Group.Id, memberId: Member.Id) =>
-    Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+    Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
       groupFollowService.follow({ groupId, memberId }),
     );
   const unfollow = (groupId: Group.Id, memberId: Member.Id) =>
-    Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+    Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
       groupFollowService.unfollow({ groupId, memberId }),
     );
   const post = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, text: "Update", mentions }),
     );
   const participantsOf = (bound: Bound, started: Thread.Started) =>
@@ -91,7 +91,7 @@ describe("group follows", () => {
     });
     yield* trusted(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.forEach([humanId, plainId, outsiderId, agentId], (memberId) =>
             Effect.andThen(
@@ -121,7 +121,7 @@ describe("group follows", () => {
     const team = yield* run(
       bound,
       owner,
-      Effect.flatMap(GroupService.Service, (groupService) =>
+      Effect.flatMap(GroupService.GroupService, (groupService) =>
         groupService.createTeam({
           name: "Team",
           memberIds: [owner.memberId, humanId, plainId, agentId],
@@ -130,7 +130,7 @@ describe("group follows", () => {
     );
     yield* trusted(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId,
           assignmentId: Assignment.Id.make("plain-start"),
@@ -251,7 +251,7 @@ describe("group follows", () => {
             const direct = yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startDirect({
                   memberIds: [humanId],
                   text: "Hello",
@@ -271,11 +271,13 @@ describe("group follows", () => {
             yield* run(
               bound,
               human,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.leave({
-                  groupId: team.id,
-                  membershipId: admission.id,
-                }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.leave({
+                    groupId: team.id,
+                    membershipId: admission.id,
+                  }),
               ),
             );
             expect(yield* bound.groupFollows.get(followed.id)).toMatchObject({
@@ -284,8 +286,10 @@ describe("group follows", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.add({ groupId: team.id, memberId: humanId }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: team.id, memberId: humanId }),
               ),
             );
             expect(yield* participantsOf(bound, yield* run(bound, owner, post(team.id)))).toEqual([
@@ -296,7 +300,7 @@ describe("group follows", () => {
             yield* storage.discardProjections;
             yield* trusted(
               bound,
-              Effect.flatMap(Journal.Service, (journal) => journal.replay),
+              Effect.flatMap(Journal.Journal, (journal) => journal.replay),
             );
             expect(yield* bound.groupFollows.get(followed.id)).toEqual(saved);
           }),

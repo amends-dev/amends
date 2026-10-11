@@ -85,5 +85,3 @@ export const decode = (workspaceId: Workspace.Id, columns: Columns): unknown => 
       }
     : undefined;
 };
-
-export * as ScopeColumns from "./scope.ts";

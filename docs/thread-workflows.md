@@ -18,7 +18,7 @@ import { Effect } from "effect";
 
 const start = (groupId: Group.Id) =>
   Effect.gen(function* () {
-    const threads = yield* ThreadService.Service;
+    const threads = yield* ThreadService.ThreadService;
     return yield* threads.startInGroup({
       groupId,
       text: "Here's the proposal",
@@ -227,7 +227,7 @@ import { Effect } from "effect";
 
 const reply = (threadId: Thread.Id) =>
   Effect.gen(function* () {
-    const messages = yield* ThreadMessageService.Service;
+    const messages = yield* ThreadMessageService.ThreadMessageService;
     return yield* messages.publish({ threadId, text: "Here's my feedback", mentions: [] });
   });
 ```

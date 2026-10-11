@@ -1,9 +1,9 @@
 import { DateTime, Schema } from "effect";
-import { Audience } from "../journal/audience.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { Text } from "../text/text.ts";
-import { GroupId } from "./id.ts";
+import * as Audience from "../journal/audience.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as Text from "../text/text.ts";
+import * as GroupId from "./id.ts";
 
 export const Id = GroupId.Id;
 
@@ -237,5 +237,3 @@ export interface Summary extends Schema.Schema.Type<typeof Summary> {}
 
 /** The readers of one group: its current members. */
 export const audienceOf = (groupId: Id): Audience.Scope => Audience.make("group", groupId);
-
-export * as Group from "./group.ts";

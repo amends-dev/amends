@@ -18,8 +18,8 @@ import {
   ShardingConfig,
 } from "effect/cluster";
 import { TestClock } from "effect/testing";
-import { DeliveryJob } from "../../src/jobs/delivery-job.ts";
-import { JobRequests } from "../../src/jobs/requests.ts";
+import * as DeliveryJob from "../../src/jobs/delivery-job.ts";
+import * as JobRequests from "../../src/jobs/requests.ts";
 
 /** Cluster in memory, reading for due messages every second of the test clock. */
 const cluster = Sharding.layer.pipe(
@@ -81,7 +81,7 @@ const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
   const endings: Array<Ending> = [];
   const ended = new Set<string>();
   const deliveries = options.deliveries ?? [requested(2)];
-  const deliveryExecution = DeliveryExecution.Service.of({
+  const deliveryExecution = DeliveryExecution.DeliveryExecution.of({
     accept: () => Effect.sync(() => deliveries.filter((delivery) => !ended.has(delivery.id))),
     start: (deliveryId) =>
       Effect.sync(() => {
@@ -106,8 +106,8 @@ const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
         endings.push({ kind: "failed", deliveryId, ...failed });
       }),
   });
-  const services = Context.make(DeliveryExecution.Service, deliveryExecution);
-  const gateway = Gateway.Service.of({
+  const services = Context.make(DeliveryExecution.DeliveryExecution, deliveryExecution);
+  const gateway = Gateway.Gateway.of({
     createWorkspace: () => Effect.die("The fake workspace is never created"),
     asMember: () => Effect.die("The job runs as no member"),
     inWorkspace: (_, program) =>
@@ -180,14 +180,16 @@ const deliveryJobsFor = (
   DeliveryJob.layer.pipe(
     Layer.provideMerge(cluster),
     Layer.provide(
-      Layer.merge(Layer.succeed(Gateway.Service, workspace.gateway), transport.integrations),
+      Layer.merge(Layer.succeed(Gateway.Gateway, workspace.gateway), transport.integrations),
     ),
   );
 
 /** Run `request` in a commit `commitId`, then what it asked to run once the commit is done. */
 const inCommit = <E>(
   commitId: string,
-  request: (deliveryJobs: DeliveryJobs.Interface) => Effect.Effect<void, E, Store.Transaction>,
+  request: (
+    deliveryJobs: DeliveryJobs.DeliveryJobs["Service"],
+  ) => Effect.Effect<void, E, Store.Transaction>,
 ) =>
   Effect.gen(function* () {
     const afterCommit: Array<Effect.Effect<void>> = [];
@@ -196,7 +198,7 @@ const inCommit = <E>(
       append: () => Effect.die("The test commit appends nothing"),
       afterCommit: (effect) => Effect.sync(() => void afterCommit.push(effect)),
     });
-    yield* Effect.flatMap(DeliveryJobs.Service, request).pipe(
+    yield* Effect.flatMap(DeliveryJobs.DeliveryJobs, request).pipe(
       Effect.provideService(Store.Transaction, storeTransaction),
     );
     yield* Effect.forEach(afterCommit, (effect) => effect, { discard: true });

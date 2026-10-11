@@ -9,14 +9,8 @@ import { Member } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Queue, Schema, Stream } from "effect";
 import type { Fixture, Host, Storage } from "./fixture.ts";
-import {
-  alice,
-  type Bound,
-  forWorkspace,
-  otherWorkspaceId,
-  Support,
-  workspaceId,
-} from "./support.ts";
+import * as Support from "./support.ts";
+import { alice, type Bound, forWorkspace, otherWorkspaceId, workspaceId } from "./support.ts";
 
 const memberActor = (name: string) =>
   Actor.Value.make({
@@ -68,7 +62,7 @@ const markerFor = (memberId: Member.Id) =>
   });
 /** A workspace's signal hub on a host, as storage binds it. */
 const hubOf = (host: Context.Context<Host>, id = workspaceId) =>
-  Effect.map(forWorkspace(host, id), (bound) => Context.get(bound.context, SignalHub.Service));
+  Effect.map(forWorkspace(host, id), (bound) => Context.get(bound.context, SignalHub.SignalHub));
 
 /** Ephemeral signals through the host's hub: delivery across hosts, by workspace and by reach. */
 export const signals = (fixture: Fixture) => {
@@ -98,10 +92,10 @@ export const signals = (fixture: Fixture) => {
       const as =
         (host: keyof typeof cores) =>
         <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-          program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(cores[host]));
+          program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(cores[host]));
       const group = yield* as("first")(
         owner,
-        Effect.flatMap(GroupService.Service, (groupService) =>
+        Effect.flatMap(GroupService.GroupService, (groupService) =>
           groupService.createTeam({
             name: "Private",
             memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
@@ -110,7 +104,7 @@ export const signals = (fixture: Fixture) => {
       );
       const started = yield* as("first")(
         owner,
-        Effect.flatMap(ThreadService.Service, (threadService) =>
+        Effect.flatMap(ThreadService.ThreadService, (threadService) =>
           threadService.startInGroup({
             groupId: group.id,
             mentions: [reader.memberId],
@@ -122,7 +116,7 @@ export const signals = (fixture: Fixture) => {
       const feed = Effect.fnUntraced(function* (host: keyof typeof cores, actor: Actor.Value) {
         const next = yield* as(host)(
           actor,
-          Effect.flatMap(ChangeFeedService.Service, (changeFeedService) =>
+          Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) =>
             changeFeedService.watch(),
           ),
         ).pipe(Effect.flatMap(buffer));
@@ -196,7 +190,7 @@ export const signals = (fixture: Fixture) => {
           const before = yield* DateTime.now;
           yield* as("first")(
             owner,
-            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
               threadMessageService.typing(threadId),
             ),
           );
@@ -231,7 +225,7 @@ export const signals = (fixture: Fixture) => {
             as("first")(
               actor,
               Effect.flip(
-                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                   threadMessageService.typing(thread),
                 ),
               ),
@@ -255,7 +249,7 @@ export const signals = (fixture: Fixture) => {
           const ownerFeed = yield* feed("second", owner);
           const [notification] = yield* as("first")(
             reader,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
+            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
               Effect.map(notificationService.inbox({ limit: 10 }), (items) =>
                 items.map((item) => item.notification),
               ),
@@ -265,8 +259,8 @@ export const signals = (fixture: Fixture) => {
           yield* as("first")(
             reader,
             Effect.gen(function* () {
-              yield* (yield* NotificationService.Service).markSeen(notification.id);
-              const readStateService = yield* ReadStateService.Service;
+              yield* (yield* NotificationService.NotificationService).markSeen(notification.id);
+              const readStateService = yield* ReadStateService.ReadStateService;
               yield* readStateService.markThreadRead({ threadId, throughSequence: 1 });
               yield* readStateService.markGroupRead({ groupId });
             }),

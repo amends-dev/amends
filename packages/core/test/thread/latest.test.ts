@@ -15,12 +15,12 @@ import {
 import { Member } from "@amends-dev/core/workspace";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Publication from "../../src/journal/publication.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
 import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
@@ -51,7 +51,7 @@ it.effect(
       const inserted: Array<unknown> = [];
       const threadLatest: Array<Thread.Latest> = [];
       const groupLatest: Array<Group.Latest> = [];
-      const threads: ThreadStore.Interface = {
+      const threads: ThreadStore.ThreadStore["Service"] = {
         get: () => Effect.die("Unexpected thread read"),
         getMany: () => Effect.die("Unexpected thread read"),
         listByGroup: () => Effect.die("Unexpected thread read"),
@@ -62,7 +62,7 @@ it.effect(
         rename: () => Effect.die("Unexpected thread rename"),
         recordLatest: (latest) => Effect.sync(() => void threadLatest.push(latest)),
       };
-      const groups: GroupStore.Interface = {
+      const groups: GroupStore.GroupStore["Service"] = {
         get: () => Effect.die("Unexpected group read"),
         getMany: () => Effect.die("Unexpected group read"),
         findDirect: () => Effect.die("Unexpected group read"),
@@ -74,10 +74,10 @@ it.effect(
       };
       const journal = <R>(program: Effect.Effect<void, unknown, R>) =>
         program.pipe(
-          Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+          Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
           Effect.provide(Log.layer),
-          Effect.provideService(Store.Service, fixture.store),
-          Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+          Effect.provideService(Store.Store, fixture.store),
+          Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
         );
       // History recorded before the projections existed, as a rebuild finds it.
       yield* journal(
@@ -121,13 +121,13 @@ it.effect(
         Effect.flatMap(
           Journal.make({ logId, projections: [ThreadProjection.definition] }),
           (rebuilt) => rebuilt.replay,
-        ).pipe(Effect.provideService(ThreadStore.Service, threads)),
+        ).pipe(Effect.provideService(ThreadStore.ThreadStore, threads)),
       );
       yield* journal(
         Effect.flatMap(
           Journal.make({ logId, projections: [GroupProjection.definition] }),
           (rebuilt) => rebuilt.replay,
-        ).pipe(Effect.provideService(GroupStore.Service, groups)),
+        ).pipe(Effect.provideService(GroupStore.GroupStore, groups)),
       );
       expect(inserted).toHaveLength(2);
       // Only messages move the latest activity; following a thread does not.

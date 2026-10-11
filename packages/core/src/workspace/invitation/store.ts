@@ -1,11 +1,11 @@
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import { Identity } from "../../identity/identity.ts";
-import type { Store } from "../../journal/store.ts";
+import * as Identity from "../../identity/identity.ts";
+import type * as Store from "../../journal/store.ts";
 
-import { Invitation } from "./invitation.ts";
-import { StoreInput } from "../../journal/StoreInput.ts";
-import type { WorkspaceId } from "../id.ts";
+import * as Invitation from "./invitation.ts";
+import * as StoreInput from "../../journal/StoreInput.ts";
+import type * as WorkspaceId from "../id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("InvitationStore.Failure", {
   operation: Schema.String,
@@ -19,32 +19,32 @@ export class Conflict extends Schema.TaggedError<Conflict>()("InvitationStore.Co
 /**
  * Workspace-bound read model. All writes share the journal's native transaction.
  *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  /** Return an isolated record from the current transaction or committed state. */
-  readonly get: (id: Invitation.Id) => Effect.Effect<Option.Option<Invitation.Record>, Failure>;
-  /** All Pending invitations for this human in this workspace, including expired ones. */
-  readonly listPendingByRecipient: (
-    recipientId: Identity.HumanId,
-  ) => Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
-  /** Every invitation in this workspace in issue order, whatever its state. */
-  readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
-  /** Insert a pending invitation; a duplicate ID conflicts. Never upsert. */
-  readonly insert: (
-    record: Invitation.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Transition Pending to a terminal state; reject absent/terminal records and retain all intent. */
-  readonly settle: (
-    id: Invitation.Id,
-    state: Exclude<Invitation.State, { readonly _tag: "Pending" }>,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/workspace/invitation-store/Service",
-) {}
+export class InvitationStore extends Context.Service<
+  InvitationStore,
+  {
+    /** Return an isolated record from the current transaction or committed state. */
+    readonly get: (id: Invitation.Id) => Effect.Effect<Option.Option<Invitation.Record>, Failure>;
+    /** All Pending invitations for this human in this workspace, including expired ones. */
+    readonly listPendingByRecipient: (
+      recipientId: Identity.HumanId,
+    ) => Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
+    /** Every invitation in this workspace in issue order, whatever its state. */
+    readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Failure>;
+    /** Insert a pending invitation; a duplicate ID conflicts. Never upsert. */
+    readonly insert: (
+      record: Invitation.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /** Transition Pending to a terminal state; reject absent/terminal records and retain all intent. */
+    readonly settle: (
+      id: Invitation.Id,
+      state: Exclude<Invitation.State, { readonly _tag: "Pending" }>,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/workspace/invitation-store/Service") {}
 
 /** The states an invitation settles into. */
 const Settled = Schema.Union([Invitation.State.cases.Accepted, Invitation.State.cases.Revoked]);
@@ -56,7 +56,10 @@ const Settled = Schema.Union([Invitation.State.cases.Accepted, Invitation.State.
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: InvitationStore["Service"],
+): InvitationStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -89,5 +92,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
     }),
   };
 };
-
-export * as InvitationStore from "./store.ts";

@@ -8,12 +8,12 @@
 import { ChannelTransport } from "@amends-dev/channel";
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ChannelId } from "./ChannelId.ts";
-import { Delivery } from "./Delivery.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import type * as Store from "../journal/store.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ChannelId from "./ChannelId.ts";
+import * as Delivery from "./Delivery.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing deliveries.
@@ -39,50 +39,45 @@ export class Conflict extends Schema.TaggedError<Conflict>()("DeliveryStore.Conf
 }) {}
 
 /**
- * What a storage adapter implements for deliveries.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  readonly get: (id: Delivery.Id) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
-  /** The thread's deliveries not yet sent or failed, by their messages' positions, then by id. */
-  readonly listRequestedByThread: (
-    threadId: ThreadId.Id,
-  ) => Effect.Effect<ReadonlyArray<Delivery.Record>, Failure>;
-  /**
-   * The delivery that posted the message the external system knows as `externalMessageId` in a
-   * conversation on a channel, if one did: what tells a post of our own, received back, from a
-   * message to take in.
-   */
-  readonly findByExternalMessage: (
-    channelId: ChannelId.Id,
-    conversationId: ChannelTransport.ExternalId,
-    externalMessageId: ChannelTransport.ExternalId,
-  ) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
-  /** Reject a reused id. Never upsert. */
-  readonly insert: (
-    record: Delivery.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Replace a stored delivery; a missing record conflicts. */
-  readonly update: (
-    record: Delivery.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The delivery store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for deliveries.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/DeliveryStore",
-) {}
+export class DeliveryStore extends Context.Service<
+  DeliveryStore,
+  {
+    readonly get: (id: Delivery.Id) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
+    /** The thread's deliveries not yet sent or failed, by their messages' positions, then by id. */
+    readonly listRequestedByThread: (
+      threadId: ThreadId.Id,
+    ) => Effect.Effect<ReadonlyArray<Delivery.Record>, Failure>;
+    /**
+     * The delivery that posted the message the external system knows as `externalMessageId` in a
+     * conversation on a channel, if one did: what tells a post of our own, received back, from a
+     * message to take in.
+     */
+    readonly findByExternalMessage: (
+      channelId: ChannelId.Id,
+      conversationId: ChannelTransport.ExternalId,
+      externalMessageId: ChannelTransport.ExternalId,
+    ) => Effect.Effect<Option.Option<Delivery.Record>, Failure>;
+    /** Reject a reused id. Never upsert. */
+    readonly insert: (
+      record: Delivery.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /** Replace a stored delivery; a missing record conflicts. */
+    readonly update: (
+      record: Delivery.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/channel/DeliveryStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -91,7 +86,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: DeliveryStore["Service"],
+): DeliveryStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -114,5 +112,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
     update: (record) => Effect.flatMap(write("update", Delivery.Record, record), driver.update),
   };
 };
-
-export * as DeliveryStore from "./DeliveryStore.ts";

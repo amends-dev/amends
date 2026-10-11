@@ -7,10 +7,10 @@ import type { Context, Crypto, Effect, Scope } from "effect";
  * processes over one system do.
  */
 export type Host =
-  | WorkspaceStorage.Service
-  | WorkspaceDirectory.Service
-  | Accounts.Service
-  | SignInStorage.Service
+  | WorkspaceStorage.WorkspaceStorage
+  | WorkspaceDirectory.WorkspaceDirectory
+  | Accounts.Accounts
+  | SignInStorage.SignInStorage
   | Crypto.Crypto;
 
 export interface HostOptions {

@@ -1,9 +1,10 @@
 import { Identity } from "../identity/index.ts";
 import { Member, MemberStore } from "../workspace/index.ts";
 import { Array, Effect, Layer, Schema, Option } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Member.Record));
 
@@ -18,12 +19,12 @@ const isActive = (member: Member.Record, identity: Identity.MemberReference) =>
  * @category constructors
  */
 export const make = Effect.fn("Members.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const all = (operation: string) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("members"))).pipe(
       Effect.mapError(storeFailure(MemberStore, operation)),
     );
-  const driver: MemberStore.Interface = {
+  const driver: MemberStore.MemberStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("members"), id)).pipe(
         Effect.mapError(storeFailure(MemberStore, "get")),
@@ -95,10 +96,8 @@ export const make = Effect.fn("Members.make")(function* () {
 });
 
 /**
- * Provide MemberStore.Service using its constructor and the caller's dependencies.
+ * Provide MemberStore.MemberStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(MemberStore.Service, make());
-
-export * as Members from "./members.ts";
+export const layer = Layer.effect(MemberStore.MemberStore, make());

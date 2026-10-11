@@ -10,12 +10,12 @@
  */
 import { ChannelTransport } from "@amends-dev/channel";
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadMessageId } from "../thread/ThreadMessageId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { ChannelId } from "./ChannelId.ts";
-import { DeliveryId } from "./DeliveryId.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as ChannelId from "./ChannelId.ts";
+import * as DeliveryId from "./DeliveryId.ts";
 
 /**
  * Names a delivery; `DeliveryId.Id`, where models that only refer to deliveries import it from.
@@ -151,5 +151,3 @@ export const Failed = Schema.Struct({
  * @since 0.1.0
  */
 export interface Failed extends Schema.Schema.Type<typeof Failed> {}
-
-export * as Delivery from "./Delivery.ts";

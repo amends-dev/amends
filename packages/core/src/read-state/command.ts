@@ -1,37 +1,37 @@
 import { Context, DateTime, Effect, Layer } from "effect";
-import { Store } from "../journal/store.ts";
-import { NotificationStore } from "../notification/store.ts";
-import type { Thread } from "../thread/Thread.ts";
-import type { ReadState } from "./read-state.ts";
-import { ReadStateStore } from "./store.ts";
+import * as Store from "../journal/store.ts";
+import * as NotificationStore from "../notification/store.ts";
+import type * as Thread from "../thread/Thread.ts";
+import type * as ReadState from "./read-state.ts";
+import * as ReadStateStore from "./store.ts";
 
 export type Error =
   | NotificationStore.Failure
   | NotificationStore.Conflict
   | ReadStateStore.Failure
   | ReadStateStore.Conflict;
-export interface Interface {
-  /**
-   * Record that a person has read a thread through a position: their pending notifications from
-   * its activity up to there are seen, and their read position advances. Both are private state,
-   * written outside the journal; they join the caller's transaction when there is one, as when
-   * posting reads the thread for its author. The caller owns authorization.
-   */
-  readonly markThreadRead: (
-    reader: ReadState.Reader,
-    thread: Thread.Record,
-    throughSequence: number,
-  ) => Effect.Effect<void, Error>;
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/read-state/command/Service",
-) {}
+export class ReadStateCommand extends Context.Service<
+  ReadStateCommand,
+  {
+    /**
+     * Record that a person has read a thread through a position: their pending notifications from
+     * its activity up to there are seen, and their read position advances. Both are private state,
+     * written outside the journal; they join the caller's transaction when there is one, as when
+     * posting reads the thread for its author. The caller owns authorization.
+     */
+    readonly markThreadRead: (
+      reader: ReadState.Reader,
+      thread: Thread.Record,
+      throughSequence: number,
+    ) => Effect.Effect<void, Error>;
+  }
+>()("@amends-dev/core/read-state/command/Service") {}
 
 /** @category constructors */
 export const make = Effect.fn("ReadStateCommand.make")(function* () {
-  const notificationStore = yield* NotificationStore.Service;
-  const readStateStore = yield* ReadStateStore.Service;
-  const { workspaceId } = yield* Store.Service;
+  const notificationStore = yield* NotificationStore.NotificationStore;
+  const readStateStore = yield* ReadStateStore.ReadStateStore;
+  const { workspaceId } = yield* Store.Store;
 
   const markThreadRead = Effect.fn("ReadStateCommand.markThreadRead")(function* (
     reader: ReadState.Reader,
@@ -52,8 +52,7 @@ export const make = Effect.fn("ReadStateCommand.make")(function* () {
     });
   });
 
-  return Service.of({ markThreadRead });
+  return ReadStateCommand.of({ markThreadRead });
 });
 /** Internal write shared by read-state, thread, and message operations. @category layers */
-export const layer = Layer.effect(Service, make());
-export * as ReadStateCommand from "./command.ts";
+export const layer = Layer.effect(ReadStateCommand, make());

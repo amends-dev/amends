@@ -8,8 +8,8 @@ import { Effect, Layer, Redacted, Schema } from "effect";
  *
  * @category constructors
  */
-export const make = (): SessionTokens.Interface =>
-  SessionTokens.Service.of({
+export const make = (): SessionTokens.SessionTokens["Service"] =>
+  SessionTokens.SessionTokens.of({
     resolve: (token) =>
       Schema.decodeEffect(Identity.HumanId)(Redacted.value(token)).pipe(
         Effect.mapError(() => new SessionTokens.Rejected({ reason: "malformed" })),
@@ -23,6 +23,4 @@ export const make = (): SessionTokens.Interface =>
  *
  * @category layers
  */
-export const layer = Layer.sync(SessionTokens.Service, make);
-
-export * as DevelopmentSessionTokens from "./session-tokens.ts";
+export const layer = Layer.sync(SessionTokens.SessionTokens, make);

@@ -8,7 +8,7 @@ import { SessionLog, Turn, type TurnExecution } from "@amends-dev/core/turn";
 import { Agent, type Session } from "@amends-dev/harness";
 import { Array, Effect, Ref, Schema } from "effect";
 import type { Prompt } from "effect/ai";
-import type { TurnWorkspace } from "./workspace.ts";
+import type * as TurnWorkspace from "./workspace.ts";
 
 /** Another run of the turn wrote to its session log after this one: this one stops. */
 export class Superseded extends Schema.TaggedError<Superseded>()("SessionLogWriter.Superseded", {
@@ -184,5 +184,3 @@ export const open = Effect.fn("SessionLogWriter.open")(function* (
 });
 
 export type Writer = Effect.Success<ReturnType<typeof open>>;
-
-export * as SessionLogWriter from "./session-log-writer.ts";

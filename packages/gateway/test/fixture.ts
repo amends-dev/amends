@@ -22,7 +22,7 @@ export const fixture: Fixture = {
           connect: () =>
             Layer.build(
               MemoryStorage.layer.pipe(Layer.provideMerge(Layer.succeed(Crypto.Crypto, webCrypto))),
-            ).pipe(Effect.provideService(MemoryDatabase.Service, database)),
+            ).pipe(Effect.provideService(MemoryDatabase.MemoryDatabase, database)),
           discardProjections: Effect.sync(() => {
             for (const space of database.spaces.values())
               for (const table of space.records) table.clear();

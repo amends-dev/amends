@@ -34,16 +34,21 @@ const isRetryable = (error: unknown) =>
 
 /** @category constructors */
 export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
-  const gateway = yield* Gateway.Service;
+  const gateway = yield* Gateway.Gateway;
   const integrations = yield* Integrations.Integrations;
   /** How many times this runner tried to post each delivery it has not finished with. */
   const tries = yield* Ref.make(new Map<Delivery.Id, number>());
   /** Ask `call` of the workspace's delivery execution, holding the workspace only while it runs. */
   const deliveryExecution = <A, E>(
-    call: (deliveryExecution: DeliveryExecution.Interface) => Effect.Effect<A, E>,
+    call: (
+      deliveryExecution: DeliveryExecution.DeliveryExecution["Service"],
+    ) => Effect.Effect<A, E>,
   ) =>
     Effect.scoped(
-      gateway.inWorkspace(job.workspaceId, Effect.flatMap(DeliveryExecution.Service, call)),
+      gateway.inWorkspace(
+        job.workspaceId,
+        Effect.flatMap(DeliveryExecution.DeliveryExecution, call),
+      ),
     );
 
   /** Post what `ready` says through the channel's transport. */
@@ -126,5 +131,3 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
 });
 
 export type DeliveryRunner = Effect.Success<ReturnType<typeof make>>;
-
-export * as DeliveryRunner from "./runner.ts";

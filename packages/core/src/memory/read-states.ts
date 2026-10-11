@@ -1,6 +1,6 @@
 import { ReadStateStore } from "../read-state/index.ts";
 import { DateTime, Effect, Layer } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
 import { keyOf } from "./rows.ts";
 
@@ -15,8 +15,8 @@ const advance = (values: Map<string, number>, key: string, value: number) =>
  * @category constructors
  */
 export const make = Effect.fn("ReadStates.make")(function* () {
-  const { workspaceId, read, join } = yield* Binding.Service;
-  const driver: ReadStateStore.Interface = {
+  const { workspaceId, read, join } = yield* Binding.Binding;
+  const driver: ReadStateStore.ReadStateStore["Service"] = {
     getThreadPositions: Effect.fn("ReadStates.getThreadPositions")(
       function* (memberId, threadIds) {
         const positions = (yield* read).threadPositions;
@@ -64,6 +64,4 @@ export const make = Effect.fn("ReadStates.make")(function* () {
 });
 
 /** Provide read-state storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ReadStateStore.Service, make());
-
-export * as ReadStates from "./read-states.ts";
+export const layer = Layer.effect(ReadStateStore.ReadStateStore, make());

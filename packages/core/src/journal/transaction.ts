@@ -1,7 +1,7 @@
 import { Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect";
 import type { Cause, Scope } from "effect";
-import type { WorkspaceId } from "../workspace/id.ts";
-import { Store } from "./store.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
+import * as Store from "./store.ts";
 
 export class Aborted extends Schema.TaggedError<Aborted>()("Commit.Aborted", {
   cause: Schema.Defect(),
@@ -28,28 +28,28 @@ export type Error =
   | WriteForbidden;
 export type Remaining<R> = Exclude<Exclude<R, Scope.Scope>, Store.Transaction>;
 
-export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
-  readonly run: <A, E, R>(
-    program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | Error, Remaining<R>>;
-  /**
-   * Run one compound write as a step of the commit, joining or starting it. Nested steps in the
-   * same fiber run within it; a step from another fiber while it runs dies with Concurrent.
-   */
-  readonly operation: <A, E, R>(
-    program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | Error, Remaining<R>>;
-  /**
-   * Run a read as a step of the current commit, under the same rule as operation, so it never
-   * overlaps the commit's writes. Outside a commit, run it as it is; after the commit ends, the
-   * store rejects its expired handle.
-   */
-  readonly step: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/journal/transaction/Service",
-) {}
+export class Transaction extends Context.Service<
+  Transaction,
+  {
+    readonly workspaceId: WorkspaceId.Id;
+    readonly run: <A, E, R>(
+      program: Effect.Effect<A, E, R>,
+    ) => Effect.Effect<A, E | Error, Remaining<R>>;
+    /**
+     * Run one compound write as a step of the commit, joining or starting it. Nested steps in the
+     * same fiber run within it; a step from another fiber while it runs dies with Concurrent.
+     */
+    readonly operation: <A, E, R>(
+      program: Effect.Effect<A, E, R>,
+    ) => Effect.Effect<A, E | Error, Remaining<R>>;
+    /**
+     * Run a read as a step of the current commit, under the same rule as operation, so it never
+     * overlaps the commit's writes. Outside a commit, run it as it is; after the commit ends, the
+     * store rejects its expired handle.
+     */
+    readonly step: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+  }
+>()("@amends-dev/core/journal/transaction/Service") {}
 
 interface State {
   readonly owner: symbol;
@@ -88,11 +88,11 @@ const recordFailure = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =
  * @category constructors
  */
 export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return<
-  Interface,
+  Transaction["Service"],
   never,
-  Store.Service
+  Store.Store
 > {
-  const store = yield* Store.Service;
+  const store = yield* Store.Store;
   const owner = Symbol("transaction coordinator");
 
   const run = Effect.fn("Commit.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
@@ -200,7 +200,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     return yield* runExclusively(current.value, program);
   });
 
-  return Service.of({ workspaceId: store.workspaceId, run, operation, step });
+  return Transaction.of({ workspaceId: store.workspaceId, run, operation, step });
 });
 
 /**
@@ -208,6 +208,4 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
-
-export * as Transaction from "./transaction.ts";
+export const layer = Layer.effect(Transaction, make());

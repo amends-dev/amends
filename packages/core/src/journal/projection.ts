@@ -1,11 +1,11 @@
 import { Array, Context, Effect, Option, Schema } from "effect";
-import { Checkpoint } from "./checkpoint.ts";
-import { Entry } from "./entry.ts";
-import { Event } from "./event.ts";
-import type { Fact } from "./fact.ts";
-import type { Log } from "./log.ts";
-import { Store } from "./store.ts";
-import { Transaction } from "./transaction.ts";
+import * as Checkpoint from "./checkpoint.ts";
+import * as Entry from "./entry.ts";
+import * as Event from "./event.ts";
+import type * as Fact from "./fact.ts";
+import type * as Log from "./log.ts";
+import * as Store from "./store.ts";
+import * as Transaction from "./transaction.ts";
 
 /** The decoded event supplied to a handler for this fact. */
 export type Input<F extends Fact.Definition> = Event.Type<F>;
@@ -172,7 +172,7 @@ const toCursor = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
  * entry, and rebuilding it later applies only the commits it missed, never earlier ones again.
  */
 export const replaceLive = Effect.fnUntraced(function* (
-  checkpoint: Checkpoint.Interface,
+  checkpoint: Checkpoint.Checkpoint["Service"],
   log: Log.Reader<typeof Event.Envelope>,
   current: ReadonlyArray<Checkpoint.LiveVersion>,
   next: ReadonlyArray<Checkpoint.LiveVersion>,
@@ -209,8 +209,8 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
   readonly definition: Definition<string, number, E, R>;
   readonly log: Log.Reader<typeof Event.Envelope>;
 }) {
-  const checkpoint = yield* Checkpoint.Service;
-  const transaction = yield* Transaction.Service;
+  const checkpoint = yield* Checkpoint.Checkpoint;
+  const transaction = yield* Transaction.Transaction;
   const services = yield* Effect.context<Transaction.Remaining<R>>();
   const { definition, log } = options;
   const key = yield* Schema.decodeEffect(Checkpoint.Key)({
@@ -366,5 +366,3 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
   };
   return runner;
 });
-
-export * as Projection from "./projection.ts";

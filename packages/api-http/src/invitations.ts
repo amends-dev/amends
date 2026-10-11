@@ -1,9 +1,9 @@
-import { Accounts } from "@amends-dev/gateway/accounts";
+import * as Accounts from "@amends-dev/gateway/accounts";
 import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
-import { ApiErrors } from "./errors.ts";
+import * as ApiErrors from "./errors.ts";
 
 /**
  * An invitation to issue: the address it goes to, which the host resolves to that address's

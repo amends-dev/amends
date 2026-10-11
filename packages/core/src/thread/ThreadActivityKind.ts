@@ -9,9 +9,9 @@
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
-import { Subject } from "../journal/subject.ts";
-import { ThreadActivity } from "./ThreadActivity.ts";
-import type { ThreadId } from "./ThreadId.ts";
+import * as Subject from "../journal/subject.ts";
+import * as ThreadActivity from "./ThreadActivity.ts";
+import type * as ThreadId from "./ThreadId.ts";
 
 /**
  * Resolved timeline items by activity kind. Each domain that records activity adds its kinds'
@@ -223,5 +223,3 @@ export const makeRecordUnsafe = <K extends Definition>(
       ...prepared,
     })),
   );
-
-export * as ThreadActivityKind from "./ThreadActivityKind.ts";

@@ -1,10 +1,10 @@
 import { Record, Schema } from "effect";
-import { ChannelId } from "../channel/ChannelId.ts";
-import { Connection } from "../connection/connection.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { GroupId } from "../group/id.ts";
-import { Member } from "../workspace/member/member.ts";
-import { Workspace } from "../workspace/workspace.ts";
+import * as ChannelId from "../channel/ChannelId.ts";
+import * as Connection from "../connection/connection.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as GroupId from "../group/id.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as Workspace from "../workspace/workspace.ts";
 
 /** A concrete authorization target within a workspace, not a grant's scope. */
 export const Reference = Schema.TaggedUnion({
@@ -21,5 +21,3 @@ export const Kind = Schema.Literals(Record.keys(Reference.cases));
 export type Kind = typeof Kind.Type;
 
 export type Of<K extends Kind> = Extract<Reference, { readonly _tag: K }>;
-
-export * as Target from "./target.ts";

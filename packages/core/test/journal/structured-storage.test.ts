@@ -1,16 +1,16 @@
 import { Subject } from "@amends-dev/core/journal";
 import { expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
-import { Codec } from "../../src/journal/codec.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Event } from "../../src/journal/event.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
+import * as Codec from "../../src/journal/codec.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Event from "../../src/journal/event.ts";
+import * as Fact from "../../src/journal/fact.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Publication from "../../src/journal/publication.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as Transaction from "../../src/journal/transaction.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
 import { make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
@@ -37,14 +37,14 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Log.Service | Transaction.Service | Publication.Service | Checkpoint.Service
+    Log.Log | Transaction.Transaction | Publication.Publication | Checkpoint.Checkpoint
   >,
 ) =>
   program.pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
   );
 it.effect(
   "storage keeps the fact header separate and filtered entry pages preserve mixed-version commit order",
@@ -101,7 +101,7 @@ it.effect(
           ).toEqual([events[2]?.id]);
           expect(yield* journal.read({ name: "absent", limit: 10 })).toEqual([]);
           expect((yield* journal.log.read({ limit: 1 }))[0]?.entries).toHaveLength(4);
-          const plain = (yield* Log.Service).open({ id: logId, schema: Schema.Uint8Array });
+          const plain = (yield* Log.Log).open({ id: logId, schema: Schema.Uint8Array });
           expect((yield* Effect.flip(plain.read({ limit: 1 })))._tag).toBe("SchemaError");
         }),
       );
@@ -232,7 +232,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const log = yield* Log.Service;
+          const log = yield* Log.Log;
           const plain = log.open({ id: Log.Id.make("plain"), schema: Schema.String });
           const other = log.open({ id: Log.Id.make("other"), schema: Schema.String });
           const written = yield* plain.append("value");

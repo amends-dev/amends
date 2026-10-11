@@ -2,7 +2,7 @@ import { ThreadParticipation, ThreadParticipationStore } from "@amends-dev/core/
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, eq, sql } from "drizzle-orm";
 import { threadParticipations } from "./schema.ts";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
@@ -72,10 +72,10 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
   );
 /** Workspace-bound thread-participations projection storage. @category constructors */
 export const make = Effect.fn("ThreadParticipations.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(threadParticipations.workspaceId, workspaceId);
-  const driver: ThreadParticipationStore.Interface = {
+  const driver: ThreadParticipationStore.ThreadParticipationStore["Service"] = {
     get: Effect.fn("ThreadParticipations.get")(
       function* (id) {
         return yield* guard(
@@ -215,5 +215,4 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
   return ThreadParticipationStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(ThreadParticipationStore.Service, make());
-export * as ThreadParticipations from "./thread-participations.ts";
+export const layer = Layer.effect(ThreadParticipationStore.ThreadParticipationStore, make());

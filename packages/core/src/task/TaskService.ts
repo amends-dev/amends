@@ -7,23 +7,23 @@
  * @since 0.1.0
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { AgentPermissions } from "../agent/permissions.ts";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import type { Group } from "../group/group.ts";
-import type { GroupQuery } from "../group/query.ts";
-import { Actor } from "../identity/actor.ts";
-import { Identity } from "../identity/identity.ts";
-import { Journal } from "../journal/journal.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Thread } from "../thread/Thread.ts";
-import type { ThreadCommand } from "../thread/ThreadCommand.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
-import { ThreadStore } from "../thread/ThreadStore.ts";
-import type { Member } from "../workspace/member/member.ts";
-import { Task } from "./Task.ts";
-import { TaskCommand } from "./TaskCommand.ts";
+import * as AgentPermissions from "../agent/permissions.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import type * as Group from "../group/group.ts";
+import type * as GroupQuery from "../group/query.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Journal from "../journal/journal.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Thread from "../thread/Thread.ts";
+import type * as ThreadCommand from "../thread/ThreadCommand.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
+import * as ThreadStore from "../thread/ThreadStore.ts";
+import type * as Member from "../workspace/member/member.ts";
+import * as Task from "./Task.ts";
+import * as TaskCommand from "./TaskCommand.ts";
 import {
   AlreadyTask,
   Changed,
@@ -31,8 +31,8 @@ import {
   NotFound,
   ParticipantUnavailable,
 } from "./TaskErrors.ts";
-import { TaskPermissions } from "./TaskPermissions.ts";
-import { TaskStore } from "./TaskStore.ts";
+import * as TaskPermissions from "./TaskPermissions.ts";
+import * as TaskStore from "./TaskStore.ts";
 export {
   AlreadyTask,
   Changed,
@@ -85,52 +85,47 @@ export type ReadError =
   | GroupNotFound;
 
 /**
+ * The task operations, one of `Core.Operations`.
+ *
  * The task operations.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Make a conversation a task, under current group audience and `task.create` on the group. The
-   * conversation's opening message becomes the task's description, and its title stays as it is. A
-   * thread that is a task already is `AlreadyTask`. An assignee must be able to take part in the
-   * thread, and assigning an agent needs `agent.use` on it. Returns the task.
-   */
-  readonly create: (
-    input: Task.CreateInput,
-  ) => Effect.Effect<Task.Record, CreateError, Actor.Service>;
-  /**
-   * Change a task in one way, under current group audience and `task.update` on the thread. The
-   * change names the value it replaces: the same value again records nothing, and a task that
-   * changed meanwhile is `Changed`. A new assignee must be able to take part, and assigning an
-   * agent needs `agent.use` on it. Returns the task as changed.
-   */
-  readonly update: (
-    input: Task.UpdateInput,
-  ) => Effect.Effect<Task.Record, UpdateError, Actor.Service>;
-  /** The thread's task, under current group audience and `thread.read`; a thread without one is `NotFound`. */
-  readonly get: (threadId: Thread.Id) => Effect.Effect<Task.Record, ReadError, Actor.Service>;
-  /**
-   * One page of a group's tasks the actor can read, newest created first, of one status when the
-   * options name one: each thread with its task, latest activity, and the actor's position and
-   * unread state, under the rules of `ThreadService.listInGroup`.
-   */
-  readonly listInGroup: (
-    groupId: Group.Id,
-    options: Task.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Service>;
-}
-
-/**
- * The task operations, one of `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/task/TaskService",
-) {}
+export class TaskService extends Context.Service<
+  TaskService,
+  {
+    /**
+     * Make a conversation a task, under current group audience and `task.create` on the group. The
+     * conversation's opening message becomes the task's description, and its title stays as it is. A
+     * thread that is a task already is `AlreadyTask`. An assignee must be able to take part in the
+     * thread, and assigning an agent needs `agent.use` on it. Returns the task.
+     */
+    readonly create: (
+      input: Task.CreateInput,
+    ) => Effect.Effect<Task.Record, CreateError, Actor.Actor>;
+    /**
+     * Change a task in one way, under current group audience and `task.update` on the thread. The
+     * change names the value it replaces: the same value again records nothing, and a task that
+     * changed meanwhile is `Changed`. A new assignee must be able to take part, and assigning an
+     * agent needs `agent.use` on it. Returns the task as changed.
+     */
+    readonly update: (
+      input: Task.UpdateInput,
+    ) => Effect.Effect<Task.Record, UpdateError, Actor.Actor>;
+    /** The thread's task, under current group audience and `thread.read`; a thread without one is `NotFound`. */
+    readonly get: (threadId: Thread.Id) => Effect.Effect<Task.Record, ReadError, Actor.Actor>;
+    /**
+     * One page of a group's tasks the actor can read, newest created first, of one status when the
+     * options name one: each thread with its task, latest activity, and the actor's position and
+     * unread state, under the rules of `ThreadService.listInGroup`.
+     */
+    readonly listInGroup: (
+      groupId: Group.Id,
+      options: Task.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Actor>;
+  }
+>()("@amends-dev/core/task/TaskService") {}
 
 /**
  * Capture bound services; authorize each operation inside its commit.
@@ -139,14 +134,14 @@ export class Service extends Context.Service<Service, Interface>()(
  * @since 0.1.0
  */
 export const make = Effect.fn("TaskService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadStore = yield* ThreadStore.Service;
-  const taskCommand = yield* TaskCommand.Service;
-  const taskStore = yield* TaskStore.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadStore = yield* ThreadStore.ThreadStore;
+  const taskCommand = yield* TaskCommand.TaskCommand;
+  const taskStore = yield* TaskStore.TaskStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   /** The thread, which only its group's members may act on; to anyone else it is missing. */
   const requireThread = (threadId: Thread.Id) =>
@@ -185,7 +180,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
 
   /** The actor as a member, who created the task or made the change, and is told nothing of it. */
   const actorAsMember = Effect.map(
-    Actor.Service,
+    Actor.Actor,
     (actor) => ({ _tag: "Member", memberId: actor.memberId }) as const,
   );
 
@@ -309,7 +304,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
       .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
   });
 
-  return Service.of({ create, update, get, listInGroup });
+  return TaskService.of({ create, update, get, listInGroup });
 });
 
 /**
@@ -318,6 +313,4 @@ export const make = Effect.fn("TaskService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as TaskService from "./TaskService.ts";
+export const layer = Layer.effect(TaskService, make());

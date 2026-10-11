@@ -2,7 +2,7 @@ import { Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/worksp
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
-import { ApiErrors } from "./errors.ts";
+import * as ApiErrors from "./errors.ts";
 
 /** Workspace creation and ownership operations. Creation entitlement checks belong to the host. */
 export class WorkspacesGroup extends HttpApiGroup.make("workspaces")

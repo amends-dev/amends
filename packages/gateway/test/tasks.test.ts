@@ -24,13 +24,13 @@ import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import { TestClock } from "effect/testing";
 import { withStorage } from "./fixture.ts";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
   listOldestFirst,
   otherWorkspaceId,
   runHost,
-  Support,
   takeTurnJobs,
   testProvenance,
   workspaceId,
@@ -50,10 +50,10 @@ describe("tasks", () => {
   const actorFor = (memberId: Member.Id) =>
     Actor.Value.make({ workspaceId, memberId, identity: identityFor(memberId) });
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
+    effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
   const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
@@ -78,7 +78,7 @@ describe("tasks", () => {
   ) =>
     facts(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
           assignmentId: Assignment.Id.make(
@@ -92,7 +92,7 @@ describe("tasks", () => {
   const seed = (bound: Bound) =>
     facts(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.forEach([humanId, otherId, agentId], (memberId) =>
             journal.publish(MemberFacts.Added, {
@@ -106,7 +106,7 @@ describe("tasks", () => {
       ),
     );
   const create = (memberIds: ReadonlyArray<Member.Id>) =>
-    Effect.flatMap(GroupService.Service, (groupService) =>
+    Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name: "Engineering", memberIds, visibility: "Private" }),
     );
   const start = (
@@ -114,15 +114,17 @@ describe("tasks", () => {
       Partial<Pick<Thread.StartInGroupInput, "text" | "mentions">>,
     options?: { readonly requestKey: Request.Key },
   ) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ text: "Ship it", mentions: [], ...input }, options),
     );
   const taskOf = (threadId: Thread.Id) =>
-    Effect.flatMap(TaskService.Service, (taskService) => taskService.get(threadId));
+    Effect.flatMap(TaskService.TaskService, (taskService) => taskService.get(threadId));
   const createTask = (input: Task.CreateInput) =>
-    Effect.flatMap(TaskService.Service, (taskService) => taskService.create(input));
+    Effect.flatMap(TaskService.TaskService, (taskService) => taskService.create(input));
   const update = (threadId: Thread.Id, change: Task.Change) =>
-    Effect.flatMap(TaskService.Service, (taskService) => taskService.update({ threadId, change }));
+    Effect.flatMap(TaskService.TaskService, (taskService) =>
+      taskService.update({ threadId, change }),
+    );
   const kinds = (bound: Bound, threadId: Thread.Id) =>
     Effect.map(bound.activities.listByThread(threadId), (activities) =>
       activities.map((activity) => [activity.sequence, activity.kind] as const),
@@ -232,7 +234,7 @@ describe("tasks", () => {
             const timeline = yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.readTimeline(assigned.thread.id, { limit: 10 }),
               ),
             );
@@ -263,7 +265,7 @@ describe("tasks", () => {
             const listed = yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.listOpenings(group.id, { limit: 10 }),
               ),
             );
@@ -275,7 +277,7 @@ describe("tasks", () => {
             const inTriage = yield* run(
               bound,
               owner,
-              Effect.flatMap(TaskService.Service, (taskService) =>
+              Effect.flatMap(TaskService.TaskService, (taskService) =>
                 taskService.listInGroup(group.id, { status: "triage", limit: 1 }),
               ),
             );
@@ -284,7 +286,7 @@ describe("tasks", () => {
             const next = yield* run(
               bound,
               owner,
-              Effect.flatMap(TaskService.Service, (taskService) =>
+              Effect.flatMap(TaskService.TaskService, (taskService) =>
                 taskService.listInGroup(group.id, {
                   status: "triage",
                   before: { createdAt: cursor!.task!.createdAt, threadId: cursor!.thread.id },
@@ -415,14 +417,14 @@ describe("tasks", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.rename({ threadId, title: "Own the launch", expectedTitle: null }),
               ),
             );
             yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.edit({
                   messageId: started.message.id,
                   text: "Own the launch, end to end.",
@@ -502,7 +504,7 @@ describe("tasks", () => {
             const timeline = yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.readTimeline(threadId, { limit: 10 }),
               ),
             );

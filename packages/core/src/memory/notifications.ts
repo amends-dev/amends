@@ -2,10 +2,11 @@ import { Store } from "../journal/index.ts";
 import { Group } from "../group/index.ts";
 import { Notification, NotificationStore } from "../notification/index.ts";
 import { DateTime, Effect, Layer, Option, Schema, Predicate } from "effect";
-import { Binding } from "./binding.ts";
-import type { MemoryDatabase } from "./database.ts";
+import * as Binding from "./binding.ts";
+import type * as MemoryDatabase from "./database.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, keyOf, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary, keyOf } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Notification.Record));
 
@@ -58,7 +59,7 @@ const withSeen = (space: MemoryDatabase.Space, record: Notification.Record) => {
  * @category constructors
  */
 export const make = Effect.fn("Notifications.make")(function* () {
-  const { workspaceId, read, write, exclusive } = yield* Binding.Service;
+  const { workspaceId, read, write, exclusive } = yield* Binding.Binding;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.of("notifications")));
 
   const listPending = Effect.fnUntraced(function* (
@@ -131,7 +132,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
     for (const [id, row] of written) space.records.of("notifications").set(id, row);
   });
 
-  const driver: NotificationStore.Interface = {
+  const driver: NotificationStore.NotificationStore["Service"] = {
     get: Effect.fn("Notifications.get")(
       function* (id) {
         const space = yield* read;
@@ -359,10 +360,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
 });
 
 /**
- * Provide NotificationStore.Service using its constructor and the caller's dependencies.
+ * Provide NotificationStore.NotificationStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(NotificationStore.Service, make());
-
-export * as Notifications from "./notifications.ts";
+export const layer = Layer.effect(NotificationStore.NotificationStore, make());

@@ -5,7 +5,7 @@
  */
 import { DateTime, Effect, Schema } from "effect";
 import { Snowflake } from "effect/cluster";
-import { PostgresDatabase } from "./database.ts";
+import * as PostgresDatabase from "./database.ts";
 
 /** Another live process runs jobs at this runner address. */
 export class AddressTaken extends Schema.TaggedError<AddressTaken>()(
@@ -29,7 +29,7 @@ export const prune = Effect.fn("PostgresClusterStorage.prune")(function* (
   options: { readonly batch?: number | undefined } = {},
 ) {
   const batch = options.batch ?? 1000;
-  const { sql } = yield* PostgresDatabase.Service;
+  const { sql } = yield* PostgresDatabase.PostgresDatabase;
   const since = DateTime.toEpochMillis(before) - Snowflake.constEpochMillis;
   if (since <= 0 || entityTypes.length === 0) return 0;
   const bound = String(BigInt(since) << 22n);
@@ -59,7 +59,7 @@ export const prune = Effect.fn("PostgresClusterStorage.prune")(function* (
 export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(function* (
   address: string,
 ) {
-  const { sql } = yield* PostgresDatabase.Service;
+  const { sql } = yield* PostgresDatabase.PostgresDatabase;
   const connection = yield* sql.reserve;
   const key = JSON.stringify(["runner", address]);
   const claim = (statement: string) =>
@@ -73,5 +73,3 @@ export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(fun
     Effect.ignore(claim("SELECT pg_advisory_unlock(hashtextextended($1, 2)) AS held")),
   );
 });
-
-export * as PostgresClusterStorage from "./cluster-storage.ts";

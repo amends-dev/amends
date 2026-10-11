@@ -4,9 +4,9 @@ import { migrate } from "drizzle-orm/effect-postgres/migrator";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { fileURLToPath } from "node:url";
-import { PostgresNotices } from "./notices.ts";
-import { PostgresReads } from "./reads.ts";
-import { PostgresTurns } from "./turns.ts";
+import * as PostgresNotices from "./notices.ts";
+import * as PostgresReads from "./reads.ts";
+import * as PostgresTurns from "./turns.ts";
 
 /** Migrations generated from the schema by `bun run generate`; applied during construction. */
 export const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
@@ -19,20 +19,19 @@ export type DrizzleClient = Effect.Success<ReturnType<typeof PgDrizzle.makeWithD
  * runs through that client, so a transaction the journal opens on a reserved
  * connection carries the Drizzle statements inside it.
  */
-export interface Interface {
-  readonly db: DrizzleClient;
-  readonly sql: SqlClient.SqlClient;
-  /** Append wakeups and relayed signals, from one listener for this pool. */
-  readonly notices: PostgresNotices.Interface;
-  /** Turns among this process's writers to one workspace or log, before they take a connection. */
-  readonly turns: PostgresTurns.Interface;
-  /** The cap on connections one workspace's statements outside its transactions use at once. */
-  readonly reads: PostgresReads.Interface;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/storage-postgresql/database/Service",
-) {}
+export class PostgresDatabase extends Context.Service<
+  PostgresDatabase,
+  {
+    readonly db: DrizzleClient;
+    readonly sql: SqlClient.SqlClient;
+    /** Append wakeups and relayed signals, from one listener for this pool. */
+    readonly notices: PostgresNotices.PostgresNotices;
+    /** Turns among this process's writers to one workspace or log, before they take a connection. */
+    readonly turns: PostgresTurns.PostgresTurns;
+    /** The cap on connections one workspace's statements outside its transactions use at once. */
+    readonly reads: PostgresReads.PostgresReads;
+  }
+>()("@amends-dev/storage-postgresql/database/Service") {}
 
 /**
  * Construct the database service over the caller's PostgreSQL client, applying pending
@@ -52,7 +51,7 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
     ),
   );
   const notices = yield* PostgresNotices.make();
-  return Service.of({
+  return PostgresDatabase.of({
     db,
     sql,
     notices,
@@ -67,6 +66,4 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
  * @category layers
  */
 export const layer = (config: PgClient.PgPoolConfig) =>
-  Layer.effect(Service, make()).pipe(Layer.provideMerge(PgClient.layer(config)));
-
-export * as PostgresDatabase from "./database.ts";
+  Layer.effect(PostgresDatabase, make()).pipe(Layer.provideMerge(PgClient.layer(config)));

@@ -2,8 +2,8 @@ import { Connection } from "@amends-dev/connection";
 import { ConnectionCredentialStore } from "@amends-dev/core/connection";
 import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
-import { CredentialKey } from "./credential-key.ts";
+import * as Binding from "./binding.ts";
+import * as CredentialKey from "./credential-key.ts";
 import { storeFailure } from "./errors.ts";
 import { connectionCredentials } from "./schema.ts";
 
@@ -22,8 +22,8 @@ const decodeCredential = Schema.decodeEffect(CredentialJson);
  * @category constructors
  */
 export const make = Effect.fn("ConnectionCredentials.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
-  const credentialKey = yield* CredentialKey.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
+  const credentialKey = yield* CredentialKey.CredentialKey;
   const { db } = database;
   /** What each sealed credential is bound to: its workspace and its connection. */
   const bindingOf = (connectionId: string) => JSON.stringify([workspaceId, connectionId]);
@@ -32,7 +32,7 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
       eq(connectionCredentials.workspaceId, workspaceId),
       eq(connectionCredentials.connectionId, connectionId),
     );
-  const driver: ConnectionCredentialStore.Interface = {
+  const driver: ConnectionCredentialStore.ConnectionCredentialStore["Service"] = {
     set: Effect.fn("ConnectionCredentials.set")(function* (connectionId, credential) {
       if (Option.isNone(credentialKey)) return yield* unavailable;
       const sealed = yield* encodeCredential(credential).pipe(
@@ -75,6 +75,4 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
 });
 
 /** Provide credential storage over the caller's binding and credential key. @category layers */
-export const layer = Layer.effect(ConnectionCredentialStore.Service, make());
-
-export * as ConnectionCredentials from "./connection-credentials.ts";
+export const layer = Layer.effect(ConnectionCredentialStore.ConnectionCredentialStore, make());

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import type { Workspace } from "../../workspace/workspace.ts";
-import { Permission } from "../permission.ts";
-import { Role } from "./role.ts";
+import type * as Workspace from "../../workspace/workspace.ts";
+import * as Permission from "../permission.ts";
+import * as Role from "./role.ts";
 
 /** Reserved identities, scoped by the role's workspace. Display names are not identities. */
 export const MemberId = Role.Id.make("builtin:member");
@@ -60,5 +60,3 @@ export const make = (
     }),
   );
 };
-
-export * as BuiltinRoles from "./builtin.ts";

@@ -2,14 +2,14 @@ import { expect, it } from "@effect/vitest";
 import { SessionTokens } from "@amends-dev/gateway";
 import { Identity } from "@amends-dev/core/identity";
 import { Effect, Redacted } from "effect";
-import { DevelopmentSessionTokens } from "../../src/authentication/session-tokens.ts";
+import * as DevelopmentSessionTokens from "../../src/authentication/session-tokens.ts";
 
 it.effect.each(["make", "layer"] as const)(
   "development session tokens %s trust asserted human IDs and reject empty tokens",
   (construction) =>
     Effect.gen(function* () {
       const program = Effect.gen(function* () {
-        const sessionTokens = yield* SessionTokens.Service;
+        const sessionTokens = yield* SessionTokens.SessionTokens;
         expect(yield* sessionTokens.resolve(Redacted.make("alice"))).toEqual(
           Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") }),
         );
@@ -23,7 +23,7 @@ it.effect.each(["make", "layer"] as const)(
       });
       yield* construction === "make"
         ? program.pipe(
-            Effect.provideService(SessionTokens.Service, DevelopmentSessionTokens.make()),
+            Effect.provideService(SessionTokens.SessionTokens, DevelopmentSessionTokens.make()),
           )
         : program.pipe(Effect.provide(DevelopmentSessionTokens.layer));
     }),

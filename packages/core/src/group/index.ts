@@ -1,37 +1,37 @@
-export { Group } from "./group.ts";
+export * as Group from "./group.ts";
 
-export { GroupService } from "./service.ts";
+export * as GroupService from "./service.ts";
 
-export { GroupCommand } from "./command.ts";
+export * as GroupCommand from "./command.ts";
 
-export { GroupQuery } from "./query.ts";
+export * as GroupQuery from "./query.ts";
 
-export { GroupFacts } from "./facts.ts";
+export * as GroupFacts from "./facts.ts";
 
-export { GroupPermissions } from "./permissions.ts";
+export * as GroupPermissions from "./permissions.ts";
 
-export { GroupProjection } from "./projection.ts";
+export * as GroupProjection from "./projection.ts";
 
-export { GroupStore } from "./store.ts";
+export * as GroupStore from "./store.ts";
 
-export { GroupMembership } from "./membership/membership.ts";
+export * as GroupMembership from "./membership/membership.ts";
 
-export { GroupMembershipService } from "./membership/service.ts";
+export * as GroupMembershipService from "./membership/service.ts";
 
-export { GroupMembershipPermissions } from "./membership/permissions.ts";
+export * as GroupMembershipPermissions from "./membership/permissions.ts";
 
-export { GroupMembershipFacts } from "./membership/facts.ts";
+export * as GroupMembershipFacts from "./membership/facts.ts";
 
-export { GroupMembershipProjection } from "./membership/projection.ts";
+export * as GroupMembershipProjection from "./membership/projection.ts";
 
-export { GroupMembershipStore } from "./membership/store.ts";
+export * as GroupMembershipStore from "./membership/store.ts";
 
-export { GroupFollow } from "./follow/follow.ts";
+export * as GroupFollow from "./follow/follow.ts";
 
-export { GroupFollowService } from "./follow/service.ts";
+export * as GroupFollowService from "./follow/service.ts";
 
-export { GroupFollowFacts } from "./follow/facts.ts";
+export * as GroupFollowFacts from "./follow/facts.ts";
 
-export { GroupFollowProjection } from "./follow/projection.ts";
+export * as GroupFollowProjection from "./follow/projection.ts";
 
-export { GroupFollowStore } from "./follow/store.ts";
+export * as GroupFollowStore from "./follow/store.ts";

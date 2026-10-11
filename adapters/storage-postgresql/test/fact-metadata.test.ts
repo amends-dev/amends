@@ -30,7 +30,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId);
           yield* Effect.gen(function* () {
-            const journal = yield* Journal.Service;
+            const journal = yield* Journal.Journal;
             yield* journal.commit(
               Effect.gen(function* () {
                 yield* journal.publish(Changed, "first");
@@ -40,7 +40,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
             yield* journal.publish(Changed, "third");
           }).pipe(
-            Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+            Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
             Effect.provide(core(bound)),
           );
           const rows =

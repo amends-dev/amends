@@ -12,22 +12,22 @@ import {
 } from "@amends-dev/core/thread";
 import { Identity } from "@amends-dev/core/identity";
 import { Subject } from "@amends-dev/core/journal";
-import { Publication } from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Schema } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Store } from "../../src/journal/store.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Group } from "../../src/group/group.ts";
-import { GroupMembership } from "../../src/group/membership/membership.ts";
-import { GroupMembershipFacts } from "../../src/group/membership/facts.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { NotificationProjection } from "../../src/notification/projection.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Fact from "../../src/journal/fact.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
+import * as Group from "../../src/group/group.ts";
+import * as GroupMembership from "../../src/group/membership/membership.ts";
+import * as GroupMembershipFacts from "../../src/group/membership/facts.ts";
+import * as Member from "../../src/workspace/member/member.ts";
+import * as Transaction from "../../src/journal/transaction.ts";
+import * as NotificationProjection from "../../src/notification/projection.ts";
 import { make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
@@ -44,7 +44,7 @@ const key = {
   version: NotificationProjection.definition.version,
 };
 /** A notification store that refuses every call; tests replace the calls they expect. */
-const refusing: NotificationStore.Interface = {
+const refusing: NotificationStore.NotificationStore["Service"] = {
   get: () => Effect.die("Unexpected notification read"),
   listPendingByRecipient: () => Effect.die("Unexpected notification read"),
   listLatestByRecipient: () => Effect.die("Unexpected notification read"),
@@ -66,20 +66,20 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    | Publication.Service
-    | Log.Service
-    | Transaction.Service
-    | Checkpoint.Service
-    | NotificationStore.Service
+    | Publication.Publication
+    | Log.Log
+    | Transaction.Transaction
+    | Checkpoint.Checkpoint
+    | NotificationStore.NotificationStore
   >,
   notifications = refusing,
 ) =>
   program.pipe(
-    Effect.provideService(NotificationStore.Service, notifications),
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(NotificationStore.NotificationStore, notifications),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
   );
 it.effect(
   "facts without a notification handler rebuild and publish without reading or writing domain stores",
@@ -154,7 +154,7 @@ it.effect("notifications rebuild from recorded activity alone", () =>
     const fixture = yield* make();
     const inserted: Array<Notification.Record> = [];
     const discarded: Array<ThreadParticipation.Id> = [];
-    const notifications: NotificationStore.Interface = {
+    const notifications: NotificationStore.NotificationStore["Service"] = {
       ...refusing,
       insertMany: (records) => Effect.sync(() => void inserted.push(...records)),
       discardPendingForParticipation: (id) => Effect.sync(() => void discarded.push(id)),
@@ -244,7 +244,7 @@ it.effect("leaving a group settles what the member had pending from it, live and
     for (const rebuild of [false, true]) {
       const fixture = yield* make();
       const settled: Array<readonly [Member.Id, Group.Id]> = [];
-      const notifications: NotificationStore.Interface = {
+      const notifications: NotificationStore.NotificationStore["Service"] = {
         ...refusing,
         discardPendingForGroup: (memberId, groupId) =>
           Effect.sync(() => void settled.push([memberId, groupId])),

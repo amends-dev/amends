@@ -18,25 +18,25 @@ import { type Array, Effect, type Scope } from "effect";
 
 /** @category constructors */
 export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
-  const gateway = yield* Gateway.Service;
+  const gateway = yield* Gateway.Gateway;
   /** Run `program` in the workspace, holding it only while `program` runs. */
   const enter = <A, E>(program: Effect.Effect<A, E, Core.JobServices | Scope.Scope>) =>
     Effect.scoped(gateway.inWorkspace(workspaceId, program));
   /** Ask `call` of the workspace's turn execution, whose errors the gateway reports as public. */
   const turnExecution = <A, E>(
-    call: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>,
-  ) => enter(Effect.flatMap(TurnExecution.Service, call));
+    call: (turnExecution: TurnExecution.TurnExecution["Service"]) => Effect.Effect<A, E>,
+  ) => enter(Effect.flatMap(TurnExecution.TurnExecution, call));
   /**
    * Ask `call` of the workspace's session log store. The log takes part in no commit and its
    * errors are the writer's to handle, so they leave the workspace as they are, where the gateway
    * would report them as defects.
    */
   const sessionLogStore = <A, E>(
-    call: (sessionLogStore: SessionLogStore.Interface) => Effect.Effect<A, E>,
+    call: (sessionLogStore: SessionLogStore.SessionLogStore["Service"]) => Effect.Effect<A, E>,
   ) =>
-    enter(Effect.flatMap(SessionLogStore.Service, (store) => Effect.result(call(store)))).pipe(
-      Effect.flatMap(Effect.fromResult),
-    );
+    enter(
+      Effect.flatMap(SessionLogStore.SessionLogStore, (store) => Effect.result(call(store))),
+    ).pipe(Effect.flatMap(Effect.fromResult));
   return {
     /** The agent's active turn in the thread, or a new one that accepts the work that waits. */
     accept: (job: TurnJobs.Job) =>
@@ -50,15 +50,19 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
     showDraft: (turnId: Turn.Id, draft: Turn.Draft) =>
       turnExecution((turnExecution) => turnExecution.showDraft(turnId, draft)),
     /** Close the turn its agent answered. */
-    close: (turnId: Turn.Id, closing: Parameters<TurnExecution.Interface["close"]>[1]) =>
-      turnExecution((turnExecution) => turnExecution.close(turnId, closing)),
+    close: (
+      turnId: Turn.Id,
+      closing: Parameters<TurnExecution.TurnExecution["Service"]["close"]>[1],
+    ) => turnExecution((turnExecution) => turnExecution.close(turnId, closing)),
     /** Fail the turn. */
-    fail: (turnId: Turn.Id, failure: Parameters<TurnExecution.Interface["fail"]>[1]) =>
-      turnExecution((turnExecution) => turnExecution.fail(turnId, failure)),
+    fail: (
+      turnId: Turn.Id,
+      failure: Parameters<TurnExecution.TurnExecution["Service"]["fail"]>[1],
+    ) => turnExecution((turnExecution) => turnExecution.fail(turnId, failure)),
     /** End the turn that was asked to stop, or that no run holds. */
     confirmStopped: (
       turnId: Turn.Id,
-      stopped: Parameters<TurnExecution.Interface["confirmStopped"]>[1],
+      stopped: Parameters<TurnExecution.TurnExecution["Service"]["confirmStopped"]>[1],
     ) => turnExecution((turnExecution) => turnExecution.confirmStopped(turnId, stopped)),
     /** The participation's session log past `after`, at most `limit` entries, oldest first. */
     readLog: (
@@ -79,5 +83,3 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
 });
 
 export type TurnWorkspace = Effect.Success<ReturnType<typeof make>>;
-
-export * as TurnWorkspace from "./workspace.ts";

@@ -1,6 +1,6 @@
 import { Context, Schema } from "effect";
 import type { Effect } from "effect";
-import { Accounts } from "./accounts.ts";
+import * as Accounts from "./accounts.ts";
 
 export const Code = Schema.String.check(Schema.isPattern(/^\d{6}$/, { title: "six-digit code" }));
 export type Code = typeof Code.Type;
@@ -36,25 +36,24 @@ export class Limited extends Schema.TaggedError<Limited>()("SignIn.Limited", {})
 /** The host could not send the code now; asking again may work. */
 export class Unavailable extends Schema.TaggedError<Unavailable>()("SignIn.Unavailable", {}) {}
 
-export interface Interface {
-  /** The ways this host signs people in, which a sign-in page offers. */
-  readonly methods: Methods;
-  /**
-   * Send a one-time code to the address, for a client at `remoteAddress`, the network address
-   * the request came from when the host knows it. Unknown addresses are accepted: completing
-   * sign-in finds or creates the address's account.
-   */
-  readonly start: (
-    email: Accounts.Email,
-    remoteAddress: string | undefined,
-  ) => Effect.Effect<void, Limited | Unavailable>;
-  /** Exchange a delivered code for a session as the address's account. A code works once. */
-  readonly complete: (email: Accounts.Email, code: Code) => Effect.Effect<Session, Rejected>;
-}
-
-/** The ingress that produces authenticated humans; hosts own delivery and token issuance. */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/gateway/sign-in/Service",
-) {}
-
-export * as SignIn from "./sign-in.ts";
+/**
+ * The ingress that produces authenticated humans; hosts own delivery and token issuance.
+ */
+export class SignIn extends Context.Service<
+  SignIn,
+  {
+    /** The ways this host signs people in, which a sign-in page offers. */
+    readonly methods: Methods;
+    /**
+     * Send a one-time code to the address, for a client at `remoteAddress`, the network address
+     * the request came from when the host knows it. Unknown addresses are accepted: completing
+     * sign-in finds or creates the address's account.
+     */
+    readonly start: (
+      email: Accounts.Email,
+      remoteAddress: string | undefined,
+    ) => Effect.Effect<void, Limited | Unavailable>;
+    /** Exchange a delivered code for a session as the address's account. A code works once. */
+    readonly complete: (email: Accounts.Email, code: Code) => Effect.Effect<Session, Rejected>;
+  }
+>()("@amends-dev/gateway/sign-in/Service") {}

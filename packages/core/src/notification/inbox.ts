@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import { ThreadTimeline } from "../thread/ThreadTimeline.ts";
-import { Notification } from "./notification.ts";
-import { NotificationStore } from "./store.ts";
+import * as ThreadTimeline from "../thread/ThreadTimeline.ts";
+import * as Notification from "./notification.ts";
+import * as NotificationStore from "./store.ts";
 
 /** One page of a reader's inbox, newest first: all of it, or what still waits for them. */
 export const Options = Schema.Struct({
@@ -20,5 +20,3 @@ export const Item = Schema.Struct({
   source: Schema.optionalKey(ThreadTimeline.Item),
 });
 export interface Item extends Schema.Schema.Type<typeof Item> {}
-
-export * as NotificationInbox from "./inbox.ts";

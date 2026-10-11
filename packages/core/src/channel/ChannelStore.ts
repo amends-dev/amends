@@ -7,10 +7,10 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
-import { Channel } from "./Channel.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import type * as Store from "../journal/store.ts";
+import * as Channel from "./Channel.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing channels.
@@ -36,39 +36,34 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ChannelStore.Confl
 }) {}
 
 /**
- * What a storage adapter implements for channels.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  /** The channel, removed or not. */
-  readonly get: (id: Channel.Id) => Effect.Effect<Option.Option<Channel.Record>, Failure>;
-  /** The workspace's channels that are not removed, in no particular order. */
-  readonly listActive: Effect.Effect<ReadonlyArray<Channel.Record>, Failure>;
-  /** Reject a reused id. Never upsert. */
-  readonly insert: (
-    record: Channel.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Replace a stored channel; a missing record conflicts. */
-  readonly update: (
-    record: Channel.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The channel store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for channels.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/ChannelStore",
-) {}
+export class ChannelStore extends Context.Service<
+  ChannelStore,
+  {
+    /** The channel, removed or not. */
+    readonly get: (id: Channel.Id) => Effect.Effect<Option.Option<Channel.Record>, Failure>;
+    /** The workspace's channels that are not removed, in no particular order. */
+    readonly listActive: Effect.Effect<ReadonlyArray<Channel.Record>, Failure>;
+    /** Reject a reused id. Never upsert. */
+    readonly insert: (
+      record: Channel.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /** Replace a stored channel; a missing record conflicts. */
+    readonly update: (
+      record: Channel.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/channel/ChannelStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -77,7 +72,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: ChannelStore["Service"],
+): ChannelStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -87,5 +85,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
     update: (record) => Effect.flatMap(write("update", Channel.Record, record), driver.update),
   };
 };
-
-export * as ChannelStore from "./ChannelStore.ts";

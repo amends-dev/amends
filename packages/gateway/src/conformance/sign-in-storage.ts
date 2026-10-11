@@ -22,17 +22,17 @@ const session: SignInStorage.SessionRecord = {
 };
 
 /** Read an address's pending code, leaving it as it is. */
-const readCode = Effect.flatMap(SignInStorage.Service, (signInStorage) =>
+const readCode = Effect.flatMap(SignInStorage.SignInStorage, (signInStorage) =>
   signInStorage.modifyCode(email, (current) => [current, current] as const),
 );
 /** Set an address's pending code, or remove it with none. */
 const writeCode = (next: Option.Option<SignInStorage.PendingCode>) =>
-  Effect.flatMap(SignInStorage.Service, (signInStorage) =>
+  Effect.flatMap(SignInStorage.SignInStorage, (signInStorage) =>
     signInStorage.modifyCode(email, () => [undefined, next] as const),
   );
 const withSignInStorage = <A, E, R>(
-  use: (signInStorage: SignInStorage.Interface) => Effect.Effect<A, E, R>,
-) => Effect.flatMap(SignInStorage.Service, use);
+  use: (signInStorage: SignInStorage.SignInStorage["Service"]) => Effect.Effect<A, E, R>,
+) => Effect.flatMap(SignInStorage.SignInStorage, use);
 
 /** Sign-in codes changed one at a time from every host, and sessions found, extended, and ended. */
 export const signInStorage = (fixture: Fixture) => {

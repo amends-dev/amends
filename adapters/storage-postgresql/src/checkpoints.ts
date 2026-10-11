@@ -1,7 +1,7 @@
 import { Checkpoint, Store } from "@amends-dev/core/journal";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { checkpoints, liveProjections } from "./schema.ts";
 
@@ -12,7 +12,7 @@ import { checkpoints, liveProjections } from "./schema.ts";
  * @category constructors
  */
 export const make = Effect.fn("Checkpoints.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const cursorColumns = {
     position: checkpoints.position,
@@ -20,7 +20,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
     index: checkpoints.entryIndex,
     entryId: checkpoints.entryId,
   };
-  const driver: Checkpoint.Interface = {
+  const driver: Checkpoint.Checkpoint["Service"] = {
     get: Effect.fn("Checkpoints.get")(function* (key) {
       const rows = yield* guard(
         db
@@ -105,10 +105,8 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
 });
 
 /**
- * Provide Checkpoint.Service using its constructor and the caller's dependencies.
+ * Provide Checkpoint.Checkpoint using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(Checkpoint.Service, make());
-
-export * as Checkpoints from "./checkpoints.ts";
+export const layer = Layer.effect(Checkpoint.Checkpoint, make());

@@ -1,25 +1,25 @@
-import { Request } from "../../request/request.ts";
+import * as Request from "../../request/request.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-import { Authorization } from "../../authorization/authorization.ts";
-import { Delegation } from "../../authorization/delegation.ts";
-import { Requirement } from "../../authorization/requirement.ts";
-import { Target } from "../../authorization/target.ts";
-import { Actor } from "../../identity/actor.ts";
-import { Identity } from "../../identity/identity.ts";
-import { Journal } from "../../journal/journal.ts";
-import { Publication } from "../../journal/publication.ts";
-import type { Log } from "../../journal/log.ts";
-import type { Projection } from "../../journal/projection.ts";
-import { Store } from "../../journal/store.ts";
-import { Invitation } from "./invitation.ts";
-import { InvitationFacts } from "./facts.ts";
-import { InvitationPermissions } from "./permissions.ts";
-import { InvitationStore } from "./store.ts";
-import { Member } from "../member/member.ts";
-import { MemberCommand } from "../member/command.ts";
-import { MemberStore } from "../member/store.ts";
+import * as Authorization from "../../authorization/authorization.ts";
+import * as Delegation from "../../authorization/delegation.ts";
+import * as Requirement from "../../authorization/requirement.ts";
+import * as Target from "../../authorization/target.ts";
+import * as Actor from "../../identity/actor.ts";
+import * as Identity from "../../identity/identity.ts";
+import * as Journal from "../../journal/journal.ts";
+import * as Publication from "../../journal/publication.ts";
+import type * as Log from "../../journal/log.ts";
+import type * as Projection from "../../journal/projection.ts";
+import * as Store from "../../journal/store.ts";
+import * as Invitation from "./invitation.ts";
+import * as InvitationFacts from "./facts.ts";
+import * as InvitationPermissions from "./permissions.ts";
+import * as InvitationStore from "./store.ts";
+import * as Member from "../member/member.ts";
+import * as MemberCommand from "../member/command.ts";
+import * as MemberStore from "../member/store.ts";
 import { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
 export { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
 
@@ -38,28 +38,30 @@ export type Error =
   | Unavailable
   | InvalidExpiry;
 
-export interface Interface {
-  readonly issue: (
-    request: Invitation.IssueInput,
-    options?: Request.Options,
-  ) => Effect.Effect<Invitation.Record, Error, Actor.Service>;
-  /**
-   * Trusted ingress supplies the authenticated recipient; no membership is required yet. The
-   * recipient says what people in the workspace call them.
-   */
-  readonly accept: (
-    id: Invitation.Id,
-    recipient: Identity.HumanId,
-    name: Member.Name,
-  ) => Effect.Effect<Member.Record, Error>;
-  readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Record, Error, Actor.Service>;
-  /** Every invitation in the workspace in issue order; requires invitation.manage. */
-  readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Error, Actor.Service>;
-}
-/** What a keyed issuance created, so that a retry returns it. */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/workspace/invitation-application/Service",
-) {}
+/**
+ * What a keyed issuance created, so that a retry returns it.
+ */
+export class InvitationService extends Context.Service<
+  InvitationService,
+  {
+    readonly issue: (
+      request: Invitation.IssueInput,
+      options?: Request.Options,
+    ) => Effect.Effect<Invitation.Record, Error, Actor.Actor>;
+    /**
+     * Trusted ingress supplies the authenticated recipient; no membership is required yet. The
+     * recipient says what people in the workspace call them.
+     */
+    readonly accept: (
+      id: Invitation.Id,
+      recipient: Identity.HumanId,
+      name: Member.Name,
+    ) => Effect.Effect<Member.Record, Error>;
+    readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Record, Error, Actor.Actor>;
+    /** Every invitation in the workspace in issue order; requires invitation.manage. */
+    readonly list: Effect.Effect<ReadonlyArray<Invitation.Record>, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/workspace/invitation-application/Service") {}
 
 /**
  * Construct invitation operations from workspace services; read the actor during protected calls.
@@ -67,25 +69,25 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  */
 export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.Return<
-  Interface,
+  InvitationService["Service"],
   never,
-  | InvitationStore.Service
-  | MemberStore.Service
-  | Authorization.Service
-  | Delegation.Service
-  | MemberCommand.Service
-  | Journal.Service
+  | InvitationStore.InvitationStore
+  | MemberStore.MemberStore
+  | Authorization.Authorization
+  | Delegation.Delegation
+  | MemberCommand.MemberCommand
+  | Journal.Journal
   | Crypto.Crypto
-  | Store.Service
+  | Store.Store
 > {
-  const invitationStore = yield* InvitationStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const authorization = yield* Authorization.Service;
-  const delegation = yield* Delegation.Service;
-  const memberCommand = yield* MemberCommand.Service;
-  const journal = yield* Journal.Service;
+  const invitationStore = yield* InvitationStore.InvitationStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const authorization = yield* Authorization.Authorization;
+  const delegation = yield* Delegation.Delegation;
+  const memberCommand = yield* MemberCommand.MemberCommand;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
   const manage = Requirement.make(
     InvitationPermissions.Manage,
     Target.Reference.cases.Workspace.make({ workspaceId }),
@@ -96,7 +98,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   ) {
     yield* authorization.require([manage]);
     yield* delegation.requireGrant(input.roleId);
-    return yield* Actor.Service;
+    return yield* Actor.Actor;
   });
   const requireInvitation = Effect.fnUntraced(function* (id: Invitation.Id) {
     const validId = yield* Schema.decodeEffect(Invitation.Id)(id);
@@ -180,7 +182,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       });
     // Only this authority check uses the recorded inviter, never recipient input.
     yield* authorizeInvitation(details).pipe(
-      Effect.provideService(Actor.Service, {
+      Effect.provideService(Actor.Actor, {
         workspaceId,
         memberId: details.inviterMemberId,
         identity: inviter.value.identity,
@@ -207,7 +209,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         acceptedAt,
       });
       return member;
-    }).pipe(Effect.provideService(Publication.Service, provenance));
+    }).pipe(Effect.provideService(Publication.Publication, provenance));
   }, journal.commit);
 
   const revoke = Effect.fn("InvitationService.revoke")(
@@ -237,7 +239,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     return yield* invitationStore.list;
   }).pipe(Effect.withSpan("InvitationService.list"));
 
-  return Service.of({ issue, accept, revoke, list });
+  return InvitationService.of({ issue, accept, revoke, list });
 });
 
 /**
@@ -245,6 +247,4 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
-
-export * as InvitationService from "./service.ts";
+export const layer = Layer.effect(InvitationService, make());

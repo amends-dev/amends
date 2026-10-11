@@ -36,7 +36,7 @@ Both have one shape. A workspace binding owns one workspace's view of the databa
 transaction boundary. Each store is a module over that binding, implementing core's store
 contract, with matching filenames in both, such as `thread-messages.ts`. `layerWorkspace` merges
 the stores over one binding, and `PostgresWorkspaceStorage` builds those views on demand as
-`WorkspaceStorage.Service`. Database tables and migrations belong to the adapter; domain records
+`WorkspaceStorage.WorkspaceStorage`. Database tables and migrations belong to the adapter; domain records
 and store contracts belong to core. `PostgresStorage.layer` composes workspace storage, the directory, the accounts, and sign-in
 storage, with the signal hub that relays signals between hosts over the same database, and leaves
 the database itself to the host. The PostgreSQL adapter also keeps up the tables Effect

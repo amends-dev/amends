@@ -11,8 +11,9 @@ import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Result } from "effect";
 
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
 
+import * as Support from "./support.ts";
 import {
   alice,
   at,
@@ -23,7 +24,6 @@ import {
   future,
   journalLog,
   request,
-  Support,
   testProvenance,
 } from "./support.ts";
 
@@ -52,8 +52,10 @@ describe("invitation replay", () => {
               cause: "injected late failure",
             });
             const broken = failingLate(bound, error);
-            const failure = yield* Effect.flatMap(InvitationService.Service, (invitationService) =>
-              invitationService.accept(invitation.details.id, bob.id, Member.Name.make("bob")),
+            const failure = yield* Effect.flatMap(
+              InvitationService.InvitationService,
+              (invitationService) =>
+                invitationService.accept(invitation.details.id, bob.id, Member.Name.make("bob")),
             ).pipe(Effect.provide(core(broken)), Effect.flip);
             expect(failure).toBe(error);
             expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
@@ -109,11 +111,11 @@ describe("invitation replay", () => {
               cause: "injected late failure",
             });
             const broken = failingLate(bound, error);
-            const failure = yield* Effect.flatMap(MemberService.Service, (memberService) =>
+            const failure = yield* Effect.flatMap(MemberService.MemberService, (memberService) =>
               memberService.remove(member.id),
             ).pipe(
               Effect.provide(core(broken)),
-              Effect.provideService(Actor.Service, {
+              Effect.provideService(Actor.Actor, {
                 workspaceId: workspace.id,
                 memberId: workspace.ownerMemberId,
                 identity: alice,
@@ -175,7 +177,7 @@ describe("invitation replay", () => {
             );
             // Rebuild the read models from the recorded outcomes.
             yield* storage.discardProjections;
-            yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+            yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
               Effect.provide(core(bound)),
             );
             expect(yield* Operations.getMember(workspace.id, alice, member.id)).toMatchObject({
@@ -240,20 +242,20 @@ describe("invitation replay", () => {
                 source.roleId === BuiltinRoles.OwnerId,
             );
             if (assignment === undefined) throw new Error("Missing Owner assignment");
-            yield* Effect.flatMap(Journal.Service, (journal) =>
+            yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(AssignmentFacts.Revoked, {
                   workspaceId: workspace.id,
                   assignmentId: assignment.id,
                   memberId: assignment.memberId,
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspace.id))),
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspace.id))),
             ).pipe(Effect.provide(core(bound)));
             const before = yield* bound.store.read(journalLog, { limit: 20 });
             yield* storage.discardProjections;
             yield* at(
               DateTime.add(expiresAt, { days: 1 }),
-              Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+              Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
                 Effect.provide(core(bound)),
               ),
             );

@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { fileURLToPath } from "node:url";
-import { ChangeFeedEvents } from "../../src/change-feed/events.ts";
-import type { Fact } from "../../src/journal/fact.ts";
+import * as ChangeFeedEvents from "../../src/change-feed/events.ts";
+import type * as Fact from "../../src/journal/fact.ts";
 
 const isFact = (value: unknown): value is Fact.Definition =>
   typeof value === "object" &&

@@ -15,7 +15,7 @@ const messages: Record<SessionTokens.Rejected["reason"], string> = {
  * @category constructors
  */
 export const make = Effect.fn("BearerAuthentication.make")(function* () {
-  const sessionTokens = yield* SessionTokens.Service;
+  const sessionTokens = yield* SessionTokens.SessionTokens;
   return Authentication.of({
     bearer: (httpEffect, { credential }) =>
       sessionTokens.resolve(credential).pipe(
@@ -36,5 +36,3 @@ export const make = Effect.fn("BearerAuthentication.make")(function* () {
  * @category layers
  */
 export const layer = Layer.effect(Authentication, make());
-
-export * as BearerAuthentication from "./authentication.ts";

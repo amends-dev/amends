@@ -1,6 +1,6 @@
 import { SignalHub } from "../signal/index.ts";
 import { Effect, Layer } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 
 /**
  * The workspace's signals, shared by every host over the same storage. Each subscriber has its
@@ -9,19 +9,17 @@ import { Binding } from "./binding.ts";
  * @category constructors
  */
 export const make = Effect.fn("MemorySignalHub.make")(function* () {
-  const { workspaceId, connection } = yield* Binding.Service;
+  const { workspaceId, connection } = yield* Binding.Binding;
   const { signals } = connection.database;
-  return SignalHub.Service.of({
+  return SignalHub.SignalHub.of({
     publish: signals.publish,
     subscribe: signals.subscribe(workspaceId),
   });
 });
 
 /**
- * Provide SignalHub.Service using its constructor and the caller's dependencies.
+ * Provide SignalHub.SignalHub using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(SignalHub.Service, make());
-
-export * as MemorySignalHub from "./signal-hub.ts";
+export const layer = Layer.effect(SignalHub.SignalHub, make());

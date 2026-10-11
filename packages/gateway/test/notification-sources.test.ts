@@ -33,6 +33,7 @@ import {
 import { Gateway } from "@amends-dev/gateway";
 import { Context, DateTime, Effect, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
@@ -40,7 +41,6 @@ import {
   otherWorkspaceId,
   placed,
   runHost,
-  Support,
   testProvenance,
   threadInternals,
   workspaceId,
@@ -68,12 +68,12 @@ describe("notification sources", () => {
   const actorFor = (memberId: Member.Id) =>
     Actor.Value.make({ workspaceId, memberId, identity: identityFor(memberId) });
   const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Value) =>
-    effect.pipe(Effect.provideService(Actor.Service, actor));
+    effect.pipe(Effect.provideService(Actor.Actor, actor));
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
     asActor(effect, actor).pipe(Effect.provide(core(bound)));
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
     );
   const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
@@ -82,15 +82,15 @@ describe("notification sources", () => {
       limit: 100,
     });
   const create = (memberIds: ReadonlyArray<Member.Id>) =>
-    Effect.flatMap(GroupService.Service, (groupService) =>
+    Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name: "Engineering", memberIds }),
     );
   const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, mentions, text: "Opening" }),
     ).pipe(Effect.flatMap(placed));
   const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
-    Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+    Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
       threadMessageService.publish({ threadId, mentions, text }),
     ).pipe(Effect.flatMap((message) => placed({ message })));
   const threadTarget = (threadId: Thread.Id): Target.Reference => ({
@@ -106,7 +106,7 @@ describe("notification sources", () => {
   ) =>
     facts(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
           assignmentId: Assignment.Id.make(
@@ -128,7 +128,7 @@ describe("notification sources", () => {
   const seed = (bound: Bound) =>
     facts(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.gen(function* () {
             for (const memberId of [humanId, otherId, agentId])
@@ -161,7 +161,7 @@ describe("notification sources", () => {
     Object.assign({}, record, changes);
   /** The actor's inbox entry for a notification, if their inbox holds it. */
   const entryOf = (id: Notification.Id) =>
-    Effect.flatMap(NotificationService.Service, (notificationService) =>
+    Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
       Effect.map(notificationService.inbox({ limit: 50 }), (items) =>
         items.find((item) => item.notification.id === id),
       ),
@@ -179,7 +179,7 @@ describe("notification sources", () => {
   });
   const withNote = (bound: Bound, note: Notification.Record): Bound => ({
     ...bound,
-    context: Context.add(bound.context, NotificationStore.Service, {
+    context: Context.add(bound.context, NotificationStore.NotificationStore, {
       ...bound.notifications,
       listLatestByRecipient: () => Effect.succeed([note]),
     }),
@@ -205,7 +205,9 @@ describe("notification sources", () => {
         runHost(
           storage,
           Effect.gen(function* () {
-            expectTypeOf<Extract<Core.Operations, ThreadQuery.Service>>().toEqualTypeOf<never>();
+            expectTypeOf<
+              Extract<Core.Operations, ThreadQuery.ThreadQuery>
+            >().toEqualTypeOf<never>();
             const { bound, owner, first, human, agent } = yield* prepare();
             for (const actor of [human, agent])
               yield* grant(
@@ -218,7 +220,7 @@ describe("notification sources", () => {
             let lookups = 0;
             const readOnly = {
               ...bound,
-              context: Context.add(bound.context, Store.Service, {
+              context: Context.add(bound.context, Store.Store, {
                 ...bound.store,
                 transaction: () => Effect.die("Source reads must not open a transaction"),
                 read: () => Effect.die("Source reads must not scan log batches"),
@@ -239,7 +241,7 @@ describe("notification sources", () => {
                 (yield* run(
                   bound,
                   owner,
-                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                  Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                     threadService.readTimeline(first.thread.id, { limit: 1 }),
                   ),
                 ))[0],
@@ -263,7 +265,7 @@ describe("notification sources", () => {
             const note = yield* noteFor(bound, humanId);
             const protectedBound = {
               ...bound,
-              context: Context.add(bound.context, Store.Service, {
+              context: Context.add(bound.context, Store.Store, {
                 ...bound.store,
                 getEntry: () => Effect.die("Source must not be read"),
               }),
@@ -279,7 +281,7 @@ describe("notification sources", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(MemberService.Service, (memberService) =>
+              Effect.flatMap(MemberService.MemberService, (memberService) =>
                 memberService.remove(humanId),
               ),
             );
@@ -308,7 +310,9 @@ describe("notification sources", () => {
               ThreadPermissions.Read,
               threadTarget(first.thread.id),
             );
-            const service = yield* NotificationService.Service.pipe(Effect.provide(core(bound)));
+            const service = yield* NotificationService.NotificationService.pipe(
+              Effect.provide(core(bound)),
+            );
             const part = Option.getOrThrow(
               yield* bound.participations.get(
                 note.participationId ?? ThreadParticipation.Id.make("missing"),
@@ -317,16 +321,20 @@ describe("notification sources", () => {
             yield* run(
               bound,
               human,
-              Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
-                threadParticipationService.unfollow({
-                  threadId: first.thread.id,
-                  participationId: part.id,
-                }),
+              Effect.flatMap(
+                ThreadParticipationService.ThreadParticipationService,
+                (threadParticipationService) =>
+                  threadParticipationService.unfollow({
+                    threadId: first.thread.id,
+                    participationId: part.id,
+                  }),
               ),
             );
             expect(
               yield* asActor(
-                sourceOf(note.id).pipe(Effect.provideService(NotificationService.Service, service)),
+                sourceOf(note.id).pipe(
+                  Effect.provideService(NotificationService.NotificationService, service),
+                ),
                 human,
               ),
             ).toEqual({
@@ -335,7 +343,7 @@ describe("notification sources", () => {
             });
             yield* facts(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Revoked, {
                   workspaceId,
                   assignmentId: assignment.payload.assignmentId,
@@ -345,7 +353,9 @@ describe("notification sources", () => {
             );
             expect(
               yield* asActor(
-                sourceOf(note.id).pipe(Effect.provideService(NotificationService.Service, service)),
+                sourceOf(note.id).pipe(
+                  Effect.provideService(NotificationService.NotificationService, service),
+                ),
                 human,
               ),
             ).toBeUndefined();
@@ -353,11 +363,13 @@ describe("notification sources", () => {
             yield* run(
               bound,
               human,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.leave({
-                  groupId: group.id,
-                  membershipId: memberParticipant(part).groupMembershipId,
-                }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.leave({
+                    groupId: group.id,
+                    membershipId: memberParticipant(part).groupMembershipId,
+                  }),
               ),
             );
             // Leaving settles what was pending from the group; it stays as history.
@@ -367,20 +379,26 @@ describe("notification sources", () => {
             expect(yield* run(bound, human, inboxGet(note.id))).toEqual(settled);
             expect(
               yield* asActor(
-                sourceOf(note.id).pipe(Effect.provideService(NotificationService.Service, service)),
+                sourceOf(note.id).pipe(
+                  Effect.provideService(NotificationService.NotificationService, service),
+                ),
                 human,
               ),
             ).toBeUndefined();
             yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.add({ groupId: group.id, memberId: humanId }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: humanId }),
               ),
             );
             expect(
               yield* asActor(
-                sourceOf(note.id).pipe(Effect.provideService(NotificationService.Service, service)),
+                sourceOf(note.id).pipe(
+                  Effect.provideService(NotificationService.NotificationService, service),
+                ),
                 human,
               ),
             ).toEqual({
@@ -412,7 +430,7 @@ describe("notification sources", () => {
               run(
                 bound,
                 human,
-                Effect.flatMap(NotificationService.Service, (notificationService) =>
+                Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
                   notificationService.inbox(options),
                 ),
               );
@@ -440,7 +458,7 @@ describe("notification sources", () => {
             const seen = yield* run(
               bound,
               human,
-              Effect.flatMap(NotificationService.Service, (notificationService) =>
+              Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
                 notificationService.markSeen(older.id),
               ),
             );
@@ -461,11 +479,13 @@ describe("notification sources", () => {
             yield* run(
               bound,
               human,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.leave({
-                  groupId: group.id,
-                  membershipId: memberParticipant(part).groupMembershipId,
-                }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.leave({
+                    groupId: group.id,
+                    membershipId: memberParticipant(part).groupMembershipId,
+                  }),
               ),
             );
             expect(yield* inbox({ limit: 10 })).toEqual([
@@ -482,7 +502,7 @@ describe("notification sources", () => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(NotificationService.Service, (notificationService) =>
+                Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
                   notificationService.inbox({ limit: 10 }),
                 ),
               ),
@@ -507,11 +527,13 @@ describe("notification sources", () => {
             yield* run(
               bound,
               agent,
-              Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
-                threadParticipationService.unfollow({
-                  threadId: first.thread.id,
-                  participationId,
-                }),
+              Effect.flatMap(
+                ThreadParticipationService.ThreadParticipationService,
+                (threadParticipationService) =>
+                  threadParticipationService.unfollow({
+                    threadId: first.thread.id,
+                    participationId,
+                  }),
               ),
             );
             const before = yield* snapshot(bound, first.thread.id);
@@ -556,7 +578,7 @@ describe("notification sources", () => {
             );
             const header = entry.fact;
             if (!header) return yield* Effect.die("Missing fact header");
-            const context = Context.add(bound.context, Store.Service, {
+            const context = Context.add(bound.context, Store.Store, {
               ...bound.store,
               getEntry: () =>
                 Effect.succeedSome(changed(entry, { fact: changed(header, { version: 999 }) })),
@@ -588,7 +610,7 @@ describe("notification sources", () => {
         Effect.gen(function* () {
           const { bound, human } = yield* prepare();
           const note = yield* noteFor(bound, humanId);
-          const guarded = Context.add(bound.context, ThreadMessageStore.Service, {
+          const guarded = Context.add(bound.context, ThreadMessageStore.ThreadMessageStore, {
             ...bound.messages,
             get: () => Effect.die("Message must not be read without permission"),
             getMany: () => Effect.die("Message must not be read without permission"),
@@ -597,7 +619,7 @@ describe("notification sources", () => {
             yield* run({ ...bound, context: guarded }, human, sourceOf(note.id)),
           ).toBeUndefined();
           const failure = new Store.Failure({ operation: "getEntry", cause: "injected" });
-          const failing = Context.add(bound.context, Store.Service, {
+          const failing = Context.add(bound.context, Store.Store, {
             ...bound.store,
             getEntry: () => Effect.fail(failure),
           });
@@ -624,10 +646,10 @@ describe("notification sources", () => {
             if (!ownerPart) return yield* Effect.die("Missing owner");
             const events = yield* facts(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
                   Effect.gen(function* () {
-                    const threadCommand = yield* ThreadCommand.Service;
+                    const threadCommand = yield* ThreadCommand.ThreadCommand;
                     const occurredAt = yield* DateTime.now;
                     const recipients = [
                       {
@@ -692,7 +714,7 @@ describe("notification sources", () => {
             const timeline = yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.readTimeline(first.thread.id, { limit: 10 }),
               ),
             );
@@ -741,7 +763,7 @@ describe("notification sources", () => {
             const assignment = yield* grant(bound, humanId, ThreadPermissions.Read);
             const note = yield* noteFor(bound, humanId);
             const before = yield* snapshot(bound, first.thread.id);
-            const operation = Effect.flatMap(Journal.Service, (journal) =>
+            const operation = Effect.flatMap(Journal.Journal, (journal) =>
               journal.commit(
                 Effect.gen(function* () {
                   const result = yield* reply(first.thread.id, [humanId], "Staged reply");
@@ -765,15 +787,17 @@ describe("notification sources", () => {
             const admission = Option.getOrThrow(
               yield* bound.groupMemberships.findActive(group.id, humanId),
             );
-            const leave = Effect.flatMap(Journal.Service, (journal) =>
+            const leave = Effect.flatMap(Journal.Journal, (journal) =>
               journal.commit(
                 Effect.gen(function* () {
                   yield* asActor(
-                    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                      groupMembershipService.leave({
-                        groupId: group.id,
-                        membershipId: admission.id,
-                      }),
+                    Effect.flatMap(
+                      GroupMembershipService.GroupMembershipService,
+                      (groupMembershipService) =>
+                        groupMembershipService.leave({
+                          groupId: group.id,
+                          membershipId: admission.id,
+                        }),
                     ),
                     human,
                   );
@@ -805,7 +829,7 @@ describe("notification sources", () => {
         yield* runGateway(
           storage,
           Effect.gen(function* () {
-            const gateway = yield* Gateway.Service;
+            const gateway = yield* Gateway.Gateway;
             expect(
               yield* gateway.asMember(workspaceId, saved.human.identity, sourceOf(saved.note.id)),
             ).toEqual({ activity: saved.first.activity, message: saved.first.message });

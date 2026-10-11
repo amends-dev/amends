@@ -23,6 +23,7 @@ import { InvitationService, Member, MemberPermissions } from "@amends-dev/core/w
 import { describe, expect, it } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import type { Fixture } from "./fixture.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -35,7 +36,6 @@ import {
   otherWorkspaceId,
   publishedMessage,
   request,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -57,7 +57,7 @@ export const journal = (fixture: Fixture) => {
             const b = yield* forWorkspace(host, otherWorkspaceId);
             const otherA = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const open = (bound: Bound) =>
-              Log.Service.pipe(
+              Log.Log.pipe(
                 Effect.map((logs) =>
                   logs.open({ id: Log.Id.make("execution"), schema: Schema.String }),
                 ),
@@ -76,7 +76,7 @@ export const journal = (fixture: Fixture) => {
             const waiting = yield* Deferred.make<void>();
             const watched = {
               ...a,
-              context: Context.add(a.context, Store.Service, {
+              context: Context.add(a.context, Store.Store, {
                 ...a.store,
                 waitForAppend: (id, after) =>
                   Deferred.succeed(waiting, undefined).pipe(
@@ -112,7 +112,7 @@ export const journal = (fixture: Fixture) => {
             const a = yield* forWorkspace(host, workspaceId);
             const b = yield* forWorkspace(host, otherWorkspaceId);
             const execution = Log.Id.make("execution");
-            const logs = yield* Log.Service.pipe(Effect.provide(core(a)));
+            const logs = yield* Log.Log.pipe(Effect.provide(core(a)));
             const log = logs.open({ id: execution, schema: Schema.String });
             expect(yield* a.store.head(execution)).toEqual(Option.none());
             const first = yield* log.append("first");
@@ -146,14 +146,14 @@ export const journal = (fixture: Fixture) => {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const workspace = yield* initialized(bound);
             // A recorded policy change must survive replay even when the current template differs.
-            yield* Effect.flatMap(Journal.Service, (journal) =>
+            yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(RoleFacts.PermissionsChanged, {
                   workspaceId,
                   roleId: BuiltinRoles.OwnerId,
                   permissions: [MemberPermissions.Read.name],
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId))),
             ).pipe(Effect.provide(core(bound)));
             const roleIds = [
               BuiltinRoles.MemberId,
@@ -167,7 +167,7 @@ export const journal = (fixture: Fixture) => {
             yield* storage.discardProjections;
             expect(yield* bound.workspace.get).toEqual(Option.none());
             expect(yield* bound.members.list).toEqual([]);
-            yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+            yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
               Effect.provide(core(bound)),
             );
             expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
@@ -209,14 +209,11 @@ export const journal = (fixture: Fixture) => {
             });
             yield* seed(bound, [human, agent], [human, agent]);
             const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-              program.pipe(
-                Effect.provideService(Actor.Service, actor),
-                Effect.provide(core(bound)),
-              );
+              program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
             // History that every projection records something from.
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, human.memberId, agent.memberId],
@@ -225,13 +222,13 @@ export const journal = (fixture: Fixture) => {
             );
             yield* as(
               owner,
-              Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+              Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
                 groupFollowService.follow({ groupId: group.id, memberId: owner.memberId }),
               ),
             );
             const started = yield* as(
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startInGroup({
                   groupId: group.id,
                   text: "Hello",
@@ -242,7 +239,7 @@ export const journal = (fixture: Fixture) => {
             const reply = (mentions: ReadonlyArray<Member.Id>) =>
               as(
                 owner,
-                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                   threadMessageService.publish({
                     threadId: started.thread.id,
                     text: "Reply",
@@ -256,14 +253,16 @@ export const journal = (fixture: Fixture) => {
             );
             yield* as(
               agent,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.leave({ groupId: group.id, membershipId: admission.id }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.leave({ groupId: group.id, membershipId: admission.id }),
               ),
             );
             const expiresAt = yield* future;
             yield* as(
               owner,
-              Effect.flatMap(InvitationService.Service, (invitationService) =>
+              Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
                 invitationService.issue(request(expiresAt, charlie.id)),
               ),
             );
@@ -337,7 +336,7 @@ export const journal = (fixture: Fixture) => {
             const rebuild = (projections: ReadonlyArray<(typeof Core.projections)[number]>) =>
               Effect.gen(function* () {
                 yield* storage.discardProjections;
-                yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+                yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
                   Effect.provide(
                     Journal.layer({ logId: journalLog, projections }).pipe(
                       Layer.provideMerge(Log.layer),
@@ -387,12 +386,12 @@ export const journal = (fixture: Fixture) => {
             yield* initialized(bound);
             const withCore = <A, E, R>(program: Effect.Effect<A, E, R>) =>
               program.pipe(
-                Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
                 Effect.provide(core(bound)),
               );
             const role = (id: string) =>
               withCore(
-                Effect.flatMap(Journal.Service, (journal) =>
+                Effect.flatMap(Journal.Journal, (journal) =>
                   journal.publish(RoleFacts.Created, {
                     workspaceId,
                     roleId: Role.Id.make(id),
@@ -401,7 +400,7 @@ export const journal = (fixture: Fixture) => {
                   }),
                 ),
               );
-            const replay = withCore(Effect.flatMap(Journal.Service, (journal) => journal.replay));
+            const replay = withCore(Effect.flatMap(Journal.Journal, (journal) => journal.replay));
             const live = byName(yield* bound.checkpoints.listLive(journalLog));
             // A version live here that this host does not run would miss this host's commits.
             yield* bound.store.transaction(
@@ -476,7 +475,7 @@ export const journal = (fixture: Fixture) => {
               key: { logId, name: "second", version: 1 },
             });
           }).pipe(
-            Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+            Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
             Effect.provide(core(bound)),
           );
         }),
@@ -502,7 +501,7 @@ export const journal = (fixture: Fixture) => {
             (bound: Bound) =>
             <A, E, R>(program: Effect.Effect<A, E, R>) =>
               program.pipe(
-                Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
                 Effect.provide(core(bound)),
               );
           const newer = yield* on(newerHost)(Journal.make({ logId, projections: [recording] }));

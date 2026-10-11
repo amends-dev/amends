@@ -4,7 +4,7 @@ import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { tasks } from "./schema.ts";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { inIds } from "./id-list.ts";
 import { storeError, storeFailure } from "./errors.ts";
 const decodeRows = Schema.decodeUnknownEffect(
@@ -45,10 +45,10 @@ const changeColumns = (
 };
 /** Tasks by thread, over one workspace's binding. @category constructors */
 export const make = Effect.fn("Tasks.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(tasks.workspaceId, workspaceId);
-  const driver: TaskStore.Interface = {
+  const driver: TaskStore.TaskStore["Service"] = {
     get: (threadId) =>
       guard(
         db
@@ -123,5 +123,4 @@ export const make = Effect.fn("Tasks.make")(function* () {
   return TaskStore.make(workspaceId, driver);
 });
 /** @category layers */
-export const layer = Layer.effect(TaskStore.Service, make());
-export * as Tasks from "./tasks.ts";
+export const layer = Layer.effect(TaskStore.TaskStore, make());

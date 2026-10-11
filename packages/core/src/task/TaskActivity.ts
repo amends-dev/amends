@@ -6,10 +6,10 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
-import { ThreadMessage } from "../thread/ThreadMessage.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { Task } from "./Task.ts";
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
+import * as ThreadMessage from "../thread/ThreadMessage.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as Task from "./Task.ts";
 
 /**
  * The thread became a task, with these initial values. It is about its thread, which has one task,
@@ -54,5 +54,3 @@ export const Updated = ThreadActivityKind.make("task.updated", {
  * @since 0.1.0
  */
 export type Updated = ThreadActivityKind.Activity<typeof Updated>;
-
-export * as TaskActivity from "./TaskActivity.ts";

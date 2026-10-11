@@ -1,7 +1,7 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { DateTime, Effect, Option } from "effect";
-import type { Accounts } from "./accounts.ts";
+import type * as Accounts from "./accounts.ts";
 
 /**
  * The code an address was last sent, and how many it was sent lately. The code itself is never
@@ -29,29 +29,26 @@ export const SessionRecord = Schema.Struct({
 });
 export type SessionRecord = typeof SessionRecord.Type;
 
-export interface Interface {
-  /**
-   * Replace the address's pending code with what `decide` makes of the current one, and answer
-   * what it decided. Changes to one address apply one at a time, across every host over the
-   * storage. `decide` is pure; a next code of none removes the pending code.
-   */
-  readonly modifyCode: <A>(
-    email: Accounts.Email,
-    decide: (current: Option.Option<PendingCode>) => readonly [A, Option.Option<PendingCode>],
-  ) => Effect.Effect<A>;
-  readonly insertSession: (digest: string, session: SessionRecord) => Effect.Effect<void>;
-  readonly findSession: (digest: string) => Effect.Effect<Option.Option<SessionRecord>>;
-  /** Move a session's end, as using it does; a session that is gone stays gone. */
-  readonly extendSession: (digest: string, expiresAt: DateTime.Utc) => Effect.Effect<void>;
-  readonly deleteSession: (digest: string) => Effect.Effect<void>;
-}
-
 /**
  * Where email sign-in keeps the codes it sent and the sessions it began, across every host over
  * the storage. Storage failures are defects.
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/gateway/sign-in-storage/Service",
-) {}
-
-export * as SignInStorage from "./sign-in-storage.ts";
+export class SignInStorage extends Context.Service<
+  SignInStorage,
+  {
+    /**
+     * Replace the address's pending code with what `decide` makes of the current one, and answer
+     * what it decided. Changes to one address apply one at a time, across every host over the
+     * storage. `decide` is pure; a next code of none removes the pending code.
+     */
+    readonly modifyCode: <A>(
+      email: Accounts.Email,
+      decide: (current: Option.Option<PendingCode>) => readonly [A, Option.Option<PendingCode>],
+    ) => Effect.Effect<A>;
+    readonly insertSession: (digest: string, session: SessionRecord) => Effect.Effect<void>;
+    readonly findSession: (digest: string) => Effect.Effect<Option.Option<SessionRecord>>;
+    /** Move a session's end, as using it does; a session that is gone stays gone. */
+    readonly extendSession: (digest: string, expiresAt: DateTime.Utc) => Effect.Effect<void>;
+    readonly deleteSession: (digest: string) => Effect.Effect<void>;
+  }
+>()("@amends-dev/gateway/sign-in-storage/Service") {}

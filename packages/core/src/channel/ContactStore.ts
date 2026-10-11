@@ -7,10 +7,10 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
-import { Contact } from "./Contact.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import type * as Store from "../journal/store.ts";
+import * as Contact from "./Contact.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 /**
  * Storage failed while reading or writing contacts.
@@ -36,43 +36,38 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ContactStore.Confl
 }) {}
 
 /**
- * What a storage adapter implements for contacts.
- *
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  readonly get: (id: Contact.Id) => Effect.Effect<Option.Option<Contact.Record>, Failure>;
-  /**
-   * Several contacts in one read. Absent ids are omitted and each contact appears once; order is
-   * unspecified, so callers index results by id. An empty request reads nothing.
-   */
-  readonly getMany: (
-    ids: ReadonlyArray<Contact.Id>,
-  ) => Effect.Effect<ReadonlyArray<Contact.Record>, Failure>;
-  /** Reject a reused id. Never upsert. */
-  readonly insert: (
-    record: Contact.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /** Replace a stored contact; a missing record conflicts. */
-  readonly update: (
-    record: Contact.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The contact store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for contacts.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/ContactStore",
-) {}
+export class ContactStore extends Context.Service<
+  ContactStore,
+  {
+    readonly get: (id: Contact.Id) => Effect.Effect<Option.Option<Contact.Record>, Failure>;
+    /**
+     * Several contacts in one read. Absent ids are omitted and each contact appears once; order is
+     * unspecified, so callers index results by id. An empty request reads nothing.
+     */
+    readonly getMany: (
+      ids: ReadonlyArray<Contact.Id>,
+    ) => Effect.Effect<ReadonlyArray<Contact.Record>, Failure>;
+    /** Reject a reused id. Never upsert. */
+    readonly insert: (
+      record: Contact.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /** Replace a stored contact; a missing record conflicts. */
+    readonly update: (
+      record: Contact.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/channel/ContactStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -81,7 +76,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: ContactStore["Service"],
+): ContactStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -92,5 +90,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
     update: (record) => Effect.flatMap(write("update", Contact.Record, record), driver.update),
   };
 };
-
-export * as ContactStore from "./ContactStore.ts";

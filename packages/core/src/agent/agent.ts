@@ -6,13 +6,13 @@
  */
 import { ModelEndpoint } from "@amends-dev/harness";
 import { Schema } from "effect";
-import { Role } from "../authorization/role/role.ts";
-import { Connection } from "../connection/connection.ts";
-import { Identity } from "../identity/identity.ts";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { Member } from "../workspace/member/member.ts";
+import * as Role from "../authorization/role/role.ts";
+import * as Connection from "../connection/connection.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Text from "../text/text.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as Member from "../workspace/member/member.ts";
 
 /** An agent's identity, which its membership refers to. */
 export const Id = Identity.AgentId;
@@ -202,5 +202,3 @@ export const view = (
   createdBy: record.createdBy,
   createdAt: record.createdAt,
 });
-
-export * as Agent from "./agent.ts";

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Member } from "../workspace/member/member.ts";
-import { Requirement } from "./requirement.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as Requirement from "./requirement.ts";
 
 /** The outcomes `Authorization` reports that a caller can act on; schemas only, for contracts. */
 export class Denied extends Schema.TaggedError<Denied>()("Authorization.Denied", {
@@ -11,5 +11,3 @@ export class InvalidActor extends Schema.TaggedError<InvalidActor>()("Authorizat
   memberId: Member.Id,
   reason: Schema.Literals(["membership-missing", "membership-removed", "identity-mismatch"]),
 }) {}
-
-export * as AuthorizationErrors from "./errors.ts";

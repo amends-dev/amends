@@ -1,7 +1,7 @@
 import { ReadState, ReadStateStore } from "@amends-dev/core/read-state";
 import { and, eq, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { inIds } from "./id-list.ts";
 import { groupReadTimes, threadReadPositions } from "./schema.ts";
@@ -21,9 +21,9 @@ const decodeGroups = Schema.decodeUnknownEffect(
  * @category constructors
  */
 export const make = Effect.fn("ReadStates.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
-  const driver: ReadStateStore.Interface = {
+  const driver: ReadStateStore.ReadStateStore["Service"] = {
     getThreadPositions: Effect.fn("ReadStates.getThreadPositions")(
       function* (memberId, threadIds) {
         if (threadIds.length === 0) return [];
@@ -96,6 +96,4 @@ export const make = Effect.fn("ReadStates.make")(function* () {
 });
 
 /** Provide read-state storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ReadStateStore.Service, make());
-
-export * as ReadStates from "./read-states.ts";
+export const layer = Layer.effect(ReadStateStore.ReadStateStore, make());

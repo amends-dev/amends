@@ -4,8 +4,8 @@ import { WorkspaceDirectory } from "@amends-dev/gateway";
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DateTime, Effect, Layer, Schema } from "effect";
-import { PostgresDatabase } from "./database.ts";
-import { Invitations } from "./invitations.ts";
+import * as PostgresDatabase from "./database.ts";
+import * as Invitations from "./invitations.ts";
 import { invitations, members, workspaces } from "./schema.ts";
 
 const Membership = Schema.Struct({
@@ -22,10 +22,10 @@ const Membership = Schema.Struct({
  * @category constructors
  */
 export const make = Effect.fn("PostgresDirectory.make")(function* () {
-  const { db } = yield* PostgresDatabase.Service;
-  const list: WorkspaceDirectory.Interface["list"] = Effect.fn("PostgresDirectory.list")(function* (
-    identity: Identity.MemberReference,
-  ) {
+  const { db } = yield* PostgresDatabase.PostgresDatabase;
+  const list: WorkspaceDirectory.WorkspaceDirectory["Service"]["list"] = Effect.fn(
+    "PostgresDirectory.list",
+  )(function* (identity: Identity.MemberReference) {
     // Count only the identity's workspaces; a workspace without active members still lists at zero.
     const active = alias(members, "active_members");
     const activeMemberCount = db
@@ -97,14 +97,12 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
       }),
     };
   });
-  return WorkspaceDirectory.Service.of({ list });
+  return WorkspaceDirectory.WorkspaceDirectory.of({ list });
 });
 
 /**
- * Provide WorkspaceDirectory.Service using its constructor and the caller's dependencies.
+ * Provide WorkspaceDirectory.WorkspaceDirectory using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(WorkspaceDirectory.Service, make());
-
-export * as PostgresDirectory from "./directory.ts";
+export const layer = Layer.effect(WorkspaceDirectory.WorkspaceDirectory, make());

@@ -1,10 +1,10 @@
-import { Subject } from "../../journal/subject.ts";
+import * as Subject from "../../journal/subject.ts";
 import { Schema } from "effect";
-import { Audience } from "../../journal/audience.ts";
-import { Fact } from "../../journal/fact.ts";
-import { Workspace } from "../../workspace/workspace.ts";
-import { BuiltinRoles } from "./builtin.ts";
-import { Role } from "./role.ts";
+import * as Audience from "../../journal/audience.ts";
+import * as Fact from "../../journal/fact.ts";
+import * as Workspace from "../../workspace/workspace.ts";
+import * as BuiltinRoles from "./builtin.ts";
+import * as Role from "./role.ts";
 
 /** Establishes a workspace role with its initial permission names. */
 export const Created = Fact.make("workspace.role.created", {
@@ -55,5 +55,3 @@ export const BuiltinsRevised = Fact.make("workspace.role.builtins-revised", {
   payload: Schema.Struct({ workspaceId: Workspace.Id, revision: BuiltinRoles.Revision }),
   occurrence: (payload) => [String(payload.revision)],
 });
-
-export * as RoleFacts from "./facts.ts";

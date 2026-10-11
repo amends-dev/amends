@@ -25,5 +25,3 @@ export const makeKey = Effect.fn("Occurrence.makeKey")(function* (
   const parts = yield* Schema.decodeUnknownEffect(Parts)(input);
   return Key.make(`fact:${JSON.stringify([factName, parts])}`);
 });
-
-export * as Occurrence from "./occurrence.ts";

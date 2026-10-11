@@ -15,8 +15,8 @@ export const layer = HttpApiBuilder.group(
   Api,
   "accounts",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
-    const accounts = yield* Accounts.Service;
+    const gateway = yield* Gateway.Gateway;
+    const accounts = yield* Accounts.Accounts;
     return handlers.handleAll({
       list: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
@@ -25,11 +25,11 @@ export const layer = HttpApiBuilder.group(
             principal,
             Effect.gen(function* () {
               const invitations = yield* Effect.flatMap(
-                InvitationService.Service,
+                InvitationService.InvitationService,
                 (invitationService) => invitationService.list,
               );
               const members = yield* Effect.flatMap(
-                MemberService.Service,
+                MemberService.MemberService,
                 (memberService) => memberService.list,
               );
               return yield* accounts.findByIds(humanIdsOf(members, invitations));
@@ -52,5 +52,3 @@ const humanIdsOf = (
     ...invitations.map((invitation) => invitation.details.recipientId),
   ]),
 ];
-
-export * as AccountsHandlers from "./accounts.ts";

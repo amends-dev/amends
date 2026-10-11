@@ -1,15 +1,16 @@
 import { Delivery, DeliveryStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Delivery.Record));
 
 /** Delivery records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Deliveries.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: DeliveryStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: DeliveryStore.DeliveryStore["Service"] = {
     get: Effect.fn("Deliveries.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("deliveries"), id);
@@ -73,6 +74,4 @@ export const make = Effect.fn("Deliveries.make")(function* () {
 });
 
 /** Provide delivery storage over the caller's binding. @category layers */
-export const layer = Layer.effect(DeliveryStore.Service, make());
-
-export * as Deliveries from "./deliveries.ts";
+export const layer = Layer.effect(DeliveryStore.DeliveryStore, make());

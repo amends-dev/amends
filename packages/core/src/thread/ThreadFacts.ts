@@ -4,10 +4,10 @@
  *
  * @since 0.1.0
  */
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { Thread } from "./Thread.ts";
+import * as Fact from "../journal/fact.ts";
+import * as Subject from "../journal/subject.ts";
+import * as Group from "../group/group.ts";
+import * as Thread from "./Thread.ts";
 
 /**
  * A thread was created, as its record says. The members of its group may learn of it.
@@ -36,5 +36,3 @@ export const Renamed = Fact.make("thread.renamed", {
   subject: (payload) => Subject.make("thread", payload.threadId),
   payload: Thread.Renamed,
 });
-
-export * as ThreadFacts from "./ThreadFacts.ts";

@@ -1,17 +1,17 @@
 import { Context, Effect, Layer, Schema } from "effect";
-import { GroupMembershipFacts } from "../group/membership/facts.ts";
-import type { Event } from "../journal/event.ts";
-import type { Reaction } from "../journal/reaction.ts";
-import { Store } from "../journal/store.ts";
-import { Notification } from "../notification/notification.ts";
-import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadParticipationFacts } from "../thread/ThreadParticipationFacts.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { TurnFacts } from "./facts.ts";
-import { TurnStore } from "./store.ts";
-import type { Turn } from "./turn.ts";
+import * as GroupMembershipFacts from "../group/membership/facts.ts";
+import type * as Event from "../journal/event.ts";
+import type * as Reaction from "../journal/reaction.ts";
+import * as Store from "../journal/store.ts";
+import * as Notification from "../notification/notification.ts";
+import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadParticipationFacts from "../thread/ThreadParticipationFacts.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as TurnFacts from "./facts.ts";
+import * as TurnStore from "./store.ts";
+import type * as Turn from "./turn.ts";
 
 /** An agent's turn job: the work of one agent in one thread, named by its membership. */
 export const Job = Schema.Struct({
@@ -22,42 +22,43 @@ export const Job = Schema.Struct({
 export interface Job extends Schema.Schema.Type<typeof Job> {}
 
 /**
+ * @effect-expect-leaking Transaction
+ *
  * Turn jobs: one for each agent in each thread, which takes the work asked of the agent there into
  * a turn and runs it, one turn at a time, and stops the turn when asked. Hosts supply it and
  * deliver each request to whatever runs turn jobs; a host that runs none accepts requests and
  * runs nothing, so work waits in agents' inboxes.
  */
-export interface Interface {
-  /**
-   * Request, as part of the caller's commit, that the job run the agent's work in the thread: the
-   * request is stored with the commit and discarded if it rolls back. Asking again before it runs
-   * asks once.
-   */
-  readonly requestRun: (job: Job) => Effect.Effect<void, Store.Failure, Store.Transaction>;
-  /**
-   * Request, likewise, that the job stop its turn `turnId`, which was asked to stop or whose agent
-   * no longer takes part where it works. A turn the job is not running is stopped as it stands.
-   */
-  readonly requestStop: (
-    job: Job & { readonly turnId: Turn.Id },
-  ) => Effect.Effect<void, Store.Failure, Store.Transaction>;
-}
-/** @effect-expect-leaking Transaction */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/turn/jobs/Service",
-) {}
+export class TurnJobs extends Context.Service<
+  TurnJobs,
+  {
+    /**
+     * Request, as part of the caller's commit, that the job run the agent's work in the thread: the
+     * request is stored with the commit and discarded if it rolls back. Asking again before it runs
+     * asks once.
+     */
+    readonly requestRun: (job: Job) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+    /**
+     * Request, likewise, that the job stop its turn `turnId`, which was asked to stop or whose agent
+     * no longer takes part where it works. A turn the job is not running is stopped as it stands.
+     */
+    readonly requestStop: (
+      job: Job & { readonly turnId: Turn.Id },
+    ) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+  }
+>()("@amends-dev/core/turn/jobs/Service") {}
 
 /**
  * For a host that runs no turn jobs: requests are accepted and nothing runs, so work waits in
  * agents' inboxes until something runs it.
  */
-export const noRunner: Interface = Service.of({
+export const noRunner: TurnJobs["Service"] = TurnJobs.of({
   requestRun: () => Effect.void,
   requestStop: () => Effect.void,
 });
 
 /** @category layers */
-export const layerNoRunner = Layer.succeed(Service, noRunner);
+export const layerNoRunner = Layer.succeed(TurnJobs, noRunner);
 
 /** A turn store failure, as the commit a reaction runs in fails with it. */
 const toStoreFailure = (failure: TurnStore.Failure) =>
@@ -100,7 +101,7 @@ const decodeGroupRemoval = Schema.decodeUnknownSync(
 
 /** Each agent the activity asks for work runs it in the activity's thread. */
 const runRequestedWork = Effect.fnUntraced(function* (event: Event.Record) {
-  const turnJobs = yield* Service;
+  const turnJobs = yield* TurnJobs;
   const { activity, recipients } = decodeRecorded(event.payload);
   for (const { recipient, requestsWork } of recipients)
     if (requestsWork && Notification.Recipient.isAnyOf(["Agent"])(recipient))
@@ -117,7 +118,7 @@ const runRequestedWork = Effect.fnUntraced(function* (event: Event.Record) {
  */
 const runWaitingWork = Effect.fnUntraced(function* (event: Event.Record) {
   const { memberId, threadId } = decodeEnded(event.payload);
-  yield* (yield* Service).requestRun({
+  yield* (yield* TurnJobs).requestRun({
     workspaceId: event.provenance.workspaceId,
     memberId,
     threadId,
@@ -127,7 +128,7 @@ const runWaitingWork = Effect.fnUntraced(function* (event: Event.Record) {
 /** A turn asked to stop has its job stop it. */
 const stopCancelledTurn = Effect.fnUntraced(function* (event: Event.Record) {
   const { memberId, threadId, turnId } = decodeCancelRequested(event.payload);
-  yield* (yield* Service).requestStop({
+  yield* (yield* TurnJobs).requestStop({
     workspaceId: event.provenance.workspaceId,
     memberId,
     threadId,
@@ -138,10 +139,10 @@ const stopCancelledTurn = Effect.fnUntraced(function* (event: Event.Record) {
 /** A member that stopped taking part in a thread has its turn there stopped. */
 const stopTurnOfEndedParticipation = Effect.fnUntraced(function* (event: Event.Record) {
   const { memberId, threadId, participationId } = decodeParticipationEnded(event.payload);
-  const turnStore = yield* TurnStore.Service;
+  const turnStore = yield* TurnStore.TurnStore;
   const active = yield* Effect.mapError(turnStore.findActive(memberId, threadId), toStoreFailure);
   if (active._tag === "None" || active.value.participationId !== participationId) return;
-  yield* (yield* Service).requestStop({
+  yield* (yield* TurnJobs).requestStop({
     workspaceId: event.provenance.workspaceId,
     memberId,
     threadId,
@@ -155,8 +156,8 @@ const stopTurnOfEndedParticipation = Effect.fnUntraced(function* (event: Event.R
  */
 const stopTurnsInLeftGroup = Effect.fnUntraced(function* (event: Event.Record) {
   const { memberId, groupId } = decodeGroupRemoval(event.payload);
-  const turnStore = yield* TurnStore.Service;
-  const turnJobs = yield* Service;
+  const turnStore = yield* TurnStore.TurnStore;
+  const turnJobs = yield* TurnJobs;
   const active = yield* Effect.mapError(turnStore.listActiveByMember(memberId), toStoreFailure);
   for (const turn of active)
     if (turn.groupId === groupId)
@@ -169,7 +170,7 @@ const stopTurnsInLeftGroup = Effect.fnUntraced(function* (event: Event.Record) {
 });
 
 /** The facts that change an agent's work in a thread request its job, in the commit that publishes them. */
-export const reactions: ReadonlyArray<Reaction.Definition<Service | TurnStore.Service>> = [
+export const reactions: ReadonlyArray<Reaction.Definition<TurnJobs | TurnStore.TurnStore>> = [
   { fact: ThreadActivityFacts.Recorded.name, react: runRequestedWork },
   { fact: TurnFacts.Retried.name, react: runWaitingWork },
   { fact: TurnFacts.Completed.name, react: runWaitingWork },
@@ -179,5 +180,3 @@ export const reactions: ReadonlyArray<Reaction.Definition<Service | TurnStore.Se
   { fact: ThreadParticipationFacts.Ended.name, react: stopTurnOfEndedParticipation },
   { fact: GroupMembershipFacts.Removed.name, react: stopTurnsInLeftGroup },
 ];
-
-export * as TurnJobs from "./jobs.ts";

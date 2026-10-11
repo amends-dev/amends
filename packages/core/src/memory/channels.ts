@@ -1,15 +1,15 @@
 import { Channel, ChannelStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Channel.Record));
 
 /** Channel records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Channels.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: ChannelStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: ChannelStore.ChannelStore["Service"] = {
     get: Effect.fn("Channels.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("channels"), id);
@@ -52,6 +52,4 @@ export const make = Effect.fn("Channels.make")(function* () {
 });
 
 /** Provide channel storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ChannelStore.Service, make());
-
-export * as Channels from "./channels.ts";
+export const layer = Layer.effect(ChannelStore.ChannelStore, make());

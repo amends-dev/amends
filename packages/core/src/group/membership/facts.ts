@@ -1,9 +1,9 @@
 import { Schema } from "effect";
-import { Fact } from "../../journal/fact.ts";
-import { Subject } from "../../journal/subject.ts";
-import { Member } from "../../workspace/member/member.ts";
-import { Group } from "../group.ts";
-import { GroupMembership } from "./membership.ts";
+import * as Fact from "../../journal/fact.ts";
+import * as Subject from "../../journal/subject.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as Group from "../group.ts";
+import * as GroupMembership from "./membership.ts";
 
 /** The group's members learn who joined, and so does the joining member. */
 export const Added = Fact.make("group.membership.added", {
@@ -22,5 +22,3 @@ export const Removed = Fact.make("group.membership.removed", {
   occurrence: (payload) => [payload.membershipId],
   payload: GroupMembership.Removal,
 });
-
-export * as GroupMembershipFacts from "./facts.ts";

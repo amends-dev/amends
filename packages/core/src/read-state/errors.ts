@@ -1,7 +1,7 @@
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { MemberId } from "../workspace/member/id.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as MemberId from "../workspace/member/id.ts";
 
 /** The outcomes `ReadStateService` reports that a caller can act on; schemas only, for contracts. */
 /** The requested position is past the thread's latest recorded activity. */
@@ -24,5 +24,3 @@ export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
   "ReadStateService.ThreadNotFound",
   { threadId: ThreadId.Id },
 ) {}
-
-export * as ReadStateErrors from "./errors.ts";

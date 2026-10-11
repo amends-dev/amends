@@ -2,10 +2,10 @@ import { Assignment, AssignmentStore } from "@amends-dev/core/authorization";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { assignments } from "./schema.ts";
-import { ScopeColumns } from "./scope.ts";
+import * as ScopeColumns from "./scope.ts";
 
 /** A row is one of two source cases, so it is shaped in code before decoding checks it. */
 const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
@@ -29,7 +29,7 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Record));
  * @category constructors
  */
 export const make = Effect.fn("Assignments.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(assignments.workspaceId, workspaceId);
   const select = (operation: string, where: SQL | undefined) =>
@@ -37,7 +37,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
       Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))),
       Effect.mapError(storeFailure(AssignmentStore, operation)),
     );
-  const driver: AssignmentStore.Interface = {
+  const driver: AssignmentStore.AssignmentStore["Service"] = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(assignments.id, id))), Array.head),
     listActiveByMember: (memberId) =>
       select(
@@ -94,10 +94,8 @@ export const make = Effect.fn("Assignments.make")(function* () {
 });
 
 /**
- * Provide AssignmentStore.Service using its constructor and the caller's dependencies.
+ * Provide AssignmentStore.AssignmentStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(AssignmentStore.Service, make());
-
-export * as Assignments from "./assignments.ts";
+export const layer = Layer.effect(AssignmentStore.AssignmentStore, make());

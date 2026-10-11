@@ -6,8 +6,8 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Thread } from "./Thread.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
+import * as Thread from "./Thread.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
 
 /**
  * The actor's participation had already ended.
@@ -54,5 +54,3 @@ export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
   "ThreadParticipationService.ThreadNotFound",
   { threadId: Thread.Id },
 ) {}
-
-export * as ThreadParticipationErrors from "./ThreadParticipationErrors.ts";

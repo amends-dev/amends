@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Turn } from "./turn.ts";
+import * as Turn from "./turn.ts";
 
 /** The outcomes turn operations report that a caller can act on; schemas only. */
 
@@ -19,5 +19,3 @@ export class NotRetryable extends Schema.TaggedError<NotRetryable>()("TurnServic
   turnId: Turn.Id,
   reason: Turn.NotRetryableReason,
 }) {}
-
-export * as TurnErrors from "./errors.ts";

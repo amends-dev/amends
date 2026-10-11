@@ -6,7 +6,8 @@ import { ThreadId } from "@amends-dev/core/thread";
 import { Invitation, Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
-import { type Bound, boundTo, otherWorkspaceId, runHost, Support, workspaceId } from "./support.ts";
+import * as Support from "./support.ts";
+import { type Bound, boundTo, otherWorkspaceId, runHost, workspaceId } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
 

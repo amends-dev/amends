@@ -20,13 +20,13 @@ import {
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { DateTime, Deferred, Effect, Fiber, Tracer } from "effect";
 import { TestClock } from "effect/testing";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
   otherWorkspaceId,
   placed,
   runHost,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -48,27 +48,27 @@ describe("read state", () => {
   const actorFor = (memberId: Member.Id) =>
     Actor.Value.make({ workspaceId, memberId, identity: identityOf(memberId) });
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-    program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
+    program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
   const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
   const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id>) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, text: "Opening", mentions }),
     ).pipe(Effect.flatMap(placed));
   const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
-    Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+    Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
       threadMessageService.publish({ threadId, text: "Reply", mentions }),
     ).pipe(Effect.flatMap((message) => placed({ message })));
   const markRead = (threadId: Thread.Id, throughSequence: number) =>
-    Effect.flatMap(ReadStateService.Service, (readStateService) =>
+    Effect.flatMap(ReadStateService.ReadStateService, (readStateService) =>
       readStateService.markThreadRead({ threadId, throughSequence }),
     );
   const markGroupRead = (groupId: Group.Id) =>
-    Effect.flatMap(ReadStateService.Service, (readStateService) =>
+    Effect.flatMap(ReadStateService.ReadStateService, (readStateService) =>
       readStateService.markGroupRead({ groupId }),
     );
   const pending = (bound: Bound, memberId: Member.Id) =>
@@ -97,7 +97,7 @@ describe("read state", () => {
     });
     yield* trusted(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.forEach([humanId, otherId, plainId, outsiderId, agentId], (memberId) =>
             Effect.andThen(
@@ -127,7 +127,7 @@ describe("read state", () => {
     const team = yield* run(
       bound,
       owner,
-      Effect.flatMap(GroupService.Service, (groupService) =>
+      Effect.flatMap(GroupService.GroupService, (groupService) =>
         groupService.createTeam({
           name: "Team",
           memberIds: [owner.memberId, humanId, otherId, plainId, agentId],
@@ -157,8 +157,9 @@ describe("read state", () => {
           yield* run(
             bound,
             actorFor(otherId),
-            Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
-              threadParticipationService.follow(started.thread.id),
+            Effect.flatMap(
+              ThreadParticipationService.ThreadParticipationService,
+              (threadParticipationService) => threadParticipationService.follow(started.thread.id),
             ),
           );
           expect(yield* bound.threads.getLatest([started.thread.id])).toMatchObject([
@@ -367,7 +368,7 @@ describe("read state", () => {
           yield* storage.discardProjections;
           yield* trusted(
             bound,
-            Effect.flatMap(Journal.Service, (journal) => journal.replay),
+            Effect.flatMap(Journal.Journal, (journal) => journal.replay),
           );
           expect(yield* bound.threads.getLatest([threadId])).toMatchObject([{ sequence: 1 }]);
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([7]);
@@ -392,7 +393,7 @@ describe("read state", () => {
             run(
               bound,
               actor,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.listInGroup(team.id, options),
               ),
             );
@@ -431,8 +432,10 @@ describe("read state", () => {
           yield* run(
             bound,
             owner,
-            Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-              groupMembershipService.add({ groupId: team.id, memberId: outsiderId }),
+            Effect.flatMap(
+              GroupMembershipService.GroupMembershipService,
+              (groupMembershipService) =>
+                groupMembershipService.add({ groupId: team.id, memberId: outsiderId }),
             ),
           );
           const outsider = actorFor(outsiderId);
@@ -447,7 +450,7 @@ describe("read state", () => {
           expect(yield* listed(plain, { limit: 1 })).toEqual([]);
           yield* trusted(
             bound,
-            Effect.flatMap(Journal.Service, (journal) =>
+            Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Created, {
                 workspaceId,
                 assignmentId: Assignment.Id.make("plain-reads-own"),
@@ -470,7 +473,7 @@ describe("read state", () => {
               run(
                 bound,
                 actorFor(outsiderId),
-                Effect.flatMap(ThreadService.Service, (threadService) =>
+                Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                   threadService.listInGroup(Group.Id.make("missing"), { limit: 1 }),
                 ),
               ),
@@ -494,7 +497,7 @@ describe("read state", () => {
               run(
                 bound,
                 actor,
-                Effect.flatMap(ThreadService.Service, (threadService) =>
+                Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                   threadService.listOpenings(team.id, options),
                 ),
               );
@@ -540,7 +543,7 @@ describe("read state", () => {
             const recent = yield* run(
               bound,
               human,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.listInGroup(team.id, { limit: 1 }),
               ),
             );
@@ -560,7 +563,7 @@ describe("read state", () => {
                 run(
                   bound,
                   actorFor(outsiderId),
-                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                  Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                     threadService.listOpenings(team.id, { limit: 1 }),
                   ),
                 ),
@@ -583,7 +586,7 @@ describe("read state", () => {
             const items = yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.listOpenings(team.id, { limit: 50 }),
               ),
             ).pipe(
@@ -636,14 +639,14 @@ describe("read state", () => {
             run(
               bound,
               actor,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.listMine({ limit: 100 }),
               ),
             );
           const quiet = yield* run(
             bound,
             owner,
-            Effect.flatMap(GroupService.Service, (groupService) =>
+            Effect.flatMap(GroupService.GroupService, (groupService) =>
               groupService.createTeam({
                 name: "Quiet",
                 memberIds: [owner.memberId, humanId],
@@ -676,7 +679,7 @@ describe("read state", () => {
           yield* run(
             bound,
             human,
-            Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+            Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
               groupFollowService.follow({ groupId: team.id, memberId: humanId }),
             ),
           );

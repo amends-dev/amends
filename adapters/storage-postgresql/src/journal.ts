@@ -1,9 +1,9 @@
 import { Commit, Entry, Store } from "@amends-dev/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
-import { JournalEntry } from "./journal-entry.ts";
-import { PostgresNotices } from "./notices.ts";
-import { Binding } from "./binding.ts";
+import * as JournalEntry from "./journal-entry.ts";
+import * as PostgresNotices from "./notices.ts";
+import * as Binding from "./binding.ts";
 import { isContention, storeError, storeFailure } from "./errors.ts";
 import { insertChunked } from "./parameters.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts";
@@ -59,7 +59,7 @@ const copyReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
  * @category constructors
  */
 export const make = Effect.fn("Journal.make")(function* () {
-  const { workspaceId, database, guard, transaction, pollInterval } = yield* Binding.Service;
+  const { workspaceId, database, guard, transaction, pollInterval } = yield* Binding.Binding;
   const { db } = database;
 
   const scoped = (logId: Entry.LogId) =>
@@ -395,7 +395,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     return entries.map(copyEntry);
   });
 
-  const driver: Store.Interface = {
+  const driver: Store.Store["Service"] = {
     workspaceId,
     getEntry: Effect.fn("Journal.getEntry")(
       function* (logId, entryId) {
@@ -560,10 +560,8 @@ export const make = Effect.fn("Journal.make")(function* () {
 });
 
 /**
- * Provide Store.Service using its constructor and the caller's dependencies.
+ * Provide Store.Store using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(Store.Service, make());
-
-export * as Journal from "./journal.ts";
+export const layer = Layer.effect(Store.Store, make());

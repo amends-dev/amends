@@ -16,7 +16,7 @@ it.effect.each(["make", "layer"] as const)(
       yield* Effect.gen(function* () {
         const token = yield* Ref.make("alice");
         const revoked = yield* Ref.make<ReadonlySet<string>>(new Set());
-        const sessionTokens = SessionTokens.Service.of({
+        const sessionTokens = SessionTokens.SessionTokens.of({
           resolve: Effect.fnUntraced(function* (token) {
             const id = Redacted.value(token);
             resolutions.push(id);
@@ -31,15 +31,15 @@ it.effect.each(["make", "layer"] as const)(
             ? Layer.succeed(
                 Authentication,
                 yield* BearerAuthentication.make().pipe(
-                  Effect.provideService(SessionTokens.Service, sessionTokens),
+                  Effect.provideService(SessionTokens.SessionTokens, sessionTokens),
                 ),
               )
             : BearerAuthentication.layer.pipe(
-                Layer.provide(Layer.succeed(SessionTokens.Service, sessionTokens)),
+                Layer.provide(Layer.succeed(SessionTokens.SessionTokens, sessionTokens)),
               );
         const directory = Layer.succeed(
-          WorkspaceDirectory.Service,
-          WorkspaceDirectory.Service.of({
+          WorkspaceDirectory.WorkspaceDirectory,
+          WorkspaceDirectory.WorkspaceDirectory.of({
             list: (identity) =>
               Effect.sync(() => {
                 principals.push(identity);
@@ -48,8 +48,8 @@ it.effect.each(["make", "layer"] as const)(
           }),
         );
         const accounts = Layer.succeed(
-          Accounts.Service,
-          Accounts.Service.of({
+          Accounts.Accounts,
+          Accounts.Accounts.of({
             findOrCreate: () => Effect.die("unused"),
             findByIds: () => Effect.succeed([]),
           }),
@@ -70,7 +70,7 @@ it.effect.each(["make", "layer"] as const)(
             Layer.mergeAll(
               directory,
               accounts,
-              Layer.succeed(SessionTokens.Service, sessionTokens),
+              Layer.succeed(SessionTokens.SessionTokens, sessionTokens),
             ),
           ),
         );

@@ -1,7 +1,7 @@
 import { Workspace, WorkspaceStore } from "@amends-dev/core/workspace";
 import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { workspaces } from "./schema.ts";
 
@@ -20,10 +20,10 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Workspace.Record));
  * @category constructors
  */
 export const make = Effect.fn("Workspaces.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const own = eq(workspaces.workspaceId, workspaceId);
-  const driver: WorkspaceStore.Interface = {
+  const driver: WorkspaceStore.WorkspaceStore["Service"] = {
     get: guard(db.select(recordColumns).from(workspaces).where(own)).pipe(
       Effect.flatMap(decode),
       Effect.map(Array.head),
@@ -75,10 +75,8 @@ export const make = Effect.fn("Workspaces.make")(function* () {
 });
 
 /**
- * Provide WorkspaceStore.Service using its constructor and the caller's dependencies.
+ * Provide WorkspaceStore.WorkspaceStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(WorkspaceStore.Service, make());
-
-export * as Workspaces from "./workspaces.ts";
+export const layer = Layer.effect(WorkspaceStore.WorkspaceStore, make());

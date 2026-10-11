@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Commit } from "./commit.ts";
+import * as Commit from "./commit.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("LogEntryId"));
 export type Id = typeof Id.Type;
@@ -20,5 +20,3 @@ export const Metadata = Schema.Struct({
   recordedAt: Schema.DateTimeUtcFromString,
 });
 export interface Metadata extends Schema.Schema.Type<typeof Metadata> {}
-
-export * as Entry from "./entry.ts";

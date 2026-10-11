@@ -2,7 +2,7 @@ import { Identity } from "@amends-dev/core/identity";
 import { MemoryDatabase, Rows } from "@amends-dev/core/memory";
 import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
-import { WorkspaceDirectory } from "../directory.ts";
+import * as WorkspaceDirectory from "../directory.ts";
 
 const workspaces = Rows.make(Schema.fromJsonString(Workspace.Record));
 const members = Rows.make(Schema.fromJsonString(Member.Record));
@@ -16,10 +16,10 @@ const invitations = Rows.make(Schema.fromJsonString(Invitation.Record));
  * @category constructors
  */
 export const make = Effect.fn("MemoryDirectory.make")(function* () {
-  const database = yield* MemoryDatabase.Service;
-  const list: WorkspaceDirectory.Interface["list"] = Effect.fn("MemoryDirectory.list")(function* (
-    identity: Identity.MemberReference,
-  ) {
+  const database = yield* MemoryDatabase.MemoryDatabase;
+  const list: WorkspaceDirectory.WorkspaceDirectory["Service"]["list"] = Effect.fn(
+    "MemoryDirectory.list",
+  )(function* (identity: Identity.MemberReference) {
     const now = yield* DateTime.now;
     const memberships: Array<WorkspaceDirectory.Membership> = [];
     const pending = [];
@@ -56,14 +56,12 @@ export const make = Effect.fn("MemoryDirectory.make")(function* () {
     }
     return { memberships, invitations: pending };
   }, Effect.orDie);
-  return WorkspaceDirectory.Service.of({ list });
+  return WorkspaceDirectory.WorkspaceDirectory.of({ list });
 });
 
 /**
- * Provide WorkspaceDirectory.Service using its constructor and the caller's dependencies.
+ * Provide WorkspaceDirectory.WorkspaceDirectory using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(WorkspaceDirectory.Service, make());
-
-export * as MemoryDirectory from "./directory.ts";
+export const layer = Layer.effect(WorkspaceDirectory.WorkspaceDirectory, make());

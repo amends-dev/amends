@@ -48,6 +48,7 @@ import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from 
 
 import { TestClock } from "effect/testing";
 
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
@@ -57,7 +58,6 @@ import {
   otherWorkspaceId,
   placed,
   runHost,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -84,12 +84,12 @@ describe("threads", () => {
     id: Identity.AgentId.make("agent"),
   });
   const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Value) =>
-    program.pipe(Effect.provideService(Actor.Service, actor));
+    program.pipe(Effect.provideService(Actor.Actor, actor));
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
     asActor(program, actor).pipe(Effect.provide(core(bound)));
   const publish = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
   const startOnly = (
@@ -97,7 +97,7 @@ describe("threads", () => {
     mentions: ReadonlyArray<Member.Id> = [],
     text = "Here's the proposal",
   ) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, mentions, text }),
     );
   // Inspect persisted participation through the internal test binding, not the public result.
@@ -110,20 +110,20 @@ describe("threads", () => {
     // A start returns its thread and opening message; the activity is read back from the store.
     expect(Object.keys(started).sort()).toEqual(["message", "task", "thread"]);
     const result = yield* placed(started);
-    const threadParticipationStore = yield* ThreadParticipationStore.Service;
+    const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
     return Object.assign({}, result, {
       participants: yield* threadParticipationStore.listByThread(result.thread.id),
     });
   });
   const create = (members: ReadonlyArray<Member.Id>, name = "Engineering") =>
-    Effect.flatMap(GroupService.Service, (groupService) =>
+    Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name, memberIds: members }),
     );
   const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
   const seed = (bound: Bound) =>
     publish(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           Effect.gen(function* () {
             for (const [memberId, identity] of [
@@ -178,7 +178,9 @@ describe("threads", () => {
         runHost(
           storage,
           Effect.gen(function* () {
-            expectTypeOf<Extract<Core.Operations, ThreadCommand.Service>>().toEqualTypeOf<never>();
+            expectTypeOf<
+              Extract<Core.Operations, ThreadCommand.ThreadCommand>
+            >().toEqualTypeOf<never>();
             const { bound, owner, group } = yield* prepare();
             yield* TestClock.adjust("5 seconds");
             const before = yield* history(bound);
@@ -215,7 +217,7 @@ describe("threads", () => {
             ]);
             const events = yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal
                   .read({ name: ThreadActivityFacts.Recorded.name, limit: 100 })
                   .pipe(
@@ -314,7 +316,7 @@ describe("threads", () => {
             expect(yield* history(bound)).toEqual(before);
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
                   assignmentId: Assignment.Id.make("start"),
@@ -344,7 +346,7 @@ describe("threads", () => {
             yield* run(bound, human, start(group.id, [owner.memberId]));
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
                   assignmentId: Assignment.Id.make("use-agent"),
@@ -362,7 +364,7 @@ describe("threads", () => {
             yield* run(bound, human, start(group.id, [agentId]));
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
                   assignmentId: Assignment.Id.make("agent-start"),
@@ -382,7 +384,7 @@ describe("threads", () => {
             });
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(RoleFacts.PermissionsChanged, {
                   workspaceId,
                   roleId: BuiltinRoles.OwnerId,
@@ -410,13 +412,13 @@ describe("threads", () => {
               memberIds: ReadonlyArray<Member.Id>,
               mentions: ReadonlyArray<Member.Id> = [],
             ) =>
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startDirect({ memberIds, text: "Hello", mentions }),
               );
             // The human may start threads anywhere, but may not use the agent.
             yield* publish(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
                   assignmentId: Assignment.Id.make("start-anywhere"),
@@ -479,7 +481,7 @@ describe("threads", () => {
           });
           const broken = {
             ...bound,
-            context: Context.add(bound.context, NotificationStore.Service, {
+            context: Context.add(bound.context, NotificationStore.NotificationStore, {
               ...bound.notifications,
               insertMany: (records) =>
                 Effect.andThen(
@@ -533,11 +535,13 @@ describe("threads", () => {
             yield* run(
               bound,
               agent,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.leave({
-                  groupId: group.id,
-                  membershipId: memberParticipant(participant).groupMembershipId,
-                }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.leave({
+                    groupId: group.id,
+                    membershipId: memberParticipant(participant).groupMembershipId,
+                  }),
               ),
             );
             expect(yield* bound.participations.get(participant.id)).toMatchObject({
@@ -556,8 +560,10 @@ describe("threads", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                groupMembershipService.add({ groupId: group.id, memberId: agentId }),
+              Effect.flatMap(
+                GroupMembershipService.GroupMembershipService,
+                (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: agentId }),
               ),
             );
             expect(yield* bound.participations.get(participant.id)).toMatchObject({
@@ -575,7 +581,7 @@ describe("threads", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(MemberService.Service, (memberService) =>
+              Effect.flatMap(MemberService.MemberService, (memberService) =>
                 memberService.remove(agentId),
               ),
             );
@@ -606,7 +612,7 @@ describe("threads", () => {
         Effect.gen(function* () {
           const { bound, owner, group } = yield* prepare();
           const before = yield* history(bound);
-          const outer = Effect.flatMap(Journal.Service, (journal) =>
+          const outer = Effect.flatMap(Journal.Journal, (journal) =>
             journal.commit(
               start(group.id, everyone(owner.memberId)).pipe(
                 Effect.andThen(Effect.fail("rollback")),
@@ -619,7 +625,7 @@ describe("threads", () => {
               run(
                 bound,
                 owner,
-                Effect.flatMap(Journal.Service, (journal) =>
+                Effect.flatMap(Journal.Journal, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
                       yield* journal.publish(RoleFacts.PermissionsChanged, {
@@ -642,7 +648,7 @@ describe("threads", () => {
               run(
                 bound,
                 owner,
-                Effect.flatMap(Journal.Service, (journal) =>
+                Effect.flatMap(Journal.Journal, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
                       yield* journal.publish(GroupMembershipFacts.Removed, {
@@ -680,20 +686,22 @@ describe("threads", () => {
                 yield* run(
                   bound,
                   owner,
-                  Effect.flatMap(MemberService.Service, (memberService) =>
+                  Effect.flatMap(MemberService.MemberService, (memberService) =>
                     memberService.remove(agentId),
                   ),
                 );
                 yield* run(
                   bound,
                   owner,
-                  Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                    groupMembershipService.add({ groupId: group.id, memberId: otherId }),
+                  Effect.flatMap(
+                    GroupMembershipService.GroupMembershipService,
+                    (groupMembershipService) =>
+                      groupMembershipService.add({ groupId: group.id, memberId: otherId }),
                   ),
                 );
                 yield* publish(
                   bound,
-                  Effect.flatMap(Journal.Service, (journal) =>
+                  Effect.flatMap(Journal.Journal, (journal) =>
                     journal.publish(RoleFacts.PermissionsChanged, {
                       workspaceId,
                       roleId: BuiltinRoles.OwnerId,
@@ -724,7 +732,7 @@ describe("threads", () => {
                 yield* storage.discardProjections;
                 yield* publish(
                   bound,
-                  Effect.flatMap(Journal.Service, (journal) => journal.replay),
+                  Effect.flatMap(Journal.Journal, (journal) => journal.replay),
                 );
                 expect(yield* bound.participations.listByThread(saved.started.thread.id)).toEqual(
                   saved.participants,
@@ -759,7 +767,7 @@ describe("threads", () => {
         runGateway(
           storage,
           Effect.gen(function* () {
-            const gateway = yield* Gateway.Service;
+            const gateway = yield* Gateway.Gateway;
             const workspace = yield* gateway.createWorkspace(Identity.HumanId.make("owner"), {
               name: "Workspace",
               memberName: "owner",
@@ -893,7 +901,7 @@ describe("threads", () => {
                       yield* Deferred.succeed(ready, undefined);
                       yield* Deferred.await(startGate);
                       if (remove) {
-                        yield* Effect.flatMap(MemberService.Service, (memberService) =>
+                        yield* Effect.flatMap(MemberService.MemberService, (memberService) =>
                           memberService.remove(agentId),
                         );
                       } else {
@@ -930,7 +938,7 @@ describe("threads", () => {
                   yield* run(
                     bound,
                     saved.owner,
-                    Effect.flatMap(MemberService.Service, (memberService) =>
+                    Effect.flatMap(MemberService.MemberService, (memberService) =>
                       memberService.remove(agentId),
                     ),
                   );
@@ -984,7 +992,7 @@ describe("threads", () => {
             const snapshot = yield* history(bound);
             const failing = {
               ...bound,
-              context: Context.add(bound.context, NotificationStore.Service, {
+              context: Context.add(bound.context, NotificationStore.NotificationStore, {
                 ...bound.notifications,
                 // Leaving settles the agent's pending input with the departure itself.
                 discardPendingForGroup: () =>
@@ -1001,11 +1009,13 @@ describe("threads", () => {
                 run(
                   failing,
                   agent,
-                  Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
-                    groupMembershipService.leave({
-                      groupId: group.id,
-                      membershipId: memberParticipant(participation).groupMembershipId,
-                    }),
+                  Effect.flatMap(
+                    GroupMembershipService.GroupMembershipService,
+                    (groupMembershipService) =>
+                      groupMembershipService.leave({
+                        groupId: group.id,
+                        membershipId: memberParticipant(participation).groupMembershipId,
+                      }),
                   ),
                 ),
               ),
@@ -1165,7 +1175,7 @@ describe("threads", () => {
             run(
               bound,
               by,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.rename({ threadId, title, expectedTitle }),
               ),
             );
@@ -1189,7 +1199,7 @@ describe("threads", () => {
           expect(yield* history(bound)).toHaveLength(before.length + 1);
           const batches = yield* publish(
             bound,
-            Effect.flatMap(Journal.Service, (journal) => journal.log.read({ limit: 100 })),
+            Effect.flatMap(Journal.Journal, (journal) => journal.log.read({ limit: 100 })),
           );
           const entries = batches.at(-1)?.entries ?? [];
           expect(entries.map((entry) => entry.payload.name)).toEqual([
@@ -1224,7 +1234,7 @@ describe("threads", () => {
           const items = yield* run(
             bound,
             owner,
-            Effect.flatMap(ThreadService.Service, (threadService) =>
+            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
               threadService.readTimeline(started.thread.id, { limit: 10 }),
             ),
           );
@@ -1253,7 +1263,7 @@ describe("threads", () => {
           const titled = yield* run(
             bound,
             owner,
-            Effect.flatMap(ThreadService.Service, (threadService) =>
+            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
               threadService.startInGroup({
                 groupId: group.id,
                 mentions: [],

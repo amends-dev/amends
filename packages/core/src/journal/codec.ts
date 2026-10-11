@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { SchemaBinary } from "effect/encoding";
-import type { Fact } from "./fact.ts";
-import type { Store } from "./store.ts";
+import type * as Fact from "./fact.ts";
+import type * as Store from "./store.ts";
 
 /** Maps a log's values to structured storage content, retaining schema requirements. */
 export interface EntryCodec<S extends Schema.Constraint> {
@@ -73,5 +73,3 @@ export const make = <F extends Fact.Definition>(fact: F): FactCodec<F> => ({
   fact,
   ...makeForSchema<F["payload"]>(fact.payload),
 });
-
-export * as Codec from "./codec.ts";

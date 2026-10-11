@@ -12,5 +12,3 @@ export const Record = Schema.Struct({
 });
 
 export interface Record extends Schema.Schema.Type<typeof Record> {}
-
-export * as Commit from "./commit.ts";

@@ -25,17 +25,14 @@ export const Listing = Schema.Struct({
 }).annotate({ identifier: "WorkspaceDirectoryListing" });
 export interface Listing extends Schema.Schema.Type<typeof Listing> {}
 
-export interface Interface {
-  /**
-   * Hosts route workspaces; this is one identity's routing table, read from
-   * host-owned indexes across workspaces. Removed memberships stay listed so a
-   * client can explain them. Invitations are listed for humans only.
-   */
-  readonly list: (identity: Identity.MemberReference) => Effect.Effect<Listing>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/gateway/directory/Service",
-) {}
-
-export * as WorkspaceDirectory from "./directory.ts";
+export class WorkspaceDirectory extends Context.Service<
+  WorkspaceDirectory,
+  {
+    /**
+     * Hosts route workspaces; this is one identity's routing table, read from
+     * host-owned indexes across workspaces. Removed memberships stay listed so a
+     * client can explain them. Invitations are listed for humans only.
+     */
+    readonly list: (identity: Identity.MemberReference) => Effect.Effect<Listing>;
+  }
+>()("@amends-dev/gateway/directory/Service") {}

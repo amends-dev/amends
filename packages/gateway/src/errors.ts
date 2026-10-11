@@ -163,5 +163,3 @@ export type PublicError = typeof PublicError.Type;
 
 /** The public outcomes of a core program whose error type is E. */
 export type PublicErrorOf<E> = Extract<E, PublicError> | Conflict | Uncertain | InvalidInput;
-
-export * as GatewayErrors from "./errors.ts";

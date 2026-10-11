@@ -1,14 +1,14 @@
 import { Schema, Struct } from "effect";
-import { Agent } from "../agent/agent.ts";
-import { GroupId } from "../group/id.ts";
-import { Identity } from "../identity/identity.ts";
-import { Notification } from "../notification/notification.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadMessageId } from "../thread/ThreadMessageId.ts";
-import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { TurnId } from "./id.ts";
+import * as Agent from "../agent/agent.ts";
+import * as GroupId from "../group/id.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Notification from "../notification/notification.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as TurnId from "./id.ts";
 
 export const Id = TurnId.Id;
 export type Id = TurnId.Id;
@@ -203,5 +203,3 @@ export class LogUnavailable extends Schema.TaggedError<LogUnavailable>()(
   "Turn.LogUnavailable",
   {},
 ) {}
-
-export * as Turn from "./turn.ts";

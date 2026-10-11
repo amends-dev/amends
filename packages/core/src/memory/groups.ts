@@ -1,8 +1,9 @@
 import { Group, GroupStore } from "../group/index.ts";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Group.Record));
 const latestRows = Rows.make(Schema.fromJsonString(Group.Latest));
@@ -12,8 +13,8 @@ const keyOf = (record: Group.Record) =>
 
 /** Group records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Groups.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: GroupStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: GroupStore.GroupStore["Service"] = {
     get: Effect.fn("Groups.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("groups"), id);
@@ -122,6 +123,4 @@ export const make = Effect.fn("Groups.make")(function* () {
 });
 
 /** Provide group storage over the caller's binding. @category layers */
-export const layer = Layer.effect(GroupStore.Service, make());
-
-export * as Groups from "./groups.ts";
+export const layer = Layer.effect(GroupStore.GroupStore, make());

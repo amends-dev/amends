@@ -1,31 +1,31 @@
 import { Context, Crypto, DateTime, Effect, Layer, Option, Order, Schema } from "effect";
-import { Request } from "../request/request.ts";
+import * as Request from "../request/request.ts";
 import type { PlatformError } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { Target } from "../authorization/target.ts";
-import { Actor } from "../identity/actor.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { MemberStore } from "../workspace/member/store.ts";
-import { Group } from "./group.ts";
-import { GroupCommand } from "./command.ts";
-import { GroupQuery } from "./query.ts";
-import { GroupStore } from "./store.ts";
-import { GroupFacts } from "./facts.ts";
-import { GroupPermissions } from "./permissions.ts";
-import { GroupMembership } from "./membership/membership.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as Target from "../authorization/target.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as MemberStore from "../workspace/member/store.ts";
+import * as Group from "./group.ts";
+import * as GroupCommand from "./command.ts";
+import * as GroupQuery from "./query.ts";
+import * as GroupStore from "./store.ts";
+import * as GroupFacts from "./facts.ts";
+import * as GroupPermissions from "./permissions.ts";
+import * as GroupMembership from "./membership/membership.ts";
 
-import { GroupMembershipPermissions } from "./membership/permissions.ts";
-import { GroupMembershipStore } from "./membership/store.ts";
-import { GroupFollowStore } from "./follow/store.ts";
-import { ReadStateStore } from "../read-state/store.ts";
-import { NotificationStore } from "../notification/store.ts";
+import * as GroupMembershipPermissions from "./membership/permissions.ts";
+import * as GroupMembershipStore from "./membership/store.ts";
+import * as GroupFollowStore from "./follow/store.ts";
+import * as ReadStateStore from "../read-state/store.ts";
+import * as NotificationStore from "../notification/store.ts";
 import { Changed, InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
-import { Notification } from "../notification/notification.ts";
+import * as Notification from "../notification/notification.ts";
 export { Changed, InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
 
 export type Error =
@@ -59,65 +59,64 @@ export type ReadError =
   | Schema.SchemaError
   | NotFound;
 
-export interface Interface {
-  /**
-   * Require group.create in this workspace, then create a private team and its explicit
-   * initial admissions in one commit. No extra membership-management grant is required
-   * for the initial audience. New invocations create new groups; this is not a retry receipt.
-   */
-  readonly createTeam: (
-    input: Group.CreateTeamInput,
-    options?: Request.Options,
-  ) => Effect.Effect<Group.Record, CreateError, Actor.Service>;
-  /**
-   * Require group.rename on the group and membership of it, then give a team group a new name.
-   * No workspace role reaches a group from outside it: to a non-member, a group is NotFound, as a
-   * missing or foreign one is. A direct group, named by its members, is NotRenamable. The same name
-   * again records nothing; otherwise a name other than `expectedName` is Changed, and nothing is
-   * recorded.
-   */
-  readonly rename: (
-    input: Group.RenameInput,
-  ) => Effect.Effect<Group.Record, RenameError, Actor.Service>;
-  /** Require group.read and current audience membership; no transaction or publication. */
-  readonly get: (groupId: Group.Id) => Effect.Effect<Group.Record, ReadError, Actor.Service>;
-  /** Current readable groups only, ordered by group ID. Honors an existing transaction. */
-  /**
-   * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
-   * its latest activity, when the actor last read it, whether it has new activity for them, and
-   * whether they follow it. Each page reads a fixed number of times, however large.
-   */
-  readonly listMine: (
-    options: Group.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<Group.ListItem>, ReadError, Actor.Service>;
-  /**
-   * A page of the workspace's public team groups that `group.join` covers for the actor, in
-   * group-ID order, each with its member count and whether the actor belongs to it. Their threads
-   * stay with their members. Each page reads a fixed number of times, however large.
-   */
-  readonly listPublic: (
-    options: Group.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<Group.PublicItem>, ReadError, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/group/service/Service",
-) {}
+export class GroupService extends Context.Service<
+  GroupService,
+  {
+    /**
+     * Require group.create in this workspace, then create a private team and its explicit
+     * initial admissions in one commit. No extra membership-management grant is required
+     * for the initial audience. New invocations create new groups; this is not a retry receipt.
+     */
+    readonly createTeam: (
+      input: Group.CreateTeamInput,
+      options?: Request.Options,
+    ) => Effect.Effect<Group.Record, CreateError, Actor.Actor>;
+    /**
+     * Require group.rename on the group and membership of it, then give a team group a new name.
+     * No workspace role reaches a group from outside it: to a non-member, a group is NotFound, as a
+     * missing or foreign one is. A direct group, named by its members, is NotRenamable. The same name
+     * again records nothing; otherwise a name other than `expectedName` is Changed, and nothing is
+     * recorded.
+     */
+    readonly rename: (
+      input: Group.RenameInput,
+    ) => Effect.Effect<Group.Record, RenameError, Actor.Actor>;
+    /** Require group.read and current audience membership; no transaction or publication. */
+    readonly get: (groupId: Group.Id) => Effect.Effect<Group.Record, ReadError, Actor.Actor>;
+    /** Current readable groups only, ordered by group ID. Honors an existing transaction. */
+    /**
+     * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
+     * its latest activity, when the actor last read it, whether it has new activity for them, and
+     * whether they follow it. Each page reads a fixed number of times, however large.
+     */
+    readonly listMine: (
+      options: Group.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<Group.ListItem>, ReadError, Actor.Actor>;
+    /**
+     * A page of the workspace's public team groups that `group.join` covers for the actor, in
+     * group-ID order, each with its member count and whether the actor belongs to it. Their threads
+     * stay with their members. Each page reads a fixed number of times, however large.
+     */
+    readonly listPublic: (
+      options: Group.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<Group.PublicItem>, ReadError, Actor.Actor>;
+  }
+>()("@amends-dev/core/group/service/Service") {}
 
 /** Capture workspace dependencies; resolve authority and member eligibility inside each commit. @category constructors */
 export const make = Effect.fn("GroupService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const memberStore = yield* MemberStore.Service;
-  const groupStore = yield* GroupStore.Service;
-  const groupMembershipStore = yield* GroupMembershipStore.Service;
-  const groupQuery = yield* GroupQuery.Service;
-  const groupCommand = yield* GroupCommand.Service;
-  const groupFollowStore = yield* GroupFollowStore.Service;
-  const readStateStore = yield* ReadStateStore.Service;
-  const notificationStore = yield* NotificationStore.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const memberStore = yield* MemberStore.MemberStore;
+  const groupStore = yield* GroupStore.GroupStore;
+  const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
+  const groupQuery = yield* GroupQuery.GroupQuery;
+  const groupCommand = yield* GroupCommand.GroupCommand;
+  const groupFollowStore = yield* GroupFollowStore.GroupFollowStore;
+  const readStateStore = yield* ReadStateStore.ReadStateStore;
+  const notificationStore = yield* NotificationStore.NotificationStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
   const createGroupRequirement = Requirement.make(
     GroupPermissions.Create,
     Target.Reference.cases.Workspace.make({ workspaceId }),
@@ -134,7 +133,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
     function* (input: Group.CreateTeamInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreateTeamInput))(input);
       yield* authorization.require([createGroupRequirement]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const groupId = Group.Id.make(
         yield* Request.idFor(options.requestKey, ["group.create", workspaceId, actor.memberId]),
       );
@@ -293,7 +292,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
   const listMine = Effect.fn("GroupService.listMine")(function* (input: Group.ListOptions) {
     const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
     yield* authorization.require([]);
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     const items: Array<Group.ListItem> = [];
     let after = options.after;
     // Fill the page with readable groups, reading further when grants skip some.
@@ -318,7 +317,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
   const listPublic = Effect.fn("GroupService.listPublic")(function* (input: Group.ListOptions) {
     const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
     yield* authorization.require([]);
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     const items: Array<Group.PublicItem> = [];
     let after = options.after;
     // Fill the page with groups the actor may join, reading further when grants skip some.
@@ -354,7 +353,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
     return items;
   });
 
-  return Service.of({
+  return GroupService.of({
     createTeam,
     rename,
     get,
@@ -364,6 +363,4 @@ export const make = Effect.fn("GroupService.make")(function* () {
 });
 
 /** Provide group creation and authorized reads over the workspace's services. @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as GroupService from "./service.ts";
+export const layer = Layer.effect(GroupService, make());

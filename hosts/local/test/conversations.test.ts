@@ -8,9 +8,9 @@ import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
-import { LocalHost } from "../src/host.ts";
-import { LocalServer } from "../src/server.ts";
+import * as DevelopmentAuthentication from "../src/authentication/authentication.ts";
+import * as LocalHost from "../src/host.ts";
+import * as LocalServer from "../src/server.ts";
 import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");

@@ -24,44 +24,44 @@ import {
 } from "@amends-dev/core/group";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Exit, Fiber, Layer, Option, Queue, Schema, Scope, Stream } from "effect";
-import { Assignment } from "../../src/authorization/assignment/assignment.ts";
-import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
-import { Authorization } from "../../src/authorization/authorization.ts";
-import { GrantResolver } from "../../src/authorization/grant-resolver.ts";
-import { PermissionCatalog } from "../../src/authorization/permission-catalog.ts";
-import type { Permission } from "../../src/authorization/permission.ts";
-import { RoleStore } from "../../src/authorization/role/store.ts";
-import { Scope as GrantScope } from "../../src/authorization/scope.ts";
-import { ChangeFeedService } from "../../src/change-feed/service.ts";
-import { ChangeFeed } from "../../src/change-feed/change-feed.ts";
-import { ChangeFeedSource } from "../../src/change-feed/source.ts";
-import { Actor } from "../../src/identity/actor.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Invitation } from "../../src/workspace/invitation/invitation.ts";
-import { InvitationPermissions } from "../../src/workspace/invitation/permissions.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
-import { AssignmentPermissions } from "../../src/authorization/assignment/permissions.ts";
-import { InvitationFacts } from "../../src/workspace/invitation/facts.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberFacts } from "../../src/workspace/member/facts.ts";
-import { MemberStore } from "../../src/workspace/member/store.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
-import { WorkspaceFacts } from "../../src/workspace/facts.ts";
-import { Role } from "../../src/authorization/role/role.ts";
-import { RoleFacts } from "../../src/authorization/role/facts.ts";
-import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
+import * as Assignment from "../../src/authorization/assignment/assignment.ts";
+import * as AssignmentStore from "../../src/authorization/assignment/store.ts";
+import * as Authorization from "../../src/authorization/authorization.ts";
+import * as GrantResolver from "../../src/authorization/grant-resolver.ts";
+import * as PermissionCatalog from "../../src/authorization/permission-catalog.ts";
+import type * as Permission from "../../src/authorization/permission.ts";
+import * as RoleStore from "../../src/authorization/role/store.ts";
+import * as GrantScope from "../../src/authorization/scope.ts";
+import * as ChangeFeedService from "../../src/change-feed/service.ts";
+import * as ChangeFeed from "../../src/change-feed/change-feed.ts";
+import * as ChangeFeedSource from "../../src/change-feed/source.ts";
+import * as Actor from "../../src/identity/actor.ts";
+import * as Identity from "../../src/identity/identity.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Fact from "../../src/journal/fact.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Publication from "../../src/journal/publication.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as Invitation from "../../src/workspace/invitation/invitation.ts";
+import * as InvitationPermissions from "../../src/workspace/invitation/permissions.ts";
+import * as MemberPermissions from "../../src/workspace/member/permissions.ts";
+import * as AssignmentPermissions from "../../src/authorization/assignment/permissions.ts";
+import * as InvitationFacts from "../../src/workspace/invitation/facts.ts";
+import * as Member from "../../src/workspace/member/member.ts";
+import * as MemberFacts from "../../src/workspace/member/facts.ts";
+import * as MemberStore from "../../src/workspace/member/store.ts";
+import * as Workspace from "../../src/workspace/workspace.ts";
+import * as WorkspaceFacts from "../../src/workspace/facts.ts";
+import * as Role from "../../src/authorization/role/role.ts";
+import * as RoleFacts from "../../src/authorization/role/facts.ts";
+import * as AssignmentFacts from "../../src/authorization/assignment/facts.ts";
 import { make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
-import { TestSignalHub } from "../signal-hub.ts";
-import { Notification } from "../../src/notification/notification.ts";
-import { Signal } from "../../src/signal/signal.ts";
-import { SignalHub } from "../../src/signal/hub.ts";
+import * as TestSignalHub from "../signal-hub.ts";
+import * as Notification from "../../src/notification/notification.ts";
+import * as Signal from "../../src/signal/signal.ts";
+import * as SignalHub from "../../src/signal/hub.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const at = DateTime.makeUnsafe("2026-09-20T12:00:00.123Z");
@@ -180,10 +180,10 @@ const racing = () => {
   };
 };
 type Services =
-  | ChangeFeedService.Service
-  | Journal.Service
-  | SignalHub.Service
-  | Actor.Service
+  | ChangeFeedService.ChangeFeedService
+  | Journal.Journal
+  | SignalHub.SignalHub
+  | Actor.Actor
   | Scope.Scope;
 
 const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options: Options = {}) =>
@@ -219,7 +219,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     const accessRead = racing();
     const members = fixture.members;
     const unexpected = () => Effect.die(new Error("Unexpected membership store use"));
-    const memberships = GroupMembershipStore.Service.of({
+    const memberships = GroupMembershipStore.GroupMembershipStore.of({
       get: unexpected,
       getMany: unexpected,
       findActive: unexpected,
@@ -238,15 +238,15 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       markRemoved: unexpected,
     });
     const host = Layer.mergeAll(
-      Layer.succeed(Store.Service, fixture.store),
-      Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+      Layer.succeed(Store.Store, fixture.store),
+      Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
       Layer.succeed(
-        MemberStore.Service,
+        MemberStore.MemberStore,
         Object.assign({}, members, { get: (id: Member.Id) => memberRead.after(members.get(id)) }),
       ),
-      Layer.succeed(RoleStore.Service, fixture.roles),
-      Layer.succeed(AssignmentStore.Service, fixture.assignments),
-      Layer.succeed(GroupMembershipStore.Service, memberships),
+      Layer.succeed(RoleStore.RoleStore, fixture.roles),
+      Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
+      Layer.succeed(GroupMembershipStore.GroupMembershipStore, memberships),
       TestSignalHub.layer,
       PermissionCatalog.layer([
         ThreadPermissions.Read,
@@ -272,25 +272,27 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       admitted,
       afterMemberRead: memberRead.set,
       afterAccessRead: accessRead.set,
-    }).pipe(Effect.provide(configured), Effect.provideService(Actor.Service, actor));
+    }).pipe(Effect.provide(configured), Effect.provideService(Actor.Actor, actor));
   }).pipe(Effect.scoped);
 
 /** Publish facts in one commit with trusted test attribution. */
-const commit = (program: Effect.Effect<unknown, unknown, Journal.Service | Publication.Service>) =>
-  Effect.flatMap(Journal.Service, (journal) =>
+const commit = (
+  program: Effect.Effect<unknown, unknown, Journal.Journal | Publication.Publication>,
+) =>
+  Effect.flatMap(Journal.Journal, (journal) =>
     journal
       .commit(program)
       .pipe(
-        Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-        Effect.provideService(Journal.Service, journal),
+        Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+        Effect.provideService(Journal.Journal, journal),
       ),
   ).pipe(Effect.orDie);
 const publish = <F extends Fact.Definition>(fact: F, payload: Fact.Payload<NoInfer<F>>) =>
-  Effect.flatMap(Journal.Service, (journal) => journal.publish(fact, payload));
+  Effect.flatMap(Journal.Journal, (journal) => journal.publish(fact, payload));
 
 /** Open a subscription and buffer its messages; the stream's end shows in its fiber. */
 const listen = Effect.fnUntraced(function* (options?: ChangeFeed.WatchOptions) {
-  const stream = yield* (yield* ChangeFeedService.Service).watch(options);
+  const stream = yield* (yield* ChangeFeedService.ChangeFeedService).watch(options);
   const queue = yield* Queue.unbounded<ChangeFeed.Message>();
   const fiber = yield* stream.pipe(
     Stream.runForEach((message) => Queue.offer(queue, message)),
@@ -304,7 +306,7 @@ const committed = (message: ChangeFeed.Message) => {
   return message;
 };
 const signal = (value: Signal.Value) =>
-  Effect.flatMap(SignalHub.Service, (signalHub) => signalHub.publish(value));
+  Effect.flatMap(SignalHub.SignalHub, (signalHub) => signalHub.publish(value));
 const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
   Signal.Value.cases.Typing.make({
     workspaceId,
@@ -424,7 +426,7 @@ it.effect("a cursor past the head, or further behind than the replay limit, rese
 it.effect("invalid cursors are rejected before subscribing", () =>
   run(() =>
     Effect.gen(function* () {
-      const changeFeedService = yield* ChangeFeedService.Service;
+      const changeFeedService = yield* ChangeFeedService.ChangeFeedService;
       for (const after of ["-1", "01", "1.5", "x", "9007199254740993"]) {
         const error = yield* Effect.flip(
           changeFeedService.watch({ after: after as ChangeFeed.Cursor }),
@@ -938,7 +940,7 @@ it.effect("a revocation that commits while the reader subscribes still applies t
   run(({ admitted, afterAccessRead }) =>
     Effect.gen(function* () {
       admitted.add(groupId);
-      const journal = yield* Journal.Service;
+      const journal = yield* Journal.Journal;
       // The reader's admissions are read, and then their removal from the group commits.
       afterAccessRead(
         Effect.suspend(() => {
@@ -952,7 +954,7 @@ it.effect("a revocation that commits while the reader subscribes still applies t
               reason: "removed",
             }),
           );
-        }).pipe(Effect.asVoid, Effect.provideService(Journal.Service, journal)),
+        }).pipe(Effect.asVoid, Effect.provideService(Journal.Journal, journal)),
       );
       const feed = yield* listen();
       yield* feed.next;
@@ -973,13 +975,13 @@ it.effect(
   () =>
     run(({ fixture, afterMemberRead }) =>
       Effect.gen(function* () {
-        const journal = yield* Journal.Service;
+        const journal = yield* Journal.Journal;
         // The reader's active membership is checked, and then their removal commits.
         afterMemberRead(
           Effect.andThen(
             fixture.store.transaction(fixture.members.markRemoved(actor.memberId)),
             commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId })),
-          ).pipe(Effect.asVoid, Effect.orDie, Effect.provideService(Journal.Service, journal)),
+          ).pipe(Effect.asVoid, Effect.orDie, Effect.provideService(Journal.Journal, journal)),
         );
         const feed = yield* listen();
         yield* feed.next;
@@ -1000,7 +1002,7 @@ it.effect("a slow subscriber catches up from the journal instead of losing commi
   run(
     () =>
       Effect.gen(function* () {
-        const changeFeedService = yield* ChangeFeedService.Service;
+        const changeFeedService = yield* ChangeFeedService.ChangeFeedService;
         const slow = yield* changeFeedService.watch();
         const fast = yield* listen();
         yield* fast.next;
@@ -1099,7 +1101,7 @@ it.effect("a removed member cannot subscribe", () =>
   run(({ fixture }) =>
     Effect.gen(function* () {
       yield* fixture.store.transaction(fixture.members.markRemoved(actor.memberId));
-      const error = yield* Effect.flip((yield* ChangeFeedService.Service).watch());
+      const error = yield* Effect.flip((yield* ChangeFeedService.ChangeFeedService).watch());
       expect(error).toMatchObject({ _tag: "Authorization.InvalidActor" });
     }),
   ),

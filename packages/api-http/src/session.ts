@@ -1,5 +1,5 @@
-import { Accounts } from "@amends-dev/gateway/accounts";
-import { SignIn } from "@amends-dev/gateway/sign-in";
+import * as Accounts from "@amends-dev/gateway/accounts";
+import * as SignIn from "@amends-dev/gateway/sign-in";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 

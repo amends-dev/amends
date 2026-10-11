@@ -24,12 +24,12 @@ import { Actor, Identity } from "@amends-dev/core/identity";
 import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { Context, DateTime, Effect, Option, Ref } from "effect";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
   otherWorkspaceId,
   runHost,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -46,9 +46,9 @@ describe("groups", () => {
     id: Identity.HumanId.make("group-human"),
   });
   const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Value) =>
-    program.pipe(Effect.provideService(Actor.Service, actor));
+    program.pipe(Effect.provideService(Actor.Actor, actor));
   const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
-    Effect.flatMap(GroupService.Service, (groupService) =>
+    Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name, memberIds }),
     );
   const prepare = Effect.fnUntraced(function* () {
@@ -60,7 +60,7 @@ describe("groups", () => {
       identity: { _tag: "Human", id: workspace.createdBy },
     });
     yield* Effect.gen(function* () {
-      const journal = yield* Journal.Service;
+      const journal = yield* Journal.Journal;
       yield* journal.commit(
         Effect.gen(function* () {
           yield* journal.publish(MemberFacts.Added, {
@@ -78,7 +78,7 @@ describe("groups", () => {
         }),
       );
     }).pipe(
-      Effect.provideService(Publication.Service, testProvenance()),
+      Effect.provideService(Publication.Publication, testProvenance()),
       Effect.provide(core(bound)),
     );
     return {
@@ -90,7 +90,7 @@ describe("groups", () => {
   });
   const publish = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Service, testProvenance()),
+      Effect.provideService(Publication.Publication, testProvenance()),
       Effect.provide(core(bound)),
     );
   const history = (bound: Bound) => bound.store.read(journalId, { limit: 100 });
@@ -134,7 +134,7 @@ describe("groups", () => {
             expect(yield* bound.groupMemberships.findActive(group.id, owner.memberId)).toEqual(
               Option.none(),
             );
-            const batches = yield* Effect.flatMap(Journal.Service, (journal) =>
+            const batches = yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal.log.read({ limit: 100 }),
             ).pipe(Effect.provide(core(bound)));
             const last = batches.at(-1);
@@ -173,7 +173,7 @@ describe("groups", () => {
           yield* publish(
             bound,
             Effect.gen(function* () {
-              const journal = yield* Journal.Service;
+              const journal = yield* Journal.Journal;
               yield* journal.commit(
                 Effect.gen(function* () {
                   yield* journal.publish(RoleFacts.Created, {
@@ -195,7 +195,7 @@ describe("groups", () => {
           expect((yield* call(actor)).createdBy).toBe(memberId);
           yield* publish(
             bound,
-            Effect.flatMap(Journal.Service, (journal) =>
+            Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(RoleFacts.PermissionsChanged, {
                 workspaceId,
                 roleId,
@@ -208,7 +208,7 @@ describe("groups", () => {
           });
           yield* publish(
             bound,
-            Effect.flatMap(Journal.Service, (journal) =>
+            Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Created, {
                 assignmentId: Assignment.Id.make("direct-create"),
                 workspaceId,
@@ -226,7 +226,7 @@ describe("groups", () => {
           expect((yield* call(actor)).createdBy).toBe(memberId);
           yield* publish(
             bound,
-            Effect.flatMap(Journal.Service, (journal) =>
+            Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(RoleFacts.PermissionsChanged, {
                 workspaceId,
                 roleId: BuiltinRoles.OwnerId,
@@ -252,7 +252,7 @@ describe("groups", () => {
           const other = yield* initialized(foreign);
           yield* publish(
             bound,
-            Effect.flatMap(Journal.Service, (journal) =>
+            Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(MemberFacts.Removed, { workspaceId, memberId: agentId }),
             ),
           );
@@ -300,14 +300,14 @@ describe("groups", () => {
             const broken = {
               ...bound,
               context: bound.context.pipe(
-                Context.add(GroupStore.Service, {
+                Context.add(GroupStore.GroupStore, {
                   ...bound.groups,
                   insert: (group) =>
                     Ref.set(observed, Option.some(group)).pipe(
                       Effect.andThen(bound.groups.insert(group)),
                     ),
                 }),
-                Context.add(GroupMembershipStore.Service, {
+                Context.add(GroupMembershipStore.GroupMembershipStore, {
                   ...bound.groupMemberships,
                   insert: (membership) =>
                     membership.memberId === agentId
@@ -361,7 +361,7 @@ describe("groups", () => {
           const observed = yield* Ref.make(Option.none<Group.Record>());
           const cancelled = asActor(
             Effect.gen(function* () {
-              const journal = yield* Journal.Service;
+              const journal = yield* Journal.Journal;
               return yield* journal.commit(
                 Effect.gen(function* () {
                   const group = yield* create([memberId]);
@@ -379,7 +379,7 @@ describe("groups", () => {
           expect(yield* history(bound)).toEqual(before);
           const revoked = asActor(
             Effect.gen(function* () {
-              const journal = yield* Journal.Service;
+              const journal = yield* Journal.Journal;
               return yield* journal.commit(
                 Effect.gen(function* () {
                   yield* journal.publish(RoleFacts.PermissionsChanged, {
@@ -417,7 +417,7 @@ describe("groups", () => {
                 yield* publish(
                   bound,
                   Effect.gen(function* () {
-                    const journal = yield* Journal.Service;
+                    const journal = yield* Journal.Journal;
                     yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId });
                     yield* journal.publish(RoleFacts.PermissionsChanged, {
                       workspaceId,
@@ -443,7 +443,7 @@ describe("groups", () => {
                 expect(yield* foreign.groups.get(saved.group.id)).toEqual(Option.none());
                 expect(yield* foreign.groupMemberships.listByGroup(saved.group.id)).toEqual([]);
                 yield* storage.discardProjections;
-                yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+                yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
                   Effect.provide(core(bound)),
                 );
                 expect(yield* bound.groups.get(saved.group.id)).toEqual(Option.some(saved.group));
@@ -595,14 +595,14 @@ describe("groups", () => {
           };
           const memberships = (
             program: (
-              service: GroupMembershipService.Interface,
-            ) => Effect.Effect<unknown, unknown, Actor.Service>,
+              service: GroupMembershipService.GroupMembershipService["Service"],
+            ) => Effect.Effect<unknown, unknown, Actor.Actor>,
             as: Actor.Value,
           ) =>
-            asActor(Effect.flatMap(GroupMembershipService.Service, program), as).pipe(
-              Effect.provide(core(bound)),
-              Effect.flip,
-            );
+            asActor(
+              Effect.flatMap(GroupMembershipService.GroupMembershipService, program),
+              as,
+            ).pipe(Effect.provide(core(bound)), Effect.flip);
           expect(
             yield* memberships(
               (service) => service.add({ groupId: direct.id, memberId: agentId }),
@@ -647,7 +647,7 @@ describe("groups", () => {
             expectedName: string = "Engineering",
           ) =>
             asActor(
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.rename({ groupId, name, expectedName }),
               ),
               by,
@@ -660,7 +660,7 @@ describe("groups", () => {
           const renamed = yield* rename(owner, group.id, "Platform");
           expect(renamed).toEqual({ ...group, name: "Platform" });
           expect(yield* bound.groups.get(group.id)).toEqual(Option.some(renamed));
-          const batches = yield* Effect.flatMap(Journal.Service, (journal) =>
+          const batches = yield* Effect.flatMap(Journal.Journal, (journal) =>
             journal.log.read({ limit: 100 }),
           ).pipe(Effect.provide(core(bound)));
           expect(batches).toHaveLength(before.length + 1);
@@ -734,7 +734,7 @@ describe("groups", () => {
           ).toMatchObject({ _tag: "GroupStore.Conflict", operation: "rename" });
           // Rebuilding from the journal keeps the latest name.
           yield* storage.discardProjections;
-          yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+          yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
             Effect.provide(core(bound)),
           );
           expect(yield* bound.groups.get(group.id)).toEqual(Option.some(renamed));

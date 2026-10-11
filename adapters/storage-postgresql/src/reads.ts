@@ -5,7 +5,7 @@
  */
 import { Context, Effect, Option, Semaphore } from "effect";
 
-export interface Interface {
+export interface PostgresReads {
   /** Run the effect as one of at most `permits` at once for this key in this process. */
   readonly run: <A, E, R>(
     key: string,
@@ -25,7 +25,7 @@ class Holding extends Context.Service<Holding, string>()(
 ) {}
 
 /** @category constructors */
-export const make = (): Interface => {
+export const make = (): PostgresReads => {
   // A lane lives while it has statements, so keys never accumulate.
   const lanes = new Map<string, Lane>();
   const run = <A, E, R>(
@@ -53,5 +53,3 @@ export const make = (): Interface => {
     );
   return { run };
 };
-
-export * as PostgresReads from "./reads.ts";

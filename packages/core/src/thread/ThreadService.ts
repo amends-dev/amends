@@ -7,48 +7,48 @@
  *
  * @since 0.1.0
  */
-import { Identity } from "../identity/identity.ts";
+import * as Identity from "../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { AgentPermissions } from "../agent/permissions.ts";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { Actor } from "../identity/actor.ts";
-import { Group } from "../group/group.ts";
-import { GroupQuery } from "../group/query.ts";
-import { GroupMembershipStore } from "../group/membership/store.ts";
-import { Member } from "../workspace/member/member.ts";
-import { MemberStore } from "../workspace/member/store.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Thread } from "./Thread.ts";
-import { ThreadStore } from "./ThreadStore.ts";
-import { ThreadCommand } from "./ThreadCommand.ts";
-import { GroupStore } from "../group/store.ts";
-import { GroupCommand } from "../group/command.ts";
-import type { GroupFollowStore } from "../group/follow/store.ts";
-import { ThreadQuery } from "./ThreadQuery.ts";
-import { ThreadPermissions } from "./ThreadPermissions.ts";
-import { ThreadMessageStore } from "./ThreadMessageStore.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
-import { ThreadParticipationStore } from "./ThreadParticipationStore.ts";
-import { ThreadActivityResolvers } from "./ThreadActivityResolvers.ts";
-import { ThreadActivityStore } from "./ThreadActivityStore.ts";
-import { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { ThreadMessageActivity } from "./ThreadMessageActivity.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
-import { ThreadFacts } from "./ThreadFacts.ts";
-import { ThreadTitleActivity } from "./ThreadTitleActivity.ts";
-import { ReadStateCommand } from "../read-state/command.ts";
-import type { ReadState } from "../read-state/read-state.ts";
-import { Request } from "../request/request.ts";
-import { Task } from "../task/Task.ts";
-import { TaskCommand } from "../task/TaskCommand.ts";
-import { TaskPermissions } from "../task/TaskPermissions.ts";
-import { TaskStore } from "../task/TaskStore.ts";
+import * as AgentPermissions from "../agent/permissions.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Group from "../group/group.ts";
+import * as GroupQuery from "../group/query.ts";
+import * as GroupMembershipStore from "../group/membership/store.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as MemberStore from "../workspace/member/store.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Thread from "./Thread.ts";
+import * as ThreadStore from "./ThreadStore.ts";
+import * as ThreadCommand from "./ThreadCommand.ts";
+import * as GroupStore from "../group/store.ts";
+import * as GroupCommand from "../group/command.ts";
+import type * as GroupFollowStore from "../group/follow/store.ts";
+import * as ThreadQuery from "./ThreadQuery.ts";
+import * as ThreadPermissions from "./ThreadPermissions.ts";
+import * as ThreadMessageStore from "./ThreadMessageStore.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
+import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
+import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
+import * as ThreadActivityStore from "./ThreadActivityStore.ts";
+import * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import * as ThreadFacts from "./ThreadFacts.ts";
+import * as ThreadTitleActivity from "./ThreadTitleActivity.ts";
+import * as ReadStateCommand from "../read-state/command.ts";
+import type * as ReadState from "../read-state/read-state.ts";
+import * as Request from "../request/request.ts";
+import * as Task from "../task/Task.ts";
+import * as TaskCommand from "../task/TaskCommand.ts";
+import * as TaskPermissions from "../task/TaskPermissions.ts";
+import * as TaskStore from "../task/TaskStore.ts";
 import {
   Changed,
   DirectMembersRequired,
@@ -57,7 +57,7 @@ import {
   NotFound,
   ParticipantUnavailable,
 } from "./ThreadErrors.ts";
-import { Notification } from "../notification/notification.ts";
+import * as Notification from "../notification/notification.ts";
 export {
   Changed,
   DirectMembersRequired,
@@ -130,92 +130,87 @@ export type ReadError =
   | NotFound;
 
 /**
+ * The thread operations, one of `Core.Operations`.
+ *
  * The thread operations.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Start a thread in a group the author belongs to. A team thread starts with its author,
-   * mentioned members, and the group's followers; the rest of the group can read it without
-   * participating. A direct-group thread enrolls all of its members, and mentions only narrow who
-   * is notified. Only mentioned agents need the author's agent-use authority. A thread derived
-   * from an `origin` the author can read names it. Started as a task, under `task.create` on the
-   * group, the thread's second activity creates the task, admitting its assignee, who must be able
-   * to take part, and triage while it is in triage; assigning an agent needs `agent.use` on it.
-   */
-  readonly startInGroup: (
-    input: Thread.StartInGroupInput,
-    options?: Request.Options,
-  ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
-  /**
-   * Establish or reuse the direct group for the author and the given members, then start a
-   * thread with all of them. Needs active membership, agent use for every named agent, and
-   * thread.start on the direct group; no group-management permission.
-   */
-  readonly startDirect: (
-    input: Thread.StartDirectInput,
-    options?: Request.Options,
-  ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
-  /**
-   * Give a thread a title, under current group audience and `thread.rename` on the thread. The
-   * same title again records nothing; otherwise a title other than `expectedTitle` is `Changed`,
-   * and nothing is recorded. A rename publishes its fact and records a quiet `thread.renamed`
-   * activity in one commit, and returns the renamed thread.
-   */
-  readonly rename: (
-    input: Thread.RenameInput,
-  ) => Effect.Effect<Thread.Record, RenameError, Actor.Service>;
-  /**
-   * The thread, under current group audience and `thread.read`. Reading creates no participation
-   * and marks nothing seen.
-   */
-  readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Record, ReadError, Actor.Service>;
-  /**
-   * One page of a group's threads the actor can read, newest latest activity first, each with the
-   * actor's read position and unread state. Requires current group membership; `thread.read` is
-   * checked for the whole page at once, and threads it does not cover are skipped.
-   */
-  readonly listInGroup: (
-    groupId: Group.Id,
-    options: Thread.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Service>;
-  /**
-   * One page of a group's threads the actor can read, newest start first, as its stream shows them:
-   * each with its opening message, reply count, latest message, and the actor's position and unread
-   * state, under the same rules as `listInGroup`. A page reads a fixed number of times, however
-   * many threads it holds.
-   */
-  readonly listOpenings: (
-    groupId: Group.Id,
-    options: Thread.OpeningOptions,
-  ) => Effect.Effect<ReadonlyArray<Thread.Opening>, ReadError, Actor.Service>;
-  /** Bounded activity page with resolved subjects, ordered by sequence. The cursor is exclusive. */
-  readonly readTimeline: (
-    threadId: Thread.Id,
-    options: ThreadActivityStore.ReadOptions,
-  ) => Effect.Effect<ReadonlyArray<Thread.TimelineItem>, ReadError, Actor.Service>;
-  /**
-   * A page of current participants: active participations backed by current workspace and group
-   * admissions, in participation-ID order after the exclusive cursor, with public member
-   * references only.
-   */
-  readonly listParticipants: (
-    threadId: Thread.Id,
-    options: ThreadParticipation.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Summary>, ReadError, Actor.Service>;
-}
-
-/**
- * The thread operations, one of `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadService",
-) {}
+export class ThreadService extends Context.Service<
+  ThreadService,
+  {
+    /**
+     * Start a thread in a group the author belongs to. A team thread starts with its author,
+     * mentioned members, and the group's followers; the rest of the group can read it without
+     * participating. A direct-group thread enrolls all of its members, and mentions only narrow who
+     * is notified. Only mentioned agents need the author's agent-use authority. A thread derived
+     * from an `origin` the author can read names it. Started as a task, under `task.create` on the
+     * group, the thread's second activity creates the task, admitting its assignee, who must be able
+     * to take part, and triage while it is in triage; assigning an agent needs `agent.use` on it.
+     */
+    readonly startInGroup: (
+      input: Thread.StartInGroupInput,
+      options?: Request.Options,
+    ) => Effect.Effect<Thread.Started, Error, Actor.Actor>;
+    /**
+     * Establish or reuse the direct group for the author and the given members, then start a
+     * thread with all of them. Needs active membership, agent use for every named agent, and
+     * thread.start on the direct group; no group-management permission.
+     */
+    readonly startDirect: (
+      input: Thread.StartDirectInput,
+      options?: Request.Options,
+    ) => Effect.Effect<Thread.Started, Error, Actor.Actor>;
+    /**
+     * Give a thread a title, under current group audience and `thread.rename` on the thread. The
+     * same title again records nothing; otherwise a title other than `expectedTitle` is `Changed`,
+     * and nothing is recorded. A rename publishes its fact and records a quiet `thread.renamed`
+     * activity in one commit, and returns the renamed thread.
+     */
+    readonly rename: (
+      input: Thread.RenameInput,
+    ) => Effect.Effect<Thread.Record, RenameError, Actor.Actor>;
+    /**
+     * The thread, under current group audience and `thread.read`. Reading creates no participation
+     * and marks nothing seen.
+     */
+    readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Record, ReadError, Actor.Actor>;
+    /**
+     * One page of a group's threads the actor can read, newest latest activity first, each with the
+     * actor's read position and unread state. Requires current group membership; `thread.read` is
+     * checked for the whole page at once, and threads it does not cover are skipped.
+     */
+    readonly listInGroup: (
+      groupId: Group.Id,
+      options: Thread.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Actor>;
+    /**
+     * One page of a group's threads the actor can read, newest start first, as its stream shows them:
+     * each with its opening message, reply count, latest message, and the actor's position and unread
+     * state, under the same rules as `listInGroup`. A page reads a fixed number of times, however
+     * many threads it holds.
+     */
+    readonly listOpenings: (
+      groupId: Group.Id,
+      options: Thread.OpeningOptions,
+    ) => Effect.Effect<ReadonlyArray<Thread.Opening>, ReadError, Actor.Actor>;
+    /** Bounded activity page with resolved subjects, ordered by sequence. The cursor is exclusive. */
+    readonly readTimeline: (
+      threadId: Thread.Id,
+      options: ThreadActivityStore.ReadOptions,
+    ) => Effect.Effect<ReadonlyArray<Thread.TimelineItem>, ReadError, Actor.Actor>;
+    /**
+     * A page of current participants: active participations backed by current workspace and group
+     * admissions, in participation-ID order after the exclusive cursor, with public member
+     * references only.
+     */
+    readonly listParticipants: (
+      threadId: Thread.Id,
+      options: ThreadParticipation.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Summary>, ReadError, Actor.Actor>;
+  }
+>()("@amends-dev/core/thread/ThreadService") {}
 
 /**
  * Capture bound services; authorize the complete requested conversation inside its commit.
@@ -224,21 +219,21 @@ export class Service extends Context.Service<Service, Interface>()(
  * @since 0.1.0
  */
 export const make = Effect.fn("ThreadService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const groupQuery = yield* GroupQuery.Service;
-  const threadCommand = yield* ThreadCommand.Service;
-  const groupStore = yield* GroupStore.Service;
-  const groupCommand = yield* GroupCommand.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadStore = yield* ThreadStore.Service;
-  const readStateCommand = yield* ReadStateCommand.Service;
-  const threadMessageStore = yield* ThreadMessageStore.Service;
-  const threadActivityStore = yield* ThreadActivityStore.Service;
-  const taskCommand = yield* TaskCommand.Service;
-  const taskStore = yield* TaskStore.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const groupQuery = yield* GroupQuery.GroupQuery;
+  const threadCommand = yield* ThreadCommand.ThreadCommand;
+  const groupStore = yield* GroupStore.GroupStore;
+  const groupCommand = yield* GroupCommand.GroupCommand;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadStore = yield* ThreadStore.ThreadStore;
+  const readStateCommand = yield* ReadStateCommand.ReadStateCommand;
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
+  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
+  const taskCommand = yield* TaskCommand.TaskCommand;
+  const taskStore = yield* TaskStore.TaskStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
   /**
    * The IDs a start gives its thread and opening message. Without a key they are new each time. A
    * keyed start derives them from its author and key, so a retry names what its first attempt
@@ -248,7 +243,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     operation: string,
     key: Request.Key | undefined,
   ) {
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     const parts = [operation, workspaceId, actor.memberId];
     const threadId = Thread.Id.make(yield* Request.idFor(key, [...parts, "thread"]));
     const messageId = ThreadMessage.Id.make(yield* Request.idFor(key, [...parts, "message"]));
@@ -395,7 +390,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     function* (input: Thread.StartDirectInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartDirectInput)(input);
       yield* authorization.require([]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const author = Notification.ofMember(actor.memberId, actor.identity);
@@ -450,7 +445,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
           groupId: request.groupId,
         }),
       ]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const author = Notification.ofMember(actor.memberId, actor.identity);
@@ -509,7 +504,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       // A task's title is a requirement: every participant is told of it, and the assignee asked
       // to work on it anew; a conversation's title tells no one.
       const task = yield* taskStore.get(thread.id);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const recipients = Option.isNone(task)
         ? []
         : Task.recipients(
@@ -669,7 +664,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     const participants = yield* threadQuery.pageParticipants(thread, options);
     return participants.map(ThreadParticipation.toSummary);
   });
-  return Service.of({
+  return ThreadService.of({
     startInGroup,
     startDirect,
     rename,
@@ -687,6 +682,4 @@ export const make = Effect.fn("ThreadService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as ThreadService from "./ThreadService.ts";
+export const layer = Layer.effect(ThreadService, make());

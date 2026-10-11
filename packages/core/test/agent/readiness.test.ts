@@ -6,10 +6,10 @@ import {
 } from "@amends-dev/connection";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Result, Schema } from "effect";
-import { AgentReadiness } from "../../src/agent/readiness.ts";
-import { Connection } from "../../src/connection/connection.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as AgentReadiness from "../../src/agent/readiness.ts";
+import * as Connection from "../../src/connection/connection.ts";
+import * as Member from "../../src/workspace/member/member.ts";
+import * as Workspace from "../../src/workspace/workspace.ts";
 
 const unused = () => Effect.die("No test makes a harness or a sandbox provider");
 

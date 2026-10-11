@@ -15,6 +15,7 @@ import { Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option } from "effect";
 import type { Fixture } from "./fixture.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -26,7 +27,6 @@ import {
   otherWorkspaceId,
   placedIn,
   runHost,
-  Support,
   workspaceId,
 } from "./support.ts";
 
@@ -397,13 +397,10 @@ export const contracts = (fixture: Fixture) => {
             });
             yield* Support.seed(bound, [human], [human]);
             const as = <A, E, R>(actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-              program.pipe(
-                Effect.provideService(Actor.Service, actor),
-                Effect.provide(core(bound)),
-              );
+              program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, human.memberId],
@@ -412,7 +409,7 @@ export const contracts = (fixture: Fixture) => {
             );
             const started = yield* as(
               owner,
-              Effect.flatMap(ThreadService.Service, (threadService) =>
+              Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startInGroup({
                   groupId: group.id,
                   text: "Hello",

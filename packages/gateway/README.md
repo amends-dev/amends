@@ -13,15 +13,15 @@ published to npm.
 
 ## Use
 
-`Gateway.make(options?)` builds a `Gateway.Interface` in the host's scope from
-`WorkspaceStorage.Service`, core's `TurnJobs.Service` and `DeliveryJobs.Service`, and
+`Gateway.make(options?)` builds a `Gateway.Gateway["Service"]` in the host's scope from
+`WorkspaceStorage.WorkspaceStorage`, core's `TurnJobs.TurnJobs` and `DeliveryJobs.DeliveryJobs`, and
 `Crypto.Crypto`. It opens no workspace and resolves no actor until it is called. Its options:
 
 - `idleTimeToLive`: how long an unused workspace stays prepared, five minutes by default.
 - `integrations`: the [integrations](../connection/README.md) the host installs, with distinct ids,
   which every workspace's core receives as connection's `Integrations`. None by default.
 
-`Gateway.layer(options?)` provides `Gateway.Service` and owns the gateway's scope; a direct caller
+`Gateway.layer(options?)` provides `Gateway.Gateway` and owns the gateway's scope; a direct caller
 of `make` keeps that scope open for the gateway's lifetime. The gateway's operations:
 
 - `createWorkspace(creator, input, options?)` creates a workspace with a required name and runs
@@ -29,7 +29,7 @@ of `make` keeps that scope open for the gateway's lifetime. The gateway's operat
   the creator and the key, so a retry returns what its first attempt created, whatever name it
   gives. The caller has authenticated the creator and checked that they may create one.
 - `asMember(workspaceId, identity, program)` resolves the identity's active membership into
-  `Actor.Service`, binds the workspace, and runs the program. A non-member, or a workspace that does
+  `Actor.Actor`, binds the workspace, and runs the program. A non-member, or a workspace that does
   not exist, gets `NotMember` without the workspace being loaded. Programs may require only core's
   `Operations`, the actor, and `Scope`: stores, the journal, and authorization are out of reach, so
   protocol code cannot bypass the checks inside each operation.
@@ -42,7 +42,7 @@ Both keep the workspace prepared for the caller's scope: an HTTP response's, whi
 until the client disconnects, or one the caller closes. Identities must come from a trusted ingress,
 never from client input.
 
-A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns one workspace's stores and
+A host provides `WorkspaceStorage.WorkspaceStorage`, whose `forWorkspace` returns one workspace's stores and
 signal hub (`WorkspaceStorage.Bindings`), the storage part of core's `HostServices`. It also
 provides core's job services, which take every workspace's job requests, each naming its workspace;
 a host that runs no jobs provides each one's `layerNoRunner`, so requests are accepted and work
@@ -82,30 +82,30 @@ projection tables directly.
 
 ## Host contracts
 
-- `WorkspaceStorage.Service` binds one workspace's stores and its `SignalHub.Service`, which
+- `WorkspaceStorage.WorkspaceStorage` binds one workspace's stores and its `SignalHub.SignalHub`, which
   delivers [signals](../core/README.md#signals) between every process over the same storage, best
   effort.
-- `Accounts.Service` holds the people a host knows across its workspaces: `findOrCreate` gives an
+- `Accounts.Accounts` holds the people a host knows across its workspaces: `findOrCreate` gives an
   address's `Accounts.Account`, its `id`, the human ID core names the person by, and its `email`,
   creating it the first time the address comes up; `findByIds` reads accounts back by ID. The ID is
   the host's own and never the address. `Accounts.Email` trims and lowercases an address as it
   decodes, so one address is one account however it was typed.
-- `SignIn.Service` produces authenticated people: `methods` says how the host signs people in,
+- `SignIn.SignIn` produces authenticated people: `methods` says how the host signs people in,
   `start` delivers a one-time code to an address, failing with `SignIn.Limited` when too many were
   asked for lately, for the address or from the client's network address, and with
   `SignIn.Unavailable` when it could not send one; and `complete` exchanges the code for a
   `SignIn.Session`, a token the host's authentication accepts and the address's account.
-- `SessionTokens.Service` resolves a session token into an identity, and `revoke` stops honoring
+- `SessionTokens.SessionTokens` resolves a session token into an identity, and `revoke` stops honoring
   one, as signing out does.
-- `WorkspaceDirectory.Service` is one identity's routing table, `WorkspaceDirectory.Listing`: its
+- `WorkspaceDirectory.WorkspaceDirectory` is one identity's routing table, `WorkspaceDirectory.Listing`: its
   memberships, ended ones included, each with its workspace's `activeMemberCount`, and its pending
   invitations.
-- `SignInStorage.Service` keeps email sign-in's pending codes and sessions across every host over
+- `SignInStorage.SignInStorage` keeps email sign-in's pending codes and sessions across every host over
   the storage: `modifyCode` replaces an address's `SignInStorage.PendingCode` with what a pure
   decision makes of it, one change to an address at a time, and sessions, each a
   `SignInStorage.SessionRecord` named by its token's digest, are inserted, found, extended, and
   deleted. Storage adapters implement it.
-- `EmailSender.Service` hands an `EmailSender.Message` to the host's email provider, failing with
+- `EmailSender.EmailSender` hands an `EmailSender.Message` to the host's email provider, failing with
   `EmailSender.Undelivered`.
 
 These span workspaces or issue credentials, which core never does, so hosts implement them, apart
@@ -180,8 +180,8 @@ runs the suites over a real database, and the gateway's tests over the [memory s
 
 ## Email sign-in
 
-`EmailSignIn.layer({ codeKey, policy? })` provides `SignIn.Service` and `SessionTokens.Service` over
-`SignInStorage.Service`, `Accounts.Service`, `EmailSender.Service`, and `Crypto.Crypto`;
+`EmailSignIn.layer({ codeKey, policy? })` provides `SignIn.SignIn` and `SessionTokens.SessionTokens` over
+`SignInStorage.SignInStorage`, `Accounts.Accounts`, `EmailSender.EmailSender`, and `Crypto.Crypto`;
 `EmailSignIn.make` returns both. `codeKey` is a secret every host over the storage shares: codes are
 stored only as HMAC-SHA256 digests under it, and session tokens, 32 random bytes, only as SHA-256
 digests. `EmailSignIn.defaultPolicy`, which `policy` overrides in part:

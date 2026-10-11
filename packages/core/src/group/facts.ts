@@ -1,7 +1,7 @@
-import { Audience } from "../journal/audience.ts";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "./group.ts";
+import * as Audience from "../journal/audience.ts";
+import * as Fact from "../journal/fact.ts";
+import * as Subject from "../journal/subject.ts";
+import * as Group from "./group.ts";
 
 /** A group's creation; a public one is news to everyone who might join it. */
 export const Created = Fact.make("group.created", {
@@ -22,5 +22,3 @@ export const Renamed = Fact.make("group.renamed", {
   subject: (payload) => Subject.make("group", payload.groupId),
   payload: Group.Renamed,
 });
-
-export * as GroupFacts from "./facts.ts";

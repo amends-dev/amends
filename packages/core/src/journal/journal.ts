@@ -1,52 +1,51 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import { Checkpoint } from "./checkpoint.ts";
-import { Codec } from "./codec.ts";
-import { Event } from "./event.ts";
-import { Fact } from "./fact.ts";
-import { Log } from "./log.ts";
-import { Projection } from "./projection.ts";
-import { Publication } from "./publication.ts";
-import type { Reaction } from "./reaction.ts";
-import { Store } from "./store.ts";
-import { Transaction } from "./transaction.ts";
+import * as Checkpoint from "./checkpoint.ts";
+import * as Codec from "./codec.ts";
+import * as Event from "./event.ts";
+import * as Fact from "./fact.ts";
+import * as Log from "./log.ts";
+import * as Projection from "./projection.ts";
+import * as Publication from "./publication.ts";
+import type * as Reaction from "./reaction.ts";
+import * as Store from "./store.ts";
+import * as Transaction from "./transaction.ts";
 
 export { Envelope, FactMismatch, decode, storageCodec } from "./event.ts";
 
-export interface Interface {
-  readonly log: Log.Reader<typeof Event.Envelope>;
-  /** Read matching envelopes by fact name and/or subject, ordered by position and entry index. */
-  readonly read: (
-    options: Store.ReadFactsOptions,
-  ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>;
-  readonly commit: Transaction.Interface["run"];
-  /**
-   * Make exactly the registered projections live before accepting publications: rebuild any
-   * that are not live from the log, and retire live versions this journal does not run, which
-   * later resume from the last commit they applied. When every registered projection is live,
-   * this reads nothing but the live versions. An empty log has nothing to rebuild, and its
-   * first commit makes the projections live, so replaying it writes nothing.
-   */
-  readonly replay: Effect.Effect<void, Projection.Error>;
-  /**
-   * Stamp trusted operation attribution and derive a key from the fact's occurrence rule.
-   * Explicit keys are allowed only when no key is derived. Matching retries return the
-   * original event without applying projections; conflicting content aborts.
-   */
-  readonly publish: <F extends Fact.Definition>(
-    fact: F,
-    payload: Fact.Payload<NoInfer<F>>,
-    options?: Store.AppendOptions,
-  ) => Effect.Effect<
-    Event.Type<F>,
-    Projection.Error | Log.WriteError,
-    | Publication.Service
-    | Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
-  >;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/journal/Service",
-) {}
+export class Journal extends Context.Service<
+  Journal,
+  {
+    readonly log: Log.Reader<typeof Event.Envelope>;
+    /** Read matching envelopes by fact name and/or subject, ordered by position and entry index. */
+    readonly read: (
+      options: Store.ReadFactsOptions,
+    ) => Effect.Effect<ReadonlyArray<Log.Entry<Event.Envelope>>, Log.ReadError>;
+    readonly commit: Transaction.Transaction["Service"]["run"];
+    /**
+     * Make exactly the registered projections live before accepting publications: rebuild any
+     * that are not live from the log, and retire live versions this journal does not run, which
+     * later resume from the last commit they applied. When every registered projection is live,
+     * this reads nothing but the live versions. An empty log has nothing to rebuild, and its
+     * first commit makes the projections live, so replaying it writes nothing.
+     */
+    readonly replay: Effect.Effect<void, Projection.Error>;
+    /**
+     * Stamp trusted operation attribution and derive a key from the fact's occurrence rule.
+     * Explicit keys are allowed only when no key is derived. Matching retries return the
+     * original event without applying projections; conflicting content aborts.
+     */
+    readonly publish: <F extends Fact.Definition>(
+      fact: F,
+      payload: Fact.Payload<NoInfer<F>>,
+      options?: Store.AppendOptions,
+    ) => Effect.Effect<
+      Event.Type<F>,
+      Projection.Error | Log.WriteError,
+      | Publication.Publication
+      | Transaction.Remaining<F["payload"]["EncodingServices"] | F["payload"]["DecodingServices"]>
+    >;
+  }
+>()("@amends-dev/core/journal/Service") {}
 
 export interface Options<
   Requirements extends ReadonlyArray<unknown> = readonly [],
@@ -77,9 +76,9 @@ export const make = Effect.fn("Journal.make")(function* <
   const Requirements extends ReadonlyArray<unknown>,
   ReactionRequirements = never,
 >(options: Options<Requirements, ReactionRequirements>) {
-  const log = yield* Log.Service;
-  const transaction = yield* Transaction.Service;
-  const checkpoint = yield* Checkpoint.Service;
+  const log = yield* Log.Log;
+  const transaction = yield* Transaction.Transaction;
+  const checkpoint = yield* Checkpoint.Checkpoint;
   // Captured outside any transaction; the publishing commit supplies its own.
   const reactionServices = yield* Effect.context<ReactionRequirements>();
   const reactions = new Map<string, Array<Reaction.Definition<ReactionRequirements>>>();
@@ -182,7 +181,7 @@ export const make = Effect.fn("Journal.make")(function* <
       Effect.gen(function* () {
         yield* requireLive();
         const provenance = Event.snapshotProvenance(
-          yield* validateProvenance(yield* Publication.Service),
+          yield* validateProvenance(yield* Publication.Publication),
         );
         const request = yield* Schema.decodeEffect(Store.AppendOptions)(options);
         const registered = definitions.get(fact.name)?.get(fact.version);
@@ -306,7 +305,7 @@ export const make = Effect.fn("Journal.make")(function* <
     for (const runner of pending) yield* runner.replay;
   }).pipe(Effect.withSpan("Journal.replay"));
 
-  return Service.of({
+  return Journal.of({
     log: reader,
     read: journalLog.readFacts,
     commit: transaction.run,
@@ -325,6 +324,4 @@ export const layer = <
   ReactionRequirements = never,
 >(
   options: Options<Requirements, ReactionRequirements>,
-) => Layer.effect(Service, make(options));
-
-export * as Journal from "./journal.ts";
+) => Layer.effect(Journal, make(options));

@@ -1,11 +1,11 @@
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import { Commit } from "./commit.ts";
-import { Entry as LogEntry } from "./entry.ts";
-import { Event } from "./event.ts";
-import { Occurrence } from "./occurrence.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
-import { StoreInput } from "./StoreInput.ts";
+import * as Commit from "./commit.ts";
+import * as LogEntry from "./entry.ts";
+import * as Event from "./event.ts";
+import * as Occurrence from "./occurrence.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
+import * as StoreInput from "./StoreInput.ts";
 
 /** Domain journals provide a fact header; generic logs provide only payload bytes. */
 export const Content = Schema.Struct({
@@ -180,98 +180,97 @@ export class Transaction extends Context.Service<
 >()("@amends-dev/core/journal/store/Transaction") {}
 
 /**
- * What a storage adapter implements for the journal. `make` builds the store over a driver that
- * implements this interface. It checks every input against its schema, and an appended fact
+ * What a storage adapter implements for the journal. `make` builds the store over a driver of
+ * the same shape. It checks every input against its schema, and an appended fact
  * against the workspace, before the driver sees it, so a driver keeps only what storage keeps.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /** Every log and read addresses this workspace alone. */
-  readonly workspaceId: WorkspaceId.Id;
-  /**
-   * Lookup is workspace-bound and sees this transaction's staged keys when present. Inside a
-   * transaction, it holds the log against standalone appends, as appending does.
-   */
-  readonly getAppend: (
-    logId: LogEntry.LogId,
-    key: IdempotencyKey,
-  ) => Effect.Effect<Option.Option<AppendReceipt>, Failure>;
-  /**
-   * Host transaction primitive. Provides Transaction and enlists all log writes
-   * and domain projection stores and checkpoints in one serializable commit.
-   * The core transaction coordinator calls this once per outer commit, and issues the commit's
-   * log appends and reads one at a time, never concurrently. Do not
-   * automatically retry the program. Roll back failures and interruption; report an unconfirmed
-   * commit outcome as CommitUncertain with its identity for reconciliation.
-   * Persistence across restarts depends on the adapter.
-   */
-  readonly transaction: <A, E, R>(
-    program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, E | Failure | Conflict | CommitUncertain, Exclude<R, Transaction>>;
-  /**
-   * Append to one log in a commit of its own, outside the workspace's write order: it waits
-   * only for that log's other writers, including a transaction that holds the log, never for
-   * the workspace's transactions. Otherwise as Transaction.append, returning committed entries.
-   * For logs written without projections, such as execution output. Fail inside a transaction,
-   * whose own append joins it instead.
-   */
-  readonly append: (
-    request: AppendInput,
-  ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict | CommitUncertain>;
+export class Store extends Context.Service<
+  Store,
+  {
+    /** Every log and read addresses this workspace alone. */
+    readonly workspaceId: WorkspaceId.Id;
+    /**
+     * Lookup is workspace-bound and sees this transaction's staged keys when present. Inside a
+     * transaction, it holds the log against standalone appends, as appending does.
+     */
+    readonly getAppend: (
+      logId: LogEntry.LogId,
+      key: IdempotencyKey,
+    ) => Effect.Effect<Option.Option<AppendReceipt>, Failure>;
+    /**
+     * Host transaction primitive. Provides Transaction and enlists all log writes
+     * and domain projection stores and checkpoints in one serializable commit.
+     * The core transaction coordinator calls this once per outer commit, and issues the commit's
+     * log appends and reads one at a time, never concurrently. Do not
+     * automatically retry the program. Roll back failures and interruption; report an unconfirmed
+     * commit outcome as CommitUncertain with its identity for reconciliation.
+     * Persistence across restarts depends on the adapter.
+     */
+    readonly transaction: <A, E, R>(
+      program: Effect.Effect<A, E, R>,
+    ) => Effect.Effect<A, E | Failure | Conflict | CommitUncertain, Exclude<R, Transaction>>;
+    /**
+     * Append to one log in a commit of its own, outside the workspace's write order: it waits
+     * only for that log's other writers, including a transaction that holds the log, never for
+     * the workspace's transactions. Otherwise as Transaction.append, returning committed entries.
+     * For logs written without projections, such as execution output. Fail inside a transaction,
+     * whose own append joins it instead.
+     */
+    readonly append: (
+      request: AppendInput,
+    ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict | CommitUncertain>;
 
-  /** Reads use the current transaction when present, otherwise committed state. */
-  readonly getEntry: (
-    logId: LogEntry.LogId,
-    entryId: LogEntry.Id,
-  ) => Effect.Effect<Option.Option<Entry>, Failure>;
-  readonly get: (
-    logId: LogEntry.LogId,
-    commitId: Commit.Id,
-  ) => Effect.Effect<Option.Option<Batch>, Failure>;
-  /**
-   * The position of this log's latest batch, or None for an empty log. Use the current
-   * transaction's view when present, otherwise committed state.
-   */
-  readonly head: (
-    logId: LogEntry.LogId,
-  ) => Effect.Effect<Option.Option<LogEntry.Position>, Failure>;
-  /**
-   * Read complete batches for this log after the exclusive cursor, in increasing
-   * position order. A commit touching other logs does not appear here. Never split
-   * a batch across pages. Empty logs return an empty page. Isolate returned bytes
-   * and records from caller mutation.
-   */
-  readonly read: (
-    logId: LogEntry.LogId,
-    options: ReadOptions,
-  ) => Effect.Effect<ReadonlyArray<Batch>, Failure>;
+    /** Reads use the current transaction when present, otherwise committed state. */
+    readonly getEntry: (
+      logId: LogEntry.LogId,
+      entryId: LogEntry.Id,
+    ) => Effect.Effect<Option.Option<Entry>, Failure>;
+    readonly get: (
+      logId: LogEntry.LogId,
+      commitId: Commit.Id,
+    ) => Effect.Effect<Option.Option<Batch>, Failure>;
+    /**
+     * The position of this log's latest batch, or None for an empty log. Use the current
+     * transaction's view when present, otherwise committed state.
+     */
+    readonly head: (
+      logId: LogEntry.LogId,
+    ) => Effect.Effect<Option.Option<LogEntry.Position>, Failure>;
+    /**
+     * Read complete batches for this log after the exclusive cursor, in increasing
+     * position order. A commit touching other logs does not appear here. Never split
+     * a batch across pages. Empty logs return an empty page. Isolate returned bytes
+     * and records from caller mutation.
+     */
+    readonly read: (
+      logId: LogEntry.LogId,
+      options: ReadOptions,
+    ) => Effect.Effect<ReadonlyArray<Batch>, Failure>;
 
-  /** Filter in storage and page individual facts by (position, index), across versions by default. */
-  readonly readFacts: (
-    logId: LogEntry.LogId,
-    options: ReadFactsOptions,
-  ) => Effect.Effect<ReadonlyArray<Entry>, Failure>;
+    /** Filter in storage and page individual facts by (position, index), across versions by default. */
+    readonly readFacts: (
+      logId: LogEntry.LogId,
+      options: ReadFactsOptions,
+    ) => Effect.Effect<ReadonlyArray<Entry>, Failure>;
 
-  /**
-   * Wait outside a transaction for committed entries beyond the exclusive cursor
-   * (None means any committed batch). Check durable state around subscribing so
-   * an append before or during registration cannot be missed. Observe all writers,
-   * including other processes and commits whose acknowledgment was lost. Hosts
-   * may use notifications, polling, or both; never hold a write transaction while
-   * waiting. Wakeups are hints: callers re-read the log. Coalesce notifications
-   * instead of buffering entries, and release waiting resources on interruption.
-   */
-  readonly waitForAppend: (
-    logId: LogEntry.LogId,
-    after: Option.Option<LogEntry.Position>,
-  ) => Effect.Effect<void, Failure>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/journal/store/Service",
-) {}
+    /**
+     * Wait outside a transaction for committed entries beyond the exclusive cursor
+     * (None means any committed batch). Check durable state around subscribing so
+     * an append before or during registration cannot be missed. Observe all writers,
+     * including other processes and commits whose acknowledgment was lost. Hosts
+     * may use notifications, polling, or both; never hold a write transaction while
+     * waiting. Wakeups are hints: callers re-read the log. Coalesce notifications
+     * instead of buffering entries, and release waiting resources on interruption.
+     */
+    readonly waitForAppend: (
+      logId: LogEntry.LogId,
+      after: Option.Option<LogEntry.Position>,
+    ) => Effect.Effect<void, Failure>;
+  }
+>()("@amends-dev/core/journal/store/Service") {}
 
 /**
  * Run what a committed transaction's `afterCommit` collected, in order, logging each failure
@@ -295,7 +294,7 @@ export const runAfterCommit = (effects: ReadonlyArray<Effect.Effect<void>>) =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = (driver: Interface): Interface => {
+export const make = (driver: Store["Service"]): Store["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, driver.workspaceId);
   const appendInput = (request: AppendInput) =>
@@ -362,5 +361,3 @@ export const make = (driver: Interface): Interface => {
     }),
   };
 };
-
-export * as Store from "./store.ts";

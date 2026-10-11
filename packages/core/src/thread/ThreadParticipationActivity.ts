@@ -5,10 +5,10 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Subject } from "../journal/subject.ts";
-import { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { ThreadParticipationId } from "./ThreadParticipationId.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
+import * as Subject from "../journal/subject.ts";
+import * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as ThreadParticipationId from "./ThreadParticipationId.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
 
 const subject = ({ participationId }: { readonly participationId: ThreadParticipationId.Id }) =>
   Subject.make("participation", participationId);
@@ -54,5 +54,3 @@ export const Ended = ThreadActivityKind.make("participation.ended", {
  * @since 0.1.0
  */
 export type Ended = ThreadActivityKind.Activity<typeof Ended>;
-
-export * as ThreadParticipationActivity from "./ThreadParticipationActivity.ts";

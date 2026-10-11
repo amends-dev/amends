@@ -9,6 +9,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, Option, Result } from "effect";
 
 import type { Fixture } from "./fixture.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -16,7 +17,6 @@ import {
   forWorkspace,
   journalLog,
   otherWorkspaceId,
-  Support,
   workspaceId,
 } from "./support.ts";
 
@@ -78,7 +78,7 @@ export const transactions = (fixture: Fixture) => {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const ready = yield* Deferred.make<void>();
           const program = Effect.gen(function* () {
-            const journal = yield* Journal.Service;
+            const journal = yield* Journal.Journal;
             return yield* journal.commit(
               Effect.gen(function* () {
                 yield* WorkspaceInitialization.initialize(alice.id, {
@@ -195,7 +195,7 @@ export const transactions = (fixture: Fixture) => {
             const ready = yield* Deferred.make<void>();
             const release = yield* Deferred.make<void>();
             const owner = yield* Effect.gen(function* () {
-              const journal = yield* Journal.Service;
+              const journal = yield* Journal.Journal;
               return yield* journal.commit(
                 Effect.gen(function* () {
                   const record = yield* WorkspaceInitialization.initialize(alice.id, {

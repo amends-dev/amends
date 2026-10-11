@@ -1,7 +1,7 @@
 import { Contact, ContactStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { inIds } from "./id-list.ts";
 import { contacts } from "./schema.ts";
@@ -20,10 +20,10 @@ const toRow = (record: Contact.Record): typeof contacts.$inferInsert => ({
 
 /** Contact records in the workspace's database. @category constructors */
 export const make = Effect.fn("Contacts.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(contacts.workspaceId, workspaceId);
-  const driver: ContactStore.Interface = {
+  const driver: ContactStore.ContactStore["Service"] = {
     get: Effect.fn("Contacts.get")(
       function* (id) {
         return yield* guard(
@@ -72,6 +72,4 @@ export const make = Effect.fn("Contacts.make")(function* () {
 });
 
 /** Provide contact storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ContactStore.Service, make());
-
-export * as Contacts from "./contacts.ts";
+export const layer = Layer.effect(ContactStore.ContactStore, make());

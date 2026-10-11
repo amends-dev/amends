@@ -1,20 +1,20 @@
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import { Actor } from "../identity/actor.ts";
-import { Event } from "../journal/event.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Event from "../journal/event.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
 
-import { Notification } from "./notification.ts";
-import { NotificationStore } from "./store.ts";
-import { NotificationInbox } from "./inbox.ts";
-import type { Thread } from "../thread/Thread.ts";
-import { Signal } from "../signal/signal.ts";
-import { SignalHub } from "../signal/hub.ts";
+import * as Notification from "./notification.ts";
+import * as NotificationStore from "./store.ts";
+import * as NotificationInbox from "./inbox.ts";
+import type * as Thread from "../thread/Thread.ts";
+import * as Signal from "../signal/signal.ts";
+import * as SignalHub from "../signal/hub.ts";
 import { AlreadyHandled, HumanRecipientRequired, NotFound } from "./errors.ts";
-import { Store } from "../journal/store.ts";
+import * as Store from "../journal/store.ts";
 export { AlreadyHandled, HumanRecipientRequired, NotFound } from "./errors.ts";
 
 export type Error = Authorization.Error | NotificationStore.Failure | Schema.SchemaError;
@@ -37,33 +37,32 @@ export type MarkSeenError =
  * without the workspace's write order; an existing caller transaction is honored. Reading a
  * notification neither marks it seen nor grants access to its source.
  */
-export interface Interface {
-  /**
-   * The acting member's notifications newest first, each with the timeline item it points to
-   * while they may still read it, or without one where they may not.
-   */
-  readonly inbox: (
-    options: NotificationInbox.Options,
-  ) => Effect.Effect<ReadonlyArray<NotificationInbox.Item>, InboxError, Actor.Service>;
-  /** Record that the acting person saw their notification; source access is independent. */
-  readonly markSeen: (
-    notificationId: Notification.Id,
-  ) => Effect.Effect<Notification.Record, MarkSeenError, Actor.Service>;
-  /**
-   * Record that the acting person saw every notification still pending for them up to and
-   * including `through`, in inbox order, so what arrives after the newest they saw stays pending.
-   * Returns how many it marked. Their other sessions hear of each batch as a signal.
-   */
-  readonly markSeenThrough: (
-    through: NotificationStore.Cursor,
-  ) => Effect.Effect<number, Exclude<MarkSeenError, NotFound | AlreadyHandled>, Actor.Service>;
-  /** How many notifications are still pending for the acting member, from anywhere. */
-  readonly countPending: Effect.Effect<number, Error, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/notification/service/Service",
-) {}
+export class NotificationService extends Context.Service<
+  NotificationService,
+  {
+    /**
+     * The acting member's notifications newest first, each with the timeline item it points to
+     * while they may still read it, or without one where they may not.
+     */
+    readonly inbox: (
+      options: NotificationInbox.Options,
+    ) => Effect.Effect<ReadonlyArray<NotificationInbox.Item>, InboxError, Actor.Actor>;
+    /** Record that the acting person saw their notification; source access is independent. */
+    readonly markSeen: (
+      notificationId: Notification.Id,
+    ) => Effect.Effect<Notification.Record, MarkSeenError, Actor.Actor>;
+    /**
+     * Record that the acting person saw every notification still pending for them up to and
+     * including `through`, in inbox order, so what arrives after the newest they saw stays pending.
+     * Returns how many it marked. Their other sessions hear of each batch as a signal.
+     */
+    readonly markSeenThrough: (
+      through: NotificationStore.Cursor,
+    ) => Effect.Effect<number, Exclude<MarkSeenError, NotFound | AlreadyHandled>, Actor.Actor>;
+    /** How many notifications are still pending for the acting member, from anywhere. */
+    readonly countPending: Effect.Effect<number, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/notification/service/Service") {}
 
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options));
 const isSameRecipient = Schema.toEquivalence(Notification.Recipient);
@@ -91,26 +90,26 @@ const seenBatch = 100;
  * @category constructors
  */
 export const make = Effect.fn("NotificationService.make")(function* (): Effect.fn.Return<
-  Interface,
+  NotificationService["Service"],
   never,
-  | NotificationStore.Service
-  | Authorization.Service
-  | Journal.Service
-  | ThreadQuery.Service
-  | SignalHub.Service
-  | Store.Service
+  | NotificationStore.NotificationStore
+  | Authorization.Authorization
+  | Journal.Journal
+  | ThreadQuery.ThreadQuery
+  | SignalHub.SignalHub
+  | Store.Store
 > {
-  const notificationStore = yield* NotificationStore.Service;
-  const signalHub = yield* SignalHub.Service;
-  const authorization = yield* Authorization.Service;
-  const journal = yield* Journal.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const { workspaceId } = yield* Store.Service;
+  const notificationStore = yield* NotificationStore.NotificationStore;
+  const signalHub = yield* SignalHub.SignalHub;
+  const authorization = yield* Authorization.Authorization;
+  const journal = yield* Journal.Journal;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const { workspaceId } = yield* Store.Store;
 
   /** The acting member as a recipient, once their membership is checked. */
   const requireRecipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     return Notification.ofMember(actor.memberId, actor.identity);
   });
 
@@ -197,7 +196,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     yield* signalHub.publish(
       Signal.Value.cases.NotificationsSeen.make({
         workspaceId,
-        memberId: (yield* Actor.Service).memberId,
+        memberId: (yield* Actor.Actor).memberId,
         notificationIds: [notification.id],
       }),
     );
@@ -210,7 +209,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     if (!Notification.Recipient.isAnyOf(["Human"])(target))
       return yield* new HumanRecipientRequired({});
     const through = yield* decodeCursor(input);
-    const memberId = (yield* Actor.Service).memberId;
+    const memberId = (yield* Actor.Actor).memberId;
     /** One page marked: what it listed and how many of them were due. */
     const markPageSeen = Effect.fnUntraced(function* (after: NotificationStore.Cursor | undefined) {
       const page = yield* notificationStore.listPendingByRecipient(
@@ -249,7 +248,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     const target = yield* requireRecipient();
     return yield* notificationStore.countPendingByRecipient(target);
   }).pipe(Effect.withSpan("NotificationService.countPending"));
-  return Service.of({ inbox, markSeen, markSeenThrough, countPending });
+  return NotificationService.of({ inbox, markSeen, markSeenThrough, countPending });
 });
 
 /**
@@ -257,6 +256,4 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
-
-export * as NotificationService from "./service.ts";
+export const layer = Layer.effect(NotificationService, make());

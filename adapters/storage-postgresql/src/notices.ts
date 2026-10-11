@@ -46,7 +46,7 @@ const parse = (payload: string) => {
   return undefined;
 };
 
-export interface Interface {
+export interface PostgresNotices {
   /**
    * Keep this pool listening for the caller's scope. The first lease waits for PostgreSQL to
    * confirm `LISTEN`, briefly, so an append right after the caller's first check still wakes
@@ -176,7 +176,5 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
     notifyAppend,
     publishSignal,
     subscribeSignals,
-  } satisfies Interface;
+  } satisfies PostgresNotices;
 });
-
-export * as PostgresNotices from "./notices.ts";

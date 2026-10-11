@@ -1,8 +1,8 @@
 import { Assignment, AssignmentStore } from "../authorization/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Assignment.Record));
 
@@ -12,13 +12,13 @@ const rows = Rows.make(Schema.fromJsonString(Assignment.Record));
  * @category constructors
  */
 export const make = Effect.fn("Assignments.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const select = (operation: string, predicate: (record: Assignment.Record) => boolean) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("assignments"))).pipe(
       Effect.map((records) => records.filter(predicate)),
       Effect.mapError(storeFailure(AssignmentStore, operation)),
     );
-  const driver: AssignmentStore.Interface = {
+  const driver: AssignmentStore.AssignmentStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("assignments"), id)).pipe(
         Effect.mapError(storeFailure(AssignmentStore, "get")),
@@ -70,10 +70,8 @@ export const make = Effect.fn("Assignments.make")(function* () {
 });
 
 /**
- * Provide AssignmentStore.Service using its constructor and the caller's dependencies.
+ * Provide AssignmentStore.AssignmentStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(AssignmentStore.Service, make());
-
-export * as Assignments from "./assignments.ts";
+export const layer = Layer.effect(AssignmentStore.AssignmentStore, make());

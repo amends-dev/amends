@@ -1,12 +1,12 @@
 import { Effect, Schema } from "effect";
-import { Performer } from "../identity/performer.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { Codec } from "./codec.ts";
-import { Commit } from "./commit.ts";
-import { Entry } from "./entry.ts";
-import { Fact } from "./fact.ts";
-import type { Log } from "./log.ts";
-import { Subject } from "./subject.ts";
+import * as Performer from "../identity/performer.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as Codec from "./codec.ts";
+import * as Commit from "./commit.ts";
+import * as Entry from "./entry.ts";
+import * as Fact from "./fact.ts";
+import type * as Log from "./log.ts";
+import * as Subject from "./subject.ts";
 
 /** Enough information to locate a particular event in a workspace journal. */
 export const Reference = Schema.Struct({
@@ -168,5 +168,3 @@ export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Defini
     payload,
   });
 });
-
-export * as Event from "./event.ts";

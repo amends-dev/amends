@@ -6,10 +6,10 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Connection } from "../connection/connection.ts";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ChannelId } from "./ChannelId.ts";
+import * as Connection from "../connection/connection.ts";
+import * as GroupId from "../group/id.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ChannelId from "./ChannelId.ts";
 
 /**
  * The channel is missing or removed, or the actor may not read it; the three are not told apart.
@@ -78,5 +78,3 @@ export class Rejected extends Schema.TaggedError<Rejected>()("ChannelIntake.Reje
 export class Unavailable extends Schema.TaggedError<Unavailable>()("ChannelIntake.Unavailable", {
   description: Schema.String,
 }) {}
-
-export * as ChannelErrors from "./ChannelErrors.ts";

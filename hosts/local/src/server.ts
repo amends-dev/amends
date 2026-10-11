@@ -4,7 +4,7 @@ import type { Accounts, SessionTokens, SignIn, SignInStorage } from "@amends-dev
 import type { Crypto } from "effect";
 import { Layer } from "effect";
 import { HttpRouter } from "effect/http";
-import type { LocalHost } from "./host.ts";
+import type * as LocalHost from "./host.ts";
 
 /**
  * Register the HTTP API, its OpenAPI document, and docs over the required host services.
@@ -39,9 +39,9 @@ export const maxRequestBodySize = 1024 * 1024;
 
 /** How the host signs people in and resolves their bearer tokens, over the host's services. */
 export type Authentication = Layer.Layer<
-  SignIn.Service | SessionTokens.Service,
+  SignIn.SignIn | SessionTokens.SessionTokens,
   never,
-  Crypto.Crypto | Accounts.Service | SignInStorage.Service
+  Crypto.Crypto | Accounts.Accounts | SignInStorage.SignInStorage
 >;
 
 /**
@@ -64,5 +64,3 @@ export const layer = (host: LocalHost.HostLayer, authentication: Authentication,
     ),
     Layer.provide(Draining.layer),
   );
-
-export * as LocalServer from "./server.ts";

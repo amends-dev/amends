@@ -1,38 +1,38 @@
-import { Threads } from "./threads.ts";
-import { ThreadParticipations } from "./thread-participations.ts";
-import { ThreadMessages } from "./thread-messages.ts";
-import { ThreadActivities } from "./thread-activities.ts";
-import { Tasks } from "./tasks.ts";
-import { Channels } from "./channels.ts";
-import { ChannelBindings } from "./channel-bindings.ts";
-import { Contacts } from "./contacts.ts";
-import { Deliveries } from "./deliveries.ts";
+import * as Threads from "./threads.ts";
+import * as ThreadParticipations from "./thread-participations.ts";
+import * as ThreadMessages from "./thread-messages.ts";
+import * as ThreadActivities from "./thread-activities.ts";
+import * as Tasks from "./tasks.ts";
+import * as Channels from "./channels.ts";
+import * as ChannelBindings from "./channel-bindings.ts";
+import * as Contacts from "./contacts.ts";
+import * as Deliveries from "./deliveries.ts";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { WorkspaceStorage } from "@amends-dev/gateway";
 import { Effect, Layer, Option } from "effect";
 import type { Redacted } from "effect";
-import { Agents } from "./agents.ts";
-import { TurnRecords } from "./turn-records.ts";
-import { Assignments } from "./assignments.ts";
-import { Groups } from "./groups.ts";
-import { GroupMemberships } from "./group-memberships.ts";
-import { GroupFollows } from "./group-follows.ts";
-import { ReadStates } from "./read-states.ts";
-import { PostgresSignalHub } from "./signal-hub.ts";
-import { Binding } from "./binding.ts";
-import { Checkpoints } from "./checkpoints.ts";
-import { ConnectionCredentials } from "./connection-credentials.ts";
-import { SessionLogs } from "./session-logs.ts";
-import { SessionStates } from "./session-states.ts";
-import { Connections } from "./connections.ts";
-import { CredentialKey } from "./credential-key.ts";
-import { PostgresDatabase } from "./database.ts";
-import { Invitations } from "./invitations.ts";
-import { Journal } from "./journal.ts";
-import { Members } from "./members.ts";
-import { Notifications } from "./notifications.ts";
-import { Roles } from "./roles.ts";
-import { Workspaces } from "./workspaces.ts";
+import * as Agents from "./agents.ts";
+import * as TurnRecords from "./turn-records.ts";
+import * as Assignments from "./assignments.ts";
+import * as Groups from "./groups.ts";
+import * as GroupMemberships from "./group-memberships.ts";
+import * as GroupFollows from "./group-follows.ts";
+import * as ReadStates from "./read-states.ts";
+import * as PostgresSignalHub from "./signal-hub.ts";
+import * as Binding from "./binding.ts";
+import * as Checkpoints from "./checkpoints.ts";
+import * as ConnectionCredentials from "./connection-credentials.ts";
+import * as SessionLogs from "./session-logs.ts";
+import * as SessionStates from "./session-states.ts";
+import * as Connections from "./connections.ts";
+import * as CredentialKey from "./credential-key.ts";
+import * as PostgresDatabase from "./database.ts";
+import * as Invitations from "./invitations.ts";
+import * as Journal from "./journal.ts";
+import * as Members from "./members.ts";
+import * as Notifications from "./notifications.ts";
+import * as Roles from "./roles.ts";
+import * as Workspaces from "./workspaces.ts";
 
 export interface Options extends Binding.Options {
   /**
@@ -87,7 +87,7 @@ const layerStores = Layer.mergeAll(
 export const layerWorkspace = (
   workspaceId: Workspace.Id,
   options: Options = {},
-  credentialKey: Option.Option<CredentialKey.Interface> = Option.none(),
+  credentialKey: Option.Option<CredentialKey.Cipher> = Option.none(),
 ) =>
   layerStores.pipe(
     Layer.provide(
@@ -108,16 +108,16 @@ export const make = Effect.fn("PostgresWorkspaceStorage.make")(function* (option
     options.credentialKey === undefined
       ? Option.none()
       : Option.some(yield* Effect.orDie(CredentialKey.make(options.credentialKey)));
-  const postgresDatabase = yield* PostgresDatabase.Service;
-  const forWorkspace: WorkspaceStorage.Interface["forWorkspace"] = Effect.fn(
+  const postgresDatabase = yield* PostgresDatabase.PostgresDatabase;
+  const forWorkspace: WorkspaceStorage.WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn(
     "PostgresWorkspaceStorage.forWorkspace",
   )(
     function* (workspaceId: Workspace.Id) {
       return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options, credentialKey)));
     },
-    Effect.provideService(PostgresDatabase.Service, postgresDatabase),
+    Effect.provideService(PostgresDatabase.PostgresDatabase, postgresDatabase),
   );
-  return WorkspaceStorage.Service.of({ forWorkspace });
+  return WorkspaceStorage.WorkspaceStorage.of({ forWorkspace });
 });
 
 /**
@@ -126,6 +126,4 @@ export const make = Effect.fn("PostgresWorkspaceStorage.make")(function* (option
  * @category layers
  */
 export const layer = (options: Options = {}) =>
-  Layer.effect(WorkspaceStorage.Service, make(options));
-
-export * as PostgresWorkspaceStorage from "./workspace-storage.ts";
+  Layer.effect(WorkspaceStorage.WorkspaceStorage, make(options));

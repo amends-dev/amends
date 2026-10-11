@@ -8,7 +8,8 @@ import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Redacted, Schema } from "effect";
 import { withStorage } from "./fixture.ts";
-import { Operations } from "./operations.ts";
+import * as Operations from "./operations.ts";
+import * as Support from "./support.ts";
 import {
   alice,
   bob,
@@ -19,17 +20,22 @@ import {
   installed,
   journalLog,
   request,
-  Support,
   testModel,
 } from "./support.ts";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,
   identity: Identity.MemberReference,
-  use: (connectionService: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (
+    connectionService: ConnectionService.ConnectionService["Service"],
+  ) => Effect.Effect<A, E, Actor.Actor>,
 ) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(workspaceId, identity, Effect.flatMap(ConnectionService.Service, use)),
+  Effect.flatMap(Gateway.Gateway, (gateway) =>
+    gateway.asMember(
+      workspaceId,
+      identity,
+      Effect.flatMap(ConnectionService.ConnectionService, use),
+    ),
   );
 
 const models: Connection.CreateInput = {
@@ -77,8 +83,8 @@ const journalText = (bound: Support.Bound) =>
 
 /** An operation a test runs as some member, whatever it answers. */
 type Operation = (
-  connectionService: ConnectionService.Interface,
-) => Effect.Effect<unknown, unknown, Actor.Service>;
+  connectionService: ConnectionService.ConnectionService["Service"],
+) => Effect.Effect<unknown, unknown, Actor.Actor>;
 
 /** The key stored for a connection, as it is. */
 const keyOf = (bound: Support.Bound, connectionId: Connection.Id) =>
@@ -442,11 +448,11 @@ describe("connections", () => {
           });
           expect(
             yield* Effect.flip(
-              Effect.flatMap(ConnectionService.Service, (connectionService) =>
+              Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
                 connectionService.create(models),
               ).pipe(
                 Effect.provide(core(failingLate(bound, failure))),
-                Effect.provideService(Actor.Service, {
+                Effect.provideService(Actor.Actor, {
                   workspaceId: workspace.id,
                   memberId: workspace.ownerMemberId,
                   identity: alice,
@@ -604,7 +610,7 @@ describe("connections", () => {
 
           yield* storage.discardProjections;
           expect(yield* bound.connections.get(keyed.id)).toEqual(Option.none());
-          yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+          yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
             Effect.provide(core(bound)),
           );
           expect([

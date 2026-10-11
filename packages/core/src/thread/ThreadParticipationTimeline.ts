@@ -5,13 +5,13 @@
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
-import type { Thread } from "./Thread.ts";
-import type { ThreadActivity } from "./ThreadActivity.ts";
-import { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { ThreadActivityResolvers } from "./ThreadActivityResolvers.ts";
-import { ThreadParticipationActivity } from "./ThreadParticipationActivity.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
-import { ThreadParticipationStore } from "./ThreadParticipationStore.ts";
+import type * as Thread from "./Thread.ts";
+import type * as ThreadActivity from "./ThreadActivity.ts";
+import * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
+import * as ThreadParticipationActivity from "./ThreadParticipationActivity.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
+import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 
 /**
  * A member following the thread, with their public participant summary.
@@ -75,7 +75,7 @@ const decode = (
  * @since 0.1.0
  */
 export const resolver = Effect.gen(function* () {
-  const threadParticipationStore = yield* ThreadParticipationStore.Service;
+  const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
   const resolve = Effect.fn("ThreadParticipationTimeline.resolve")(function* (
     _thread: Thread.Record,
     listed: ReadonlyArray<ThreadActivity.Record>,
@@ -105,5 +105,3 @@ export const resolver = Effect.gen(function* () {
     resolve,
   } satisfies ThreadActivityResolvers.Resolver;
 });
-
-export * as ThreadParticipationTimeline from "./ThreadParticipationTimeline.ts";

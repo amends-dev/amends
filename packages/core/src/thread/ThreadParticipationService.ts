@@ -6,21 +6,21 @@
  * @since 0.1.0
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { Actor } from "../identity/actor.ts";
-import { Journal } from "../journal/journal.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Thread } from "./Thread.ts";
-import { ThreadCommand } from "./ThreadCommand.ts";
-import { ThreadQuery } from "./ThreadQuery.ts";
-import { ThreadParticipationActivity } from "./ThreadParticipationActivity.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
-import { ThreadParticipationStore } from "./ThreadParticipationStore.ts";
-import { ThreadParticipationFacts } from "./ThreadParticipationFacts.ts";
-import { ThreadParticipationPermissions } from "./ThreadParticipationPermissions.ts";
-import { GroupStore } from "../group/store.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Journal from "../journal/journal.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Thread from "./Thread.ts";
+import * as ThreadCommand from "./ThreadCommand.ts";
+import * as ThreadQuery from "./ThreadQuery.ts";
+import * as ThreadParticipationActivity from "./ThreadParticipationActivity.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
+import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
+import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
+import * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";
+import * as GroupStore from "../group/store.ts";
 import {
   AlreadyEnded,
   FixedParticipation,
@@ -52,34 +52,29 @@ export type Error =
   | FixedParticipation;
 
 /**
+ * The participation operations, one of `Core.Operations`.
+ *
  * The participation operations.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /** Follow as the acting member. An existing participation is returned without new facts. */
-  readonly follow: (
-    threadId: Thread.Id,
-  ) => Effect.Effect<ThreadParticipation.Summary, Error, Actor.Service>;
-  /**
-   * End only the actor's addressed participation, with no action grant required. Threads of a
-   * direct conversation, where everyone takes part in everything, cannot be unfollowed.
-   */
-  readonly unfollow: (
-    input: ThreadParticipation.UnfollowInput,
-  ) => Effect.Effect<void, Error, Actor.Service>;
-}
-
-/**
- * The participation operations, one of `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadParticipationService",
-) {}
+export class ThreadParticipationService extends Context.Service<
+  ThreadParticipationService,
+  {
+    /** Follow as the acting member. An existing participation is returned without new facts. */
+    readonly follow: (
+      threadId: Thread.Id,
+    ) => Effect.Effect<ThreadParticipation.Summary, Error, Actor.Actor>;
+    /**
+     * End only the actor's addressed participation, with no action grant required. Threads of a
+     * direct conversation, where everyone takes part in everything, cannot be unfollowed.
+     */
+    readonly unfollow: (
+      input: ThreadParticipation.UnfollowInput,
+    ) => Effect.Effect<void, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/thread/ThreadParticipationService") {}
 
 /**
  * Capture bound services; authorize each operation inside its commit.
@@ -88,14 +83,14 @@ export class Service extends Context.Service<Service, Interface>()(
  * @since 0.1.0
  */
 export const make = Effect.fn("ThreadParticipationService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadCommand = yield* ThreadCommand.Service;
-  const threadParticipationStore = yield* ThreadParticipationStore.Service;
-  const groupStore = yield* GroupStore.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadCommand = yield* ThreadCommand.ThreadCommand;
+  const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
+  const groupStore = yield* GroupStore.GroupStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
   /** The thread, under its audience; one outside it is missing to the actor. */
   const requireAccess = (threadId: Thread.Id) =>
     threadQuery
@@ -116,7 +111,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
           threadId: thread.id,
         }),
       ]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const [current] = yield* threadQuery.findParticipants(thread, [
         { _tag: "Member", memberId: actor.memberId },
       ]);
@@ -154,7 +149,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
       if (Option.isNone(group)) return yield* Effect.die("A thread's group is missing");
       if (group.value.kind === "Direct")
         return yield* new FixedParticipation({ threadId: thread.id });
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const found = yield* threadParticipationStore.get(request.participationId);
       if (Option.isNone(found)) return yield* new NotFound(request);
       const participant = found.value;
@@ -200,7 +195,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ follow, unfollow });
+  return ThreadParticipationService.of({ follow, unfollow });
 });
 
 /**
@@ -210,6 +205,4 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as ThreadParticipationService from "./ThreadParticipationService.ts";
+export const layer = Layer.effect(ThreadParticipationService, make());

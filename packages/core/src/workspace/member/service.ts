@@ -1,27 +1,27 @@
-import { Identity } from "../../identity/identity.ts";
+import * as Identity from "../../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Authorization } from "../../authorization/authorization.ts";
-import { Delegation } from "../../authorization/delegation.ts";
-import { Requirement } from "../../authorization/requirement.ts";
-import { Target } from "../../authorization/target.ts";
-import { Actor } from "../../identity/actor.ts";
+import * as Authorization from "../../authorization/authorization.ts";
+import * as Delegation from "../../authorization/delegation.ts";
+import * as Requirement from "../../authorization/requirement.ts";
+import * as Target from "../../authorization/target.ts";
+import * as Actor from "../../identity/actor.ts";
 
-import { GroupCommand } from "../../group/command.ts";
-import { GroupMembershipStore } from "../../group/membership/store.ts";
-import { Journal } from "../../journal/journal.ts";
-import { Publication } from "../../journal/publication.ts";
-import type { Log } from "../../journal/log.ts";
-import type { Projection } from "../../journal/projection.ts";
-import { Store } from "../../journal/store.ts";
+import * as GroupCommand from "../../group/command.ts";
+import * as GroupMembershipStore from "../../group/membership/store.ts";
+import * as Journal from "../../journal/journal.ts";
+import * as Publication from "../../journal/publication.ts";
+import type * as Log from "../../journal/log.ts";
+import type * as Projection from "../../journal/projection.ts";
+import * as Store from "../../journal/store.ts";
 
-import { InvitationFacts } from "../invitation/facts.ts";
-import { InvitationStore } from "../invitation/store.ts";
-import { MemberFacts } from "./facts.ts";
-import { MemberPermissions } from "./permissions.ts";
-import { MemberStore } from "./store.ts";
-import { Member } from "./member.ts";
-import { WorkspaceStore } from "../store.ts";
+import * as InvitationFacts from "../invitation/facts.ts";
+import * as InvitationStore from "../invitation/store.ts";
+import * as MemberFacts from "./facts.ts";
+import * as MemberPermissions from "./permissions.ts";
+import * as MemberStore from "./store.ts";
+import * as Member from "./member.ts";
+import * as WorkspaceStore from "../store.ts";
 
 import { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
 export { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
@@ -42,71 +42,70 @@ export type RemoveError =
   | OwnerProtected
   | AlreadyRemoved;
 
-export interface Interface {
-  /**
-   * Read an active or removed membership after requiring member.read on it.
-   * Authorization and lookup read current state without opening a transaction.
-   * They use an existing commit when present. Only authorized callers can receive NotFound.
-   */
-  readonly get: (memberId: Member.Id) => Effect.Effect<Member.Record, Error, Actor.Service>;
-  /**
-   * List the memberships the actor may read, active and removed. Active
-   * membership is required; each record is then included only when member.read
-   * covers it, so a workspace-scoped grant sees everyone and an exact grant sees
-   * that member. This does not open a transaction or promise a shared snapshot.
-   */
-  readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Error, Actor.Service>;
-  /**
-   * Require member.remove on an active target, protect current ownership, and
-   * publish its removal and revoke its human recipient's pending invitations in
-   * one commit, ending all of its active group admissions. Historical membership and grants remain;
-   * authorization rejects removed members. Rejoining requires a new member ID.
-   */
-  readonly remove: (
-    memberId: Member.Id,
-  ) => Effect.Effect<Member.Record, RemoveError, Actor.Service>;
-  /**
-   * Choose what people in the workspace call the acting member. Anyone active may name
-   * themselves, and only themselves; the same name again records nothing.
-   */
-  readonly rename: (name: Member.Name) => Effect.Effect<Member.Record, RenameError, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/workspace/member-application/Service",
-) {}
+export class MemberService extends Context.Service<
+  MemberService,
+  {
+    /**
+     * Read an active or removed membership after requiring member.read on it.
+     * Authorization and lookup read current state without opening a transaction.
+     * They use an existing commit when present. Only authorized callers can receive NotFound.
+     */
+    readonly get: (memberId: Member.Id) => Effect.Effect<Member.Record, Error, Actor.Actor>;
+    /**
+     * List the memberships the actor may read, active and removed. Active
+     * membership is required; each record is then included only when member.read
+     * covers it, so a workspace-scoped grant sees everyone and an exact grant sees
+     * that member. This does not open a transaction or promise a shared snapshot.
+     */
+    readonly list: Effect.Effect<ReadonlyArray<Member.Record>, Error, Actor.Actor>;
+    /**
+     * Require member.remove on an active target, protect current ownership, and
+     * publish its removal and revoke its human recipient's pending invitations in
+     * one commit, ending all of its active group admissions. Historical membership and grants remain;
+     * authorization rejects removed members. Rejoining requires a new member ID.
+     */
+    readonly remove: (
+      memberId: Member.Id,
+    ) => Effect.Effect<Member.Record, RemoveError, Actor.Actor>;
+    /**
+     * Choose what people in the workspace call the acting member. Anyone active may name
+     * themselves, and only themselves; the same name again records nothing.
+     */
+    readonly rename: (name: Member.Name) => Effect.Effect<Member.Record, RenameError, Actor.Actor>;
+  }
+>()("@amends-dev/core/workspace/member-application/Service") {}
 
 const decodeId = Schema.decodeEffect(Member.Id);
 
 /**
- * Construct member operations from workspace services; the caller supplies Actor.Service per call.
+ * Construct member operations from workspace services; the caller supplies Actor.Actor per call.
  *
  * @category constructors
  */
 export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Return<
-  Interface,
+  MemberService["Service"],
   never,
-  | MemberStore.Service
-  | WorkspaceStore.Service
-  | InvitationStore.Service
-  | GroupMembershipStore.Service
-  | GroupCommand.Service
-  | Authorization.Service
-  | Delegation.Service
-  | Journal.Service
+  | MemberStore.MemberStore
+  | WorkspaceStore.WorkspaceStore
+  | InvitationStore.InvitationStore
+  | GroupMembershipStore.GroupMembershipStore
+  | GroupCommand.GroupCommand
+  | Authorization.Authorization
+  | Delegation.Delegation
+  | Journal.Journal
   | Crypto.Crypto
-  | Store.Service
+  | Store.Store
 > {
-  const memberStore = yield* MemberStore.Service;
-  const workspaceStore = yield* WorkspaceStore.Service;
-  const invitationStore = yield* InvitationStore.Service;
-  const groupMembershipStore = yield* GroupMembershipStore.Service;
-  const groupCommand = yield* GroupCommand.Service;
-  const authorization = yield* Authorization.Service;
-  const delegation = yield* Delegation.Service;
-  const journal = yield* Journal.Service;
+  const memberStore = yield* MemberStore.MemberStore;
+  const workspaceStore = yield* WorkspaceStore.WorkspaceStore;
+  const invitationStore = yield* InvitationStore.InvitationStore;
+  const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
+  const groupCommand = yield* GroupCommand.GroupCommand;
+  const authorization = yield* Authorization.Authorization;
+  const delegation = yield* Delegation.Delegation;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   const requireMember = Effect.fnUntraced(function* (id: Member.Id) {
     const found = yield* memberStore.get(id);
@@ -173,7 +172,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
       }).pipe(Publication.withCause(removed, removed.provenance.occurredAt));
       if (Identity.MemberReference.isAnyOf(["Human"])(member.identity)) {
         const recipientId = member.identity.id;
-        const actor = yield* Actor.Service;
+        const actor = yield* Actor.Actor;
         const revokedAt = yield* DateTime.now;
         yield* Effect.gen(function* () {
           for (const invitation of yield* invitationStore.listPendingByRecipient(recipientId))
@@ -197,7 +196,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
     function* (input: Member.Name) {
       const name = yield* Schema.decodeEffect(Member.NewName)(input);
       yield* authorization.require([]);
-      const member = yield* requireMember((yield* Actor.Service).memberId);
+      const member = yield* requireMember((yield* Actor.Actor).memberId);
       if (member.name === name) return member;
       yield* journal.publish(MemberFacts.Renamed, { workspaceId, memberId: member.id, name });
       return Object.assign({}, member, { name }) satisfies Member.Record;
@@ -207,7 +206,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
     journal.commit,
   );
 
-  return Service.of({ get, list, remove, rename });
+  return MemberService.of({ get, list, remove, rename });
 });
 
 /**
@@ -215,6 +214,4 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
-
-export * as MemberService from "./service.ts";
+export const layer = Layer.effect(MemberService, make());

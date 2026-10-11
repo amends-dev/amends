@@ -1,7 +1,7 @@
 import { Role, RoleStore } from "@amends-dev/core/authorization";
 import { and, eq, lt } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { builtinRoleRevisions, roles } from "./schema.ts";
 
@@ -14,7 +14,7 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Record));
  * @category constructors
  */
 export const make = Effect.fn("Roles.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(roles.workspaceId, workspaceId);
   /** Apply an edit to one role, reporting a conflict when it does not exist. */
@@ -34,7 +34,7 @@ export const make = Effect.fn("Roles.make")(function* () {
     if (rows.length === 0)
       return yield* new RoleStore.Conflict({ operation, message: "Role does not exist" });
   });
-  const driver: RoleStore.Interface = {
+  const driver: RoleStore.RoleStore["Service"] = {
     get: (id) =>
       guard(
         db
@@ -97,10 +97,8 @@ export const make = Effect.fn("Roles.make")(function* () {
 });
 
 /**
- * Provide RoleStore.Service using its constructor and the caller's dependencies.
+ * Provide RoleStore.RoleStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(RoleStore.Service, make());
-
-export * as Roles from "./roles.ts";
+export const layer = Layer.effect(RoleStore.RoleStore, make());

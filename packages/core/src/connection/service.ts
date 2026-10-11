@@ -1,19 +1,19 @@
 import { type Connection as ConnectionContract, Integrations } from "@amends-dev/connection";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import type { Permission } from "../authorization/permission.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { Target } from "../authorization/target.ts";
-import { Actor } from "../identity/actor.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Request } from "../request/request.ts";
-import { Connection } from "./connection.ts";
-import { ConnectionCredentialStore } from "./credential-store.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import type * as Permission from "../authorization/permission.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as Target from "../authorization/target.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Request from "../request/request.ts";
+import * as Connection from "./connection.ts";
+import * as ConnectionCredentialStore from "./credential-store.ts";
 import {
   Changed,
   CredentialsUnavailable,
@@ -22,9 +22,9 @@ import {
   NotFound,
   UnknownIntegration,
 } from "./errors.ts";
-import { ConnectionFacts } from "./facts.ts";
-import { ConnectionPermissions } from "./permissions.ts";
-import { ConnectionStore } from "./store.ts";
+import * as ConnectionFacts from "./facts.ts";
+import * as ConnectionPermissions from "./permissions.ts";
+import * as ConnectionStore from "./store.ts";
 export {
   Changed,
   CredentialsUnavailable,
@@ -50,72 +50,71 @@ export type RemoveError = Error | ConnectionCredentialStore.Failure;
 export type CheckError = ReadError | UnknownIntegration | InvalidConnection | KeyError;
 export type ModelsError = ReadError | UnknownIntegration;
 
-export interface Interface {
-  /**
-   * The integrations this host installs, in the order it installs them. They describe the host
-   * rather than the workspace, so every member may see them.
-   */
-  readonly integrations: Effect.Effect<
-    ReadonlyArray<Connection.IntegrationView>,
-    Authorization.Error,
-    Actor.Service
-  >;
-  /** The workspace's connections the actor may read, by name. */
-  readonly list: Effect.Effect<ReadonlyArray<Connection.View>, ReadError, Actor.Service>;
-  readonly get: (
-    connectionId: Connection.Id,
-  ) => Effect.Effect<Connection.View, ReadError, Actor.Service>;
-  /**
-   * The models the connection offers an agent, to set an agent up with one: those its integration
-   * lists, and whether it also offers others by any id. A connection whose integration this host no
-   * longer installs offers nothing, and fails with UnknownIntegration.
-   */
-  readonly models: (
-    connectionId: Connection.Id,
-  ) => Effect.Effect<Connection.Models, ModelsError, Actor.Service>;
-  /**
-   * Connect the workspace to an installed integration, with settings and a way of authenticating
-   * the integration takes, and its key when it authenticates with one, stored in the same commit.
-   */
-  readonly create: (
-    input: Connection.CreateInput,
-    options?: Request.Options,
-  ) => Effect.Effect<Connection.View, CreateError, Actor.Service>;
-  readonly rename: (
-    input: Connection.RenameInput,
-  ) => Effect.Effect<Connection.View, Error | Changed, Actor.Service>;
-  /** Replace its settings, which its integration must take. */
-  readonly configure: (
-    input: Connection.ConfigureInput,
-  ) => Effect.Effect<Connection.View, ConfigureError, Actor.Service>;
-  /** Store a new key for a connection that authenticates with one, in place of its key. */
-  readonly replaceKey: (
-    input: Connection.ReplaceKeyInput,
-  ) => Effect.Effect<Connection.View, ReplaceKeyError, Actor.Service>;
-  /**
-   * Ask the connection's system whether the connection works, with its key, as its integration
-   * checks it. It changes nothing, and holds no commit open while the system answers.
-   */
-  readonly check: (
-    connectionId: Connection.Id,
-  ) => Effect.Effect<ConnectionContract.Health, CheckError, Actor.Service>;
-  /** Stop its use and delete its key; its record remains. */
-  readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, RemoveError, Actor.Service>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/connection/service/Service",
-) {}
+export class ConnectionService extends Context.Service<
+  ConnectionService,
+  {
+    /**
+     * The integrations this host installs, in the order it installs them. They describe the host
+     * rather than the workspace, so every member may see them.
+     */
+    readonly integrations: Effect.Effect<
+      ReadonlyArray<Connection.IntegrationView>,
+      Authorization.Error,
+      Actor.Actor
+    >;
+    /** The workspace's connections the actor may read, by name. */
+    readonly list: Effect.Effect<ReadonlyArray<Connection.View>, ReadError, Actor.Actor>;
+    readonly get: (
+      connectionId: Connection.Id,
+    ) => Effect.Effect<Connection.View, ReadError, Actor.Actor>;
+    /**
+     * The models the connection offers an agent, to set an agent up with one: those its integration
+     * lists, and whether it also offers others by any id. A connection whose integration this host no
+     * longer installs offers nothing, and fails with UnknownIntegration.
+     */
+    readonly models: (
+      connectionId: Connection.Id,
+    ) => Effect.Effect<Connection.Models, ModelsError, Actor.Actor>;
+    /**
+     * Connect the workspace to an installed integration, with settings and a way of authenticating
+     * the integration takes, and its key when it authenticates with one, stored in the same commit.
+     */
+    readonly create: (
+      input: Connection.CreateInput,
+      options?: Request.Options,
+    ) => Effect.Effect<Connection.View, CreateError, Actor.Actor>;
+    readonly rename: (
+      input: Connection.RenameInput,
+    ) => Effect.Effect<Connection.View, Error | Changed, Actor.Actor>;
+    /** Replace its settings, which its integration must take. */
+    readonly configure: (
+      input: Connection.ConfigureInput,
+    ) => Effect.Effect<Connection.View, ConfigureError, Actor.Actor>;
+    /** Store a new key for a connection that authenticates with one, in place of its key. */
+    readonly replaceKey: (
+      input: Connection.ReplaceKeyInput,
+    ) => Effect.Effect<Connection.View, ReplaceKeyError, Actor.Actor>;
+    /**
+     * Ask the connection's system whether the connection works, with its key, as its integration
+     * checks it. It changes nothing, and holds no commit open while the system answers.
+     */
+    readonly check: (
+      connectionId: Connection.Id,
+    ) => Effect.Effect<ConnectionContract.Health, CheckError, Actor.Actor>;
+    /** Stop its use and delete its key; its record remains. */
+    readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, RemoveError, Actor.Actor>;
+  }
+>()("@amends-dev/core/connection/service/Service") {}
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("ConnectionService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const connectionStore = yield* ConnectionStore.Service;
-  const connectionCredentialStore = yield* ConnectionCredentialStore.Service;
+  const authorization = yield* Authorization.Authorization;
+  const connectionStore = yield* ConnectionStore.ConnectionStore;
+  const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore;
   const integrations = yield* Integrations.Integrations;
-  const journal = yield* Journal.Service;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   const connectionTarget = (connectionId: Connection.Id) =>
     Target.Reference.cases.Connection.make({ workspaceId, connectionId });
@@ -256,7 +255,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       yield* authorization.require([
         Requirement.make(ConnectionPermissions.Create, { _tag: "Workspace", workspaceId }),
       ]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const connectionId = Connection.Id.make(
         yield* Request.idFor(options.requestKey, [
           "connection.create",
@@ -377,7 +376,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     journal.commit,
   );
 
-  return Service.of({
+  return ConnectionService.of({
     integrations: listIntegrations,
     list,
     get,
@@ -392,6 +391,4 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
 });
 
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as ConnectionService from "./service.ts";
+export const layer = Layer.effect(ConnectionService, make());

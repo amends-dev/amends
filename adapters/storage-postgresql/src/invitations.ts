@@ -1,8 +1,8 @@
 import { Invitation, InvitationStore, type Workspace } from "@amends-dev/core/workspace";
 import { and, asc, eq, type SQL } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
-import { Binding } from "./binding.ts";
-import type { PostgresDatabase } from "./database.ts";
+import * as Binding from "./binding.ts";
+import type * as PostgresDatabase from "./database.ts";
 import { storeError, storeFailure } from "./errors.ts";
 import { invitations } from "./schema.ts";
 
@@ -41,7 +41,7 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Invitation.Record));
 
 /** Workspace and directory reads share the same record decoder. */
 export const select = (
-  db: PostgresDatabase.Interface["db"],
+  db: PostgresDatabase.PostgresDatabase["Service"]["db"],
   where: SQL | undefined,
   order: ReadonlyArray<SQL>,
 ) =>
@@ -58,12 +58,12 @@ export const select = (
  * @category constructors
  */
 export const make = Effect.fn("Invitations.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Service;
+  const { workspaceId, database, guard } = yield* Binding.Binding;
   const { db } = database;
   const inWorkspace = eq(invitations.workspaceId, workspaceId);
   const read = (operation: string, where: SQL | undefined, order: ReadonlyArray<SQL>) =>
     guard(select(db, where, order)).pipe(Effect.mapError(storeFailure(InvitationStore, operation)));
-  const driver: InvitationStore.Interface = {
+  const driver: InvitationStore.InvitationStore["Service"] = {
     get: (id) => Effect.map(read("get", and(inWorkspace, eq(invitations.id, id)), []), Array.head),
     listPendingByRecipient: (recipientId) =>
       read(
@@ -124,10 +124,8 @@ export const make = Effect.fn("Invitations.make")(function* () {
 });
 
 /**
- * Provide InvitationStore.Service using its constructor and the caller's dependencies.
+ * Provide InvitationStore.InvitationStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(InvitationStore.Service, make());
-
-export * as Invitations from "./invitations.ts";
+export const layer = Layer.effect(InvitationStore.InvitationStore, make());

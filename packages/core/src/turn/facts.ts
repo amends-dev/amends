@@ -1,14 +1,14 @@
 import { Schema } from "effect";
-import { Agent } from "../agent/agent.ts";
-import { Group } from "../group/group.ts";
-import { GroupId } from "../group/id.ts";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadMessageId } from "../thread/ThreadMessageId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { Turn } from "./turn.ts";
+import * as Agent from "../agent/agent.ts";
+import * as Group from "../group/group.ts";
+import * as GroupId from "../group/id.ts";
+import * as Fact from "../journal/fact.ts";
+import * as Subject from "../journal/subject.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as Turn from "./turn.ts";
 
 /**
  * Every fact names the turn's thread and group, which the group's members may learn of, and its
@@ -119,5 +119,3 @@ export const Cancelled = Fact.make("turn.cancelled", {
     finishedAt: Schema.DateTimeUtcFromString,
   }),
 });
-
-export * as TurnFacts from "./facts.ts";

@@ -19,12 +19,12 @@ import {
 } from "@amends-dev/core/thread";
 import { Member, MemberFacts, MemberStore } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Layer, Option, Context } from "effect";
+import * as Support from "./support.ts";
 import {
   type Bound,
   boundTo,
   listOldestFirst,
   runHost,
-  Support,
   testProvenance,
   threadInternals,
   workspaceId,
@@ -39,10 +39,10 @@ describe("thread starts", () => {
   const otherId = Member.Id.make("other");
   const contactId = Identity.ContactId.make("customer");
   const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
-    program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
+    program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
     program.pipe(
-      Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
     );
   const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 200 });
@@ -50,7 +50,7 @@ describe("thread starts", () => {
     memberIds: ReadonlyArray<Member.Id>,
     mentions: ReadonlyArray<Member.Id> = [],
   ) =>
-    Effect.flatMap(ThreadService.Service, (threadService) =>
+    Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startDirect({ memberIds, text: "Hello", mentions }),
     );
   const participantsOf = (bound: Bound, threadId: Thread.Id) =>
@@ -69,7 +69,7 @@ describe("thread starts", () => {
     });
     yield* trusted(
       bound,
-      Effect.flatMap(Journal.Service, (journal) =>
+      Effect.flatMap(Journal.Journal, (journal) =>
         journal.commit(
           // Members join with the Viewer role, as invitation acceptance grants it.
           Effect.forEach([humanId, otherId], (memberId) =>
@@ -139,27 +139,27 @@ describe("thread starts", () => {
     const rows = new Map<string, number>();
     const context = Context.mergeAll(
       bound.context,
-      Context.make(MemberStore.Service, countReads("members", bound.members, counts, rows)),
-      Context.make(GroupStore.Service, countReads("groups", bound.groups, counts, rows)),
+      Context.make(MemberStore.MemberStore, countReads("members", bound.members, counts, rows)),
+      Context.make(GroupStore.GroupStore, countReads("groups", bound.groups, counts, rows)),
       Context.make(
-        GroupMembershipStore.Service,
+        GroupMembershipStore.GroupMembershipStore,
         countReads("groupMemberships", bound.groupMemberships, counts, rows),
       ),
-      Context.make(ThreadStore.Service, countReads("threads", bound.threads, counts, rows)),
+      Context.make(ThreadStore.ThreadStore, countReads("threads", bound.threads, counts, rows)),
       Context.make(
-        ThreadParticipationStore.Service,
+        ThreadParticipationStore.ThreadParticipationStore,
         countReads("participations", bound.participations, counts, rows),
       ),
       Context.make(
-        ThreadMessageStore.Service,
+        ThreadMessageStore.ThreadMessageStore,
         countReads("messages", bound.messages, counts, rows),
       ),
       Context.make(
-        ThreadActivityStore.Service,
+        ThreadActivityStore.ThreadActivityStore,
         countReads("activities", bound.activities, counts, rows),
       ),
       Context.make(
-        NotificationStore.Service,
+        NotificationStore.NotificationStore,
         countReads("notifications", bound.notifications, counts, rows),
       ),
     );
@@ -223,7 +223,7 @@ describe("thread starts", () => {
           const mentioned = yield* run(
             bound,
             owner,
-            Effect.flatMap(ThreadService.Service, (threadService) =>
+            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
               threadService.startInGroup({
                 groupId: trio.thread.groupId,
                 text: "Just Bob",
@@ -274,7 +274,7 @@ describe("thread starts", () => {
             const team = yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupService.Service, (groupService) =>
+              Effect.flatMap(GroupService.GroupService, (groupService) =>
                 groupService.createTeam({
                   name: "Support",
                   memberIds: [owner.memberId, humanId],
@@ -284,9 +284,9 @@ describe("thread starts", () => {
             const contact: Notification.Recipient = { _tag: "Contact", id: contactId };
             const started = yield* trusted(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
-                  Effect.flatMap(ThreadCommand.Service, (threadCommand) =>
+                  Effect.flatMap(ThreadCommand.ThreadCommand, (threadCommand) =>
                     Effect.flatMap(DateTime.now, (occurredAt) =>
                       threadCommand.create({
                         threadId: Thread.Id.make("late-order"),
@@ -324,7 +324,7 @@ describe("thread starts", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.publish({
                   threadId: started.thread.id,
                   text: "Looking into it",
@@ -341,7 +341,7 @@ describe("thread starts", () => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.publish({
                   threadId: started.thread.id,
                   text: "Bob?",
@@ -377,7 +377,7 @@ describe("thread starts", () => {
             );
             yield* trusted(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
                   Effect.forEach(extra, (memberId) =>
                     journal.publish(MemberFacts.Added, {
@@ -396,7 +396,7 @@ describe("thread starts", () => {
               const team = yield* run(
                 counted.bound,
                 owner,
-                Effect.flatMap(GroupService.Service, (groupService) =>
+                Effect.flatMap(GroupService.GroupService, (groupService) =>
                   groupService.createTeam({
                     name: `Team ${size}`,
                     memberIds: [owner.memberId, ...extra.slice(0, size)],
@@ -407,7 +407,7 @@ describe("thread starts", () => {
               const started = yield* run(
                 counted.bound,
                 owner,
-                Effect.flatMap(ThreadService.Service, (threadService) =>
+                Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                   // Mentioning the members enrolls them, so the participants grow with the group.
                   threadService.startInGroup({
                     groupId: team.id,
@@ -417,12 +417,14 @@ describe("thread starts", () => {
                 ),
               );
               const start = counted.take();
-              const reply = Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
-                threadMessageService.publish({
-                  threadId: started.thread.id,
-                  text: "Reply",
-                  mentions: [],
-                }),
+              const reply = Effect.flatMap(
+                ThreadMessageService.ThreadMessageService,
+                (threadMessageService) =>
+                  threadMessageService.publish({
+                    threadId: started.thread.id,
+                    text: "Reply",
+                    mentions: [],
+                  }),
               );
               yield* run(counted.bound, owner, reply);
               const replied = counted.take();
@@ -432,7 +434,7 @@ describe("thread starts", () => {
               const page = yield* run(
                 counted.bound,
                 owner,
-                Effect.flatMap(ThreadService.Service, (threadService) =>
+                Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                   threadService.readTimeline(started.thread.id, { limit: 50 }),
                 ),
               );
@@ -461,7 +463,7 @@ describe("thread starts", () => {
             );
             yield* trusted(
               bound,
-              Effect.flatMap(Journal.Service, (journal) =>
+              Effect.flatMap(Journal.Journal, (journal) =>
                 journal.commit(
                   Effect.forEach(extra, (memberId) =>
                     journal.publish(MemberFacts.Added, {
@@ -481,7 +483,7 @@ describe("thread starts", () => {
                 identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
               });
             const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
-              Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
                 threadMessageService.publish({ threadId, text: "Reply", mentions }),
               );
             const counted = countingReads(bound);
@@ -489,7 +491,7 @@ describe("thread starts", () => {
               const team = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupService.Service, (groupService) =>
+                Effect.flatMap(GroupService.GroupService, (groupService) =>
                   groupService.createTeam({
                     name: `Team ${size}`,
                     memberIds: [owner.memberId, ...extra.slice(0, size)],
@@ -499,7 +501,7 @@ describe("thread starts", () => {
               const started = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadService.Service, (threadService) =>
+                Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                   threadService.startInGroup({
                     groupId: team.id,
                     text: "Hello",
@@ -517,11 +519,13 @@ describe("thread starts", () => {
                 yield* run(
                   bound,
                   as(memberId),
-                  Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
-                    threadParticipationService.unfollow({
-                      threadId: started.thread.id,
-                      participationId: own.id,
-                    }),
+                  Effect.flatMap(
+                    ThreadParticipationService.ThreadParticipationService,
+                    (threadParticipationService) =>
+                      threadParticipationService.unfollow({
+                        threadId: started.thread.id,
+                        participationId: own.id,
+                      }),
                   ),
                 );
               }

@@ -16,7 +16,7 @@ import {
   Redacted,
 } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
-import { Binding } from "../src/binding.ts";
+import * as Binding from "../src/binding.ts";
 import { PostgresDatabase, PostgresWorkspaceStorage } from "../src/index.ts";
 import type { Bound } from "./support.ts";
 import { initialized, inDatabase, setup, views, workspaceId } from "./support.ts";
@@ -185,7 +185,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const pool = yield* Layer.build(
             PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 }),
           );
-          const { sql } = Context.get(pool, PostgresDatabase.Service);
+          const { sql } = Context.get(pool, PostgresDatabase.PostgresDatabase);
           const binding = (id: Workspace.Id) =>
             Binding.make(id, { readConnections: 2 }).pipe(Effect.provide(pool));
           const busy = yield* binding(first);
@@ -242,7 +242,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         inDatabase(
           url,
           Effect.gen(function* () {
-            const real = yield* PostgresDatabase.Service;
+            const real = yield* PostgresDatabase.PostgresDatabase;
             let commits = 0;
             const failing = new Proxy(real.sql, {
               get(target, key, receiver) {
@@ -272,7 +272,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               },
             });
             const storage = yield* views().pipe(
-              Effect.provideService(PostgresDatabase.Service, {
+              Effect.provideService(PostgresDatabase.PostgresDatabase, {
                 db: real.db,
                 sql: failing,
                 notices: real.notices,

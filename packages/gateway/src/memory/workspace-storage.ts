@@ -1,7 +1,7 @@
 import { MemoryConnection, MemoryStores } from "@amends-dev/core/memory";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer } from "effect";
-import { WorkspaceStorage } from "../storage.ts";
+import * as WorkspaceStorage from "../storage.ts";
 
 /**
  * One connection, with inexpensive workspace-bound views over it. The stores hold no resources,
@@ -10,16 +10,16 @@ import { WorkspaceStorage } from "../storage.ts";
  * @category constructors
  */
 export const make = Effect.fn("MemoryWorkspaceStorage.make")(function* () {
-  const memoryConnection = yield* MemoryConnection.Service;
-  const forWorkspace: WorkspaceStorage.Interface["forWorkspace"] = Effect.fn(
+  const memoryConnection = yield* MemoryConnection.MemoryConnection;
+  const forWorkspace: WorkspaceStorage.WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn(
     "MemoryWorkspaceStorage.forWorkspace",
   )(
     function* (workspaceId: Workspace.Id) {
       return yield* Effect.scoped(Layer.build(MemoryStores.layer(workspaceId)));
     },
-    Effect.provideService(MemoryConnection.Service, memoryConnection),
+    Effect.provideService(MemoryConnection.MemoryConnection, memoryConnection),
   );
-  return WorkspaceStorage.Service.of({ forWorkspace });
+  return WorkspaceStorage.WorkspaceStorage.of({ forWorkspace });
 });
 
 /**
@@ -27,6 +27,4 @@ export const make = Effect.fn("MemoryWorkspaceStorage.make")(function* () {
  *
  * @category layers
  */
-export const layer = Layer.effect(WorkspaceStorage.Service, make());
-
-export * as MemoryWorkspaceStorage from "./workspace-storage.ts";
+export const layer = Layer.effect(WorkspaceStorage.WorkspaceStorage, make());

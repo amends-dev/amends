@@ -22,8 +22,8 @@ const secret = "connect ECONNREFUSED 10.0.0.5:5432 password=hunter2";
 
 /** A change feed that opens, then fails in a way no client should learn the details of. */
 const failing = Layer.succeed(
-  ChangeFeedService.Service,
-  ChangeFeedService.Service.of({
+  ChangeFeedService.ChangeFeedService,
+  ChangeFeedService.ChangeFeedService.of({
     watch: () =>
       Effect.succeed(
         Stream.make(
@@ -33,24 +33,28 @@ const failing = Layer.succeed(
   }),
 );
 const gateway = Layer.succeed(
-  Gateway.Service,
-  Gateway.Service.of({
+  Gateway.Gateway,
+  Gateway.Gateway.of({
     inWorkspace: () => Effect.die("unused"),
     createWorkspace: () => Effect.die("unused"),
     asMember: <A, E>(
       _id: Workspace.Id,
       _identity: Identity.MemberReference,
-      program: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope>,
+      program: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope>,
     ) =>
-      Effect.provide(
-        Effect.provideService(program, Actor.Service, actor),
-        failing,
-      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>,
+      Effect.provide(Effect.provideService(program, Actor.Actor, actor), failing) as Effect.Effect<
+        A,
+        GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember,
+        Scope.Scope
+      >,
   }),
 );
 const credentials = Layer.succeed(
-  SessionTokens.Service,
-  SessionTokens.Service.of({ resolve: () => Effect.succeed(alice), revoke: () => Effect.void }),
+  SessionTokens.SessionTokens,
+  SessionTokens.SessionTokens.of({
+    resolve: () => Effect.succeed(alice),
+    revoke: () => Effect.void,
+  }),
 );
 const client = HttpApiTest.groups(Api, ["changeFeed"]).pipe(
   Effect.provide(

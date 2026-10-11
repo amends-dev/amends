@@ -1,32 +1,31 @@
-import { Assignment } from "./assignment/assignment.ts";
+import * as Assignment from "./assignment/assignment.ts";
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import type { Member } from "../workspace/member/member.ts";
+import type * as Member from "../workspace/member/member.ts";
 
-import { AssignmentStore } from "./assignment/store.ts";
+import * as AssignmentStore from "./assignment/store.ts";
 
-import { Grant } from "./grant.ts";
-import { PermissionCatalog } from "./permission-catalog.ts";
-import type { Permission } from "./permission.ts";
-import { RoleStore } from "./role/store.ts";
+import * as Grant from "./grant.ts";
+import * as PermissionCatalog from "./permission-catalog.ts";
+import type * as Permission from "./permission.ts";
+import * as RoleStore from "./role/store.ts";
 
-import type { Scope } from "./scope.ts";
+import type * as Scope from "./scope.ts";
 
 export type Error = AssignmentStore.Failure | RoleStore.Failure | Schema.SchemaError;
 
-export interface Interface {
-  /**
-   * Resolve active assignments from current state, using an existing transaction
-   * when the caller supplies one. This does not open a transaction. Any invalid
-   * assignment fails the whole operation. A recorded permission the catalog no longer declares
-   * grants nothing, since no requirement can name it. Overlapping grants may repeat.
-   * Actor identity, active membership, and action requirements are checked by authorization.
-   */
-  readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Value>, Error>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/authorization/grant-resolver/Service",
-) {}
+export class GrantResolver extends Context.Service<
+  GrantResolver,
+  {
+    /**
+     * Resolve active assignments from current state, using an existing transaction
+     * when the caller supplies one. This does not open a transaction. Any invalid
+     * assignment fails the whole operation. A recorded permission the catalog no longer declares
+     * grants nothing, since no requirement can name it. Overlapping grants may repeat.
+     * Actor identity, active membership, and action requirements are checked by authorization.
+     */
+    readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Value>, Error>;
+  }
+>()("@amends-dev/core/authorization/grant-resolver/Service") {}
 
 /**
  * Construct a resolver from workspace stores and metadata; read assignments and roles per call.
@@ -34,13 +33,13 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  */
 export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Return<
-  Interface,
+  GrantResolver["Service"],
   never,
-  AssignmentStore.Service | RoleStore.Service | PermissionCatalog.Service
+  AssignmentStore.AssignmentStore | RoleStore.RoleStore | PermissionCatalog.PermissionCatalog
 > {
-  const assignmentStore = yield* AssignmentStore.Service;
-  const roleStore = yield* RoleStore.Service;
-  const permissionCatalog = yield* PermissionCatalog.Service;
+  const assignmentStore = yield* AssignmentStore.AssignmentStore;
+  const roleStore = yield* RoleStore.RoleStore;
+  const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
 
   /** A retired permission grants nothing, rather than failing every grant its holder has. */
   const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Value) {
@@ -74,7 +73,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
     return grants;
   });
 
-  return Service.of({ resolve });
+  return GrantResolver.of({ resolve });
 });
 
 /**
@@ -82,6 +81,4 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
  *
  * @category layers
  */
-export const layer = Layer.effect(Service, make());
-
-export * as GrantResolver from "./grant-resolver.ts";
+export const layer = Layer.effect(GrantResolver, make());

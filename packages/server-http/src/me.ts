@@ -14,9 +14,9 @@ export const layer = HttpApiBuilder.group(
   Api,
   "me",
   Effect.fn(function* (handlers) {
-    const accounts = yield* Accounts.Service;
-    const workspaceDirectory = yield* WorkspaceDirectory.Service;
-    const sessionTokens = yield* SessionTokens.Service;
+    const accounts = yield* Accounts.Accounts;
+    const workspaceDirectory = yield* WorkspaceDirectory.WorkspaceDirectory;
+    const sessionTokens = yield* SessionTokens.SessionTokens;
     return handlers.handleAll({
       account: () =>
         Effect.gen(function* () {
@@ -34,5 +34,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 );
-
-export * as MeHandlers from "./me.ts";

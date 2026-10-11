@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Identity } from "../../identity/identity.ts";
-import { Invitation } from "./invitation.ts";
+import * as Identity from "../../identity/identity.ts";
+import * as Invitation from "./invitation.ts";
 
 /** The outcomes `InvitationService` reports that a caller can act on; schemas only, for contracts. */
 export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
@@ -25,5 +25,3 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()(
     reason: Schema.Literals(["expired", "revoked", "accepted"]),
   },
 ) {}
-
-export * as InvitationErrors from "./errors.ts";

@@ -13,12 +13,12 @@ import {
   Integrations,
 } from "@amends-dev/connection";
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import { Connection } from "../connection/connection.ts";
-import { ConnectionCredentialStore } from "../connection/credential-store.ts";
-import { ConnectionStore } from "../connection/store.ts";
-import { Channel } from "./Channel.ts";
+import * as Connection from "../connection/connection.ts";
+import * as ConnectionCredentialStore from "../connection/credential-store.ts";
+import * as ConnectionStore from "../connection/store.ts";
+import * as Channel from "./Channel.ts";
 import { NotFound } from "./ChannelErrors.ts";
-import { ChannelStore } from "./ChannelStore.ts";
+import * as ChannelStore from "./ChannelStore.ts";
 
 /**
  * The channel's external system cannot be reached as the channel stands: its connection was
@@ -41,42 +41,37 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()("ChannelQuery
 export type Error = ConnectionStore.Failure | ConnectionCredentialStore.Failure;
 
 /**
+ * The shared reads of channels. Internal: not among `Core.Operations`.
+ *
  * The shared reads.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /** The channel, which must exist and not be removed; otherwise it is `NotFound`. */
-  readonly requireActive: (
-    channelId: Channel.Id,
-  ) => Effect.Effect<Channel.Record, ChannelStore.Failure | NotFound>;
-  /** The integration of a connection, which must be installed and give channels. */
-  readonly integrationOf: (
-    connection: Connection.Record,
-  ) => Effect.Effect<Integration.Integration, Unavailable>;
-  /**
-   * The channel's connection as its integration takes it, with its key, for whoever reaches the
-   * system on the channel's behalf outside core, as the delivery job does.
-   */
-  readonly access: (
-    channel: Channel.Record,
-  ) => Effect.Effect<Connection.Access, Error | Unavailable>;
-  /** The channel's transport, made by its integration from that access. */
-  readonly transport: (
-    channel: Channel.Record,
-  ) => Effect.Effect<ChannelTransport.ChannelTransport, Error | Unavailable>;
-}
-
-/**
- * The shared reads of channels. Internal: not among `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/ChannelQuery",
-) {}
+export class ChannelQuery extends Context.Service<
+  ChannelQuery,
+  {
+    /** The channel, which must exist and not be removed; otherwise it is `NotFound`. */
+    readonly requireActive: (
+      channelId: Channel.Id,
+    ) => Effect.Effect<Channel.Record, ChannelStore.Failure | NotFound>;
+    /** The integration of a connection, which must be installed and give channels. */
+    readonly integrationOf: (
+      connection: Connection.Record,
+    ) => Effect.Effect<Integration.Integration, Unavailable>;
+    /**
+     * The channel's connection as its integration takes it, with its key, for whoever reaches the
+     * system on the channel's behalf outside core, as the delivery job does.
+     */
+    readonly access: (
+      channel: Channel.Record,
+    ) => Effect.Effect<Connection.Access, Error | Unavailable>;
+    /** The channel's transport, made by its integration from that access. */
+    readonly transport: (
+      channel: Channel.Record,
+    ) => Effect.Effect<ChannelTransport.ChannelTransport, Error | Unavailable>;
+  }
+>()("@amends-dev/core/channel/ChannelQuery") {}
 
 /**
  * Capture the stores and the integrations the host installs.
@@ -85,9 +80,9 @@ export class Service extends Context.Service<Service, Interface>()(
  * @since 0.1.0
  */
 export const make = Effect.fn("ChannelQuery.make")(function* () {
-  const channelStore = yield* ChannelStore.Service;
-  const connectionStore = yield* ConnectionStore.Service;
-  const connectionCredentialStore = yield* ConnectionCredentialStore.Service;
+  const channelStore = yield* ChannelStore.ChannelStore;
+  const connectionStore = yield* ConnectionStore.ConnectionStore;
+  const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore;
   const integrations = yield* Integrations.Integrations;
 
   const requireActive = Effect.fn("ChannelQuery.requireActive")(function* (channelId: Channel.Id) {
@@ -156,7 +151,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
       .pipe(Effect.mapError((error) => new Unavailable({ description: error.reason.description })));
   });
 
-  return Service.of({ requireActive, integrationOf, access, transport });
+  return ChannelQuery.of({ requireActive, integrationOf, access, transport });
 });
 
 /**
@@ -165,6 +160,4 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as ChannelQuery from "./ChannelQuery.ts";
+export const layer = Layer.effect(ChannelQuery, make());

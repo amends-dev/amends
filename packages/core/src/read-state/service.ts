@@ -1,23 +1,23 @@
-import { Identity } from "../identity/identity.ts";
+import * as Identity from "../identity/identity.ts";
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { GroupQuery } from "../group/query.ts";
-import { GroupPermissions } from "../group/permissions.ts";
-import { Actor } from "../identity/actor.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as GroupQuery from "../group/query.ts";
+import * as GroupPermissions from "../group/permissions.ts";
+import * as Actor from "../identity/actor.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
 
-import { ThreadActivityStore } from "../thread/ThreadActivityStore.ts";
-import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
+import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts";
+import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
 
-import { ReadState } from "./read-state.ts";
-import { ReadStateStore } from "./store.ts";
-import { Signal } from "../signal/signal.ts";
-import { SignalHub } from "../signal/hub.ts";
-import { ReadStateCommand } from "./command.ts";
+import * as ReadState from "./read-state.ts";
+import * as ReadStateStore from "./store.ts";
+import * as Signal from "../signal/signal.ts";
+import * as SignalHub from "../signal/hub.ts";
+import * as ReadStateCommand from "./command.ts";
 import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
-import { Notification } from "../notification/notification.ts";
-import { Store } from "../journal/store.ts";
+import * as Notification from "../notification/notification.ts";
+import * as Store from "../journal/store.ts";
 export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 
 export type Error =
@@ -33,39 +33,39 @@ export type Error =
   | ThreadNotFound
   | GroupNotFound
   | BeyondTimeline;
-export interface Interface {
-  /**
-   * Record that the acting person has read a thread through a timeline position, under the
-   * thread's current access and `thread.read`. The position only moves forward. Their pending
-   * notifications from that thread up to the position are marked seen in the same
-   * commit; with none, only the position is written, outside the workspace's write order.
-   */
-  readonly markThreadRead: (
-    input: ReadState.MarkThreadReadInput,
-  ) => Effect.Effect<void, Error, Actor.Service>;
-  /** Record that the acting person read a group now, under membership and `group.read`. */
-  readonly markGroupRead: (
-    input: ReadState.MarkGroupReadInput,
-  ) => Effect.Effect<void, Error, Actor.Service>;
-}
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/read-state/service/Service",
-) {}
+export class ReadStateService extends Context.Service<
+  ReadStateService,
+  {
+    /**
+     * Record that the acting person has read a thread through a timeline position, under the
+     * thread's current access and `thread.read`. The position only moves forward. Their pending
+     * notifications from that thread up to the position are marked seen in the same
+     * commit; with none, only the position is written, outside the workspace's write order.
+     */
+    readonly markThreadRead: (
+      input: ReadState.MarkThreadReadInput,
+    ) => Effect.Effect<void, Error, Actor.Actor>;
+    /** Record that the acting person read a group now, under membership and `group.read`. */
+    readonly markGroupRead: (
+      input: ReadState.MarkGroupReadInput,
+    ) => Effect.Effect<void, Error, Actor.Actor>;
+  }
+>()("@amends-dev/core/read-state/service/Service") {}
 
 /** Capture workspace dependencies; resolve authority per operation. @category constructors */
 export const make = Effect.fn("ReadStateService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const groupQuery = yield* GroupQuery.Service;
-  const threadActivityStore = yield* ThreadActivityStore.Service;
-  const readStateCommand = yield* ReadStateCommand.Service;
-  const readStateStore = yield* ReadStateStore.Service;
-  const signalHub = yield* SignalHub.Service;
-  const { workspaceId } = yield* Store.Service;
+  const authorization = yield* Authorization.Authorization;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const groupQuery = yield* GroupQuery.GroupQuery;
+  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
+  const readStateCommand = yield* ReadStateCommand.ReadStateCommand;
+  const readStateStore = yield* ReadStateStore.ReadStateStore;
+  const signalHub = yield* SignalHub.SignalHub;
+  const { workspaceId } = yield* Store.Store;
 
   /** The acting person as a reader; agents keep no read state. */
   const requireHumanReader = Effect.fnUntraced(function* () {
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
       return yield* new HumanRequired({ memberId: actor.memberId });
     return Notification.ofMember(actor.memberId, actor.identity) satisfies ReadState.Reader;
@@ -152,8 +152,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
     );
   });
 
-  return Service.of({ markThreadRead, markGroupRead });
+  return ReadStateService.of({ markThreadRead, markGroupRead });
 });
 /** @category layers */
-export const layer = Layer.effect(Service, make());
-export * as ReadStateService from "./service.ts";
+export const layer = Layer.effect(ReadStateService, make());

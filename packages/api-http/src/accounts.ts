@@ -1,9 +1,9 @@
-import { Accounts } from "@amends-dev/gateway/accounts";
+import * as Accounts from "@amends-dev/gateway/accounts";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
-import { ApiErrors } from "./errors.ts";
+import * as ApiErrors from "./errors.ts";
 
 /**
  * The accounts behind a workspace's people: its human members and the recipients of its

@@ -15,14 +15,20 @@ export const layer = HttpApiBuilder.group(
   Api,
   "agents",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
+    const gateway = yield* Gateway.Gateway;
     /** Run an agent operation as the principal, a member of the workspace. */
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
-      operation: (agentService: AgentService.Interface) => Effect.Effect<A, E, Actor.Service>,
+      operation: (
+        agentService: AgentService.AgentService["Service"],
+      ) => Effect.Effect<A, E, Actor.Actor>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
-        gateway.asMember(workspaceId, principal, Effect.flatMap(AgentService.Service, operation)),
+        gateway.asMember(
+          workspaceId,
+          principal,
+          Effect.flatMap(AgentService.AgentService, operation),
+        ),
       );
     return handlers.handleAll({
       list: ({ params }) => asMember(params.workspaceId, (agentService) => agentService.list),
@@ -53,5 +59,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 );
-
-export * as AgentsHandlers from "./agents.ts";

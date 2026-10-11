@@ -3,7 +3,7 @@ import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
-import { Streams } from "./streams.ts";
+import * as Streams from "./streams.ts";
 
 /**
  * Acquire the subscription in the HTTP response scope, which closes on disconnect. Each stream
@@ -16,8 +16,8 @@ export const layer = HttpApiBuilder.group(
   Api,
   "changeFeed",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
-    const streams = yield* Streams.Service;
+    const gateway = yield* Gateway.Gateway;
+    const streams = yield* Streams.Streams;
     const unavailable = () => new ChangeFeed.Unavailable({});
     return handlers.handleAll({
       watch: ({ params, query }) =>
@@ -27,7 +27,7 @@ export const layer = HttpApiBuilder.group(
               gateway.asMember(
                 params.workspaceId,
                 principal,
-                Effect.flatMap(ChangeFeedService.Service, (changeFeedService) =>
+                Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) =>
                   Effect.map(changeFeedService.watch(query), (stream) =>
                     streams.serve(stream, unavailable),
                   ),
@@ -39,5 +39,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 ).pipe(Layer.provide(Streams.layer));
-
-export * as ChangeFeedHandlers from "./change-feed.ts";

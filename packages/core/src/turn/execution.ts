@@ -1,46 +1,46 @@
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Prompt } from "effect/ai";
-import type { Agent } from "../agent/agent.ts";
-import { AgentQuery } from "../agent/query.ts";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { ContactStore } from "../channel/ContactStore.ts";
-import { Actor } from "../identity/actor.ts";
-import { Identity } from "../identity/identity.ts";
-import { Performer } from "../identity/performer.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Notification } from "../notification/notification.ts";
-import { NotificationStore } from "../notification/store.ts";
-import { SignalHub } from "../signal/hub.ts";
-import { TaskStore } from "../task/TaskStore.ts";
-import type { Thread } from "../thread/Thread.ts";
-import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
-import { ThreadActivityStore } from "../thread/ThreadActivityStore.ts";
-import { ThreadCommand } from "../thread/ThreadCommand.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { ThreadMessageActivity } from "../thread/ThreadMessageActivity.ts";
-import { ThreadMessage } from "../thread/ThreadMessage.ts";
-import { ThreadMessagePermissions } from "../thread/ThreadMessagePermissions.ts";
-import { ThreadMessageStore } from "../thread/ThreadMessageStore.ts";
-import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
-import { ThreadParticipationStore } from "../thread/ThreadParticipationStore.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
-import { ThreadStore } from "../thread/ThreadStore.ts";
-import type { Member } from "../workspace/member/member.ts";
-import { MemberStore } from "../workspace/member/store.ts";
+import type * as Agent from "../agent/agent.ts";
+import * as AgentQuery from "../agent/query.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as ContactStore from "../channel/ContactStore.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Performer from "../identity/performer.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Notification from "../notification/notification.ts";
+import * as NotificationStore from "../notification/store.ts";
+import * as SignalHub from "../signal/hub.ts";
+import * as TaskStore from "../task/TaskStore.ts";
+import type * as Thread from "../thread/Thread.ts";
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
+import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts";
+import * as ThreadCommand from "../thread/ThreadCommand.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as ThreadMessageActivity from "../thread/ThreadMessageActivity.ts";
+import * as ThreadMessage from "../thread/ThreadMessage.ts";
+import * as ThreadMessagePermissions from "../thread/ThreadMessagePermissions.ts";
+import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts";
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
+import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
+import * as ThreadStore from "../thread/ThreadStore.ts";
+import type * as Member from "../workspace/member/member.ts";
+import * as MemberStore from "../workspace/member/store.ts";
 import { NotActive, NotFound } from "./errors.ts";
-import { TurnActivity } from "./activity.ts";
-import { TurnCommand } from "./command.ts";
-import { TurnFacts } from "./facts.ts";
-import { TurnPrompt } from "./prompt.ts";
-import { SessionLogStore } from "./session-log-store.ts";
-import { SessionStateStore } from "./session-state-store.ts";
-import { TurnStore } from "./store.ts";
-import { Turn } from "./turn.ts";
+import * as TurnActivity from "./activity.ts";
+import * as TurnCommand from "./command.ts";
+import * as TurnFacts from "./facts.ts";
+import * as TurnPrompt from "./prompt.ts";
+import * as SessionLogStore from "./session-log-store.ts";
+import * as SessionStateStore from "./session-state-store.ts";
+import * as TurnStore from "./store.ts";
+import * as Turn from "./turn.ts";
 
 export type Error =
   | TurnStore.Failure
@@ -122,65 +122,64 @@ export type Closing = typeof Closing.Type;
  * in memory. Each change is its own commit, attributed to the turn's agent. The job is trusted: it
  * runs what the agent accepted, and closing checks the agent's own access before posting for it.
  */
-export interface Interface {
-  /**
-   * The active turn in the thread of the agent of membership `memberId`, or, while it has none, a
-   * new one that accepts the work its notifications from the thread ask for, settling them. None
-   * while no work waits, or while the agent cannot open the thread, where the work waits, as a
-   * person's notification waits in their inbox.
-   */
-  readonly accept: (
-    memberId: Member.Id,
-    threadId: ThreadId.Id,
-  ) => Effect.Effect<Option.Option<Turn.Record>, AcceptError>;
-  /**
-   * Start the turn: one asked to stop, or whose participation ended, ends as it stands; one that
-   * cannot run on what `AgentQuery` selects for it, kept when it runs again, fails; and one with
-   * nothing to tell the agent completes. Otherwise it is ready to run, and a queued turn starts.
-   * A turn that is no longer active is `Idle`.
-   */
-  readonly start: (turnId: Turn.Id) => Effect.Effect<Start, StartError>;
-  /**
-   * The conversation the turn's agent joined in the thread: the thread's messages before its
-   * participation, which its session starts with when its session log is new.
-   */
-  readonly joinedConversation: (
-    turnId: Turn.Id,
-  ) => Effect.Effect<ReadonlyArray<Prompt.Message>, ReadError>;
-  /**
-   * Show the turn's readers more of a step before it finishes, as a signal: nothing is recorded,
-   * and a turn no longer running shows nothing. A reader who starts following midway sees the step
-   * from the next draft that starts at its beginning.
-   */
-  readonly showDraft: (turnId: Turn.Id, draft: Turn.Draft) => Effect.Effect<void, Error>;
-  /**
-   * Close a turn whose harness turn finished: post `reply`, the text of its last step, as the
-   * agent's message to the thread's current participants, keep what its session resumes from, and
-   * record completion, in one commit. A turn asked to stop meanwhile stops instead, keeping the
-   * session.
-   */
-  readonly close: (
-    turnId: Turn.Id,
-    closing: { readonly reply: string; readonly resume: SessionStateStore.Resume },
-  ) => Effect.Effect<Closing, CloseError>;
-  /** The turn could not go on, for `reason`; a session it started is kept as it was left. */
-  readonly fail: (
-    turnId: Turn.Id,
-    failure: { readonly reason: string; readonly resume?: SessionStateStore.Resume | undefined },
-  ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
-  /**
-   * End a turn its job stopped, or that it was not running, keeping a session it started: one
-   * asked to stop, or whose participation ended. Any other turn is left as it is.
-   */
-  readonly confirmStopped: (
-    turnId: Turn.Id,
-    stopped: { readonly resume?: SessionStateStore.Resume | undefined },
-  ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/turn/execution/Service",
-) {}
+export class TurnExecution extends Context.Service<
+  TurnExecution,
+  {
+    /**
+     * The active turn in the thread of the agent of membership `memberId`, or, while it has none, a
+     * new one that accepts the work its notifications from the thread ask for, settling them. None
+     * while no work waits, or while the agent cannot open the thread, where the work waits, as a
+     * person's notification waits in their inbox.
+     */
+    readonly accept: (
+      memberId: Member.Id,
+      threadId: ThreadId.Id,
+    ) => Effect.Effect<Option.Option<Turn.Record>, AcceptError>;
+    /**
+     * Start the turn: one asked to stop, or whose participation ended, ends as it stands; one that
+     * cannot run on what `AgentQuery` selects for it, kept when it runs again, fails; and one with
+     * nothing to tell the agent completes. Otherwise it is ready to run, and a queued turn starts.
+     * A turn that is no longer active is `Idle`.
+     */
+    readonly start: (turnId: Turn.Id) => Effect.Effect<Start, StartError>;
+    /**
+     * The conversation the turn's agent joined in the thread: the thread's messages before its
+     * participation, which its session starts with when its session log is new.
+     */
+    readonly joinedConversation: (
+      turnId: Turn.Id,
+    ) => Effect.Effect<ReadonlyArray<Prompt.Message>, ReadError>;
+    /**
+     * Show the turn's readers more of a step before it finishes, as a signal: nothing is recorded,
+     * and a turn no longer running shows nothing. A reader who starts following midway sees the step
+     * from the next draft that starts at its beginning.
+     */
+    readonly showDraft: (turnId: Turn.Id, draft: Turn.Draft) => Effect.Effect<void, Error>;
+    /**
+     * Close a turn whose harness turn finished: post `reply`, the text of its last step, as the
+     * agent's message to the thread's current participants, keep what its session resumes from, and
+     * record completion, in one commit. A turn asked to stop meanwhile stops instead, keeping the
+     * session.
+     */
+    readonly close: (
+      turnId: Turn.Id,
+      closing: { readonly reply: string; readonly resume: SessionStateStore.Resume },
+    ) => Effect.Effect<Closing, CloseError>;
+    /** The turn could not go on, for `reason`; a session it started is kept as it was left. */
+    readonly fail: (
+      turnId: Turn.Id,
+      failure: { readonly reason: string; readonly resume?: SessionStateStore.Resume | undefined },
+    ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
+    /**
+     * End a turn its job stopped, or that it was not running, keeping a session it started: one
+     * asked to stop, or whose participation ended. Any other turn is left as it is.
+     */
+    readonly confirmStopped: (
+      turnId: Turn.Id,
+      stopped: { readonly resume?: SessionStateStore.Resume | undefined },
+    ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
+  }
+>()("@amends-dev/core/turn/execution/Service") {}
 
 /** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
@@ -203,26 +202,26 @@ const describeIssue = (issue: Agent.Issue): string => {
 
 /** @category constructors */
 export const make = Effect.fn("TurnExecution.make")(function* () {
-  const turnStore = yield* TurnStore.Service;
-  const sessionStateStore = yield* SessionStateStore.Service;
-  const sessionLogStore = yield* SessionLogStore.Service;
-  const notificationStore = yield* NotificationStore.Service;
-  const memberStore = yield* MemberStore.Service;
-  const contactStore = yield* ContactStore.Service;
-  const taskStore = yield* TaskStore.Service;
-  const threadStore = yield* ThreadStore.Service;
-  const threadParticipationStore = yield* ThreadParticipationStore.Service;
-  const threadActivityStore = yield* ThreadActivityStore.Service;
-  const threadMessageStore = yield* ThreadMessageStore.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadCommand = yield* ThreadCommand.Service;
-  const turnCommand = yield* TurnCommand.Service;
-  const agentQuery = yield* AgentQuery.Service;
-  const authorization = yield* Authorization.Service;
-  const journal = yield* Journal.Service;
-  const signalHub = yield* SignalHub.Service;
+  const turnStore = yield* TurnStore.TurnStore;
+  const sessionStateStore = yield* SessionStateStore.SessionStateStore;
+  const sessionLogStore = yield* SessionLogStore.SessionLogStore;
+  const notificationStore = yield* NotificationStore.NotificationStore;
+  const memberStore = yield* MemberStore.MemberStore;
+  const contactStore = yield* ContactStore.ContactStore;
+  const taskStore = yield* TaskStore.TaskStore;
+  const threadStore = yield* ThreadStore.ThreadStore;
+  const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
+  const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadCommand = yield* ThreadCommand.ThreadCommand;
+  const turnCommand = yield* TurnCommand.TurnCommand;
+  const agentQuery = yield* AgentQuery.AgentQuery;
+  const authorization = yield* Authorization.Authorization;
+  const journal = yield* Journal.Journal;
+  const signalHub = yield* SignalHub.SignalHub;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   const requireTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turnStore.get(turnId);
@@ -240,8 +239,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       Publication.make(workspaceId, Performer.Reference.cases.Member.make({ memberId, identity })),
       (provenance) =>
         step.pipe(
-          Effect.provideService(Publication.Service, provenance),
-          Effect.provideService(Actor.Service, { workspaceId, memberId, identity }),
+          Effect.provideService(Publication.Publication, provenance),
+          Effect.provideService(Actor.Actor, { workspaceId, memberId, identity }),
         ),
     );
   /** Run `step` in its own commit, as the agent `identity` of membership `memberId`. */
@@ -515,7 +514,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const accept: Interface["accept"] = Effect.fn("TurnExecution.accept")(
+  const accept: TurnExecution["Service"]["accept"] = Effect.fn("TurnExecution.accept")(
     function* (memberId, threadId) {
       const member = yield* memberStore.get(memberId);
       if (Option.isNone(member) || member.value.status !== "active") return Option.none();
@@ -596,53 +595,55 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     });
   });
 
-  const start: Interface["start"] = Effect.fn("TurnExecution.start")(function* (turnId) {
-    return yield* asTurnAgent(
-      turnId,
-      Effect.fnUntraced(function* (turn) {
-        if (!Turn.active(turn.status)) return Start.cases.Idle.make({});
-        if (turn.status === "cancelling")
-          return yield* endAsIdle(turn, {
-            outcome: "cancelled",
-            cancelReason: reasonAskedToStop(turn),
-          });
-        if (yield* hasDeparted(turn))
-          return yield* endAsIdle(turn, {
-            outcome: "cancelled",
-            cancelReason: "participation-ended",
-          });
-        return yield* Effect.gen(function* () {
-          const selection = yield* selectionOf(turn);
-          const runnable = yield* agentQuery.buildRunnable(turn.memberId, selection);
-          return yield* readyTurn(turn, selection, runnable);
-        }).pipe(
-          // The agent cannot run on what is selected for it: the turn fails, saying why.
-          Effect.catchTags({
-            "AgentService.Incomplete": ({ issues }) =>
-              endAsIdle(turn, {
-                outcome: "failed",
-                reason: issues.map(describeIssue).join(" "),
-              }),
-            "AgentQuery.NotFound": () =>
-              endAsIdle(turn, { outcome: "failed", reason: "The agent can no longer run." }),
-            // The thread is gone or closed to the agent: the turn fails rather than tells nothing.
-            "ThreadQuery.NotFound": () =>
-              endAsIdle(turn, {
-                outcome: "failed",
-                reason: "The agent can no longer read the thread.",
-              }),
-            "Authorization.Denied": () =>
-              endAsIdle(turn, {
-                outcome: "failed",
-                reason: "The agent can no longer read the thread.",
-              }),
-          }),
-        );
-      }),
-    );
-  });
+  const start: TurnExecution["Service"]["start"] = Effect.fn("TurnExecution.start")(
+    function* (turnId) {
+      return yield* asTurnAgent(
+        turnId,
+        Effect.fnUntraced(function* (turn) {
+          if (!Turn.active(turn.status)) return Start.cases.Idle.make({});
+          if (turn.status === "cancelling")
+            return yield* endAsIdle(turn, {
+              outcome: "cancelled",
+              cancelReason: reasonAskedToStop(turn),
+            });
+          if (yield* hasDeparted(turn))
+            return yield* endAsIdle(turn, {
+              outcome: "cancelled",
+              cancelReason: "participation-ended",
+            });
+          return yield* Effect.gen(function* () {
+            const selection = yield* selectionOf(turn);
+            const runnable = yield* agentQuery.buildRunnable(turn.memberId, selection);
+            return yield* readyTurn(turn, selection, runnable);
+          }).pipe(
+            // The agent cannot run on what is selected for it: the turn fails, saying why.
+            Effect.catchTags({
+              "AgentService.Incomplete": ({ issues }) =>
+                endAsIdle(turn, {
+                  outcome: "failed",
+                  reason: issues.map(describeIssue).join(" "),
+                }),
+              "AgentQuery.NotFound": () =>
+                endAsIdle(turn, { outcome: "failed", reason: "The agent can no longer run." }),
+              // The thread is gone or closed to the agent: the turn fails rather than tells nothing.
+              "ThreadQuery.NotFound": () =>
+                endAsIdle(turn, {
+                  outcome: "failed",
+                  reason: "The agent can no longer read the thread.",
+                }),
+              "Authorization.Denied": () =>
+                endAsIdle(turn, {
+                  outcome: "failed",
+                  reason: "The agent can no longer read the thread.",
+                }),
+            }),
+          );
+        }),
+      );
+    },
+  );
 
-  const joinedConversation: Interface["joinedConversation"] = Effect.fn(
+  const joinedConversation: TurnExecution["Service"]["joinedConversation"] = Effect.fn(
     "TurnExecution.joinedConversation",
   )(function* (turnId) {
     const turn = yield* requireTurn(turnId);
@@ -655,7 +656,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const showDraft: Interface["showDraft"] = Effect.fn("TurnExecution.showDraft")(
+  const showDraft: TurnExecution["Service"]["showDraft"] = Effect.fn("TurnExecution.showDraft")(
     function* (turnId, draft) {
       const turn = yield* requireTurn(turnId);
       if (turn.status !== "running" || draft.text === "") return;
@@ -709,7 +710,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       Closing.cases.Failed.make({ reason }),
     );
 
-  const close: Interface["close"] = Effect.fn("TurnExecution.close")(function* (
+  const close: TurnExecution["Service"]["close"] = Effect.fn("TurnExecution.close")(function* (
     turnId,
     { reply, resume },
   ) {
@@ -750,35 +751,36 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const fail: Interface["fail"] = Effect.fn("TurnExecution.fail")(function* (turnId, failure) {
-    const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(failure.reason);
-    yield* asTurnAgent(
-      turnId,
-      Effect.fnUntraced(function* (turn) {
-        if (!Turn.active(turn.status))
-          return yield* new NotActive({ turnId: turn.id, status: turn.status });
-        if (failure.resume !== undefined) yield* saveSession(turn, failure.resume);
-        yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
-      }),
-    );
-  });
-
-  const confirmStopped: Interface["confirmStopped"] = Effect.fn("TurnExecution.confirmStopped")(
-    function* (turnId, { resume }) {
+  const fail: TurnExecution["Service"]["fail"] = Effect.fn("TurnExecution.fail")(
+    function* (turnId, failure) {
+      const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(failure.reason);
       yield* asTurnAgent(
         turnId,
         Effect.fnUntraced(function* (turn) {
-          if (!Turn.active(turn.status)) return;
-          if (turn.status === "cancelling")
-            return yield* endStopped(turn, reasonAskedToStop(turn), resume);
-          if (yield* hasDeparted(turn))
-            return yield* endStopped(turn, "participation-ended", resume);
+          if (!Turn.active(turn.status))
+            return yield* new NotActive({ turnId: turn.id, status: turn.status });
+          if (failure.resume !== undefined) yield* saveSession(turn, failure.resume);
+          yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
         }),
       );
     },
   );
 
-  return Service.of({
+  const confirmStopped: TurnExecution["Service"]["confirmStopped"] = Effect.fn(
+    "TurnExecution.confirmStopped",
+  )(function* (turnId, { resume }) {
+    yield* asTurnAgent(
+      turnId,
+      Effect.fnUntraced(function* (turn) {
+        if (!Turn.active(turn.status)) return;
+        if (turn.status === "cancelling")
+          return yield* endStopped(turn, reasonAskedToStop(turn), resume);
+        if (yield* hasDeparted(turn)) return yield* endStopped(turn, "participation-ended", resume);
+      }),
+    );
+  });
+
+  return TurnExecution.of({
     accept,
     start,
     joinedConversation,
@@ -790,6 +792,4 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 });
 
 /** Internal service for turn jobs: callers are trusted to run what agents accepted. @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as TurnExecution from "./execution.ts";
+export const layer = Layer.effect(TurnExecution, make());

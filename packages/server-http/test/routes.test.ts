@@ -117,8 +117,8 @@ const messageId = ThreadMessage.Id.make("message-one");
 /** Conversation services record their inputs; failures show that each tag keeps its status. */
 const conversations = Layer.mergeAll(
   Layer.succeed(
-    GroupService.Service,
-    GroupService.Service.of({
+    GroupService.GroupService,
+    GroupService.GroupService.of({
       createTeam: record("group.create", () => Effect.succeed(team)),
       rename: record("group.rename", () => Effect.succeed(team)),
       get: record("group.get", (id) => Effect.fail(new GroupService.NotFound({ groupId: id }))),
@@ -127,8 +127,8 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    GroupMembershipService.Service,
-    GroupMembershipService.Service.of({
+    GroupMembershipService.GroupMembershipService,
+    GroupMembershipService.GroupMembershipService.of({
       add: record("group.add", (input) =>
         Effect.fail(new GroupMembershipService.AlreadyMember(input)),
       ),
@@ -145,8 +145,8 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    GroupFollowService.Service,
-    GroupFollowService.Service.of({
+    GroupFollowService.GroupFollowService,
+    GroupFollowService.GroupFollowService.of({
       follow: record("group.follow", () => Effect.void),
       unfollow: record("group.unfollow", (input) =>
         Effect.fail(new GroupFollowService.NotFollowable({ groupId: input.groupId })),
@@ -154,8 +154,8 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    ThreadService.Service,
-    ThreadService.Service.of({
+    ThreadService.ThreadService,
+    ThreadService.ThreadService.of({
       startInGroup: record("thread.start", () =>
         Effect.fail(new ThreadService.ParticipantUnavailable({ memberId })),
       ),
@@ -173,8 +173,8 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    TaskService.Service,
-    TaskService.Service.of({
+    TaskService.TaskService,
+    TaskService.TaskService.of({
       create: record("task.create", (input) =>
         Effect.fail(new TaskService.AlreadyTask({ threadId: input.threadId })),
       ),
@@ -186,8 +186,8 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    ThreadMessageService.Service,
-    ThreadMessageService.Service.of({
+    ThreadMessageService.ThreadMessageService,
+    ThreadMessageService.ThreadMessageService.of({
       publish: record("thread.publish", () =>
         Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
       ),
@@ -201,8 +201,8 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    ThreadParticipationService.Service,
-    ThreadParticipationService.Service.of({
+    ThreadParticipationService.ThreadParticipationService,
+    ThreadParticipationService.ThreadParticipationService.of({
       follow: record("thread.follow", (id) =>
         Effect.fail(new ThreadParticipationService.ThreadNotFound({ threadId: id })),
       ),
@@ -212,8 +212,8 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    ReadStateService.Service,
-    ReadStateService.Service.of({
+    ReadStateService.ReadStateService,
+    ReadStateService.ReadStateService.of({
       markThreadRead: record("thread.markRead", ({ threadId, throughSequence }) =>
         Effect.fail(
           new ReadStateService.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
@@ -227,8 +227,8 @@ const conversations = Layer.mergeAll(
 const channelId = Channel.Id.make("channel-one");
 const channels = Layer.mergeAll(
   Layer.succeed(
-    ChannelService.Service,
-    ChannelService.Service.of({
+    ChannelService.ChannelService,
+    ChannelService.ChannelService.of({
       list: Effect.suspend(() => {
         calls.push({ operation: "channel.list", arguments: [] });
         return Effect.succeed([]);
@@ -249,8 +249,8 @@ const channels = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    ChannelIntake.Service,
-    ChannelIntake.Service.of({
+    ChannelIntake.ChannelIntake,
+    ChannelIntake.ChannelIntake.of({
       receive: record("channel.receive", () => Effect.succeed({ answer: "ack", intakes: [] })),
       intake: () => Effect.die("unused"),
     }),
@@ -260,8 +260,8 @@ const operations = Layer.mergeAll(
   conversations,
   channels,
   Layer.succeed(
-    NotificationService.Service,
-    NotificationService.Service.of({
+    NotificationService.NotificationService,
+    NotificationService.NotificationService.of({
       markSeen: record("notification.markSeen", (notificationId) =>
         notificationId === notification.id
           ? Effect.fail(new NotificationService.AlreadyHandled({ notificationId }))
@@ -273,8 +273,8 @@ const operations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    MemberService.Service,
-    MemberService.Service.of({
+    MemberService.MemberService,
+    MemberService.MemberService.of({
       get: record("get", (target) =>
         target === memberId
           ? Effect.succeed(member)
@@ -294,8 +294,8 @@ const operations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    InvitationService.Service,
-    InvitationService.Service.of({
+    InvitationService.InvitationService,
+    InvitationService.InvitationService.of({
       issue: record("issue", (input) => Effect.succeed(pending(input))),
       accept: record("accept", () => Effect.succeed(member)),
       revoke: record("revoke", () => Effect.die("unused")),
@@ -311,8 +311,8 @@ const operations = Layer.mergeAll(
 );
 /** Runs programs against the stubbed services; the stubs fail only with public outcomes. */
 const gateway = Layer.succeed(
-  Gateway.Service,
-  Gateway.Service.of({
+  Gateway.Gateway,
+  Gateway.Gateway.of({
     createWorkspace: record("createWorkspace", () => Effect.succeed(workspace)),
     inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, unknown>) => {
       calls.push({ operation: "inWorkspace", arguments: [id] });
@@ -328,13 +328,13 @@ const gateway = Layer.succeed(
     asMember: <A, E>(
       id: Workspace.Id,
       identity: Identity.MemberReference,
-      program: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope>,
+      program: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope>,
     ) => {
       calls.push({ operation: "asMember", arguments: [id, identity] });
       if (identity.id !== alice.id)
         return Effect.fail(new GatewayErrors.NotMember({ workspaceId: id }));
       return Effect.provide(
-        Effect.provideService(program, Actor.Service, actor),
+        Effect.provideService(program, Actor.Actor, actor),
         operations,
       ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
     },
@@ -343,8 +343,8 @@ const gateway = Layer.succeed(
 
 /** Trusts the token as a human ID, like the local host's development credentials. */
 const credentials = Layer.succeed(
-  SessionTokens.Service,
-  SessionTokens.Service.of({
+  SessionTokens.SessionTokens,
+  SessionTokens.SessionTokens.of({
     resolve: (credential) => {
       const token = Redacted.value(credential);
       if (token === "agent")
@@ -374,8 +374,8 @@ const methods: SignIn.Methods = {
   providers: [{ id: "google", name: "Google" }],
 };
 const signIn = Layer.succeed(
-  SignIn.Service,
-  SignIn.Service.of({
+  SignIn.SignIn,
+  SignIn.SignIn.of({
     methods,
     start: record("start", (email) =>
       email === "busy@mercier.co" ? Effect.fail(new SignIn.Limited()) : Effect.void,
@@ -393,8 +393,8 @@ const addresses = new Map<Identity.HumanId, Accounts.Email>([
   [bob, Accounts.Email.make("bob@example.com")],
 ]);
 const accounts = Layer.succeed(
-  Accounts.Service,
-  Accounts.Service.of({
+  Accounts.Accounts,
+  Accounts.Accounts.of({
     findOrCreate: record("findOrCreate", (email) =>
       Effect.sync(() => {
         const found = [...addresses].find(([, address]) => address === email);
@@ -415,8 +415,8 @@ const accounts = Layer.succeed(
   }),
 );
 const directory = Layer.succeed(
-  WorkspaceDirectory.Service,
-  WorkspaceDirectory.Service.of({
+  WorkspaceDirectory.WorkspaceDirectory,
+  WorkspaceDirectory.WorkspaceDirectory.of({
     list: record("list", () =>
       Effect.succeed({
         memberships: [{ workspace, member, activeMemberCount: 1 }],

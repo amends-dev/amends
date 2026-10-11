@@ -6,9 +6,9 @@ import { Effect, Layer, Logger, Redacted } from "effect";
 import { Base64 } from "effect/encoding";
 import { HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import { EmailAuthentication } from "../../src/authentication/email.ts";
-import { LocalHost } from "../../src/host.ts";
-import { LocalServer } from "../../src/server.ts";
+import * as EmailAuthentication from "../../src/authentication/email.ts";
+import * as LocalHost from "../../src/host.ts";
+import * as LocalServer from "../../src/server.ts";
 import { setup } from "../database.ts";
 
 const ada = Accounts.Email.make("ada@example.com");

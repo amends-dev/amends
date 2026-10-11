@@ -7,14 +7,14 @@
  * @since 0.1.0
  */
 import { DateTime, Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
-import type { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { Task } from "../task/Task.ts";
+import * as GroupId from "../group/id.ts";
+import * as Text from "../text/text.ts";
+import * as WorkspaceId from "../workspace/id.ts";
+import * as MemberId from "../workspace/member/id.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import type * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as Task from "../task/Task.ts";
 
 /**
  * Names a thread; `ThreadId.Id`, where models that only refer to threads import it from.
@@ -382,5 +382,3 @@ export interface Started extends Schema.Schema.Type<typeof Started> {}
  * @since 0.1.0
  */
 export type TimelineItem = ThreadActivityKind.Item;
-
-export * as Thread from "./Thread.ts";

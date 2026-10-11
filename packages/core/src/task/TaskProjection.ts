@@ -5,9 +5,9 @@
  * @since 0.1.0
  */
 import { Effect } from "effect";
-import { Projection } from "../journal/projection.ts";
-import { TaskFacts } from "./TaskFacts.ts";
-import { TaskStore } from "./TaskStore.ts";
+import * as Projection from "../journal/projection.ts";
+import * as TaskFacts from "./TaskFacts.ts";
+import * as TaskStore from "./TaskStore.ts";
 
 /**
  * Inserts each created task and applies each change.
@@ -19,16 +19,14 @@ export const definition = Projection.make("task", { version: 1 })
   .on(
     TaskFacts.Created,
     Effect.fn("TaskProjection.created")(function* ({ payload }) {
-      const taskStore = yield* TaskStore.Service;
+      const taskStore = yield* TaskStore.TaskStore;
       yield* taskStore.insert(payload);
     }),
   )
   .on(
     TaskFacts.Updated,
     Effect.fn("TaskProjection.updated")(function* ({ payload }) {
-      const taskStore = yield* TaskStore.Service;
+      const taskStore = yield* TaskStore.TaskStore;
       yield* taskStore.apply(payload.threadId, payload.change);
     }),
   );
-
-export * as TaskProjection from "./TaskProjection.ts";

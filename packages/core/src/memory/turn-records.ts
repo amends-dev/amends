@@ -2,9 +2,10 @@ import { Thread } from "../thread/index.ts";
 import { Turn, TurnStore } from "../turn/index.ts";
 import { Member } from "../workspace/index.ts";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Turn.Record));
 
@@ -19,7 +20,7 @@ const byCreated = (left: Turn.Record, right: Turn.Record) =>
 
 /** Turn records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("TurnRecords.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const all = (operation: string) =>
     Effect.gen(function* () {
       return yield* rows.all((yield* read).records.of("turns"));
@@ -43,7 +44,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       .filter((record) => record.memberId === memberId && record.threadId === threadId)
       .toSorted(byCreated);
   });
-  const driver: TurnStore.Interface = {
+  const driver: TurnStore.TurnStore["Service"] = {
     get: Effect.fn("TurnRecords.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("turns"), id);
@@ -108,6 +109,4 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
 });
 
 /** Provide turn storage over the caller's binding. @category layers */
-export const layer = Layer.effect(TurnStore.Service, make());
-
-export * as TurnRecords from "./turn-records.ts";
+export const layer = Layer.effect(TurnStore.TurnStore, make());

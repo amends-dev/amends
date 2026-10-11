@@ -1,44 +1,43 @@
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect";
 import type { Scope } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import { Grant } from "../authorization/grant.ts";
-import { GrantResolver } from "../authorization/grant-resolver.ts";
-import type { Requirement } from "../authorization/requirement.ts";
-import { Group } from "../group/group.ts";
-import { GroupMembershipStore } from "../group/membership/store.ts";
-import { Actor } from "../identity/actor.ts";
-import { Identity } from "../identity/identity.ts";
-import { Audience } from "../journal/audience.ts";
-import { Store } from "../journal/store.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import * as Grant from "../authorization/grant.ts";
+import * as GrantResolver from "../authorization/grant-resolver.ts";
+import type * as Requirement from "../authorization/requirement.ts";
+import * as Group from "../group/group.ts";
+import * as GroupMembershipStore from "../group/membership/store.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Identity from "../identity/identity.ts";
+import * as Audience from "../journal/audience.ts";
+import * as Store from "../journal/store.ts";
 
-import { Member } from "../workspace/member/member.ts";
-import { ChangeFeed } from "./change-feed.ts";
-import { ChangeFeedEvents } from "./events.ts";
-import { ChangeFeedSource } from "./source.ts";
-import { Signal } from "../signal/signal.ts";
-import { SignalHub } from "../signal/hub.ts";
+import * as Member from "../workspace/member/member.ts";
+import * as ChangeFeed from "./change-feed.ts";
+import * as ChangeFeedEvents from "./events.ts";
+import * as ChangeFeedSource from "./source.ts";
+import * as Signal from "../signal/signal.ts";
+import * as SignalHub from "../signal/hub.ts";
 
-export interface Interface {
-  /**
-   * Register, then check active membership and load the reader's access, before returning
-   * Ready. The caller owns the subscription scope. A reader sees an event when they hold a
-   * scope in its audience (the workspace, their membership or identity, or a group they belong
-   * to) and any read permission it names. Their scopes and grants are reloaded when a
-   * delivered fact changes them, and the stream ends after the fact that removes them from the
-   * workspace.
-   */
-  readonly watch: (
-    options?: ChangeFeed.WatchOptions,
-  ) => Effect.Effect<
-    Stream.Stream<ChangeFeed.Message, ChangeFeed.Unavailable>,
-    Authorization.Error | ChangeFeed.Unavailable | Schema.SchemaError,
-    Actor.Service | Scope.Scope
-  >;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/change-feed/service/Service",
-) {}
+export class ChangeFeedService extends Context.Service<
+  ChangeFeedService,
+  {
+    /**
+     * Register, then check active membership and load the reader's access, before returning
+     * Ready. The caller owns the subscription scope. A reader sees an event when they hold a
+     * scope in its audience (the workspace, their membership or identity, or a group they belong
+     * to) and any read permission it names. Their scopes and grants are reloaded when a
+     * delivered fact changes them, and the stream ends after the fact that removes them from the
+     * workspace.
+     */
+    readonly watch: (
+      options?: ChangeFeed.WatchOptions,
+    ) => Effect.Effect<
+      Stream.Stream<ChangeFeed.Message, ChangeFeed.Unavailable>,
+      Authorization.Error | ChangeFeed.Unavailable | Schema.SchemaError,
+      Actor.Actor | Scope.Scope
+    >;
+  }
+>()("@amends-dev/core/change-feed/service/Service") {}
 
 /** What one reader may see: their delivery scopes and resolved grants. */
 interface Access {
@@ -73,12 +72,12 @@ const changesAccessOf = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prep
 
 /** Capture the shared source and the reader's policy; authenticate the actor per subscription. @category constructors */
 export const make = Effect.fn("ChangeFeedService.make")(function* () {
-  const changeFeedSource = yield* ChangeFeedSource.Service;
-  const signalHub = yield* SignalHub.Service;
-  const authorization = yield* Authorization.Service;
-  const grantResolver = yield* GrantResolver.Service;
-  const groupMembershipStore = yield* GroupMembershipStore.Service;
-  const { workspaceId } = yield* Store.Service;
+  const changeFeedSource = yield* ChangeFeedSource.ChangeFeedSource;
+  const signalHub = yield* SignalHub.SignalHub;
+  const authorization = yield* Authorization.Authorization;
+  const grantResolver = yield* GrantResolver.GrantResolver;
+  const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
+  const { workspaceId } = yield* Store.Store;
 
   const resolveAccess = Effect.fnUntraced(function* (actor: Actor.Value) {
     const admissions = yield* groupMembershipStore.listActiveByMember(actor.memberId);
@@ -98,7 +97,7 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
     input: ChangeFeed.WatchOptions = {},
   ) {
     const options = yield* Schema.decodeEffect(ChangeFeed.WatchOptions)(input);
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     // Register for signals and commits before Ready, so neither misses what follows it.
     const live = yield* signalHub.subscribe;
     const subscription = yield* changeFeedSource.subscribe(
@@ -162,10 +161,8 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
       Stream.concat(Stream.merge(updates, happening, { haltStrategy: "left" })),
     );
   });
-  return Service.of({ watch });
+  return ChangeFeedService.of({ watch });
 });
 
 /** Provide the workspace change-feed application. @category layers */
-export const layer = Layer.effect(Service, make());
-
-export * as ChangeFeedService from "./service.ts";
+export const layer = Layer.effect(ChangeFeedService, make());

@@ -1,11 +1,11 @@
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import type { Store } from "../journal/store.ts";
+import type * as Store from "../journal/store.ts";
 
-import type { MemberId } from "../workspace/member/id.ts";
-import { Group } from "./group.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import type * as MemberId from "../workspace/member/id.ts";
+import * as Group from "./group.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("GroupStore.Failure", {
   operation: Schema.String,
@@ -20,61 +20,60 @@ export class Conflict extends Schema.TaggedError<Conflict>()("GroupStore.Conflic
 /**
  * Internal projection storage. Reads honor an existing transaction; writes require one.
  *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
-  /**
-   * Find several groups in one read. Absent IDs are omitted and each found record appears once;
-   * order is unspecified, so callers index results by ID. An empty request reads nothing.
-   */
-  readonly getMany: (
-    ids: ReadonlyArray<Group.Id>,
-  ) => Effect.Effect<ReadonlyArray<Group.Record>, Failure>;
-  /** A page of the workspace's public team groups in binary group-ID order, after the cursor. */
-  readonly pagePublic: (
-    options: Group.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<Group.TeamRecord>, Failure>;
-  /** The direct group with exactly these members, in any order. */
-  readonly findDirect: (
-    memberIds: ReadonlyArray<MemberId.Id>,
-  ) => Effect.Effect<Option.Option<Group.DirectRecord>, Failure>;
-  /**
-   * Reject reused IDs and a second direct group for the same member set.
-   * The creator is recorded as given: references to other read models are checked when facts are
-   * published, so this one rebuilds alone. Never upsert.
-   */
-  readonly insert: (
-    record: Group.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Projection write that sets a team group's name. A missing or direct group conflicts;
-   * the same name again changes nothing.
-   */
-  readonly rename: (
-    renamed: Group.Renamed,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Latest content activity of several groups in one read. Groups without any, and absent IDs,
-   * are omitted; order is unspecified.
-   */
-  readonly getLatest: (
-    ids: ReadonlyArray<Group.Id>,
-  ) => Effect.Effect<ReadonlyArray<Group.Latest>, Failure>;
-  /**
-   * Projection write that advances a group's latest activity time. A time at or before the recorded
-   * one changes nothing; a missing group conflicts.
-   */
-  readonly recordLatest: (
-    latest: Group.Latest,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/group/store/Service",
-) {}
+export class GroupStore extends Context.Service<
+  GroupStore,
+  {
+    readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
+    /**
+     * Find several groups in one read. Absent IDs are omitted and each found record appears once;
+     * order is unspecified, so callers index results by ID. An empty request reads nothing.
+     */
+    readonly getMany: (
+      ids: ReadonlyArray<Group.Id>,
+    ) => Effect.Effect<ReadonlyArray<Group.Record>, Failure>;
+    /** A page of the workspace's public team groups in binary group-ID order, after the cursor. */
+    readonly pagePublic: (
+      options: Group.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<Group.TeamRecord>, Failure>;
+    /** The direct group with exactly these members, in any order. */
+    readonly findDirect: (
+      memberIds: ReadonlyArray<MemberId.Id>,
+    ) => Effect.Effect<Option.Option<Group.DirectRecord>, Failure>;
+    /**
+     * Reject reused IDs and a second direct group for the same member set.
+     * The creator is recorded as given: references to other read models are checked when facts are
+     * published, so this one rebuilds alone. Never upsert.
+     */
+    readonly insert: (
+      record: Group.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Projection write that sets a team group's name. A missing or direct group conflicts;
+     * the same name again changes nothing.
+     */
+    readonly rename: (
+      renamed: Group.Renamed,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Latest content activity of several groups in one read. Groups without any, and absent IDs,
+     * are omitted; order is unspecified.
+     */
+    readonly getLatest: (
+      ids: ReadonlyArray<Group.Id>,
+    ) => Effect.Effect<ReadonlyArray<Group.Latest>, Failure>;
+    /**
+     * Projection write that advances a group's latest activity time. A time at or before the recorded
+     * one changes nothing; a missing group conflicts.
+     */
+    readonly recordLatest: (
+      latest: Group.Latest,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/group/store/Service") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -83,7 +82,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: GroupStore["Service"],
+): GroupStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -104,5 +106,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
       Effect.flatMap(write("recordLatest", Group.Latest, latest), driver.recordLatest),
   };
 };
-
-export * as GroupStore from "./store.ts";

@@ -13,13 +13,13 @@ export class Failure extends Data.TaggedError("CredentialKey.Failure")<{
   readonly cause?: unknown;
 }> {}
 
-export interface Interface {
+export interface Cipher {
   readonly seal: (secret: string, binding: string) => Effect.Effect<string, Failure>;
   readonly open: (sealed: string, binding: string) => Effect.Effect<string, Failure>;
 }
 
 /** The host's credential key, when it configured one. */
-export class Service extends Context.Service<Service, Option.Option<Interface>>()(
+export class CredentialKey extends Context.Service<CredentialKey, Option.Option<Cipher>>()(
   "@amends-dev/storage-postgresql/credential-key/Service",
 ) {}
 
@@ -41,7 +41,7 @@ const bytes = (base64: string) =>
  *
  * @category constructors
  */
-export const make = (key: Redacted.Redacted<string>): Effect.Effect<Interface, Failure> =>
+export const make = (key: Redacted.Redacted<string>): Effect.Effect<Cipher, Failure> =>
   Effect.tryPromise({
     try: async () => {
       const raw = bytes(Redacted.value(key));
@@ -84,6 +84,4 @@ export const make = (key: Redacted.Redacted<string>): Effect.Effect<Interface, F
   );
 
 /** @category layers */
-export const layer = (key: Option.Option<Interface>) => Layer.succeed(Service, key);
-
-export * as CredentialKey from "./credential-key.ts";
+export const layer = (key: Option.Option<Cipher>) => Layer.succeed(CredentialKey, key);

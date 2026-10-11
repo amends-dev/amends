@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Permission } from "../authorization/permission.ts";
+import * as Permission from "../authorization/permission.ts";
 
 /**
  * Publish a message in a thread, or tell its readers one is being written. Replying needs no
@@ -28,5 +28,3 @@ export const Moderate = Permission.make("thread.moderate", {
   targetKind: "Group",
   builtinTier: "administrator",
 });
-
-export * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts";

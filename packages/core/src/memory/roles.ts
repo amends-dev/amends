@@ -1,8 +1,8 @@
 import { BuiltinRoles, Role, RoleStore } from "../authorization/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Role.Record));
 const revisions = Rows.make(Schema.fromJsonString(BuiltinRoles.Revision));
@@ -15,7 +15,7 @@ const revisionKey = "builtin";
  * @category constructors
  */
 export const make = Effect.fn("Roles.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   /** Replace one role with an edited record. */
   const edit = Effect.fn("Roles.edit")(function* (
     operation: string,
@@ -34,7 +34,7 @@ export const make = Effect.fn("Roles.make")(function* () {
       .pipe(Effect.mapError(storeFailure(RoleStore, operation)));
     space.records.of("roles").set(id, row);
   });
-  const driver: RoleStore.Interface = {
+  const driver: RoleStore.RoleStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("roles"), id)).pipe(
         Effect.mapError(storeFailure(RoleStore, "get")),
@@ -79,10 +79,8 @@ export const make = Effect.fn("Roles.make")(function* () {
 });
 
 /**
- * Provide RoleStore.Service using its constructor and the caller's dependencies.
+ * Provide RoleStore.RoleStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(RoleStore.Service, make());
-
-export * as Roles from "./roles.ts";
+export const layer = Layer.effect(RoleStore.RoleStore, make());

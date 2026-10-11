@@ -1,9 +1,9 @@
 import { Context, Effect, Schema } from "effect";
 import type { Array } from "effect";
-import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
-import { SessionLog } from "./session-log.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
+import * as SessionLog from "./session-log.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("SessionLogStore.Failure", {
   operation: Schema.String,
@@ -34,39 +34,37 @@ export const ReadOptions = Schema.Struct({
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
 /**
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
+ * `make` builds the store over a driver of the same shape. It checks every input
  * against its schema, and a record against the workspace, before the driver sees it, so a driver
  * keeps only what storage keeps.
  */
-export interface Interface {
-  /** The position of the log's latest entry, or 0 while it has none. */
-  readonly head: (participationId: ThreadParticipationId.Id) => Effect.Effect<number, Failure>;
-  /**
-   * Append `entries` in order after the entry at `after`, the log's latest as the writer read it,
-   * or 0 for an empty log. A log that holds an entry past `after` takes none of them and fails with
-   * Conflict, so a writer that fell behind, as one another replaced has, cannot write past it.
-   */
-  readonly append: (
-    participationId: ThreadParticipationId.Id,
-    entries: Array.NonEmptyReadonlyArray<SessionLog.Entry>,
-    after: number,
-  ) => Effect.Effect<Array.NonEmptyReadonlyArray<SessionLog.Recorded>, Failure | Conflict>;
-  /** The log's entries past `after`, oldest first, at most `limit` of them. */
-  readonly read: (
-    participationId: ThreadParticipationId.Id,
-    options: ReadOptions,
-  ) => Effect.Effect<ReadonlyArray<SessionLog.Recorded>, Failure>;
-  /** Completes once the log holds an entry past `after`. */
-  readonly waitForAppend: (
-    participationId: ThreadParticipationId.Id,
-    after: number,
-  ) => Effect.Effect<void, Failure>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/turn/session-log-store/Service",
-) {}
+export class SessionLogStore extends Context.Service<
+  SessionLogStore,
+  {
+    /** The position of the log's latest entry, or 0 while it has none. */
+    readonly head: (participationId: ThreadParticipationId.Id) => Effect.Effect<number, Failure>;
+    /**
+     * Append `entries` in order after the entry at `after`, the log's latest as the writer read it,
+     * or 0 for an empty log. A log that holds an entry past `after` takes none of them and fails with
+     * Conflict, so a writer that fell behind, as one another replaced has, cannot write past it.
+     */
+    readonly append: (
+      participationId: ThreadParticipationId.Id,
+      entries: Array.NonEmptyReadonlyArray<SessionLog.Entry>,
+      after: number,
+    ) => Effect.Effect<Array.NonEmptyReadonlyArray<SessionLog.Recorded>, Failure | Conflict>;
+    /** The log's entries past `after`, oldest first, at most `limit` of them. */
+    readonly read: (
+      participationId: ThreadParticipationId.Id,
+      options: ReadOptions,
+    ) => Effect.Effect<ReadonlyArray<SessionLog.Recorded>, Failure>;
+    /** Completes once the log holds an entry past `after`. */
+    readonly waitForAppend: (
+      participationId: ThreadParticipationId.Id,
+      after: number,
+    ) => Effect.Effect<void, Failure>;
+  }
+>()("@amends-dev/core/turn/session-log-store/Service") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -75,7 +73,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: SessionLogStore["Service"],
+): SessionLogStore["Service"] => {
   const read = StoreInput.read(Failure);
   return {
     head: (participationId) =>
@@ -101,5 +102,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
     }),
   };
 };
-
-export * as SessionLogStore from "./session-log-store.ts";

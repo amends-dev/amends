@@ -23,14 +23,8 @@ import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect";
 import { withStorage } from "./fixture.ts";
-import {
-  alice,
-  type Bound,
-  forWorkspace,
-  Support,
-  testProvenance,
-  workspaceId,
-} from "./support.ts";
+import * as Support from "./support.ts";
+import { alice, type Bound, forWorkspace, testProvenance, workspaceId } from "./support.ts";
 
 const roleIds = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
 const current = BuiltinRoles.make(workspaceId, Core.permissions);
@@ -66,7 +60,7 @@ const roles = (bound: Bound) => Effect.forEach(roleIds, (id) => bound.roles.get(
 const upgrade = (bound: Bound, target?: BuiltinRoleUpgrade.Target) =>
   BuiltinRoleUpgrade.upgrade(target).pipe(Effect.provide(core(bound)));
 const history = (bound: Bound) =>
-  Effect.flatMap(Journal.Service, (journal) => journal.log.read({ limit: 100 })).pipe(
+  Effect.flatMap(Journal.Journal, (journal) => journal.log.read({ limit: 100 })).pipe(
     Effect.provide(core(bound)),
   );
 /**
@@ -74,7 +68,7 @@ const history = (bound: Bound) =>
  * and an Owner with another name and an earlier bundle.
  */
 const recordedBeforeRevisions = (bound: Bound) =>
-  Effect.flatMap(Journal.Service, (journal) =>
+  Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
       Effect.gen(function* () {
         yield* journal.publish(WorkspaceFacts.Initialized, {
@@ -110,7 +104,10 @@ const recordedBeforeRevisions = (bound: Bound) =>
         });
       }),
     ),
-  ).pipe(Effect.provideService(Publication.Service, testProvenance()), Effect.provide(core(bound)));
+  ).pipe(
+    Effect.provideService(Publication.Publication, testProvenance()),
+    Effect.provide(core(bound)),
+  );
 
 describe("built-in roles", () => {
   // Real time: the host tries again a second after the first attempt failed.
@@ -132,7 +129,7 @@ describe("built-in roles", () => {
           yield* Deferred.await(held);
           const host = yield* Layer.build(gateway(yield* storage.connect({ failFast: true })));
           // The workspace still loads and admits its members, with the roles it recorded.
-          yield* Effect.flatMap(Gateway.Service, (gateway) =>
+          yield* Effect.flatMap(Gateway.Gateway, (gateway) =>
             gateway.asMember(workspaceId, alice, Effect.void),
           ).pipe(Effect.provide(host));
           expect(yield* bound.roles.builtinRevision).toEqual(Option.none());
@@ -183,12 +180,12 @@ describe("built-in roles", () => {
           yield* recordedBeforeRevisions(bound);
           expect(yield* bound.roles.builtinRevision).toEqual(Option.none());
           // Any operation loads the workspace; the owner's grants already hold the new bundle.
-          const choices = yield* Effect.flatMap(Gateway.Service, (gateway) =>
+          const choices = yield* Effect.flatMap(Gateway.Gateway, (gateway) =>
             gateway.asMember(
               workspaceId,
               alice,
               Effect.flatMap(
-                AssignmentService.Service,
+                AssignmentService.AssignmentService,
                 (assignmentService) => assignmentService.roles,
               ),
             ),
@@ -227,7 +224,7 @@ describe("built-in roles", () => {
         expect(yield* roles(bound)).toEqual(upgraded);
         // Replay restores the upgraded bundles and their revision from the recorded facts.
         yield* storage.discardProjections;
-        yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+        yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
           Effect.provide(core(bound)),
         );
         expect(yield* roles(bound)).toEqual(upgraded);
@@ -243,13 +240,13 @@ describe("built-in roles", () => {
         yield* initialized(bound);
         // A newer host upgrades the bundles; this host, still on the current revision, loads them.
         expect(yield* upgrade(bound, later)).toBe(true);
-        const [choices, invitation] = yield* Effect.flatMap(Gateway.Service, (gateway) =>
+        const [choices, invitation] = yield* Effect.flatMap(Gateway.Gateway, (gateway) =>
           gateway.asMember(
             workspaceId,
             alice,
             Effect.gen(function* () {
-              const choices = yield* (yield* AssignmentService.Service).roles;
-              const invitation = yield* (yield* InvitationService.Service).issue({
+              const choices = yield* (yield* AssignmentService.AssignmentService).roles;
+              const invitation = yield* (yield* InvitationService.InvitationService).issue({
                 recipientId: Identity.HumanId.make("recipient"),
                 roleId: BuiltinRoles.MemberId,
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),

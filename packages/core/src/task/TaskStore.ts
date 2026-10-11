@@ -7,12 +7,12 @@
  */
 import { Context, Effect, Schema } from "effect";
 import type { Option } from "effect";
-import { GroupId } from "../group/id.ts";
-import type { Store } from "../journal/store.ts";
-import { StoreInput } from "../journal/StoreInput.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
-import { Task } from "./Task.ts";
+import * as GroupId from "../group/id.ts";
+import type * as Store from "../journal/store.ts";
+import * as StoreInput from "../journal/StoreInput.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import type * as WorkspaceId from "../workspace/id.ts";
+import * as Task from "./Task.ts";
 
 /**
  * Storage failed while reading or writing tasks.
@@ -38,56 +38,52 @@ export class Conflict extends Schema.TaggedError<Conflict>()("TaskStore.Conflict
 }) {}
 
 /**
- * What a storage adapter implements for tasks.
- * @category services
- * @since 0.1.0
- *
- * `make` builds the store over a driver that implements this interface. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
- */
-export interface Interface {
-  /** The thread's task, if it has one. */
-  readonly get: (threadId: ThreadId.Id) => Effect.Effect<Option.Option<Task.Record>, Failure>;
-  /**
-   * Several threads' tasks in one read. Threads without one are omitted and each task appears
-   * once; order is unspecified, so callers index results by thread. An empty request reads
-   * nothing.
-   */
-  readonly getMany: (
-    threadIds: ReadonlyArray<ThreadId.Id>,
-  ) => Effect.Effect<ReadonlyArray<Task.Record>, Failure>;
-  /**
-   * A page of a group's tasks by creation, newest first, after the exclusive cursor, of one status
-   * when the options name one.
-   */
-  readonly listByGroup: (
-    groupId: GroupId.Id,
-    options: Task.ListOptions,
-  ) => Effect.Effect<ReadonlyArray<Task.Record>, Failure>;
-  /** Reject a thread that has a task. */
-  readonly insert: (
-    record: Task.Record,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-  /**
-   * Apply one change to a thread's task. A thread without a task, or a task whose value is not
-   * the one the change replaces, conflicts.
-   */
-  readonly apply: (
-    threadId: ThreadId.Id,
-    change: Task.Change,
-  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-}
-
-/**
  * The task store, bound to one workspace by the host.
  *
+ * What a storage adapter implements for tasks.
+ *
+ * `make` builds the store over a driver of the same shape. It checks every input
+ * against its schema, and a record against the workspace, before the driver sees it, so a driver
+ * keeps only what storage keeps.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/task/TaskStore",
-) {}
+export class TaskStore extends Context.Service<
+  TaskStore,
+  {
+    /** The thread's task, if it has one. */
+    readonly get: (threadId: ThreadId.Id) => Effect.Effect<Option.Option<Task.Record>, Failure>;
+    /**
+     * Several threads' tasks in one read. Threads without one are omitted and each task appears
+     * once; order is unspecified, so callers index results by thread. An empty request reads
+     * nothing.
+     */
+    readonly getMany: (
+      threadIds: ReadonlyArray<ThreadId.Id>,
+    ) => Effect.Effect<ReadonlyArray<Task.Record>, Failure>;
+    /**
+     * A page of a group's tasks by creation, newest first, after the exclusive cursor, of one status
+     * when the options name one.
+     */
+    readonly listByGroup: (
+      groupId: GroupId.Id,
+      options: Task.ListOptions,
+    ) => Effect.Effect<ReadonlyArray<Task.Record>, Failure>;
+    /** Reject a thread that has a task. */
+    readonly insert: (
+      record: Task.Record,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    /**
+     * Apply one change to a thread's task. A thread without a task, or a task whose value is not
+     * the one the change replaces, conflicts.
+     */
+    readonly apply: (
+      threadId: ThreadId.Id,
+      change: Task.Change,
+    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  }
+>()("@amends-dev/core/task/TaskStore") {}
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
@@ -96,7 +92,10 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface => {
+export const make = (
+  workspaceId: WorkspaceId.Id,
+  driver: TaskStore["Service"],
+): TaskStore["Service"] => {
   const read = StoreInput.read(Failure);
   const write = StoreInput.write(Conflict, workspaceId);
   return {
@@ -118,5 +117,3 @@ export const make = (workspaceId: WorkspaceId.Id, driver: Interface): Interface 
     }),
   };
 };
-
-export * as TaskStore from "./TaskStore.ts";

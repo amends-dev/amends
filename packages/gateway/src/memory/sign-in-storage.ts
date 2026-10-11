@@ -1,6 +1,6 @@
 import { MemoryDatabase, Rows } from "@amends-dev/core/memory";
 import { Effect, Layer, Option, Schema } from "effect";
-import { SignInStorage } from "../sign-in-storage.ts";
+import * as SignInStorage from "../sign-in-storage.ts";
 
 const codes = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SignInStorage.PendingCode)));
 const sessions = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SignInStorage.SessionRecord)));
@@ -12,10 +12,10 @@ const sessions = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SignInStorag
  * @category constructors
  */
 export const make = Effect.fn("MemorySignInStorage.make")(function* () {
-  const database = yield* MemoryDatabase.Service;
+  const database = yield* MemoryDatabase.MemoryDatabase;
   const signInCodes = MemoryDatabase.table(database, "sign_in_codes");
   const signInSessions = MemoryDatabase.table(database, "sign_in_sessions");
-  return SignInStorage.Service.of({
+  return SignInStorage.SignInStorage.of({
     modifyCode: (email, decide) =>
       MemoryDatabase.lock(database, Rows.keyOf("sign-in-code", email))
         .withPermit(
@@ -44,10 +44,8 @@ export const make = Effect.fn("MemorySignInStorage.make")(function* () {
 });
 
 /**
- * Provide SignInStorage.Service using its constructor and the caller's dependencies.
+ * Provide SignInStorage.SignInStorage using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(SignInStorage.Service, make());
-
-export * as MemorySignInStorage from "./sign-in-storage.ts";
+export const layer = Layer.effect(SignInStorage.SignInStorage, make());

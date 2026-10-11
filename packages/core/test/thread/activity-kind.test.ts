@@ -1,7 +1,7 @@
 import { Thread, ThreadActivity, ThreadActivityKind } from "@amends-dev/core/thread";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Schema } from "effect";
-import { WorkspaceId } from "../../src/workspace/id.ts";
+import * as WorkspaceId from "../../src/workspace/id.ts";
 
 /** A kind at its first version, the same kind once its details changed, and another kind. */
 const Noted = ThreadActivityKind.make("test.noted", {

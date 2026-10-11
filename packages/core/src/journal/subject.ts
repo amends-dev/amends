@@ -11,5 +11,3 @@ export type Value = typeof Value.Type;
 /** Construct an unambiguous entity key; IDs may themselves contain colons. @category constructors */
 export const make = (kind: string, id: string): Value =>
   Value.make(`${Kind.make(kind)}:${Schema.NonEmptyString.make(id)}`);
-
-export * as Subject from "./subject.ts";

@@ -1,8 +1,8 @@
 import { Workspace, WorkspaceStore } from "../workspace/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Workspace.Record));
 
@@ -12,10 +12,10 @@ const rows = Rows.make(Schema.fromJsonString(Workspace.Record));
  * @category constructors
  */
 export const make = Effect.fn("Workspaces.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const writable = (operation: string) =>
     write.pipe(Effect.mapError(storeFailure(WorkspaceStore, operation)));
-  const driver: WorkspaceStore.Interface = {
+  const driver: WorkspaceStore.WorkspaceStore["Service"] = {
     get: Effect.flatMap(read, (space) => rows.get(space.records.of("workspace"), workspaceId)).pipe(
       Effect.mapError(storeFailure(WorkspaceStore, "get")),
     ),
@@ -66,10 +66,8 @@ export const make = Effect.fn("Workspaces.make")(function* () {
 });
 
 /**
- * Provide WorkspaceStore.Service using its constructor and the caller's dependencies.
+ * Provide WorkspaceStore.WorkspaceStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(WorkspaceStore.Service, make());
-
-export * as Workspaces from "./workspaces.ts";
+export const layer = Layer.effect(WorkspaceStore.WorkspaceStore, make());

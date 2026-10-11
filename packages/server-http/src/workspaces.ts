@@ -14,7 +14,7 @@ export const layer = HttpApiBuilder.group(
   Api,
   "workspaces",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Service;
+    const gateway = yield* Gateway.Gateway;
     return handlers.handleAll({
       settings: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
@@ -22,7 +22,7 @@ export const layer = HttpApiBuilder.group(
             params.workspaceId,
             principal,
             Effect.flatMap(
-              WorkspaceSettingsService.Service,
+              WorkspaceSettingsService.WorkspaceSettingsService,
               (workspaceSettingsService) => workspaceSettingsService.get,
             ),
           ),
@@ -33,7 +33,7 @@ export const layer = HttpApiBuilder.group(
             params.workspaceId,
             principal,
             Effect.flatMap(
-              WorkspaceSettingsService.Service,
+              WorkspaceSettingsService.WorkspaceSettingsService,
               (workspaceSettingsService) => workspaceSettingsService.members,
             ),
           ),
@@ -43,8 +43,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(WorkspaceSettingsService.Service, (workspaceSettingsService) =>
-              workspaceSettingsService.rename(payload),
+            Effect.flatMap(
+              WorkspaceSettingsService.WorkspaceSettingsService,
+              (workspaceSettingsService) => workspaceSettingsService.rename(payload),
             ),
           ),
         ),
@@ -53,7 +54,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(OwnershipService.Service, (ownershipService) => ownershipService.get),
+            Effect.flatMap(
+              OwnershipService.OwnershipService,
+              (ownershipService) => ownershipService.get,
+            ),
           ),
         ),
       transferOwnership: ({ params, payload }) =>
@@ -64,7 +68,7 @@ export const layer = HttpApiBuilder.group(
           return yield* gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(OwnershipService.Service, (ownershipService) =>
+            Effect.flatMap(OwnershipService.OwnershipService, (ownershipService) =>
               ownershipService.transfer(payload),
             ),
           );
@@ -81,5 +85,3 @@ export const layer = HttpApiBuilder.group(
     });
   }),
 );
-
-export * as WorkspacesHandlers from "./workspaces.ts";

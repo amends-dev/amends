@@ -1,10 +1,10 @@
-import { Subject } from "../../journal/subject.ts";
+import * as Subject from "../../journal/subject.ts";
 import { Schema } from "effect";
-import { Audience } from "../../journal/audience.ts";
-import { Fact } from "../../journal/fact.ts";
-import { Member } from "../../workspace/member/member.ts";
-import { Workspace } from "../../workspace/workspace.ts";
-import { Assignment } from "./assignment.ts";
+import * as Audience from "../../journal/audience.ts";
+import * as Fact from "../../journal/fact.ts";
+import * as Member from "../../workspace/member/member.ts";
+import * as Workspace from "../../workspace/workspace.ts";
+import * as Assignment from "./assignment.ts";
 
 /** Establishes an active role or direct grant assignment with a fresh ID. */
 export const Created = Fact.make("workspace.assignment.created", {
@@ -33,5 +33,3 @@ export const Revoked = Fact.make("workspace.assignment.revoked", {
   }),
   occurrence: (payload) => [payload.assignmentId],
 });
-
-export * as AssignmentFacts from "./facts.ts";

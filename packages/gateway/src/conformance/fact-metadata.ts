@@ -12,11 +12,11 @@ import {
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
 import type { Fixture } from "./fixture.ts";
+import * as Support from "./support.ts";
 import {
   forWorkspace,
   journalLog,
   otherWorkspaceId,
-  Support,
   testProvenance,
   workspaceId,
 } from "./support.ts";
@@ -53,7 +53,7 @@ export const factMetadata = (fixture: Fixture) => {
                 const host = yield* storage.connect();
                 const bound = yield* forWorkspace(host, workspaceId);
                 return yield* Effect.gen(function* () {
-                  const journal = yield* Journal.Service;
+                  const journal = yield* Journal.Journal;
                   const events = yield* journal.commit(
                     Effect.gen(function* () {
                       const first = yield* journal.publish(Changed, "first");
@@ -97,7 +97,7 @@ export const factMetadata = (fixture: Fixture) => {
                   expect(
                     yield* foreign.store.readFacts(journalLog, { name: Changed.name, limit: 10 }),
                   ).toEqual([]);
-                  const execution = (yield* Log.Service).open({
+                  const execution = (yield* Log.Log).open({
                     id: Log.Id.make("execution"),
                     schema: Schema.String,
                   });
@@ -107,7 +107,7 @@ export const factMetadata = (fixture: Fixture) => {
                   ).toEqual([]);
                   return [...events, third] as const;
                 }).pipe(
-                  Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+                  Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
                   Effect.provide(core(bound)),
                 );
               }),
@@ -220,7 +220,7 @@ export const factMetadata = (fixture: Fixture) => {
                 const host = yield* storage.connect();
                 const bound = yield* forWorkspace(host, workspaceId);
                 return yield* Effect.gen(function* () {
-                  const journal = yield* Journal.Service;
+                  const journal = yield* Journal.Journal;
                   const saved = yield* journal.commit(
                     Effect.gen(function* () {
                       const first = yield* journal.publish(Message, {
@@ -274,7 +274,7 @@ export const factMetadata = (fixture: Fixture) => {
                   expect(
                     yield* foreign.store.readFacts(journalLog, { subject: target, limit: 10 }),
                   ).toEqual([]);
-                  const plain = (yield* Log.Service).open({
+                  const plain = (yield* Log.Log).open({
                     id: journalLog,
                     schema: Schema.String,
                   });
@@ -283,7 +283,7 @@ export const factMetadata = (fixture: Fixture) => {
                   return all;
                 }).pipe(
                   Effect.provideService(
-                    Publication.Service,
+                    Publication.Publication,
                     Object.assign({}, testProvenance(workspaceId), {
                       performedBy: { _tag: "Identity" as const, identity: contact },
                     }),

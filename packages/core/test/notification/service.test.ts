@@ -1,31 +1,31 @@
-import { ThreadQuery } from "../../src/thread/ThreadQuery.ts";
-import { Publication } from "../../src/journal/publication.ts";
+import * as ThreadQuery from "../../src/thread/ThreadQuery.ts";
+import * as Publication from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Authorization } from "../../src/authorization/authorization.ts";
-import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
-import { GrantResolver } from "../../src/authorization/grant-resolver.ts";
-import { PermissionCatalog } from "../../src/authorization/permission-catalog.ts";
-import { RoleStore } from "../../src/authorization/role/store.ts";
-import { Actor } from "../../src/identity/actor.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Entry } from "../../src/journal/entry.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Notification } from "../../src/notification/notification.ts";
-import { NotificationService } from "../../src/notification/service.ts";
-import { NotificationStore } from "../../src/notification/store.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberFacts } from "../../src/workspace/member/facts.ts";
-import { MemberProjection } from "../../src/workspace/member/projection.ts";
-import { MemberStore } from "../../src/workspace/member/store.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Authorization from "../../src/authorization/authorization.ts";
+import * as AssignmentStore from "../../src/authorization/assignment/store.ts";
+import * as GrantResolver from "../../src/authorization/grant-resolver.ts";
+import * as PermissionCatalog from "../../src/authorization/permission-catalog.ts";
+import * as RoleStore from "../../src/authorization/role/store.ts";
+import * as Actor from "../../src/identity/actor.ts";
+import * as Identity from "../../src/identity/identity.ts";
+import * as Checkpoint from "../../src/journal/checkpoint.ts";
+import * as Entry from "../../src/journal/entry.ts";
+import * as Journal from "../../src/journal/journal.ts";
+import * as Log from "../../src/journal/log.ts";
+import * as Store from "../../src/journal/store.ts";
+import * as Notification from "../../src/notification/notification.ts";
+import * as NotificationService from "../../src/notification/service.ts";
+import * as NotificationStore from "../../src/notification/store.ts";
+import * as Member from "../../src/workspace/member/member.ts";
+import * as MemberFacts from "../../src/workspace/member/facts.ts";
+import * as MemberProjection from "../../src/workspace/member/projection.ts";
+import * as MemberStore from "../../src/workspace/member/store.ts";
+import * as Workspace from "../../src/workspace/workspace.ts";
 import { make, type Fixture } from "../memory.ts";
-import { TestSignalHub } from "../signal-hub.ts";
-import { SignalHub } from "../../src/signal/hub.ts";
+import * as TestSignalHub from "../signal-hub.ts";
+import * as SignalHub from "../../src/signal/hub.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
@@ -75,7 +75,10 @@ const seed = (fixture: Fixture) =>
       }),
     ),
   );
-const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Interface> = {}) => {
+const configured = (
+  fixture: Fixture,
+  overrides: Partial<NotificationStore.NotificationStore["Service"]> = {},
+) => {
   const records = [mine, theirs, agents];
   const list = (
     recipient: Notification.Recipient,
@@ -84,7 +87,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Effect.succeed(
       records.filter((value) => sameRecipient(value.recipient, recipient)).slice(0, options.limit),
     );
-  const notifications = Layer.succeed(NotificationStore.Service, {
+  const notifications = Layer.succeed(NotificationStore.NotificationStore, {
     get: (id) => Effect.succeed(Option.fromUndefinedOr(records.find((value) => value.id === id))),
     listPendingByRecipient: list,
     listLatestByRecipient: list,
@@ -103,11 +106,11 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     ...overrides,
   });
   const host = Layer.mergeAll(
-    Layer.succeed(Store.Service, fixture.store),
-    Layer.succeed(Checkpoint.Service, fixture.checkpoints),
-    Layer.succeed(MemberStore.Service, fixture.members),
-    Layer.succeed(RoleStore.Service, fixture.roles),
-    Layer.succeed(AssignmentStore.Service, fixture.assignments),
+    Layer.succeed(Store.Store, fixture.store),
+    Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
+    Layer.succeed(MemberStore.MemberStore, fixture.members),
+    Layer.succeed(RoleStore.RoleStore, fixture.roles),
+    Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
     PermissionCatalog.layer([]),
   );
   const journal = Journal.layer({ logId, projections: [MemberProjection.definition] }).pipe(
@@ -118,7 +121,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provideMerge(host))),
     Layer.provide(notifications),
     Layer.provide(
-      Layer.succeed(ThreadQuery.Service, {
+      Layer.succeed(ThreadQuery.ThreadQuery, {
         requireAccess: unexpected,
         requireReadable: unexpected,
         eligibleMembers: unexpected,
@@ -145,14 +148,17 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    NotificationService.Service | Journal.Service | Authorization.Service | Actor.Service
+    | NotificationService.NotificationService
+    | Journal.Journal
+    | Authorization.Authorization
+    | Actor.Actor
   >,
   actor = alice,
-  overrides: Partial<NotificationStore.Interface> = {},
+  overrides: Partial<NotificationStore.NotificationStore["Service"]> = {},
 ) =>
   program.pipe(
     Effect.provide(configured(fixture, overrides)),
-    Effect.provideService(Actor.Service, actor),
+    Effect.provideService(Actor.Actor, actor),
   );
 /** A page of the inbox as the actor reads it: their notifications, without sources here. */
 const inboxOf = (...records: ReadonlyArray<Notification.Record>) =>
@@ -163,29 +169,29 @@ it.effect(
   () =>
     Effect.gen(function* () {
       expectTypeOf<Layer.Services<typeof NotificationService.layer>>().toEqualTypeOf<
-        | NotificationStore.Service
-        | Authorization.Service
-        | Journal.Service
-        | ThreadQuery.Service
-        | SignalHub.Service
-        | Store.Service
+        | NotificationStore.NotificationStore
+        | Authorization.Authorization
+        | Journal.Journal
+        | ThreadQuery.ThreadQuery
+        | SignalHub.SignalHub
+        | Store.Store
       >();
       expectTypeOf<
-        Effect.Services<ReturnType<NotificationService.Interface["inbox"]>>
-      >().toEqualTypeOf<Actor.Service>();
+        Effect.Services<ReturnType<NotificationService.NotificationService["Service"]["inbox"]>>
+      >().toEqualTypeOf<Actor.Actor>();
       const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       const attempts = yield* fixture.attempts;
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationService = yield* NotificationService.Service;
+          const notificationService = yield* NotificationService.NotificationService;
           expect(yield* notificationService.inbox(page)).toEqual(inboxOf(mine));
           expect(yield* notificationService.inbox({ ...page, pendingOnly: true })).toEqual(
             inboxOf(mine),
           );
           expect(yield* notificationService.countPending).toBe(1);
-          expect(yield* (yield* Journal.Service).log.read({ limit: 10 })).toEqual([]);
+          expect(yield* (yield* Journal.Journal).log.read({ limit: 10 })).toEqual([]);
         }),
       );
       expect(yield* fixture.attempts).toBe(attempts);
@@ -201,7 +207,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationService = yield* NotificationService.Service;
+          const notificationService = yield* NotificationService.NotificationService;
           for (const [actor, expected] of [
             [alice, mine],
             [agent, agents],
@@ -210,12 +216,12 @@ it.effect(
             expect(
               yield* notificationService
                 .inbox(page)
-                .pipe(Effect.provideService(Actor.Service, actor)),
+                .pipe(Effect.provideService(Actor.Actor, actor)),
             ).toEqual(inboxOf(expected));
             expect(
               yield* notificationService
                 .inbox({ ...page, pendingOnly: true })
-                .pipe(Effect.provideService(Actor.Service, actor)),
+                .pipe(Effect.provideService(Actor.Actor, actor)),
             ).toEqual(inboxOf(expected));
           }
         }),
@@ -232,7 +238,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationService = yield* NotificationService.Service;
+          const notificationService = yield* NotificationService.NotificationService;
           for (const id of [theirs.id, agents.id, Notification.Id.make("absent")]) {
             expect(yield* Effect.flip(notificationService.markSeen(id))).toEqual(
               new NotificationService.NotFound({
@@ -262,9 +268,9 @@ it.effect(
         yield* run(
           fixture,
           Effect.gen(function* () {
-            const notificationService = yield* NotificationService.Service;
+            const notificationService = yield* NotificationService.NotificationService;
             const operations: ReadonlyArray<
-              Effect.Effect<void, { readonly _tag: string }, Actor.Service>
+              Effect.Effect<void, { readonly _tag: string }, Actor.Actor>
             > = [
               notificationService.markSeen(mine.id).pipe(Effect.asVoid),
               notificationService.inbox(page).pipe(Effect.asVoid),
@@ -297,8 +303,8 @@ it.effect("inbox reads join an outer commit and observe staged membership remova
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notificationService = yield* NotificationService.Service;
-        const journal = yield* Journal.Service;
+        const notificationService = yield* NotificationService.NotificationService;
+        const journal = yield* Journal.Journal;
         const error = yield* Effect.flip(
           journal.commit(
             Effect.gen(function* () {
@@ -307,7 +313,7 @@ it.effect("inbox reads join an outer commit and observe staged membership remova
               expect((yield* Store.Transaction).id).toBe(storeTransaction.id);
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
               return yield* notificationService.countPending;
             }),
           ),
@@ -356,7 +362,7 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationService = yield* NotificationService.Service;
+          const notificationService = yield* NotificationService.NotificationService;
           const input = { ...options, recipient: bob.identity };
           expect(yield* notificationService.inbox(input)).toEqual(inboxOf(mine));
           expect(yield* notificationService.inbox({ ...input, pendingOnly: true })).toEqual(
@@ -386,7 +392,7 @@ it.effect("invalid notification IDs and paging are rejected before store reads",
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notificationService = yield* NotificationService.Service;
+        const notificationService = yield* NotificationService.NotificationService;
         expect((yield* Effect.flip(notificationService.markSeen(invalid.id)))._tag).toBe(
           "SchemaError",
         );
@@ -412,7 +418,7 @@ it.effect("notification storage failures retain their cause", () =>
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notificationService = yield* NotificationService.Service;
+        const notificationService = yield* NotificationService.NotificationService;
         expect(yield* Effect.flip(notificationService.markSeen(mine.id))).toBe(failure);
         expect(yield* Effect.flip(notificationService.inbox(page))).toBe(failure);
         expect(yield* Effect.flip(notificationService.countPending)).toBe(failure);

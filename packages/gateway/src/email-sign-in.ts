@@ -9,11 +9,11 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Redacted } from "effect";
 import { Base64Url } from "effect/encoding";
-import { Accounts } from "./accounts.ts";
-import { EmailSender } from "./email-sender.ts";
-import { SessionTokens } from "./session-tokens.ts";
-import { SignIn } from "./sign-in.ts";
-import { SignInStorage } from "./sign-in-storage.ts";
+import * as Accounts from "./accounts.ts";
+import * as EmailSender from "./email-sender.ts";
+import * as SessionTokens from "./session-tokens.ts";
+import * as SignIn from "./sign-in.ts";
+import * as SignInStorage from "./sign-in-storage.ts";
 
 /** How long codes and sessions last, and how many codes may be sent. */
 export interface Policy {
@@ -188,9 +188,9 @@ const hmacSha256 = Effect.fnUntraced(function* (
  */
 export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
   const policy: Policy = { ...defaultPolicy, ...options.policy };
-  const signInStorage = yield* SignInStorage.Service;
-  const accounts = yield* Accounts.Service;
-  const emailSender = yield* EmailSender.Service;
+  const signInStorage = yield* SignInStorage.SignInStorage;
+  const accounts = yield* Accounts.Accounts;
+  const emailSender = yield* EmailSender.EmailSender;
   const crypto = yield* Crypto.Crypto;
   const codeKey = Redacted.value(options.codeKey);
   const codeMinutes = Math.ceil(Duration.toMinutes(policy.codeLifetime));
@@ -225,7 +225,7 @@ export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
     return true;
   };
 
-  const start: SignIn.Interface["start"] = Effect.fn("EmailSignIn.start")(
+  const start: SignIn.SignIn["Service"]["start"] = Effect.fn("EmailSignIn.start")(
     function* (email, remoteAddress) {
       const now = yield* DateTime.now;
       if (!admitClient(remoteAddress, now)) return yield* new SignIn.Limited();
@@ -256,7 +256,7 @@ export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
     },
   );
 
-  const complete: SignIn.Interface["complete"] = Effect.fn("EmailSignIn.complete")(
+  const complete: SignIn.SignIn["Service"]["complete"] = Effect.fn("EmailSignIn.complete")(
     function* (email, code) {
       const now = yield* DateTime.now;
       const digest = yield* digestCode(email, code);
@@ -278,37 +278,37 @@ export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
     },
   );
 
-  const resolve: SessionTokens.Interface["resolve"] = Effect.fn("EmailSignIn.resolve")(
-    function* (token) {
-      const digest = yield* digestToken(Redacted.value(token));
-      const found = yield* signInStorage.findSession(digest);
-      if (Option.isNone(found)) return yield* new SessionTokens.Rejected({ reason: "unknown" });
-      const session = found.value;
-      const now = yield* DateTime.now;
-      if (!DateTime.isLessThan(now, session.expiresAt)) {
-        yield* signInStorage.deleteSession(digest);
-        return yield* new SessionTokens.Rejected({ reason: "expired" });
-      }
-      const renewal = renewalOf(session, now, policy);
-      if (Option.isSome(renewal)) yield* signInStorage.extendSession(digest, renewal.value);
-      return Identity.Reference.cases.Human.make({ id: session.humanId });
-    },
-  );
+  const resolve: SessionTokens.SessionTokens["Service"]["resolve"] = Effect.fn(
+    "EmailSignIn.resolve",
+  )(function* (token) {
+    const digest = yield* digestToken(Redacted.value(token));
+    const found = yield* signInStorage.findSession(digest);
+    if (Option.isNone(found)) return yield* new SessionTokens.Rejected({ reason: "unknown" });
+    const session = found.value;
+    const now = yield* DateTime.now;
+    if (!DateTime.isLessThan(now, session.expiresAt)) {
+      yield* signInStorage.deleteSession(digest);
+      return yield* new SessionTokens.Rejected({ reason: "expired" });
+    }
+    const renewal = renewalOf(session, now, policy);
+    if (Option.isSome(renewal)) yield* signInStorage.extendSession(digest, renewal.value);
+    return Identity.Reference.cases.Human.make({ id: session.humanId });
+  });
 
-  const revoke: SessionTokens.Interface["revoke"] = Effect.fn("EmailSignIn.revoke")(
+  const revoke: SessionTokens.SessionTokens["Service"]["revoke"] = Effect.fn("EmailSignIn.revoke")(
     function* (token) {
       yield* signInStorage.deleteSession(yield* digestToken(Redacted.value(token)));
     },
   );
 
   return {
-    signIn: SignIn.Service.of({ methods, start, complete }),
-    sessionTokens: SessionTokens.Service.of({ resolve, revoke }),
+    signIn: SignIn.SignIn.of({ methods, start, complete }),
+    sessionTokens: SessionTokens.SessionTokens.of({ resolve, revoke }),
   };
 });
 
 /**
- * Provide SignIn.Service and SessionTokens.Service over the host's sign-in storage, accounts,
+ * Provide SignIn.SignIn and SessionTokens.SessionTokens over the host's sign-in storage, accounts,
  * email sender, and cryptography.
  *
  * @category layers
@@ -316,8 +316,8 @@ export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
 export const layer = (options: Options) =>
   Layer.effectContext(
     Effect.map(make(options), ({ signIn, sessionTokens }) =>
-      Context.make(SignIn.Service, signIn).pipe(Context.add(SessionTokens.Service, sessionTokens)),
+      Context.make(SignIn.SignIn, signIn).pipe(
+        Context.add(SessionTokens.SessionTokens, sessionTokens),
+      ),
     ),
   );
-
-export * as EmailSignIn from "./email-sign-in.ts";

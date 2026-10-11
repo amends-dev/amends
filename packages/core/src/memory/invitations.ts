@@ -1,8 +1,9 @@
 import { Invitation, InvitationStore } from "../workspace/index.ts";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { compareBinary, Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
+import { compareBinary } from "./rows.ts";
 
 export const rows = Rows.make(Schema.fromJsonString(Invitation.Record));
 
@@ -17,12 +18,12 @@ export const byIssue = (left: Invitation.Record, right: Invitation.Record) =>
  * @category constructors
  */
 export const make = Effect.fn("Invitations.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { workspaceId, read, write } = yield* Binding.Binding;
   const all = (operation: string) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("invitations"))).pipe(
       Effect.mapError(storeFailure(InvitationStore, operation)),
     );
-  const driver: InvitationStore.Interface = {
+  const driver: InvitationStore.InvitationStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("invitations"), id)).pipe(
         Effect.mapError(storeFailure(InvitationStore, "get")),
@@ -70,10 +71,8 @@ export const make = Effect.fn("Invitations.make")(function* () {
 });
 
 /**
- * Provide InvitationStore.Service using its constructor and the caller's dependencies.
+ * Provide InvitationStore.InvitationStore using its constructor and the caller's dependencies.
  *
  * @category layers
  */
-export const layer = Layer.effect(InvitationStore.Service, make());
-
-export * as Invitations from "./invitations.ts";
+export const layer = Layer.effect(InvitationStore.InvitationStore, make());

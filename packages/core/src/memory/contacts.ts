@@ -1,15 +1,15 @@
 import { Contact, ContactStore } from "../channel/index.ts";
 import { Effect, Layer, Option, Schema } from "effect";
-import { Binding } from "./binding.ts";
+import * as Binding from "./binding.ts";
 import { storeFailure } from "./errors.ts";
-import { Rows } from "./rows.ts";
+import * as Rows from "./rows.ts";
 
 const rows = Rows.make(Schema.fromJsonString(Contact.Record));
 
 /** Contact records over the current workspace transaction. @category constructors */
 export const make = Effect.fn("Contacts.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
-  const driver: ContactStore.Interface = {
+  const { workspaceId, read, write } = yield* Binding.Binding;
+  const driver: ContactStore.ContactStore["Service"] = {
     get: Effect.fn("Contacts.get")(
       function* (id) {
         return yield* rows.get((yield* read).records.of("contacts"), id);
@@ -54,6 +54,4 @@ export const make = Effect.fn("Contacts.make")(function* () {
 });
 
 /** Provide contact storage over the caller's binding. @category layers */
-export const layer = Layer.effect(ContactStore.Service, make());
-
-export * as Contacts from "./contacts.ts";
+export const layer = Layer.effect(ContactStore.ContactStore, make());

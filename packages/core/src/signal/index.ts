@@ -1,3 +1,3 @@
 /** Ephemeral signals: typing, turn drafts, and read-state changes for connected readers, never stored. */
-export { Signal } from "./signal.ts";
-export { SignalHub } from "./hub.ts";
+export * as Signal from "./signal.ts";
+export * as SignalHub from "./hub.ts";

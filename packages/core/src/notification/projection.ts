@@ -1,13 +1,13 @@
 import { Effect } from "effect";
-import { DeliveryFacts } from "../channel/DeliveryFacts.ts";
-import { GroupMembershipFacts } from "../group/membership/facts.ts";
-import { Projection } from "../journal/projection.ts";
-import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
-import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
-import { ThreadParticipationActivity } from "../thread/ThreadParticipationActivity.ts";
-import { TurnFacts } from "../turn/facts.ts";
-import { Notification } from "./notification.ts";
-import { NotificationStore } from "./store.ts";
+import * as DeliveryFacts from "../channel/DeliveryFacts.ts";
+import * as GroupMembershipFacts from "../group/membership/facts.ts";
+import * as Projection from "../journal/projection.ts";
+import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
+import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
+import * as ThreadParticipationActivity from "../thread/ThreadParticipationActivity.ts";
+import * as TurnFacts from "../turn/facts.ts";
+import * as Notification from "./notification.ts";
+import * as NotificationStore from "./store.ts";
 /**
  * Activity generates notifications, and an unfollow's ending settles an agent's pending input
  * from that participation; leaving a group settles what a member had pending from it; human Seen
@@ -20,7 +20,7 @@ export const definition = Projection.make("notifications", { version: 4 })
   .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("NotificationProjection.activity")(function* (event) {
-      const notificationStore = yield* NotificationStore.Service;
+      const notificationStore = yield* NotificationStore.NotificationStore;
       const { activity, recipients } = event.payload;
       // Settlement is driven by the activity itself, even when no new recipients are selected. The
       // store settles only an agent's notifications, which it recognizes by their recipient.
@@ -46,7 +46,7 @@ export const definition = Projection.make("notifications", { version: 4 })
   .on(
     GroupMembershipFacts.Removed,
     Effect.fn("NotificationProjection.departure")(function* (event) {
-      const notificationStore = yield* NotificationStore.Service;
+      const notificationStore = yield* NotificationStore.NotificationStore;
       const { memberId, groupId } = event.payload;
       yield* notificationStore.discardPendingForGroup(memberId, groupId);
     }),
@@ -55,7 +55,7 @@ export const definition = Projection.make("notifications", { version: 4 })
     TurnFacts.Created,
     Effect.fn("NotificationProjection.turnCreated")(function* ({ payload }) {
       // A turn's acceptance settles the notifications it took, in the same commit.
-      const notificationStore = yield* NotificationStore.Service;
+      const notificationStore = yield* NotificationStore.NotificationStore;
       yield* notificationStore.accept(
         payload.notificationIds,
         { _tag: "Turn", turnId: payload.id },
@@ -67,7 +67,7 @@ export const definition = Projection.make("notifications", { version: 4 })
     DeliveryFacts.Created,
     Effect.fn("NotificationProjection.deliveryCreated")(function* ({ payload }) {
       // A delivery's acceptance settles the contact notifications it carries, in the same commit.
-      const notificationStore = yield* NotificationStore.Service;
+      const notificationStore = yield* NotificationStore.NotificationStore;
       yield* notificationStore.accept(
         payload.notificationIds,
         { _tag: "Delivery", deliveryId: payload.id },
@@ -75,4 +75,3 @@ export const definition = Projection.make("notifications", { version: 4 })
       );
     }),
   );
-export * as NotificationProjection from "./projection.ts";

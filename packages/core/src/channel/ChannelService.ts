@@ -9,33 +9,33 @@
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import type { Permission } from "../authorization/permission.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { ConnectionPermissions } from "../connection/permissions.ts";
-import { ConnectionStore } from "../connection/store.ts";
-import type { Connection } from "../connection/connection.ts";
-import type { Group } from "../group/group.ts";
-import type { GroupMembershipStore } from "../group/membership/store.ts";
-import { GroupQuery } from "../group/query.ts";
-import { Actor } from "../identity/actor.ts";
-import { Journal } from "../journal/journal.ts";
-import type { Log } from "../journal/log.ts";
-import type { Projection } from "../journal/projection.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { Request } from "../request/request.ts";
-import type { Thread } from "../thread/Thread.ts";
-import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
-import { ThreadQuery } from "../thread/ThreadQuery.ts";
-import { Channel } from "./Channel.ts";
-import type { ChannelBinding } from "./ChannelBinding.ts";
-import { ChannelBindingStore } from "./ChannelBindingStore.ts";
+import * as Authorization from "../authorization/authorization.ts";
+import type * as Permission from "../authorization/permission.ts";
+import * as Requirement from "../authorization/requirement.ts";
+import * as ConnectionPermissions from "../connection/permissions.ts";
+import * as ConnectionStore from "../connection/store.ts";
+import type * as Connection from "../connection/connection.ts";
+import type * as Group from "../group/group.ts";
+import type * as GroupMembershipStore from "../group/membership/store.ts";
+import * as GroupQuery from "../group/query.ts";
+import * as Actor from "../identity/actor.ts";
+import * as Journal from "../journal/journal.ts";
+import type * as Log from "../journal/log.ts";
+import type * as Projection from "../journal/projection.ts";
+import * as Publication from "../journal/publication.ts";
+import * as Store from "../journal/store.ts";
+import * as Request from "../request/request.ts";
+import type * as Thread from "../thread/Thread.ts";
+import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
+import * as ThreadQuery from "../thread/ThreadQuery.ts";
+import * as Channel from "./Channel.ts";
+import type * as ChannelBinding from "./ChannelBinding.ts";
+import * as ChannelBindingStore from "./ChannelBindingStore.ts";
 import { ConnectionUnavailable, GroupNotFound, NotBound, NotFound } from "./ChannelErrors.ts";
-import { ChannelFacts } from "./ChannelFacts.ts";
-import { ChannelPermissions } from "./ChannelPermissions.ts";
-import { ChannelQuery } from "./ChannelQuery.ts";
-import { ChannelStore } from "./ChannelStore.ts";
+import * as ChannelFacts from "./ChannelFacts.ts";
+import * as ChannelPermissions from "./ChannelPermissions.ts";
+import * as ChannelQuery from "./ChannelQuery.ts";
+import * as ChannelStore from "./ChannelStore.ts";
 export { ConnectionUnavailable, GroupNotFound, NotBound, NotFound } from "./ChannelErrors.ts";
 
 /**
@@ -95,53 +95,48 @@ export type BindingError =
   | NotBound;
 
 /**
+ * The channel operations, one of `Core.Operations`.
+ *
  * The channel operations.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Create a channel under `channel.create`: over a connection the actor may read and use, whose
-   * integration gives channels, and into a group the actor belongs to and may start threads in,
-   * since every member of that group will read the channel's conversations. Returns the channel.
-   */
-  readonly create: (
-    input: Channel.CreateInput,
-    options?: Request.Options,
-  ) => Effect.Effect<Channel.Record, CreateError, Actor.Service>;
-  /** The workspace's channels the actor may read, by name. */
-  readonly list: Effect.Effect<ReadonlyArray<Channel.Record>, ReadError, Actor.Service>;
-  /** One channel, under `channel.read`; one the actor may not read, or removed, is `NotFound`. */
-  readonly get: (channelId: Channel.Id) => Effect.Effect<Channel.Record, ReadError, Actor.Service>;
-  /**
-   * Send the channel's conversations to come to another group, under `channel.manage`, which the
-   * actor must belong to and be able to start threads in. Bound threads stay where they are.
-   * Returns the channel as redirected.
-   */
-  readonly redirect: (
-    input: Channel.RedirectInput,
-  ) => Effect.Effect<Channel.Record, RedirectError, Actor.Service>;
-  /** Stop the channel's use under `channel.manage`; its record and its threads' bindings remain. */
-  readonly remove: (channelId: Channel.Id) => Effect.Effect<void, Error, Actor.Service>;
-  /**
-   * The external conversation a thread came from, under `thread.read`; a thread that came through
-   * no channel, or that the actor cannot read, is `NotBound`.
-   */
-  readonly getBinding: (
-    threadId: Thread.Id,
-  ) => Effect.Effect<ChannelBinding.Record, BindingError, Actor.Service>;
-}
-
-/**
- * The channel operations, one of `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/channel/ChannelService",
-) {}
+export class ChannelService extends Context.Service<
+  ChannelService,
+  {
+    /**
+     * Create a channel under `channel.create`: over a connection the actor may read and use, whose
+     * integration gives channels, and into a group the actor belongs to and may start threads in,
+     * since every member of that group will read the channel's conversations. Returns the channel.
+     */
+    readonly create: (
+      input: Channel.CreateInput,
+      options?: Request.Options,
+    ) => Effect.Effect<Channel.Record, CreateError, Actor.Actor>;
+    /** The workspace's channels the actor may read, by name. */
+    readonly list: Effect.Effect<ReadonlyArray<Channel.Record>, ReadError, Actor.Actor>;
+    /** One channel, under `channel.read`; one the actor may not read, or removed, is `NotFound`. */
+    readonly get: (channelId: Channel.Id) => Effect.Effect<Channel.Record, ReadError, Actor.Actor>;
+    /**
+     * Send the channel's conversations to come to another group, under `channel.manage`, which the
+     * actor must belong to and be able to start threads in. Bound threads stay where they are.
+     * Returns the channel as redirected.
+     */
+    readonly redirect: (
+      input: Channel.RedirectInput,
+    ) => Effect.Effect<Channel.Record, RedirectError, Actor.Actor>;
+    /** Stop the channel's use under `channel.manage`; its record and its threads' bindings remain. */
+    readonly remove: (channelId: Channel.Id) => Effect.Effect<void, Error, Actor.Actor>;
+    /**
+     * The external conversation a thread came from, under `thread.read`; a thread that came through
+     * no channel, or that the actor cannot read, is `NotBound`.
+     */
+    readonly getBinding: (
+      threadId: Thread.Id,
+    ) => Effect.Effect<ChannelBinding.Record, BindingError, Actor.Actor>;
+  }
+>()("@amends-dev/core/channel/ChannelService") {}
 
 /** Channels by name, and by id among channels of one name. */
 const byName = (left: Channel.Record, right: Channel.Record) =>
@@ -154,16 +149,16 @@ const byName = (left: Channel.Record, right: Channel.Record) =>
  * @since 0.1.0
  */
 export const make = Effect.fn("ChannelService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const groupQuery = yield* GroupQuery.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const channelQuery = yield* ChannelQuery.Service;
-  const channelStore = yield* ChannelStore.Service;
-  const channelBindingStore = yield* ChannelBindingStore.Service;
-  const connectionStore = yield* ConnectionStore.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const groupQuery = yield* GroupQuery.GroupQuery;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const channelQuery = yield* ChannelQuery.ChannelQuery;
+  const channelStore = yield* ChannelStore.ChannelStore;
+  const channelBindingStore = yield* ChannelBindingStore.ChannelBindingStore;
+  const connectionStore = yield* ConnectionStore.ConnectionStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const { workspaceId } = yield* Store.Service;
+  const { workspaceId } = yield* Store.Store;
 
   const channelTarget = (channelId: Channel.Id) =>
     ({ _tag: "Channel", workspaceId, channelId }) as const;
@@ -222,7 +217,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
       yield* authorization.require([
         Requirement.make(ChannelPermissions.Create, { _tag: "Workspace", workspaceId }),
       ]);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       const channelId = Channel.Id.make(
         yield* Request.idFor(options.requestKey, ["channel.create", workspaceId, actor.memberId]),
       );
@@ -308,7 +303,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     return binding.value;
   });
 
-  return Service.of({ create, list, get, redirect, remove, getBinding });
+  return ChannelService.of({ create, list, get, redirect, remove, getBinding });
 });
 
 /**
@@ -317,6 +312,4 @@ export const make = Effect.fn("ChannelService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as ChannelService from "./ChannelService.ts";
+export const layer = Layer.effect(ChannelService, make());
