@@ -70,9 +70,10 @@ on each operation.
 
 ## Testing and migrations
 
-Every storage adapter runs the [conformance suites](../packages/storage-conformance/README.md)
-through `test/fixture.ts`, from one test file that calls `run`. Behavior core relies on belongs in those suites;
-an adapter's own tests keep what only it has, such as columns, query plans, or a driver's failures.
+Every storage adapter runs the [conformance suites](../packages/gateway/README.md#conformance)
+through `test/fixture.ts`, from one test file that calls `run`. What every adapter must promise
+belongs in those suites; an adapter's own tests keep what only it has, such as columns, query
+plans, or a driver's failures.
 
 Each storage adapter keeps one schema baseline: PostgreSQL's generated baseline is in
 `storage-postgresql/drizzle/`. Regenerate it when the schema changes, and reset development

@@ -238,17 +238,19 @@ anything.
 
 ## Storage conformance
 
-The [conformance suites](../packages/storage-conformance/README.md) specify storage
-behavior once and run it on every adapter. Each adapter's `test/fixture.ts` supplies
+The [conformance suites](../packages/gateway/README.md#conformance) specify what the storage
+contracts promise once and run it on every adapter. Each adapter's `test/fixture.ts` supplies
 fresh storage per test, further hosts over it, a way to discard projections before replay,
 and a count of stored records for rollback checks. Its `conformance.test.ts` runs every suite
 with `run(fixture)`, and its other test files cover only what that adapter stores or fails
-differently.
+differently. The gateway's own `test/conformance.test.ts` runs the suites over the memory
+implementation, in the `backend` project.
 
-The suites cover the journal and transactions, direct store contracts, and every workflow the
-stores serve: workspaces, access, invitations, the gateway, groups, threads, notifications, and
-read state. Each adapter's own tests cover only construction, access paths, and what it stores or
-fails differently.
+The suites cover the journal, transactions, and standalone appends, the change feed and signals
+across hosts, session logs, idempotency keys, fact metadata, reads beside a writer, the direct
+store contracts, workspace isolation, accounts, and sign-in storage. Every workflow the stores
+serve, from workspaces and access to threads, notifications, turns, and channels, is tested in
+the gateway's tests over the memory implementation, as a host runs it.
 
 ## Limits of current coverage
 

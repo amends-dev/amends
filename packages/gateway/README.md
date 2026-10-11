@@ -133,6 +133,52 @@ import { Layer } from "effect";
 const storage = MemoryStorage.layer.pipe(Layer.provide(MemoryDatabase.layer));
 ```
 
+## Conformance
+
+`@amends-dev/gateway/conformance` holds the test suites every storage adapter runs against itself,
+so that core and the gateway work the same over each: what the storage contracts promise, from the
+journal's transactions and logs to the host's accounts, across hosts over the same storage. An
+adapter's tests call `run` with a `Fixture`, by convention in its `test/fixture.ts`:
+
+- `name` names the adapter in suite titles.
+- `available` set to `false` skips every suite, as the PostgreSQL adapter does without a server.
+- `withStorage` runs one test over fresh, empty storage and releases it when the test ends.
+
+`withStorage` gives the test a `Storage`:
+
+- `connect(options?)` opens another host over the same storage, with its own connection or pool,
+  closed with the test's scope: its storage, directory, accounts, sign-in storage, and signal hub,
+  with the cryptography it was built over. `failFast` asks for prompt contention where the adapter
+  would otherwise wait.
+- `discardProjections` removes every projected record, live projection version, and checkpoint,
+  keeping logs and read state, as rebuilding projections does before replay. No storage contract
+  performs this.
+- `footprint` counts every stored record, so a test can show that a rolled-back write left none.
+
+The suites need `@effect/vitest`, an optional peer dependency that only an adapter's tests install.
+`Support` exports what the suites share, for an adapter's own tests: the identities, bound stores
+by name, and a core or gateway over a host.
+
+| Suite                | Covers                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `journal`            | Appends seen across hosts, log heads, isolation of identical log IDs, projections going live and rebuilding, and commits refused meanwhile. |
+| `transactions`       | Competing initialization, rollback without leftovers, interruption, foreign and expired handles, and contention from another host.          |
+| `changeFeed`         | Commits from another host, and resuming from a cursor on another host.                                                                      |
+| `signals`            | Delivery between hosts in order, only to subscribers present and in their workspace, and the audiences of typing and read state.            |
+| `sessionLogs`        | Appends only after the latest position, one of two concurrent writers winning, entries read back, appends kept through rollback, wakeups.   |
+| `standaloneAppends`  | Appends outside a transaction while another host holds the workspace, positions from several hosts, and keys across both kinds of append.   |
+| `idempotency`        | Keyed appends across reopening, content validation, rollback, byte ownership, concurrent attempts, and more keys than one statement binds.  |
+| `factMetadata`       | Fact headers across reopening, filtered and paged fact and subject reads, and retries that compare metadata.                                |
+| `reads`              | Workspace reads and change-feed opening while another host holds the writer.                                                                |
+| `contracts`          | Direct store calls: validation without partial writes, one active membership per identity, IDs never reused, and the live projections.      |
+| `workspaceIsolation` | Every store refusing a record that names another workspace, and keeping none of it.                                                         |
+| `accounts`           | One account per address, however typed and from any host, concurrent first requests sharing one, and accounts read back by ID.              |
+| `signInStorage`      | An address's pending code replaced and removed one change at a time from every host, and sessions found, extended, and deleted.             |
+
+What every adapter must promise belongs in a suite here, not in one adapter's tests; a new store
+or rule adds its suite to `run`. The [PostgreSQL adapter](../../adapters/storage-postgresql/README.md)
+runs the suites over a real database, and the gateway's tests over the [memory storage](#memory).
+
 ## Email sign-in
 
 `EmailSignIn.layer({ codeKey, policy? })` provides `SignIn.Service` and `SessionTokens.Service` over
@@ -150,8 +196,8 @@ digests. `EmailSignIn.defaultPolicy`, which `policy` overrides in part:
 
 A code the email provider did not send leaves the address as it was, so asking again works at once.
 The decisions are pure functions, `decideSend`, `decideRedeem`, `withdrawUnsent`, and `renewalOf`,
-which `modifyCode` and `resolve` apply. The [storage suites](../storage-conformance/README.md) run
-email sign-in over each adapter.
+which `modifyCode` and `resolve` apply. The gateway's `test/sign-in.test.ts` runs
+email sign-in over the memory storage, and the [conformance suites](#conformance) its storage.
 
 ## Public outcomes
 
@@ -186,5 +232,11 @@ bun run test packages/gateway
 failed boot, release after the idle time-to-live, leases, isolation between calls, shutdown, and
 actor resolution, over host stubs whose journals are empty and that refuse unexpected writes.
 `test/contracts.test.ts` checks the sign-in and directory encodings, and
-`test/public-errors.test.ts` the classification of core's errors. The storage adapters' conformance
-suites cover the gateway over real storage. See [testing](../../docs/testing.md).
+`test/public-errors.test.ts` the classification of core's errors. The rest of `test/` runs core's
+operations as a host runs them, through the gateway over the [memory storage](#memory) that
+`test/fixture.ts` opens: workspaces and access, groups, threads, tasks, notifications,
+connections, agents, turns, channels, and email sign-in, with hosts over the same storage where
+several take part. `test/support.ts` installs a test harness, channel transport, and models, and
+jobs that record each request a commit makes, so a test runs the turns and deliveries it expects
+itself. `test/conformance.test.ts` runs the [conformance suites](#conformance) over the same
+storage. See [testing](../../docs/testing.md).

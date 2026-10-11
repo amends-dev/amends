@@ -4,7 +4,7 @@ Workspace storage, each workspace's signal hub, the workspace directory, the hos
 sign-in's codes and sessions over PostgreSQL: the storage the [local host](../../hosts/local/README.md) runs on. Statements are
 written with Drizzle and run through `@effect/sql-pg`, so they share the Effect client's transaction
 service: the journal opens each commit on a reserved connection, and every statement inside it lands
-there. The adapter passes the [conformance suites](../../packages/storage-conformance/README.md)
+there. The adapter passes the [conformance suites](../../packages/gateway/README.md#conformance)
 every storage adapter runs. It is internal to this repository and not published to npm.
 
 ## Use

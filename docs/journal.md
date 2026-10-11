@@ -237,7 +237,7 @@ Reads inside a transaction see its own staged keys.
 The returned entries remain provisional until their owning commit succeeds.
 `Store.getAppend` supplies a validated receipt with the key, commit, first index,
 count, and exact entries. The entries a keyed append returns are its receipt; the log does not
-read the receipt back, and the [conformance suites](../packages/storage-conformance/README.md)
+read the receipt back, and the [conformance suites](../packages/gateway/README.md#conformance)
 check that every adapter keeps the two identical. The PostgreSQL adapter persists receipts in
 `log_append_keys`, using a unique workspace/log/key constraint and its existing writer serialization.
 
@@ -658,8 +658,8 @@ and that a journal that does not run a live projection cannot publish to its log
 Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
 staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The
-[PostgreSQL](../adapters/storage-postgresql/README.md) adapter runs these contracts through the
-conformance suites, over independent connections, including standalone appends beside a
+[PostgreSQL](../adapters/storage-postgresql/README.md) adapter and the memory implementation run
+these contracts through the [conformance suites](../packages/gateway/README.md#conformance), over independent connections, including standalone appends beside a
 transaction that holds the workspace or the log; PostgreSQL suites require an available
 server as described in the [testing guide](testing.md). The
 [local host](../hosts/local/README.md) composes the PostgreSQL adapter. The core's own

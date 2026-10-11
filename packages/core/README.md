@@ -73,7 +73,7 @@ later write. Stores still require a valid workspace transaction for every mutati
 inside an existing commit uses that transaction and sees its staged changes.
 
 Core trusts what storage returns: the adapters decode each record and scope it to its workspace, and
-the [storage conformance suites](../storage-conformance/README.md) check that. Operations use stored
+the [storage conformance suites](../gateway/README.md#conformance) check that. Operations use stored
 records as they come, and a record core itself wrote that is missing is a defect rather than a typed
 error. Core validates what crosses into it instead: callers' input, an actor or target from another
 workspace, and what a turn's runner or harness reports.
@@ -714,7 +714,8 @@ bun run test packages/core
 
 Core's tests follow its domain and feature directories under `test/`, over its
 [memory storage](#memory) (`test/memory.ts`); tests across authorization features live in `test/authorization/`.
-Behavior that storage adapters must share belongs in the
-[storage conformance suites](../storage-conformance/README.md), which run core over each adapter.
+What storage adapters must promise belongs in the
+[storage conformance suites](../gateway/README.md#conformance), and core's operations are tested
+as a host runs them in the [gateway's tests](../gateway/README.md#development).
 Construction tests exercise transaction ownership, rollback, dependency capture, and lifetimes
 rather than object shape. See [testing](../../docs/testing.md).

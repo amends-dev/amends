@@ -104,7 +104,6 @@
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends-dev/storage-conformance": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "drizzle-kit": "1.0.0-rc.5-5935859",
       },
@@ -335,6 +334,17 @@
         "@amends-dev/core": "workspace:*",
         "effect": "catalog:",
       },
+      "devDependencies": {
+        "@amends-dev/channel": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
+        "@effect/vitest": "catalog:",
+      },
+      "peerDependencies": {
+        "@effect/vitest": "catalog:",
+      },
+      "optionalPeers": [
+        "@effect/vitest",
+      ],
     },
     "packages/harness": {
       "name": "@amends-dev/harness",
@@ -372,19 +382,6 @@
         "@amends-dev/api-http": "workspace:*",
         "@amends-dev/core": "workspace:*",
         "@amends-dev/gateway": "workspace:*",
-        "effect": "catalog:",
-      },
-    },
-    "packages/storage-conformance": {
-      "name": "@amends-dev/storage-conformance",
-      "version": "0.0.0",
-      "dependencies": {
-        "@amends-dev/channel": "workspace:*",
-        "@amends-dev/connection": "workspace:*",
-        "@amends-dev/core": "workspace:*",
-        "@amends-dev/gateway": "workspace:*",
-        "@amends-dev/harness": "workspace:*",
-        "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
     },
@@ -467,8 +464,6 @@
     "@amends-dev/server-http": ["@amends-dev/server-http@workspace:packages/server-http"],
 
     "@amends-dev/site": ["@amends-dev/site@workspace:apps/site"],
-
-    "@amends-dev/storage-conformance": ["@amends-dev/storage-conformance@workspace:packages/storage-conformance"],
 
     "@amends-dev/storage-postgresql": ["@amends-dev/storage-postgresql@workspace:adapters/storage-postgresql"],
 

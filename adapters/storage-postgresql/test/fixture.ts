@@ -1,4 +1,4 @@
-import type { Fixture } from "@amends-dev/storage-conformance";
+import type { Fixture } from "@amends-dev/gateway/conformance";
 import { BunCrypto } from "@effect/platform-bun";
 import { Effect, Layer, Redacted } from "effect";
 import { Base64 } from "effect/encoding";

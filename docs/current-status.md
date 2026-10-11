@@ -14,7 +14,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   with fixed membership.
 - Member, task, and [channel](thread-workflows.md#channels) workflows exist; managing other
   participants and muting are not implemented. No installed integration gives channels yet, so the
-  local host can create no channel until one does; the conformance suites run channels on a test
+  local host can create no channel until one does; the gateway's tests run channels on a test
   transport. Contacts are told of messages alone, which the delivery job carries to their
   conversation; a sent message's edits and deletions are not carried, and a channel's readiness is
   not shown. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision

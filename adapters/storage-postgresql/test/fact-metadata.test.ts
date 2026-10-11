@@ -1,9 +1,25 @@
-import { Codec, Journal, Log, Publication, Subject } from "@amends-dev/core/journal";
-import { Changed, Changed2, Other } from "@amends-dev/storage-conformance";
+import { Codec, Fact, Journal, Log, Publication, Subject } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import { boundTo, core, inDatabase, setup, testProvenance, workspaceId } from "./support.ts";
+
+const testSubject = () => Subject.make("test", "entity");
+const Changed = Fact.make("storage.changed", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
+const Changed2 = Fact.make(Changed.name, {
+  subject: testSubject,
+  version: 2,
+  payload: Schema.String,
+});
+const Other = Fact.make("storage.other", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {

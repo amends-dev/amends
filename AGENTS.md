@@ -43,10 +43,11 @@ currently run through TypeScript. Check compatibility before changing this setup
   the host contracts for storage, accounts, sign-in, session token resolution, and the
   workspace directory. `api-http` is the HTTP contract shared by servers and clients, and
   `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
-  over the same gateway rather than new gateway methods. `storage-conformance` holds
-  the test suites every storage adapter runs against itself through a harness; behavior
-  core relies on belongs there, and adapter tests keep only what one adapter stores or
-  fails differently. `harness` is the contract every harness implements: an agent's sessions
+  over the same gateway rather than new gateway methods. The gateway's `conformance` module holds
+  the test suites every storage adapter runs against itself through a fixture: what the storage
+  contracts promise, from transactions and logs to accounts, across hosts over the same storage.
+  The gateway's tests run them over the memory implementation, and test core's operations as a
+  host runs them; adapter tests keep only what one adapter stores or fails differently. `harness` is the contract every harness implements: an agent's sessions
   and turns, streamed in one format whichever agent runs them, and the bridge through which a host
   drives an agent inside a sandbox. `sandbox` is the contract every sandbox provider implements,
   with the suites each provider runs from `@amends-dev/sandbox/conformance`; a sandbox knows nothing
