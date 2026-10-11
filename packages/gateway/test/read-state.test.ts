@@ -583,7 +583,23 @@ describe("read state", () => {
         storage,
         Effect.gen(function* () {
           const { bound, owner, team } = yield* prepare();
-          // Count store reads by span name, which both adapters share.
+          // Count store reads by store and operation. The PostgreSQL adapter names its spans after
+          // its modules, such as `Threads.listByStart`, and the memory stores after their
+          // contracts, such as `ThreadStore.memory.listByStart`.
+          const modules: Record<string, string> = {
+            ThreadStore: "Threads",
+            TaskStore: "Tasks",
+            ThreadActivityStore: "ThreadActivities",
+            ThreadMessageStore: "ThreadMessages",
+            ReadStateStore: "ReadStates",
+          };
+          const readOf = (name: string) => {
+            const memory = /^(\w+)\.memory\.(\w+)$/.exec(name);
+            const read = memory ? `${modules[memory[1]!] ?? memory[1]}.${memory[2]}` : name;
+            return /^(Threads|Tasks|ThreadActivities|ThreadMessages|ReadStates)\./.test(read)
+              ? read
+              : undefined;
+          };
           const reads = Effect.fnUntraced(function* () {
             const counts = new Map<string, number>();
             const items = yield* run(
@@ -596,12 +612,8 @@ describe("read state", () => {
               Effect.withTracer(
                 Tracer.make({
                   span(options) {
-                    if (
-                      /^(Threads|Tasks|ThreadActivities|ThreadMessages|ReadStates)\./.test(
-                        options.name,
-                      )
-                    )
-                      counts.set(options.name, (counts.get(options.name) ?? 0) + 1);
+                    const read = readOf(options.name);
+                    if (read !== undefined) counts.set(read, (counts.get(read) ?? 0) + 1);
                     return Tracer.nativeTracer.span(options);
                   },
                 }),

@@ -3,7 +3,7 @@
  * without an actor, and `GatewayErrors` names what those programs may fail with. The other modules
  * are the contracts a host implements beside it, for storage, accounts, sign-in, session tokens,
  * email, and the workspace directory; `EmailSignIn` implements sign-in and session tokens over
- * three of them. `@amends-dev/gateway/memory` implements the contracts in process memory, and
+ * three of them. Each storage contract's `layerMemory` implements it in process memory, and
  * `@amends-dev/gateway/conformance` holds the suites every storage adapter runs against itself.
  *
  * @since 0.1.0

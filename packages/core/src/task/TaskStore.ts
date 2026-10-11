@@ -5,14 +5,15 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import * as GroupId from "../group/GroupId.ts";
-import type * as Store from "../journal/Store.ts";
+import * as Store from "../journal/Store.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Task from "./Task.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing tasks.
@@ -117,3 +118,92 @@ export const make = (
     }),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Task.Task));
+
+/** Newest creation first, then thread ID in descending binary order. */
+const newestFirst = (
+  left: { readonly at: number; readonly id: string },
+  right: { readonly at: number; readonly id: string },
+) => right.at - left.at || MemoryDatabase.compareBinary(right.id, left.id);
+
+/**
+ * Tasks by thread, over one workspace's binding.
+ */
+const makeMemory = Effect.fn("TaskStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const driver: TaskStore["Service"] = {
+    get: Effect.fn("TaskStore.memory.get")(
+      function* (threadId) {
+        return yield* rows.get((yield* read).records.of("tasks"), threadId);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    getMany: Effect.fn("TaskStore.memory.getMany")(
+      function* (threadIds) {
+        return yield* rows.getMany((yield* read).records.of("tasks"), threadIds);
+      },
+      Effect.mapError(storeFailure(Failure, "getMany")),
+    ),
+    listByGroup: Effect.fn("TaskStore.memory.listByGroup")(
+      function* (groupId, options) {
+        const before = Option.fromUndefinedOr(options.before).pipe(
+          Option.map((cursor) => ({
+            at: DateTime.toEpochMillis(cursor.createdAt),
+            id: cursor.threadId,
+          })),
+        );
+        return (yield* rows.all((yield* read).records.of("tasks")))
+          .filter(
+            (task) =>
+              task.groupId === groupId &&
+              (options.status === undefined || task.status === options.status),
+          )
+          .map((task) => ({ task, at: DateTime.toEpochMillis(task.createdAt), id: task.threadId }))
+          .filter((entry) => Option.isNone(before) || newestFirst(entry, before.value) > 0)
+          .toSorted(newestFirst)
+          .slice(0, options.limit)
+          .map(({ task }) => task);
+      },
+      Effect.mapError(storeFailure(Failure, "listByGroup")),
+    ),
+    insert: Effect.fn("TaskStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("tasks").has(record.threadId))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Thread already has a task",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("tasks").set(record.threadId, row);
+    }),
+    apply: Effect.fn("TaskStore.memory.apply")(function* (threadId, change) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "apply")));
+      const found = yield* rows
+        .get(space.records.of("tasks"), threadId)
+        .pipe(Effect.mapError(storeFailure(Failure, "apply")));
+      if (Option.isNone(found) || Task.valueOf(found.value, change) !== change.from)
+        return yield* new Conflict({
+          operation: "apply",
+          message: "Expected a task holding the value the change replaces",
+        });
+      const row = yield* rows
+        .encode(Task.apply(found.value, change))
+        .pipe(Effect.mapError(storeFailure(Failure, "apply")));
+      space.records.of("tasks").set(threadId, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `TaskStore` in process memory, over the workspace's `Store.MemoryBinding`: tasks keyed by
+ * their thread. It keeps what the contract leaves to storage: a second task for one thread
+ * conflicts, and a change applies only to a stored task that still holds the value the change
+ * replaces, so a change made against a stale value conflicts. A group's tasks list newest first,
+ * then by thread ID in descending binary order. `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(TaskStore, makeMemory());

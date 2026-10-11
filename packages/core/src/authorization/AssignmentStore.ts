@@ -7,15 +7,15 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as Member from "../workspace/Member.ts";
-
 import * as Assignment from "./Assignment.ts";
 import * as Role from "./Role.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing assignments.
@@ -130,3 +130,73 @@ export const make = (
       Effect.flatMap(write("markRevoked", Assignment.Id, assignmentId), driver.markRevoked),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Assignment.Assignment));
+
+/**
+ * Access assigned to memberships, by role or directly; revoked rows keep their source.
+ */
+const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const select = (operation: string, predicate: (record: Assignment.Assignment) => boolean) =>
+    Effect.flatMap(read, (space) => rows.all(space.records.of("assignments"))).pipe(
+      Effect.map((records) => records.filter(predicate)),
+      Effect.mapError(storeFailure(Failure, operation)),
+    );
+  const driver: AssignmentStore["Service"] = {
+    get: (id) =>
+      Effect.flatMap(read, (space) => rows.get(space.records.of("assignments"), id)).pipe(
+        Effect.mapError(storeFailure(Failure, "get")),
+      ),
+    listActiveByMember: (memberId) =>
+      select(
+        "listActiveByMember",
+        (record) => record.status === "active" && record.memberId === memberId,
+      ),
+    listActiveByRole: (roleId) =>
+      select(
+        "listActiveByRole",
+        (record) =>
+          record.status === "active" &&
+          Assignment.Source.isAnyOf(["Role"])(record.source) &&
+          record.source.roleId === roleId,
+      ),
+    insert: Effect.fn("AssignmentStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("assignments").has(record.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Assignment ID already exists",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("assignments").set(record.id, row);
+    }),
+    markRevoked: Effect.fn("AssignmentStore.memory.markRevoked")(function* (id) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "markRevoked")));
+      const current = yield* rows
+        .get(space.records.of("assignments"), id)
+        .pipe(Effect.mapError(storeFailure(Failure, "markRevoked")));
+      if (Option.isNone(current) || current.value.status !== "active")
+        return yield* new Conflict({
+          operation: "markRevoked",
+          message: "Expected an active assignment",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, status: "revoked" })
+        .pipe(Effect.mapError(storeFailure(Failure, "markRevoked")));
+      space.records.of("assignments").set(id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `AssignmentStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * what the contract leaves to storage: a reused ID conflicts, and revoking conflicts unless the
+ * assignment is stored and active. A revoked assignment keeps its row and its source. `make` checks
+ * every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(AssignmentStore, makeMemory());

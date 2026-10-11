@@ -6,14 +6,15 @@
  * @since 0.1.0
  */
 import { ChannelTransport } from "@amends-dev/channel";
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ChannelId from "./ChannelId.ts";
 import * as Delivery from "./Delivery.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing deliveries.
@@ -112,3 +113,81 @@ export const make = (
     update: (record) => Effect.flatMap(write("update", Delivery.Delivery, record), driver.update),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Delivery.Delivery));
+
+/**
+ * Delivery records over the current workspace transaction.
+ */
+const makeMemory = Effect.fn("DeliveryStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const driver: DeliveryStore["Service"] = {
+    get: Effect.fn("DeliveryStore.memory.get")(
+      function* (id) {
+        return yield* rows.get((yield* read).records.of("deliveries"), id);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    listRequestedByThread: Effect.fn("DeliveryStore.memory.listRequestedByThread")(
+      function* (threadId) {
+        const records = yield* rows.all((yield* read).records.of("deliveries"));
+        return records
+          .filter((record) => record.threadId === threadId && record.status === "requested")
+          .toSorted(
+            (left, right) =>
+              left.sequence - right.sequence || MemoryDatabase.compareBinary(left.id, right.id),
+          );
+      },
+      Effect.mapError(storeFailure(Failure, "listRequestedByThread")),
+    ),
+    findByExternalMessage: Effect.fn("DeliveryStore.memory.findByExternalMessage")(
+      function* (channelId, conversationId, externalMessageId) {
+        const records = yield* rows.all((yield* read).records.of("deliveries"));
+        return Option.fromUndefinedOr(
+          records.find(
+            (record) =>
+              record.channelId === channelId &&
+              record.conversationId === conversationId &&
+              record.externalMessageId === externalMessageId,
+          ),
+        );
+      },
+      Effect.mapError(storeFailure(Failure, "findByExternalMessage")),
+    ),
+    insert: Effect.fn("DeliveryStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("deliveries").has(record.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Delivery ID already exists",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("deliveries").set(record.id, row);
+    }),
+    update: Effect.fn("DeliveryStore.memory.update")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "update")));
+      const found = yield* rows
+        .get(space.records.of("deliveries"), record.id)
+        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+      if (Option.isNone(found))
+        return yield* new Conflict({
+          operation: "update",
+          message: "Expected a stored delivery",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "update")));
+      space.records.of("deliveries").set(record.id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `DeliveryStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * what the contract leaves to storage: a reused ID conflicts, and so does an update of a missing
+ * delivery. A thread's requested deliveries list in sequence order, then by ID. `make` checks every
+ * input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(DeliveryStore, makeMemory());

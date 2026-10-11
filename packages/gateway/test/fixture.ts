@@ -1,7 +1,10 @@
-import { MemoryDatabase } from "@amends-dev/core/memory";
+import { MemoryDatabase } from "@amends-dev/core/journal";
 import type { Fixture } from "@amends-dev/gateway/conformance";
 import { Crypto, Effect, Layer } from "effect";
-import { MemoryStorage } from "../src/memory/index.ts";
+import * as Accounts from "../src/Accounts.ts";
+import * as SignInStorage from "../src/SignInStorage.ts";
+import * as WorkspaceDirectory from "../src/WorkspaceDirectory.ts";
+import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
 
 /** The runtime's Web Crypto, for new human IDs. */
 export const webCrypto = Crypto.make({
@@ -9,6 +12,17 @@ export const webCrypto = Crypto.make({
   digest: (algorithm, data) =>
     Effect.promise(async () => new Uint8Array(await crypto.subtle.digest(algorithm, data))),
 });
+
+/**
+ * Every contract a host implements for the gateway in process memory, over one new connection to
+ * the `MemoryDatabase` beneath: each build over the same database is another host.
+ */
+const layerMemoryStorage = Layer.mergeAll(
+  WorkspaceStorage.layerMemory,
+  WorkspaceDirectory.layerMemory,
+  Accounts.layerMemory,
+  SignInStorage.layerMemory,
+).pipe(Layer.provide(MemoryDatabase.layerConnection));
 
 /** New memory storage for each test; each connection is another host over it. */
 export const fixture: Fixture = {
@@ -21,7 +35,7 @@ export const fixture: Fixture = {
         return yield* use({
           connect: () =>
             Layer.build(
-              MemoryStorage.layer.pipe(Layer.provideMerge(Layer.succeed(Crypto.Crypto, webCrypto))),
+              layerMemoryStorage.pipe(Layer.provideMerge(Layer.succeed(Crypto.Crypto, webCrypto))),
             ).pipe(Effect.provideService(MemoryDatabase.MemoryDatabase, database)),
           discardProjections: Effect.sync(() => {
             for (const space of database.spaces.values())

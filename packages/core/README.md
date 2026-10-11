@@ -556,8 +556,8 @@ current, and a turn's drafts nobody there, only readers following the turn's log
 offers a signal to the subscribers present at that moment, in every process over the same storage,
 and `subscribe` returns those published until its scope closes. Delivery is best effort: publishing
 never fails the operation, and a subscriber that falls behind or loses its connection misses
-signals. `SignalHub.makeLocal` is one process's hub for every workspace, which storage adapters bind
-to each workspace and relay between processes.
+signals. `LocalSignalHub` is one process's hub for every workspace, which storage adapters bind to
+each workspace and relay between processes.
 
 `ThreadMessageService.typing(threadId)` tells the thread's readers that the acting member is
 composing there for the next six seconds. It requires current group access and `thread.publish`, and
@@ -567,27 +567,30 @@ and `markSeenThrough` publish the read-state signals after their writes.
 
 ## Memory
 
-`@amends-dev/core/memory` implements every store, and the signal hub, in process memory: the
-reference implementation of the storage contracts, which enforces with plain maps what the
-PostgreSQL adapter enforces with keys and indexes, and which core's tests run over. Nothing
-survives the process.
+Every store contract, and the signal hub, has a `layerMemory` beside it that implements it in
+process memory: the reference implementation of the storage contracts, which enforces with plain
+maps what the PostgreSQL adapter enforces with keys and indexes, and which core's tests run over.
+Nothing survives the process.
 
 Every store contract builds its store with `make(workspaceId, driver)`, over the driver an
 adapter implements: the store checks each input against its schema, and a record against the
 workspace, through `StoreInput`, before the driver sees it. A driver keeps only what storage
 keeps, such as reused IDs and conditional writes, and an adapter's module returns
-`XStore.make(workspaceId, driver)` from its constructor.
+`XStore.make(workspaceId, driver)` from its constructor, as each `layerMemory` does.
 
-- `MemoryDatabase` is the storage every connected host shares. Each workspace has one `Space`:
-  its commits, log batches, keyed append slices, projected records by kind, with the live
-  projection versions and rebuild checkpoints, and private read state. Beside the workspaces sit
-  the session logs, and tables and locks by name, created on first use, for what a host stores
-  across its workspaces, such as its accounts.
-- `MemoryConnection` is one host's connection: its transactions take turns on a one-permit gate,
-  as on one database connection.
-- `MemoryStores.layer(workspaceId)` binds every store and the signal hub to one workspace over the
-  connection, as the gateway's [memory storage](../gateway/README.md#memory) does for each
-  workspace it opens.
+- `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
+  workspace has one `Space`: its commits, log batches, keyed append slices, projected records by
+  kind, with the live projection versions and rebuild checkpoints, and private read state. Beside
+  the workspaces sit the session logs, and tables and locks by name, created on first use, for what
+  a host stores across its workspaces, such as its accounts. `MemoryDatabase.makeRows` is how a
+  store keeps one kind of record.
+- `MemoryDatabase.Connection` is one host's connection: its transactions take turns on a
+  one-permit gate, as on one database connection.
+- `Store.layerMemory(workspaceId)` binds one workspace over the connection: it provides the
+  workspace's logs and the `Store.MemoryBinding` that every other store's `layerMemory`, and the
+  signal hub's, reads and writes through. The gateway's
+  [memory workspace storage](../gateway/README.md#memory) merges them all for each workspace it
+  opens.
 
 Records are the JSON of their encoded form, keyed by ID. Stored values never change: writes
 replace them, and every read decodes a fresh record; journal entries are copied on the way in and
@@ -607,7 +610,7 @@ state, and inside one its copy; a handle from another connection, workspace, or 
 fails. Read-state writes outside a transaction apply at once, so a commit keeps the later of its
 own and the committed values. Session logs take part in no transaction: an append is kept at once
 and wakes waiting readers, as a commit's appends do. The signal hub offers each signal to the
-subscribers present, through `SignalHub.makeLocal`; nothing is kept.
+subscribers present, through the `LocalSignalHub` the database holds; nothing is kept.
 
 ## Conventions
 

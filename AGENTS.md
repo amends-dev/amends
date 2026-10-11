@@ -70,9 +70,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   `storage-postgresql` implements workspace storage, the workspace directory, accounts, and sign-in
   storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field, except
   the kind-specific `details` of a thread activity or a session log entry, stored as JSON. The
-  reference implementation of the same contracts, in process memory, lives beside them: core's
-  stores in `core/memory`, the gateway's contracts in `gateway/memory`, which their tests run over.
-  Both follow one shape: a module per store over a workspace binding, merged at the edge.
+  reference implementation of the same contracts, in process memory, is each contract's
+  `layerMemory`, beside it in core and the gateway, which their tests run over. Both follow one
+  shape: each store over a workspace binding, merged at the edge.
   Hosts compose adapters and implement no storage themselves; shared packages never
   depend on adapters.
 - `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves

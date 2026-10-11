@@ -10,7 +10,7 @@
  * @since 0.1.0
  */
 import { PgClient } from "@effect/sql-pg";
-import { Signal, SignalHub } from "@amends-dev/core/signal";
+import { LocalSignalHub, Signal } from "@amends-dev/core/signal";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { Deferred, Duration, Effect, Option, Queue, RcRef, Schema, Stream } from "effect";
 import type { Scope } from "effect";
@@ -121,7 +121,7 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
   const client = yield* PgClient.PgClient;
   const retry = Duration.fromInputUnsafe(options.retry ?? "1 second");
   const waiting = new Map<string, Deferred.Deferred<void>>();
-  const signals = yield* SignalHub.makeLocal;
+  const signals = yield* LocalSignalHub.make;
   const wake = (key: string) => {
     const appended = waiting.get(key);
     if (appended === undefined) return;

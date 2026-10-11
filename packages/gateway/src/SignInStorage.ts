@@ -1,15 +1,15 @@
 /**
  * Where email sign-in keeps its pending codes and sessions, shared by every host over the same
  * storage. `EmailSignIn` reads and writes it, deciding each change to a code with a pure function
- * that `modifyCode` applies. Storage adapters implement it, `MemorySignInStorage` in process
- * memory, and the `signInStorage` conformance suite checks that each applies one change to an
+ * that `modifyCode` applies. Storage adapters implement it, `layerMemory` in process memory, and the `signInStorage` conformance suite checks that each applies one change to an
  * address at a time across hosts.
  *
  * @since 0.1.0
  */
 import { Identity } from "@amends-dev/core/identity";
-import { Context, Schema } from "effect";
-import type { DateTime, Effect, Option } from "effect";
+import { MemoryDatabase } from "@amends-dev/core/journal";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import type { DateTime } from "effect";
 import type * as Accounts from "./Accounts.ts";
 
 /**
@@ -83,3 +83,51 @@ export class SignInStorage extends Context.Service<
     readonly deleteSession: (digest: string) => Effect.Effect<void>;
   }
 >()("@amends-dev/gateway/SignInStorage") {}
+
+const codeRows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(PendingCode)));
+const sessionRows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(Session)));
+
+/**
+ * Sign-in codes and sessions in two tables beside every workspace's state. A change to an
+ * address's code holds the address's lock, so changes to it apply one at a time across every host.
+ */
+const makeMemory = Effect.fn("SignInStorage.makeMemory")(function* () {
+  const database = yield* MemoryDatabase.MemoryDatabase;
+  const signInCodes = MemoryDatabase.table(database, "sign_in_codes");
+  const signInSessions = MemoryDatabase.table(database, "sign_in_sessions");
+  return SignInStorage.of({
+    modifyCode: (email, decide) =>
+      MemoryDatabase.lock(database, MemoryDatabase.keyOf("sign-in-code", email))
+        .withPermit(
+          Effect.gen(function* () {
+            const [answer, next] = decide(yield* codeRows.get(signInCodes, email));
+            if (Option.isSome(next)) signInCodes.set(email, yield* codeRows.encode(next.value));
+            else signInCodes.delete(email);
+            return answer;
+          }),
+        )
+        .pipe(Effect.orDie),
+    insertSession: Effect.fn("SignInStorage.memory.insertSession")(function* (digest, session) {
+      signInSessions.set(digest, yield* sessionRows.encode(session));
+    }, Effect.orDie),
+    findSession: (digest) => sessionRows.get(signInSessions, digest).pipe(Effect.orDie),
+    extendSession: Effect.fn("SignInStorage.memory.extendSession")(function* (digest, expiresAt) {
+      const found = yield* sessionRows.get(signInSessions, digest);
+      if (Option.isSome(found))
+        signInSessions.set(digest, yield* sessionRows.encode({ ...found.value, expiresAt }));
+    }, Effect.orDie),
+    deleteSession: (digest) =>
+      Effect.sync(() => {
+        signInSessions.delete(digest);
+      }),
+  });
+});
+
+/**
+ * Provide sign-in storage in process memory, over the `MemoryDatabase` beneath: pending codes and
+ * sessions in two of its tables, shared by every host over the same database.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(SignInStorage, makeMemory());

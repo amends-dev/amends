@@ -5,13 +5,13 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
-
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as Agent from "./Agent.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
 
 /**
  * Storage failed while reading or writing agents.
@@ -87,3 +87,76 @@ export const make = (
     update: (record) => Effect.flatMap(write("update", Agent.Agent, record), driver.update),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Agent.Agent));
+
+/**
+ * Agent records over the current workspace transaction.
+ */
+const makeMemory = Effect.fn("AgentStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  /** Fails when another agent than `record` has its membership, as PostgreSQL's unique index does. */
+  const requireOwnMembership = (
+    operation: string,
+    record: Agent.Agent,
+    space: MemoryDatabase.Space,
+  ) =>
+    Effect.gen(function* () {
+      const agents = yield* rows
+        .all(space.records.of("agents"))
+        .pipe(Effect.mapError(storeFailure(Failure, operation)));
+      if (agents.some((agent) => agent.memberId === record.memberId && agent.id !== record.id))
+        return yield* new Conflict({
+          operation,
+          message: "Another agent has this membership",
+        });
+    });
+  const driver: AgentStore["Service"] = {
+    get: Effect.fn("AgentStore.memory.get")(
+      function* (id) {
+        return yield* rows.get((yield* read).records.of("agents"), id);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    list: Effect.gen(function* () {
+      return yield* rows.all((yield* read).records.of("agents"));
+    }).pipe(Effect.mapError(storeFailure(Failure, "list"))),
+    insert: Effect.fn("AgentStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("agents").has(record.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Agent ID already exists",
+        });
+      yield* requireOwnMembership("insert", record, space);
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("agents").set(record.id, row);
+    }),
+    update: Effect.fn("AgentStore.memory.update")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "update")));
+      const found = yield* rows
+        .get(space.records.of("agents"), record.id)
+        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+      if (Option.isNone(found))
+        return yield* new Conflict({
+          operation: "update",
+          message: "Expected a stored agent",
+        });
+      yield* requireOwnMembership("update", record, space);
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "update")));
+      space.records.of("agents").set(record.id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `AgentStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps what
+ * the contract leaves to storage: a reused ID or an update of a missing agent conflicts, and so
+ * does a second agent for one membership, which PostgreSQL refuses with a unique index. `make`
+ * checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(AgentStore, makeMemory());

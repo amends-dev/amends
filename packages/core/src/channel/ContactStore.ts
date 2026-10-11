@@ -5,12 +5,13 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as Contact from "./Contact.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing contacts.
@@ -90,3 +91,60 @@ export const make = (
     update: (record) => Effect.flatMap(write("update", Contact.Contact, record), driver.update),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Contact.Contact));
+
+/**
+ * Contact records over the current workspace transaction.
+ */
+const makeMemory = Effect.fn("ContactStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const driver: ContactStore["Service"] = {
+    get: Effect.fn("ContactStore.memory.get")(
+      function* (id) {
+        return yield* rows.get((yield* read).records.of("contacts"), id);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    getMany: Effect.fn("ContactStore.memory.getMany")(
+      function* (ids) {
+        return yield* rows.getMany((yield* read).records.of("contacts"), ids);
+      },
+      Effect.mapError(storeFailure(Failure, "getMany")),
+    ),
+    insert: Effect.fn("ContactStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("contacts").has(record.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Contact ID already exists",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("contacts").set(record.id, row);
+    }),
+    update: Effect.fn("ContactStore.memory.update")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "update")));
+      const found = yield* rows
+        .get(space.records.of("contacts"), record.id)
+        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+      if (Option.isNone(found))
+        return yield* new Conflict({
+          operation: "update",
+          message: "Expected a stored contact",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "update")));
+      space.records.of("contacts").set(record.id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `ContactStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * what the contract leaves to storage: a reused ID conflicts, and so does an update of a missing
+ * contact. `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(ContactStore, makeMemory());

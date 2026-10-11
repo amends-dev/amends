@@ -3,14 +3,14 @@
  * keeps the address that ID belongs to here, so sign-in and invitations reach a person by address.
  * `EmailSignIn` finds or creates an account when sign-in completes, and server-http reads accounts
  * to resolve invitation addresses and to show a workspace's addresses. Storage adapters implement
- * `Accounts`, `MemoryAccounts` in process memory, and the HTTP contract imports its schemas from
+ * `Accounts`, `layerMemory` in process memory, and the HTTP contract imports its schemas from
  * `@amends-dev/gateway/Accounts`.
  *
  * @since 0.1.0
  */
 import { Identity } from "@amends-dev/core/identity";
-import { Context, Schema, SchemaGetter } from "effect";
-import type { Effect } from "effect";
+import { MemoryDatabase } from "@amends-dev/core/journal";
+import { Context, Crypto, Effect, Layer, Schema, SchemaGetter } from "effect";
 
 /**
  * An email address as accounts hold it. Decoding trims and lowercases it, so one address is one
@@ -75,3 +75,41 @@ export class Accounts extends Context.Service<
     ) => Effect.Effect<ReadonlyArray<Account>>;
   }
 >()("@amends-dev/gateway/Accounts") {}
+
+/** The host's accounts in a table of `MemoryDatabase`: each one's address by its human ID. */
+const makeMemory = Effect.fn("Accounts.makeMemory")(function* () {
+  const accounts = MemoryDatabase.table(yield* MemoryDatabase.MemoryDatabase, "accounts");
+  const crypto = yield* Crypto.Crypto;
+  const accountOf = (id: string, email: string): Account => ({
+    id: Identity.HumanId.make(id),
+    email: Email.make(email),
+  });
+  return Accounts.of({
+    findOrCreate: Effect.fn("Accounts.memory.findOrCreate")(function* (email) {
+      const issued = yield* crypto.randomUUIDv4;
+      return yield* Effect.sync(() => {
+        for (const [id, address] of accounts) if (address === email) return accountOf(id, address);
+        accounts.set(issued, email);
+        return accountOf(issued, email);
+      });
+    }, Effect.orDie),
+    findByIds: (ids) =>
+      Effect.sync(() =>
+        ids.flatMap((id) => {
+          const email = accounts.get(id);
+          return email === undefined ? [] : [accountOf(id, email)];
+        }),
+      ),
+  });
+});
+
+/**
+ * Provide the host's accounts in process memory, over the `MemoryDatabase` and `Crypto.Crypto`
+ * beneath: a table of addresses by human ID beside every workspace's state, so every host over the
+ * same database sees one account per address. New human IDs are random UUIDs from the host's
+ * cryptography.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(Accounts, makeMemory());

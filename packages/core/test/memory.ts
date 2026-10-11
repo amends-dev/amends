@@ -1,16 +1,13 @@
 /**
- * Core's stores over memory storage, bound to one workspace, with what the journal tests count
- * and inject: transactions attempted, standalone appends, a lost commit acknowledgment, and a
- * counter that projections write inside the transaction.
+ * The journal's stores, and those of members and their roles, over memory storage, bound to one
+ * workspace, with what the journal tests count and inject: transactions attempted, standalone
+ * appends, a lost commit acknowledgment, and a counter that projections write inside the
+ * transaction.
  */
 import { Context, Effect, Layer, Ref } from "effect";
 import { AssignmentStore, RoleStore } from "../src/authorization/index.ts";
 import type { Commit } from "../src/journal/index.ts";
-import { Checkpoint, Store } from "../src/journal/index.ts";
-import * as Binding from "../src/memory/Binding.ts";
-import * as MemoryConnection from "../src/memory/MemoryConnection.ts";
-import * as MemoryDatabase from "../src/memory/MemoryDatabase.ts";
-import * as MemoryStores from "../src/memory/MemoryStores.ts";
+import { Checkpoint, MemoryDatabase, Store } from "../src/journal/index.ts";
 import { MemberStore, Workspace } from "../src/workspace/index.ts";
 
 /** A projection target: a number the transaction stages, like any projected record. */
@@ -27,19 +24,25 @@ export const make = Effect.fn("JournalTest.memory")(function* (
   workspaceId: Workspace.Id = Workspace.Id.make("workspace-one"),
 ) {
   const database = yield* MemoryDatabase.make();
-  const memoryConnection = yield* MemoryConnection.make().pipe(
+  const connection = yield* MemoryDatabase.makeConnection().pipe(
     Effect.provideService(MemoryDatabase.MemoryDatabase, database),
   );
   /** The stores bound to one workspace over this host's connection. */
   const bind = Effect.fn("JournalTest.bind")(function* (id: Workspace.Id) {
     const context = yield* Layer.build(
-      Layer.merge(MemoryStores.layer(id), Binding.layer(id)).pipe(
-        Layer.provide(Layer.succeed(MemoryConnection.MemoryConnection, memoryConnection)),
+      Layer.mergeAll(
+        Checkpoint.layerMemory,
+        MemberStore.layerMemory,
+        RoleStore.layerMemory,
+        AssignmentStore.layerMemory,
+      ).pipe(
+        Layer.provideMerge(Store.layerMemory(id)),
+        Layer.provide(Layer.succeed(MemoryDatabase.Connection, connection)),
       ),
     );
     return {
       context,
-      binding: Context.get(context, Binding.Binding),
+      binding: Context.get(context, Store.MemoryBinding),
       store: Context.get(context, Store.Store),
       checkpoints: Context.get(context, Checkpoint.Checkpoint),
       members: Context.get(context, MemberStore.MemberStore),

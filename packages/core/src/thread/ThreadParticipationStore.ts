@@ -5,16 +5,16 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option, DateTime } from "effect";
-import type * as Store from "../journal/Store.ts";
-
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import type { DateTime } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
-
 import * as ThreadId from "./ThreadId.ts";
 import * as GroupMembership from "../group/GroupMembership.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing participations.
@@ -168,3 +168,143 @@ export const make = (
       ),
   };
 };
+
+/**
+ * How participation records are stored: the JSON of each record's encoded form, keyed by its ID.
+ */
+const rows = MemoryDatabase.makeRows(
+  Schema.fromJsonString(ThreadParticipation.ThreadParticipation),
+);
+const byId = (
+  left: ThreadParticipation.ThreadParticipation,
+  right: ThreadParticipation.ThreadParticipation,
+) => MemoryDatabase.compareBinary(left.id, right.id);
+
+/**
+ * Participations over the current workspace transaction, which `ThreadParticipationProjection`
+ * writes.
+ */
+const makeMemory = Effect.fn("ThreadParticipationStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const all = Effect.flatMap(read, (space) => rows.all(space.records.of("threadParticipations")));
+
+  const driver: ThreadParticipationStore["Service"] = {
+    get: Effect.fn("ThreadParticipationStore.memory.get")(
+      function* (id) {
+        return yield* rows.get((yield* read).records.of("threadParticipations"), id);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    getMany: Effect.fn("ThreadParticipationStore.memory.getMany")(
+      function* (ids) {
+        return yield* rows.getMany((yield* read).records.of("threadParticipations"), ids);
+      },
+      Effect.mapError(storeFailure(Failure, "getMany")),
+    ),
+    listByThread: Effect.fn("ThreadParticipationStore.memory.listByThread")(
+      function* (id) {
+        return (yield* all).filter((record) => record.threadId === id).toSorted(byId);
+      },
+      Effect.mapError(storeFailure(Failure, "listByThread")),
+    ),
+    pageActiveByThread: Effect.fn("ThreadParticipationStore.memory.pageActiveByThread")(
+      function* (id, options) {
+        const after = options.after;
+        return (yield* all)
+          .filter(
+            (record) =>
+              record.threadId === id &&
+              record.status === "active" &&
+              (after === undefined || MemoryDatabase.compareBinary(record.id, after) > 0),
+          )
+          .toSorted(byId)
+          .slice(0, options.limit);
+      },
+      Effect.mapError(storeFailure(Failure, "pageActiveByThread")),
+    ),
+    findActive: Effect.fn("ThreadParticipationStore.memory.findActive")(
+      function* (id, references) {
+        if (references.length === 0) return [];
+        const keys = new Set(references.map(ThreadParticipation.keyOf));
+        return (yield* all).filter(
+          (record) =>
+            record.threadId === id &&
+            record.status === "active" &&
+            keys.has(ThreadParticipation.keyOf(record.participant)),
+        );
+      },
+      Effect.mapError(storeFailure(Failure, "findActive")),
+    ),
+    endByAdmission: Effect.fn("ThreadParticipationStore.memory.endByAdmission")(
+      function* (id, endedAt) {
+        const space = yield* write;
+        const records = yield* rows.all(space.records.of("threadParticipations"));
+        for (const record of records) {
+          if (
+            record.status !== "active" ||
+            !ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant) ||
+            record.participant.groupMembershipId !== id
+          )
+            continue;
+          const row = yield* rows.encode({ ...record, status: "ended", endedAt });
+          space.records.of("threadParticipations").set(record.id, row);
+        }
+      },
+      Effect.mapError(storeFailure(Failure, "endByAdmission")),
+    ),
+    end: Effect.fn("ThreadParticipationStore.memory.end")(function* (departure, endedAt) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "end")));
+      const current = yield* rows
+        .get(space.records.of("threadParticipations"), departure.participationId)
+        .pipe(Effect.mapError(storeFailure(Failure, "end")));
+      if (
+        Option.isNone(current) ||
+        current.value.threadId !== departure.threadId ||
+        current.value.status !== "active"
+      )
+        return yield* new Conflict({
+          operation: "end",
+          message: "Participation is missing, mismatched, or already ended",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, status: "ended", endedAt })
+        .pipe(Effect.mapError(storeFailure(Failure, "end")));
+      space.records.of("threadParticipations").set(departure.participationId, row);
+    }),
+    insert: Effect.fn("ThreadParticipationStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const participations = yield* rows
+        .all(space.records.of("threadParticipations"))
+        .pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const key = ThreadParticipation.keyOf(record.participant);
+      if (
+        space.records.of("threadParticipations").has(record.id) ||
+        participations.some(
+          (participation) =>
+            participation.threadId === record.threadId &&
+            participation.status === "active" &&
+            ThreadParticipation.keyOf(participation.participant) === key,
+        )
+      )
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Participation ID reused, or the participant already takes part",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("threadParticipations").set(record.id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `ThreadParticipationStore` in process memory, over the workspace's `Store.MemoryBinding`.
+ * It keeps what the contract leaves to storage: a reused ID conflicts, and so does a second active
+ * participation of one participant in one thread; ending conflicts unless the participation is
+ * stored, active, and in the thread named. An ended participation keeps its row. `make` checks
+ * every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(ThreadParticipationStore, makeMemory());

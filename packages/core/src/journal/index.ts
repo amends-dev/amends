@@ -72,6 +72,14 @@ export * as Journal from "./Journal.ts";
 export * as Log from "./Log.ts";
 
 /**
+ * Storage held in process memory, the reference implementation every storage contract has: the
+ * database hosts connect to, and how its stores keep records.
+ *
+ * @since 0.1.0
+ */
+export * as MemoryDatabase from "./MemoryDatabase.ts";
+
+/**
  * The identity of one occurrence of a fact, which makes publishing it idempotent.
  *
  * @since 0.1.0

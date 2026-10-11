@@ -8,7 +8,6 @@
     ".": "./src/index.ts",
     "./conformance/internal/*": null,
     "./*": "./src/*.ts",
-    "./memory": "./src/memory/index.ts",
     "./conformance": "./src/conformance/index.ts"
   },
   "scripts": {

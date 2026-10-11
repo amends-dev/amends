@@ -5,14 +5,15 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
-
+import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as Thread from "./Thread.ts";
 import * as GroupId from "../group/GroupId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as Group from "../group/Group.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing threads.
@@ -149,3 +150,154 @@ export const make = (
       Effect.flatMap(write("recordLatest", Thread.Latest, latest), driver.recordLatest),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Thread.Thread));
+const latestRows = MemoryDatabase.makeRows(Schema.fromJsonString(Thread.Latest));
+
+/** Newest time first, then ID in descending binary order. */
+const newestFirst = (
+  left: { readonly at: number; readonly id: string },
+  right: { readonly at: number; readonly id: string },
+) => right.at - left.at || MemoryDatabase.compareBinary(right.id, left.id);
+
+/**
+ * Threads over the current workspace transaction, which `ThreadProjection` writes.
+ */
+const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const inGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+    const records = yield* rows.all((yield* read).records.of("threads"));
+    return records.filter((record) => record.groupId === groupId);
+  });
+  const driver: ThreadStore["Service"] = {
+    get: Effect.fn("ThreadStore.memory.get")(
+      function* (id) {
+        return yield* rows.get((yield* read).records.of("threads"), id);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    getMany: Effect.fn("ThreadStore.memory.getMany")(
+      function* (ids) {
+        return yield* rows.getMany((yield* read).records.of("threads"), ids);
+      },
+      Effect.mapError(storeFailure(Failure, "getMany")),
+    ),
+    listByGroup: Effect.fn("ThreadStore.memory.listByGroup")(
+      function* (groupId) {
+        return (yield* inGroup(groupId)).toSorted((left, right) =>
+          MemoryDatabase.compareBinary(left.id, right.id),
+        );
+      },
+      Effect.mapError(storeFailure(Failure, "listByGroup")),
+    ),
+    listByLatest: Effect.fn("ThreadStore.memory.listByLatest")(
+      function* (groupId, options) {
+        const threads = yield* inGroup(groupId);
+        const latest = new Map(
+          (yield* latestRows.getMany(
+            (yield* read).records.of("threadLatest"),
+            threads.map((thread) => thread.id),
+          )).map((value) => [value.threadId, DateTime.toEpochMillis(value.occurredAt)]),
+        );
+        const before = Option.fromUndefinedOr(options.before).pipe(
+          Option.map((cursor) => ({
+            at: DateTime.toEpochMillis(cursor.latestActivityAt),
+            id: cursor.threadId,
+          })),
+        );
+        return threads
+          .flatMap((thread) => {
+            const at = latest.get(thread.id);
+            return at === undefined ? [] : [{ thread, at, id: thread.id }];
+          })
+          .filter((entry) => Option.isNone(before) || newestFirst(entry, before.value) > 0)
+          .toSorted(newestFirst)
+          .slice(0, options.limit)
+          .map(({ thread }) => thread);
+      },
+      Effect.mapError(storeFailure(Failure, "listByLatest")),
+    ),
+    listByStart: Effect.fn("ThreadStore.memory.listByStart")(
+      function* (groupId, options) {
+        const before = Option.fromUndefinedOr(options.before).pipe(
+          Option.map((cursor) => ({
+            at: DateTime.toEpochMillis(cursor.createdAt),
+            id: cursor.threadId,
+          })),
+        );
+        return (yield* inGroup(groupId))
+          .map((thread) => ({
+            thread,
+            at: DateTime.toEpochMillis(thread.createdAt),
+            id: thread.id,
+          }))
+          .filter((entry) => Option.isNone(before) || newestFirst(entry, before.value) > 0)
+          .toSorted(newestFirst)
+          .slice(0, options.limit)
+          .map(({ thread }) => thread);
+      },
+      Effect.mapError(storeFailure(Failure, "listByStart")),
+    ),
+    getLatest: Effect.fn("ThreadStore.memory.getLatest")(
+      function* (ids) {
+        return yield* latestRows.getMany((yield* read).records.of("threadLatest"), ids);
+      },
+      Effect.mapError(storeFailure(Failure, "getLatest")),
+    ),
+    recordLatest: Effect.fn("ThreadStore.memory.recordLatest")(function* (latest) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "recordLatest")));
+      if (!space.records.of("threads").has(latest.threadId))
+        return yield* new Conflict({
+          operation: "recordLatest",
+          message: "Thread is missing",
+        });
+      const current = yield* latestRows
+        .get(space.records.of("threadLatest"), latest.threadId)
+        .pipe(Effect.mapError(storeFailure(Failure, "recordLatest")));
+      // Only a later position advances; an earlier one changes nothing.
+      if (Option.isSome(current) && latest.sequence <= current.value.sequence) return;
+      const row = yield* latestRows
+        .encode(latest)
+        .pipe(Effect.mapError(storeFailure(Failure, "recordLatest")));
+      space.records.of("threadLatest").set(latest.threadId, row);
+    }),
+    rename: Effect.fn("ThreadStore.memory.rename")(function* (renamed) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      const found = yield* rows
+        .get(space.records.of("threads"), renamed.threadId)
+        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      if (Option.isNone(found))
+        return yield* new Conflict({
+          operation: "rename",
+          message: "Thread is missing",
+        });
+      const row = yield* rows
+        .encode({ ...found.value, title: renamed.title })
+        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      space.records.of("threads").set(renamed.threadId, row);
+    }),
+    insert: Effect.fn("ThreadStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("threads").has(record.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Thread ID already exists",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("threads").set(record.id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `ThreadStore` in process memory, over the workspace's `Store.MemoryBinding`: thread
+ * records, and each thread's latest content activity as a row of its own. It keeps what the
+ * contract leaves to storage: a reused ID conflicts; renaming or recording latest activity
+ * conflicts for a missing thread; and a latest position at or before the recorded one changes
+ * nothing. `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(ThreadStore, makeMemory());

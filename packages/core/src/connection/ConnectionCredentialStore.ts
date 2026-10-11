@@ -8,12 +8,13 @@
  * @since 0.1.0
  */
 import { Connection as ConnectionContract } from "@amends-dev/connection";
-import { Context, Effect, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
-
+import * as Store from "../journal/Store.ts";
 import * as Connection from "./Connection.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing credentials.
@@ -91,3 +92,49 @@ export const make = (
       Effect.flatMap(read("remove", Connection.Id, connectionId), driver.remove),
   };
 };
+
+/** A credential as JSON, its key as it is: this adapter is for tests. */
+const rows = MemoryDatabase.makeRows(
+  Schema.fromJsonString(Schema.toCodecJson(ConnectionContract.Credential)),
+);
+
+/**
+ * Each connection's credential in the workspace's memory, written in its transactions.
+ */
+const makeMemory = Effect.fn("ConnectionCredentialStore.makeMemory")(function* () {
+  const { read, write } = yield* Store.MemoryBinding;
+  const driver: ConnectionCredentialStore["Service"] = {
+    set: Effect.fn("ConnectionCredentialStore.memory.set")(
+      function* (connectionId, credential) {
+        const row = yield* rows.encode(credential);
+        (yield* write).connectionCredentials.set(connectionId, row);
+      },
+      Effect.mapError(storeFailure(Failure, "set")),
+    ),
+    get: Effect.fn("ConnectionCredentialStore.memory.get")(
+      function* (connectionId) {
+        return yield* rows.get((yield* read).connectionCredentials, connectionId);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    remove: Effect.fn("ConnectionCredentialStore.memory.remove")(
+      function* (connectionId) {
+        (yield* write).connectionCredentials.delete(connectionId);
+      },
+      Effect.mapError(storeFailure(Failure, "remove")),
+    ),
+  };
+  return make(driver);
+});
+
+/**
+ * Provide `ConnectionCredentialStore` in process memory, over the workspace's
+ * `Store.MemoryBinding`. Each connection's credential is kept beside the projected records, outside
+ * the journal, so rebuilding projections keeps it; writes require the caller's transaction. A
+ * credential is stored as JSON, its key as it is, unprotected, so this store is for tests and
+ * development. `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(ConnectionCredentialStore, makeMemory());

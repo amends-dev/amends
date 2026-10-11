@@ -118,20 +118,26 @@ Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters
 
 ## Memory
 
-`@amends-dev/gateway/memory` implements the host contracts in process memory over core's
-[memory storage](../core/README.md#memory). `MemoryStorage.layer` provides workspace storage, the
-directory, accounts, and sign-in storage over a new connection to the `MemoryDatabase` beneath it,
-with cryptography from the host for new human IDs. Building it again over the same database is
-another host over the same storage, which is how tests of what several hosts do together run.
-Accounts, sign-in codes, and sessions are tables beside the workspaces' state, and a change to an
-address's code holds the address's lock across every host.
+Each host contract for storage has a `layerMemory` that implements it in process memory, over
+core's [memory storage](../core/README.md#memory): `WorkspaceStorage.layerMemory` over a
+`MemoryDatabase.Connection`, and the directory, accounts, and sign-in storage over the
+`MemoryDatabase` itself, with cryptography from the host for new human IDs. Merged over a new
+connection, they are one host; building them again over the same database is another host over the
+same storage, which is how tests of what several hosts do together run. Accounts, sign-in codes,
+and sessions are tables beside the workspaces' state, and a change to an address's code holds the
+address's lock across every host.
 
 ```ts
-import { MemoryDatabase } from "@amends-dev/core/memory";
-import { MemoryStorage } from "@amends-dev/gateway/memory";
+import { MemoryDatabase } from "@amends-dev/core/journal";
+import { Accounts, SignInStorage, WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway";
 import { Layer } from "effect";
 
-const storage = MemoryStorage.layer.pipe(Layer.provide(MemoryDatabase.layer));
+const storage = Layer.mergeAll(
+  WorkspaceStorage.layerMemory,
+  WorkspaceDirectory.layerMemory,
+  Accounts.layerMemory,
+  SignInStorage.layerMemory,
+).pipe(Layer.provide(MemoryDatabase.layerConnection), Layer.provide(MemoryDatabase.layer));
 ```
 
 ## Conformance

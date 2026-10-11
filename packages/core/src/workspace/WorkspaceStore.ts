@@ -6,14 +6,15 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as WorkspaceSettings from "./WorkspaceSettings.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "./WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing the workspace record.
@@ -107,3 +108,71 @@ export const make = (
       ),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Workspace.Workspace));
+
+/**
+ * Workspace metadata, with ownership changes guarded by the previous owner.
+ */
+const makeMemory = Effect.fn("WorkspaceStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const writable = (operation: string) =>
+    write.pipe(Effect.mapError(storeFailure(Failure, operation)));
+  const driver: WorkspaceStore["Service"] = {
+    get: Effect.flatMap(read, (space) => rows.get(space.records.of("workspace"), workspaceId)).pipe(
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    insert: Effect.fn("WorkspaceStore.memory.insert")(function* (record) {
+      const space = yield* writable("insert");
+      if (space.records.of("workspace").has(workspaceId))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Workspace already exists",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("workspace").set(workspaceId, row);
+    }),
+    rename: Effect.fn("WorkspaceStore.memory.rename")(function* (change) {
+      const space = yield* writable("rename");
+      const current = yield* rows
+        .get(space.records.of("workspace"), workspaceId)
+        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      if (Option.isNone(current) || current.value.name !== change.previousName)
+        return yield* new Conflict({
+          operation: "rename",
+          message: "Workspace is missing or name has changed",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, name: change.name })
+        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      space.records.of("workspace").set(workspaceId, row);
+    }),
+    transferOwnership: Effect.fn("WorkspaceStore.memory.transferOwnership")(function* (change) {
+      const space = yield* writable("transferOwnership");
+      const current = yield* rows
+        .get(space.records.of("workspace"), workspaceId)
+        .pipe(Effect.mapError(storeFailure(Failure, "transferOwnership")));
+      if (Option.isNone(current) || current.value.ownerMemberId !== change.previousOwnerMemberId)
+        return yield* new Conflict({
+          operation: "transferOwnership",
+          message: "Workspace is missing or ownership has changed",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, ownerMemberId: change.ownerMemberId })
+        .pipe(Effect.mapError(storeFailure(Failure, "transferOwnership")));
+      space.records.of("workspace").set(workspaceId, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `WorkspaceStore` in process memory, over the workspace's `Store.MemoryBinding`: the bound
+ * workspace's one record, keyed by its ID. It keeps what the contract leaves to storage: a second
+ * insert conflicts, and a rename or ownership transfer is a conditional write that conflicts unless
+ * the stored name or owner is still the one the change replaces. `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(WorkspaceStore, makeMemory());

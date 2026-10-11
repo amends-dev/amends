@@ -2,18 +2,45 @@
  * The storage a host gives the gateway: for each workspace, the stores core reads and writes and
  * the signal hub that delivers signals between every process over the same storage. The gateway
  * binds a workspace's storage to check who may enter it and to build its core. Storage adapters
- * implement it, `MemoryWorkspaceStorage` in process memory, and the conformance suites check what
- * its stores promise.
+ * implement it, `layerMemory` in process memory, and the conformance suites check what its stores
+ * promise.
  *
  * @since 0.1.0
  */
 import type { Integrations } from "@amends-dev/connection";
 import type * as Core from "@amends-dev/core";
+import { AgentStore } from "@amends-dev/core/agent";
+import { AssignmentStore, RoleStore } from "@amends-dev/core/authorization";
+import {
+  ChannelBindingStore,
+  ChannelStore,
+  ContactStore,
+  DeliveryStore,
+} from "@amends-dev/core/channel";
 import type { DeliveryJobs } from "@amends-dev/core/channel";
+import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/connection";
+import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends-dev/core/group";
+import { Checkpoint, MemoryDatabase, Store } from "@amends-dev/core/journal";
+import { NotificationStore } from "@amends-dev/core/notification";
+import { ReadStateStore } from "@amends-dev/core/read-state";
+import { SignalHub } from "@amends-dev/core/signal";
+import { TaskStore } from "@amends-dev/core/task";
+import {
+  ThreadActivityStore,
+  ThreadMessageStore,
+  ThreadParticipationStore,
+  ThreadStore,
+} from "@amends-dev/core/thread";
+import { SessionLogStore, SessionStateStore, TurnStore } from "@amends-dev/core/turn";
 import type { TurnJobs } from "@amends-dev/core/turn";
-import type { Workspace } from "@amends-dev/core/workspace";
-import { Context } from "effect";
-import type { Crypto, Effect } from "effect";
+import {
+  InvitationStore,
+  MemberStore,
+  Workspace,
+  WorkspaceStore,
+} from "@amends-dev/core/workspace";
+import { Context, Effect, Layer } from "effect";
+import type { Crypto } from "effect";
 
 /**
  * What storage binds to one workspace: its stores and its signal hub. The gateway supplies
@@ -45,3 +72,64 @@ export class WorkspaceStorage extends Context.Service<
     readonly forWorkspace: (workspaceId: Workspace.Id) => Effect.Effect<Context.Context<Bindings>>;
   }
 >()("@amends-dev/gateway/WorkspaceStorage") {}
+
+/** Every store core requires, and the signal hub, in process memory. Adding a store adds a line. */
+const layerMemoryStores = Layer.mergeAll(
+  Checkpoint.layerMemory,
+  WorkspaceStore.layerMemory,
+  MemberStore.layerMemory,
+  RoleStore.layerMemory,
+  AssignmentStore.layerMemory,
+  InvitationStore.layerMemory,
+  NotificationStore.layerMemory,
+  GroupStore.layerMemory,
+  GroupMembershipStore.layerMemory,
+  GroupFollowStore.layerMemory,
+  ThreadStore.layerMemory,
+  ThreadParticipationStore.layerMemory,
+  ThreadMessageStore.layerMemory,
+  ThreadActivityStore.layerMemory,
+  TaskStore.layerMemory,
+  ChannelStore.layerMemory,
+  ChannelBindingStore.layerMemory,
+  ContactStore.layerMemory,
+  DeliveryStore.layerMemory,
+  ReadStateStore.layerMemory,
+  ConnectionStore.layerMemory,
+  ConnectionCredentialStore.layerMemory,
+  AgentStore.layerMemory,
+  TurnStore.layerMemory,
+  SessionStateStore.layerMemory,
+  SessionLogStore.layerMemory,
+  SignalHub.layerMemory,
+);
+
+/**
+ * Each workspace's stores and signal hub over one connection: the workspace's journal store binds
+ * it, and every other store reads and writes through that binding. The stores hold no resources,
+ * so the scope that builds them can close at once.
+ */
+const makeMemory = Effect.fn("WorkspaceStorage.makeMemory")(function* () {
+  const connection = yield* MemoryDatabase.Connection;
+  const forWorkspace: WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn(
+    "WorkspaceStorage.memory.forWorkspace",
+  )(
+    function* (workspaceId: Workspace.Id) {
+      return yield* Effect.scoped(
+        Layer.build(layerMemoryStores.pipe(Layer.provideMerge(Store.layerMemory(workspaceId)))),
+      );
+    },
+    Effect.provideService(MemoryDatabase.Connection, connection),
+  );
+  return WorkspaceStorage.of({ forWorkspace });
+});
+
+/**
+ * Provide workspace storage in process memory, over the `MemoryDatabase.Connection` beneath: each
+ * workspace's stores and signal hub are core's `layerMemory`s, bound to the workspace over the
+ * connection.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(WorkspaceStorage, makeMemory());

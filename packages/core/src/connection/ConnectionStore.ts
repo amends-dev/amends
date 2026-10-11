@@ -6,13 +6,13 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
-
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Store from "../journal/Store.ts";
 import * as Connection from "./Connection.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing connections.
@@ -91,3 +91,59 @@ export const make = (
       Effect.flatMap(write("update", Connection.Connection, record), driver.update),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Connection.Connection));
+
+/**
+ * Connection records over the current workspace transaction.
+ */
+const makeMemory = Effect.fn("ConnectionStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const driver: ConnectionStore["Service"] = {
+    get: Effect.fn("ConnectionStore.memory.get")(
+      function* (id) {
+        return yield* rows.get((yield* read).records.of("connections"), id);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    listActive: Effect.gen(function* () {
+      const records = yield* rows.all((yield* read).records.of("connections"));
+      return records.filter((record) => record.status === "active");
+    }).pipe(Effect.mapError(storeFailure(Failure, "listActive"))),
+    insert: Effect.fn("ConnectionStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("connections").has(record.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Connection ID already exists",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("connections").set(record.id, row);
+    }),
+    update: Effect.fn("ConnectionStore.memory.update")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "update")));
+      const found = yield* rows
+        .get(space.records.of("connections"), record.id)
+        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+      if (Option.isNone(found))
+        return yield* new Conflict({
+          operation: "update",
+          message: "Expected a stored connection",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "update")));
+      space.records.of("connections").set(record.id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `ConnectionStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * what the contract leaves to storage: a reused ID conflicts, and so does an update of a missing
+ * connection. The connection's credential is kept apart, by `ConnectionCredentialStore`. `make` checks
+ * every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(ConnectionStore, makeMemory());

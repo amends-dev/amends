@@ -7,12 +7,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Array } from "effect";
+import { Array, Context, DateTime, Deferred, Effect, Layer, Schema } from "effect";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as SessionLog from "./SessionLog.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as Store from "../journal/Store.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
 
 /**
  * Storage failed while reading or writing session logs.
@@ -126,3 +128,69 @@ export const make = (
     }),
   };
 };
+
+/** An entry as JSON, where and when its log recorded it. */
+const rows = MemoryDatabase.makeRows(
+  Schema.fromJsonString(Schema.toCodecJson(SessionLog.Recorded)),
+);
+
+/**
+ * Each participation's session log in memory, beside the workspace's transactional state: an
+ * append takes part in no transaction and is kept at once.
+ */
+const makeMemory = Effect.fn("SessionLogStore.makeMemory")(function* () {
+  const { workspaceId, connection } = yield* Store.MemoryBinding;
+  const { database } = connection;
+  const logKeyOf = (participationId: string) => MemoryDatabase.keyOf(workspaceId, participationId);
+  const logOf = (participationId: string) =>
+    database.sessionLogs.get(logKeyOf(participationId)) ?? [];
+  const driver: SessionLogStore["Service"] = {
+    head: (participationId) => Effect.sync(() => logOf(participationId).length),
+    append: Effect.fn("SessionLogStore.memory.append")(function* (participationId, entries, after) {
+      const log = logOf(participationId);
+      if (log.length !== after) return yield* new Conflict({ participationId, after });
+      const recordedAt = yield* DateTime.now;
+      const recorded = Array.map(entries, (entry, index) => ({
+        position: after + index + 1,
+        recordedAt,
+        entry,
+      }));
+      const encoded = yield* Effect.forEach(recorded, (entry) => rows.encode(entry)).pipe(
+        Effect.mapError(storeFailure(Failure, "append")),
+      );
+      database.sessionLogs.set(logKeyOf(participationId), [...log, ...encoded]);
+      MemoryDatabase.wakeAppendReaders(database);
+      return recorded;
+    }),
+    read: Effect.fn("SessionLogStore.memory.read")(
+      function* (participationId, { after, limit }) {
+        const page = logOf(participationId).slice(Math.max(after, 0), Math.max(after, 0) + limit);
+        return yield* Effect.forEach(page, (row) => rows.decode(row));
+      },
+      Effect.mapError(storeFailure(Failure, "read")),
+    ),
+    waitForAppend: Effect.fn("SessionLogStore.memory.waitForAppend")(
+      function* (participationId, after) {
+        while (true) {
+          // Take the signal before checking the log, so no append falls between the two.
+          const appended = database.appended;
+          if (logOf(participationId).length > after) return;
+          yield* Deferred.await(appended);
+        }
+      },
+    ),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `SessionLogStore` in process memory, over the workspace's `Store.MemoryBinding`: each
+ * participation's session log, kept in `MemoryDatabase` beside the workspaces' state. An append
+ * takes part in no transaction: it is kept at once and wakes waiting readers. It keeps what the
+ * contract leaves to storage: an append conflicts unless the log ends where its writer read it to.
+ * `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(SessionLogStore, makeMemory());

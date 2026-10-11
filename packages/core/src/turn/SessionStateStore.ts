@@ -7,12 +7,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import * as Agent from "../agent/Agent.ts";
 import type { Option } from "effect";
-import type * as Store from "../journal/Store.ts";
+import * as Store from "../journal/Store.ts";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing session states.
@@ -111,3 +113,40 @@ export const make = (driver: SessionStateStore["Service"]): SessionStateStore["S
     }),
   };
 };
+
+/** A participation's session as JSON. */
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(Saved)));
+
+/**
+ * Each participation's harness session in the workspace's memory, written in its transactions.
+ */
+const makeMemory = Effect.fn("SessionStateStore.makeMemory")(function* () {
+  const { read, write } = yield* Store.MemoryBinding;
+  const driver: SessionStateStore["Service"] = {
+    get: Effect.fn("SessionStateStore.memory.get")(
+      function* (participationId) {
+        return yield* rows.get((yield* read).sessionStates, participationId);
+      },
+      Effect.mapError(storeFailure(Failure, "get")),
+    ),
+    set: Effect.fn("SessionStateStore.memory.set")(
+      function* (participationId, saved) {
+        const row = yield* rows.encode(saved);
+        (yield* write).sessionStates.set(participationId, row);
+      },
+      Effect.mapError(storeFailure(Failure, "set")),
+    ),
+  };
+  return make(driver);
+});
+
+/**
+ * Provide `SessionStateStore` in process memory, over the workspace's `Store.MemoryBinding`: what
+ * each participation's harness session resumes from, kept as JSON beside the projected records,
+ * outside the journal, so rebuilding projections keeps it. Writes require the caller's transaction,
+ * and a write replaces what was stored. `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(SessionStateStore, makeMemory());

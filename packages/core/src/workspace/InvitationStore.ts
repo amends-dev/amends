@@ -5,14 +5,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import * as Identity from "../identity/Identity.ts";
-import type * as Store from "../journal/Store.ts";
-
+import * as Store from "../journal/Store.ts";
 import * as Invitation from "./Invitation.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "./WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing invitations.
@@ -124,3 +124,83 @@ export const make = (
     }),
   };
 };
+
+/**
+ * How invitation records are stored: the JSON of each record's encoded form, keyed by its ID.
+ */
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Invitation.Invitation));
+
+/**
+ * Issue order: issue time, then ID in binary order. `list` returns a workspace's invitations in
+ * it.
+ */
+const byIssue = (left: Invitation.Invitation, right: Invitation.Invitation) =>
+  DateTime.toEpochMillis(left.details.issuedAt) - DateTime.toEpochMillis(right.details.issuedAt) ||
+  MemoryDatabase.compareBinary(left.details.id, right.details.id);
+
+/**
+ * Invitations and their grants; settlement records who acted and when.
+ */
+const makeMemory = Effect.fn("InvitationStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const all = (operation: string) =>
+    Effect.flatMap(read, (space) => rows.all(space.records.of("invitations"))).pipe(
+      Effect.mapError(storeFailure(Failure, operation)),
+    );
+  const driver: InvitationStore["Service"] = {
+    get: (id) =>
+      Effect.flatMap(read, (space) => rows.get(space.records.of("invitations"), id)).pipe(
+        Effect.mapError(storeFailure(Failure, "get")),
+      ),
+    listPendingByRecipient: (recipientId) =>
+      Effect.map(all("listPendingByRecipient"), (records) =>
+        records
+          .filter(
+            (record) =>
+              record.details.recipientId === recipientId &&
+              Invitation.State.isAnyOf(["Pending"])(record.state),
+          )
+          .toSorted((left, right) =>
+            MemoryDatabase.compareBinary(left.details.id, right.details.id),
+          ),
+      ),
+    list: Effect.map(all("list"), (records) => records.toSorted(byIssue)),
+    insert: Effect.fn("InvitationStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("invitations").has(record.details.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Invitation ID already exists",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("invitations").set(record.details.id, row);
+    }),
+    settle: Effect.fn("InvitationStore.memory.settle")(function* (id, state) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "settle")));
+      const current = yield* rows
+        .get(space.records.of("invitations"), id)
+        .pipe(Effect.mapError(storeFailure(Failure, "settle")));
+      if (Option.isNone(current) || !Invitation.State.isAnyOf(["Pending"])(current.value.state))
+        return yield* new Conflict({
+          operation: "settle",
+          message: "Expected a pending invitation",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, state })
+        .pipe(Effect.mapError(storeFailure(Failure, "settle")));
+      space.records.of("invitations").set(id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `InvitationStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
+ * what the contract leaves to storage: a reused ID conflicts, and settling conflicts unless the
+ * invitation is stored and pending. A settled invitation keeps its row, with who acted and when.
+ * `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(InvitationStore, makeMemory());

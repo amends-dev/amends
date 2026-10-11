@@ -234,7 +234,7 @@ errors that could be classified as a definite rollback; see
 Each workspace's [signal hub](../../packages/core/README.md#signals) relays signals on the same
 channel: `publish` sends the JSON-encoded signal with its workspace through `pg_notify` outside any
 transaction, and the listener in every pool, the sender's included, decodes it once and offers it to
-that workspace's subscribers through the pool's `SignalHub.makeLocal`. A subscriber more than 256
+that workspace's subscribers through the pool's `LocalSignalHub`. A subscriber more than 256
 behind misses the oldest, and a signal this version cannot decode is skipped. Nothing is stored:
 signals sent while a listener reconnects are lost, a failed publish is logged rather than failing
 its operation, and a payload over PostgreSQL's 8,000-byte notification limit is not delivered.

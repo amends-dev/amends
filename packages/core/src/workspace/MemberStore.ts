@@ -5,13 +5,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema } from "effect";
-import type { Option } from "effect";
+import { Array, Context, Effect, Layer, Option, Schema } from "effect";
 import * as Identity from "../identity/Identity.ts";
-import type * as Store from "../journal/Store.ts";
+import * as Store from "../journal/Store.ts";
 import * as Member from "./Member.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "./WorkspaceId.ts";
+import { storeFailure } from "../journal/internal/storeFailure.ts";
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 
 /**
  * Storage failed while reading or writing memberships.
@@ -141,3 +142,99 @@ export const make = (
       Effect.flatMap(write("markRemoved", Member.Id, memberId), driver.markRemoved),
   };
 };
+
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Member.Member));
+
+const isActive = (member: Member.Member, identity: Identity.MemberReference) =>
+  member.status === "active" &&
+  Identity.MemberReference.isAnyOf([identity._tag])(member.identity) &&
+  member.identity.id === identity.id;
+
+/**
+ * Memberships, active and removed; one active membership per identity.
+ */
+const makeMemory = Effect.fn("MemberStore.makeMemory")(function* () {
+  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const all = (operation: string) =>
+    Effect.flatMap(read, (space) => rows.all(space.records.of("members"))).pipe(
+      Effect.mapError(storeFailure(Failure, operation)),
+    );
+  const driver: MemberStore["Service"] = {
+    get: (id) =>
+      Effect.flatMap(read, (space) => rows.get(space.records.of("members"), id)).pipe(
+        Effect.mapError(storeFailure(Failure, "get")),
+      ),
+    getMany: (ids) =>
+      Effect.flatMap(read, (space) => rows.getMany(space.records.of("members"), ids)).pipe(
+        Effect.mapError(storeFailure(Failure, "getMany")),
+      ),
+    findActive: (identity) =>
+      Effect.map(
+        all("findActive"),
+        Array.findFirst((member) => isActive(member, identity)),
+      ),
+    list: Effect.map(all("list"), (members) =>
+      members.toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id)),
+    ),
+    insert: Effect.fn("MemberStore.memory.insert")(function* (record) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const members = yield* rows
+        .all(space.records.of("members"))
+        .pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      if (space.records.of("members").has(record.id))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Member ID already exists",
+        });
+      if (members.some((member) => isActive(member, record.identity)))
+        return yield* new Conflict({
+          operation: "insert",
+          message: "Identity already has an active membership",
+        });
+      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      space.records.of("members").set(record.id, row);
+    }),
+    rename: Effect.fn("MemberStore.memory.rename")(function* (id, name) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      const current = yield* rows
+        .get(space.records.of("members"), id)
+        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      if (Option.isNone(current) || current.value.status !== "active")
+        return yield* new Conflict({
+          operation: "rename",
+          message: "Expected an active membership",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, name })
+        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      space.records.of("members").set(id, row);
+    }),
+    markRemoved: Effect.fn("MemberStore.memory.markRemoved")(function* (id) {
+      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "markRemoved")));
+      const current = yield* rows
+        .get(space.records.of("members"), id)
+        .pipe(Effect.mapError(storeFailure(Failure, "markRemoved")));
+      if (Option.isNone(current) || current.value.status !== "active")
+        return yield* new Conflict({
+          operation: "markRemoved",
+          message: "Expected an active membership",
+        });
+      const row = yield* rows
+        .encode({ ...current.value, status: "removed" })
+        .pipe(Effect.mapError(storeFailure(Failure, "markRemoved")));
+      space.records.of("members").set(id, row);
+    }),
+  };
+  return make(workspaceId, driver);
+});
+
+/**
+ * Provide `MemberStore` in process memory, over the workspace's `Store.MemoryBinding`: memberships,
+ * active and removed. It keeps what the contract leaves to storage: a reused ID conflicts, and so
+ * does a second active membership for one identity; renaming and removing conflict unless the
+ * membership is stored and active. `make` checks every input first.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerMemory = Layer.effect(MemberStore, makeMemory());
