@@ -171,7 +171,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* asAlice.connections
               .rename({ params, payload: { name: "Other", expectedName: "Tools" } })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "ConnectionService.Changed" });
+          ).toMatchObject({ _tag: "CoreError.Changed" });
           const configured = yield* asAlice.connections.configure({
             params,
             payload: { settings: { url: "http://127.0.0.1:2/mcp", keyHeader: "X-Api-Key" } },

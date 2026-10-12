@@ -394,7 +394,7 @@ describe("connections", () => {
                 }),
               ),
             ),
-          ).toEqual(new ConnectionService.Changed({ connectionId: created.id }));
+          ).toEqual(new CoreError.Changed({ resource: "Connection", id: created.id }));
           const configured = yield* as(workspace.id, alice, (connectionService) =>
             connectionService.configure({
               connectionId: created.id,

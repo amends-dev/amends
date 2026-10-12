@@ -17,13 +17,6 @@ export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
 ) {}
 
 /**
- * The group's name is no longer the one the renamer expected: someone renamed it meanwhile.
- */
-export class Changed extends Schema.TaggedError<Changed>()("GroupService.Changed", {
-  groupId: Group.Id,
-}) {}
-
-/**
  * A direct group is named by its members, so it has no name to change.
  */
 export class NotRenamable extends Schema.TaggedError<NotRenamable>()("GroupService.NotRenamable", {

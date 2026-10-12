@@ -67,7 +67,7 @@ which every built-in role holds, and membership of the group. To anyone outside 
 members, is `GroupService.NotRenamable`. The name follows creation's rule, while `expectedName` may be any recorded name. Renaming
 records `group.renamed` with the new name and returns the group; the same name again records
 nothing. Otherwise `expectedName`, the name the renamer last saw, must still be the group's name:
-one renamed meanwhile is `GroupService.Changed`, so a rename is never silently replaced, and
+one renamed meanwhile is `CoreError.Changed`, so a rename is never silently replaced, and
 nothing is recorded. Members read
 the new name through their groups list, and the change feed delivers the fact to the group's
 readers. Each listed group says whether the reader may rename it (`renamable`), from the same grant

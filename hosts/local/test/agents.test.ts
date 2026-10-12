@@ -226,7 +226,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asAlice.agents
             .rename({ params, payload: { name: "Other", expectedName: "Reviewer" } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "AgentService.Changed" });
+        ).toMatchObject({ _tag: "CoreError.Changed" });
 
         // An agent leaves as any member does.
         yield* asAlice.members.remove({ params: { workspaceId, memberId: created.memberId } });

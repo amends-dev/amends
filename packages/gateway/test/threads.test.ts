@@ -1249,7 +1249,7 @@ describe("threads", () => {
           // Another title from a renamer who last saw none would replace the rename made
           // meanwhile, so it is refused, and nothing is recorded; from the current one, it is not.
           expect(yield* Effect.flip(rename(owner, started.thread.id, "Launch review"))).toEqual(
-            new ThreadService.Changed({ threadId: started.thread.id }),
+            new CoreError.Changed({ resource: "Thread", id: started.thread.id }),
           );
           expect(yield* history(bound)).toHaveLength(before.length + 1);
           const reviewed = yield* rename(owner, started.thread.id, "Launch review", "Launch plan");

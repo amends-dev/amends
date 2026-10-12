@@ -124,7 +124,9 @@ whatever it asks for. A turn retry derives its turn's ID from the turn it retrie
 `@amends-dev/core/error` holds `CoreError`, the outcomes every feature reports, each one class
 whichever operation raises it, carrying in its fields what it is about and in its `message` what
 happened. `CoreError.NotFound` names the `resource` and the `id` the caller asked for; a missing
-resource and one out of the caller's reach answer alike. Operations pass it through unchanged, so a
+resource and one out of the caller's reach answer alike. `CoreError.Changed` names one that changed
+since the caller read it: a name, title, revision, or set of roles they expected is no longer so,
+and nothing was recorded. Operations pass it through unchanged, so a
 protocol answers it with one status and a client handles it once, and an operation that reaches a
 resource through another reports the one the caller named: a message whose thread they cannot read
 is the message not found, not the thread.
@@ -652,8 +654,9 @@ src/workspace/
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
 An outcome every feature reports is one kind in `CoreError`, whichever operation raises it:
-anything missing, or out of the caller's reach, is `CoreError.NotFound`, which names the resource
-and its ID and passes through every operation unchanged. Any other error belongs to the module that
+anything missing, or out of the caller's reach, is `CoreError.NotFound`, and anything that changed
+since the caller read it is `CoreError.Changed`; each names the resource and its ID and passes
+through every operation unchanged. Any other error belongs to the module that
 raises it, and its tag is its name there, as `MemberService.OwnerProtected` or `Store.Conflict`. The
 outcomes a service reports to callers are schemas in an `internal/` errors module, apart from the
 services, so a protocol or a browser client carries them without loading an implementation, and the

@@ -74,7 +74,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
         expectedName: Connection.RenameInput.fields.expectedName,
       }),
       success: view,
-      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.ConnectionChanged],
+      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.Changed],
     }),
     HttpApiEndpoint.put("configure", "/:connectionId/settings", {
       params: connection,

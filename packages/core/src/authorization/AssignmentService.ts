@@ -27,17 +27,9 @@ import * as Assignment from "./Assignment.ts";
 import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
-import { Changed, InactiveMember } from "./internal/assignment-errors.ts";
+import { InactiveMember } from "./internal/assignment-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The member's workspace role assignments are no longer the ones the caller expected: someone
-   * changed them meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
   /**
    * The member has been removed; roles are given to and taken from active members only.
    *
@@ -62,7 +54,7 @@ export type Error =
   | PlatformError.PlatformError
   | CoreError.NotFound
   | InactiveMember
-  | Changed;
+  | CoreError.Changed;
 
 /**
  * What reading a member's access can fail with: the delegation checks it shows, and a member who
@@ -134,7 +126,8 @@ export class AssignmentService extends Context.Service<
     /**
      * Replace a member's workspace roles with one, under `assignment.manage` and the delegation
      * rules for the member, the new role, and each role replaced. The roles must be the ones the
-     * caller saw, or the change is `Changed`; a member holding that role alone is left as they are.
+     * caller saw, or the change is `CoreError.Changed`; a member holding that role alone is left as
+     * they are.
      */
     readonly change: (
       input: Assignment.ChangeInput,
@@ -282,7 +275,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
         current.length !== request.expectedAssignmentIds.length ||
         current.some(({ id }) => !request.expectedAssignmentIds.includes(id))
       )
-        return yield* new Changed({ memberId: request.memberId });
+        return yield* new CoreError.Changed({ resource: "Member", id: request.memberId });
       for (const record of current) yield* delegation.requireGrant(record.source.roleId);
       const same = current.find(({ source }) => source.roleId === request.roleId);
       if (current.length === 1 && same !== undefined) return same;

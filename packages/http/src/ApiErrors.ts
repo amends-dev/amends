@@ -3,19 +3,14 @@
  * its HTTP status, and the lists of them that groups spread into an endpoint's `error`. Core
  * declares no transport concerns, so the status lives here, on the contract's view of each error,
  * and the serialized tag stays the one core or the gateway declares. A name that would be ambiguous
- * in the shared namespace says its source, such as `InvitationUnavailable` or `ConnectionChanged`.
+ * in the shared namespace says its source, such as `InvitationUnavailable` or `TurnNotActive`.
  * `HumanRequired` and `TooManyStreams` are the contract's own, and `requestKey` is the
  * `Idempotency-Key` header a creating endpoint accepts.
  *
  * @since 0.1.0
  */
 import { AssignmentService, Authorization, Delegation } from "@amends-dev/core/authorization";
-import {
-  InvitationService,
-  MemberService,
-  OwnershipService,
-  WorkspaceSettingsService,
-} from "@amends-dev/core/workspace";
+import { InvitationService, MemberService, OwnershipService } from "@amends-dev/core/workspace";
 import * as GatewayErrors from "@amends-dev/gateway/GatewayErrors";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
 import { AgentService } from "@amends-dev/core/agent";
@@ -69,6 +64,14 @@ export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
  */
 export const NotFound = CoreError.NotFound.pipe(HttpApiSchema.status(404));
 /**
+ * What the caller expected of a resource, such as its name, title, revision, or roles, changed
+ * since they read it, and nothing was recorded: 409, with the resource and the ID.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const Changed = CoreError.Changed.pipe(HttpApiSchema.status(409));
+/**
  * The principal holds no active membership of the workspace, or no workspace has this ID: 403.
  * The gateway answers it before loading the workspace.
  *
@@ -76,14 +79,6 @@ export const NotFound = CoreError.NotFound.pipe(HttpApiSchema.status(404));
  * @since 0.1.0
  */
 export const NotMember = GatewayErrors.NotMember.pipe(HttpApiSchema.status(403));
-/**
- * The workspace's name is no longer the one the renamer expected: someone renamed it meanwhile;
- * 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const WorkspaceChanged = WorkspaceSettingsService.Changed.pipe(HttpApiSchema.status(409));
 /**
  * The request key a creating endpoint accepts: send a new one for each logical request and the
  * same one on every retry of it, and the retry returns the first attempt's result.
@@ -245,10 +240,7 @@ export const assignmentRead = [
  * @category errors
  * @since 0.1.0
  */
-export const assignment = [
-  ...assignmentRead,
-  AssignmentService.Changed.pipe(HttpApiSchema.status(409)),
-] as const;
+export const assignment = [...assignmentRead, Changed] as const;
 
 /**
  * Ownership outcomes: a caller who is not the owner is 403, a missing recipient 404, and a
@@ -262,7 +254,7 @@ export const ownership = [
   OwnershipService.NotOwner.pipe(HttpApiSchema.status(403)),
   NotFound,
   OwnershipService.InvalidRecipient.pipe(HttpApiSchema.status(409)),
-  OwnershipService.Changed.pipe(HttpApiSchema.status(409)),
+  Changed,
 ] as const;
 
 /**
@@ -284,13 +276,6 @@ export const group = [
  * @since 0.1.0
  */
 export const NotRenamable = GroupService.NotRenamable.pipe(HttpApiSchema.status(409));
-/**
- * A group renamed since the caller last saw its name refuses another name with 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const GroupChanged = GroupService.Changed.pipe(HttpApiSchema.status(409));
 /**
  * Admission outcomes: a missing group, member, or admission is 404; a member no longer active, one
  * admitted already, an admission ended already, and the fixed roster of a direct or the general
@@ -337,13 +322,6 @@ export const thread = [
   ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
 ] as const;
 /**
- * A thread renamed since the caller last saw its title refuses another title with 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const ThreadChanged = ThreadService.Changed.pipe(HttpApiSchema.status(409));
-/**
  * Replying outcomes: a thread missing or outside the caller's groups is 404, an agent principal
  * 403, and a mentioned member who cannot take part 409.
  *
@@ -367,7 +345,7 @@ export const messageEdit = [
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.NotAuthor.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.Deleted.pipe(HttpApiSchema.status(409)),
-  ThreadMessageService.Changed.pipe(HttpApiSchema.status(409)),
+  Changed,
   ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
 /**
@@ -430,7 +408,7 @@ export const taskCreate = [
  */
 export const taskUpdate = [
   NotFound,
-  TaskService.Changed.pipe(HttpApiSchema.status(409)),
+  Changed,
   TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
 
@@ -446,13 +424,6 @@ export const readState = [
   ReadStateService.BeyondTimeline.pipe(HttpApiSchema.status(409)),
 ] as const;
 
-/**
- * A connection renamed since the caller last saw its name refuses another name with 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const ConnectionChanged = ConnectionService.Changed.pipe(HttpApiSchema.status(409));
 /**
  * The integration is not installed on this host.
  *
@@ -488,13 +459,6 @@ export const ConnectionCredentialsUnavailable = ConnectionService.CredentialsUna
   HttpApiSchema.status(503),
 );
 
-/**
- * An agent renamed since the caller last saw its name refuses another name with 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const AgentChanged = AgentService.Changed.pipe(HttpApiSchema.status(409));
 /**
  * A connection the setup names is missing or removed, or the caller may not read and use it.
  *

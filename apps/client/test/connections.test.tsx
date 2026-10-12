@@ -467,7 +467,9 @@ it("keeps a rename draft through a conflict and saves it against the name review
   await waitFor(() => expect(f.view.connection("docs")).toBeDefined());
   f.view.rename.setName("docs", "Team search");
   f.server.connections[0]!.name = "Docs";
-  f.server.answers.push(json({ _tag: "ConnectionService.Changed", connectionId: "docs" }, 409));
+  f.server.answers.push(
+    json({ _tag: "CoreError.Changed", resource: "Connection", id: "docs" }, 409),
+  );
   f.view.rename.save("docs");
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "rename", error: "changed" }));
   expect(f.view.stale()).toBe(true);

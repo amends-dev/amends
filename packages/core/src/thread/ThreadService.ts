@@ -49,20 +49,12 @@ import * as TaskCommand from "../task/TaskCommand.ts";
 import * as TaskPermissions from "../task/TaskPermissions.ts";
 import * as TaskStore from "../task/TaskStore.ts";
 import {
-  Changed,
   DirectMembersRequired,
   HumanAuthorRequired,
   ParticipantUnavailable,
 } from "./internal/thread-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The thread's title is no longer the one the renamer expected: someone renamed it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
   /**
    * A direct group needs the author and at least one other member.
    *
@@ -131,7 +123,7 @@ export type RenameError =
   | GroupMembershipStore.Failure
   | TaskStore.Failure
   | CoreError.NotFound
-  | Changed;
+  | CoreError.Changed;
 
 /**
  * What reading threads can fail with.
@@ -183,9 +175,9 @@ export class ThreadService extends Context.Service<
     ) => Effect.Effect<Thread.Started, Error, Actor.Actor>;
     /**
      * Give a thread a title, under current group audience and `thread.rename` on the thread. The
-     * same title again records nothing; otherwise a title other than `expectedTitle` is `Changed`,
-     * and nothing is recorded. A rename publishes its fact and records a quiet `thread.renamed`
-     * activity in one commit, and returns the renamed thread.
+     * same title again records nothing; otherwise a title other than `expectedTitle` is
+     * `CoreError.Changed`, and nothing is recorded. A rename publishes its fact and records a quiet
+     * `thread.renamed` activity in one commit, and returns the renamed thread.
      */
     readonly rename: (
       input: Thread.RenameInput,
@@ -502,7 +494,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       ]);
       if (thread.title === request.title) return thread;
       if (thread.title !== request.expectedTitle)
-        return yield* new Changed({ threadId: thread.id });
+        return yield* new CoreError.Changed({ resource: "Thread", id: thread.id });
       const occurredAt = yield* DateTime.now;
       // A task's title is a requirement: every participant is told of it, and the assignee asked
       // to work on it anew; a conversation's title tells no one.

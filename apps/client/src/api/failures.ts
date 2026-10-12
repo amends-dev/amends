@@ -45,9 +45,8 @@ type Reported =
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
-  "WorkspaceSettingsService.Changed": "changed",
-  "AssignmentService.Changed": "changed",
-  "OwnershipService.Changed": "changed",
+  // What the reader expected changed since they read it.
+  "CoreError.Changed": "changed",
   "GatewayErrors.Conflict": "changed",
   "Authorization.Denied": "denied",
   "Authorization.InvalidActor": "denied",
@@ -65,29 +64,25 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "InvitationService.Unavailable": "gone",
   "MemberService.AlreadyRemoved": "gone",
   "OwnershipService.InvalidRecipient": "gone",
-  // Conversations: someone else changed what the reader acted on, or it left their reach.
+  // Conversations: someone else changed what the reader acted on.
   "GroupMembershipService.AlreadyMember": "changed",
-  "GroupService.Changed": "changed",
   "ReadStateService.BeyondTimeline": "changed",
   "ThreadParticipationService.AlreadyEnded": "changed",
   "NotificationService.AlreadyHandled": "changed",
-  // Connections: renamed meanwhile, or naming an integration this host no longer has;
-  // `connectionsFailure` tells the integration's refusals apart.
-  "ConnectionService.Changed": "changed",
+  // Connections: naming an integration this host no longer has; `connectionsFailure` tells the
+  // integration's refusals apart.
   "ConnectionService.UnknownIntegration": "changed",
   "ConnectionService.InvalidConnection": "invalid",
   "ConnectionService.Keyless": "invalid",
-  // Agents: renamed meanwhile, or gone; a connection no longer usable, or a setup that cannot
-  // run, is refused with the draft kept, and `agentsFailure` tells them apart.
-  "AgentService.Changed": "changed",
+  // Agents: a connection no longer usable, or a setup that cannot run, is refused with the draft
+  // kept, and `agentsFailure` tells them apart.
   "AgentService.ConnectionUnavailable": "invalid",
   "AgentService.Incomplete": "invalid",
-  // Turns: one that finished or moved on meanwhile, or that left the reader's reach;
-  // `turnProblems` tells the refusals apart.
+  // Turns: one that finished or moved on meanwhile; `turnProblems` tells the refusals apart.
   "TurnService.NotActive": "changed",
   "TurnService.NotRetryable": "changed",
-  // Channels: one gone or out of reach, a group the reader left, a thread bound to no conversation;
-  // a connection that gives no channels, or the reader may not use, is refused with the draft kept.
+  // Channels: a connection that gives no channels, or the reader may not use, is refused with the
+  // draft kept.
   "ChannelService.ConnectionUnavailable": "invalid",
   // Following a turn's log stopped short, or too many streams are open: following again may work.
   "Turn.LogUnavailable": "failed",
@@ -108,17 +103,14 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ThreadMessageService.ParticipantUnavailable": "gone",
   "ThreadMessageService.NotAuthor": "denied",
   "ThreadMessageService.Deleted": "gone",
-  "ThreadMessageService.Changed": "changed",
   "TaskService.ParticipantUnavailable": "gone",
   "TaskService.AlreadyTask": "changed",
-  "TaskService.Changed": "changed",
   "Client.InvalidCommand": "invalid",
   "GroupMembershipService.FixedMembership": "invalid",
   "GroupMembershipService.GeneralMembership": "invalid",
   "ThreadParticipationService.FixedParticipation": "invalid",
   "GroupFollowService.NotFollowable": "invalid",
   "ThreadService.DirectMembersRequired": "invalid",
-  "ThreadService.Changed": "changed",
   "GatewayErrors.InvalidInput": "invalid",
   "InvitationService.InvalidExpiry": "invalid",
   "Delegation.UnsupportedRole": "invalid",

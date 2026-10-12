@@ -8,13 +8,6 @@ import * as Member from "../../workspace/Member.ts";
 import * as ThreadMessageId from "../ThreadMessageId.ts";
 
 /**
- * The message's revision is no longer the one the editor expected: someone edited it meanwhile.
- */
-export class Changed extends Schema.TaggedError<Changed>()("ThreadMessageService.Changed", {
-  messageId: ThreadMessageId.Id,
-}) {}
-
-/**
  * The message was deleted, so it has no text to edit.
  */
 export class Deleted extends Schema.TaggedError<Deleted>()("ThreadMessageService.Deleted", {

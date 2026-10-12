@@ -991,10 +991,13 @@ it("renames a group it may rename, from the name it started from, saving only a 
       renames.push(body);
       // As the host does, a rename from a name the group no longer has is refused.
       if (body.name !== name && body.expectedName !== name)
-        return new Response(JSON.stringify({ _tag: "GroupService.Changed", groupId: "g1" }), {
-          status: 409,
-          headers: { "content-type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ _tag: "CoreError.Changed", resource: "Group", id: "g1" }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json" },
+          },
+        );
       name = body.name;
       return json({ ...group, name });
     }

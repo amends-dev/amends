@@ -5,7 +5,7 @@ import { InvalidCommand, isStale, workspaceFailure } from "../src/api/failures.t
 describe("workspaceFailure", () => {
   it("classifies reported failures by their contract tag", () => {
     const failure = (_tag: string) => workspaceFailure(Cause.fail({ _tag }));
-    expect(failure("WorkspaceSettingsService.Changed")).toBe("changed");
+    expect(failure("CoreError.Changed")).toBe("changed");
     expect(failure("GatewayErrors.Conflict")).toBe("changed");
     expect(failure("Authorization.Denied")).toBe("denied");
     expect(failure("MemberService.AlreadyRemoved")).toBe("gone");

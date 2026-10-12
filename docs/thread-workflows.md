@@ -83,7 +83,7 @@ rule, while `expectedTitle` is the title the renamer last saw, or null for a thr
 Renaming records `thread.renamed` with the new title and, in the same commit, a quiet
 `thread.renamed` activity whose details carry the new and previous titles; it returns the renamed
 thread. The same title again records nothing. Otherwise `expectedTitle` must still be the thread's
-title: one renamed meanwhile is `ThreadService.Changed`, so a rename is never silently replaced,
+title: one renamed meanwhile is `CoreError.Changed`, so a rename is never silently replaced,
 and nothing is recorded. The activity notifies no one and makes nothing unread, and the title
 never derives from a message: editing the opening message leaves the title as it is, and renaming
 leaves every message as it is. Readers see the new title through the thread and its group's
@@ -119,7 +119,7 @@ the task is being worked (`todo` or `doing`).
 `TaskService.update({ threadId, change })` changes one thing under `task.update` on the thread:
 `{ _tag: "Status", from, to }`, `{ _tag: "Assignee", from, to }`, or
 `{ _tag: "Priority", from, to }`, where `from` is the value the changer last saw. The same value
-again records nothing; a task that changed meanwhile is `TaskService.Changed`. Each change
+again records nothing; a task that changed meanwhile is `CoreError.Changed`. Each change
 records `task.updated` and a quiet `task.updated` activity whose details are the change, so a later
 change cannot alter what an earlier item meant. The change admits and tells by its kind, and
 whoever made it is told nothing:
@@ -276,7 +276,7 @@ group; anyone else gets `ThreadMessageService.NotAuthor`, and to someone outside
 message is `CoreError.NotFound`, as a missing one is. Agents edit their own replies through their
 turns, so an agent caller gets `HumanAuthorRequired`. The text and mentions follow a reply's
 rules. The same text and mentions again record nothing; otherwise `expectedRevision`, the revision
-the editor last saw, must still be the message's: one edited meanwhile is `Changed`, and nothing is
+the editor last saw, must still be the message's: one edited meanwhile is `CoreError.Changed`, and nothing is
 recorded. A deleted message is `Deleted`.
 
 An edit records `thread.message.edited` with the next revision, the new text and mentions, and the

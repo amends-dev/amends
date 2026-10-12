@@ -26,7 +26,6 @@ import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as Request from "../request/Request.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 import {
-  Changed,
   Deleted,
   HumanAuthorRequired,
   NotAuthor,
@@ -37,13 +36,6 @@ import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The message's revision is no longer the one the editor expected: someone edited it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
   /**
    * The message was deleted, so it has no text to edit.
    *
@@ -107,7 +99,7 @@ export type EditError =
   | HumanAuthorRequired
   | NotAuthor
   | Deleted
-  | Changed
+  | CoreError.Changed
   | ParticipantUnavailable
   | ThreadMessageStore.Failure;
 
@@ -155,9 +147,9 @@ export class ThreadMessageService extends Context.Service<
     /**
      * Replace the text and mentions of a message the actor wrote, at its next revision, under
      * `thread.publish` on its thread. The same text and mentions again record nothing; otherwise a
-     * revision other than `expectedRevision` is `Changed`, and nothing is recorded. Members the edit
-     * newly mentions join and are told, under the rules of a reply; a deleted message is `Deleted`.
-     * Returns the message as edited.
+     * revision other than `expectedRevision` is `CoreError.Changed`, and nothing is recorded.
+     * Members the edit newly mentions join and are told, under the rules of a reply; a deleted
+     * message is `Deleted`. Returns the message as edited.
      */
     readonly edit: (
       input: ThreadMessage.EditInput,
@@ -379,7 +371,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       if (content.text === request.text && sameMentions(content.mentions, request.mentions))
         return message;
       if (content.revision !== request.expectedRevision)
-        return yield* new Changed({ messageId: message.id });
+        return yield* new CoreError.Changed({ resource: "ThreadMessage", id: message.id });
       // Those the edit newly mentions must be able to take part, as a reply's mentions must, and
       // newly mentioning an agent not yet taking part directs it, so needs the author's agent use.
       const joining = request.mentions.filter((memberId) => !content.mentions.includes(memberId));

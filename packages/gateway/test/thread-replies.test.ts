@@ -1356,7 +1356,7 @@ describe("thread replies", () => {
             // meanwhile, so it is refused; a mention who cannot take part is unavailable.
             expect(yield* edit(human, messageId, text, [otherId], 7)).toEqual(edited);
             expect(yield* Effect.flip(edit(human, messageId, "Again", [otherId], 1))).toEqual(
-              new ThreadMessageService.Changed({ messageId }),
+              new CoreError.Changed({ resource: "ThreadMessage", id: messageId }),
             );
             expect(
               yield* Effect.flip(

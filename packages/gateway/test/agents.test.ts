@@ -570,7 +570,7 @@ describe("agents", () => {
             Option.map(yield* bound.members.get(created.memberId), (member) => member.name),
           ).toEqual(Option.some("Answerer"));
           expect(yield* Effect.flip(rename("Other", "Reviewer"))).toEqual(
-            new AgentService.Changed({ agentId: created.id }),
+            new CoreError.Changed({ resource: "Agent", id: created.id }),
           );
           // Renaming to the name it has is done already, whatever name was expected.
           expect(yield* rename("Answerer", "Reviewer")).toEqual(renamed);

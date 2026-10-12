@@ -566,7 +566,9 @@ it("keeps a rename draft through a conflict, and removes an agent by its members
   await waitFor(() => expect(f.view.agent("reviewer")).toBeDefined());
   f.view.rename.setName("reviewer", "Critic");
   f.server.agents[0]!.name = "Reviewer two";
-  f.server.answers.push(json({ _tag: "AgentService.Changed", agentId: "reviewer" }, 409));
+  f.server.answers.push(
+    json({ _tag: "CoreError.Changed", resource: "Agent", id: "reviewer" }, 409),
+  );
   f.view.rename.save("reviewer");
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "rename", error: "changed" }));
   expect(f.view.stale()).toBe(true);

@@ -7,14 +7,6 @@ import * as Member from "../Member.ts";
 import * as Workspace from "../Workspace.ts";
 
 /**
- * The Owner assignment is no longer the one the caller reviewed: ownership moved meanwhile, and
- * nothing was recorded.
- */
-export class Changed extends Schema.TaggedError<Changed>()("OwnershipService.Changed", {
-  workspaceId: Workspace.Id,
-}) {}
-
-/**
  * The member cannot become owner: they are the owner already, removed, or an agent, as `reason`
  * says.
  */

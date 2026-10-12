@@ -25,7 +25,6 @@ import * as Request from "../request/Request.ts";
 import * as Connection from "./Connection.ts";
 import * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts";
 import {
-  Changed,
   CredentialsUnavailable,
   InvalidConnection,
   Keyless,
@@ -36,13 +35,6 @@ import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The connection's name is no longer the one expected: someone renamed it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
   /**
    * This host keeps no credentials, so no connection that authenticates with a key can be used.
    *
@@ -198,11 +190,11 @@ export class ConnectionService extends Context.Service<
     ) => Effect.Effect<Connection.View, CreateError, Actor.Actor>;
     /**
      * Give a connection a new name, under `connection.manage`. The same name again records nothing;
-     * otherwise a name other than `expectedName` is `Changed`, and nothing is recorded.
+     * otherwise a name other than `expectedName` is `CoreError.Changed`, and nothing is recorded.
      */
     readonly rename: (
       input: Connection.RenameInput,
-    ) => Effect.Effect<Connection.View, Error | Changed, Actor.Actor>;
+    ) => Effect.Effect<Connection.View, Error | CoreError.Changed, Actor.Actor>;
     /** Replace its settings, which its integration must take, under `connection.manage`. */
     readonly configure: (
       input: Connection.ConfigureInput,
@@ -426,7 +418,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       );
       if (record.name === request.name) return yield* viewOf(record, true);
       if (record.name !== request.expectedName)
-        return yield* new Changed({ connectionId: record.id });
+        return yield* new CoreError.Changed({ resource: "Connection", id: record.id });
       yield* journal.publish(ConnectionFacts.Renamed, {
         workspaceId,
         connectionId: record.id,

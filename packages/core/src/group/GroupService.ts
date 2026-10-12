@@ -33,17 +33,10 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
-import { Changed, InactiveMember, NotRenamable } from "./internal/group-errors.ts";
+import { InactiveMember, NotRenamable } from "./internal/group-errors.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The group's name is no longer the one the renamer expected: someone renamed it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
   /**
    * A member listed for a new team group is no longer active in the workspace.
    *
@@ -102,7 +95,7 @@ export type RenameError =
   | GroupMembershipStore.Failure
   | CoreError.NotFound
   | NotRenamable
-  | Changed;
+  | CoreError.Changed;
 
 /**
  * What reading groups can fail with.
@@ -145,7 +138,7 @@ export class GroupService extends Context.Service<
      * workspace role reaches a group from outside it: to a non-member, a group is
      * `CoreError.NotFound`, as a missing or foreign one is. A direct group, named by its members,
      * is NotRenamable. The same name again records nothing; otherwise a name other than
-     * `expectedName` is Changed, and nothing is recorded.
+     * `expectedName` is `CoreError.Changed`, and nothing is recorded.
      */
     readonly rename: (
       input: Group.RenameInput,
@@ -275,7 +268,8 @@ export const make = Effect.fn("GroupService.make")(function* () {
       const group = yield* requireGroup(request.groupId);
       if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
       if (group.name === request.name) return group;
-      if (group.name !== request.expectedName) return yield* new Changed({ groupId: group.id });
+      if (group.name !== request.expectedName)
+        return yield* new CoreError.Changed({ resource: "Group", id: group.id });
       yield* journal.publish(GroupFacts.Renamed, {
         workspaceId,
         groupId: group.id,

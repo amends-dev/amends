@@ -31,7 +31,7 @@ import * as MemberFacts from "../workspace/MemberFacts.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
-import { Changed, ConnectionUnavailable, Incomplete } from "./internal/agent-errors.ts";
+import { ConnectionUnavailable, Incomplete } from "./internal/agent-errors.ts";
 import * as AgentFacts from "./AgentFacts.ts";
 import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
@@ -39,15 +39,8 @@ import * as AgentStore from "./AgentStore.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
   /**
-   * The agent's name is no longer the one expected: someone renamed it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-  /**
-   * The connection named for a part of the agent's setup is missing or removed, or the actor may not
-   * read and use it, which they cannot tell apart.
+   * The connection named for a part of the agent's setup is missing or removed, or the actor may
+   * not read and use it, which they cannot tell apart.
    *
    * @category errors
    * @since 0.1.0
@@ -121,7 +114,7 @@ export type ConfigureError = Error | SetupError;
  * @category errors
  * @since 0.1.0
  */
-export type RenameError = Error | Changed;
+export type RenameError = Error | CoreError.Changed;
 
 /**
  * The agent operations an actor calls. An agent is a member, so its role is changed, and it is
@@ -387,7 +380,8 @@ export const make = Effect.fn("AgentService.make")(function* () {
         AgentPermissions.Configure,
       );
       if (name === request.name) return yield* viewForActor(record, name);
-      if (name !== request.expectedName) return yield* new Changed({ agentId: record.id });
+      if (name !== request.expectedName)
+        return yield* new CoreError.Changed({ resource: "Agent", id: record.id });
       yield* journal.publish(MemberFacts.Renamed, {
         workspaceId,
         memberId: record.memberId,

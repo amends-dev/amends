@@ -14,14 +14,6 @@ export class AlreadyTask extends Schema.TaggedError<AlreadyTask>()("TaskService.
 }) {}
 
 /**
- * The task no longer holds the value the change replaces: it changed meanwhile, and nothing was
- * recorded.
- */
-export class Changed extends Schema.TaggedError<Changed>()("TaskService.Changed", {
-  threadId: ThreadId.Id,
-}) {}
-
-/**
  * The assignee cannot take part in the thread: missing, inactive, or outside its group.
  */
 export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()(

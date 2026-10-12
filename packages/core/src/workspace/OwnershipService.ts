@@ -32,17 +32,9 @@ import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
-import { Changed, InvalidRecipient, NotOwner } from "./internal/ownership-errors.ts";
+import { InvalidRecipient, NotOwner } from "./internal/ownership-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The Owner assignment is no longer the one the caller reviewed: ownership moved meanwhile, and
-   * nothing was recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
   /**
    * The member cannot become owner: they are the owner already, removed, or an agent, as `reason`
    * says.
@@ -78,7 +70,7 @@ export type Error =
   | NotOwner
   | CoreError.NotFound
   | InvalidRecipient
-  | Changed;
+  | CoreError.Changed;
 
 /**
  * The ownership operations, one of `Core.Operations`.
@@ -98,9 +90,10 @@ export class OwnershipService extends Context.Service<
     /**
      * Make another active human member the owner, under `workspace.transfer-ownership`, as the
      * current owner (otherwise `NotOwner`), and against the Owner assignment the caller reviewed
-     * (otherwise `Changed`). One commit revokes both members' built-in workspace roles, makes the
-     * recipient Owner and the former owner Administrator, and moves `ownerMemberId`; direct grants,
-     * scoped assignments, the name, and `createdBy` stay. Returns the workspace as it now stands.
+     * (otherwise `CoreError.Changed`). One commit revokes both members' built-in workspace roles,
+     * makes the recipient Owner and the former owner Administrator, and moves `ownerMemberId`;
+     * direct grants, scoped assignments, the name, and `createdBy` stay. Returns the workspace as
+     * it now stands.
      */
     readonly transfer: (
       input: Ownership.TransferInput,
@@ -197,7 +190,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       )
         return yield* new NotOwner({ workspaceId });
       if (request.expectedOwnerAssignmentId !== state.assignment.id)
-        return yield* new Changed({ workspaceId });
+        return yield* new CoreError.Changed({ resource: "Workspace", id: workspaceId });
       if (request.memberId === state.owner.id)
         return yield* new InvalidRecipient({ memberId: request.memberId, reason: "same-owner" });
       const recipient = yield* requireMember(request.memberId);

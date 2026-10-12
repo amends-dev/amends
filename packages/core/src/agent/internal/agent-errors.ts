@@ -8,13 +8,6 @@ import * as Connection from "../../connection/Connection.ts";
 import * as Agent from "../Agent.ts";
 
 /**
- * The agent's name is no longer the one expected: someone renamed it meanwhile.
- */
-export class Changed extends Schema.TaggedError<Changed>()("AgentService.Changed", {
-  agentId: Agent.Id,
-}) {}
-
-/**
  * The connection named for a part of the agent's setup is missing or removed, or the actor may not
  * read and use it, which they cannot tell apart.
  */

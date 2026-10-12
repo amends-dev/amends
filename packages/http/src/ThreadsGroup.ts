@@ -108,7 +108,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         expectedTitle: Thread.RenameInput.fields.expectedTitle,
       }),
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.thread, ApiErrors.ThreadChanged],
+      error: [...ApiErrors.member, ...ApiErrors.thread, ApiErrors.Changed],
     }),
     HttpApiEndpoint.get("timeline", "/threads/:threadId/timeline", {
       params: thread,

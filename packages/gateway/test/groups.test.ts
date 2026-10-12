@@ -676,8 +676,9 @@ describe("groups", () => {
           // Another name from a renamer who last saw the old one would replace a rename made
           // meanwhile, so it is refused, and nothing is recorded; from the current one, it is not.
           expect(yield* Effect.flip(rename(owner, group.id, "Design"))).toMatchObject({
-            _tag: "GroupService.Changed",
-            groupId: group.id,
+            _tag: "CoreError.Changed",
+            resource: "Group",
+            id: group.id,
           });
           expect(yield* history(bound)).toHaveLength(before.length + 1);
           expect(yield* rename(owner, group.id, "Engineering", "Platform")).toEqual(group);

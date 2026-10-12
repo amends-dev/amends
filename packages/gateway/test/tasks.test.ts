@@ -461,7 +461,7 @@ describe("tasks", () => {
                   update(threadId, { _tag: "Status", from: "triage", to: "doing" }),
                 ),
               ),
-            ).toEqual(new TaskService.Changed({ threadId }));
+            ).toEqual(new CoreError.Changed({ resource: "Task", id: threadId }));
             expect(
               yield* run(
                 bound,

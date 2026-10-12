@@ -152,7 +152,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { name: "Plans", expectedName: "Design" },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupService.Changed", groupId: group.id });
+        ).toMatchObject({ _tag: "CoreError.Changed", resource: "Group", id: group.id });
         yield* asAlice.groups.rename({
           params: { workspaceId, groupId: group.id },
           payload: { name: "Design", expectedName: "Product design" },

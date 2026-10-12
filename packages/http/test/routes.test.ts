@@ -172,7 +172,7 @@ const conversations = Layer.mergeAll(
         Effect.fail(new CoreError.NotFound({ resource: "Thread", id })),
       ),
       rename: record("thread.rename", (input) =>
-        Effect.fail(new ThreadService.Changed({ threadId: input.threadId })),
+        Effect.fail(new CoreError.Changed({ resource: "Thread", id: input.threadId })),
       ),
       listInGroup: record("thread.list", () => Effect.succeed([])),
       listOpenings: record("thread.openings", () => Effect.succeed([])),
@@ -187,7 +187,7 @@ const conversations = Layer.mergeAll(
         Effect.fail(new TaskService.AlreadyTask({ threadId: input.threadId })),
       ),
       update: record("task.update", (input) =>
-        Effect.fail(new TaskService.Changed({ threadId: input.threadId })),
+        Effect.fail(new CoreError.Changed({ resource: "Task", id: input.threadId })),
       ),
       get: record("task.get", (id) =>
         Effect.fail(new CoreError.NotFound({ resource: "Task", id })),
@@ -202,7 +202,7 @@ const conversations = Layer.mergeAll(
         Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
       ),
       edit: record("thread.edit", (input) =>
-        Effect.fail(new ThreadMessageService.Changed({ messageId: input.messageId })),
+        Effect.fail(new CoreError.Changed({ resource: "ThreadMessage", id: input.messageId })),
       ),
       delete: record("thread.delete", (id) =>
         Effect.fail(new CoreError.NotFound({ resource: "ThreadMessage", id })),

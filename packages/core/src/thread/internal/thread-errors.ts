@@ -4,14 +4,6 @@
  */
 import { Schema } from "effect";
 import * as Member from "../../workspace/Member.ts";
-import * as Thread from "../Thread.ts";
-
-/**
- * The thread's title is no longer the one the renamer expected: someone renamed it meanwhile.
- */
-export class Changed extends Schema.TaggedError<Changed>()("ThreadService.Changed", {
-  threadId: Thread.Id,
-}) {}
 
 /**
  * A direct group needs the author and at least one other member.

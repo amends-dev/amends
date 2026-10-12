@@ -282,7 +282,7 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "OwnershipService.Changed" });
+            ).toMatchObject({ _tag: "CoreError.Changed" });
             expect(yield* bound.store.read(journalLog, { limit: 30 })).toEqual(before);
             expect(
               (yield* bound.assignments.listActiveByRole(BuiltinRoles.OwnerId))[0]?.memberId,

@@ -23,7 +23,7 @@ import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as Task from "./Task.ts";
 import * as TaskCommand from "./TaskCommand.ts";
-import { AlreadyTask, Changed, ParticipantUnavailable } from "./internal/task-errors.ts";
+import { AlreadyTask, ParticipantUnavailable } from "./internal/task-errors.ts";
 import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
 import * as CoreError from "../error/CoreError.ts";
@@ -35,14 +35,6 @@ export {
    * @since 0.1.0
    */
   AlreadyTask,
-  /**
-   * The task no longer holds the value the change replaces: it changed meanwhile, and nothing was
-   * recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
   /**
    * The assignee cannot take part in the thread: missing, inactive, or outside its group.
    *
@@ -79,7 +71,7 @@ export type UpdateError =
   | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
   | TaskStore.Failure
   | CoreError.NotFound
-  | Changed
+  | CoreError.Changed
   | ParticipantUnavailable;
 
 /**
@@ -117,8 +109,8 @@ export class TaskService extends Context.Service<
     /**
      * Change a task in one way, under current group audience and `task.update` on the thread. The
      * change names the value it replaces: the same value again records nothing, and a task that
-     * changed meanwhile is `Changed`. A new assignee must be able to take part, and assigning an
-     * agent needs `agent.use` on it. Returns the task as changed.
+     * changed meanwhile is `CoreError.Changed`. A new assignee must be able to take part, and
+     * assigning an agent needs `agent.use` on it. Returns the task as changed.
      */
     readonly update: (
       input: Task.UpdateInput,
@@ -233,7 +225,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
       const { change } = request;
       if (Task.valueOf(task, change) === change.to) return task;
       if (Task.valueOf(task, change) !== change.from)
-        return yield* new Changed({ threadId: thread.id });
+        return yield* new CoreError.Changed({ resource: "Task", id: thread.id });
       if (Task.Change.isAnyOf(["Assignee"])(change) && change.to !== null)
         yield* requireAssignable(thread, change.to);
       const updated = yield* taskCommand

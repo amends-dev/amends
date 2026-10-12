@@ -476,7 +476,7 @@ export const renameGroup = (workspace: string) => (api: Api, rename: GroupRename
       })
       .pipe(
         Effect.tapError((error) =>
-          Schema.is(ApiErrors.GroupChanged)(error)
+          Schema.is(ApiErrors.Changed)(error)
             ? Reactivity.invalidate([workspaceKey(workspace, "groups")])
             : Effect.void,
         ),

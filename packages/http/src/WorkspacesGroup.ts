@@ -33,7 +33,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       params: { workspaceId: Workspace.Id },
       payload: WorkspaceSettings.RenameInput,
       success: Workspace.Workspace,
-      error: [...ApiErrors.member, ApiErrors.WorkspaceChanged],
+      error: [...ApiErrors.member, ApiErrors.Changed],
     }),
     HttpApiEndpoint.get("members", "/:workspaceId/member-management", {
       params: { workspaceId: Workspace.Id },

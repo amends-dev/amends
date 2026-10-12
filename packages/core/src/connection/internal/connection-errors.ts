@@ -7,13 +7,6 @@ import { Schema } from "effect";
 import * as Connection from "../Connection.ts";
 
 /**
- * The connection's name is no longer the one expected: someone renamed it meanwhile.
- */
-export class Changed extends Schema.TaggedError<Changed>()("ConnectionService.Changed", {
-  connectionId: Connection.Id,
-}) {}
-
-/**
  * This host does not install the integration, or no longer installs the one a connection names.
  */
 export class UnknownIntegration extends Schema.TaggedError<UnknownIntegration>()(

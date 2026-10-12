@@ -61,7 +61,7 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
         expectedName: Agent.RenameInput.fields.expectedName,
       }),
       success: view,
-      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.AgentChanged],
+      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.Changed],
     }),
   )
   .middleware(Authentication)
