@@ -6,7 +6,8 @@ the **turn job**, one for each agent in each thread, which runs the agent's
 [turns](../core/README.md#turns) there on [harness](../harness/README.md), and the **delivery job**,
 one for each thread bound to a [channel](../core/README.md#channels)'s conversation, which carries
 what the thread's contacts were told to the conversation. Jobs enter workspaces through the
-[gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an actor does. The
+[gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an actor does, once for
+each call to core, so a job holds a workspace only while a call runs. The
 [local host](../../hosts/local/README.md) runs them.
 
 | Module              | What it holds                                                                                                               |
@@ -18,10 +19,9 @@ what the thread's contacts were told to the conversation. Jobs enter workspaces 
 | `TurnRunner.ts`     | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
 | `JobPruning.ts`     | `JobPruning`, the hourly job that removes handled requests.                                                                 |
 
-`TurnRunner` keeps three steps of a run under `internal/`: `session-log-writer.ts`, what a run
-writes to its participation's session log; `turn-agent.ts`, starting the session of the agent a
-turn runs from what core gives and the host's integrations; and `turn-workspace.ts`, the workspace
-as a run calls it, each call entering it through the gateway for itself.
+`TurnRunner` keeps two steps of a run under `internal/`: `session-log-writer.ts`, what a run
+writes to its participation's session log; and `turn-agent.ts`, starting the session of the agent a
+turn runs from what core gives and the host's integrations.
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and connection
 contracts. It knows no harness, model provider, sandbox platform, or channel's system: the host
@@ -98,10 +98,9 @@ trying. The runner counts the tries it made of each delivery, which the delivery
 ## Running a turn
 
 `TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Gateway` and the host's
-`Integrations`. It calls the workspace through `TurnWorkspace`: core's `TurnExecution` and the
-session log store as a run calls them, each call entering the workspace through the gateway for
-itself, so the runner holds the workspace only while a call runs. `runNextTurn` runs one turn at a
-time:
+`Integrations`. It calls core's `TurnExecution` and the session log store directly, entering the
+job's workspace through the gateway for each call, so the runner holds the workspace only while a
+call runs, never for the minutes a turn runs. `runNextTurn` runs one turn at a time:
 
 1. `accept` the agent's active turn in the thread, or a new one that accepts the work that waits;
    with neither, there is nothing to run.
