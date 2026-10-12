@@ -1,4 +1,4 @@
-import { Agent, AgentPermissions, AgentService, AgentStore } from "@amends-dev/core/agent";
+import { Agent, AgentPermissions, AgentService } from "@amends-dev/core/agent";
 import {
   Assignment,
   AssignmentFacts,
@@ -32,6 +32,7 @@ import {
   type Bound,
 } from "./support.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,
@@ -504,7 +505,7 @@ describe("agents", () => {
           ];
           for (const write of writes)
             expect(yield* Effect.flip(bound.store.transaction(write))).toBeInstanceOf(
-              AgentStore.Conflict,
+              StoreError.StoreError,
             );
           expect(yield* storedAgents(bound)).toEqual([stored, storedPlanner].toSorted(byId));
           // A stored agent is replaced as a whole.

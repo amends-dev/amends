@@ -13,31 +13,8 @@ import * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelId from "./ChannelId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing bindings.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("ChannelBindingStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a thread bound already,
- * or a conversation bound to another thread of the same channel.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("ChannelBindingStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The binding store, bound to one workspace by the host.
@@ -57,19 +34,19 @@ export class ChannelBindingStore extends Context.Service<
     /** The thread's binding, if it came through a channel. */
     readonly get: (
       threadId: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, Failure>;
+    ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, StoreError.StoreError>;
     /** The binding of an external conversation on a channel, if the conversation has a thread. */
     readonly findByConversation: (
       channelId: ChannelId.Id,
       conversationId: ChannelTransport.ExternalId,
-    ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, Failure>;
+    ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, StoreError.StoreError>;
     /**
      * Reject a thread bound already, and a conversation bound to
      * another thread of the channel.
      */
     readonly insert: (
       record: ChannelBinding.ChannelBinding,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/channel/ChannelBindingStore") {}
 
@@ -84,8 +61,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: ChannelBindingStore["Service"],
 ): ChannelBindingStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("ChannelBindingStore");
+  const write = StoreInput.write("ChannelBindingStore", workspaceId);
   return {
     get: (threadId) => Effect.flatMap(read("get", ThreadId.Id, threadId), driver.get),
     findByConversation: Effect.fn("ChannelBindingStore.findByConversation")(
@@ -113,7 +90,7 @@ const makeMemory = Effect.fn("ChannelBindingStore.makeMemory")(function* () {
       function* (threadId) {
         return yield* rows.get((yield* read).records.of("channelBindings"), threadId);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("ChannelBindingStore", "get")),
     ),
     findByConversation: Effect.fn("ChannelBindingStore.memory.findByConversation")(
       function* (channelId, conversationId) {
@@ -124,13 +101,15 @@ const makeMemory = Effect.fn("ChannelBindingStore.makeMemory")(function* () {
           ),
         );
       },
-      Effect.mapError(storeFailure(Failure, "findByConversation")),
+      Effect.mapError(StoreError.failed("ChannelBindingStore", "findByConversation")),
     ),
     insert: Effect.fn("ChannelBindingStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("ChannelBindingStore", "insert")),
+      );
       const stored = yield* rows
         .all(space.records.of("channelBindings"))
-        .pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        .pipe(Effect.mapError(StoreError.failed("ChannelBindingStore", "insert")));
       if (
         space.records.of("channelBindings").has(record.threadId) ||
         stored.some(
@@ -139,11 +118,14 @@ const makeMemory = Effect.fn("ChannelBindingStore.makeMemory")(function* () {
             other.conversation.id === record.conversation.id,
         )
       )
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Thread or conversation already bound",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected(
+          "ChannelBindingStore",
+          "insert",
+          "Thread or conversation already bound",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("ChannelBindingStore", "insert")));
       space.records.of("channelBindings").set(record.threadId, row);
     }),
   };
@@ -153,8 +135,8 @@ const makeMemory = Effect.fn("ChannelBindingStore.makeMemory")(function* () {
 /**
  * Provide `ChannelBindingStore` in process memory, over the workspace's `Store.MemoryBinding`.
  * Bindings are keyed by thread. It keeps what the contract leaves to storage: a thread binds to one
- * conversation and a channel's conversation to one thread, so a second binding of either conflicts.
- * `make` checks every input first.
+ * conversation and a channel's conversation to one thread, so a second binding of either is
+ * rejected. `make` checks every input first.
  *
  * @category layers
  * @since 0.1.0

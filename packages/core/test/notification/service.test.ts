@@ -27,6 +27,7 @@ import { make, type Fixture } from "../memory.ts";
 import * as TestSignalHub from "../signal-hub.ts";
 import * as SignalHub from "../../src/signal/SignalHub.ts";
 import * as CoreError from "../../src/error/CoreError.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
@@ -411,7 +412,7 @@ it.effect("notification storage failures retain their cause", () =>
   Effect.gen(function* () {
     const fixture = yield* make(workspaceId);
     yield* seed(fixture);
-    const failure = new NotificationStore.Failure({ operation: "read", cause: "unavailable" });
+    const failure = StoreError.failed("NotificationStore", "read")("unavailable");
     const fail = () => Effect.fail(failure);
     yield* run(
       fixture,

@@ -22,7 +22,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
 import {
   Invitation,
   InvitationFacts,
@@ -52,6 +52,7 @@ import {
 
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Group admission and departure: authority, workspace removal, concurrency, and replay. */
 
@@ -647,10 +648,7 @@ describe("group memberships", () => {
           const { bound, group, owner } = yield* prepare();
           const before = yield* history(bound);
           const live = yield* bound.checkpoints.listLive(journalLog);
-          const failure = new Store.Failure({
-            operation: "commit",
-            cause: "injected late failure",
-          });
+          const failure = StoreError.failed("Store", "commit")("injected late failure");
           const broken = failingLate(bound, failure);
           expect(yield* Effect.flip(run(broken, owner, add(group.id, humanId)))).toEqual(failure);
           expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
@@ -832,7 +830,7 @@ describe("group memberships", () => {
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               _tag: "Some",
               value: {
-                _tag: expect.stringMatching(/^(CoreError.Conflict|Store.Conflict)$/),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
               },
             });
         }
@@ -1376,10 +1374,7 @@ describe("group memberships", () => {
             const membership = yield* run(bound, owner, add(group.id, humanId));
             const before = yield* history(bound);
             const live = yield* bound.checkpoints.listLive(journalLog);
-            const failure = new Store.Failure({
-              operation: "commit",
-              cause: "injected late failure",
-            });
+            const failure = StoreError.failed("Store", "commit")("injected late failure");
             const broken = failingLate(bound, failure);
             for (const operation of [remove, leave]) {
               const actor = operation === remove ? owner : memberActor(humanId);
@@ -1421,10 +1416,10 @@ describe("group memberships", () => {
           const admissions = yield* bound.groupMemberships.listActiveByMember(humanId);
           const before = yield* history(bound);
           const live = yield* bound.checkpoints.listLive(journalLog);
-          const failure = new GroupMembershipStore.Failure({
-            operation: "markRemoved",
-            cause: "second departure",
-          });
+          const failure = StoreError.failed(
+            "GroupMembershipStore",
+            "markRemoved",
+          )("second departure");
           const broken = {
             ...bound,
             context: Context.add(bound.context, GroupMembershipStore.GroupMembershipStore, {
@@ -1615,7 +1610,7 @@ describe("group memberships", () => {
           if (Exit.isFailure(outcome))
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               value: {
-                _tag: expect.stringMatching(/^(CoreError.Conflict|Store.Conflict)$/),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
               },
             });
         yield* Effect.scoped(
@@ -1690,7 +1685,7 @@ describe("group memberships", () => {
             if (Exit.isFailure(outcome))
               expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(/^(CoreError.Conflict|Store.Conflict)$/),
+                  _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
                 },
               });
           yield* Effect.scoped(
@@ -1745,7 +1740,11 @@ describe("group memberships", () => {
                 yield* Effect.flip(
                   bound.store.transaction(bound.groupMemberships.markRemoved(invalid)),
                 ),
-              ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "GroupMembershipStore",
+                reason: { _tag: "Rejected" },
+              });
               expect(yield* bound.groupMemberships.listActiveByMember(humanId)).toEqual(expected);
             }
             expect(
@@ -1755,12 +1754,20 @@ describe("group memberships", () => {
                   bound.groupMemberships.markRemoved({ ...removal, reason: "unknown" }),
                 ),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(
               yield* Effect.flip(
                 foreign.store.transaction(foreign.groupMemberships.markRemoved(removal)),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             yield* bound.store.transaction(bound.groupMemberships.markRemoved(removal));
             expect(yield* bound.groupMemberships.get(first.id)).toEqual(
               Option.some(Object.assign({}, first, { status: "removed" })),
@@ -1770,13 +1777,21 @@ describe("group memberships", () => {
               yield* Effect.flip(
                 bound.store.transaction(bound.groupMemberships.markRemoved(removal)),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             const fresh = yield* run(bound, owner, add(group.id, humanId));
             expect(
               yield* Effect.flip(
                 bound.store.transaction(bound.groupMemberships.markRemoved(removal)),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* bound.groupMemberships.findActive(group.id, humanId)).toEqual(
               Option.some(fresh),
             );
@@ -1947,7 +1962,11 @@ describe("group memberships", () => {
                       .publish(GroupMembershipFacts.Removed, { ...event.payload, reason: "left" })
                       .pipe(Effect.provideService(Publication.Publication, event.provenance)),
                   ),
-                ).toMatchObject({ _tag: "Store.Conflict" });
+                ).toMatchObject({
+                  _tag: "StoreError",
+                  store: "Store",
+                  reason: { _tag: "Rejected" },
+                });
               }),
             );
             expect(yield* history(bound)).toEqual(before);

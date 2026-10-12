@@ -14,8 +14,9 @@ import { SessionStateStore } from "@amends-dev/core/turn";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeFailure } from "./internal/errors.ts";
+
 import { sessionStates } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decodeSaved = Schema.decodeUnknownEffect(SessionStateStore.Saved);
 
@@ -69,7 +70,7 @@ export const make = Effect.fn("SessionStates.make")(function* () {
         if (Option.isNone(found)) return Option.none();
         return Option.some(yield* decodeSaved(savedOf(found.value)));
       },
-      Effect.mapError(storeFailure(SessionStateStore, "get")),
+      Effect.mapError(StoreError.failed("SessionStateStore", "get")),
     ),
     set: Effect.fn("SessionStates.set")(
       function* (participationId, saved) {
@@ -95,7 +96,7 @@ export const make = Effect.fn("SessionStates.make")(function* () {
           true,
         );
       },
-      Effect.mapError(storeFailure(SessionStateStore, "set")),
+      Effect.mapError(StoreError.failed("SessionStateStore", "set")),
     ),
   };
   return SessionStateStore.make(driver);

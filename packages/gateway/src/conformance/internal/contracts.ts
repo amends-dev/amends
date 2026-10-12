@@ -104,7 +104,11 @@ export const contracts = (fixture: Fixture) => {
                   }),
                 ),
               ),
-            ).toMatchObject({ _tag: "AssignmentStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "AssignmentStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* bound.roles.get(roleId)).toEqual(Option.some(role));
             expect(yield* bound.assignments.get(record.id)).toEqual(Option.none());
           }),
@@ -135,7 +139,9 @@ export const contracts = (fixture: Fixture) => {
                   expect(
                     yield* Effect.flip(bound.workspace.transferOwnership(input)),
                   ).toMatchObject({
-                    _tag: "WorkspaceStore.Conflict",
+                    _tag: "StoreError",
+                    store: "WorkspaceStore",
+                    reason: { _tag: "Rejected" },
                   });
                   expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
                 }
@@ -144,13 +150,13 @@ export const contracts = (fixture: Fixture) => {
                 expect(
                   yield* Effect.flip(bound.workspace.transferOwnership(invalid)),
                 ).toMatchObject({
-                  _tag: "WorkspaceStore.Conflict",
+                  _tag: "StoreError",
+                  store: "WorkspaceStore",
+                  reason: { _tag: "Rejected" },
                 });
                 yield* bound.workspace.transferOwnership(change);
                 expect(yield* Effect.flip(bound.workspace.transferOwnership(change))).toMatchObject(
-                  {
-                    _tag: "WorkspaceStore.Conflict",
-                  },
+                  { _tag: "StoreError", store: "WorkspaceStore", reason: { _tag: "Rejected" } },
                 );
               }),
             );
@@ -172,13 +178,21 @@ export const contracts = (fixture: Fixture) => {
                   }),
                 ),
               ),
-            ).toMatchObject({ _tag: "WorkspaceStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "WorkspaceStore",
+              reason: { _tag: "Rejected" },
+            });
             const expired = yield* bound.store.transaction(Effect.context<Store.Transaction>());
             expect(
               yield* Effect.flip(
                 bound.workspace.transferOwnership(change).pipe(Effect.provide(expired)),
               ),
-            ).toMatchObject({ _tag: "WorkspaceStore.Failure" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "WorkspaceStore",
+              reason: { _tag: "Failed" },
+            });
           }),
         ),
       ),
@@ -215,8 +229,10 @@ export const contracts = (fixture: Fixture) => {
                 Object.assign({}, member("inactive", charlie), { status: "removed" as const }),
               ])
                 expect(yield* refused(record)).toMatchObject({
-                  _tag: "MemberStore.Conflict",
+                  _tag: "StoreError",
+                  store: "MemberStore",
                   operation: "insert",
+                  reason: { _tag: "Rejected" },
                 });
               yield* bound.store.transaction(
                 bound.members.markRemoved(Member.Id.make("bob-first")),
@@ -226,10 +242,17 @@ export const contracts = (fixture: Fixture) => {
                   yield* Effect.flip(
                     bound.store.transaction(bound.members.markRemoved(Member.Id.make(id))),
                   ),
-                ).toMatchObject({ _tag: "MemberStore.Conflict", operation: "markRemoved" });
+                ).toMatchObject({
+                  _tag: "StoreError",
+                  store: "MemberStore",
+                  operation: "markRemoved",
+                  reason: { _tag: "Rejected" },
+                });
               // A removed membership frees its identity but keeps its ID.
               expect(yield* refused(member("bob-first"))).toMatchObject({
-                _tag: "MemberStore.Conflict",
+                _tag: "StoreError",
+                store: "MemberStore",
+                reason: { _tag: "Rejected" },
               });
               yield* bound.store.transaction(bound.members.insert(member("bob-second")));
               expect(yield* bound.members.findActive(bob)).toEqual(
@@ -264,19 +287,34 @@ export const contracts = (fixture: Fixture) => {
                     bound.workspace.insert(Object.assign({}, workspace, { name: "Second" })),
                   ),
                 ),
-              ).toMatchObject({ _tag: "WorkspaceStore.Conflict", operation: "insert" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "WorkspaceStore",
+                operation: "insert",
+                reason: { _tag: "Rejected" },
+              });
               expect(
                 yield* Effect.flip(
                   bound.store.transaction(
                     bound.roles.insert(Object.assign({}, role, { name: "Another" })),
                   ),
                 ),
-              ).toMatchObject({ _tag: "RoleStore.Conflict", operation: "insert" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "RoleStore",
+                operation: "insert",
+                reason: { _tag: "Rejected" },
+              });
               expect(
                 yield* Effect.flip(
                   bound.store.transaction(bound.roles.rename(Role.Id.make("missing"), "Missing")),
                 ),
-              ).toMatchObject({ _tag: "RoleStore.Conflict", operation: "rename" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "RoleStore",
+                operation: "rename",
+                reason: { _tag: "Rejected" },
+              });
               const assignment: Assignment.Assignment = {
                 id: Assignment.Id.make("reused"),
                 workspaceId,
@@ -295,7 +333,9 @@ export const contracts = (fixture: Fixture) => {
                 bound.assignments.markRevoked(Assignment.Id.make("missing")),
               ])
                 expect(yield* Effect.flip(bound.store.transaction(operation))).toMatchObject({
-                  _tag: "AssignmentStore.Conflict",
+                  _tag: "StoreError",
+                  store: "AssignmentStore",
+                  reason: { _tag: "Rejected" },
                 });
               expect(yield* bound.assignments.get(assignment.id)).toEqual(
                 Option.some(Object.assign({}, assignment, { status: "revoked" })),
@@ -334,7 +374,11 @@ export const contracts = (fixture: Fixture) => {
                     ),
                   ),
               ),
-            ).toMatchObject({ _tag: "Store.Failure" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "Checkpoint",
+              reason: { _tag: "Failed" },
+            });
             yield* bound.store.transaction(bound.checkpoints.setLive(logId, versions));
             expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
             expect(yield* bound.checkpoints.listLive(otherLog)).toEqual([]);
@@ -349,7 +393,12 @@ export const contracts = (fixture: Fixture) => {
                   ]),
                 ),
               ),
-            ).toMatchObject({ _tag: "Store.Conflict", operation: "checkpoint.setLive" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "Checkpoint",
+              operation: "setLive",
+              reason: { _tag: "Rejected" },
+            });
             expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
             // A set replaces the whole register, and a rolled-back one changes nothing.
             yield* bound.store.transaction(
@@ -436,14 +485,18 @@ export const contracts = (fixture: Fixture) => {
             // Groups and admissions: a reused ID, and one active admission per group and member.
             const stored = Option.getOrThrow(yield* bound.groups.get(group.id));
             expect(yield* refused(bound.groups.insert(stored))).toMatchObject({
-              _tag: "GroupStore.Conflict",
+              _tag: "StoreError",
+              store: "GroupStore",
+              reason: { _tag: "Rejected" },
             });
             for (const duplicate of [
               admission,
               Object.assign({}, admission, { id: GroupMembership.Id.make("another-admission") }),
             ])
               expect(yield* refused(bound.groupMemberships.insert(duplicate))).toMatchObject({
-                _tag: "GroupMembershipStore.Conflict",
+                _tag: "StoreError",
+                store: "GroupMembershipStore",
+                reason: { _tag: "Rejected" },
               });
 
             // Follows: a reused ID, and one active follow per admission.
@@ -463,14 +516,18 @@ export const contracts = (fixture: Fixture) => {
               Object.assign({}, follow, { id: GroupFollow.Id.make("second-follow") }),
             ])
               expect(yield* refused(bound.groupFollows.insert(duplicate))).toMatchObject({
-                _tag: "GroupFollowStore.Conflict",
+                _tag: "StoreError",
+                store: "GroupFollowStore",
+                reason: { _tag: "Rejected" },
               });
             expect(yield* bound.groupFollows.listActiveByGroup(group.id)).toEqual([follow]);
 
             // Threads, participations, and messages: a reused ID, and one active participation
             // per participant in a thread.
             expect(yield* refused(bound.threads.insert(started.thread))).toMatchObject({
-              _tag: "ThreadStore.Conflict",
+              _tag: "StoreError",
+              store: "ThreadStore",
+              reason: { _tag: "Rejected" },
             });
             for (const duplicate of [
               participation,
@@ -479,10 +536,14 @@ export const contracts = (fixture: Fixture) => {
               }),
             ])
               expect(yield* refused(bound.participations.insert(duplicate))).toMatchObject({
-                _tag: "ThreadParticipationStore.Conflict",
+                _tag: "StoreError",
+                store: "ThreadParticipationStore",
+                reason: { _tag: "Rejected" },
               });
             expect(yield* refused(bound.messages.insert(started.message))).toMatchObject({
-              _tag: "ThreadMessageStore.Conflict",
+              _tag: "StoreError",
+              store: "ThreadMessageStore",
+              reason: { _tag: "Rejected" },
             });
 
             // Timelines: contiguous positions, and one activity per subject.
@@ -508,7 +569,9 @@ export const contracts = (fixture: Fixture) => {
               published("same-subject", started.message.id, 2),
             ])
               expect(yield* refused(bound.activities.insert(misplaced))).toMatchObject({
-                _tag: "ThreadActivityStore.Conflict",
+                _tag: "StoreError",
+                store: "ThreadActivityStore",
+                reason: { _tag: "Rejected" },
               });
             yield* write(bound.activities.insert(published("next", message.id, 2)));
             expect(
@@ -550,7 +613,7 @@ export const contracts = (fixture: Fixture) => {
             Effect.flip(bound.store.transaction(program));
           const write = <A, E, R>(program: Effect.Effect<A, E, R>) =>
             bound.store.transaction(program);
-          const conflict = { _tag: "TurnStore.Conflict" };
+          const conflict = { _tag: "StoreError", store: "TurnStore", reason: { _tag: "Rejected" } };
 
           // Inserting: a reused ID, and a second active turn of the agent on the thread.
           const first = turn("first", "queued");

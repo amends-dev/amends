@@ -52,6 +52,7 @@ import * as SessionStateStore from "./SessionStateStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What every execution operation can fail with: a turn missing or not in the state the step needs
@@ -62,11 +63,10 @@ import * as CoreError from "../error/CoreError.ts";
  * @since 0.1.0
  */
 export type Error =
-  | TurnStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Projection.Error
-  | SessionStateStore.Failure
   | CoreError.NotFound
   | CoreError.Conflict
   | TurnCommand.EndError;
@@ -81,9 +81,7 @@ export type Error =
 export type AcceptError =
   | Error
   | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
-  | NotificationStore.Failure
-  | MemberStore.Failure
-  | SessionLogStore.Failure;
+  | StoreError.StoreError;
 
 /**
  * What `start` can fail with: `Error`, and the failures of reading what the agent is told and of
@@ -95,11 +93,7 @@ export type AcceptError =
 export type StartError =
   | Error
   | Exclude<ThreadQuery.TimelineError, CoreError.NotFound>
-  | NotificationStore.Failure
-  | MemberStore.Failure
-  | ContactStore.Failure
-  | TaskStore.Failure
-  | ThreadParticipationStore.Failure
+  | StoreError.StoreError
   | AgentQuery.BuildError;
 
 /**
@@ -109,13 +103,7 @@ export type StartError =
  * @category errors
  * @since 0.1.0
  */
-export type JoinedConversationError =
-  | Error
-  | MemberStore.Failure
-  | ContactStore.Failure
-  | ThreadParticipationStore.Failure
-  | ThreadActivityStore.Failure
-  | ThreadMessageStore.Failure;
+export type JoinedConversationError = Error | StoreError.StoreError;
 
 /**
  * What `close` can fail with: `Error`, and the failures of checking the agent's access and
@@ -127,7 +115,7 @@ export type JoinedConversationError =
 export type CloseError =
   | Error
   | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
-  | ThreadQuery.ParticipantsError
+  | StoreError.StoreError
   | ThreadCommand.Error;
 
 /**
@@ -239,7 +227,7 @@ export class TurnExecution extends Context.Service<
     readonly fail: (
       turnId: Turn.Id,
       failure: { readonly reason: string; readonly resume?: SessionStateStore.Resume | undefined },
-    ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
+    ) => Effect.Effect<void, Error | StoreError.StoreError>;
     /**
      * End a turn its job stopped, or that it was not running, keeping a session it started: one
      * asked to stop, or whose participation ended. Any other turn is left as it is.
@@ -247,7 +235,7 @@ export class TurnExecution extends Context.Service<
     readonly confirmStopped: (
       turnId: Turn.Id,
       stopped: { readonly resume?: SessionStateStore.Resume | undefined },
-    ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
+    ) => Effect.Effect<void, Error | StoreError.StoreError>;
   }
 >()("@amends-dev/core/turn/TurnExecution") {}
 

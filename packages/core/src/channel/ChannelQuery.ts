@@ -19,14 +19,7 @@ import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import * as Channel from "./Channel.ts";
 import * as ChannelStore from "./ChannelStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-
-/**
- * What reaching a channel's system can fail with, besides it being unavailable.
- *
- * @category errors
- * @since 0.1.0
- */
-export type Error = ConnectionStore.Failure | ConnectionCredentialStore.Failure;
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The shared reads of channels. Internal: not among `Core.Operations`.
@@ -40,7 +33,7 @@ export class ChannelQuery extends Context.Service<
     /** The channel, which must exist and not be removed; otherwise it is `CoreError.NotFound`. */
     readonly requireActive: (
       channelId: Channel.Id,
-    ) => Effect.Effect<Channel.Channel, ChannelStore.Failure | CoreError.NotFound>;
+    ) => Effect.Effect<Channel.Channel, StoreError.StoreError | CoreError.NotFound>;
     /** The integration of a connection, which must be installed and give channels. */
     readonly integrationOf: (
       connection: Connection.Connection,
@@ -51,11 +44,14 @@ export class ChannelQuery extends Context.Service<
      */
     readonly access: (
       channel: Channel.Channel,
-    ) => Effect.Effect<Connection.Access, Error | CoreError.Unavailable>;
+    ) => Effect.Effect<Connection.Access, StoreError.StoreError | CoreError.Unavailable>;
     /** The channel's transport, made by its integration from that access. */
     readonly transport: (
       channel: Channel.Channel,
-    ) => Effect.Effect<ChannelTransport.ChannelTransport, Error | CoreError.Unavailable>;
+    ) => Effect.Effect<
+      ChannelTransport.ChannelTransport,
+      StoreError.StoreError | CoreError.Unavailable
+    >;
   }
 >()("@amends-dev/core/channel/ChannelQuery") {}
 
@@ -115,7 +111,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
     record: Connection.Connection,
   ): Effect.fn.Return<
     ConnectionContract.Credential | null,
-    ConnectionCredentialStore.Failure | CoreError.Unavailable
+    StoreError.StoreError | CoreError.Unavailable
   > {
     if (record.auth !== "apiKey") return null;
     const credential = yield* connectionCredentialStore.get(record.id).pipe(

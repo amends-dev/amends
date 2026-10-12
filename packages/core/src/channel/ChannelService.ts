@@ -16,7 +16,6 @@ import * as ConnectionPermissions from "../connection/ConnectionPermissions.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import type * as Connection from "../connection/Connection.ts";
 import type * as Group from "../group/Group.ts";
-import type * as GroupMembershipStore from "../group/GroupMembershipStore.ts";
 import * as GroupQuery from "../group/GroupQuery.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
@@ -36,6 +35,7 @@ import * as ChannelPermissions from "./ChannelPermissions.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import * as ChannelStore from "./ChannelStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading channels can fail with.
@@ -45,7 +45,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type ReadError =
   | Authorization.Error
-  | ChannelStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
 
@@ -64,7 +64,7 @@ export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | P
  * @category errors
  * @since 0.1.0
  */
-export type DestinationError = GroupMembershipStore.Failure | CoreError.NotFound;
+export type DestinationError = StoreError.StoreError | CoreError.NotFound;
 
 /**
  * What creating a channel can fail with.
@@ -72,7 +72,7 @@ export type DestinationError = GroupMembershipStore.Failure | CoreError.NotFound
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | DestinationError | ConnectionStore.Failure | CoreError.Invalid;
+export type CreateError = Error | DestinationError | StoreError.StoreError | CoreError.Invalid;
 
 /**
  * What redirecting a channel can fail with.
@@ -88,10 +88,7 @@ export type RedirectError = Error | DestinationError;
  * @category errors
  * @since 0.1.0
  */
-export type BindingError =
-  | ThreadQuery.AccessError
-  | ChannelBindingStore.Failure
-  | CoreError.NotFound;
+export type BindingError = ThreadQuery.AccessError | StoreError.StoreError | CoreError.NotFound;
 
 /**
  * The channel operations, one of `Core.Operations`.

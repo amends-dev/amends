@@ -612,7 +612,9 @@ describe("tasks", () => {
             [foreign, foreign.tasks.insert(task)],
           ] as const) {
             expect(yield* Effect.flip(store.store.transaction(write))).toMatchObject({
-              _tag: "TaskStore.Conflict",
+              _tag: "StoreError",
+              store: "TaskStore",
+              reason: { _tag: "Rejected" },
             });
           }
           expect(yield* bound.tasks.get(task.threadId)).toEqual(Option.some(task));

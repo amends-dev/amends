@@ -51,6 +51,7 @@ import * as Gateway from "../src/Gateway.ts";
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -409,9 +410,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
             ? gateway.inWorkspace(workspaceId, program)
             : gateway.asMember(workspaceId, alice, program);
         const conflict = yield* Effect.flip(
-          enter(
-            Effect.fail(new Store.Conflict({ operation: "append", message: "Changed position" })),
-          ),
+          enter(Effect.fail(StoreError.contended("Store", "append", "Changed position"))),
         );
         expect(conflict).toMatchObject({
           _tag: "CoreError.Unavailable",
@@ -466,10 +465,7 @@ it.effect(
   () =>
     run((gateway) =>
       Effect.gen(function* () {
-        const failure = new MemberStore.Failure({
-          operation: "get",
-          cause: new Error("database detail"),
-        });
+        const failure = StoreError.failed("MemberStore", "get")(new Error("database detail"));
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
         ).toBe(failure);
@@ -490,7 +486,7 @@ it.effect("projection replay failures are defects before the operation runs", ()
     const operation = Effect.sync(() => {
       called = true;
     });
-    const failure = new Store.Failure({ operation: "read", cause: new Error("unavailable") });
+    const failure = StoreError.failed("Store", "read")(new Error("unavailable"));
     const badReplay = yield* run(
       (gateway) => Effect.exit(gateway.inWorkspace(workspaceId, operation)),
       { read: () => Effect.fail(failure) },
@@ -831,7 +827,7 @@ it.effect("an open lease keeps its workspace prepared past the time-to-live", ()
 
 it.effect("a failed boot is discarded and a later acquisition retries once", () =>
   Effect.gen(function* () {
-    const failure = new Store.Failure({ operation: "read", cause: "boot failed" });
+    const failure = StoreError.failed("Store", "read")("boot failed");
     let reads = 0;
     let executed = 0;
     yield* Effect.scoped(

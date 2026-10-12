@@ -19,6 +19,7 @@ import type * as Permission from "./Permission.ts";
 import * as RoleStore from "./RoleStore.ts";
 
 import type * as Scope from "./Scope.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What resolving grants can fail with: the assignment and role stores.
@@ -26,7 +27,7 @@ import type * as Scope from "./Scope.ts";
  * @category errors
  * @since 0.1.0
  */
-export type Error = AssignmentStore.Failure | RoleStore.Failure | Schema.SchemaError;
+export type Error = StoreError.StoreError | Schema.SchemaError;
 
 /**
  * The grant resolution, bound to one workspace. `Authorization` is its caller; operations check

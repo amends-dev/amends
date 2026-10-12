@@ -2,11 +2,10 @@
  * The PostgreSQL driver for `RoleStore.RoleStore`, over two tables: `roles`, each named bundle of
  * permissions as a text array, and `builtin_role_revisions`, the built-in bundle revision the
  * workspace's roles hold. `RoleStore.make` checks every input before the driver sees it, so the
- * driver keeps only what storage keeps: the primary key refuses a reused ID as the store's
- * `Conflict`, an edit that finds no role conflicts, and recording a revision is an upsert that
- * only moves it forward, conflicting otherwise. Every statement is scoped to the binding's
- * workspace and runs under its `guard`, which lets a read join the caller's transaction and
- * requires one for a write.
+ * driver keeps only what storage keeps: the primary key rejects a reused ID, an edit that finds no
+ * role is rejected, and recording a revision is an upsert that only moves it forward, rejected
+ * otherwise. Every statement is scoped to the binding's workspace and runs under its `guard`, which
+ * lets a read join the caller's transaction and requires one for a write.
  *
  * @since 0.1.0
  */
@@ -14,8 +13,9 @@ import { Role, RoleStore } from "@amends-dev/core/authorization";
 import { and, eq, lt } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { builtinRoleRevisions, roles } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** The table's columns already have the record's names; decoding checks brands and uniqueness. */
 const decode = Schema.decodeUnknownEffect(Schema.Array(Role.Role));
@@ -44,9 +44,9 @@ export const make = Effect.fn("Roles.make")(function* () {
         .where(and(inWorkspace, eq(roles.id, id)))
         .returning({ id: roles.id }),
       true,
-    ).pipe(Effect.mapError(storeError(RoleStore, operation)));
+    ).pipe(Effect.mapError(storeError("RoleStore", operation)));
     if (rows.length === 0)
-      return yield* new RoleStore.Conflict({ operation, message: "Role does not exist" });
+      return yield* StoreError.rejected("RoleStore", operation, "Role does not exist");
   });
   const driver: RoleStore.RoleStore["Service"] = {
     get: (id) =>
@@ -58,7 +58,7 @@ export const make = Effect.fn("Roles.make")(function* () {
       ).pipe(
         Effect.flatMap(decode),
         Effect.map(Array.head),
-        Effect.mapError(storeFailure(RoleStore, "get")),
+        Effect.mapError(StoreError.failed("RoleStore", "get")),
       ),
     insert: Effect.fn("Roles.insert")(function* (record) {
       yield* guard(
@@ -69,7 +69,7 @@ export const make = Effect.fn("Roles.make")(function* () {
           permissions: [...record.permissions],
         }),
         true,
-      ).pipe(Effect.mapError(storeError(RoleStore, "insert")));
+      ).pipe(Effect.mapError(storeError("RoleStore", "insert")));
     }),
     rename: Effect.fn("Roles.rename")(function* (id, validated) {
       yield* edit("rename", id, { name: validated });
@@ -84,7 +84,7 @@ export const make = Effect.fn("Roles.make")(function* () {
         .where(eq(builtinRoleRevisions.workspaceId, workspaceId)),
     ).pipe(
       Effect.map((rows) => Array.head(rows.map(({ revision }) => revision))),
-      Effect.mapError(storeFailure(RoleStore, "builtinRevision")),
+      Effect.mapError(StoreError.failed("RoleStore", "builtinRevision")),
     ),
     recordBuiltinRevision: Effect.fn("Roles.recordBuiltinRevision")(function* (revision) {
       // Only a later revision replaces the recorded one.
@@ -99,12 +99,13 @@ export const make = Effect.fn("Roles.make")(function* () {
           })
           .returning({ revision: builtinRoleRevisions.revision }),
         true,
-      ).pipe(Effect.mapError(storeError(RoleStore, "recordBuiltinRevision")));
+      ).pipe(Effect.mapError(storeError("RoleStore", "recordBuiltinRevision")));
       if (rows.length === 0)
-        return yield* new RoleStore.Conflict({
-          operation: "recordBuiltinRevision",
-          message: "Expected a later built-in revision",
-        });
+        return yield* StoreError.rejected(
+          "RoleStore",
+          "recordBuiltinRevision",
+          "Expected a later built-in revision",
+        );
     }),
   };
   return RoleStore.make(workspaceId, driver);

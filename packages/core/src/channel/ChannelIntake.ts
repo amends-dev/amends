@@ -33,11 +33,11 @@ import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
-import type * as ChannelStore from "./ChannelStore.ts";
 import * as Contact from "./Contact.ts";
 import * as ContactStore from "./ContactStore.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or
@@ -89,14 +89,7 @@ export interface Received extends Schema.Schema.Type<typeof Received> {}
 export type IntakeError =
   | CoreError.NotFound
   | CoreError.Unavailable
-  | ChannelStore.Failure
-  | ChannelQuery.Error
-  | ChannelBindingStore.Failure
-  | ContactStore.Failure
-  | DeliveryStore.Failure
-  | ThreadStore.Failure
-  | ThreadMessageStore.Failure
-  | ThreadQuery.FollowersError
+  | StoreError.StoreError
   | Exclude<TaskCommand.Error, CoreError.Conflict>;
 
 /**

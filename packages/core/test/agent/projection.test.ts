@@ -15,6 +15,7 @@ import * as Member from "../../src/workspace/Member.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Entry.LogId.make("workspace-one/journal");
@@ -35,7 +36,7 @@ const created: Agent.Agent = {
 const agentsInMemory = () => {
   const records = new Map<string, Agent.Agent>();
   const conflict = (operation: string, message: string) =>
-    Effect.fail(new AgentStore.Conflict({ operation, message }));
+    Effect.fail(StoreError.rejected("AgentStore", operation, message));
   return AgentStore.AgentStore.of({
     get: (id) => Effect.sync(() => Option.fromNullishOr(records.get(id))),
     list: Effect.sync(() => [...records.values()]),

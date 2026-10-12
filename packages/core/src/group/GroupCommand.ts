@@ -25,6 +25,7 @@ import * as GroupStore from "./GroupStore.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipFacts from "./GroupMembershipFacts.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What admitting a member can fail with: publishing the admission.
@@ -51,8 +52,7 @@ export type RemoveError = Log.WriteError | Projection.Error;
  */
 export type EstablishError =
   | CoreError.Conflict
-  | GroupStore.Failure
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | AdmitError;
 

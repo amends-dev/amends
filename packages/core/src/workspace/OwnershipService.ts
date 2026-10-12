@@ -33,6 +33,7 @@ import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the ownership operations can fail with: the outcomes above, and the failures
@@ -43,8 +44,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type Error =
   | Delegation.Error
-  | WorkspaceStore.Failure
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError

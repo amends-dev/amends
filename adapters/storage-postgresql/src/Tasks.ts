@@ -3,8 +3,8 @@
  * by its thread, with its creator's kind in a column beside that kind's own ID column. A group's
  * tasks page newest first through `tasks_by_group`, from an exclusive row cursor.
  * `TaskStore.make` checks every input before the driver sees it, so the driver keeps only what
- * storage keeps: the primary key refuses a thread that has a task as the store's `Conflict`, and
- * applying a change is a conditional update that conflicts unless the task holds the value the
+ * storage keeps: the primary key rejects a thread that has a task, and
+ * applying a change is a conditional update rejected unless the task holds the value the
  * change replaces. Every statement is scoped to the binding's workspace and runs under its
  * `guard`, which lets a read join the caller's transaction and requires one for a write.
  *
@@ -18,7 +18,8 @@ import type { SQL } from "drizzle-orm";
 import { tasks } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
+import { StoreError } from "@amends-dev/core/journal";
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ...Task.Task.fields, createdAt: Schema.DateTimeUtcFromDate })),
 );
@@ -76,7 +77,7 @@ export const make = Effect.fn("Tasks.make")(function* () {
       ).pipe(
         Effect.flatMap(toRecords),
         Effect.map(Array.head),
-        Effect.mapError(storeFailure(TaskStore, "get")),
+        Effect.mapError(StoreError.failed("TaskStore", "get")),
       ),
     getMany: (threadIds) =>
       threadIds.length === 0
@@ -86,7 +87,10 @@ export const make = Effect.fn("Tasks.make")(function* () {
               .select()
               .from(tasks)
               .where(and(inWorkspace, inIds(tasks.threadId, threadIds))),
-          ).pipe(Effect.flatMap(toRecords), Effect.mapError(storeFailure(TaskStore, "getMany"))),
+          ).pipe(
+            Effect.flatMap(toRecords),
+            Effect.mapError(StoreError.failed("TaskStore", "getMany")),
+          ),
     listByGroup: (groupId, options) => {
       const orderedId = sql`${tasks.threadId} COLLATE "C"`;
       return guard(
@@ -105,7 +109,10 @@ export const make = Effect.fn("Tasks.make")(function* () {
           )
           .orderBy(desc(tasks.createdAt), desc(orderedId))
           .limit(options.limit),
-      ).pipe(Effect.flatMap(toRecords), Effect.mapError(storeFailure(TaskStore, "listByGroup")));
+      ).pipe(
+        Effect.flatMap(toRecords),
+        Effect.mapError(StoreError.failed("TaskStore", "listByGroup")),
+      );
     },
     insert: (record) =>
       guard(
@@ -120,7 +127,7 @@ export const make = Effect.fn("Tasks.make")(function* () {
           createdAt: DateTime.toDate(record.createdAt),
         }),
         true,
-      ).pipe(Effect.asVoid, Effect.mapError(storeError(TaskStore, "insert"))),
+      ).pipe(Effect.asVoid, Effect.mapError(storeError("TaskStore", "insert"))),
     apply: Effect.fn("Tasks.apply")(function* (threadId, change) {
       const columns = changeColumns(change);
       const updated = yield* guard(
@@ -130,12 +137,13 @@ export const make = Effect.fn("Tasks.make")(function* () {
           .where(and(inWorkspace, eq(tasks.threadId, threadId), columns.where))
           .returning({ threadId: tasks.threadId }),
         true,
-      ).pipe(Effect.mapError(storeError(TaskStore, "apply")));
+      ).pipe(Effect.mapError(storeError("TaskStore", "apply")));
       if (updated.length === 0)
-        return yield* new TaskStore.Conflict({
-          operation: "apply",
-          message: "Expected a task holding the value the change replaces",
-        });
+        return yield* StoreError.rejected(
+          "TaskStore",
+          "apply",
+          "Expected a task holding the value the change replaces",
+        );
     }),
   };
   return TaskStore.make(workspaceId, driver);

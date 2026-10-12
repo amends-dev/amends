@@ -361,8 +361,10 @@ describe("notifications", () => {
               expect(
                 yield* Effect.flip(bound.store.transaction(bound.notifications.insert(duplicate))),
               ).toMatchObject({
-                _tag: "NotificationStore.Conflict",
+                _tag: "StoreError",
+                store: "NotificationStore",
                 operation: "insert",
+                reason: { _tag: "Rejected" },
               });
             }
             const otherLog = record("other-log", {
@@ -408,7 +410,12 @@ describe("notifications", () => {
             yield* Effect.flip(
               bound.notifications.markSeen([...absent, Notification.Id.make("many-0")], recordedAt),
             ),
-          ).toMatchObject({ _tag: "NotificationStore.Conflict", operation: "markSeen" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "NotificationStore",
+            operation: "markSeen",
+            reason: { _tag: "Rejected" },
+          });
         }),
       ),
     ),
@@ -439,7 +446,12 @@ describe("notifications", () => {
               yield* Effect.flip(
                 bound.store.transaction(bound.notifications.insertMany(conflicting)),
               ),
-            ).toMatchObject({ _tag: "NotificationStore.Conflict", operation: "insertMany" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "NotificationStore",
+              operation: "insertMany",
+              reason: { _tag: "Rejected" },
+            });
             for (const rejected of conflicting.slice(0, 1))
               expect(yield* bound.notifications.get(rejected.id)).toEqual(Option.none());
           }
@@ -466,12 +478,15 @@ describe("notifications", () => {
                 bound.store.transaction(bound.notifications.insert(input)).pipe(
                   Effect.match({
                     onSuccess: () => "Inserted",
-                    onFailure: (error) => error._tag,
+                    onFailure: (error) =>
+                      error._tag === "StoreError"
+                        ? `${error.store} ${error.reason._tag}`
+                        : error._tag,
                   }),
                 ),
               { concurrency: "unbounded" },
             );
-            expect(outcomes.sort()).toEqual(["Inserted", "NotificationStore.Conflict"]);
+            expect(outcomes.sort()).toEqual(["Inserted", "NotificationStore Rejected"]);
             expect(yield* bound.notifications.listPendingByRecipient(recipient, page)).toHaveLength(
               1,
             );
@@ -552,8 +567,10 @@ describe("notifications", () => {
                   const invalid = record("invalid");
                   change(invalid);
                   expect(yield* Effect.flip(bound.notifications.insert(invalid))).toMatchObject({
-                    _tag: "NotificationStore.Conflict",
+                    _tag: "StoreError",
+                    store: "NotificationStore",
                     operation: "insert",
+                    reason: { _tag: "Rejected" },
                   });
                   expect(yield* listOldestFirst(bound.notifications, human, page)).toEqual([]);
                 }
@@ -587,11 +604,15 @@ describe("notifications", () => {
             { limit: 1, after: badCursor },
           ]) {
             expect(yield* Effect.flip(read(human, options))).toMatchObject({
-              _tag: "NotificationStore.Failure",
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Failed" },
             });
           }
           expect(yield* Effect.flip(read(badRecipient, page))).toMatchObject({
-            _tag: "NotificationStore.Failure",
+            _tag: "StoreError",
+            store: "NotificationStore",
+            reason: { _tag: "Failed" },
           });
           expect(yield* read(human, page)).toEqual([]);
           for (const read of [
@@ -605,11 +626,15 @@ describe("notifications", () => {
               { limit: 1, before: badCursor },
             ]) {
               expect(yield* Effect.flip(read(human, options))).toMatchObject({
-                _tag: "NotificationStore.Failure",
+                _tag: "StoreError",
+                store: "NotificationStore",
+                reason: { _tag: "Failed" },
               });
             }
             expect(yield* Effect.flip(read(badRecipient, page))).toMatchObject({
-              _tag: "NotificationStore.Failure",
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Failed" },
             });
             expect(yield* read(human, page)).toEqual([]);
           }
@@ -646,7 +671,9 @@ describe("notifications", () => {
             ];
             for (const operation of failures) {
               expect(yield* Effect.flip(operation)).toMatchObject({
-                _tag: "NotificationStore.Failure",
+                _tag: "StoreError",
+                store: "NotificationStore",
+                reason: { _tag: "Failed" },
               });
             }
             expect(yield* a.notifications.get(value.id)).toEqual(Option.none());

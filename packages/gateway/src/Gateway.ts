@@ -10,7 +10,7 @@
 import * as Core from "@amends-dev/core";
 import { Authorization } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Checkpoint, Projection, Store } from "@amends-dev/core/journal";
+import { Checkpoint, Projection, Store, StoreError } from "@amends-dev/core/journal";
 import {
   type Member,
   MemberStore,
@@ -78,7 +78,7 @@ export class Gateway extends Context.Service<
 >()("@amends-dev/gateway/Gateway") {}
 
 const isPublic = Schema.is(GatewayErrors.PublicError);
-const isConflict = Schema.is(Store.Conflict);
+const isStoreError = Schema.is(StoreError.StoreError);
 const isUncertain = Schema.is(Store.CommitUncertain);
 const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
 const isBehind = Schema.is(Projection.Behind);
@@ -107,12 +107,13 @@ const toPublicErrors = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, GatewayErrors.PublicErrorOf<E>, R> =>
   Effect.catch(effect, (error): Effect.Effect<never, GatewayErrors.PublicErrorOf<E>> => {
-    if (isConflict(error))
+    // Storage another writer held or changed meanwhile: asking again may get past it.
+    if (isStoreError(error) && error.reason._tag === "Contended")
       return Effect.fail(
         new CoreError.Unavailable({
           reason: new CoreError.Contention({
             operation: error.operation,
-            description: error.message,
+            description: error.reason.description,
           }),
         }),
       );

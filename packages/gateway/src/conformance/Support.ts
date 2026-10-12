@@ -22,7 +22,15 @@ import {
   GroupStore,
 } from "@amends-dev/core/group";
 import { type Actor, Identity, Performer } from "@amends-dev/core/identity";
-import { Checkpoint, Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
+import {
+  Checkpoint,
+  Entry,
+  Event,
+  Journal,
+  Publication,
+  Store,
+  StoreError,
+} from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   type ThreadActivity,
@@ -234,7 +242,7 @@ export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
  * @category utils
  * @since 0.1.0
  */
-export const failingLate = (bound: Bound, failure: Store.Failure): Bound =>
+export const failingLate = (bound: Bound, failure: StoreError.StoreError): Bound =>
   Object.assign({}, bound, {
     context: Context.add(
       bound.context,

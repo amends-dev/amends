@@ -362,7 +362,9 @@ describe("group follows", () => {
               record("ended", { status: "ended", endedAt: followedAt }),
             ])
               expect(yield* Effect.flip(write(bound.groupFollows.insert(bad)))).toMatchObject({
-                _tag: "GroupFollowStore.Conflict",
+                _tag: "StoreError",
+                store: "GroupFollowStore",
+                reason: { _tag: "Rejected" },
               });
             expect(yield* bound.groupFollows.listActiveByGroup(team.id)).toEqual([record("first")]);
             expect(yield* bound.groupFollows.findActive(admission.id)).toEqual(
@@ -381,11 +383,19 @@ describe("group follows", () => {
             ])
               expect(
                 yield* Effect.flip(write(bound.groupFollows.end(bad, followedAt))),
-              ).toMatchObject({ _tag: "GroupFollowStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "GroupFollowStore",
+                reason: { _tag: "Rejected" },
+              });
             yield* write(bound.groupFollows.end(ending, followedAt));
             expect(
               yield* Effect.flip(write(bound.groupFollows.end(ending, followedAt))),
-            ).toMatchObject({ _tag: "GroupFollowStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupFollowStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* bound.groupFollows.get(ending.followId)).toEqual(
               Option.some(record("first", { status: "ended", endedAt: followedAt })),
             );

@@ -28,6 +28,7 @@ import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the assignment operations can fail with: the outcomes above, delegation's,
@@ -38,7 +39,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type Error =
   | Delegation.Error
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError

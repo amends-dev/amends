@@ -20,6 +20,7 @@ import type * as ThreadMessageId from "../thread/ThreadMessageId.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnFacts from "./TurnFacts.ts";
 import * as Turn from "./Turn.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * How a turn ended: completed with the reply it posted, if any, failed and why, or stopped and why
@@ -54,7 +55,7 @@ export type ActivityKind =
  * @category errors
  * @since 0.1.0
  */
-export type RecordError = ThreadCommand.Error | ThreadStore.Failure;
+export type RecordError = ThreadCommand.Error | StoreError.StoreError;
 
 /**
  * What ending a turn, or asking it to stop, can fail with: `RecordError`, and a projection's

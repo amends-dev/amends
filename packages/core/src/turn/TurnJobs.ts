@@ -23,6 +23,7 @@ import * as MemberId from "../workspace/MemberId.ts";
 import * as TurnFacts from "./TurnFacts.ts";
 import * as TurnStore from "./TurnStore.ts";
 import type * as Turn from "./Turn.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * An agent's turn job: the work of one agent in one thread, named by its membership.
@@ -61,14 +62,16 @@ export class TurnJobs extends Context.Service<
      * request is stored with the commit and discarded if it rolls back. Asking again before it runs
      * asks once.
      */
-    readonly requestRun: (job: Job) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+    readonly requestRun: (
+      job: Job,
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
      * Request, likewise, that the job stop its turn `turnId`, which was asked to stop or whose agent
      * no longer takes part where it works. A turn the job is not running is stopped as it stands.
      */
     readonly requestStop: (
       job: Job & { readonly turnId: Turn.Id },
-    ) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/turn/TurnJobs") {}
 
@@ -91,10 +94,6 @@ export const noRunner: TurnJobs["Service"] = TurnJobs.of({
  * @since 0.1.0
  */
 export const layerNoRunner = Layer.succeed(TurnJobs, noRunner);
-
-/** A turn store failure, as the commit a reaction runs in fails with it. */
-const toStoreFailure = (failure: TurnStore.Failure) =>
-  new Store.Failure({ operation: failure.operation, cause: failure.cause });
 
 const decodeRecorded = Schema.decodeUnknownSync(
   Schema.Struct({
@@ -172,7 +171,7 @@ const stopCancelledTurn = Effect.fnUntraced(function* (event: Event.Event) {
 const stopTurnOfEndedParticipation = Effect.fnUntraced(function* (event: Event.Event) {
   const { memberId, threadId, participationId } = decodeParticipationEnded(event.payload);
   const turnStore = yield* TurnStore.TurnStore;
-  const active = yield* Effect.mapError(turnStore.findActive(memberId, threadId), toStoreFailure);
+  const active = yield* turnStore.findActive(memberId, threadId);
   if (active._tag === "None" || active.value.participationId !== participationId) return;
   yield* (yield* TurnJobs).requestStop({
     workspaceId: event.provenance.workspaceId,
@@ -190,7 +189,7 @@ const stopTurnsInLeftGroup = Effect.fnUntraced(function* (event: Event.Event) {
   const { memberId, groupId } = decodeGroupRemoval(event.payload);
   const turnStore = yield* TurnStore.TurnStore;
   const turnJobs = yield* TurnJobs;
-  const active = yield* Effect.mapError(turnStore.listActiveByMember(memberId), toStoreFailure);
+  const active = yield* turnStore.listActiveByMember(memberId);
   for (const turn of active)
     if (turn.groupId === groupId)
       yield* turnJobs.requestStop({

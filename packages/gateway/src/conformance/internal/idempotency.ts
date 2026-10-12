@@ -104,14 +104,15 @@ export const idempotency = (fixture: Fixture) => {
                 (yield* log.read({ limit: 10 })).flatMap((batch) => batch.entries),
               ).toHaveLength(4);
               for (const payloads of [["one"], ["two", "one"], ["changed", "two"]])
-                expect((yield* Effect.flip(log.appendAll(payloads, options)))._tag).toBe(
-                  "Store.Conflict",
-                );
+                expect(yield* Effect.flip(log.appendAll(payloads, options))).toMatchObject({
+                  _tag: "StoreError",
+                  reason: { _tag: "Rejected" },
+                });
               expect(
-                (yield* Effect.flip(
+                yield* Effect.flip(
                   journal.publish(RoleFacts.Created, { ...original.payload, name: "Changed" }),
-                ))._tag,
-              ).toBe("Store.Conflict");
+                ),
+              ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
             }).pipe(
               Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
               Effect.provide(core(bound)),
@@ -163,14 +164,13 @@ export const idempotency = (fixture: Fixture) => {
               [new Uint8Array([1, 2])],
               [new Uint8Array([3]), new Uint8Array([1, 2])],
             ])
-              expect((yield* Effect.flip(bound.store.transaction(append(payloads))))._tag).toBe(
-                "Store.Conflict",
-              );
+              expect(yield* Effect.flip(bound.store.transaction(append(payloads)))).toMatchObject({
+                _tag: "StoreError",
+                reason: { _tag: "Rejected" },
+              });
             expect(
-              (yield* Effect.flip(
-                bound.store.transaction(append([], Occurrence.Key.make("empty"))),
-              ))._tag,
-            ).toBe("Store.Conflict");
+              yield* Effect.flip(bound.store.transaction(append([], Occurrence.Key.make("empty")))),
+            ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
             const invalid: Store.AppendInput = {
               logId: executionId,
               entries: input.map((payload) => ({ payload })),
@@ -178,14 +178,14 @@ export const idempotency = (fixture: Fixture) => {
             };
             Reflect.set(invalid, "idempotencyKey", " ");
             expect(
-              (yield* Effect.flip(
+              yield* Effect.flip(
                 bound.store.transaction(
                   Effect.flatMap(Store.Transaction, (storeTransaction) =>
                     storeTransaction.append(invalid),
                   ),
                 ),
-              ))._tag,
-            ).toBe("Store.Conflict");
+              ),
+            ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
           }),
         ),
     );
@@ -212,7 +212,11 @@ export const idempotency = (fixture: Fixture) => {
           const successes = attempts.filter((result) => Result.isSuccess(result));
           expect(successes.length).toBeGreaterThan(0);
           for (const result of attempts)
-            if (Result.isFailure(result)) expect(result.failure._tag).toBe("Store.Conflict");
+            if (Result.isFailure(result))
+              expect(result.failure).toMatchObject({
+                _tag: "StoreError",
+                reason: { _tag: "Rejected" },
+              });
           const first = yield* a.store.transaction(append);
           const second = yield* b.store.transaction(append);
           expect(second).toEqual(first);

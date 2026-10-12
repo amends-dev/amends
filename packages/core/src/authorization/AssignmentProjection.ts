@@ -9,10 +9,11 @@ import * as Projection from "../journal/Projection.ts";
 
 import * as AssignmentFacts from "./AssignmentFacts.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * Inserts each created assignment and marks each revoked one, without re-evaluating current
- * authority. A revocation naming another member than its assignment conflicts.
+ * authority. A revocation naming another member than its assignment is rejected.
  *
  * @category projections
  * @since 0.1.0
@@ -37,10 +38,11 @@ export const definition = Projection.make("workspace.assignments", { version: 1 
       const assignmentStore = yield* AssignmentStore.AssignmentStore;
       const recorded = yield* assignmentStore.get(payload.assignmentId);
       if (Option.isSome(recorded) && recorded.value.memberId !== payload.memberId)
-        return yield* new AssignmentStore.Conflict({
-          operation: "project",
-          message: "Revocation names another member than its assignment",
-        });
+        return yield* StoreError.rejected(
+          "AssignmentStore",
+          "project",
+          "Revocation names another member than its assignment",
+        );
       yield* assignmentStore.markRevoked(payload.assignmentId);
     }),
   );

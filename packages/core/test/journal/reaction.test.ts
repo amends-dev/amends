@@ -14,6 +14,7 @@ import * as Subject from "../../src/journal/Subject.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import { Counter, make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const logId = Entry.LogId.make("domain");
@@ -29,7 +30,9 @@ const Counted = Fact.make("test.counted", { subject, version: 1, payload: Schema
 class Requests extends Context.Service<
   Requests,
   {
-    readonly record: (request: string) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+    readonly record: (
+      request: string,
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("test/Requests") {}
 
@@ -39,8 +42,7 @@ const recordedRequests = () => {
   const state = { refusing: false };
   const service = Requests.of({
     record: Effect.fnUntraced(function* (request) {
-      if (state.refusing)
-        return yield* new Store.Failure({ operation: "record request", cause: "Refused" });
+      if (state.refusing) return yield* StoreError.failed("Store", "record request")("Refused");
       requested.push({ request, commit: (yield* Store.Transaction).id });
     }),
   });
@@ -135,8 +137,10 @@ it.effect("a reaction that fails fails the commit, which publishes nothing", () 
       return { failure, entries: yield* journal.log.read({ limit: 10 }) };
     }).pipe(publishing, Effect.provide(plain));
     expect(outcome.failure).toMatchObject({
-      _tag: "Store.Failure",
+      _tag: "StoreError",
+      store: "Store",
       operation: "record request",
+      reason: { _tag: "Failed" },
     });
     expect(outcome.entries).toEqual([]);
   }),

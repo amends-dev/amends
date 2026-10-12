@@ -32,6 +32,7 @@ import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
 
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading members can fail with: the outcome above, and the failures of what a
@@ -42,7 +43,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type Error =
   | Authorization.Error
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
 
@@ -66,9 +67,7 @@ export type RemoveError =
   | Error
   | PlatformError.PlatformError
   | Delegation.Error
-  | WorkspaceStore.Failure
-  | InvitationStore.Failure
-  | GroupMembershipStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | Log.WriteError
   | CoreError.Conflict;

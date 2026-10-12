@@ -35,6 +35,7 @@ import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What changing a group can fail with, which `CreateError` and `RenameError` extend:
@@ -58,12 +59,7 @@ export type Error =
  * @category errors
  * @since 0.1.0
  */
-export type CreateError =
-  | Error
-  | MemberStore.Failure
-  | CoreError.NotFound
-  | CoreError.Conflict
-  | GroupStore.Failure;
+export type CreateError = Error | StoreError.StoreError | CoreError.NotFound | CoreError.Conflict;
 
 /**
  * What renaming a team group can fail with: the outcomes above, and the failures of
@@ -74,8 +70,7 @@ export type CreateError =
  */
 export type RenameError =
   | Error
-  | GroupStore.Failure
-  | GroupMembershipStore.Failure
+  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Invalid
   | CoreError.Changed;
@@ -88,11 +83,7 @@ export type RenameError =
  */
 export type ReadError =
   | Authorization.Error
-  | GroupStore.Failure
-  | GroupMembershipStore.Failure
-  | GroupFollowStore.Failure
-  | ReadStateStore.Failure
-  | NotificationStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
 

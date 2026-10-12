@@ -13,31 +13,8 @@ import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupFollow from "./GroupFollow.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing follows.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("GroupFollowStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID, a second
- * active follow for one admission, or a missing, ended, or mismatched follow.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("GroupFollowStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The follow store, bound to one workspace by the host.
@@ -57,19 +34,19 @@ export class GroupFollowStore extends Context.Service<
     /** The follow, active or ended, if stored. */
     readonly get: (
       id: GroupFollow.Id,
-    ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, Failure>;
+    ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, StoreError.StoreError>;
     /** The active follow of one group admission; None when that admission follows nothing. */
     readonly findActive: (
       groupMembershipId: GroupMembership.Id,
-    ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, Failure>;
+    ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, StoreError.StoreError>;
     /** The active follows of several admissions in one read; admissions without one are omitted. */
     readonly findActiveMany: (
       groupMembershipIds: ReadonlyArray<GroupMembership.Id>,
-    ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, StoreError.StoreError>;
     /** Active follows of a group, in stable ID order, which `ThreadQuery.followers` reads. */
     readonly listActiveByGroup: (
       groupId: GroupId.Id,
-    ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, StoreError.StoreError>;
     /**
      * Insert an active follow. Reject reused IDs and a second active follow for one admission. The
      * admission is recorded as given: the application checks that it is current and belongs to the
@@ -77,12 +54,12 @@ export class GroupFollowStore extends Context.Service<
      */
     readonly insert: (
       record: GroupFollow.GroupFollow,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /** End exactly the addressed active follow; mismatched or ended follows conflict. */
     readonly end: (
       ending: GroupFollow.Ending,
       endedAt: DateTime.Utc,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/group/GroupFollowStore") {}
 
@@ -97,8 +74,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: GroupFollowStore["Service"],
 ): GroupFollowStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("GroupFollowStore");
+  const write = StoreInput.write("GroupFollowStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", GroupFollow.Id, id), driver.get),
     findActive: (groupMembershipId) =>
@@ -114,7 +91,7 @@ export const make = (
       write("insert", GroupFollow.GroupFollow, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active" && record.endedAt === null,
-          () => new Conflict({ operation: "insert", message: "Expected an active follow" }),
+          () => StoreError.rejected("GroupFollowStore", "insert", "Expected an active follow"),
         ),
         Effect.flatMap(driver.insert),
       ),
@@ -142,13 +119,13 @@ const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
       function* (id) {
         return yield* rows.get((yield* read).records.of("groupFollows"), id);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "get")),
     ),
     findActive: Effect.fn("GroupFollowStore.memory.findActive")(
       function* (id) {
         return Array.findFirst(yield* active, (record) => record.groupMembershipId === id);
       },
-      Effect.mapError(storeFailure(Failure, "findActive")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "findActive")),
     ),
     findActiveMany: Effect.fn("GroupFollowStore.memory.findActiveMany")(
       function* (input) {
@@ -156,7 +133,7 @@ const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
         if (ids.size === 0) return [];
         return (yield* active).filter((record) => ids.has(record.groupMembershipId));
       },
-      Effect.mapError(storeFailure(Failure, "findActiveMany")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "findActiveMany")),
     ),
     listActiveByGroup: Effect.fn("GroupFollowStore.memory.listActiveByGroup")(
       function* (groupId) {
@@ -164,13 +141,15 @@ const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
           .filter((record) => record.groupId === groupId)
           .toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id));
       },
-      Effect.mapError(storeFailure(Failure, "listActiveByGroup")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "listActiveByGroup")),
     ),
     insert: Effect.fn("GroupFollowStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("GroupFollowStore", "insert")),
+      );
       const follows = yield* rows
         .all(space.records.of("groupFollows"))
-        .pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        .pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "insert")));
       if (
         space.records.of("groupFollows").has(record.id) ||
         follows.some(
@@ -178,31 +157,37 @@ const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
             follow.groupMembershipId === record.groupMembershipId && follow.status === "active",
         )
       )
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Follow ID reused, or the admission already follows",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected(
+          "GroupFollowStore",
+          "insert",
+          "Follow ID reused, or the admission already follows",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "insert")));
       space.records.of("groupFollows").set(record.id, row);
     }),
     end: Effect.fn("GroupFollowStore.memory.end")(function* (ending, endedAt) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "end")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("GroupFollowStore", "end")),
+      );
       const current = yield* rows
         .get(space.records.of("groupFollows"), ending.followId)
-        .pipe(Effect.mapError(storeFailure(Failure, "end")));
+        .pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "end")));
       if (
         Option.isNone(current) ||
         current.value.groupId !== ending.groupId ||
         current.value.memberId !== ending.memberId ||
         current.value.status !== "active"
       )
-        return yield* new Conflict({
-          operation: "end",
-          message: "Follow is missing, mismatched, or already ended",
-        });
+        return yield* StoreError.rejected(
+          "GroupFollowStore",
+          "end",
+          "Follow is missing, mismatched, or already ended",
+        );
       const row = yield* rows
         .encode({ ...current.value, status: "ended", endedAt })
-        .pipe(Effect.mapError(storeFailure(Failure, "end")));
+        .pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "end")));
       space.records.of("groupFollows").set(ending.followId, row);
     }),
   };
@@ -211,9 +196,9 @@ const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
 
 /**
  * Provide `GroupFollowStore` in process memory, over the workspace's `Store.MemoryBinding`. It
- * keeps what the contract leaves to storage: a reused ID conflicts, and so does a second active
- * follow for one group admission; ending a follow conflicts unless it is stored, active, and of the
- * group and member named. An ended follow keeps its row. `make` checks every input first.
+ * keeps what the contract leaves to storage: a reused ID is rejected, and so is a second active
+ * follow for one group admission; ending a follow is rejected unless it is stored, active, and of
+ * the group and member named. An ended follow keeps its row. `make` checks every input first.
  *
  * @category layers
  * @since 0.1.0

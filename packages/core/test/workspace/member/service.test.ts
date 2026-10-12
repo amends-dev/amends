@@ -33,6 +33,7 @@ import * as Member from "../../../src/workspace/Member.ts";
 import * as WorkspaceStore from "../../../src/workspace/WorkspaceStore.ts";
 import * as Workspace from "../../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../../memory.ts";
+import * as StoreError from "../../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
@@ -381,7 +382,7 @@ it.effect("member reads pass storage failures through", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
-    const storageFailure = new MemberStore.Failure({ operation: "get", cause: "unavailable" });
+    const storageFailure = StoreError.failed("MemberStore", "get")("unavailable");
     expect(
       yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
         get: (id) => (id === bob.id ? Effect.fail(storageFailure) : fixture.members.get(id)),
@@ -492,7 +493,7 @@ it.effect("removal passes a failure reading ownership through and writes nothing
     const fixture = yield* make();
     yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
     const before = yield* fixture.snapshot;
-    const failure = new WorkspaceStore.Failure({ operation: "get", cause: "unavailable" });
+    const failure = StoreError.failed("WorkspaceStore", "get")("unavailable");
     expect(
       yield* run(
         fixture,

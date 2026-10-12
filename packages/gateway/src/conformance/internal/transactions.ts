@@ -19,6 +19,7 @@ import {
   otherWorkspaceId,
   workspaceId,
 } from "../Support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Atomic commits: concurrent writers, rollback, interruption, foreign handles, and work after a commit. */
 export const transactions = (fixture: Fixture) => {
@@ -54,10 +55,7 @@ export const transactions = (fixture: Fixture) => {
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const failure = new Store.Failure({
-              operation: "commit",
-              cause: "injected late failure",
-            });
+            const failure = StoreError.failed("Store", "commit")("injected late failure");
             const broken = failingLate(bound, failure);
             const footprint = yield* storage.footprint;
             expect(yield* Effect.flip(initialized(broken))).toBe(failure);
@@ -147,7 +145,9 @@ export const transactions = (fixture: Fixture) => {
             expect(ran).toEqual(["first", "second", "committed again"]);
             const expired = yield* bound.store.transaction(Store.Transaction);
             expect(yield* Effect.flip(expired.afterCommit(note("late")))).toMatchObject({
-              _tag: "Store.Failure",
+              _tag: "StoreError",
+              store: "Store",
+              reason: { _tag: "Failed" },
             });
             expect(ran).toEqual(["first", "second", "committed again"]);
           }),
@@ -165,13 +165,19 @@ export const transactions = (fixture: Fixture) => {
             const expired = yield* a.store.transaction(Effect.context<Store.Transaction>());
             expect(
               yield* Effect.flip(a.members.findActive(alice).pipe(Effect.provide(expired))),
-            ).toMatchObject({ _tag: "MemberStore.Failure" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "MemberStore",
+              reason: { _tag: "Failed" },
+            });
             expect(yield* Effect.flip(a.store.transaction(b.workspace.get))).toMatchObject({
-              _tag: "WorkspaceStore.Failure",
+              _tag: "StoreError",
+              store: "WorkspaceStore",
+              reason: { _tag: "Failed" },
             });
             expect(
               yield* Effect.flip(a.store.transaction(b.store.read(journalLog, { limit: 1 }))),
-            ).toMatchObject({ _tag: "Store.Failure" });
+            ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
             const native = Context.get(expired, Store.Transaction);
             expect(
               yield* Effect.flip(
@@ -179,7 +185,7 @@ export const transactions = (fixture: Fixture) => {
                   native.append({ logId: journalLog, entries: [{ payload: new Uint8Array([1]) }] }),
                 ),
               ),
-            ).toMatchObject({ _tag: "Store.Failure" });
+            ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
             expect(yield* a.store.read(journalLog, { limit: 1 })).toEqual([]);
           }),
         ),
@@ -210,7 +216,9 @@ export const transactions = (fixture: Fixture) => {
             }).pipe(Effect.provide(core(a)), Effect.forkChild);
             yield* Deferred.await(ready);
             expect(yield* Effect.flip(initialized(b, bob.id))).toMatchObject({
-              _tag: "Store.Conflict",
+              _tag: "StoreError",
+              store: "Store",
+              reason: { _tag: "Contended" },
             });
             yield* Deferred.succeed(release, undefined);
             const workspace = yield* Fiber.join(owner);

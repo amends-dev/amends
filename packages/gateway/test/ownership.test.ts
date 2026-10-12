@@ -8,7 +8,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Store, Publication } from "@amends-dev/core/journal";
+import { Journal, Publication } from "@amends-dev/core/journal";
 
 import {
   Member,
@@ -37,6 +37,7 @@ import {
   request,
   testProvenance,
 } from "./support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Ownership transfer: authority, recipients, competition, rollback, and replay. */
 
@@ -304,10 +305,7 @@ describe("ownership", () => {
           const before = yield* bound.store.read(journalLog, { limit: 20 });
           const previous = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
           const next = yield* bound.assignments.listActiveByMember(recipient.id);
-          const failure = new Store.Failure({
-            operation: "commit",
-            cause: "injected late failure",
-          });
+          const failure = StoreError.failed("Store", "commit")("injected late failure");
           const broken = failingLate(bound, failure);
           expect(
             yield* Effect.flatMap(OwnershipService.OwnershipService, (ownershipService) =>

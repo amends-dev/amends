@@ -30,6 +30,7 @@ import * as Member from "./Member.ts";
 import * as MemberCommand from "./MemberCommand.ts";
 import * as MemberStore from "./MemberStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the invitation operations can fail with: the outcomes above, and the
@@ -44,8 +45,7 @@ export type Error =
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError
-  | InvitationStore.Failure
-  | MemberStore.Failure
+  | StoreError.StoreError
   | MemberCommand.Error
   | CoreError.NotFound
   | CoreError.Denied

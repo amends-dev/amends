@@ -37,6 +37,7 @@ import * as ThreadMessageFacts from "./ThreadMessageFacts.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The thread's next position is not the one the caller accounted for: activity took it first.
@@ -56,10 +57,7 @@ export class PositionChanged extends Schema.TaggedError<PositionChanged>()(
  * @since 0.1.0
  */
 export type Error =
-  | ThreadQuery.ParticipantsError
-  | ThreadStore.Failure
-  | ThreadActivityStore.Failure
-  | TaskStore.Failure
+  | StoreError.StoreError
   | CoreError.Conflict
   | PositionChanged
   | Schema.SchemaError
@@ -530,7 +528,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   /** The thread a message belongs to, which a message cannot outlive. */
   const threadOf = Effect.fnUntraced(function* (message: {
     readonly threadId: Thread.Id;
-  }): Effect.fn.Return<Thread.Thread, ThreadStore.Failure> {
+  }): Effect.fn.Return<Thread.Thread, StoreError.StoreError> {
     const found = yield* threadStore.get(message.threadId);
     if (Option.isNone(found)) return yield* Effect.die("A message's thread is missing");
     return found.value;

@@ -27,6 +27,7 @@ import * as Role from "./Role.ts";
 import * as RoleStore from "./RoleStore.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What a delegation check can fail with: the outcomes above, authorization's, and
@@ -37,9 +38,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type Error =
   | Authorization.Error
-  | WorkspaceStore.Failure
-  | AssignmentStore.Failure
-  | RoleStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.Denied
   | CoreError.Conflict

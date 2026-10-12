@@ -25,6 +25,7 @@ import * as TaskCommand from "./TaskCommand.ts";
 import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What creating a task in a conversation can fail with.
@@ -36,7 +37,7 @@ export type CreateError =
   | Authorization.Error
   | ThreadQuery.AccessError
   | TaskCommand.Error
-  | TaskStore.Failure
+  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Conflict;
 
@@ -50,7 +51,7 @@ export type UpdateError =
   | Authorization.Error
   | ThreadQuery.AccessError
   | TaskCommand.Error
-  | TaskStore.Failure
+  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Changed
   | CoreError.Conflict;
@@ -64,7 +65,7 @@ export type UpdateError =
 export type ReadError =
   | ThreadQuery.AccessError
   | ThreadQuery.ListError
-  | TaskStore.Failure
+  | StoreError.StoreError
   | CoreError.NotFound;
 
 /**
@@ -243,7 +244,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
       before: Task.ListCursor | undefined,
     ): Effect.fn.Return<
       ReadonlyArray<{ readonly task: Task.Task; readonly thread: Thread.Thread }>,
-      TaskStore.Failure | ThreadStore.Failure
+      StoreError.StoreError
     > {
       const tasks = yield* taskStore.listByGroup(groupId, {
         ...(options.status === undefined ? {} : { status: options.status }),

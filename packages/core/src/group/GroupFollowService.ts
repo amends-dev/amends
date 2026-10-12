@@ -27,6 +27,7 @@ import * as GroupFollow from "./GroupFollow.ts";
 import * as GroupFollowFacts from "./GroupFollowFacts.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What following and unfollowing can fail with: the outcomes above, and the
@@ -37,10 +38,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type Error =
   | Authorization.Error
-  | GroupStore.Failure
-  | GroupMembershipStore.Failure
-  | MemberStore.Failure
-  | GroupFollowStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.WriteError

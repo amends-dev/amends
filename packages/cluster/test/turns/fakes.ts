@@ -155,7 +155,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
       Effect.suspend(() => {
         if (after !== log.length)
           return Effect.fail(
-            new SessionLogStore.Conflict({ participationId: String(participationId), after }),
+            new SessionLogStore.Overtaken({ participationId: String(participationId), after }),
           );
         const recorded = Array.map(entries, (entry, index) => ({
           position: after + index + 1,

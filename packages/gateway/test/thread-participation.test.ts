@@ -19,7 +19,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Fact, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Fact, Journal, Publication } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -71,6 +71,7 @@ import {
 
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Following and unfollowing threads: quiet activity, stale departures, settlement, and replay. */
 
@@ -687,7 +688,7 @@ describe("thread participation", () => {
             const before = yield* snapshot(bound, first.thread.id);
             const failingCommit = failingLate(
               bound,
-              new Store.Failure({ operation: "commit", cause: "injected" }),
+              StoreError.failed("Store", "commit")("injected"),
             ).context;
             const failingActivity = Context.add(
               bound.context,
@@ -695,9 +696,7 @@ describe("thread participation", () => {
               {
                 ...bound.activities,
                 insert: () =>
-                  Effect.fail(
-                    new ThreadActivityStore.Failure({ operation: "insert", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("ThreadActivityStore", "insert")("injected")),
               },
             );
             for (const context of [failingCommit, failingActivity]) {
@@ -715,9 +714,7 @@ describe("thread participation", () => {
             const failingCleanup = Context.add(bound.context, NotificationStore.NotificationStore, {
               ...bound.notifications,
               discardPendingForParticipation: () =>
-                Effect.fail(
-                  new NotificationStore.Failure({ operation: "discard", cause: "injected" }),
-                ),
+                Effect.fail(StoreError.failed("NotificationStore", "discard")("injected")),
             });
             for (const context of [failingCommit, failingCleanup]) {
               expect(
@@ -827,7 +824,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "Store.Conflict" },
+                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -895,7 +892,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "Store.Conflict" },
+                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -1073,7 +1070,11 @@ describe("thread participation", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadActivityStore",
+            reason: { _tag: "Rejected" },
+          });
           const departure = {
             workspaceId,
             threadId: first.thread.id,
@@ -1088,13 +1089,21 @@ describe("thread participation", () => {
               yield* Effect.flip(
                 bound.store.transaction(bound.participations.end(bad, yield* DateTime.now)),
               ),
-            ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "ThreadParticipationStore",
+              reason: { _tag: "Rejected" },
+            });
           yield* run(bound, human, unfollow(first.thread.id, participant.id));
           expect(
             yield* Effect.flip(
               bound.store.transaction(bound.participations.end(departure, yield* DateTime.now)),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadParticipationStore",
+            reason: { _tag: "Rejected" },
+          });
         }),
       ),
     ),
@@ -1253,10 +1262,10 @@ describe("thread participation", () => {
                 endByAdmission: (id, endedAt) =>
                   ++departures === 2
                     ? Effect.fail(
-                        new ThreadParticipationStore.Failure({
-                          operation: "endByAdmission",
-                          cause: "second departure failed",
-                        }),
+                        StoreError.failed(
+                          "ThreadParticipationStore",
+                          "endByAdmission",
+                        )("second departure failed"),
                       )
                     : bound.participations.endByAdmission(id, endedAt),
               },
@@ -1718,7 +1727,11 @@ describe("thread participation", () => {
             ])
               expect(
                 yield* Effect.flip(bound.store.transaction(bound.participations.insert(invalid))),
-              ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadParticipationStore",
+                reason: { _tag: "Rejected" },
+              });
           }),
         ),
       ),

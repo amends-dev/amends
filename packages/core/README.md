@@ -459,7 +459,7 @@ commit.
 
 Each participation has a session log, the record of the agent's conversation in the thread, apart
 from the journal and every commit (`SessionLogStore`: `head`, `append` after the position the writer
-read to, which a log past it refuses with `Conflict`, `read` past a position, and `waitForAppend`).
+read to, which a log past it refuses with `Overtaken`, `read` past a position, and `waitForAppend`).
 Its entries (`SessionLog.Entry`) are `Joined`, the conversation the agent joined, and, each naming
 its turn, `Prompted`, `Started` when a run started the turn, on which harness agent and with what
 continues the turn when the agent gives that, each `Step`, and `Interrupted` when a run stopped
@@ -610,13 +610,13 @@ process memory: the reference implementation of the storage contracts, which enf
 maps what the PostgreSQL adapter enforces with keys and indexes, and which core's tests run over.
 Nothing survives the process.
 
-Every store contract builds its store with `make(workspaceId, driver)`, over the driver an
-adapter implements: the store checks each input against its schema, and a record against the
-workspace, through `StoreInput`, before the driver sees it. The checkpoint and session log stores,
-whose inputs name no workspace, take the driver alone, and `Store.make` reads the workspace from
-its driver. A driver keeps only what storage keeps, such as reused IDs and conditional writes, and
-an adapter's module returns the contract's `make` over its driver from its constructor, as each
-`layerMemory` does.
+Every store contract builds its store with `make(workspaceId, driver)`, over the driver an adapter
+implements: the store checks each input against its schema, and a record against the workspace,
+through `StoreInput`, before the driver sees it. The checkpoint and session log stores, whose inputs
+name no workspace, take the driver alone, and `Store.make` reads the workspace from its driver. A
+driver keeps only what storage keeps, such as reused IDs and conditional writes, which it rejects
+with `StoreError` (`Rejected`), and an adapter's module returns the contract's `make` over its
+driver from its constructor, as each `layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
   workspace has one `Space`: its commits, log batches, keyed append slices, projected records by
@@ -641,7 +641,7 @@ thread sequences. Lists order IDs by their UTF-8 bytes, as binary collation does
 
 A transaction copies its workspace's maps, runs against the copy, and on success makes the copy
 the committed state; a failure or interruption discards it. A workspace another connection is
-writing reports `Store.Conflict` at once, as a lock wait that timed out immediately would;
+writing reports `StoreError` (`Contended`) at once, as a lock wait that timed out immediately would;
 the same connection's writers wait for each other. Each log has a lock shared by every host: a
 transaction takes it on its first append to the log, or lookup of one of its keys, refreshes its
 copy of that log from committed state, and keeps it until it ends; a standalone append takes only
@@ -683,9 +683,11 @@ state refuses is `CoreError.Conflict`; a request that cannot be done as asked is
 `CoreError.Invalid`; and what cannot be reached now is `CoreError.Unavailable`, the last four with
 their reason. Each says what it is about in its fields, and a query or command raises the kind
 itself, so it passes through every operation unchanged and a protocol or a browser client carries it
-without loading an implementation. Any other error is a failure of the module that raises it, and
-its tag is its name there, as `Store.Conflict`; the gateway turns those into defects. Helpers no
-consumer imports go under `internal/`.
+without loading an implementation. Every store fails with one `StoreError`, naming the store and the
+operation, whose reason says whether storage `Failed`, `Rejected` a write, or was `Contended`; the
+gateway answers contention with `CoreError.Unavailable` and turns the rest into defects. Any other
+error belongs to the module that raises it, and its tag is its name there, as
+`SessionLogStore.Overtaken`. Helpers no consumer imports go under `internal/`.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

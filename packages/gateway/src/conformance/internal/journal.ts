@@ -73,7 +73,7 @@ export const journal = (fixture: Fixture) => {
             expect((yield* logB.read({ limit: 10 }))[0]?.entries[0]?.payload).toBe("b");
             expect(
               yield* Effect.flip(writer.append("conflict", { expectedAfter: Option.none() })),
-            ).toMatchObject({ _tag: "Store.Conflict" });
+            ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } });
             const waiting = yield* Deferred.make<void>();
             const watched = {
               ...a,
@@ -101,7 +101,7 @@ export const journal = (fixture: Fixture) => {
                   a.store.waitForAppend(Entry.LogId.make("execution"), Option.none()),
                 ),
               ),
-            ).toMatchObject({ _tag: "Store.Failure" });
+            ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
           }),
         ),
     );

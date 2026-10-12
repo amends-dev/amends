@@ -12,31 +12,8 @@ import * as GroupId from "../group/GroupId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Group from "../group/Group.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing threads.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("ThreadStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID, or a missing
- * thread.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("ThreadStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The thread store, bound to one workspace by the host.
@@ -53,19 +30,23 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadStore.Confli
 export class ThreadStore extends Context.Service<
   ThreadStore,
   {
-    readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Thread>, Failure>;
+    readonly get: (
+      id: Thread.Id,
+    ) => Effect.Effect<Option.Option<Thread.Thread>, StoreError.StoreError>;
     /**
      * Several threads in one read. Absent IDs are omitted and each found thread appears once; order
      * is unspecified, so callers index results by ID. An empty request reads nothing.
      */
     readonly getMany: (
       ids: ReadonlyArray<Thread.Id>,
-    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>;
     /**
      * Every thread of a group in stable ID order. A history read for inspection; operations read
      * pages.
      */
-    readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
+    readonly listByGroup: (
+      id: GroupId.Id,
+    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>;
     /**
      * A group's threads with recorded activity, newest latest activity first, then ID in descending
      * binary order, after the exclusive `before` cursor and up to `limit`.
@@ -73,7 +54,7 @@ export class ThreadStore extends Context.Service<
     readonly listByLatest: (
       id: GroupId.Id,
       options: Thread.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>;
     /**
      * A group's threads, newest start first, then ID in descending binary order, after the exclusive
      * `before` cursor and up to `limit`.
@@ -81,35 +62,35 @@ export class ThreadStore extends Context.Service<
     readonly listByStart: (
       id: GroupId.Id,
       options: Thread.OpeningOptions,
-    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>;
     /**
      * Reject reused IDs. The group and creator are recorded as
      * given, checked when the thread starts. Preserve historical values on replay.
      */
     readonly insert: (
       record: Thread.Thread,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
-     * Projection write that sets a thread's title. A missing thread conflicts;
+     * Projection write that sets a thread's title. A missing thread is rejected;
      * the same title again changes nothing.
      */
     readonly rename: (
       renamed: Thread.Renamed,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
      * Latest content activity of several threads in one read. Threads without any, and absent IDs,
      * are omitted; order is unspecified.
      */
     readonly getLatest: (
       ids: ReadonlyArray<Thread.Id>,
-    ) => Effect.Effect<ReadonlyArray<Thread.Latest>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Thread.Latest>, StoreError.StoreError>;
     /**
-     * Projection write that advances a thread's latest content activity. A position at or before the
-     * recorded one changes nothing; a missing thread conflicts.
+     * Projection write that advances a thread's latest content activity. A position at or before
+     * the recorded one changes nothing; a missing thread is rejected.
      */
     readonly recordLatest: (
       latest: Thread.Latest,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/thread/ThreadStore") {}
 
@@ -124,8 +105,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: ThreadStore["Service"],
 ): ThreadStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("ThreadStore");
+  const write = StoreInput.write("ThreadStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", Thread.Id, id), driver.get),
     getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Thread.Id), ids), driver.getMany),
@@ -174,13 +155,13 @@ const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
       function* (id) {
         return yield* rows.get((yield* read).records.of("threads"), id);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("ThreadStore", "get")),
     ),
     getMany: Effect.fn("ThreadStore.memory.getMany")(
       function* (ids) {
         return yield* rows.getMany((yield* read).records.of("threads"), ids);
       },
-      Effect.mapError(storeFailure(Failure, "getMany")),
+      Effect.mapError(StoreError.failed("ThreadStore", "getMany")),
     ),
     listByGroup: Effect.fn("ThreadStore.memory.listByGroup")(
       function* (groupId) {
@@ -188,7 +169,7 @@ const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
           MemoryDatabase.compareBinary(left.id, right.id),
         );
       },
-      Effect.mapError(storeFailure(Failure, "listByGroup")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByGroup")),
     ),
     listByLatest: Effect.fn("ThreadStore.memory.listByLatest")(
       function* (groupId, options) {
@@ -215,7 +196,7 @@ const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
           .slice(0, options.limit)
           .map(({ thread }) => thread);
       },
-      Effect.mapError(storeFailure(Failure, "listByLatest")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByLatest")),
     ),
     listByStart: Effect.fn("ThreadStore.memory.listByStart")(
       function* (groupId, options) {
@@ -236,54 +217,49 @@ const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
           .slice(0, options.limit)
           .map(({ thread }) => thread);
       },
-      Effect.mapError(storeFailure(Failure, "listByStart")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByStart")),
     ),
     getLatest: Effect.fn("ThreadStore.memory.getLatest")(
       function* (ids) {
         return yield* latestRows.getMany((yield* read).records.of("threadLatest"), ids);
       },
-      Effect.mapError(storeFailure(Failure, "getLatest")),
+      Effect.mapError(StoreError.failed("ThreadStore", "getLatest")),
     ),
     recordLatest: Effect.fn("ThreadStore.memory.recordLatest")(function* (latest) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "recordLatest")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("ThreadStore", "recordLatest")),
+      );
       if (!space.records.of("threads").has(latest.threadId))
-        return yield* new Conflict({
-          operation: "recordLatest",
-          message: "Thread is missing",
-        });
+        return yield* StoreError.rejected("ThreadStore", "recordLatest", "Thread is missing");
       const current = yield* latestRows
         .get(space.records.of("threadLatest"), latest.threadId)
-        .pipe(Effect.mapError(storeFailure(Failure, "recordLatest")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "recordLatest")));
       // Only a later position advances; an earlier one changes nothing.
       if (Option.isSome(current) && latest.sequence <= current.value.sequence) return;
       const row = yield* latestRows
         .encode(latest)
-        .pipe(Effect.mapError(storeFailure(Failure, "recordLatest")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "recordLatest")));
       space.records.of("threadLatest").set(latest.threadId, row);
     }),
     rename: Effect.fn("ThreadStore.memory.rename")(function* (renamed) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "rename")));
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadStore", "rename")));
       const found = yield* rows
         .get(space.records.of("threads"), renamed.threadId)
-        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "rename")));
       if (Option.isNone(found))
-        return yield* new Conflict({
-          operation: "rename",
-          message: "Thread is missing",
-        });
+        return yield* StoreError.rejected("ThreadStore", "rename", "Thread is missing");
       const row = yield* rows
         .encode({ ...found.value, title: renamed.title })
-        .pipe(Effect.mapError(storeFailure(Failure, "rename")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "rename")));
       space.records.of("threads").set(renamed.threadId, row);
     }),
     insert: Effect.fn("ThreadStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadStore", "insert")));
       if (space.records.of("threads").has(record.id))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Thread ID already exists",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected("ThreadStore", "insert", "Thread ID already exists");
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "insert")));
       space.records.of("threads").set(record.id, row);
     }),
   };
@@ -293,8 +269,8 @@ const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
 /**
  * Provide `ThreadStore` in process memory, over the workspace's `Store.MemoryBinding`: thread
  * records, and each thread's latest content activity as a row of its own. It keeps what the
- * contract leaves to storage: a reused ID conflicts; renaming or recording latest activity
- * conflicts for a missing thread; and a latest position at or before the recorded one changes
+ * contract leaves to storage: a reused ID is rejected; renaming or recording latest activity
+ * is rejected for a missing thread; and a latest position at or before the recorded one changes
  * nothing. `make` checks every input first.
  *
  * @category layers

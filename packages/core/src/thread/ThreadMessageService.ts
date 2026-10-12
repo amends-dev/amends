@@ -29,6 +29,7 @@ import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What publishing can fail with: the outcomes above, and the failures of what
@@ -38,15 +39,13 @@ import * as CoreError from "../error/CoreError.ts";
  * @since 0.1.0
  */
 export type Error =
-  | ReadStateStore.Failure
-  | ReadStateStore.Conflict
+  | StoreError.StoreError
   | Authorization.Error
   | ThreadQuery.AccessError
   | ThreadCommand.Error
   | CoreError.NotFound
   | CoreError.Conflict
-  | CoreError.Denied
-  | ThreadMessageStore.Failure;
+  | CoreError.Denied;
 
 /**
  * What editing a message can fail with.
@@ -62,7 +61,7 @@ export type EditError =
   | CoreError.Denied
   | CoreError.Conflict
   | CoreError.Changed
-  | ThreadMessageStore.Failure;
+  | StoreError.StoreError;
 
 /**
  * What deleting a message can fail with.
@@ -76,7 +75,7 @@ export type DeleteError =
   | Exclude<ThreadCommand.Error, CoreError.Conflict>
   | CoreError.NotFound
   | CoreError.Denied
-  | ThreadMessageStore.Failure;
+  | StoreError.StoreError;
 
 /**
  * What saying one is typing can fail with.

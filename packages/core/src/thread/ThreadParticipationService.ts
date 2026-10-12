@@ -22,6 +22,7 @@ import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";
 import * as GroupStore from "../group/GroupStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What following and unfollowing can fail with: the outcomes above, and
@@ -34,7 +35,7 @@ export type Error =
   | Authorization.Error
   | ThreadQuery.AccessError
   | ThreadCommand.Error
-  | GroupStore.Failure
+  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Conflict
   | CoreError.Invalid;

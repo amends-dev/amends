@@ -14,31 +14,8 @@ import * as Assignment from "./Assignment.ts";
 import * as Role from "./Role.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing assignments.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("AssignmentStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID, or a missing
- * or already revoked assignment.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("AssignmentStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The assignment store, bound to one workspace by the host.
@@ -68,34 +45,34 @@ export class AssignmentStore extends Context.Service<
     /** Find an active or revoked assignment in this workspace; None if absent. */
     readonly get: (
       assignmentId: Assignment.Id,
-    ) => Effect.Effect<Option.Option<Assignment.Assignment>, Failure>;
+    ) => Effect.Effect<Option.Option<Assignment.Assignment>, StoreError.StoreError>;
 
     /** All active role and direct grant assignments for this member in this workspace. */
     readonly listActiveByMember: (
       memberId: Member.Id,
-    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>;
 
     /** All active Role-source assignments referencing this role in this workspace. */
     readonly listActiveByRole: (
       roleId: Role.Id,
-    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>;
 
     /**
-     * Insert an active assignment. Fail with Conflict for a reused assignment ID, including
+     * Insert an active assignment. Reject a reused assignment ID, including
      * revoked IDs. Overlapping grants remain separate assignments. Never upsert.
      */
     readonly insert: (
       record: Assignment.Assignment,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
 
     /**
      * Change an active assignment to revoked, retaining its ID, workspace, member,
-     * and source. Fail with Conflict if absent or already revoked. Assigning access
+     * and source. Rejected if absent or already revoked. Assigning access
      * again requires a fresh ID.
      */
     readonly markRevoked: (
       assignmentId: Assignment.Id,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/authorization/AssignmentStore") {}
 
@@ -110,8 +87,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: AssignmentStore["Service"],
 ): AssignmentStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("AssignmentStore");
+  const write = StoreInput.write("AssignmentStore", workspaceId);
   return {
     get: (assignmentId) => Effect.flatMap(read("get", Assignment.Id, assignmentId), driver.get),
     listActiveByMember: (memberId) =>
@@ -122,7 +99,7 @@ export const make = (
       write("insert", Assignment.Assignment, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active",
-          () => new Conflict({ operation: "insert", message: "Expected an active assignment" }),
+          () => StoreError.rejected("AssignmentStore", "insert", "Expected an active assignment"),
         ),
         Effect.flatMap(driver.insert),
       ),
@@ -141,12 +118,12 @@ const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
   const select = (operation: string, predicate: (record: Assignment.Assignment) => boolean) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("assignments"))).pipe(
       Effect.map((records) => records.filter(predicate)),
-      Effect.mapError(storeFailure(Failure, operation)),
+      Effect.mapError(StoreError.failed("AssignmentStore", operation)),
     );
   const driver: AssignmentStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("assignments"), id)).pipe(
-        Effect.mapError(storeFailure(Failure, "get")),
+        Effect.mapError(StoreError.failed("AssignmentStore", "get")),
       ),
     listActiveByMember: (memberId) =>
       select(
@@ -162,28 +139,36 @@ const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
           record.source.roleId === roleId,
       ),
     insert: Effect.fn("AssignmentStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("AssignmentStore", "insert")),
+      );
       if (space.records.of("assignments").has(record.id))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Assignment ID already exists",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected(
+          "AssignmentStore",
+          "insert",
+          "Assignment ID already exists",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "insert")));
       space.records.of("assignments").set(record.id, row);
     }),
     markRevoked: Effect.fn("AssignmentStore.memory.markRevoked")(function* (id) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "markRevoked")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")),
+      );
       const current = yield* rows
         .get(space.records.of("assignments"), id)
-        .pipe(Effect.mapError(storeFailure(Failure, "markRevoked")));
+        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")));
       if (Option.isNone(current) || current.value.status !== "active")
-        return yield* new Conflict({
-          operation: "markRevoked",
-          message: "Expected an active assignment",
-        });
+        return yield* StoreError.rejected(
+          "AssignmentStore",
+          "markRevoked",
+          "Expected an active assignment",
+        );
       const row = yield* rows
         .encode({ ...current.value, status: "revoked" })
-        .pipe(Effect.mapError(storeFailure(Failure, "markRevoked")));
+        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")));
       space.records.of("assignments").set(id, row);
     }),
   };
@@ -192,7 +177,7 @@ const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
 
 /**
  * Provide `AssignmentStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
- * what the contract leaves to storage: a reused ID conflicts, and revoking conflicts unless the
+ * what the contract leaves to storage: a reused ID is rejected, and revoking is rejected unless the
  * assignment is stored and active. A revoked assignment keeps its row and its source. `make` checks
  * every input first.
  *

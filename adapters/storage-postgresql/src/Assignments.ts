@@ -2,8 +2,8 @@
  * The PostgreSQL driver for `AssignmentStore.AssignmentStore`, over the `assignments` table: a
  * role assignment fills `role_id`, a direct grant `permission`, and the scope takes the columns
  * `ScopeColumns` gives it. `AssignmentStore.make` checks every input before the driver sees it, so
- * the driver keeps only what storage keeps: the primary key refuses a reused ID, revoked ones
- * included, as the store's `Conflict`, and revoking is a conditional update that conflicts unless
+ * the driver keeps only what storage keeps: the primary key rejects a reused ID, revoked ones
+ * included, and revoking is a conditional update rejected unless
  * it finds the assignment active. Revoked rows keep their source. Every statement is scoped to the
  * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
  * and requires one for a write.
@@ -15,9 +15,10 @@ import type { Workspace } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { assignments } from "./internal/schema.ts";
 import * as ScopeColumns from "./ScopeColumns.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** A row is one of two source cases, so it is shaped in code before decoding checks it. */
 const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
@@ -49,7 +50,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
   const select = (operation: string, where: SQL | undefined) =>
     guard(db.select().from(assignments).where(where).orderBy(assignments.id)).pipe(
       Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))),
-      Effect.mapError(storeFailure(AssignmentStore, operation)),
+      Effect.mapError(StoreError.failed("AssignmentStore", operation)),
     );
   const driver: AssignmentStore.AssignmentStore["Service"] = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(assignments.id, id))), Array.head),
@@ -86,7 +87,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
           ),
         }),
         true,
-      ).pipe(Effect.mapError(storeError(AssignmentStore, "insert")));
+      ).pipe(Effect.mapError(storeError("AssignmentStore", "insert")));
     }),
     markRevoked: Effect.fn("Assignments.markRevoked")(function* (id) {
       const rows = yield* guard(
@@ -96,12 +97,13 @@ export const make = Effect.fn("Assignments.make")(function* () {
           .where(and(inWorkspace, eq(assignments.id, id), eq(assignments.status, "active")))
           .returning({ id: assignments.id }),
         true,
-      ).pipe(Effect.mapError(storeError(AssignmentStore, "markRevoked")));
+      ).pipe(Effect.mapError(storeError("AssignmentStore", "markRevoked")));
       if (rows.length === 0)
-        return yield* new AssignmentStore.Conflict({
-          operation: "markRevoked",
-          message: "Expected an active assignment",
-        });
+        return yield* StoreError.rejected(
+          "AssignmentStore",
+          "markRevoked",
+          "Expected an active assignment",
+        );
     }),
   };
   return AssignmentStore.make(workspaceId, driver);

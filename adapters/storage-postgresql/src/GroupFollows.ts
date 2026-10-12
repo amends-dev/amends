@@ -3,10 +3,10 @@
  * each follow, active or ended, with the group admission it belongs to. `GroupFollowStore.make`
  * checks every input before the driver sees it, so the driver keeps only what storage keeps: the
  * primary key refuses a reused ID and `active_group_follow` a second active follow for one
- * admission, each as the store's `Conflict`, and ending a follow is a conditional update that
- * conflicts unless it finds exactly the addressed follow active. Every statement is scoped to the
- * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
- * and requires one for a write.
+ * admission, each rejected, and ending a follow is a conditional update rejected unless it finds
+ * exactly the addressed follow active. Every statement is scoped to the binding's workspace and
+ * runs under its `guard`, which lets a read join the caller's transaction and requires one for a
+ * write.
  *
  * @since 0.1.0
  */
@@ -15,8 +15,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { groupFollows } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -49,7 +50,7 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
             .where(and(inWorkspace, eq(groupFollows.id, id))),
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(GroupFollowStore, "get")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "get")),
     ),
     findActive: Effect.fn("GroupFollows.findActive")(
       function* (id) {
@@ -66,7 +67,7 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(GroupFollowStore, "findActive")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "findActive")),
     ),
     findActiveMany: Effect.fn("GroupFollows.findActiveMany")(
       function* (ids) {
@@ -84,7 +85,7 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupFollowStore, "findActiveMany")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "findActiveMany")),
     ),
     listActiveByGroup: Effect.fn("GroupFollows.listActiveByGroup")(
       function* (groupId) {
@@ -102,7 +103,7 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
             .orderBy(sql`${groupFollows.id} COLLATE "C"`),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupFollowStore, "listActiveByGroup")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "listActiveByGroup")),
     ),
     insert: Effect.fn("GroupFollows.insert")(function* (record) {
       const { followedAt, ...fields } = record;
@@ -113,7 +114,7 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
           endedAt: null,
         }),
         true,
-      ).pipe(Effect.mapError(storeError(GroupFollowStore, "insert")));
+      ).pipe(Effect.mapError(storeError("GroupFollowStore", "insert")));
     }),
     end: Effect.fn("GroupFollows.end")(function* (ending, endedAt) {
       const rows = yield* guard(
@@ -131,12 +132,13 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
           )
           .returning({ id: groupFollows.id }),
         true,
-      ).pipe(Effect.mapError(storeError(GroupFollowStore, "end")));
+      ).pipe(Effect.mapError(storeError("GroupFollowStore", "end")));
       if (rows.length !== 1)
-        return yield* new GroupFollowStore.Conflict({
-          operation: "end",
-          message: "Follow is missing, mismatched, or already ended",
-        });
+        return yield* StoreError.rejected(
+          "GroupFollowStore",
+          "end",
+          "Follow is missing, mismatched, or already ended",
+        );
     }),
   };
   return GroupFollowStore.make(workspaceId, driver);

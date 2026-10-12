@@ -13,31 +13,8 @@ import * as Role from "./Role.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as BuiltinRoles from "./BuiltinRoles.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing roles.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("RoleStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID, a missing
- * role, or a built-in revision not later than the recorded one.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("RoleStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The role store, bound to one workspace by the host.
@@ -63,42 +40,44 @@ export class RoleStore extends Context.Service<
   RoleStore,
   {
     /** Find a role in this workspace; None if absent. */
-    readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Role>, Failure>;
+    readonly get: (
+      roleId: Role.Id,
+    ) => Effect.Effect<Option.Option<Role.Role>, StoreError.StoreError>;
 
     /**
-     * Insert a role. Fail with Conflict for a reused role ID. Never upsert.
+     * Insert a role. Reject a reused role ID. Never upsert.
      */
     readonly insert: (
       record: Role.Role,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
 
     /**
-     * Change only the display name. Fail with Conflict if the role is absent in this workspace.
+     * Change only the display name. Rejected if the role is absent in this workspace.
      */
     readonly rename: (
       roleId: Role.Id,
       name: Role.Role["name"],
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
 
     /**
      * Replace the complete permission list, retaining the ID, workspace, and name.
-     * An empty list is valid. Fail with Conflict if the role is absent in this workspace.
+     * An empty list is valid. Rejected if the role is absent in this workspace.
      */
     readonly setPermissions: (
       roleId: Role.Id,
       permissions: Role.Role["permissions"],
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
 
     /** The built-in bundle revision the workspace's roles hold; None before one is recorded. */
-    readonly builtinRevision: Effect.Effect<Option.Option<number>, Failure>;
+    readonly builtinRevision: Effect.Effect<Option.Option<number>, StoreError.StoreError>;
 
     /**
-     * Record a later built-in bundle revision. Fail with Conflict for one not later than the
+     * Record a later built-in bundle revision. Reject one not later than the
      * recorded revision.
      */
     readonly recordBuiltinRevision: (
       revision: number,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/authorization/RoleStore") {}
 
@@ -113,8 +92,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: RoleStore["Service"],
 ): RoleStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("RoleStore");
+  const write = StoreInput.write("RoleStore", workspaceId);
   return {
     get: (roleId) => Effect.flatMap(read("get", Role.Id, roleId), driver.get),
     insert: (record) => Effect.flatMap(write("insert", Role.Role, record), driver.insert),
@@ -155,29 +134,30 @@ const makeMemory = Effect.fn("RoleStore.makeMemory")(function* () {
     id: Role.Id,
     change: (role: Role.Role) => Role.Role,
   ) {
-    const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, operation)));
+    const space = yield* write.pipe(Effect.mapError(StoreError.failed("RoleStore", operation)));
     const current = yield* rows
       .get(space.records.of("roles"), id)
-      .pipe(Effect.mapError(storeFailure(Failure, operation)));
+      .pipe(Effect.mapError(StoreError.failed("RoleStore", operation)));
     if (Option.isNone(current))
-      return yield* new Conflict({ operation, message: "Role does not exist" });
+      return yield* StoreError.rejected("RoleStore", operation, "Role does not exist");
     const record = change(current.value);
-    const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, operation)));
+    const row = yield* rows
+      .encode(record)
+      .pipe(Effect.mapError(StoreError.failed("RoleStore", operation)));
     space.records.of("roles").set(id, row);
   });
   const driver: RoleStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("roles"), id)).pipe(
-        Effect.mapError(storeFailure(Failure, "get")),
+        Effect.mapError(StoreError.failed("RoleStore", "get")),
       ),
     insert: Effect.fn("RoleStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("RoleStore", "insert")));
       if (space.records.of("roles").has(record.id))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Role ID already exists",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected("RoleStore", "insert", "Role ID already exists");
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("RoleStore", "insert")));
       space.records.of("roles").set(record.id, row);
     }),
     rename: (id, name) => edit("rename", id, (role) => Object.assign({}, role, { name })),
@@ -185,23 +165,24 @@ const makeMemory = Effect.fn("RoleStore.makeMemory")(function* () {
       edit("setPermissions", id, (role) => Object.assign({}, role, { permissions })),
     builtinRevision: Effect.flatMap(read, (space) =>
       revisions.get(space.records.of("builtinRoleRevision"), revisionKey),
-    ).pipe(Effect.mapError(storeFailure(Failure, "builtinRevision"))),
+    ).pipe(Effect.mapError(StoreError.failed("RoleStore", "builtinRevision"))),
     recordBuiltinRevision: Effect.fn("RoleStore.memory.recordBuiltinRevision")(
       function* (revision) {
         const space = yield* write.pipe(
-          Effect.mapError(storeFailure(Failure, "recordBuiltinRevision")),
+          Effect.mapError(StoreError.failed("RoleStore", "recordBuiltinRevision")),
         );
         const current = yield* revisions
           .get(space.records.of("builtinRoleRevision"), revisionKey)
-          .pipe(Effect.mapError(storeFailure(Failure, "recordBuiltinRevision")));
+          .pipe(Effect.mapError(StoreError.failed("RoleStore", "recordBuiltinRevision")));
         if (Option.isSome(current) && revision <= current.value)
-          return yield* new Conflict({
-            operation: "recordBuiltinRevision",
-            message: "Expected a later built-in revision",
-          });
+          return yield* StoreError.rejected(
+            "RoleStore",
+            "recordBuiltinRevision",
+            "Expected a later built-in revision",
+          );
         const row = yield* revisions
           .encode(revision)
-          .pipe(Effect.mapError(storeFailure(Failure, "recordBuiltinRevision")));
+          .pipe(Effect.mapError(StoreError.failed("RoleStore", "recordBuiltinRevision")));
         space.records.of("builtinRoleRevision").set(revisionKey, row);
       },
     ),
@@ -212,9 +193,9 @@ const makeMemory = Effect.fn("RoleStore.makeMemory")(function* () {
 /**
  * Provide `RoleStore` in process memory, over the workspace's `Store.MemoryBinding`: roles, and the
  * revision of the built-in roles the workspace was last given, as one row. It keeps what the
- * contract leaves to storage: a reused ID conflicts, renaming or setting permissions of a missing
- * role conflicts, and a built-in revision no later than the recorded one conflicts. `make` checks
- * every input first.
+ * contract leaves to storage: a reused ID is rejected, renaming or setting permissions of a missing
+ * role is rejected, and a built-in revision no later than the recorded one is rejected. `make`
+ * checks every input first.
  *
  * @category layers
  * @since 0.1.0

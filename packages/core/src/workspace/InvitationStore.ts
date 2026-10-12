@@ -11,31 +11,8 @@ import * as Store from "../journal/Store.ts";
 import * as Invitation from "./Invitation.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "./WorkspaceId.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing invitations.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("InvitationStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused invitation ID, or
- * settling one that is missing or settled already.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("InvitationStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The invitation store, bound to one workspace by the host.
@@ -56,25 +33,25 @@ export class InvitationStore extends Context.Service<
     /** Return an isolated record from the current transaction or committed state. */
     readonly get: (
       id: Invitation.Id,
-    ) => Effect.Effect<Option.Option<Invitation.Invitation>, Failure>;
+    ) => Effect.Effect<Option.Option<Invitation.Invitation>, StoreError.StoreError>;
     /** All Pending invitations for this human in this workspace, including expired ones. */
     readonly listPendingByRecipient: (
       recipientId: Identity.HumanId,
-    ) => Effect.Effect<ReadonlyArray<Invitation.Invitation>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Invitation.Invitation>, StoreError.StoreError>;
     /** Every invitation in this workspace in issue order, whatever its state. */
-    readonly list: Effect.Effect<ReadonlyArray<Invitation.Invitation>, Failure>;
-    /** Insert a pending invitation; a duplicate ID conflicts. Never upsert. */
+    readonly list: Effect.Effect<ReadonlyArray<Invitation.Invitation>, StoreError.StoreError>;
+    /** Insert a pending invitation; a duplicate ID is rejected. Never upsert. */
     readonly insert: (
       record: Invitation.Invitation,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
-     * Move a pending invitation to its terminal state. A missing or settled invitation conflicts;
+     * Move a pending invitation to its terminal state. A missing or settled invitation is rejected;
      * the issuance is retained as it was.
      */
     readonly settle: (
       id: Invitation.Id,
       state: Exclude<Invitation.State, { readonly _tag: "Pending" }>,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/workspace/InvitationStore") {}
 
@@ -92,8 +69,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: InvitationStore["Service"],
 ): InvitationStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("InvitationStore");
+  const write = StoreInput.write("InvitationStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", Invitation.Id, id), driver.get),
     listPendingByRecipient: (recipientId) =>
@@ -109,10 +86,11 @@ export const make = (
             record.details.workspaceId === workspaceId &&
             Invitation.State.isAnyOf(["Pending"])(record.state),
           () =>
-            new Conflict({
-              operation: "insert",
-              message: "Expected a pending invitation in this workspace",
-            }),
+            StoreError.rejected(
+              "InvitationStore",
+              "insert",
+              "Expected a pending invitation in this workspace",
+            ),
         ),
         Effect.flatMap(driver.insert),
       ),
@@ -145,12 +123,12 @@ const makeMemory = Effect.fn("InvitationStore.makeMemory")(function* () {
   const { workspaceId, read, write } = yield* Store.MemoryBinding;
   const all = (operation: string) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("invitations"))).pipe(
-      Effect.mapError(storeFailure(Failure, operation)),
+      Effect.mapError(StoreError.failed("InvitationStore", operation)),
     );
   const driver: InvitationStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("invitations"), id)).pipe(
-        Effect.mapError(storeFailure(Failure, "get")),
+        Effect.mapError(StoreError.failed("InvitationStore", "get")),
       ),
     listPendingByRecipient: (recipientId) =>
       Effect.map(all("listPendingByRecipient"), (records) =>
@@ -166,28 +144,36 @@ const makeMemory = Effect.fn("InvitationStore.makeMemory")(function* () {
       ),
     list: Effect.map(all("list"), (records) => records.toSorted(byIssue)),
     insert: Effect.fn("InvitationStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("InvitationStore", "insert")),
+      );
       if (space.records.of("invitations").has(record.details.id))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Invitation ID already exists",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected(
+          "InvitationStore",
+          "insert",
+          "Invitation ID already exists",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("InvitationStore", "insert")));
       space.records.of("invitations").set(record.details.id, row);
     }),
     settle: Effect.fn("InvitationStore.memory.settle")(function* (id, state) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "settle")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("InvitationStore", "settle")),
+      );
       const current = yield* rows
         .get(space.records.of("invitations"), id)
-        .pipe(Effect.mapError(storeFailure(Failure, "settle")));
+        .pipe(Effect.mapError(StoreError.failed("InvitationStore", "settle")));
       if (Option.isNone(current) || !Invitation.State.isAnyOf(["Pending"])(current.value.state))
-        return yield* new Conflict({
-          operation: "settle",
-          message: "Expected a pending invitation",
-        });
+        return yield* StoreError.rejected(
+          "InvitationStore",
+          "settle",
+          "Expected a pending invitation",
+        );
       const row = yield* rows
         .encode({ ...current.value, state })
-        .pipe(Effect.mapError(storeFailure(Failure, "settle")));
+        .pipe(Effect.mapError(StoreError.failed("InvitationStore", "settle")));
       space.records.of("invitations").set(id, row);
     }),
   };
@@ -196,7 +182,7 @@ const makeMemory = Effect.fn("InvitationStore.makeMemory")(function* () {
 
 /**
  * Provide `InvitationStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
- * what the contract leaves to storage: a reused ID conflicts, and settling conflicts unless the
+ * what the contract leaves to storage: a reused ID is rejected, and settling is rejected unless the
  * invitation is stored and pending. A settled invitation keeps its row, with who acted and when.
  * `make` checks every input first.
  *

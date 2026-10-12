@@ -42,6 +42,7 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * Marking notifications seen: a human's Seen is private state outside the journal. Ownership,
@@ -414,9 +415,7 @@ describe("marking notifications seen", () => {
           const context = Context.add(p.bound.context, NotificationStore.NotificationStore, {
             ...p.bound.notifications,
             markSeen: () =>
-              Effect.fail(
-                new NotificationStore.Failure({ operation: "markSeen", cause: "injected" }),
-              ),
+              Effect.fail(StoreError.failed("NotificationStore", "markSeen")("injected")),
           });
           expect(
             Exit.isFailure(
@@ -781,16 +780,28 @@ describe("marking notifications seen", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Rejected" },
+            });
             const before = yield* snapshot(p);
             for (const id of [Notification.Id.make("missing"), p.agentNote.id, discarded.id])
               // A valid ID in the same call is not recorded either.
               expect(
                 yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id, id], seenAt)),
-              ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "NotificationStore",
+                reason: { _tag: "Rejected" },
+              });
             expect(
               yield* Effect.flip(foreign.notifications.markSeen([p.humanNote.id], seenAt)),
-            ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* snapshot(p)).toEqual(before);
             expect(yield* Effect.flip(run(p.bound, human, markSeen(discarded.id)))).toMatchObject({
               _tag: "CoreError.Conflict",
@@ -800,7 +811,11 @@ describe("marking notifications seen", () => {
             Reflect.set(invalid, "at", "not-a-date");
             expect(
               yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id], invalid.at)),
-            ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Rejected" },
+            });
             yield* p.bound.notifications.markSeen([], seenAt);
             yield* p.bound.notifications.markSeen([p.humanNote.id, p.humanNote.id], seenAt);
             const result = changed(p.humanNote, { state: seenState(seenAt) });

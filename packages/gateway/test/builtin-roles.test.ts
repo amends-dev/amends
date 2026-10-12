@@ -165,7 +165,7 @@ describe("built-in roles", () => {
             yield* Effect.flip(
               bound.store.transaction(bound.roles.recordBuiltinRevision(revision)),
             ),
-          ).toMatchObject({ _tag: "RoleStore.Conflict" });
+          ).toMatchObject({ _tag: "StoreError", store: "RoleStore", reason: { _tag: "Rejected" } });
         expect(yield* bound.roles.builtinRevision).toEqual(Option.some(BuiltinRoles.revision));
       }),
     ),
@@ -283,7 +283,7 @@ describe("built-in roles", () => {
           if (Exit.isFailure(exit))
             expect(Exit.findErrorOption(exit)).toMatchObject({
               _tag: "Some",
-              value: { _tag: "Store.Conflict" },
+              value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
             });
         const revised = (yield* history(bound))
           .flatMap((batch) => batch.entries)

@@ -8,6 +8,7 @@
  */
 import { Effect, Schema } from "effect";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as StoreError from "./StoreError.ts";
 
 /**
  * The decoders, compiled once per schema.
@@ -41,28 +42,25 @@ const foreign = (value: unknown, workspaceId: WorkspaceId.Id): boolean =>
  * @since 0.1.0
  */
 export const read =
-  <F>(Failure: new (fields: { readonly operation: string; readonly cause: unknown }) => F) =>
+  (store: string) =>
   <S extends Schema.Top>(operation: string, schema: S, input: S["Type"]) =>
-    decoder(schema)(input).pipe(Effect.mapError((cause) => new Failure({ operation, cause })));
+    decoder(schema)(input).pipe(Effect.mapError(StoreError.failed(store, operation)));
 
 /**
- * A write's inputs, checked against their schemas; a malformed one conflicts. Given the store's
- * workspace, a record of another workspace conflicts too; a store whose inputs name no workspace,
- * as the checkpoint store's, gives none.
+ * A write's inputs, checked against their schemas; a malformed one is rejected. Given the store's
+ * workspace, a record of another workspace is rejected too; a store whose inputs name no
+ * workspace, as the checkpoint store's, gives none.
  *
  * @category constructors
  * @since 0.1.0
  */
 export const write =
-  <C>(
-    Conflict: new (fields: { readonly operation: string; readonly message: string }) => C,
-    workspaceId?: WorkspaceId.Id,
-  ) =>
+  (store: string, workspaceId?: WorkspaceId.Id) =>
   <S extends Schema.Top>(operation: string, schema: S, input: S["Type"]) =>
     decoder(schema)(input).pipe(
-      Effect.mapError((cause) => new Conflict({ operation, message: cause.message })),
+      Effect.mapError((cause) => StoreError.rejected(store, operation, cause.message)),
       Effect.filterOrFail(
         (value) => workspaceId === undefined || !foreign(value, workspaceId),
-        () => new Conflict({ operation, message: "Expected a record in this workspace" }),
+        () => StoreError.rejected(store, operation, "Expected a record in this workspace"),
       ),
     );

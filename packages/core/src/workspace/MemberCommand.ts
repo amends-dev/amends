@@ -18,6 +18,7 @@ import type * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as MemberFacts from "./MemberFacts.ts";
 import * as Member from "./Member.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What adding a member can fail with: the failures of assigning its role, of reading the general
@@ -26,7 +27,7 @@ import * as Member from "./Member.ts";
  * @category errors
  * @since 0.1.0
  */
-export type Error = AssignmentCommand.Error | GroupStore.Failure | GroupCommand.AdmitError;
+export type Error = AssignmentCommand.Error | StoreError.StoreError | GroupCommand.AdmitError;
 
 /**
  * A member to add: who they are, what they are called, the role they start with, and when.

@@ -33,6 +33,7 @@ import * as MemberStore from "../../src/workspace/MemberStore.ts";
 import * as Member from "../../src/workspace/Member.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
@@ -589,7 +590,7 @@ it.effect("a membership storage failure fails authorization", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [alice], [direct("read", alice.memberId, MemberPermissions.Read)]);
-    const failure = new MemberStore.Failure({ operation: "get", cause: "unavailable" });
+    const failure = StoreError.failed("MemberStore", "get")("unavailable");
     expect(
       yield* run(fixture, Effect.flip(check([readBob])), alice, {
         members: { get: () => Effect.fail(failure) },
@@ -620,7 +621,7 @@ it.effect(
           }),
         ],
       );
-      const failure = new RoleStore.Failure({ operation: "get", cause: "unavailable" });
+      const failure = StoreError.failed("RoleStore", "get")("unavailable");
       expect(
         yield* run(fixture, Effect.flip(check([readBob])), alice, {
           roles: { get: () => Effect.fail(failure) },

@@ -248,8 +248,9 @@ describe("workspace isolation", () => {
         ];
         for (const attempt of attempts) {
           expect(yield* Effect.flip(bound.store.transaction(attempt.write))).toMatchObject({
-            _tag: `${attempt.store}.Conflict`,
-            message: expect.stringMatching(/workspace/i),
+            _tag: "StoreError",
+            store: attempt.store,
+            reason: { _tag: "Rejected", description: expect.stringMatching(/workspace/i) },
           });
           for (const on of [bound, other]) expect(yield* attempt.kept(on)).toEqual(Option.none());
         }

@@ -24,6 +24,7 @@ import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What marking a thread or a group read can fail with: the outcomes above, and the
@@ -36,9 +37,7 @@ export type Error =
   | Authorization.Error
   | ThreadQuery.AccessError
   | GroupQuery.AudienceError
-  | ThreadActivityStore.Failure
-  | ReadStateStore.Failure
-  | ReadStateStore.Conflict
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.Denied
   | CoreError.NotFound

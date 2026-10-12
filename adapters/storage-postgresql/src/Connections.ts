@@ -3,7 +3,7 @@
  * row per connection, removed ones included, with the settings its integration declares as JSON.
  * Its credential is kept apart, by `ConnectionCredentials`. `ConnectionStore.make` checks every
  * input before the driver sees it, so the driver keeps only what storage keeps: the primary key
- * refuses a reused ID as the store's `Conflict`, and an update that finds no row conflicts. Every
+ * rejects a reused ID, and an update that finds no row is rejected. Every
  * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read
  * join the caller's transaction and requires one for a write.
  *
@@ -13,8 +13,9 @@ import { Connection, ConnectionStore } from "@amends-dev/core/connection";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { connections } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -53,7 +54,7 @@ export const make = Effect.fn("Connections.make")(function* () {
           Effect.map(Array.head),
         );
       },
-      Effect.mapError(storeFailure(ConnectionStore, "get")),
+      Effect.mapError(StoreError.failed("ConnectionStore", "get")),
     ),
     listActive: guard(
       db
@@ -62,11 +63,11 @@ export const make = Effect.fn("Connections.make")(function* () {
         .where(and(eq(connections.workspaceId, workspaceId), eq(connections.status, "active"))),
     ).pipe(
       Effect.flatMap(decodeRows),
-      Effect.mapError(storeFailure(ConnectionStore, "listActive")),
+      Effect.mapError(StoreError.failed("ConnectionStore", "listActive")),
     ),
     insert: Effect.fn("Connections.insert")(function* (record) {
       yield* guard(db.insert(connections).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError(ConnectionStore, "insert")),
+        Effect.mapError(storeError("ConnectionStore", "insert")),
       );
     }),
     update: Effect.fn("Connections.update")(function* (record) {
@@ -77,12 +78,13 @@ export const make = Effect.fn("Connections.make")(function* () {
           .where(inWorkspace(record.id))
           .returning({ id: connections.id }),
         true,
-      ).pipe(Effect.mapError(storeError(ConnectionStore, "update")));
+      ).pipe(Effect.mapError(storeError("ConnectionStore", "update")));
       if (updated.length === 0)
-        return yield* new ConnectionStore.Conflict({
-          operation: "update",
-          message: "Expected a stored connection",
-        });
+        return yield* StoreError.rejected(
+          "ConnectionStore",
+          "update",
+          "Expected a stored connection",
+        );
     }),
   };
   return ConnectionStore.make(workspaceId, driver);

@@ -69,6 +69,7 @@ import {
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Thread discovery, metadata, timeline pages, and participant summaries. */
 
@@ -477,7 +478,11 @@ describe("thread reads", () => {
               ).toMatchObject({ _tag: "SchemaError" });
               expect(
                 yield* Effect.flip(bound.activities.readPage(first.thread.id, options as never)),
-              ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadActivityStore",
+                reason: { _tag: "Failed" },
+              });
             }
           }),
         ),
@@ -543,7 +548,11 @@ describe("thread reads", () => {
               ).toMatchObject({ _tag: "SchemaError" });
               expect(
                 yield* Effect.flip(bound.activities.readPage(first.thread.id, options)),
-              ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadActivityStore",
+                reason: { _tag: "Failed" },
+              });
             }
             const foreign = yield* boundTo(otherWorkspaceId);
             expect(yield* foreign.activities.readPage(first.thread.id, { limit: 10 })).toEqual([]);
@@ -981,16 +990,13 @@ describe("thread reads", () => {
             context: Context.add(bound.context, ThreadActivityStore.ThreadActivityStore, {
               ...bound.activities,
               readPage: () =>
-                Effect.fail(
-                  new ThreadActivityStore.Failure({
-                    operation: "readPage",
-                    cause: "failed storage",
-                  }),
-                ),
+                Effect.fail(StoreError.failed("ThreadActivityStore", "readPage")("failed storage")),
             }),
           };
           expect(yield* Effect.flip(run(failing, owner, timeline(first.thread.id)))).toMatchObject({
-            _tag: "ThreadActivityStore.Failure",
+            _tag: "StoreError",
+            store: "ThreadActivityStore",
+            reason: { _tag: "Failed" },
           });
           expect(yield* history(bound)).toEqual(before);
         }),

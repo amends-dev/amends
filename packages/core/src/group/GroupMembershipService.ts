@@ -30,6 +30,7 @@ import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What changing membership can fail with: the outcomes above, and the
@@ -41,9 +42,7 @@ import * as CoreError from "../error/CoreError.ts";
 export type Error =
   | GroupCommand.RemoveError
   | Authorization.Error
-  | GroupStore.Failure
-  | MemberStore.Failure
-  | GroupMembershipStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.WriteError
@@ -60,9 +59,7 @@ export type Error =
  */
 export type ReadError =
   | Authorization.Error
-  | GroupStore.Failure
-  | GroupMembershipStore.Failure
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
 

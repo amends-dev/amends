@@ -2,8 +2,8 @@
  * The PostgreSQL driver for `InvitationStore.InvitationStore`, over the `invitations` table: each
  * invitation with its required role ID, and the columns of its state, which the
  * `invitations_state_agrees` check keeps consistent. `InvitationStore.make` checks every input
- * before the driver sees it, so the driver keeps only what storage keeps: the primary key refuses
- * a reused ID as the store's `Conflict`, and settling is a conditional update that conflicts unless
+ * before the driver sees it, so the driver keeps only what storage keeps: the primary key rejects
+ * a reused ID, and settling is a conditional update rejected unless
  * it finds the invitation pending. `select` is the read `PostgresDirectory` shares to list an
  * identity's pending invitations across workspaces. Every statement is scoped to the binding's
  * workspace and runs under its `guard`, which lets a read join the caller's transaction and
@@ -16,8 +16,9 @@ import { and, asc, eq, type SQL } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
 import type * as PostgresDatabase from "./PostgresDatabase.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { invitations } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 type InvitationRow = typeof invitations.$inferSelect;
 
@@ -83,7 +84,9 @@ export const make = Effect.fn("Invitations.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(invitations.workspaceId, workspaceId);
   const read = (operation: string, where: SQL | undefined, order: ReadonlyArray<SQL>) =>
-    guard(select(db, where, order)).pipe(Effect.mapError(storeFailure(InvitationStore, operation)));
+    guard(select(db, where, order)).pipe(
+      Effect.mapError(StoreError.failed("InvitationStore", operation)),
+    );
   const driver: InvitationStore.InvitationStore["Service"] = {
     get: (id) => Effect.map(read("get", and(inWorkspace, eq(invitations.id, id)), []), Array.head),
     listPendingByRecipient: (recipientId) =>
@@ -111,7 +114,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
           state: "Pending",
         }),
         true,
-      ).pipe(Effect.mapError(storeError(InvitationStore, "insert")));
+      ).pipe(Effect.mapError(storeError("InvitationStore", "insert")));
     }),
     settle: Effect.fn("Invitations.settle")(function* (id, state) {
       const rows = yield* guard(
@@ -133,12 +136,13 @@ export const make = Effect.fn("Invitations.make")(function* () {
           .where(and(inWorkspace, eq(invitations.id, id), eq(invitations.state, "Pending")))
           .returning({ id: invitations.id }),
         true,
-      ).pipe(Effect.mapError(storeError(InvitationStore, "settle")));
+      ).pipe(Effect.mapError(storeError("InvitationStore", "settle")));
       if (rows.length === 0)
-        return yield* new InvitationStore.Conflict({
-          operation: "settle",
-          message: "Expected a pending invitation",
-        });
+        return yield* StoreError.rejected(
+          "InvitationStore",
+          "settle",
+          "Expected a pending invitation",
+        );
     }),
   };
   return InvitationStore.make(workspaceId, driver);

@@ -15,6 +15,7 @@ import * as Store from "../../src/journal/Store.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import * as Transaction from "../../src/journal/Transaction.ts";
 import { Counter, make, type Fixture } from "../memory.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
@@ -149,28 +150,32 @@ it.effect(
         }),
       );
       const unavailable = (operation: string) =>
-        Effect.fail(new Store.Failure({ operation, cause: "unavailable" }));
+        Effect.fail(StoreError.failed("Checkpoint", operation)("unavailable"));
       const broken = {
         ...fixture,
         checkpoints: Checkpoint.Checkpoint.of({
           ...fixture.checkpoints,
-          set: () => unavailable("checkpoint.set"),
-          setLive: () => unavailable("checkpoint.setLive"),
+          set: () => unavailable("set"),
+          setLive: () => unavailable("setLive"),
         }),
       };
       yield* run(
         broken,
         Effect.gen(function* () {
           const replay = yield* runner;
-          expect((yield* Effect.flip(replay.step))._tag).toBe("Store.Failure");
+          expect(yield* Effect.flip(replay.step)).toMatchObject({
+            _tag: "StoreError",
+            reason: { _tag: "Failed" },
+          });
           // The first commit to an empty log makes its projections live, so it fails with them.
           const journal = yield* Journal.make({
             logId: Entry.LogId.make("new-domain"),
             projections: [definition],
           });
-          expect((yield* Effect.flip(journal.publish(Changed, { amount: 5 })))._tag).toBe(
-            "Store.Failure",
-          );
+          expect(yield* Effect.flip(journal.publish(Changed, { amount: 5 }))).toMatchObject({
+            _tag: "StoreError",
+            reason: { _tag: "Failed" },
+          });
           expect(yield* (yield* Counter).get).toBe(0);
           expect((yield* fixture.snapshot).checkpoints.size).toBe(0);
           expect((yield* fixture.snapshot).logs.size).toBe(1);
@@ -180,7 +185,7 @@ it.effect(
         ...fixture,
         checkpoints: Checkpoint.Checkpoint.of({
           ...fixture.checkpoints,
-          set: () => unavailable("checkpoint.set"),
+          set: () => unavailable("set"),
         }),
       };
       yield* run(

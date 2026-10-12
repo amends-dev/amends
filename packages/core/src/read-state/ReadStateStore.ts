@@ -16,37 +16,15 @@ import * as ReadState from "./ReadState.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Store from "../journal/Store.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing read state.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("ReadStateStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed record, or one for another workspace.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("ReadStateStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * Private per-member read state, kept outside the journal: rebuilding projections neither restores
  * nor removes it, so it holds no references a rebuild could break. Reads honor the caller's
  * transaction. Writes join the caller's transaction when there is one and otherwise run on their
  * own, without the workspace's write order; each is atomic. Advancing keeps the later of the stored
- * and requested value. A record for another workspace conflicts; callers write only for members,
+ * and requested value. A record for another workspace is rejected; callers write only for members,
  * threads, and groups they have checked.
  *
  * `make` builds the store over a driver of the same shape. It checks every input
@@ -63,7 +41,7 @@ export class ReadStateStore extends Context.Service<
     readonly getThreadPositions: (
       memberId: MemberId.Id,
       threadIds: ReadonlyArray<ThreadId.Id>,
-    ) => Effect.Effect<ReadonlyArray<ReadState.ThreadPosition>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ReadState.ThreadPosition>, StoreError.StoreError>;
     /**
      * Mark a thread read through a position, in one write: the member's read position advances,
      * one at or before the stored one being kept, and their pending notifications from the
@@ -73,14 +51,16 @@ export class ReadStateStore extends Context.Service<
     readonly markThreadRead: (
       position: ReadState.ThreadPosition,
       seenAt: DateTime.Utc,
-    ) => Effect.Effect<void, Failure | Conflict>;
+    ) => Effect.Effect<void, StoreError.StoreError>;
     /** One member's read times for several groups; groups never read are omitted. */
     readonly getGroupReads: (
       memberId: MemberId.Id,
       groupIds: ReadonlyArray<GroupId.Id>,
-    ) => Effect.Effect<ReadonlyArray<ReadState.GroupRead>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ReadState.GroupRead>, StoreError.StoreError>;
     /** Advance when a member last read a group; a time at or before the stored one is kept. */
-    readonly advanceGroup: (read: ReadState.GroupRead) => Effect.Effect<void, Failure | Conflict>;
+    readonly advanceGroup: (
+      read: ReadState.GroupRead,
+    ) => Effect.Effect<void, StoreError.StoreError>;
   }
 >()("@amends-dev/core/read-state/ReadStateStore") {}
 
@@ -95,8 +75,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: ReadStateStore["Service"],
 ): ReadStateStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("ReadStateStore");
+  const write = StoreInput.write("ReadStateStore", workspaceId);
   return {
     getThreadPositions: Effect.fn("ReadStateStore.getThreadPositions")(
       function* (memberId, threadIds) {
@@ -156,7 +136,7 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
             : [{ workspaceId, memberId, threadId, readThrough }];
         });
       },
-      Effect.mapError(storeFailure(Failure, "getThreadPositions")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getThreadPositions")),
     ),
     markThreadRead: Effect.fn("ReadStateStore.memory.markThreadRead")(
       function* (position, seenAt) {
@@ -181,7 +161,7 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
           }),
         );
       },
-      Effect.mapError(storeFailure(Failure, "markThreadRead")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "markThreadRead")),
     ),
     getGroupReads: Effect.fn("ReadStateStore.memory.getGroupReads")(
       function* (memberId, groupIds) {
@@ -193,10 +173,12 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
             : [{ workspaceId, memberId, groupId, readAt: DateTime.makeUnsafe(at) }];
         });
       },
-      Effect.mapError(storeFailure(Failure, "getGroupReads")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getGroupReads")),
     ),
     advanceGroup: Effect.fn("ReadStateStore.memory.advanceGroup")(function* (groupRead) {
-      const space = yield* join.pipe(Effect.mapError(storeFailure(Failure, "advanceGroup")));
+      const space = yield* join.pipe(
+        Effect.mapError(StoreError.failed("ReadStateStore", "advanceGroup")),
+      );
       advance(
         space.groupTimes,
         MemoryDatabase.keyOf(groupRead.memberId, groupRead.groupId),

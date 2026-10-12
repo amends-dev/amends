@@ -2,7 +2,7 @@ import { AssignmentFacts, BuiltinRoles, Assignment } from "@amends-dev/core/auth
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Journal, Publication } from "@amends-dev/core/journal";
 
 import { InvitationService, Member, MemberService } from "@amends-dev/core/workspace";
 
@@ -26,6 +26,7 @@ import {
   request,
   testProvenance,
 } from "./support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Acceptance and removal roll back together, and replay restores invitation records. */
 
@@ -47,10 +48,7 @@ describe("invitation replay", () => {
             const bound = yield* boundTo(workspace.id);
             const before = yield* bound.store.read(journalLog, { limit: 20 });
             const footprint = yield* storage.footprint;
-            const error = new Store.Failure({
-              operation: "commit",
-              cause: "injected late failure",
-            });
+            const error = StoreError.failed("Store", "commit")("injected late failure");
             const broken = failingLate(bound, error);
             const failure = yield* Effect.flatMap(
               InvitationService.InvitationService,
@@ -106,10 +104,7 @@ describe("invitation replay", () => {
             const before = yield* bound.store.read(journalLog, { limit: 20 });
             const live = yield* bound.checkpoints.listLive(journalLog);
             const grants = yield* bound.assignments.listActiveByMember(member.id);
-            const error = new Store.Failure({
-              operation: "commit",
-              cause: "injected late failure",
-            });
+            const error = StoreError.failed("Store", "commit")("injected late failure");
             const broken = failingLate(bound, error);
             const failure = yield* Effect.flatMap(MemberService.MemberService, (memberService) =>
               memberService.remove(member.id),

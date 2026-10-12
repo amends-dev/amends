@@ -1,7 +1,7 @@
-import type { Schema } from "effect";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import { Cause, Option } from "effect";
 import { SqlError } from "effect/sql";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** The client's classification of a failed statement, whether Drizzle or the client raised it. */
 export const sqlError = (error: unknown): SqlError.SqlError | undefined => {
@@ -27,35 +27,33 @@ export const isContention = (error: unknown): boolean => {
   );
 };
 
-/** Every core store declares this pair; the constructors take the same fields. */
-export interface StoreErrors<C, F> {
-  readonly Conflict: new (fields: { readonly operation: string; readonly message: string }) => C;
-  readonly Failure: new (fields: { readonly operation: string; readonly cause: unknown }) => F;
-}
-
-/** Reject invalid write input before any statement changes stored state. */
-export const storeConflict =
-  <C>(errors: Pick<StoreErrors<C, never>, "Conflict">, operation: string) =>
-  (cause: Schema.SchemaError): C =>
-    new errors.Conflict({ operation, message: cause.message });
-
-/** Report a read's failure as the store's own failure; reads never conflict. */
-export const storeFailure =
-  <F>(errors: Pick<StoreErrors<never, F>, "Failure">, operation: string) =>
-  (cause: unknown): F =>
-    new errors.Failure({ operation, cause });
-
 /**
- * Report a write's failure as the store's own error: a row the database
- * refused is a conflict the caller can act on, anything else is a failure.
- * Pass the store's module and the operation straight to Effect.mapError.
+ * Report a write's failure as the store's: a row the database refused is rejected, anything else
+ * failed. Pass the store's name and the operation straight to Effect.mapError.
  */
 export const storeError =
-  <C, F>(errors: StoreErrors<C, F>, operation: string) =>
-  (cause: unknown): C | F =>
+  (store: string, operation: string) =>
+  (cause: unknown): StoreError.StoreError =>
     isConstraintViolation(cause)
-      ? new errors.Conflict({
+      ? StoreError.rejected(
+          store,
           operation,
-          message: cause instanceof Error ? cause.message : String(cause),
-        })
-      : new errors.Failure({ operation, cause });
+          cause instanceof Error ? cause.message : String(cause),
+        )
+      : StoreError.failed(store, operation)(cause);
+
+/**
+ * Report a write's failure where a row the database refused is one another writer stored first, as
+ * a log's batches and receipts and a projection's checkpoints are: contention, which asking again
+ * gets past. Anything else failed.
+ */
+export const raceError =
+  (store: string, operation: string) =>
+  (cause: unknown): StoreError.StoreError =>
+    isConstraintViolation(cause)
+      ? StoreError.contended(
+          store,
+          operation,
+          cause instanceof Error ? cause.message : String(cause),
+        )
+      : StoreError.failed(store, operation)(cause);

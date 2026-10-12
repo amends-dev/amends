@@ -36,6 +36,7 @@ import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What listing agents can fail with.
@@ -43,11 +44,7 @@ import * as CoreError from "../error/CoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type ListError =
-  | Authorization.Error
-  | AgentStore.Failure
-  | MemberStore.Failure
-  | ConnectionStore.Failure;
+export type ListError = Authorization.Error | StoreError.StoreError;
 
 /**
  * What reading one agent can fail with: listing's failures, a malformed ID, and a missing agent.
@@ -118,7 +115,7 @@ export class AgentService extends Context.Service<
     readonly configure: (
       input: Agent.ConfigureInput,
     ) => Effect.Effect<Agent.View, ConfigureError, Actor.Actor>;
-    /** Rename its membership; a rename made meanwhile conflicts. */
+    /** Rename its membership; a rename made meanwhile is rejected. */
     readonly rename: (
       input: Agent.RenameInput,
     ) => Effect.Effect<Agent.View, RenameError, Actor.Actor>;

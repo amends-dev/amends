@@ -39,6 +39,7 @@ import * as ChannelStore from "./ChannelStore.ts";
 import * as Delivery from "./Delivery.ts";
 import * as DeliveryFacts from "./DeliveryFacts.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What a delivery's job posts: nothing, since the delivery is no longer requested or was failed as
@@ -101,15 +102,7 @@ type CommitError =
  * @category errors
  * @since 0.1.0
  */
-export type AcceptError =
-  | CommitError
-  | ChannelBindingStore.Failure
-  | ThreadStore.Failure
-  | ChannelStore.Failure
-  | ThreadQuery.ParticipantsError
-  | NotificationStore.Failure
-  | ThreadActivityStore.Failure
-  | DeliveryStore.Failure;
+export type AcceptError = CommitError | StoreError.StoreError;
 
 /**
  * What readying a delivery can fail with.
@@ -117,14 +110,7 @@ export type AcceptError =
  * @category errors
  * @since 0.1.0
  */
-export type StartError =
-  | CommitError
-  | DeliveryStore.Failure
-  | ThreadMessageStore.Failure
-  | MemberStore.Failure
-  | ChannelBindingStore.Failure
-  | ChannelStore.Failure
-  | ChannelQuery.Error;
+export type StartError = CommitError | StoreError.StoreError;
 
 /**
  * What recording a delivery's end can fail with.
@@ -132,7 +118,7 @@ export type StartError =
  * @category errors
  * @since 0.1.0
  */
-export type RecordError = CommitError | DeliveryStore.Failure;
+export type RecordError = CommitError | StoreError.StoreError;
 
 /**
  * What the job asks of the workspace, one of `Core.JobServices`.

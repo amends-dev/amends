@@ -11,11 +11,11 @@
  *
  * @since 0.1.0
  */
-import { Checkpoint, Store } from "@amends-dev/core/journal";
+import { Checkpoint, StoreError } from "@amends-dev/core/journal";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { raceError } from "./internal/errors.ts";
 import { checkpoints, liveProjections } from "./internal/schema.ts";
 
 /**
@@ -50,7 +50,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
           ),
       ).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(Checkpoint.Cursor))),
-        Effect.mapError(storeFailure(Store, "checkpoint.get")),
+        Effect.mapError(StoreError.failed("Checkpoint", "get")),
       );
       return Array.head(rows);
     }),
@@ -81,7 +81,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
             set: progress,
           }),
         true,
-      ).pipe(Effect.mapError(storeError(Store, "checkpoint.set")));
+      ).pipe(Effect.mapError(raceError("Checkpoint", "set")));
     }),
     listLive: (logId) =>
       guard(
@@ -94,7 +94,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
           .orderBy(sql`${liveProjections.name} COLLATE "C"`),
       ).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(Checkpoint.LiveVersions)),
-        Effect.mapError(storeFailure(Store, "checkpoint.listLive")),
+        Effect.mapError(StoreError.failed("Checkpoint", "listLive")),
       ),
     setLive: Effect.fn("Checkpoints.setLive")(function* (logId, versions) {
       const clear = db
@@ -112,7 +112,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
                   versions.map(({ name, version }) => ({ workspaceId, logId, name, version })),
                 ),
             );
-      yield* guard(replace, true).pipe(Effect.mapError(storeError(Store, "checkpoint.setLive")));
+      yield* guard(replace, true).pipe(Effect.mapError(raceError("Checkpoint", "setLive")));
     }),
   };
   return Checkpoint.make(driver);

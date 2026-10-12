@@ -36,6 +36,7 @@ import {
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Group reads: audience, rosters, management reads, and paging. */
 
@@ -837,16 +838,15 @@ describe("group reads", () => {
             ...bound,
             context: Context.add(bound.context, GroupStore.GroupStore, {
               ...bound.groups,
-              get: () =>
-                Effect.fail(new GroupStore.Failure({ operation: "get", cause: "failed storage" })),
+              get: () => Effect.fail(StoreError.failed("GroupStore", "get")("failed storage")),
               getMany: () =>
-                Effect.fail(
-                  new GroupStore.Failure({ operation: "getMany", cause: "failed storage" }),
-                ),
+                Effect.fail(StoreError.failed("GroupStore", "getMany")("failed storage")),
             }),
           };
           expect(yield* Effect.flip(run(failed, reader, mine))).toMatchObject({
-            _tag: "GroupStore.Failure",
+            _tag: "StoreError",
+            store: "GroupStore",
+            reason: { _tag: "Failed" },
           });
           expect(yield* history(bound)).toEqual(before);
         }),

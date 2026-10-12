@@ -14,6 +14,7 @@ import * as GroupId from "./GroupId.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What checking the audience can fail with.
@@ -23,7 +24,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type AudienceError =
   | Authorization.Error
-  | GroupMembershipStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
 

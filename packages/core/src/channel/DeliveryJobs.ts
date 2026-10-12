@@ -16,6 +16,7 @@ import * as Notification from "../notification/Notification.ts";
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * A delivery job: the deliveries of one bound thread.
@@ -49,7 +50,9 @@ export class DeliveryJobs extends Context.Service<
      * told: the request is stored with the commit and discarded if it rolls back. Asking again before
      * it runs asks once.
      */
-    readonly requestDeliver: (job: Job) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+    readonly requestDeliver: (
+      job: Job,
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/channel/DeliveryJobs") {}
 

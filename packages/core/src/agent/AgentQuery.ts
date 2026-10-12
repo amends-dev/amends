@@ -20,6 +20,7 @@ import * as Agent from "./Agent.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading the agent of a member can fail with.
@@ -27,7 +28,7 @@ import * as CoreError from "../error/CoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = CoreError.NotFound | MemberStore.Failure | AgentStore.Failure;
+export type ReadError = CoreError.NotFound | StoreError.StoreError;
 
 /**
  * What selecting can fail with: what reading the agent and the workspace's connections meets, and
@@ -37,7 +38,7 @@ export type ReadError = CoreError.NotFound | MemberStore.Failure | AgentStore.Fa
  * @category errors
  * @since 0.1.0
  */
-export type SelectError = ReadError | ConnectionStore.Failure | CoreError.Invalid;
+export type SelectError = ReadError | StoreError.StoreError | CoreError.Invalid;
 
 /**
  * What building can fail with: what selecting meets, and a connection whose key cannot be read.
@@ -45,7 +46,7 @@ export type SelectError = ReadError | ConnectionStore.Failure | CoreError.Invali
  * @category errors
  * @since 0.1.0
  */
-export type BuildError = SelectError | ConnectionCredentialStore.Failure;
+export type BuildError = SelectError | StoreError.StoreError;
 
 /**
  * An agent ready to run on a selection, as data: what it works by, and the connections of its

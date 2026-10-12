@@ -28,6 +28,7 @@ import type { SqlError } from "effect/sql";
 import * as PostgresDatabase from "./PostgresDatabase.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import { isContention } from "./internal/errors.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * The host's limits on a workspace's transactions and on its statements outside them, each with a
@@ -144,7 +145,7 @@ export interface TransactionState {
   /** False once the program ends, after which a handle to the transaction is expired. */
   active: boolean;
   /** Writes the transaction staged in memory, run after its program and before COMMIT. */
-  beforeCommit: Effect.Effect<void, Store.Failure | Store.Conflict>;
+  beforeCommit: Effect.Effect<void, StoreError.StoreError>;
   /**
    * Notices to send on `PostgresNotices.channel` once COMMIT succeeds, each once. Notifying inside
    * the transaction would hold PostgreSQL's notification lock through the commit's WAL flush,
@@ -166,10 +167,10 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
   Effect.suspend(() => {
     if (!session.active)
       return Effect.fail(
-        new Store.Failure({
-          operation: "afterCommit",
-          cause: "Missing, closed, or foreign workspace transaction",
-        }),
+        StoreError.failed(
+          "Store",
+          "afterCommit",
+        )("Missing, closed, or foreign workspace transaction"),
       );
     session.afterCommit.push(effect);
     return Effect.void;
@@ -211,7 +212,7 @@ export class Binding extends Context.Service<
     readonly guard: <A, E, R>(
       program: Effect.Effect<A, E, R>,
       write?: boolean,
-    ) => Effect.Effect<A, E | Store.Failure, R>;
+    ) => Effect.Effect<A, E | StoreError.StoreError, R>;
     /**
      * The store's transaction primitive, given how to expose the native handle
      * for the session it opens. See `Store.Store` for the contract. With `log`
@@ -224,17 +225,17 @@ export class Binding extends Context.Service<
       options?: { readonly log?: Entry.LogId },
     ) => Effect.Effect<
       A,
-      E | Store.Failure | Store.Conflict | Store.CommitUncertain,
+      E | StoreError.StoreError | Store.CommitUncertain,
       Exclude<R, Store.Transaction>
     >;
   }
 >()("@amends-dev/storage-postgresql/Binding") {}
 
-/** Contention is a conflict the caller may retry; anything else failed the transaction. */
+/** Contention is worth retrying; anything else failed the transaction. */
 const transactionError = (cause: SqlError.SqlError) =>
   isContention(cause)
-    ? new Store.Conflict({ operation: "transaction", message: cause.message })
-    : new Store.Failure({ operation: "transaction", cause });
+    ? StoreError.contended("Store", "transaction", cause.message)
+    : StoreError.failed("Store", "transaction")(cause);
 
 /** What the client reports for a control statement; the tag says what PostgreSQL actually did. */
 const isCommitted = Schema.is(Schema.Struct({ command: Schema.Literal("COMMIT") }));
@@ -276,10 +277,10 @@ export const make = Effect.fn("Binding.make")(function* (
       current.value.workspaceId !== workspaceId ||
       current.value.commit.id !== native.value.id
     ) {
-      return yield* new Store.Failure({
-        operation: "transaction",
-        cause: "Missing, closed, or foreign workspace transaction",
-      });
+      return yield* StoreError.failed(
+        "Store",
+        "transaction",
+      )("Missing, closed, or foreign workspace transaction");
     }
   });
   const readKey = JSON.stringify(["reads", workspaceId]);
@@ -300,18 +301,19 @@ export const make = Effect.fn("Binding.make")(function* (
     ) {
       yield* check(false);
       if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
-        return yield* new Store.Failure({
-          operation: "transaction",
-          cause: "Native transactions cannot nest; use journal.commit",
-        });
+        return yield* StoreError.failed(
+          "Store",
+          "transaction",
+        )("Native transactions cannot nest; use journal.commit");
       const standalone = options.log !== undefined;
       const held = standalone ? "log" : "workspace";
       const committed: Array<Effect.Effect<void>> = [];
       const busy = (waitingFor: string) =>
-        new Store.Conflict({
-          operation: "transaction",
-          message: `Waited longer than the lock timeout for ${waitingFor}`,
-        });
+        StoreError.contended(
+          "Store",
+          "transaction",
+          `Waited longer than the lock timeout for ${waitingFor}`,
+        );
       // Waiting in this process's queue, for a connection, and for the lock share one budget.
       const began = yield* Clock.currentTimeMillis;
       const remaining = Effect.map(Clock.currentTimeMillis, (now) =>
@@ -383,9 +385,12 @@ export const make = Effect.fn("Binding.make")(function* (
                     duration: transactionTimeout,
                     orElse: () =>
                       Effect.fail(
-                        new Store.Failure({
+                        new StoreError.StoreError({
+                          store: "Store",
                           operation: "transaction",
-                          cause: `The transaction ran longer than ${Duration.format(transactionTimeout)}`,
+                          reason: new StoreError.Failed({
+                            cause: `The transaction ran longer than ${Duration.format(transactionTimeout)}`,
+                          }),
                         }),
                       ),
                   }),
@@ -401,7 +406,7 @@ export const make = Effect.fn("Binding.make")(function* (
                 return yield* Effect.failCause(
                   Cause.combine(
                     exit.cause,
-                    Cause.fail(new Store.Failure({ operation: "rollback", cause: rollback.cause })),
+                    Cause.fail(StoreError.failed("Store", "rollback")(rollback.cause)),
                   ),
                 );
               return yield* Effect.failCause(exit.cause);
@@ -418,9 +423,13 @@ export const make = Effect.fn("Binding.make")(function* (
             // program went on regardless: PostgreSQL answers COMMIT with a
             // rollback rather than an error, which must not pass for success.
             if (!isCommitted(commit.value))
-              return yield* new Store.Failure({
+              return yield* new StoreError.StoreError({
+                store: "Store",
                 operation: "commit",
-                cause: "An earlier failed statement aborted the transaction; nothing was committed",
+                reason: new StoreError.Failed({
+                  cause:
+                    "An earlier failed statement aborted the transaction; nothing was committed",
+                }),
               });
             // Committed: tell waiting readers in every process, in one statement of its own. A notice
             // lost to a failure here leaves them to find the commit at their next poll.

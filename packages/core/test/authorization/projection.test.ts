@@ -1,7 +1,7 @@
 import * as Publication from "../../src/journal/Publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option } from "effect";
 import * as AssignmentFacts from "../../src/authorization/AssignmentFacts.ts";
 import * as AssignmentProjection from "../../src/authorization/AssignmentProjection.ts";
 import * as AssignmentStore from "../../src/authorization/AssignmentStore.ts";
@@ -27,6 +27,7 @@ import * as MemberStore from "../../src/workspace/MemberStore.ts";
 import * as Member from "../../src/workspace/Member.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Entry.LogId.make("workspace-one/journal");
@@ -359,7 +360,7 @@ it.effect("a revocation naming another member than its assignment fails without 
         );
         expect(failure).toMatchObject({
           _tag: "Projection.Failure",
-          cause: { _tag: "AssignmentStore.Conflict" },
+          cause: { _tag: "StoreError", store: "AssignmentStore", reason: { _tag: "Rejected" } },
         });
         expect(yield* fixture.snapshot).toEqual(before);
       }),
@@ -370,7 +371,7 @@ it.effect("a revocation naming another member than its assignment fails without 
 it.effect("a failure after both projection writes rolls back the entire live commit", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const failure = new Store.Failure({ operation: "later", cause: "unavailable" });
+    const failure = StoreError.failed("Store", "later")("unavailable");
     yield* run(
       fixture,
       Effect.gen(function* () {
@@ -419,7 +420,12 @@ it.effect("a failed role replay batch restores its prior name, permissions, and 
         );
         expect(yield* Effect.flip((yield* setup).replay)).toMatchObject({
           _tag: "Projection.Failure",
-          cause: { _tag: "RoleStore.Conflict", operation: "rename" },
+          cause: {
+            _tag: "StoreError",
+            store: "RoleStore",
+            operation: "rename",
+            reason: { _tag: "Rejected" },
+          },
         });
         expect(yield* (yield* RoleStore.RoleStore).get(roleId)).toEqual(Option.some(initialRole));
         const cursor = yield* fixture.checkpoints.get({
@@ -463,7 +469,12 @@ it.effect(
           );
           expect(yield* Effect.flip((yield* setup).replay)).toMatchObject({
             _tag: "Projection.Failure",
-            cause: { _tag: "AssignmentStore.Conflict", operation: "markRevoked" },
+            cause: {
+              _tag: "StoreError",
+              store: "AssignmentStore",
+              operation: "markRevoked",
+              reason: { _tag: "Rejected" },
+            },
           });
           const assignmentStore = yield* AssignmentStore.AssignmentStore;
           expect((yield* assignmentStore.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
@@ -598,14 +609,7 @@ it.effect(
           const assignmentStore = yield* AssignmentStore.AssignmentStore;
           const expired = yield* fixture.store.transaction(Effect.context<Store.Transaction>());
           const operations: ReadonlyArray<
-            Effect.Effect<
-              void,
-              | RoleStore.Failure
-              | RoleStore.Conflict
-              | AssignmentStore.Failure
-              | AssignmentStore.Conflict,
-              Store.Transaction
-            >
+            Effect.Effect<void, StoreError.StoreError, Store.Transaction>
           > = [
             roleStore.get(roleId).pipe(Effect.asVoid),
             roleStore.insert(initialRole),
@@ -622,15 +626,9 @@ it.effect(
           ];
           for (const operation of operations) {
             const closedError = yield* Effect.flip(operation.pipe(Effect.provide(expired)));
-            expect(
-              Schema.is(RoleStore.Failure)(closedError) ||
-                Schema.is(AssignmentStore.Failure)(closedError),
-            ).toBe(true);
+            expect(closedError).toMatchObject({ _tag: "StoreError", reason: { _tag: "Failed" } });
             const foreignError = yield* Effect.flip(foreign.store.transaction(operation));
-            expect(
-              Schema.is(RoleStore.Failure)(foreignError) ||
-                Schema.is(AssignmentStore.Failure)(foreignError),
-            ).toBe(true);
+            expect(foreignError).toMatchObject({ _tag: "StoreError", reason: { _tag: "Failed" } });
           }
           expect((yield* fixture.snapshot).roles.size).toBe(0);
           expect((yield* fixture.snapshot).assignments.size).toBe(0);

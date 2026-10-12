@@ -24,6 +24,7 @@ import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What every notification operation can fail with: authorization, the store, and an input that
@@ -32,7 +33,7 @@ import * as CoreError from "../error/CoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type Error = Authorization.Error | NotificationStore.Failure | Schema.SchemaError;
+export type Error = Authorization.Error | StoreError.StoreError | Schema.SchemaError;
 
 /**
  * What reading a notification's source can fail with.
@@ -59,7 +60,7 @@ export type InboxError = Error | SourceError;
  */
 export type MarkSeenError =
   | Error
-  | NotificationStore.Conflict
+  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Denied
   | CoreError.Conflict;
@@ -230,7 +231,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     // what it reads as afterwards decides.
     yield* notificationStore
       .markSeen([notification.id], yield* DateTime.now)
-      .pipe(Effect.catchTag("NotificationStore.Conflict", () => Effect.void));
+      .pipe(Effect.catchReason("StoreError", "Rejected", () => Effect.void));
     // Another device may have seen it first; the stored time is the one that holds.
     const seen = yield* requireOwn(notification.id);
     if (Notification.State.isAnyOf(["Discarded"])(seen.state))
@@ -282,7 +283,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       const { page, due } = yield* markPageSeen(after).pipe(
         Effect.retry({
           times: 2,
-          while: Schema.is(NotificationStore.Conflict),
+          while: (error) => error._tag === "StoreError" && error.reason._tag === "Rejected",
         }),
       );
       marked += due;

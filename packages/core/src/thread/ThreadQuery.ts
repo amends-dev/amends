@@ -30,6 +30,7 @@ import * as ThreadActivity from "./ThreadActivity.ts";
 import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
 import * as ThreadActivityStore from "./ThreadActivityStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * A member who may take part in a group's threads: a current admission and active membership.
@@ -50,29 +51,9 @@ export interface Eligible {
  */
 export type AccessError =
   | Authorization.Error
-  | GroupMembershipStore.Failure
-  | ThreadStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
-
-/**
- * What reading participants can fail with.
- *
- * @category errors
- * @since 0.1.0
- */
-export type ParticipantsError =
-  | GroupMembershipStore.Failure
-  | MemberStore.Failure
-  | ThreadParticipationStore.Failure;
-
-/**
- * What reading a group's followers can fail with.
- *
- * @category errors
- * @since 0.1.0
- */
-export type FollowersError = ParticipantsError | GroupFollowStore.Failure;
 
 /**
  * What reading a timeline can fail with.
@@ -80,10 +61,7 @@ export type FollowersError = ParticipantsError | GroupFollowStore.Failure;
  * @category errors
  * @since 0.1.0
  */
-export type TimelineError =
-  | AccessError
-  | ThreadActivityStore.Failure
-  | ThreadActivityResolvers.Failure;
+export type TimelineError = AccessError | StoreError.StoreError | ThreadActivityResolvers.Failure;
 
 /**
  * What listing a group's readable threads can fail with, beyond the listing's own failures.
@@ -94,10 +72,7 @@ export type TimelineError =
 export type ListError =
   | CoreError.NotFound
   | Authorization.Error
-  | GroupMembershipStore.Failure
-  | ThreadStore.Failure
-  | TaskStore.Failure
-  | ReadStateStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError;
 
 /**
@@ -148,21 +123,24 @@ export class ThreadQuery extends Context.Service<
     readonly eligibleMembers: (
       groupId: Group.Id,
       memberIds: ReadonlyArray<Member.Id>,
-    ) => Effect.Effect<ReadonlyMap<Member.Id, Eligible>, ParticipantsError>;
+    ) => Effect.Effect<ReadonlyMap<Member.Id, Eligible>, StoreError.StoreError>;
     /**
      * The group's followers whose follow is through their current admission, with both records, in
      * follow order: those a new thread in the group admits.
      */
     readonly followers: (
       groupId: Group.Id,
-    ) => Effect.Effect<ReadonlyArray<Eligible>, FollowersError>;
+    ) => Effect.Effect<ReadonlyArray<Eligible>, StoreError.StoreError>;
     /**
      * Every current participant: an active participation whose member, if any, still has a current
      * group admission. Read in pages; a reply that addresses everyone needs them all.
      */
     readonly currentParticipants: (
       thread: Thread.Thread,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, ParticipantsError>;
+    ) => Effect.Effect<
+      ReadonlyArray<ThreadParticipation.ThreadParticipation>,
+      StoreError.StoreError
+    >;
     /**
      * A page of current participants in participation-ID order after the cursor. Stored
      * participants that have lapsed are skipped, and reading continues to fill the page.
@@ -172,13 +150,16 @@ export class ThreadQuery extends Context.Service<
       options: ThreadParticipation.ListOptions,
     ) => Effect.Effect<
       ReadonlyArray<ThreadParticipation.ThreadParticipation>,
-      ParticipantsError | Schema.SchemaError
+      StoreError.StoreError | Schema.SchemaError
     >;
     /** The current participations of these participants, reading only them. */
     readonly findParticipants: (
       thread: Thread.Thread,
       participants: ReadonlyArray<ThreadParticipation.Reference>,
-    ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, ParticipantsError>;
+    ) => Effect.Effect<
+      ReadonlyArray<ThreadParticipation.ThreadParticipation>,
+      StoreError.StoreError
+    >;
     /**
      * Fill a page with a group's threads the actor can read, from the rows `options.list` gives in
      * the page's order, reading further when grants skip some: each thread with its task, if any,

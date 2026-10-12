@@ -19,6 +19,7 @@ import { ClusterSchema, Entity, Sharding } from "effect/cluster";
 import { Rpc } from "effect/rpc";
 import * as TurnRunner from "./TurnRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * Which request this is among the job's: Cluster keeps one request per key, so a commit that asks
@@ -113,7 +114,7 @@ export const layerRequests = Layer.effect(
   Effect.gen(function* () {
     const sharding = yield* Sharding.Sharding;
     const turnJobClient = yield* entity.client;
-    const failure = (cause: unknown) => new Store.Failure({ operation: "request turn job", cause });
+    const failure = StoreError.failed("Store", "request turn job");
     return TurnJobs.TurnJobs.of({
       requestRun: Effect.fnUntraced(function* ({ workspaceId, memberId, threadId }) {
         const storeTransaction = yield* Store.Transaction;

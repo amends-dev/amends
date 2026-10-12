@@ -28,6 +28,7 @@ import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading connections can fail with.
@@ -37,7 +38,7 @@ import * as CoreError from "../error/CoreError.ts";
  */
 export type ReadError =
   | Authorization.Error
-  | ConnectionStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
 
@@ -49,7 +50,7 @@ export type ReadError =
  */
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 /** Storing or reading a key can also meet a host that keeps no credentials. */
-type KeyError = ConnectionCredentialStore.Failure | CoreError.Unavailable;
+type KeyError = StoreError.StoreError | CoreError.Unavailable;
 
 /**
  * What creating a connection can fail with: an integration the host does not install or that does
@@ -84,7 +85,7 @@ export type ReplaceKeyError = Error | CoreError.Invalid | KeyError;
  * @category errors
  * @since 0.1.0
  */
-export type RemoveError = Error | ConnectionCredentialStore.Failure;
+export type RemoveError = Error | StoreError.StoreError;
 
 /**
  * What checking a connection can fail with: reading it, an integration the host no longer installs

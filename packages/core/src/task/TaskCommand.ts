@@ -37,6 +37,7 @@ import type * as Member from "../workspace/Member.ts";
 import * as Task from "./Task.ts";
 import * as TaskActivity from "./TaskActivity.ts";
 import * as TaskFacts from "./TaskFacts.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the writes can fail with.
@@ -44,7 +45,7 @@ import * as TaskFacts from "./TaskFacts.ts";
  * @category errors
  * @since 0.1.0
  */
-export type Error = ThreadCommand.Error | TurnCommand.EndError | TurnStore.Failure;
+export type Error = ThreadCommand.Error | TurnCommand.EndError | StoreError.StoreError;
 
 /**
  * What creates a task: its thread, how it starts, who created it, and when. `by` is who made the

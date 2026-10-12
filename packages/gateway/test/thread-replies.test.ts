@@ -24,7 +24,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -70,6 +70,7 @@ import {
 
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Replies: admission, recipients, concurrent sequencing, rollback, and replay. */
 
@@ -651,26 +652,19 @@ describe("thread replies", () => {
               Context.add(bound.context, ThreadMessageStore.ThreadMessageStore, {
                 ...bound.messages,
                 insert: () =>
-                  Effect.fail(
-                    new ThreadMessageStore.Failure({ operation: "insert", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("ThreadMessageStore", "insert")("injected")),
               }),
               Context.add(bound.context, ThreadActivityStore.ThreadActivityStore, {
                 ...bound.activities,
                 insert: () =>
-                  Effect.fail(
-                    new ThreadActivityStore.Failure({ operation: "insert", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("ThreadActivityStore", "insert")("injected")),
               }),
               Context.add(bound.context, NotificationStore.NotificationStore, {
                 ...bound.notifications,
                 insertMany: () =>
-                  Effect.fail(
-                    new NotificationStore.Failure({ operation: "insertMany", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("NotificationStore", "insertMany")("injected")),
               }),
-              failingLate(bound, new Store.Failure({ operation: "commit", cause: "injected" }))
-                .context,
+              failingLate(bound, StoreError.failed("Store", "commit")("injected")).context,
             ];
             for (const context of contexts) {
               const outcome = yield* Effect.exit(
@@ -794,7 +788,7 @@ describe("thread replies", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "Store.Conflict" },
+                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -951,13 +945,15 @@ describe("thread replies", () => {
           const context = Context.add(bound.context, ThreadActivityStore.ThreadActivityStore, {
             ...bound.activities,
             latest: () =>
-              Effect.fail(
-                new ThreadActivityStore.Failure({ operation: "latest", cause: "injected" }),
-              ),
+              Effect.fail(StoreError.failed("ThreadActivityStore", "latest")("injected")),
           });
           expect(
             yield* Effect.flip(run({ ...bound, context }, owner, reply(first.thread.id))),
-          ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadActivityStore",
+            reason: { _tag: "Failed" },
+          });
           expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
         }),
       ),
@@ -1075,7 +1071,7 @@ describe("thread replies", () => {
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(/^(Store.Conflict|CoreError.Conflict)$/),
+                  _tag: expect.stringMatching(/^(StoreError|CoreError.Conflict)$/),
                 },
               });
           yield* Effect.scoped(

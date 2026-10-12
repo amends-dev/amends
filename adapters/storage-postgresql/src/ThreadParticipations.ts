@@ -4,11 +4,10 @@
  * column beside that kind's own columns. `ThreadParticipationStore.make` checks every input before
  * the driver sees it, so the driver keeps only what storage keeps: the primary key refuses a reused
  * ID and `active_thread_participation` a second active participation for one participant in a
- * thread, each as the store's `Conflict`, and ending one is a conditional update that conflicts
- * unless it finds exactly the addressed participation active. A departure from a group ends every
- * participation of the admission in one statement. Every statement is scoped to the binding's
- * workspace and runs under its `guard`, which lets a read join the caller's transaction and
- * requires one for a write.
+ * thread, each rejected, and ending one is a conditional update rejected unless it finds exactly
+ * the addressed participation active. A departure from a group ends every participation of the
+ * admission in one statement. Every statement is scoped to the binding's workspace and runs under
+ * its `guard`, which lets a read join the caller's transaction and requires one for a write.
  *
  * @since 0.1.0
  */
@@ -18,7 +17,8 @@ import { and, eq, sql } from "drizzle-orm";
 import { threadParticipations } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
+import { StoreError } from "@amends-dev/core/journal";
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.ThreadParticipation));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -105,7 +105,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
             .where(and(inWorkspace, eq(threadParticipations.id, id))),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ThreadParticipationStore, "get")),
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "get")),
     ),
     getMany: Effect.fn("ThreadParticipations.getMany")(
       function* (ids) {
@@ -117,7 +117,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
             .where(and(inWorkspace, inIds(threadParticipations.id, ids))),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadParticipationStore, "getMany")),
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "getMany")),
     ),
     listByThread: Effect.fn("ThreadParticipations.listByThread")(
       function* (id) {
@@ -129,7 +129,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
             .orderBy(sql`${threadParticipations.id} COLLATE "C"`),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadParticipationStore, "listByThread")),
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "listByThread")),
     ),
     pageActiveByThread: Effect.fn("ThreadParticipations.pageActiveByThread")(
       function* (id, options) {
@@ -150,7 +150,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
             .limit(options.limit),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadParticipationStore, "pageActiveByThread")),
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "pageActiveByThread")),
     ),
     findActive: Effect.fn("ThreadParticipations.findActive")(
       function* (id, references) {
@@ -178,7 +178,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadParticipationStore, "findActive")),
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "findActive")),
     ),
     endByAdmission: Effect.fn("ThreadParticipations.endByAdmission")(function* (id, endedAt) {
       // One statement however many there are; participations_by_admission finds them.
@@ -194,7 +194,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
             ),
           ),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "endByAdmission")));
+      ).pipe(Effect.mapError(storeError("ThreadParticipationStore", "endByAdmission")));
     }),
     end: Effect.fn("ThreadParticipations.end")(function* (departure, endedAt) {
       const rows = yield* guard(
@@ -211,12 +211,13 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           )
           .returning({ id: threadParticipations.id }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "end")));
+      ).pipe(Effect.mapError(storeError("ThreadParticipationStore", "end")));
       if (rows.length !== 1)
-        return yield* new ThreadParticipationStore.Conflict({
-          operation: "end",
-          message: "Participation is missing, mismatched, or already ended",
-        });
+        return yield* StoreError.rejected(
+          "ThreadParticipationStore",
+          "end",
+          "Participation is missing, mismatched, or already ended",
+        );
     }),
     insert: Effect.fn("ThreadParticipations.insert")(function* (record) {
       const participant = record.participant;
@@ -229,7 +230,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
           endedAt: record.endedAt === null ? null : DateTime.toDate(record.endedAt),
         }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadParticipationStore, "insert")));
+      ).pipe(Effect.mapError(storeError("ThreadParticipationStore", "insert")));
     }),
   };
   return ThreadParticipationStore.make(workspaceId, driver);

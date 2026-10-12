@@ -1,7 +1,7 @@
 import { Integration } from "@amends-dev/connection";
 import { Connection, ConnectionService } from "@amends-dev/core/connection";
 import { Actor, type Identity } from "@amends-dev/core/identity";
-import { Journal, Store } from "@amends-dev/core/journal";
+import { Journal } from "@amends-dev/core/journal";
 import { Request } from "@amends-dev/core/request";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
@@ -23,6 +23,7 @@ import {
   testModel,
 } from "./support.ts";
 import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,
@@ -454,10 +455,7 @@ describe("connections", () => {
           const bound = yield* boundTo(workspace.id);
           const before = yield* bound.store.read(journalLog, { limit: 200 });
           const footprint = yield* storage.footprint;
-          const failure = new Store.Failure({
-            operation: "transaction",
-            cause: "Late write failed",
-          });
+          const failure = StoreError.failed("Store", "transaction")("Late write failed");
           expect(
             yield* Effect.flip(
               Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>

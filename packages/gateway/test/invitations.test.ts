@@ -332,10 +332,20 @@ describe("invitations", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "InvitationStore.Conflict", operation: "settle" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "InvitationStore",
+            operation: "settle",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             yield* Effect.flip(bound.store.transaction(bound.invitations.insert(pending("first")))),
-          ).toMatchObject({ _tag: "InvitationStore.Conflict", operation: "insert" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "InvitationStore",
+            operation: "insert",
+            reason: { _tag: "Rejected" },
+          });
           expect(yield* bound.invitations.get(Invitation.Id.make("first"))).toEqual(
             Option.some({
               details: details("first"),

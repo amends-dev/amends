@@ -38,7 +38,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "Store.Failure", operation: "commit" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "Store",
+            operation: "commit",
+            reason: { _tag: "Failed" },
+          });
           expect(yield* bound.invitations.get(Invitation.Id.make("second"))).toEqual(Option.none());
         }),
       ),

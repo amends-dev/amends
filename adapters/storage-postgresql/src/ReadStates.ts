@@ -15,9 +15,10 @@ import { ReadState, ReadStateStore } from "@amends-dev/core/read-state";
 import { and, eq, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { inIds } from "./internal/id-list.ts";
 import { groupReadTimes, notificationSeen, threadReadPositions } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decodePositions = Schema.decodeUnknownEffect(Schema.Array(ReadState.ThreadPosition));
 const decodeGroups = Schema.decodeUnknownEffect(
@@ -54,7 +55,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodePositions));
       },
-      Effect.mapError(storeFailure(ReadStateStore, "getThreadPositions")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getThreadPositions")),
     ),
     markThreadRead: Effect.fn("ReadStates.markThreadRead")(function* (position, seenAt) {
       const { memberId, threadId, readThrough } = position;
@@ -80,7 +81,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
           VALUES (${workspaceId}, ${memberId}, ${threadId}, ${readThrough})
           ON CONFLICT (workspace_id, member_id, thread_id) DO UPDATE
             SET read_through = greatest(thread_read_positions.read_through, excluded.read_through)`),
-      ).pipe(Effect.mapError(storeError(ReadStateStore, "markThreadRead")));
+      ).pipe(Effect.mapError(storeError("ReadStateStore", "markThreadRead")));
     }),
     getGroupReads: Effect.fn("ReadStates.getGroupReads")(
       function* (memberId, groupIds) {
@@ -98,7 +99,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeGroups));
       },
-      Effect.mapError(storeFailure(ReadStateStore, "getGroupReads")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getGroupReads")),
     ),
     advanceGroup: Effect.fn("ReadStates.advanceGroup")(function* (groupRead) {
       const { readAt, ...fields } = groupRead;
@@ -112,7 +113,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
               readAt: sql`greatest(${groupReadTimes.readAt}, excluded.read_at)`,
             },
           }),
-      ).pipe(Effect.mapError(storeError(ReadStateStore, "advanceGroup")));
+      ).pipe(Effect.mapError(storeError("ReadStateStore", "advanceGroup")));
     }),
   };
   return ReadStateStore.make(workspaceId, driver);

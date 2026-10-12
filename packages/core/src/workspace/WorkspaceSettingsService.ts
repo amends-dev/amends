@@ -30,6 +30,7 @@ import * as Workspace from "./Workspace.ts";
 import * as WorkspaceSettings from "./WorkspaceSettings.ts";
 import * as WorkspaceSettingsPermissions from "./WorkspaceSettingsPermissions.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading the member-management view can fail with: the delegation checks it shows, and
@@ -49,7 +50,7 @@ export type MembersError = Delegation.Error | MemberService.Error;
  */
 export type RenameError =
   | Authorization.Error
-  | WorkspaceStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.Changed
   | Projection.Error

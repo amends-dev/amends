@@ -23,6 +23,7 @@ import * as Requirement from "./Requirement.ts";
 
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The actor, or a requirement's target, belongs to another workspace than the one this core is
@@ -44,7 +45,7 @@ export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
  * @since 0.1.0
  */
 export type Error =
-  | MemberStore.Failure
+  | StoreError.StoreError
   | GrantResolver.Error
   | WorkspaceMismatch
   | CoreError.Denied;

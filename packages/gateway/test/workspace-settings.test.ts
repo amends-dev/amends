@@ -1,5 +1,5 @@
 import { Actor, type Identity } from "@amends-dev/core/identity";
-import { Journal, Store } from "@amends-dev/core/journal";
+import { Journal } from "@amends-dev/core/journal";
 import { BuiltinRoles, type Role } from "@amends-dev/core/authorization";
 import { Identity as Identities } from "@amends-dev/core/identity";
 import { Workspace, WorkspaceSettingsService } from "@amends-dev/core/workspace";
@@ -19,6 +19,7 @@ import {
   journalLog,
   request,
 } from "./support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const read = (id: Workspace.Id, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
@@ -285,12 +286,13 @@ describe("workspace settings", () => {
           ])
             expect(
               yield* Effect.flip(bound.store.transaction(bound.workspace.rename(change))),
-            ).toMatchObject({ _tag: "WorkspaceStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "WorkspaceStore",
+              reason: { _tag: "Rejected" },
+            });
           const before = yield* bound.store.read(journalLog, { limit: 50 });
-          const failure = new Store.Failure({
-            operation: "transaction",
-            cause: "Late write failed",
-          });
+          const failure = StoreError.failed("Store", "transaction")("Late write failed");
           const broken = failingLate(bound, failure);
           expect(
             yield* Effect.flip(

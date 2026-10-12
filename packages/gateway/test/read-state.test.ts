@@ -205,7 +205,11 @@ describe("read state", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadStore",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             yield* Effect.flip(
               bound.store.transaction(
@@ -215,7 +219,11 @@ describe("read state", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "GroupStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "GroupStore",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             yield* bound.threads.getLatest([started.thread.id, Thread.Id.make("missing")]),
           ).toHaveLength(1);
@@ -378,7 +386,11 @@ describe("read state", () => {
                 seenAt,
               ),
             ),
-          ).toMatchObject({ _tag: "ReadStateStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ReadStateStore",
+            reason: { _tag: "Rejected" },
+          });
           // Read state references no projection rows, so rebuilding threads from the journal keeps it.
           yield* storage.discardProjections;
           yield* trusted(

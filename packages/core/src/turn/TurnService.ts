@@ -48,6 +48,7 @@ import * as SessionLogStore from "./SessionLogStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading a turn can fail with: `CoreError.NotFound`, a denied `thread.read`, and the failures
@@ -59,8 +60,7 @@ import * as CoreError from "../error/CoreError.ts";
 export type ReadError =
   | ThreadQuery.AccessError
   | Authorization.Error
-  | TurnStore.Failure
-  | ThreadParticipationStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | CoreError.NotFound;
 
@@ -80,7 +80,7 @@ export type ActiveError = Exclude<ReadError, CoreError.NotFound>;
  * @category errors
  * @since 0.1.0
  */
-export type WatchError = ReadError | SessionLogStore.Failure | CoreError.Unavailable;
+export type WatchError = ReadError | StoreError.StoreError | CoreError.Unavailable;
 
 /**
  * What stopping or retrying a turn can fail with beyond its own outcome: `ReadError`, and the
@@ -92,7 +92,7 @@ export type WatchError = ReadError | SessionLogStore.Failure | CoreError.Unavail
 export type ChangeError =
   | ReadError
   | PlatformError.PlatformError
-  | SessionLogStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | TurnCommand.EndError;
 

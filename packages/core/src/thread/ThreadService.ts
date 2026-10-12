@@ -16,9 +16,7 @@ import * as Requirement from "../authorization/Requirement.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Group from "../group/Group.ts";
 import * as GroupQuery from "../group/GroupQuery.ts";
-import * as GroupMembershipStore from "../group/GroupMembershipStore.ts";
 import * as Member from "../workspace/Member.ts";
-import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Journal from "../journal/Journal.ts";
 import type * as Log from "../journal/Log.ts";
 import type * as Projection from "../journal/Projection.ts";
@@ -29,12 +27,10 @@ import * as ThreadStore from "./ThreadStore.ts";
 import * as ThreadCommand from "./ThreadCommand.ts";
 import * as GroupStore from "../group/GroupStore.ts";
 import * as GroupCommand from "../group/GroupCommand.ts";
-import type * as GroupFollowStore from "../group/GroupFollowStore.ts";
 import * as ThreadQuery from "./ThreadQuery.ts";
 import * as ThreadPermissions from "./ThreadPermissions.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
-import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
 import * as ThreadActivityStore from "./ThreadActivityStore.ts";
 import * as ThreadActivityKind from "./ThreadActivityKind.ts";
@@ -49,6 +45,7 @@ import * as TaskCommand from "../task/TaskCommand.ts";
 import * as TaskPermissions from "../task/TaskPermissions.ts";
 import * as TaskStore from "../task/TaskStore.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What starting a thread can fail with: the outcomes above, and the failures of what
@@ -62,12 +59,7 @@ export type Error =
   | ThreadCommand.Error
   | TaskCommand.Error
   | GroupCommand.EstablishError
-  | GroupStore.Failure
-  | GroupMembershipStore.Failure
-  | GroupFollowStore.Failure
-  | ReadStateStore.Failure
-  | ReadStateStore.Conflict
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.WriteError
@@ -75,11 +67,7 @@ export type Error =
   | CoreError.NotFound
   | CoreError.Conflict
   | CoreError.Denied
-  | CoreError.Invalid
-  | ThreadStore.Failure
-  | ThreadMessageStore.Failure
-  | ThreadActivityStore.Failure
-  | TaskStore.Failure;
+  | CoreError.Invalid;
 
 /**
  * What renaming a thread can fail with: the outcomes above, and the failures of what
@@ -91,8 +79,7 @@ export type Error =
 export type RenameError =
   | Authorization.Error
   | Exclude<ThreadCommand.Error, CoreError.Conflict>
-  | GroupMembershipStore.Failure
-  | TaskStore.Failure
+  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Changed;
 
@@ -104,11 +91,8 @@ export type RenameError =
  */
 export type ReadError =
   | ThreadQuery.ListError
-  | MemberStore.Failure
-  | ThreadMessageStore.Failure
-  | ThreadActivityStore.Failure
+  | StoreError.StoreError
   | ThreadActivityResolvers.Failure
-  | ThreadParticipationStore.Failure
   | CoreError.NotFound;
 
 /**
