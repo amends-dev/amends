@@ -181,7 +181,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
   const store = yield* Store.Store;
   const owner = Symbol("transaction coordinator");
 
-  const run = Effect.fn("Commit.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
+  const run = Effect.fn("Transaction.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
     const current = yield* Effect.serviceOption(Current);
     if (Option.isSome(current)) {
       const state = current.value;
@@ -252,7 +252,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     return result.value;
   });
 
-  const operation = Effect.fn("Commit.operation")(function* <A, E, R>(
+  const operation = Effect.fn("Transaction.operation")(function* <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) {
     return yield* run(
@@ -278,7 +278,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     );
   });
 
-  const step = Effect.fn("Commit.step")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
+  const step = Effect.fn("Transaction.step")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
     const current = yield* Effect.serviceOption(Current);
     if (Option.isNone(current) || current.value.owner !== owner || !current.value.active)
       return yield* program;

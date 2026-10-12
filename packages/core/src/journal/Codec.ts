@@ -40,7 +40,7 @@ export const makeEntryCodec = <S extends Schema.Constraint>(schema: S): EntryCod
   const codec = makeForSchema(schema);
   return {
     encode: (value) => Effect.map(codec.encode(value), (payload) => ({ payload })),
-    decode: Effect.fn("LogCodec.decodeEntry")(function* (entry) {
+    decode: Effect.fn("Codec.decodeEntry")(function* (entry) {
       yield* Schema.decodeUnknownEffect(Schema.Undefined)(entry.fact);
       return yield* codec.decode(entry.payload);
     }),
@@ -89,12 +89,12 @@ export const makeForSchema = <S extends Schema.Constraint>(payload: S): PayloadC
   const decode = Schema.decodeUnknownEffect(schema);
 
   return {
-    encode: Effect.fn("LogCodec.encode")(function* (payload: S["Type"]) {
+    encode: Effect.fn("Codec.encode")(function* (payload: S["Type"]) {
       const bytes = yield* encode(payload);
       // SchemaBinary can return a view into a shared encoding arena.
       return bytes.slice();
     }),
-    decode: Effect.fn("LogCodec.decode")(function* (bytes: Uint8Array) {
+    decode: Effect.fn("Codec.decode")(function* (bytes: Uint8Array) {
       return yield* decode(bytes);
     }),
   };

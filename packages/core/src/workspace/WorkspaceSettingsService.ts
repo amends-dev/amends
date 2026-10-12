@@ -99,7 +99,7 @@ export class WorkspaceSettingsService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("WorkspaceSettings.make")(function* () {
+export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore,
     authorization = yield* Authorization.Authorization,
     delegation = yield* Delegation.Delegation,
@@ -141,7 +141,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
       roles,
     };
   });
-  const listing = Effect.gen(function* () {
+  const members = Effect.gen(function* () {
     const visible = yield* memberService.list;
     const workspace = yield* readWorkspace;
     const actorId = (yield* Actor.Actor).memberId;
@@ -192,7 +192,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
       }),
     );
   });
-  const rename = Effect.fn("WorkspaceSettings.rename")(
+  const rename = Effect.fn("WorkspaceSettingsService.rename")(
     function* (input: WorkspaceSettings.RenameInput) {
       const request = yield* Schema.decodeEffect(WorkspaceSettings.RenameInput)(input);
       yield* authorization.require([renamePermission]);
@@ -210,7 +210,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return WorkspaceSettingsService.of({ get, members: listing, rename });
+  return WorkspaceSettingsService.of({ get, members, rename });
 });
 /**
  * Provide the settings operations over the workspace store, the member and assignment operations,
