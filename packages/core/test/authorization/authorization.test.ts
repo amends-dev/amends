@@ -425,10 +425,8 @@ it.effect("requirements are validated against canonical permission definitions",
       targetKind: "Member",
       builtinTier: "member",
     });
-    expect(
-      yield* run(fixture, Effect.flip(check([Requirement.make(unregistered, bobTarget)]))),
-    ).toMatchObject({ _tag: "PermissionCatalog.Unknown", name: unregistered.name });
-    // A requirement whose target is not the kind the catalog declares is a bug, not a denial.
+    // A requirement naming a permission the host does not declare, or a target other than the
+    // kind the catalog declares, is a bug, not a denial.
     const wrongDefinition = Permission.make(MemberPermissions.Remove.name, {
       targetKind: "Workspace",
       builtinTier: "administrator",
@@ -438,7 +436,7 @@ it.effect("requirements are validated against canonical permission definitions",
       permission: MemberPermissions.Remove,
       target: workspaceTarget,
     };
-    for (const requirement of [wrongKind, malformed])
+    for (const requirement of [Requirement.make(unregistered, bobTarget), wrongKind, malformed])
       expect(Exit.hasDies(yield* Effect.exit(run(fixture, check([requirement]))))).toBe(true);
   }),
 );

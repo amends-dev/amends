@@ -12,12 +12,7 @@ import {
   ThreadMessageService,
   ThreadParticipationService,
 } from "@amends-dev/core/thread";
-import {
-  AssignmentService,
-  Authorization,
-  Delegation,
-  PermissionCatalog,
-} from "@amends-dev/core/authorization";
+import { AssignmentService, Authorization, Delegation } from "@amends-dev/core/authorization";
 import { Commit } from "@amends-dev/core/journal";
 import { ChangeFeed } from "@amends-dev/core/change-feed";
 import { NotificationService } from "@amends-dev/core/notification";
@@ -112,7 +107,6 @@ export const PublicError = Schema.Union([
   InvalidInput,
   Authorization.Denied,
   Authorization.InvalidActor,
-  PermissionCatalog.Unknown,
   Delegation.Denied,
   Delegation.OwnerProtected,
   Delegation.UnsupportedRole,

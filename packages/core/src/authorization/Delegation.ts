@@ -78,7 +78,6 @@ export type Error =
   | WorkspaceStore.Failure
   | AssignmentStore.Failure
   | RoleStore.Failure
-  | PermissionCatalog.Unknown
   | Schema.SchemaError
   | Denied
   | OwnerProtected

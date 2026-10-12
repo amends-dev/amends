@@ -9,12 +9,7 @@
  *
  * @since 0.1.0
  */
-import {
-  AssignmentService,
-  Authorization,
-  Delegation,
-  PermissionCatalog,
-} from "@amends-dev/core/authorization";
+import { AssignmentService, Authorization, Delegation } from "@amends-dev/core/authorization";
 import {
   InvitationService,
   MemberService,
@@ -135,13 +130,6 @@ export const Denied = Authorization.Denied.pipe(HttpApiSchema.status(403));
  * @since 0.1.0
  */
 export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status(403));
-/**
- * A permission name that no feature declared on this host; 400.
- *
- * @category errors
- * @since 0.1.0
- */
-export const UnknownPermission = PermissionCatalog.Unknown.pipe(HttpApiSchema.status(400));
 /**
  * No membership has this ID in the workspace; 404. Only a caller authorized on that member learns
  * it.
@@ -590,14 +578,7 @@ export const TurnNotRetryable = TurnService.NotRetryable.pipe(HttpApiSchema.stat
  * @category errors
  * @since 0.1.0
  */
-export const workspace = [
-  Denied,
-  InvalidActor,
-  UnknownPermission,
-  InvalidInput,
-  Conflict,
-  Uncertain,
-] as const;
+export const workspace = [Denied, InvalidActor, InvalidInput, Conflict, Uncertain] as const;
 
 /**
  * Outcomes every member operation shares: the workspace set plus membership.

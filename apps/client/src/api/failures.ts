@@ -150,7 +150,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "GatewayErrors.InvalidInput": "invalid",
   "InvitationService.InvalidExpiry": "invalid",
   "Delegation.UnsupportedRole": "invalid",
-  "PermissionCatalog.Unknown": "invalid",
   // Rejected credentials sign out in the HTTP layer; the rest are transport or host failures.
   "Authentication.Unauthorized": "failed",
   "GatewayErrors.Uncertain": "failed",
