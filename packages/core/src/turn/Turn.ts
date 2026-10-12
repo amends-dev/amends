@@ -11,7 +11,6 @@ import { Schema, Struct } from "effect";
 import * as Agent from "../agent/Agent.ts";
 import * as GroupId from "../group/GroupId.ts";
 import * as Identity from "../identity/Identity.ts";
-import * as Notification from "../notification/Notification.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
@@ -188,24 +187,6 @@ export const queued = (
   startedAt: null,
   finishedAt: null,
 });
-
-/**
- * Accepting work into a turn: the notifications it settles, and when. `TurnFacts.Created` carries
- * the notifications with the turn's record.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Acceptance = Schema.Struct({
-  notificationIds: Schema.NonEmptyArray(Notification.Id),
-  acceptedAt: Schema.DateTimeUtcFromString,
-});
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export interface Acceptance extends Schema.Schema.Type<typeof Acceptance> {}
 
 /**
  * Why a turn cannot be retried: it has not ended, it replied, a later one followed, or its agent

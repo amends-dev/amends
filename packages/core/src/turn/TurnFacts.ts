@@ -13,6 +13,7 @@ import * as Group from "../group/Group.ts";
 import * as GroupId from "../group/GroupId.ts";
 import * as Fact from "../journal/Fact.ts";
 import * as Subject from "../journal/Subject.ts";
+import * as Notification from "../notification/Notification.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";
@@ -46,7 +47,8 @@ export const Created = Fact.make("turn.created", {
   occurrence: (payload) => [payload.id],
   payload: Schema.Struct({
     ...Turn.Turn.fields,
-    notificationIds: Turn.Acceptance.fields.notificationIds,
+    /** The notifications the turn accepted, which it settles. */
+    notificationIds: Schema.NonEmptyArray(Notification.Id),
   }),
 });
 
