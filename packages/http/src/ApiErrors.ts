@@ -251,17 +251,27 @@ export const invitation = [
   InvitationInvalidExpiry,
 ] as const;
 /**
- * Assignment outcomes, with the delegation rules: a missing assignment or member is 404, and a
- * member no longer active, or access that changed since the caller read it, is 409.
+ * Reading a member's access, with the delegation rules it shows: a missing member is 404, and one
+ * no longer active 409.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const assignmentRead = [
+  ...delegation,
+  AssignmentService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  AssignmentService.InactiveMember.pipe(HttpApiSchema.status(409)),
+] as const;
+/**
+ * Assignment outcomes: those of reading a member's access, and a missing assignment, 404, or
+ * access that changed since the caller read it, 409.
  *
  * @category errors
  * @since 0.1.0
  */
 export const assignment = [
-  ...delegation,
+  ...assignmentRead,
   AssignmentService.NotFound.pipe(HttpApiSchema.status(404)),
-  AssignmentService.MemberNotFound.pipe(HttpApiSchema.status(404)),
-  AssignmentService.InactiveMember.pipe(HttpApiSchema.status(409)),
   AssignmentService.Changed.pipe(HttpApiSchema.status(409)),
 ] as const;
 

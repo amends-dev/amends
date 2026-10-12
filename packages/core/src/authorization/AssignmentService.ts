@@ -79,6 +79,15 @@ export type Error =
   | Changed;
 
 /**
+ * What reading a member's access can fail with: the delegation checks it shows, and a member who
+ * is missing or no longer active.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type ListError = Delegation.Error | MemberNotFound | InactiveMember;
+
+/**
  * What `permissions` can fail with: authorization's failures but never `Denied`, since reading
  * one's own permissions needs only active membership.
  *
@@ -107,12 +116,18 @@ export class AssignmentService extends Context.Service<
       Actor.Actor
     >;
     /** The three built-in roles, each with whether the actor may give it, under active membership. */
-    readonly roles: Effect.Effect<ReadonlyArray<Assignment.RoleChoice>, Error, Actor.Actor>;
+    readonly roles: Effect.Effect<
+      ReadonlyArray<Assignment.RoleChoice>,
+      Delegation.Error,
+      Actor.Actor
+    >;
     /**
      * A member's access, under `assignment.read` on them: their active assignments, the roles on
      * offer, and whether the actor may change them.
      */
-    readonly list: (memberId: Member.Id) => Effect.Effect<Assignment.Access, Error, Actor.Actor>;
+    readonly list: (
+      memberId: Member.Id,
+    ) => Effect.Effect<Assignment.Access, ListError, Actor.Actor>;
     /**
      * Give a member a built-in role across the workspace, under `assignment.manage` and the
      * delegation rules for the member and the role. A role they already hold is returned as it is,
@@ -206,14 +221,6 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     if (record.status !== "active") return yield* new InactiveMember({ memberId });
     yield* delegation.requireRecipient(memberId);
   });
-  const isAllowedBy = <A, R>(effect: Effect.Effect<A, Error, R>) =>
-    effect.pipe(
-      Effect.as(true),
-      Effect.catchTag(
-        ["Authorization.Denied", "Delegation.Denied", "Delegation.OwnerProtected"],
-        () => Effect.succeed(false),
-      ),
-    );
   const listRoleChoices = Effect.gen(function* () {
     yield* authorization.require([]);
     return yield* Effect.forEach(
@@ -221,7 +228,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       (id) =>
         Effect.gen(function* () {
           const role = yield* delegation.loadRole(id);
-          return { role, assignable: yield* isAllowedBy(delegation.requireGrant(id)) };
+          return { role, assignable: yield* Delegation.isAllowedBy(delegation.requireGrant(id)) };
         }),
     );
   });
@@ -233,7 +240,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     return Assignment.Access.make({
       assignments: yield* delegation.assignmentsFor(memberId),
       roles: yield* listRoleChoices,
-      canManage: record.status === "active" && (yield* isAllowedBy(authorizeRecipient(memberId))),
+      canManage:
+        record.status === "active" && (yield* Delegation.isAllowedBy(authorizeRecipient(memberId))),
     });
   });
   /** Is this a role held across the workspace? Its source then names the role. */
