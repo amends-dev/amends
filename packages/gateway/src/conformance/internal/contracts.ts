@@ -11,9 +11,10 @@ import {
   ThreadParticipation,
   ThreadService,
 } from "@amends-dev/core/thread";
+import { Turn } from "@amends-dev/core/turn";
 import { Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { DateTime, Effect, Option } from "effect";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import {
@@ -516,6 +517,68 @@ export const contracts = (fixture: Fixture) => {
             ).toEqual([1, 2]);
           }),
         ),
+    );
+
+    it.effect("turn storage keeps one active turn per agent and thread, inserted or updated", () =>
+      fixture.withStorage((storage) =>
+        Effect.gen(function* () {
+          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          yield* initialized(bound);
+          const createdAt = yield* DateTime.now;
+          const turn = (id: string, status: Turn.Status, thread = "thread"): Turn.Turn => ({
+            id: Turn.Id.make(id),
+            workspaceId,
+            groupId: Group.GeneralId,
+            threadId: ThreadId.Id.make(thread),
+            agentId: Identity.AgentId.make("agent"),
+            memberId: Member.Id.make("agent-member"),
+            participationId: ThreadParticipation.Id.make(`${thread}-participation`),
+            retry: null,
+            status,
+            acceptedThroughSequence: 1,
+            logAfter: 0,
+            selection: null,
+            messageIds: [],
+            failure: null,
+            cancelReason: null,
+            createdAt,
+            startedAt: null,
+            finishedAt: Turn.active(status) ? null : createdAt,
+          });
+          const refused = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+            Effect.flip(bound.store.transaction(program));
+          const write = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+            bound.store.transaction(program);
+          const conflict = { _tag: "TurnStore.Conflict" };
+
+          // Inserting: a reused ID, and a second active turn of the agent on the thread.
+          const first = turn("first", "queued");
+          yield* write(bound.turns.insert(first));
+          expect(yield* refused(bound.turns.insert(first))).toMatchObject(conflict);
+          expect(yield* refused(bound.turns.insert(turn("second", "queued")))).toMatchObject(
+            conflict,
+          );
+          yield* write(bound.turns.insert(turn("elsewhere", "queued", "other-thread")));
+
+          // Updating: a finished turn may not become active while another is.
+          const second = turn("second", "failed");
+          yield* write(bound.turns.insert(second));
+          const reactivated: Turn.Turn = Object.assign({}, second, {
+            status: "running" as const,
+            finishedAt: null,
+          });
+          expect(yield* refused(bound.turns.update(reactivated))).toMatchObject(conflict);
+          yield* write(
+            bound.turns.update(
+              Object.assign({}, first, { status: "completed" as const, finishedAt: createdAt }),
+            ),
+          );
+          yield* write(bound.turns.update(reactivated));
+          expect(yield* bound.turns.findActive(first.memberId, first.threadId)).toEqual(
+            Option.some(reactivated),
+          );
+        }),
+      ),
     );
   });
 };

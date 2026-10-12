@@ -3,8 +3,8 @@
  * the harness, model, and sandbox it started on as columns, set all together or not at all, and
  * its retry as a pair of columns. `TurnStore.make` checks every input before the driver sees it, so
  * the driver keeps only what storage keeps: the primary key refuses a reused ID and
- * `active_turn_by_agent_thread` a second active turn for one agent and thread, each as the store's
- * `Conflict`, and an update that finds no row conflicts. Every statement is scoped to the
+ * `active_turn_by_agent_thread` a second active turn for one agent and thread, inserted or
+ * updated, each as the store's `Conflict`, and an update that finds no row conflicts. Every statement is scoped to the
  * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
  * and requires one for a write.
  *
