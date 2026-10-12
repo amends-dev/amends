@@ -8,10 +8,10 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { Identity } from "@amends-dev/core/identity";
 import { Invitation, InvitationService, Member, MemberService } from "@amends-dev/core/workspace";
-import { Accounts, Gateway } from "@amends-dev/gateway";
+import { Accounts } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
@@ -26,26 +26,21 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "accounts",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
+    const asMember = yield* makeAsMember;
     const accounts = yield* Accounts.Accounts;
     return handlers.handleAll({
       list: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.gen(function* () {
-              const invitations = yield* Effect.flatMap(
-                InvitationService.InvitationService,
-                (invitationService) => invitationService.list,
-              );
-              const members = yield* Effect.flatMap(
-                MemberService.MemberService,
-                (memberService) => memberService.list,
-              );
-              return yield* accounts.findByIds(humanIdsOf(members, invitations));
-            }),
-          ),
+        asMember(
+          params.workspaceId,
+          Effect.gen(function* () {
+            const invitations = yield* InvitationService.InvitationService.use(
+              (invitationService) => invitationService.list,
+            );
+            const members = yield* MemberService.MemberService.use(
+              (memberService) => memberService.list,
+            );
+            return yield* accounts.findByIds(humanIdsOf(members, invitations));
+          }),
         ),
     });
   }),

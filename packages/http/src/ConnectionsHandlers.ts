@@ -7,17 +7,14 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { ConnectionService } from "@amends-dev/core/connection";
-import type { Actor } from "@amends-dev/core/identity";
-import type { Workspace } from "@amends-dev/core/workspace";
-import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register the handlers of connections, capturing the gateway and reading the principal per
- * request.
+ * Register the handlers of connections, each entering the workspace
+ * as the request\'s principal.
  *
  * @category layers
  * @since 0.1.0
@@ -26,67 +23,85 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "connections",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
-    /** Run a connection operation as the principal, a member of the workspace. */
-    const asMember = <A, E>(
-      workspaceId: Workspace.Id,
-      operation: (
-        connectionService: ConnectionService.ConnectionService["Service"],
-      ) => Effect.Effect<A, E, Actor.Actor>,
-    ) =>
-      Effect.flatMap(Authentication.Principal, (principal) =>
-        gateway.asMember(
-          workspaceId,
-          principal,
-          Effect.flatMap(ConnectionService.ConnectionService, operation),
-        ),
-      );
+    const asMember = yield* makeAsMember;
     return handlers.handleAll({
       integrations: ({ params }) =>
-        asMember(params.workspaceId, (connectionService) => connectionService.integrations),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use(
+            (connectionService) => connectionService.integrations,
+          ),
+        ),
       list: ({ params }) =>
-        asMember(params.workspaceId, (connectionService) => connectionService.list),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) => connectionService.list),
+        ),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.create(payload, { requestKey: headers["idempotency-key"] }),
+          ),
         ),
       get: ({ params }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.get(params.connectionId),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.get(params.connectionId),
+          ),
         ),
       models: ({ params }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.models(params.connectionId),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.models(params.connectionId),
+          ),
         ),
       rename: ({ params, payload }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.rename({
-            connectionId: params.connectionId,
-            name: payload.name,
-            expectedName: payload.expectedName,
-          }),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.rename({
+              connectionId: params.connectionId,
+              name: payload.name,
+              expectedName: payload.expectedName,
+            }),
+          ),
         ),
       configure: ({ params, payload }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.configure({
-            connectionId: params.connectionId,
-            settings: payload.settings,
-          }),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.configure({
+              connectionId: params.connectionId,
+              settings: payload.settings,
+            }),
+          ),
         ),
       replaceKey: ({ params, payload }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.replaceKey({
-            connectionId: params.connectionId,
-            apiKey: payload.apiKey,
-          }),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.replaceKey({
+              connectionId: params.connectionId,
+              apiKey: payload.apiKey,
+            }),
+          ),
         ),
       check: ({ params }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.check(params.connectionId),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.check(params.connectionId),
+          ),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          connectionService.remove(params.connectionId),
+        asMember(
+          params.workspaceId,
+          ConnectionService.ConnectionService.use((connectionService) =>
+            connectionService.remove(params.connectionId),
+          ),
         ),
     });
   }),

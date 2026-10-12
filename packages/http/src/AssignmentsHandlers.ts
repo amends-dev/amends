@@ -6,14 +6,13 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { AssignmentService } from "@amends-dev/core/authorization";
-import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register the assignment handlers, capturing the gateway and reading the principal per request.
+ * Register the assignment handlers, each entering the workspace as the request's principal.
  *
  * @category layers
  * @since 0.1.0
@@ -22,68 +21,46 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "assignments",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
+    const asMember = yield* makeAsMember;
     return handlers.handleAll({
       permissions: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (identity) =>
-          gateway.asMember(
-            params.workspaceId,
-            identity,
-            Effect.flatMap(
-              AssignmentService.AssignmentService,
-              (assignmentService) => assignmentService.permissions,
-            ),
+        asMember(
+          params.workspaceId,
+          AssignmentService.AssignmentService.use(
+            (assignmentService) => assignmentService.permissions,
           ),
         ),
       roles: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (identity) =>
-          gateway.asMember(
-            params.workspaceId,
-            identity,
-            Effect.flatMap(
-              AssignmentService.AssignmentService,
-              (assignmentService) => assignmentService.roles,
-            ),
-          ),
+        asMember(
+          params.workspaceId,
+          AssignmentService.AssignmentService.use((assignmentService) => assignmentService.roles),
         ),
       list: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (identity) =>
-          gateway.asMember(
-            params.workspaceId,
-            identity,
-            Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-              assignmentService.list(params.memberId),
-            ),
+        asMember(
+          params.workspaceId,
+          AssignmentService.AssignmentService.use((assignmentService) =>
+            assignmentService.list(params.memberId),
           ),
         ),
       assign: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (identity) =>
-          gateway.asMember(
-            params.workspaceId,
-            identity,
-            Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-              assignmentService.assign(payload),
-            ),
+        asMember(
+          params.workspaceId,
+          AssignmentService.AssignmentService.use((assignmentService) =>
+            assignmentService.assign(payload),
           ),
         ),
       change: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (identity) =>
-          gateway.asMember(
-            params.workspaceId,
-            identity,
-            Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-              assignmentService.change(payload),
-            ),
+        asMember(
+          params.workspaceId,
+          AssignmentService.AssignmentService.use((assignmentService) =>
+            assignmentService.change(payload),
           ),
         ),
       revoke: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (identity) =>
-          gateway.asMember(
-            params.workspaceId,
-            identity,
-            Effect.flatMap(AssignmentService.AssignmentService, (assignmentService) =>
-              assignmentService.revoke(params.memberId, params.assignmentId),
-            ),
+        asMember(
+          params.workspaceId,
+          AssignmentService.AssignmentService.use((assignmentService) =>
+            assignmentService.revoke(params.memberId, params.assignmentId),
           ),
         ),
     });
