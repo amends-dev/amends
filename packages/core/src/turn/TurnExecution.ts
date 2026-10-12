@@ -128,7 +128,7 @@ export type StartError =
  * @category errors
  * @since 0.1.0
  */
-export type ReadError =
+export type JoinedConversationError =
   | Error
   | MemberStore.Failure
   | ContactStore.Failure
@@ -237,7 +237,7 @@ export class TurnExecution extends Context.Service<
      */
     readonly joinedConversation: (
       turnId: Turn.Id,
-    ) => Effect.Effect<ReadonlyArray<Prompt.Message>, ReadError>;
+    ) => Effect.Effect<ReadonlyArray<Prompt.Message>, JoinedConversationError>;
     /**
      * Show the turn's readers more of a step before it finishes, as a signal: nothing is recorded,
      * and a turn no longer running shows nothing. A reader who starts following midway sees the step

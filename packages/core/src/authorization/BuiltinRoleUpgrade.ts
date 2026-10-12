@@ -30,12 +30,13 @@ export const performer = Performer.Reference.cases.System.make({
 });
 
 /**
- * The bundles to bring a workspace to; by default the current revision and catalog.
+ * The revision to bring a workspace's built-in roles to, and the permission definitions their
+ * bundles are made from; by default the host's current revision and catalog.
  *
  * @category options
  * @since 0.1.0
  */
-export interface Target {
+export interface Options {
   readonly revision: number;
   readonly definitions: ReadonlyArray<Permission.Definition>;
 }
@@ -44,7 +45,7 @@ const haveSamePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<s
   left.length === right.length && left.every((name) => right.includes(name));
 
 /**
- * Bring an initialized workspace's built-in roles to the target revision, in one commit
+ * Bring an initialized workspace's built-in roles to the revision `options` names, in one commit
  * attributed to the system: create a missing built-in role, rename one whose name changed, and
  * replace permissions that differ, then record the revision. A workspace already at that
  * revision or a later one is left alone, so an older host never reverts a newer one's upgrade.
@@ -54,16 +55,16 @@ const haveSamePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<s
  * @category utils
  * @since 0.1.0
  */
-export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target?: Target) {
+export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (options?: Options) {
   const roleStore = yield* RoleStore.RoleStore;
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore;
   const journal = yield* Journal.Journal;
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
   const { workspaceId } = yield* Store.Store;
   const revision = yield* BuiltinRoles.Revision.makeEffect(
-    target?.revision ?? BuiltinRoles.revision,
+    options?.revision ?? BuiltinRoles.revision,
   );
-  const definitions = target?.definitions ?? permissionCatalog.definitions;
+  const definitions = options?.definitions ?? permissionCatalog.definitions;
   // A workspace recorded before revisions existed holds the bundles of revision zero.
   const checkUpgradeDue = Effect.gen(function* () {
     if (Option.isNone(yield* workspaceStore.get)) return false;
