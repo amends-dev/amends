@@ -159,7 +159,7 @@ no SSE event IDs. Responses use `Cache-Control: no-store` and disable proxy buff
 supported. Missing/rejected credentials return 401; absent active membership returns 403; a caller
 at the server's limit of open streams for the workspace, or for itself within it, gets 429
 `ApiErrors.TooManyStreams` with the limit it met. Failures after streaming starts use Effect's SSE failure
-encoding with `ChangeFeed.Unavailable` and no other detail; reconnect with the last cursor to
+encoding with `CoreError.Unavailable` (`ChangeFeedInterrupted`) and no other detail; reconnect with the last cursor to
 continue. A commit the server cannot read, such as a fact version a newer server wrote during a
 deployment, also ends the stream, and reconnecting then resets. See
 [known limitations](../../docs/current-status.md) for delivery and edge controls.
@@ -273,7 +273,7 @@ may change it. A connection the caller may not read answers 404 as a missing one
 retried create whose connection was removed since. An integration this host lacks is 422
 `ConnectionService.UnknownIntegration`; settings or a way of authenticating it does not take are 422
 `InvalidConnection`; a key for a connection that authenticates with nothing is 422 `Keyless`. A host
-without a credential key answers a key with 503 `ConnectionService.CredentialsUnavailable`.
+without a credential key answers a key with 503 `CoreError.Unavailable` (`CredentialsUnavailable`).
 
 ### Agents
 
@@ -322,7 +322,7 @@ that stopped short. `Changed` carries `changes`, each an `index` and the `item` 
 (`responseId`, `part`, `offset`, `text`) carries more of the step being written before it finishes,
 continuing its part at `offset` characters; it may be missed, and the step replaces it. `Ended`
 follows the turn's end once every item is delivered, and the stream closes. A stream that cannot go
-on, including once the caller can no longer open the thread, ends with `Turn.LogUnavailable`, and
+on, including once the caller can no longer open the thread, ends with `CoreError.Unavailable` (`LogInterrupted`), and
 following again opens with the items as they stand. Log streams count within the same limits as
 change streams.
 
@@ -408,7 +408,7 @@ keys.
 
 Both streams share `Streams`, which also contains unexpected failures: Effect's SSE encoder would
 send a stream's whole failure cause to the client, so the handler logs it and ends the change feed
-with `ChangeFeed.Unavailable`, or a turn log with `Turn.LogUnavailable`, alone.
+with `CoreError.Unavailable` (`ChangeFeedInterrupted`), or a turn log with `CoreError.Unavailable` (`LogInterrupted`), alone.
 
 Each process serves a limited number of streams at once, change feeds and turn logs together.
 `Streams.Limits`, a context reference, allows a thousand per workspace and twenty per member of it

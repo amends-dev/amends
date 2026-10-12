@@ -119,11 +119,3 @@ export const WatchOptions = Schema.Struct({
  * @since 0.1.0
  */
 export interface WatchOptions extends Schema.Schema.Type<typeof WatchOptions> {}
-
-/**
- * The consumer must open a new subscription and refresh its current view.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()("ChangeFeed.Unavailable", {}) {}

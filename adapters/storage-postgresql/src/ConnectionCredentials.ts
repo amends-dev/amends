@@ -20,9 +20,12 @@ import * as Binding from "./Binding.ts";
 import * as CredentialKey from "./CredentialKey.ts";
 import { storeFailure } from "./internal/errors.ts";
 import { connectionCredentials } from "./internal/schema.ts";
+import { CoreError } from "@amends-dev/core/error";
 
-const unavailable = new ConnectionCredentialStore.Unavailable({
-  reason: "This host has no credential key, so it stores no credentials.",
+const unavailable = new CoreError.Unavailable({
+  reason: new CoreError.CredentialsUnavailable({
+    description: "This host has no credential key, so it stores no credentials.",
+  }),
 });
 /** A credential as the JSON that is sealed. */
 const CredentialJson = Schema.fromJsonString(Schema.toCodecJson(Connection.Credential));

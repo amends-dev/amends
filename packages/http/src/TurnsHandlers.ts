@@ -9,16 +9,17 @@
 import * as Api from "./Api.ts";
 import * as Authentication from "./Authentication.ts";
 import { makeAsMember } from "./internal/as-member.ts";
-import { Turn, TurnService } from "@amends-dev/core/turn";
+import { TurnService } from "@amends-dev/core/turn";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 import * as Streams from "./Streams.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /**
  * Register turn handlers, capturing the gateway and reading the principal per request. Following
  * a turn's log is a stream held in the HTTP response scope, as change streams are: it counts
- * within the same limits, and ends with `Turn.LogUnavailable` when it cannot go on.
+ * within the same limits, and ends with `CoreError.Unavailable` when it cannot go on.
  *
  * @category layers
  * @since 0.1.0
@@ -30,7 +31,7 @@ export const layer = HttpApiBuilder.group(
     const asMember = yield* makeAsMember;
     const gateway = yield* Gateway.Gateway;
     const streams = yield* Streams.Streams;
-    const unavailable = () => new Turn.LogUnavailable({});
+    const unavailable = () => new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() });
     return handlers.handleAll({
       listActive: ({ params, query }) =>
         asMember(

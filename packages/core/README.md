@@ -131,7 +131,11 @@ they lack (`NotGranted`), a membership they do not hold (`NotMember`, `InvalidAc
 only the owner (`OwnerRequired`), the author (`NotAuthor`), the invitation's recipient
 (`NotRecipient`), a person (`HumanRequired`), or an agent (`AgentRequired`) takes. A caller recovers
 from one reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`, as lists do to
-leave out what the actor may not read. Operations pass it through unchanged, so a
+leave out what the actor may not read. `CoreError.Unavailable` says what an operation needs cannot
+be reached or used now: storage another writer held (`Contention`) or read models another host is
+rebuilding (`Reloading`), a change feed or turn log that stopped (`ChangeFeedInterrupted`,
+`LogInterrupted`), a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no
+keys (`CredentialsUnavailable`). Operations pass it through unchanged, so a
 protocol answers it with one status and a client handles it once, and an operation that reaches a
 resource through another reports the one the caller named: a message whose thread they cannot read
 is the message not found, not the thread.
@@ -471,7 +475,7 @@ following mid-step sees the step from the next draft that starts at its part's b
 the step is logged. Its subscriptions register before the turn and log are read, so nothing in
 between is missed. Each append checks that the reader may still read the thread, as does each commit
 that changes the reader's groups, grants, or role; following ends once the commit that took the
-reader's access is delivered. A stream that cannot go on fails with `Turn.LogUnavailable`.
+reader's access is delivered. A stream that cannot go on fails with `CoreError.Unavailable` (`LogInterrupted`).
 
 A turn's changes also show in its thread's timeline as `TurnActivity` kinds, recorded in the commits
 that make them: `turn.created` where the agent took on the work, or where a retry asked again,
@@ -660,8 +664,8 @@ The internal reads other operations share go in one `<Feature>Query.ts`. A comma
 the query; a query never writes; and a step with one caller stays a private function of that caller.
 An outcome every feature reports is one kind in `CoreError`, whichever operation raises it:
 anything missing, or out of the caller's reach, is `CoreError.NotFound`; anything that changed
-since the caller read it is `CoreError.Changed`; and a refusal of the actor is `CoreError.Denied`,
-with its reason. Each says what it is about in its fields and passes through every operation
+since the caller read it is `CoreError.Changed`; a refusal of the actor is `CoreError.Denied`; and
+what cannot be reached now is `CoreError.Unavailable`, the last two with their reason. Each says what it is about in its fields and passes through every operation
 unchanged. Any other error belongs to the module that
 raises it, and its tag is its name there, as `MemberService.OwnerProtected` or `Store.Conflict`. The
 outcomes a service reports to callers are schemas in an `internal/` errors module, apart from the

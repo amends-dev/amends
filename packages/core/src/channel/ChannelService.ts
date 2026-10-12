@@ -222,7 +222,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     if (!readable || !usable) return yield* unavailable();
     yield* channelQuery
       .integrationOf(found.value)
-      .pipe(Effect.catchTag("ChannelQuery.Unavailable", unavailable));
+      .pipe(Effect.catchTag("CoreError.Unavailable", unavailable));
     return found.value;
   });
 

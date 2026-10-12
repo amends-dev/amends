@@ -196,9 +196,7 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     const credential = yield* connectionCredentialStore
       .get(connectionId)
       .pipe(
-        Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
-          invalid(part, reason),
-        ),
+        Effect.catchTag("CoreError.Unavailable", ({ reason }) => invalid(part, reason.message)),
       );
     if (Option.isNone(credential))
       return yield* invalid(part, `The connection ${connection.name} has no API key`);

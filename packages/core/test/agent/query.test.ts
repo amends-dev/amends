@@ -178,7 +178,11 @@ const queryIn = (world: World = {}) => {
       get: (connectionId) => {
         if (world.credentialsUnavailable !== undefined) {
           return Effect.fail(
-            new ConnectionCredentialStore.Unavailable({ reason: world.credentialsUnavailable }),
+            new CoreError.Unavailable({
+              reason: new CoreError.CredentialsUnavailable({
+                description: world.credentialsUnavailable,
+              }),
+            }),
           );
         }
         const key = keys.get(connectionId);

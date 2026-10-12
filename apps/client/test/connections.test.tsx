@@ -401,7 +401,13 @@ it("says what the integration refused, and tells a host without key storage apar
     }),
   );
   f.server.answers.push(
-    json({ _tag: "ConnectionService.CredentialsUnavailable", reason: "No credential key" }, 503),
+    json(
+      {
+        _tag: "CoreError.Unavailable",
+        reason: { _tag: "CredentialsUnavailable", description: "No credential key" },
+      },
+      503,
+    ),
   );
   f.view.create.save();
   await waitFor(() =>

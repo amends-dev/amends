@@ -332,7 +332,10 @@ function eventStream(request: Request) {
     send: (message: unknown) => write("message", message),
     unavailable: () => {
       write("effect/http-api/stream/failure", [
-        { _tag: "Fail", error: { _tag: "Turn.LogUnavailable" } },
+        {
+          _tag: "Fail",
+          error: { _tag: "CoreError.Unavailable", reason: { _tag: "LogInterrupted" } },
+        },
       ]);
       controller.close();
     },

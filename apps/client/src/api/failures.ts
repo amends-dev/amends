@@ -47,7 +47,6 @@ type Reported =
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // What the reader expected changed since they read it.
   "CoreError.Changed": "changed",
-  "GatewayErrors.Conflict": "changed",
   // The reader may not do this, for the reason it gives.
   "CoreError.Denied": "denied",
   "Delegation.OwnerProtected": "denied",
@@ -79,11 +78,11 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // Channels: a connection that gives no channels, or the reader may not use, is refused with the
   // draft kept.
   "ChannelService.ConnectionUnavailable": "invalid",
-  // Following a turn's log stopped short, or too many streams are open: following again may work.
-  "Turn.LogUnavailable": "failed",
+  // What the request needs cannot be reached now, such as storage another writer held or a turn's
+  // log that stopped short, or too many streams are open: asking again may work. A host that keeps
+  // no keys is one too; `connectionsFailure` tells it apart.
+  "CoreError.Unavailable": "failed",
   "ApiErrors.TooManyStreams": "failed",
-  // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
-  "ConnectionService.CredentialsUnavailable": "failed",
   "GroupService.NotRenamable": "invalid",
   "GroupService.InactiveMember": "gone",
   "GroupMembershipService.InactiveMember": "gone",

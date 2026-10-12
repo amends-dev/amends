@@ -414,10 +414,8 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           ),
         );
         expect(conflict).toMatchObject({
-          _tag: "GatewayErrors.Conflict",
-          workspaceId,
-          operation: "append",
-          message: "Changed position",
+          _tag: "CoreError.Unavailable",
+          reason: { _tag: "Contention", operation: "append", description: "Changed position" },
         });
         const uncertain = yield* Effect.flip(
           enter(

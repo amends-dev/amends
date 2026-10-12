@@ -68,6 +68,14 @@ export const Changed = CoreError.Changed.pipe(HttpApiSchema.status(409));
  */
 export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403));
 /**
+ * What the operation needs cannot be reached or used now, for the `reason` given, such as storage
+ * another writer held or a host that keeps no keys: 503.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const Unavailable = CoreError.Unavailable.pipe(HttpApiSchema.status(503));
+/**
  * The request key a creating endpoint accepts: send a new one for each logical request and the
  * same one on every retry of it, and the retry returns the first attempt's result.
  *
@@ -77,13 +85,6 @@ export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403));
 export const requestKey = {
   "idempotency-key": Schema.optionalKey(Request.Key),
 };
-/**
- * Storage contention: the operation did not apply and may be retried; 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const Conflict = GatewayErrors.Conflict.pipe(HttpApiSchema.status(409));
 /**
  * The commit's outcome is unknown, so the client reconciles what is stored before repeating it;
  * 500, with the commit's ID.
@@ -395,15 +396,6 @@ export const InvalidConnection = ConnectionService.InvalidConnection.pipe(
  * @since 0.1.0
  */
 export const Keyless = ConnectionService.Keyless.pipe(HttpApiSchema.status(422));
-/**
- * This host keeps no credentials, so no key can be stored or read.
- *
- * @category errors
- * @since 0.1.0
- */
-export const ConnectionCredentialsUnavailable = ConnectionService.CredentialsUnavailable.pipe(
-  HttpApiSchema.status(503),
-);
 
 /**
  * A connection the setup names is missing or removed, or the caller may not read and use it.
@@ -443,7 +435,7 @@ export const TurnNotRetryable = TurnService.NotRetryable.pipe(HttpApiSchema.stat
  * @category errors
  * @since 0.1.0
  */
-export const workspace = [Denied, InvalidInput, Conflict, Uncertain] as const;
+export const workspace = [Denied, InvalidInput, Unavailable, Uncertain] as const;
 
 /**
  * Channel outcomes. A channel the caller may not read, or removed, is 404, as is a group the caller
@@ -489,5 +481,5 @@ export const channelBinding = [NotFound] as const;
 export const channelEvents = [
   NotFound,
   ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
-  ChannelIntake.Unavailable.pipe(HttpApiSchema.status(503)),
+  Unavailable,
 ] as const;

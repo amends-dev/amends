@@ -791,7 +791,13 @@ it("tells the reader when changes stop arriving, and clears once they resume", a
     "/workspaces/one/tasks",
     memoryStore(session("alice")).store,
     liveWorkspace({ name: () => "Studio" }),
-    () => (down ? response({ _tag: "ChangeFeed.Unavailable" }, 503) : undefined),
+    () =>
+      down
+        ? response(
+            { _tag: "CoreError.Unavailable", reason: { _tag: "ChangeFeedInterrupted" } },
+            503,
+          )
+        : undefined,
   );
   await screen.findByRole("heading", { name: "Tasks" });
   const announcer = screen.getByRole("status");

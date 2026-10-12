@@ -128,7 +128,8 @@ export const reloadConnections = (reads: ConnectionsReads) =>
 
 const unknownIntegration = Schema.is(ApiErrors.UnknownIntegration);
 const invalidConnection = Schema.is(ApiErrors.InvalidConnection);
-const credentialsUnavailable = Schema.is(ApiErrors.ConnectionCredentialsUnavailable);
+const credentialsUnavailable = (error: unknown) =>
+  Schema.is(ApiErrors.Unavailable)(error) && error.reason._tag === "CredentialsUnavailable";
 
 /**
  * Why a change or check failed, telling apart an integration this host no longer installs, one

@@ -370,8 +370,8 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
           if (channel.value.status !== "active") return yield* failed("The channel was removed.");
           const reached = yield* channelQuery.access(channel.value).pipe(
             Effect.map(Result.succeed),
-            Effect.catchTag("ChannelQuery.Unavailable", (error) =>
-              Effect.succeed(Result.fail(error.description)),
+            Effect.catchTag("CoreError.Unavailable", ({ reason }) =>
+              Effect.succeed(Result.fail(reason.message)),
             ),
           );
           if (Result.isFailure(reached)) return yield* failed(reached.failure);

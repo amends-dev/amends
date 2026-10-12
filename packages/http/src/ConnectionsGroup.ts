@@ -54,7 +54,6 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
         ApiErrors.NotFound,
         ApiErrors.UnknownIntegration,
         ApiErrors.InvalidConnection,
-        ApiErrors.ConnectionCredentialsUnavailable,
       ],
     }),
     HttpApiEndpoint.get("get", "/:connectionId", {
@@ -91,12 +90,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       params: connection,
       payload: Schema.Struct({ apiKey: Connection.ReplaceKeyInput.fields.apiKey }),
       success: view,
-      error: [
-        ...ApiErrors.workspace,
-        ApiErrors.NotFound,
-        ApiErrors.Keyless,
-        ApiErrors.ConnectionCredentialsUnavailable,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Keyless],
     }),
     HttpApiEndpoint.post("check", "/:connectionId/check", {
       params: connection,
@@ -106,7 +100,6 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
         ApiErrors.NotFound,
         ApiErrors.UnknownIntegration,
         ApiErrors.InvalidConnection,
-        ApiErrors.ConnectionCredentialsUnavailable,
       ],
     }),
     HttpApiEndpoint.delete("remove", "/:connectionId", {

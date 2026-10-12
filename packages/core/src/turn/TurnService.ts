@@ -93,12 +93,12 @@ export type ActiveError = Exclude<ReadError, CoreError.NotFound>;
 
 /**
  * What opening a turn's log can fail with: `ReadError`, the session log store's failures, and
- * `Turn.LogUnavailable`.
+ * `CoreError.Unavailable`.
  *
  * @category errors
  * @since 0.1.0
  */
-export type WatchError = ReadError | SessionLogStore.Failure | Turn.LogUnavailable;
+export type WatchError = ReadError | SessionLogStore.Failure | CoreError.Unavailable;
 
 /**
  * What stopping or retrying a turn can fail with beyond its own outcome: `ReadError`, and the
@@ -155,15 +155,15 @@ export class TurnService extends Context.Service<
     /**
      * Follow a turn's log, for a reader who may read its thread: its items as they stand, then
      * those its session log adds as the turn works, with the step it is writing, until the turn's
-     * end commits and every item is delivered. The caller owns the subscription scope. The stream fails with
-     * LogUnavailable when following cannot go on, including once the reader may no longer read the
-     * thread, which it checks with each batch and whenever a commit changes their groups or grants;
-     * following again starts from the items as they stand.
+     * end commits and every item is delivered. The caller owns the subscription scope. The stream
+     * fails with `CoreError.Unavailable`, `LogInterrupted`, when following cannot go on, including
+     * once the reader may no longer read the thread, which it checks with each batch and whenever a
+     * commit changes their groups or grants; following again starts from the items as they stand.
      */
     readonly watchLog: (
       turnId: Turn.Id,
     ) => Effect.Effect<
-      Stream.Stream<Turn.LogMessage, Turn.LogUnavailable>,
+      Stream.Stream<Turn.LogMessage, CoreError.Unavailable>,
       WatchError,
       Actor.Actor | Scope.Scope
     >;
@@ -314,7 +314,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
     return yield* toViews(active.filter((turn) => readable.has(turn.threadId)));
   });
 
-  const toLogUnavailable = () => new Turn.LogUnavailable({});
+  const logInterrupted = () =>
+    new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() });
 
   const watchLog = Effect.fn("TurnService.watchLog")(function* (turnId: Turn.Id) {
     const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
@@ -323,14 +324,14 @@ export const make = Effect.fn("TurnService.make")(function* () {
     const live = yield* signalHub.subscribe;
     const committed = yield* changeFeedSource
       .subscribe(Option.none())
-      .pipe(Effect.mapError(toLogUnavailable));
+      .pipe(Effect.mapError(logInterrupted));
     const turn = yield* requireReadableTurn(id);
     // Following outlasts the request that opened it, so its access checks name the reader.
     const actor = yield* Actor.Actor;
     /** The reader still may read the thread, or following ends. */
     const checkStillReadable = requireReadableThread(turn.threadId).pipe(
       Effect.provideService(Actor.Actor, actor),
-      Effect.mapError(toLogUnavailable),
+      Effect.mapError(logInterrupted),
     );
 
     const reader = SessionLog.reader(turn.id, turn.logAfter);
@@ -389,7 +390,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
           Option.some(page.at(-1)?.position ?? after),
         ] as const;
       }),
-    ).pipe(Stream.mapError(toLogUnavailable));
+    ).pipe(Stream.mapError(logInterrupted));
     const draftedInputs = live.pipe(
       Stream.filter(
         (signal): signal is Extract<Signal.Signal, { readonly _tag: "TurnDraft" }> =>
@@ -415,7 +416,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
         ...(endsTurn(delivery, turn.id) ? [Input.Ended()] : []),
       ]),
       Stream.flattenIterable,
-      Stream.mapError(toLogUnavailable),
+      Stream.mapError(logInterrupted),
     );
     /** The turn as it ended, with what is left of its log: every entry precedes its end. */
     const readEnding = Effect.gen(function* () {
@@ -423,14 +424,14 @@ export const make = Effect.fn("TurnService.make")(function* () {
       const ended = yield* turnStore.get(turn.id);
       reader.end(Option.match(ended, { onNone: () => [], onSome: ({ messageIds }) => messageIds }));
       return [...(yield* changeMessages), endedMessage];
-    }).pipe(Effect.mapError(toLogUnavailable));
+    }).pipe(Effect.mapError(logInterrupted));
     /**
      * What each input tells the reader, one at a time, so reads and what was sent agree. Once the
      * reader's access changes, it is checked before anything more is sent, drafts included.
      */
     const messagesFor = (
       input: Input,
-    ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, Turn.LogUnavailable> =>
+    ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, CoreError.Unavailable> =>
       Input.$match(input, {
         Drafted: ({ draft }) => Effect.succeed([draft]),
         AccessChanged: () => Effect.as(checkStillReadable, []),

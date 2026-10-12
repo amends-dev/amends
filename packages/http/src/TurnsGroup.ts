@@ -4,7 +4,7 @@
  * active membership and a thread the caller may open, and stopping or retrying a turn needs
  * permission to direct its agent. Following a log is a server-sent event stream of
  * `Turn.LogMessage` that counts within the same limits as change streams, and ends with
- * `Turn.LogUnavailable` when it cannot go on. `TurnsHandlers` implements it.
+ * `CoreError.Unavailable` when it cannot go on. `TurnsHandlers` implements it.
  *
  * @since 0.1.0
  */
@@ -15,6 +15,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const turn = { workspaceId: Workspace.Id, turnId: Turn.Id };
 const view = Turn.View.annotate({ identifier: "Turn" });
@@ -44,13 +45,8 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
     }),
     HttpApiEndpoint.get("watchLog", "/turns/:turnId/log/events", {
       params: turn,
-      success: HttpApiSchema.StreamSse({ data: Turn.LogMessage, error: Turn.LogUnavailable }),
-      error: [
-        ...ApiErrors.workspace,
-        ApiErrors.NotFound,
-        Turn.LogUnavailable.pipe(HttpApiSchema.status(503)),
-        ApiErrors.TooManyStreams,
-      ],
+      success: HttpApiSchema.StreamSse({ data: Turn.LogMessage, error: CoreError.Unavailable }),
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.TooManyStreams],
     }),
     HttpApiEndpoint.post("cancel", "/turns/:turnId/cancel", {
       params: turn,

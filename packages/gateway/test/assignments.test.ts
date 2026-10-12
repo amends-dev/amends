@@ -279,7 +279,7 @@ describe("assignments", () => {
                 expect(results.filter(Result.isSuccess)).toHaveLength(1);
                 const rejected = results.find((result) => Result.isFailure(result));
                 // A writer that waited sees the winner's change; one that gave up reports contention.
-                expect(["CoreError.Changed", "GatewayErrors.Conflict"]).toContain(
+                expect(["CoreError.Changed", "CoreError.Unavailable"]).toContain(
                   rejected !== undefined && Result.isFailure(rejected)
                     ? rejected.failure._tag
                     : undefined,

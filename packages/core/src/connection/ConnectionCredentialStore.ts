@@ -15,6 +15,7 @@ import * as Connection from "./Connection.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * Storage failed while reading or writing credentials.
@@ -26,17 +27,6 @@ export class Failure extends Schema.TaggedError<Failure>()("ConnectionCredential
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
-
-/**
- * This host keeps no credentials, as when it has no key to protect them with.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()(
-  "ConnectionCredentialStore.Unavailable",
-  { reason: Schema.String },
-) {}
 
 /**
  * Protected storage for connections' credentials, one for each connection that authenticates with
@@ -58,11 +48,14 @@ export class ConnectionCredentialStore extends Context.Service<
     readonly set: (
       connectionId: Connection.Id,
       credential: ConnectionContract.Credential,
-    ) => Effect.Effect<void, Failure | Unavailable, Store.Transaction>;
+    ) => Effect.Effect<void, Failure | CoreError.Unavailable, Store.Transaction>;
     /** The connection's credential, for using it. No operation returns one to a reader. */
     readonly get: (
       connectionId: Connection.Id,
-    ) => Effect.Effect<Option.Option<ConnectionContract.Credential>, Failure | Unavailable>;
+    ) => Effect.Effect<
+      Option.Option<ConnectionContract.Credential>,
+      Failure | CoreError.Unavailable
+    >;
     /** Delete the connection's credential; one already gone is left so. */
     readonly remove: (
       connectionId: Connection.Id,

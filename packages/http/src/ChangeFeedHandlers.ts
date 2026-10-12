@@ -9,16 +9,17 @@
  */
 import * as Api from "./Api.ts";
 import * as Authentication from "./Authentication.ts";
-import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
+import { ChangeFeedService } from "@amends-dev/core/change-feed";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 import * as Streams from "./Streams.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /**
  * Register the change feed handler, which acquires the subscription in the HTTP response scope,
  * closed on disconnect. Each stream holds a place within the workspace's and its member's limits
- * until then, and ends with `ChangeFeed.Unavailable`, which tells the client to reconnect.
+ * until then, and ends with `CoreError.Unavailable`, which tells the client to reconnect.
  *
  * @category layers
  * @since 0.1.0
@@ -29,7 +30,8 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Gateway;
     const streams = yield* Streams.Streams;
-    const unavailable = () => new ChangeFeed.Unavailable({});
+    const unavailable = () =>
+      new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() });
     return handlers.handleAll({
       watch: ({ params, query }) =>
         Effect.flatMap(Authentication.Principal, (principal) =>

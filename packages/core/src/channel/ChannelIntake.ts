@@ -31,7 +31,7 @@ import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import { Rejected, Unavailable } from "./internal/channel-intake-errors.ts";
+import { Rejected } from "./internal/channel-intake-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import type * as ChannelStore from "./ChannelStore.ts";
@@ -48,15 +48,6 @@ export {
    * @since 0.1.0
    */
   Rejected,
-  /**
-   * The channel cannot be reached now: its connection was removed or has no key, its integration is
-   * not installed or gives no channels, or the external system could not answer. The system may send
-   * again.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Unavailable,
 } from "./internal/channel-intake-errors.ts";
 
 /**
@@ -108,7 +99,7 @@ export interface Received extends Schema.Schema.Type<typeof Received> {}
  */
 export type IntakeError =
   | CoreError.NotFound
-  | Unavailable
+  | CoreError.Unavailable
   | ChannelStore.Failure
   | ChannelQuery.Error
   | ChannelBindingStore.Failure
@@ -448,31 +439,23 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
   );
 
   /** The channel's transport, or why its system cannot be reached. */
-  const transportOf = (channel: Channel.Channel) =>
-    channelQuery
-      .transport(channel)
-      .pipe(
-        Effect.catchTag(
-          "ChannelQuery.Unavailable",
-          (error) => new Unavailable({ description: error.description }),
-        ),
-      );
+  const transportOf = (channel: Channel.Channel) => channelQuery.transport(channel);
 
   const receive: ChannelIntake["Service"]["receive"] = Effect.fn("ChannelIntake.receive")(
     function* (channelId, inbound) {
       const channel = yield* channelQuery.requireActive(channelId);
       const transport = yield* transportOf(channel);
-      const received = yield* transport
-        .receive(inbound)
-        .pipe(
-          Effect.catchTag("TransportError", (error) =>
-            Effect.fail(
-              error.reason === "rejected"
-                ? new Rejected({ description: error.description })
-                : new Unavailable({ description: error.description }),
-            ),
+      const received = yield* transport.receive(inbound).pipe(
+        Effect.catchTag("TransportError", (error) =>
+          Effect.fail(
+            error.reason === "rejected"
+              ? new Rejected({ description: error.description })
+              : new CoreError.Unavailable({
+                  reason: new CoreError.ChannelUnreachable({ description: error.description }),
+                }),
           ),
-        );
+        ),
+      );
       const intakes: Array<Intake> = [];
       for (const event of received.events)
         intakes.push(yield* intakeEvent(channel, transport.self, event));

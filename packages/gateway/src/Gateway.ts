@@ -49,7 +49,7 @@ export class Gateway extends Context.Service<
       options?: Request.Options,
     ) => Effect.Effect<
       Workspace.Workspace,
-      GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
+      CoreError.Unavailable | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
     >;
     /**
      * Run core operations as the identity's active membership, keeping the workspace prepared for
@@ -109,10 +109,11 @@ const toPublicErrors = <A, E, R>(
   Effect.catch(effect, (error): Effect.Effect<never, GatewayErrors.PublicErrorOf<E>> => {
     if (isConflict(error))
       return Effect.fail(
-        new GatewayErrors.Conflict({
-          workspaceId,
-          operation: error.operation,
-          message: error.message,
+        new CoreError.Unavailable({
+          reason: new CoreError.Contention({
+            operation: error.operation,
+            description: error.message,
+          }),
         }),
       );
     if (isUncertain(error))
@@ -121,13 +122,7 @@ const toPublicErrors = <A, E, R>(
       return Effect.fail(new GatewayErrors.InvalidInput({ message: error.message }));
     // The runtime is prepared again for the next request, so this one may simply be retried.
     if (isBehind(error) || isUnregistered(error))
-      return Effect.fail(
-        new GatewayErrors.Conflict({
-          workspaceId,
-          operation: "commit",
-          message: "Another host changed this workspace's read models; retry once they are rebuilt",
-        }),
-      );
+      return Effect.fail(new CoreError.Unavailable({ reason: new CoreError.Reloading() }));
     if (isMismatch(error))
       return Effect.fail(
         new GatewayErrors.InvalidInput({

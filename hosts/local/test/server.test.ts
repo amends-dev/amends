@@ -484,7 +484,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           if (chunk.done) break;
           received += decoder.decode(chunk.value, { stream: true });
         }
-        expect(received).toContain("ChangeFeed.Unavailable");
+        expect(received).toContain("CoreError.Unavailable");
       }),
     ),
   );

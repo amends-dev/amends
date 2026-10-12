@@ -365,8 +365,8 @@ describe("gateway", () => {
           expect((yield* other.checkpoints.listLive(Core.journalLog)).length).toBe(live.length - 1);
           // The write this host was about to make did not commit, and may simply be retried.
           expect(yield* Effect.flip(createGroup("During"))).toMatchObject({
-            _tag: "GatewayErrors.Conflict",
-            operation: "commit",
+            _tag: "CoreError.Unavailable",
+            reason: { _tag: "Reloading" },
           });
           const retried = yield* createGroup("During");
           expect(yield* other.checkpoints.listLive(Core.journalLog)).toEqual(

@@ -30,11 +30,3 @@ export class InvalidConnection extends Schema.TaggedError<InvalidConnection>()(
 export class Keyless extends Schema.TaggedError<Keyless>()("ConnectionService.Keyless", {
   connectionId: Connection.Id,
 }) {}
-
-/**
- * This host keeps no credentials, so no connection that authenticates with a key can be used.
- */
-export class CredentialsUnavailable extends Schema.TaggedError<CredentialsUnavailable>()(
-  "ConnectionService.CredentialsUnavailable",
-  { reason: Schema.String },
-) {}

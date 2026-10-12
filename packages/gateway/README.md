@@ -77,7 +77,7 @@ Commits persist events and projection records together. `Projection.Behind` refu
 registered projection is not live, and `Projection.Unregistered` while one this host does not run
 is, as when a host with a different projection set booted. Either stops sharing the prepared
 runtime: the next request prepares the workspace again, and the failed request, which committed
-nothing, gets `GatewayErrors.Conflict` to retry. Boot is not an online migration: the directory reads
+nothing, gets `CoreError.Unavailable` (`Reloading`) to retry. Boot is not an online migration: the directory reads
 projection tables directly.
 
 ## Host contracts
@@ -209,10 +209,10 @@ email sign-in over the memory storage, and the [conformance suites](#conformance
 
 Programs fail only with outcomes a caller can act on. Core's domain errors pass through unchanged,
 among them `CoreError.NotFound`, which `inWorkspace` also returns for a workspace that was never
-created. The gateway adds:
+created, and `CoreError.Unavailable` (`Contention`) for storage contention worth retrying. The
+gateway adds:
 
 - `CoreError.Denied` (`NotMember`) when the identity has no active membership;
-- `Conflict` for storage contention worth retrying;
 - `Uncertain` when a commit's outcome is unknown, with its commit ID;
 - `InvalidInput` when core rejects values the caller supplied, such as invitation grants.
 

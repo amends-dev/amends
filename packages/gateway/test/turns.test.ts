@@ -102,7 +102,7 @@ const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberRef
     yield* stream.pipe(
       Stream.runForEach((message) => Queue.offer(queue, message)),
       Effect.andThen(Queue.offer(queue, "done")),
-      Effect.catchTag("Turn.LogUnavailable", () => Queue.offer(queue, "unavailable")),
+      Effect.catchTag("CoreError.Unavailable", () => Queue.offer(queue, "unavailable")),
       Effect.forkScoped,
     );
     return Queue.take(queue).pipe(Effect.timeout("10 seconds"));

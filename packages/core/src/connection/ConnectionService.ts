@@ -24,24 +24,12 @@ import * as Store from "../journal/Store.ts";
 import * as Request from "../request/Request.ts";
 import * as Connection from "./Connection.ts";
 import * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts";
-import {
-  CredentialsUnavailable,
-  InvalidConnection,
-  Keyless,
-  UnknownIntegration,
-} from "./internal/connection-errors.ts";
+import { InvalidConnection, Keyless, UnknownIntegration } from "./internal/connection-errors.ts";
 import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * This host keeps no credentials, so no connection that authenticates with a key can be used.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  CredentialsUnavailable,
   /**
    * The integration does not take the connection: its settings, how it authenticates, or, when
    * checking one that authenticates with a key, a missing key. The description is the integration's,
@@ -87,7 +75,7 @@ export type ReadError =
  */
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 /** Storing or reading a key can also meet a host that keeps no credentials. */
-type KeyError = ConnectionCredentialStore.Failure | CredentialsUnavailable;
+type KeyError = ConnectionCredentialStore.Failure | CoreError.Unavailable;
 
 /**
  * What creating a connection can fail with: an integration the host does not install or that does
@@ -306,26 +294,12 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
 
   /** Store `apiKey` as the connection's key, in place of any it had. */
   const setKey = (connectionId: Connection.Id, apiKey: Connection.ApiKey) =>
-    connectionCredentialStore
-      .set(connectionId, { apiKey })
-      .pipe(
-        Effect.catchTag(
-          "ConnectionCredentialStore.Unavailable",
-          ({ reason }) => new CredentialsUnavailable({ reason }),
-        ),
-      );
+    connectionCredentialStore.set(connectionId, { apiKey });
 
   /** The connection's key, read for using it, or nothing for one that authenticates with none. */
   const credentialOf = Effect.fnUntraced(function* (record: Connection.Connection) {
     if (record.auth !== "apiKey") return undefined;
-    const credential = yield* connectionCredentialStore
-      .get(record.id)
-      .pipe(
-        Effect.catchTag(
-          "ConnectionCredentialStore.Unavailable",
-          ({ reason }) => new CredentialsUnavailable({ reason }),
-        ),
-      );
+    const credential = yield* connectionCredentialStore.get(record.id);
     return Option.getOrUndefined(credential);
   });
 

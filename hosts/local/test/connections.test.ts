@@ -243,7 +243,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
               },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ConnectionService.CredentialsUnavailable" });
+        ).toMatchObject({
+          _tag: "CoreError.Unavailable",
+          reason: { _tag: "CredentialsUnavailable" },
+        });
         expect(yield* asAlice.connections.list({ params: { workspaceId } })).toEqual([]);
         expect(
           yield* asAlice.connections.create({

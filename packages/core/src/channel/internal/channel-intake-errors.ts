@@ -12,12 +12,3 @@ import { Schema } from "effect";
 export class Rejected extends Schema.TaggedError<Rejected>()("ChannelIntake.Rejected", {
   description: Schema.String,
 }) {}
-
-/**
- * The channel cannot be reached now: its connection was removed or has no key, its integration is
- * not installed or gives no channels, or the external system could not answer. The system may send
- * again.
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()("ChannelIntake.Unavailable", {
-  description: Schema.String,
-}) {}

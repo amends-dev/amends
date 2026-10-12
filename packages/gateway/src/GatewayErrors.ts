@@ -1,7 +1,7 @@
 /**
  * The outcomes a program run through the gateway may fail with: core's outcomes by kind, such as
  * `CoreError.NotFound`, and the domain errors its services still declare, which pass through
- * unchanged, and the gateway's own, such as `Conflict`. Every other failure becomes a defect.
+ * unchanged, and the gateway's own, such as `Uncertain`. Every other failure becomes a defect.
  * `PublicError` lists them all, so a service error core adds reaches callers only once it is
  * listed here. The HTTP contract imports this module from `@amends-dev/gateway/GatewayErrors`,
  * which does not load the gateway itself.
@@ -15,7 +15,6 @@ import {
 } from "@amends-dev/core/thread";
 import { AssignmentService, Delegation } from "@amends-dev/core/authorization";
 import { Commit } from "@amends-dev/core/journal";
-import { ChangeFeed } from "@amends-dev/core/change-feed";
 import { NotificationService } from "@amends-dev/core/notification";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
 import {
@@ -29,21 +28,9 @@ import { ConnectionService } from "@amends-dev/core/connection";
 import { AgentService } from "@amends-dev/core/agent";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
 import { TaskService } from "@amends-dev/core/task";
-import { Turn, TurnService } from "@amends-dev/core/turn";
+import { TurnService } from "@amends-dev/core/turn";
 import { Schema } from "effect";
 import { CoreError } from "@amends-dev/core/error";
-
-/**
- * Storage contention; the operation did not apply and may be retried.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("GatewayErrors.Conflict", {
-  workspaceId: Workspace.Id,
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
 
 /**
  * The commit's outcome is unknown; reconcile stored state before repeating.
@@ -79,9 +66,7 @@ export const PublicError = Schema.Union([
   CoreError.NotFound,
   CoreError.Changed,
   CoreError.Denied,
-  ChangeFeed.Unavailable,
-  Turn.LogUnavailable,
-  Conflict,
+  CoreError.Unavailable,
   Uncertain,
   InvalidInput,
   Delegation.OwnerProtected,
@@ -115,14 +100,12 @@ export const PublicError = Schema.Union([
   ConnectionService.UnknownIntegration,
   ConnectionService.InvalidConnection,
   ConnectionService.Keyless,
-  ConnectionService.CredentialsUnavailable,
   AgentService.ConnectionUnavailable,
   AgentService.Incomplete,
   TurnService.NotActive,
   TurnService.NotRetryable,
   ChannelService.ConnectionUnavailable,
   ChannelIntake.Rejected,
-  ChannelIntake.Unavailable,
 ]);
 /**
  * @category schemas
@@ -137,4 +120,8 @@ export type PublicError = typeof PublicError.Type;
  * @category models
  * @since 0.1.0
  */
-export type PublicErrorOf<E> = Extract<E, PublicError> | Conflict | Uncertain | InvalidInput;
+export type PublicErrorOf<E> =
+  | Extract<E, PublicError>
+  | CoreError.Unavailable
+  | Uncertain
+  | InvalidInput;

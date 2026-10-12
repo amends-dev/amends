@@ -9,6 +9,7 @@ import { Gateway } from "../../index.ts";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import { alice, bob } from "../Support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const issue = (recipient: Identity.HumanId) =>
   InvitationService.InvitationService.use((invitations) =>
@@ -23,7 +24,7 @@ const issue = (recipient: Identity.HumanId) =>
 
 /** Buffer a subscription's messages for the enclosing scope. */
 const listen = <E, R>(
-  watch: Effect.Effect<Stream.Stream<ChangeFeed.Message, ChangeFeed.Unavailable>, E, R>,
+  watch: Effect.Effect<Stream.Stream<ChangeFeed.Message, CoreError.Unavailable>, E, R>,
 ) =>
   Effect.gen(function* () {
     const stream = yield* watch;

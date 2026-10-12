@@ -90,7 +90,7 @@ it.effect(
       );
       expect(messages.map((message) => message._tag)).toEqual(["Ready"]);
       expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
-        Option.some(new ChangeFeed.Unavailable({})),
+        Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })),
       );
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(false);
       expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).not.toContain("hunter2");
