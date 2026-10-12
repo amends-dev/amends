@@ -7,7 +7,7 @@
  *
  * @since 0.1.0
  */
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -41,6 +41,7 @@ import {
 import { FetchHttpClient } from "effect/http";
 import type { SqlClient } from "effect/sql";
 import * as HarnessIntegrations from "./HarnessIntegrations.ts";
+import * as LocalConfig from "./LocalConfig.ts";
 import * as SandboxIntegrations from "./SandboxIntegrations.ts";
 
 /**
@@ -100,24 +101,6 @@ export interface Options {
 }
 
 /**
- * A secret for one purpose, such as opencode's bridge tokens: one made from the credential key,
- * which every host over the database shares, so that hosts agree on it; or, without a credential
- * key, this process's own.
- *
- * @category utils
- * @since 0.1.0
- */
-export const deriveSecret = (
-  credentialKey: Redacted.Redacted<string> | undefined,
-  purpose: string,
-) =>
-  credentialKey === undefined
-    ? randomBytes(32)
-    : createHmac("sha256", Buffer.from(Redacted.value(credentialKey), "base64"))
-        .update(purpose)
-        .digest();
-
-/**
  * The integrations this host installs, which workspaces connect to: each model provider in the
  * catalog and any OpenAI-compatible API, for models; MCP servers and HTTP APIs, for tools;
  * sandboxes as directories under `directory`, for development, and on Daytona; and amends's agent
@@ -129,7 +112,7 @@ export const deriveSecret = (
 export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
     // A host reaches a bridge another host launched.
-    const bridgeSecret = deriveSecret(credentialKey, "amends/opencode-bridge");
+    const bridgeSecret = LocalConfig.deriveSecret(credentialKey, "amends/opencode-bridge");
     const opencodeOptions: HarnessIntegrations.OpencodeOptions = {
       token: (sandboxId) =>
         Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url")),

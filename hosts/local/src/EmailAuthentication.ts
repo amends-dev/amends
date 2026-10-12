@@ -8,7 +8,7 @@
  */
 import { EmailSender, EmailSignIn } from "@amends-dev/gateway";
 import { Effect, Layer, Redacted } from "effect";
-import * as LocalHost from "./LocalHost.ts";
+import * as LocalConfig from "./LocalConfig.ts";
 
 /**
  * Send email by logging it where the server runs, as the host does until it is given an email
@@ -33,5 +33,5 @@ export const logEmails = EmailSender.EmailSender.of({
  */
 export const layer = (credentialKey: Redacted.Redacted<string> | undefined) =>
   EmailSignIn.layer({
-    codeKey: Redacted.make(LocalHost.deriveSecret(credentialKey, "amends/sign-in-codes")),
+    codeKey: Redacted.make(LocalConfig.deriveSecret(credentialKey, "amends/sign-in-codes")),
   }).pipe(Layer.provide(Layer.succeed(EmailSender.EmailSender, logEmails)));

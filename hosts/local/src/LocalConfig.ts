@@ -3,13 +3,14 @@
  * before any resource is acquired, so a missing or invalid setting fails startup before a
  * connection opens. The database URL and the credential key stay redacted, in errors too. The entry
  * point passes what `load` returns to `LocalHost.layer`, `LocalServer.layer`, and the
- * authentication `AMENDS_SIGN_IN` names.
+ * authentication `AMENDS_SIGN_IN` names. `deriveSecret` makes each purpose's secret from the
+ * credential key.
  *
  * @since 0.1.0
  */
-import { Config, Duration, Effect, Option, Result, Schema } from "effect";
+import { createHmac, randomBytes } from "node:crypto";
+import { Config, Duration, Effect, Option, Redacted, Result, Schema } from "effect";
 import { Base64 } from "effect/encoding";
-import type { Redacted } from "effect";
 
 /**
  * The host's settings, read from their `AMENDS_*` environment variables with defaults applied.
@@ -148,3 +149,21 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
     signIn: yield* signIn,
   };
 });
+
+/**
+ * A secret for one purpose, such as opencode's bridge tokens: one made from the credential key,
+ * which every host over the database shares, so that hosts agree on it; or, without a credential
+ * key, this process's own.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const deriveSecret = (
+  credentialKey: Redacted.Redacted<string> | undefined,
+  purpose: string,
+) =>
+  credentialKey === undefined
+    ? randomBytes(32)
+    : createHmac("sha256", Buffer.from(Redacted.value(credentialKey), "base64"))
+        .update(purpose)
+        .digest();

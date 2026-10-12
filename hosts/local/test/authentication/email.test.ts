@@ -7,6 +7,7 @@ import { Base64 } from "effect/encoding";
 import { HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import * as EmailAuthentication from "../../src/EmailAuthentication.ts";
+import * as LocalConfig from "../../src/LocalConfig.ts";
 import * as LocalHost from "../../src/LocalHost.ts";
 import * as LocalServer from "../../src/LocalServer.ts";
 import { setup } from "../database.ts";
@@ -51,13 +52,13 @@ const server = (url: string) => {
 
 it("hosts over one credential key derive the same secret for a purpose, and another for another", () => {
   const key = Redacted.make(Base64.encode(new Uint8Array(32).fill(1)));
-  expect(LocalHost.deriveSecret(key, "amends/sign-in-codes")).toEqual(
-    LocalHost.deriveSecret(key, "amends/sign-in-codes"),
+  expect(LocalConfig.deriveSecret(key, "amends/sign-in-codes")).toEqual(
+    LocalConfig.deriveSecret(key, "amends/sign-in-codes"),
   );
-  expect(LocalHost.deriveSecret(key, "amends/sign-in-codes")).not.toEqual(
-    LocalHost.deriveSecret(key, "amends/opencode-bridge"),
+  expect(LocalConfig.deriveSecret(key, "amends/sign-in-codes")).not.toEqual(
+    LocalConfig.deriveSecret(key, "amends/opencode-bridge"),
   );
-  expect(LocalHost.deriveSecret(undefined, "amends/sign-in-codes")).toHaveLength(32);
+  expect(LocalConfig.deriveSecret(undefined, "amends/sign-in-codes")).toHaveLength(32);
 });
 
 const { available, withDatabase } = setup();
