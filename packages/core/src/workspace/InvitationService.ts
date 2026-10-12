@@ -29,16 +29,9 @@ import * as InvitationStore from "./InvitationStore.ts";
 import * as Member from "./Member.ts";
 import * as MemberCommand from "./MemberCommand.ts";
 import * as MemberStore from "./MemberStore.ts";
-import { AlreadyMember, InvalidExpiry, Unavailable } from "./internal/invitation-errors.ts";
+import { InvalidExpiry } from "./internal/invitation-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The person has an active membership already, so they can neither be invited nor accept.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyMember,
   /**
    * The expiry given is not after now.
    *
@@ -46,14 +39,6 @@ export {
    * @since 0.1.0
    */
   InvalidExpiry,
-  /**
-   * The invitation cannot be accepted or revoked now: it has expired, was revoked, or was accepted
-   * already, as `reason` says.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Unavailable,
 } from "./internal/invitation-errors.ts";
 
 /**
@@ -74,8 +59,7 @@ export type Error =
   | MemberCommand.Error
   | CoreError.NotFound
   | CoreError.Denied
-  | AlreadyMember
-  | Unavailable
+  | CoreError.Conflict
   | InvalidExpiry;
 
 /**
@@ -176,7 +160,9 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         yield* memberStore.findActive(Identity.Reference.cases.Human.make({ id: recipientId })),
       )
     )
-      return yield* new AlreadyMember({ recipientId });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.AlreadyJoined({ recipientId }),
+      });
   });
 
   const issue = Effect.fn("InvitationService.issue")(
@@ -236,10 +222,14 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       return member.value;
     }
     if (Invitation.State.isAnyOf(["Revoked"])(state))
-      return yield* new Unavailable({ invitationId: id, reason: "revoked" });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.InvitationClosed({ invitationId: id, reason: "revoked" }),
+      });
     const acceptedAt = yield* DateTime.now;
     if (!DateTime.isGreaterThan(details.expiresAt, acceptedAt))
-      return yield* new Unavailable({ invitationId: id, reason: "expired" });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.InvitationClosed({ invitationId: id, reason: "expired" }),
+      });
     yield* requireUnjoined(recipient);
     const inviter = yield* memberStore.get(details.inviterMemberId);
     if (Option.isNone(inviter))
@@ -290,7 +280,9 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       const actor = yield* Actor.Actor;
       if (Invitation.State.isAnyOf(["Revoked"])(invitation.state)) return invitation;
       if (Invitation.State.isAnyOf(["Accepted"])(invitation.state))
-        return yield* new Unavailable({ invitationId: id, reason: "accepted" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvitationClosed({ invitationId: id, reason: "accepted" }),
+        });
       const state = Invitation.State.cases.Revoked.make({
         revokedBy: actor.memberId,
         revokedAt: yield* DateTime.now,

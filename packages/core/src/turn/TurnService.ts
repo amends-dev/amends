@@ -40,7 +40,6 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import type * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts";
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
-import { NotActive, NotRetryable } from "./internal/turn-errors.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnCommand from "./TurnCommand.ts";
 import * as TurnFacts from "./TurnFacts.ts";
@@ -49,23 +48,6 @@ import * as SessionLogStore from "./SessionLogStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The turn has already finished, or is not in the state the operation needs.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotActive,
-  /**
-   * The turn cannot be retried now, for `reason`: it is still active, it completed, a later turn of
-   * its agent superseded it, or its agent no longer takes part in the thread.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotRetryable,
-} from "./internal/turn-errors.ts";
 
 /**
  * What reading a turn can fail with: `CoreError.NotFound`, a denied `thread.read`, and the failures
@@ -115,20 +97,22 @@ export type ChangeError =
   | TurnCommand.EndError;
 
 /**
- * What `cancel` can fail with: `ChangeError`, or `NotActive` for a turn that already ended.
+ * What `cancel` can fail with: `ChangeError`, or `CoreError.Conflict` (`TurnNotActive`) for a turn
+ * that already ended.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CancelError = ChangeError | NotActive;
+export type CancelError = ChangeError | CoreError.Conflict;
 
 /**
- * What `retry` can fail with: `ChangeError`, or `NotRetryable` with the reason.
+ * What `retry` can fail with: `ChangeError`, or `CoreError.Conflict` (`NotRetryable`) with the
+ * reason.
  *
  * @category errors
  * @since 0.1.0
  */
-export type RetryError = ChangeError | NotRetryable;
+export type RetryError = ChangeError | CoreError.Conflict;
 
 /**
  * The turn operations, one of `Core.Operations`.
@@ -170,7 +154,7 @@ export class TurnService extends Context.Service<
     /**
      * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
      * queued turn stops at once, since nothing runs it yet; a running one stops once its job
-     * confirms it. A turn already stopping stays as it is; a finished one is NotActive.
+     * confirms it. A turn already stopping stays as it is; a finished one is `CoreError.Conflict`.
      */
     readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Actor>;
     /**
@@ -178,8 +162,8 @@ export class TurnService extends Context.Service<
      * agent: a new turn for the same agent and input, which continues the session that turn left
      * and tells the agent who asked, on what the agent is set up with now. Only the agent's latest
      * turn on the thread can be retried, while the agent still takes part there; otherwise it is
-     * NotRetryable. A turn is retried at most once, so asking again returns the turn its retry
-     * created.
+     * `CoreError.Conflict`. A turn is retried at most once, so asking again returns the turn its
+     * retry created.
      */
     readonly retry: (turnId: Turn.Id) => Effect.Effect<Turn.View, RetryError, Actor.Actor>;
   }
@@ -460,7 +444,9 @@ export const make = Effect.fn("TurnService.make")(function* () {
       const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
       yield* authorization.require([directAgentRequirement(turn)]);
       if (!Turn.active(turn.status))
-        return yield* new NotActive({ turnId: turn.id, status: turn.status });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
+        });
       if (turn.status === "cancelling") return yield* toView(turn);
       return yield* toView(yield* turnCommand.requestStop(turn, "requested"));
     },
@@ -480,7 +466,10 @@ export const make = Effect.fn("TurnService.make")(function* () {
       if (Option.isSome(yield* turnStore.get(retryId)))
         return yield* toView(yield* requireReadableTurn(retryId));
       const reason = yield* whyNotRetryable(turn);
-      if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
+      if (reason !== undefined)
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.NotRetryable({ turnId: turn.id, reason }),
+        });
       // The same input, in the same session, created after the turn it retries, even on a clock
       // that has not moved, so it is the agent's latest there.
       const now = yield* DateTime.now;

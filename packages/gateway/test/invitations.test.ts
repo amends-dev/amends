@@ -225,7 +225,10 @@ describe("invitations", () => {
                     saved.invitation.details.id,
                   ),
                 ),
-              ).toMatchObject({ _tag: "InvitationService.Unavailable", reason: "revoked" });
+              ).toMatchObject({
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "revoked" },
+              });
               const replacement = yield* Operations.invite(
                 saved.workspace.id,
                 alice,
@@ -241,8 +244,8 @@ describe("invitations", () => {
                   Operations.revokeInvitation(saved.workspace.id, alice, replacement.details.id),
                 ),
               ).toMatchObject({
-                _tag: "InvitationService.Unavailable",
-                reason: "accepted",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "accepted" },
               });
             }),
           ),
@@ -273,7 +276,7 @@ describe("invitations", () => {
             const failure = results.find((value) => Result.isFailure(value));
             expect(failure).toMatchObject({
               _tag: "Failure",
-              failure: { _tag: "InvitationService.AlreadyMember" },
+              failure: { _tag: "CoreError.Conflict", reason: { _tag: "AlreadyJoined" } },
             });
             const bound = yield* boundTo(workspace.id);
             const member = yield* bound.members.findActive(bob);

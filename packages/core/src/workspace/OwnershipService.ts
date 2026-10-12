@@ -32,18 +32,7 @@ import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
-import { InvalidRecipient } from "./internal/ownership-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The member cannot become owner: they are the owner already, removed, or an agent, as `reason`
-   * says.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidRecipient,
-} from "./internal/ownership-errors.ts";
 
 /**
  * What the ownership operations can fail with: the outcomes above, and the failures
@@ -61,7 +50,7 @@ export type Error =
   | PlatformError.PlatformError
   | CoreError.Denied
   | CoreError.NotFound
-  | InvalidRecipient
+  | CoreError.Conflict
   | CoreError.Changed;
 
 /**
@@ -186,12 +175,21 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       if (request.expectedOwnerAssignmentId !== state.assignment.id)
         return yield* new CoreError.Changed({ resource: "Workspace", id: workspaceId });
       if (request.memberId === state.owner.id)
-        return yield* new InvalidRecipient({ memberId: request.memberId, reason: "same-owner" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvalidRecipient({
+            memberId: request.memberId,
+            reason: "same-owner",
+          }),
+        });
       const recipient = yield* requireMember(request.memberId);
       if (recipient.status !== "active")
-        return yield* new InvalidRecipient({ memberId: recipient.id, reason: "removed" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "removed" }),
+        });
       if (!Identity.MemberReference.isAnyOf(["Human"])(recipient.identity))
-        return yield* new InvalidRecipient({ memberId: recipient.id, reason: "agent" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "agent" }),
+        });
       const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId);
       yield* delegation.loadRole(BuiltinRoles.AdministratorId);
       if (!ownerRole.permissions.includes(OwnershipPermissions.Transfer.name))

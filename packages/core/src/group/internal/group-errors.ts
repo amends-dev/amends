@@ -3,18 +3,7 @@
  * carry them to clients; the service's error types add the failures of what it depends on.
  */
 import { Schema } from "effect";
-import * as Member from "../../workspace/Member.ts";
 import * as Group from "../Group.ts";
-
-/**
- * A member listed for a new team group is no longer active in the workspace.
- */
-export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
-  "GroupService.InactiveMember",
-  {
-    memberId: Member.Id,
-  },
-) {}
 
 /**
  * A direct group is named by its members, so it has no name to change.

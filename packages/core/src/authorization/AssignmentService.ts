@@ -27,17 +27,7 @@ import * as Assignment from "./Assignment.ts";
 import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
-import { InactiveMember } from "./internal/assignment-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The member has been removed; roles are given to and taken from active members only.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InactiveMember,
-} from "./internal/assignment-errors.ts";
 
 /**
  * What the assignment operations can fail with: the outcomes above, delegation's,
@@ -53,7 +43,7 @@ export type Error =
   | Log.WriteError
   | PlatformError.PlatformError
   | CoreError.NotFound
-  | InactiveMember
+  | CoreError.Conflict
   | CoreError.Changed;
 
 /**
@@ -63,7 +53,7 @@ export type Error =
  * @category errors
  * @since 0.1.0
  */
-export type ListError = Delegation.Error | CoreError.NotFound | InactiveMember;
+export type ListError = Delegation.Error | CoreError.NotFound | CoreError.Conflict;
 
 /**
  * The assignment operations, one of `Core.Operations`.
@@ -188,7 +178,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   ) {
     yield* authorization.require([manageRequirement]);
     const record = yield* requireMember(memberId);
-    if (record.status !== "active") return yield* new InactiveMember({ memberId });
+    if (record.status !== "active")
+      return yield* new CoreError.Conflict({ reason: new CoreError.InactiveMember({ memberId }) });
     yield* delegation.requireRecipient(memberId);
   });
   const listRoleChoices = Effect.gen(function* () {

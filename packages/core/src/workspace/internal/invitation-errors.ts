@@ -4,16 +4,6 @@
  * on.
  */
 import { Schema } from "effect";
-import * as Identity from "../../identity/Identity.ts";
-import * as Invitation from "../Invitation.ts";
-
-/**
- * The person has an active membership already, so they can neither be invited nor accept.
- */
-export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
-  "InvitationService.AlreadyMember",
-  { recipientId: Identity.HumanId },
-) {}
 
 /**
  * The expiry given is not after now.
@@ -21,16 +11,4 @@ export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
 export class InvalidExpiry extends Schema.TaggedError<InvalidExpiry>()(
   "InvitationService.InvalidExpiry",
   {},
-) {}
-
-/**
- * The invitation cannot be accepted or revoked now: it has expired, was revoked, or was accepted
- * already, as `reason` says.
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()(
-  "InvitationService.Unavailable",
-  {
-    invitationId: Invitation.Id,
-    reason: Schema.Literals(["expired", "revoked", "accepted"]),
-  },
 ) {}

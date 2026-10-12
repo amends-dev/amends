@@ -410,10 +410,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           `/workspaces/${workspace.id}/invitations/${second.details.id}/accept`,
           { name: "charlie" },
         );
-        expect(revoked.status).toBe(410);
+        expect(revoked.status).toBe(409);
         expect(revoked.body).toMatchObject({
-          _tag: "InvitationService.Unavailable",
-          reason: "revoked",
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "InvitationClosed", reason: "revoked" },
         });
         expect((await call(bobId, "DELETE", owner)).status).toBe(403);
         expect((await call(alice.id, "DELETE", owner)).status).toBe(409);

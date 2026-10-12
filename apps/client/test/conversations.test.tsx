@@ -797,9 +797,8 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
       if (memberId === "kit-one")
         return new Response(
           JSON.stringify({
-            _tag: "GroupMembershipService.AlreadyMember",
-            groupId: "g1",
-            memberId,
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "AlreadyMember", groupId: "g1", memberId },
           }),
           { status: 409, headers: { "content-type": "application/json" } },
         );

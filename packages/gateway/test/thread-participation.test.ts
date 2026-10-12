@@ -389,9 +389,11 @@ describe("thread participation", () => {
             expect(
               yield* Effect.flip(run(bound, human, unfollow(first.thread.id, initial.id))),
             ).toEqual(
-              new ThreadParticipationService.AlreadyEnded({
-                threadId: first.thread.id,
-                participationId: initial.id,
+              new CoreError.Conflict({
+                reason: new CoreError.AlreadyEnded({
+                  resource: "ThreadParticipation",
+                  id: initial.id,
+                }),
               }),
             );
             expect(yield* bound.participations.get(returned.id)).toMatchObject({
@@ -1022,7 +1024,10 @@ describe("thread participation", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, owner, unfollow(first.thread.id, result.id)),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationService.AlreadyEnded" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "AlreadyEnded", resource: "ThreadParticipation" },
+          });
           expect(
             yield* Effect.flip(
               gateway.asMember(workspace.id, owner, follow(Thread.Id.make("missing"))),

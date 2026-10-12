@@ -251,10 +251,12 @@ describe("read state", () => {
             expect(yield* positionOf(bound, humanId, threadId)).toEqual([2]);
             expect(yield* pending(bound, humanId)).toEqual([3]);
             expect(yield* Effect.flip(run(bound, human, markRead(threadId, 4)))).toEqual(
-              new ReadStateService.BeyondTimeline({
-                threadId,
-                throughSequence: 4,
-                latestSequence: 3,
+              new CoreError.Conflict({
+                reason: new CoreError.BeyondTimeline({
+                  threadId,
+                  throughSequence: 4,
+                  latestSequence: 3,
+                }),
               }),
             );
             yield* run(bound, human, markRead(threadId, 3));

@@ -489,6 +489,12 @@ it("says which connection the host refused and why a setup couldn't run, keeping
   );
   f.view.create.save();
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "role-denied" }));
+  // An owner the role would reach is refused the same.
+  f.server.answers.push(
+    json({ _tag: "CoreError.Conflict", reason: { _tag: "OwnerProtected" } }, 409),
+  );
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "role-denied" }));
   // A role the workspace does not record is refused the same; anything else missing is gone.
   f.server.answers.push(json({ _tag: "CoreError.NotFound", resource: "Role", id: "member" }, 404));
   f.view.create.save();

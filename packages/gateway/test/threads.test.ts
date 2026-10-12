@@ -282,7 +282,9 @@ describe("threads", () => {
             const before = yield* history(bound);
             for (const id of [otherId, Member.Id.make("missing")])
               expect(yield* Effect.flip(run(bound, owner, start(group.id, [id])))).toEqual(
-                new ThreadService.ParticipantUnavailable({ memberId: id }),
+                new CoreError.Conflict({
+                  reason: new CoreError.ParticipantUnavailable({ memberId: id }),
+                }),
               );
             expect(
               yield* Effect.flip(run(bound, owner, start(group.id, [humanId, humanId]))),
@@ -679,7 +681,10 @@ describe("threads", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadService.ParticipantUnavailable" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "ParticipantUnavailable" },
+          });
           expect(yield* history(bound)).toEqual(before);
           expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);
         }),
@@ -806,7 +811,10 @@ describe("threads", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, owner, startOnly(group.id, [otherId])),
               ),
-            ).toMatchObject({ _tag: "ThreadService.ParticipantUnavailable" });
+            ).toMatchObject({
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "ParticipantUnavailable" },
+            });
             expect(
               yield* Effect.flip(
                 gateway.asMember(workspace.id, owner, startOnly(group.id, [], " ")),
@@ -938,9 +946,7 @@ describe("threads", () => {
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(
-                    /^(Store.Conflict|ThreadService.ParticipantUnavailable)$/,
-                  ),
+                  _tag: expect.stringMatching(/^(Store.Conflict|CoreError.Conflict)$/),
                 },
               });
           yield* Effect.scoped(

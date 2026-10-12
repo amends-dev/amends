@@ -26,43 +26,37 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * Every failure the workspace, member, access, invitation, conversation, connection, agent, turn,
- * and channel endpoints report.
+ * The workspace, member, access, invitation, conversation, connection, agent, turn, and channel
+ * endpoints.
  */
+type Endpoints =
+  | "workspaces"
+  | "members"
+  | "assignments"
+  | "invitations"
+  | "groups"
+  | "threads"
+  | "tasks"
+  | "notifications"
+  | "connections"
+  | "agents"
+  | "turns"
+  | "channels";
+/** Every failure those endpoints report. */
 type Reported =
-  | Failure<Client["workspaces"][keyof Client["workspaces"]]>
-  | Failure<Client["members"][keyof Client["members"]]>
-  | Failure<Client["assignments"][keyof Client["assignments"]]>
-  | Failure<Client["invitations"][keyof Client["invitations"]]>
-  | Failure<Client["groups"][keyof Client["groups"]]>
-  | Failure<Client["threads"][keyof Client["threads"]]>
-  | Failure<Client["tasks"][keyof Client["tasks"]]>
-  | Failure<Client["notifications"][keyof Client["notifications"]]>
-  | Failure<Client["connections"][keyof Client["connections"]]>
-  | Failure<Client["agents"][keyof Client["agents"]]>
-  | Failure<Client["turns"][keyof Client["turns"]]>
-  | Failure<Client["channels"][keyof Client["channels"]]>
+  | { readonly [Group in Endpoints]: Failure<Client[Group][keyof Client[Group]]> }[Endpoints]
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // What the reader expected changed since they read it.
   "CoreError.Changed": "changed",
+  // The state of what the reader acted on refuses it, such as a member removed or a turn finished
+  // meanwhile; `turnRefusal` tells a turn's reasons apart.
+  "CoreError.Conflict": "changed",
   // The reader may not do this, for the reason it gives.
   "CoreError.Denied": "denied",
-  "Delegation.OwnerProtected": "denied",
-  "MemberService.OwnerProtected": "denied",
   // Anything the reader named that is missing or out of their reach.
   "CoreError.NotFound": "gone",
-  "AssignmentService.InactiveMember": "gone",
-  "InvitationService.AlreadyMember": "gone",
-  "InvitationService.Unavailable": "gone",
-  "MemberService.AlreadyRemoved": "gone",
-  "OwnershipService.InvalidRecipient": "gone",
-  // Conversations: someone else changed what the reader acted on.
-  "GroupMembershipService.AlreadyMember": "changed",
-  "ReadStateService.BeyondTimeline": "changed",
-  "ThreadParticipationService.AlreadyEnded": "changed",
-  "NotificationService.AlreadyHandled": "changed",
   // Connections: naming an integration this host no longer has; `connectionsFailure` tells the
   // integration's refusals apart.
   "ConnectionService.UnknownIntegration": "changed",
@@ -72,9 +66,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // kept, and `agentsFailure` tells them apart.
   "AgentService.ConnectionUnavailable": "invalid",
   "AgentService.Incomplete": "invalid",
-  // Turns: one that finished or moved on meanwhile; `turnProblems` tells the refusals apart.
-  "TurnService.NotActive": "changed",
-  "TurnService.NotRetryable": "changed",
   // Channels: a connection that gives no channels, or the reader may not use, is refused with the
   // draft kept.
   "ChannelService.ConnectionUnavailable": "invalid",
@@ -84,15 +75,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "CoreError.Unavailable": "failed",
   "ApiErrors.TooManyStreams": "failed",
   "GroupService.NotRenamable": "invalid",
-  "GroupService.InactiveMember": "gone",
-  "GroupMembershipService.InactiveMember": "gone",
-  "GroupMembershipService.AlreadyRemoved": "gone",
-  "GroupFollowService.MemberUnavailable": "gone",
-  "ThreadService.ParticipantUnavailable": "gone",
-  "ThreadMessageService.ParticipantUnavailable": "gone",
-  "ThreadMessageService.Deleted": "gone",
-  "TaskService.ParticipantUnavailable": "gone",
-  "TaskService.AlreadyTask": "changed",
   "Client.InvalidCommand": "invalid",
   "GroupMembershipService.FixedMembership": "invalid",
   "GroupMembershipService.GeneralMembership": "invalid",

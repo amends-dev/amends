@@ -295,7 +295,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { throughSequence: latest + 1 },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ReadStateService.BeyondTimeline", latestSequence: latest });
+        ).toMatchObject({
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "BeyondTimeline", latestSequence: latest },
+        });
         yield* asBob.groups.markRead({ params: { workspaceId, groupId } });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({ newActivity: false });
@@ -315,7 +318,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.threads
             .unfollow({ params: { workspaceId, threadId }, payload: { participationId: own.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadParticipationService.AlreadyEnded" });
+        ).toMatchObject({
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "AlreadyEnded", resource: "ThreadParticipation" },
+        });
         const followed = yield* asBob.threads.follow({ params: { workspaceId, threadId } });
         expect(followed.participant).toEqual({ _tag: "Member", memberId: bobId });
         expect(followed.id).not.toBe(own.id);

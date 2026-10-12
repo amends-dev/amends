@@ -25,27 +25,10 @@ import * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as Request from "../request/Request.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
-import { Deleted, ParticipantUnavailable } from "./internal/thread-message-errors.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The message was deleted, so it has no text to edit.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Deleted,
-  /**
-   * A mentioned member cannot take part: they are missing, inactive, or not in the group.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ParticipantUnavailable,
-} from "./internal/thread-message-errors.ts";
 
 /**
  * What publishing can fail with: the outcomes above, and the failures of what
@@ -59,9 +42,9 @@ export type Error =
   | ReadStateStore.Conflict
   | Authorization.Error
   | ThreadQuery.AccessError
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | ThreadCommand.Error
   | CoreError.NotFound
-  | ParticipantUnavailable
+  | CoreError.Conflict
   | CoreError.Denied
   | ThreadMessageStore.Failure;
 
@@ -74,12 +57,11 @@ export type Error =
 export type EditError =
   | Authorization.Error
   | ThreadQuery.AccessError
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | ThreadCommand.Error
   | CoreError.NotFound
   | CoreError.Denied
-  | Deleted
+  | CoreError.Conflict
   | CoreError.Changed
-  | ParticipantUnavailable
   | ThreadMessageStore.Failure;
 
 /**
@@ -91,7 +73,7 @@ export type EditError =
 export type DeleteError =
   | Authorization.Error
   | ThreadQuery.AccessError
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | Exclude<ThreadCommand.Error, CoreError.Conflict>
   | CoreError.NotFound
   | CoreError.Denied
   | ThreadMessageStore.Failure;
@@ -283,7 +265,9 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           continue;
         const entry = eligible.get(reference.memberId);
         if (entry === undefined)
-          return yield* new ParticipantUnavailable({ memberId: reference.memberId });
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.ParticipantUnavailable({ memberId: reference.memberId }),
+          });
         // Mentioning an agent directs it; replying where it already takes part does not.
         if (
           Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity) &&
@@ -297,21 +281,14 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
             }),
           ]);
       }
-      const published = yield* threadCommand
-        .publishMessage({
-          ...request,
-          messageId,
-          author: { _tag: "Member", memberId: actor.memberId },
-          via: null,
-          participants: selected,
-          occurredAt: yield* DateTime.now,
-        })
-        .pipe(
-          Effect.catchTag(
-            "ThreadCommand.Unavailable",
-            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-          ),
-        );
+      const published = yield* threadCommand.publishMessage({
+        ...request,
+        messageId,
+        author: { _tag: "Member", memberId: actor.memberId },
+        via: null,
+        participants: selected,
+        occurredAt: yield* DateTime.now,
+      });
       // Replying reads the thread through the author's own message.
       yield* readStateStore.markThreadRead(
         {
@@ -348,7 +325,9 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
         }),
       ]);
       if (!ThreadMessage.Content.isAnyOf(["Text"])(message.content))
-        return yield* new Deleted({ messageId: message.id });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.Deleted({ messageId: message.id }),
+        });
       const content = message.content;
       if (content.text === request.text && sameMentions(content.mentions, request.mentions))
         return message;
@@ -366,7 +345,10 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const eligible = yield* threadQuery.eligibleMembers(thread.groupId, joining);
       for (const memberId of joining) {
         const entry = eligible.get(memberId);
-        if (entry === undefined) return yield* new ParticipantUnavailable({ memberId });
+        if (entry === undefined)
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.ParticipantUnavailable({ memberId }),
+          });
         if (
           Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity) &&
           !participating.has(memberId)
@@ -375,19 +357,12 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
             Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
           ]);
       }
-      const edited = yield* threadCommand
-        .editMessage({
-          message,
-          text: request.text,
-          mentions: request.mentions,
-          occurredAt: yield* DateTime.now,
-        })
-        .pipe(
-          Effect.catchTag(
-            "ThreadCommand.Unavailable",
-            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-          ),
-        );
+      const edited = yield* threadCommand.editMessage({
+        message,
+        text: request.text,
+        mentions: request.mentions,
+        occurredAt: yield* DateTime.now,
+      });
       return edited.message;
     },
     Publication.withActor,
@@ -420,7 +395,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const deleted = yield* threadCommand
         .deleteMessage({ message, occurredAt: yield* DateTime.now })
         .pipe(
-          Effect.catchTag("ThreadCommand.Unavailable", () =>
+          Effect.catchTag("CoreError.Conflict", () =>
             Effect.die("A deletion admits no participant"),
           ),
         );

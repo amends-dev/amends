@@ -212,7 +212,9 @@ describe("group follows", () => {
               },
             });
             expect(yield* Effect.flip(run(bound, owner, follow(team.id, outsiderId)))).toEqual(
-              new GroupFollowService.MemberUnavailable({ memberId: outsiderId }),
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: outsiderId }),
+              }),
             );
             expect(yield* history(bound)).toEqual(before);
             yield* run(bound, owner, follow(team.id, agentId));

@@ -332,7 +332,11 @@ describe("tasks", () => {
               yield* Effect.flip(
                 run(bound, human, start({ groupId: group.id, task: { assignee: otherId } })),
               ),
-            ).toEqual(new ThreadService.ParticipantUnavailable({ memberId: otherId }));
+            ).toEqual(
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: otherId }),
+              }),
+            );
             expect(
               yield* Effect.flip(
                 run(bound, human, start({ groupId: group.id, origin: secret.thread.id })),
@@ -377,7 +381,7 @@ describe("tasks", () => {
             expect(task).toMatchObject({ threadId, status: "triage", assignee: null });
             expect(yield* run(bound, owner, taskOf(threadId))).toEqual(task);
             expect(yield* Effect.flip(run(bound, owner, createTask({ threadId })))).toEqual(
-              new TaskService.AlreadyTask({ threadId }),
+              new CoreError.Conflict({ reason: new CoreError.AlreadyTask({ threadId }) }),
             );
             expect(yield* Effect.flip(run(bound, other, createTask({ threadId })))).toEqual(
               new CoreError.NotFound({ resource: "Thread", id: threadId }),
@@ -571,7 +575,11 @@ describe("tasks", () => {
                   update(threadId, { _tag: "Assignee", from: agentId, to: otherId }),
                 ),
               ),
-            ).toEqual(new TaskService.ParticipantUnavailable({ memberId: otherId }));
+            ).toEqual(
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: otherId }),
+              }),
+            );
           }),
         ),
       ),

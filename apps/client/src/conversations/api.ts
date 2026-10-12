@@ -536,7 +536,7 @@ export const changeMembership = (workspace: string) => (api: Api, change: Member
             api.groups.addMember({ params, payload: { memberId: id } }),
           ).pipe(
             Effect.asVoid,
-            Effect.catchTag("GroupMembershipService.AlreadyMember", () => Effect.void),
+            Effect.catchReason("CoreError.Conflict", "AlreadyMember", () => Effect.void),
           ),
         ).pipe(Effect.ensuring(invalidate));
         return;

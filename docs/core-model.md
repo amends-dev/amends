@@ -660,7 +660,7 @@ and group departures and invitation revocations share one journal commit. The me
 assignments remain for history. Subsequent authorization rejects that membership,
 including an actor resolved before removal. Other workspace memberships are unchanged.
 Authorized readers may still inspect the historical record. Repeating removal of
-the same member returns `MemberService.AlreadyRemoved` without another fact.
+the same member returns `CoreError.Conflict` (`AlreadyEnded`) without another fact.
 
 For humans, an old accepted invitation remains a receipt and cannot restore access.
 Rejoining requires a fresh invitation and member ID with newly authorized grants.
@@ -1763,14 +1763,14 @@ permission and cannot be used to remove someone else. Humans and agents follow t
 rule. Being the group's creator or the workspace owner does not prevent leaving a group;
 workspace ownership and membership remain unchanged.
 
-For private team groups, `GroupMembershipService.remove` and `leave` address a specific
-`{ groupId, membershipId }`. Removal requires `group.membership.manage` on that group;
-self-leave verifies the admission belongs to the caller. A successful departure records
-`group.membership.removed` and ends that admission without deleting it. The payload records
-the reason, while event provenance records the performer and time. Repeating the operation
-returns `AlreadyRemoved`; a later authorized addition creates a new admission ID that an old
-departure request cannot affect. These operations and workspace-removal cleanup are implemented
-in core and the storage adapters; their group HTTP/UI surface remains future work.
+For private team groups, `GroupMembershipService.remove` and `leave` address a specific `{ groupId,
+membershipId }`. Removal requires `group.membership.manage` on that group; self-leave verifies the
+admission belongs to the caller. A successful departure records `group.membership.removed` and ends
+that admission without deleting it. The payload records the reason, while event provenance records
+the performer and time. Repeating the operation returns `CoreError.Conflict` (`AlreadyEnded`); a
+later authorized addition creates a new admission ID that an old departure request cannot affect.
+These operations and workspace-removal cleanup are implemented in core and the storage adapters;
+their group HTTP/UI surface remains future work.
 
 Membership management happens from inside the group: management authority never lets someone
 outside a group add themselves, since joining would expose the group's whole history. The one way

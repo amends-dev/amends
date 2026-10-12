@@ -249,7 +249,7 @@ describe("assignments", () => {
                   roleId: BuiltinRoles.MemberId,
                 }),
               ),
-            ).toMatchObject({ _tag: "AssignmentService.InactiveMember" });
+            ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "InactiveMember" } });
           }),
         ),
       ),

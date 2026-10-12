@@ -17,32 +17,14 @@ import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as Thread from "../thread/Thread.ts";
-import type * as ThreadCommand from "../thread/ThreadCommand.ts";
 import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as Task from "./Task.ts";
 import * as TaskCommand from "./TaskCommand.ts";
-import { AlreadyTask, ParticipantUnavailable } from "./internal/task-errors.ts";
 import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The thread is a task already; a thread has one.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyTask,
-  /**
-   * The assignee cannot take part in the thread: missing, inactive, or outside its group.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ParticipantUnavailable,
-} from "./internal/task-errors.ts";
 
 /**
  * What creating a task in a conversation can fail with.
@@ -53,11 +35,10 @@ export {
 export type CreateError =
   | Authorization.Error
   | ThreadQuery.AccessError
-  | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
+  | TaskCommand.Error
   | TaskStore.Failure
   | CoreError.NotFound
-  | AlreadyTask
-  | ParticipantUnavailable;
+  | CoreError.Conflict;
 
 /**
  * What changing a task can fail with.
@@ -68,11 +49,11 @@ export type CreateError =
 export type UpdateError =
   | Authorization.Error
   | ThreadQuery.AccessError
-  | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
+  | TaskCommand.Error
   | TaskStore.Failure
   | CoreError.NotFound
   | CoreError.Changed
-  | ParticipantUnavailable;
+  | CoreError.Conflict;
 
 /**
  * What reading tasks can fail with.
@@ -99,9 +80,10 @@ export class TaskService extends Context.Service<
   {
     /**
      * Make a conversation a task, under current group audience and `task.create` on the group. The
-     * conversation's opening message becomes the task's description, and its title stays as it is. A
-     * thread that is a task already is `AlreadyTask`. An assignee must be able to take part in the
-     * thread, and assigning an agent needs `agent.use` on it. Returns the task.
+     * conversation's opening message becomes the task's description, and its title stays as it is.
+     * A thread that is a task already is `CoreError.Conflict` (`AlreadyTask`). An assignee must be
+     * able to take part in the thread, and assigning an agent needs `agent.use` on it. Returns the
+     * task.
      */
     readonly create: (
       input: Task.CreateInput,
@@ -166,7 +148,10 @@ export const make = Effect.fn("TaskService.make")(function* () {
   ) {
     const eligible = yield* threadQuery.eligibleMembers(thread.groupId, [memberId]);
     const entry = eligible.get(memberId);
-    if (entry === undefined) return yield* new ParticipantUnavailable({ memberId });
+    if (entry === undefined)
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.ParticipantUnavailable({ memberId }),
+      });
     if (Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity))
       yield* authorization.require([
         Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
@@ -191,18 +176,19 @@ export const make = Effect.fn("TaskService.make")(function* () {
         }),
       ]);
       if (Option.isSome(yield* taskStore.get(thread.id)))
-        return yield* new AlreadyTask({ threadId: thread.id });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.AlreadyTask({ threadId: thread.id }),
+        });
       const initial = Task.initial(request);
       if (initial.assignee !== null) yield* requireAssignable(thread, initial.assignee);
       const by = yield* actorAsMember;
-      const created = yield* taskCommand
-        .create({ thread, ...initial, createdBy: by, by, occurredAt: yield* DateTime.now })
-        .pipe(
-          Effect.catchTag(
-            "ThreadCommand.Unavailable",
-            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-          ),
-        );
+      const created = yield* taskCommand.create({
+        thread,
+        ...initial,
+        createdBy: by,
+        by,
+        occurredAt: yield* DateTime.now,
+      });
       return created.task;
     },
     Publication.withActor,
@@ -228,14 +214,12 @@ export const make = Effect.fn("TaskService.make")(function* () {
         return yield* new CoreError.Changed({ resource: "Task", id: thread.id });
       if (Task.Change.isAnyOf(["Assignee"])(change) && change.to !== null)
         yield* requireAssignable(thread, change.to);
-      const updated = yield* taskCommand
-        .update({ task, change, by: yield* actorAsMember, occurredAt: yield* DateTime.now })
-        .pipe(
-          Effect.catchTag(
-            "ThreadCommand.Unavailable",
-            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-          ),
-        );
+      const updated = yield* taskCommand.update({
+        task,
+        change,
+        by: yield* actorAsMember,
+        occurredAt: yield* DateTime.now,
+      });
       return updated.task;
     },
     Publication.withActor,

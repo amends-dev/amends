@@ -49,7 +49,7 @@ Removal also, in the same commit and without further grants:
 - ends every active group admission of that workspace member, recording `workspace-removed`
   with the removal as its cause; see [group departures](group-workflows.md#workspace-member-removal).
 
-A failure rolls all of it back. Repeating a removal returns `MemberService.AlreadyRemoved`
+A failure rolls all of it back. Repeating a removal returns `CoreError.Conflict` (`AlreadyEnded`)
 without recording anything; the caller must still be active and authorized. Missing members
 return `CoreError.NotFound`, only after authorization.
 

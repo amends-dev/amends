@@ -278,7 +278,7 @@ describe("agents", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "Delegation.OwnerProtected" });
+            ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "OwnerProtected" } });
 
             // Without a role, a member reads no agents, and each is missing to them.
             yield* revokeRoles(bound, bobMemberId);

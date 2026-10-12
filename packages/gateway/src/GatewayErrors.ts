@@ -8,27 +8,14 @@
  *
  * @since 0.1.0
  */
-import {
-  ThreadService,
-  ThreadMessageService,
-  ThreadParticipationService,
-} from "@amends-dev/core/thread";
-import { AssignmentService, Delegation } from "@amends-dev/core/authorization";
+import { ThreadService, ThreadParticipationService } from "@amends-dev/core/thread";
+import { Delegation } from "@amends-dev/core/authorization";
 import { Commit } from "@amends-dev/core/journal";
-import { NotificationService } from "@amends-dev/core/notification";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
-import {
-  InvitationService,
-  MemberService,
-  OwnershipService,
-  Workspace,
-} from "@amends-dev/core/workspace";
-import { ReadStateService } from "@amends-dev/core/read-state";
+import { InvitationService, Workspace } from "@amends-dev/core/workspace";
 import { ConnectionService } from "@amends-dev/core/connection";
 import { AgentService } from "@amends-dev/core/agent";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
-import { TaskService } from "@amends-dev/core/task";
-import { TurnService } from "@amends-dev/core/turn";
 import { Schema } from "effect";
 import { CoreError } from "@amends-dev/core/error";
 
@@ -66,44 +53,23 @@ export const PublicError = Schema.Union([
   CoreError.NotFound,
   CoreError.Changed,
   CoreError.Denied,
+  CoreError.Conflict,
   CoreError.Unavailable,
   Uncertain,
   InvalidInput,
-  Delegation.OwnerProtected,
   Delegation.UnsupportedRole,
-  AssignmentService.InactiveMember,
-  OwnershipService.InvalidRecipient,
-  MemberService.OwnerProtected,
-  MemberService.AlreadyRemoved,
-  NotificationService.AlreadyHandled,
-  ThreadService.ParticipantUnavailable,
   ThreadService.DirectMembersRequired,
-  ThreadMessageService.ParticipantUnavailable,
-  ThreadMessageService.Deleted,
-  ThreadParticipationService.AlreadyEnded,
   ThreadParticipationService.FixedParticipation,
-  TaskService.AlreadyTask,
-  TaskService.ParticipantUnavailable,
-  GroupService.InactiveMember,
   GroupService.NotRenamable,
-  GroupMembershipService.InactiveMember,
-  GroupMembershipService.AlreadyMember,
-  GroupMembershipService.AlreadyRemoved,
   GroupMembershipService.FixedMembership,
   GroupMembershipService.GeneralMembership,
   GroupFollowService.NotFollowable,
-  GroupFollowService.MemberUnavailable,
-  ReadStateService.BeyondTimeline,
-  InvitationService.AlreadyMember,
-  InvitationService.Unavailable,
   InvitationService.InvalidExpiry,
   ConnectionService.UnknownIntegration,
   ConnectionService.InvalidConnection,
   ConnectionService.Keyless,
   AgentService.ConnectionUnavailable,
   AgentService.Incomplete,
-  TurnService.NotActive,
-  TurnService.NotRetryable,
   ChannelService.ConnectionUnavailable,
   ChannelIntake.Rejected,
 ]);

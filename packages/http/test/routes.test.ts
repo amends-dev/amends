@@ -138,7 +138,7 @@ const conversations = Layer.mergeAll(
     GroupMembershipService.GroupMembershipService,
     GroupMembershipService.GroupMembershipService.of({
       add: record("group.add", (input) =>
-        Effect.fail(new GroupMembershipService.AlreadyMember(input)),
+        Effect.fail(new CoreError.Conflict({ reason: new CoreError.AlreadyMember(input) })),
       ),
       join: record("group.join", (groupId) =>
         Effect.fail(new CoreError.NotFound({ resource: "Group", id: groupId })),
@@ -147,7 +147,14 @@ const conversations = Layer.mergeAll(
         Effect.fail(new GroupMembershipService.FixedMembership({ groupId: input.groupId })),
       ),
       leave: record("group.leave", (input) =>
-        Effect.fail(new GroupMembershipService.AlreadyRemoved(input)),
+        Effect.fail(
+          new CoreError.Conflict({
+            reason: new CoreError.AlreadyEnded({
+              resource: "GroupMembership",
+              id: input.membershipId,
+            }),
+          }),
+        ),
       ),
       listCurrent: record("group.members", () => Effect.succeed([])),
     }),
@@ -165,7 +172,9 @@ const conversations = Layer.mergeAll(
     ThreadService.ThreadService,
     ThreadService.ThreadService.of({
       startInGroup: record("thread.start", () =>
-        Effect.fail(new ThreadService.ParticipantUnavailable({ memberId })),
+        Effect.fail(
+          new CoreError.Conflict({ reason: new CoreError.ParticipantUnavailable({ memberId }) }),
+        ),
       ),
       startDirect: record("thread.startDirect", () =>
         Effect.fail(new ThreadService.DirectMembersRequired()),
@@ -186,7 +195,11 @@ const conversations = Layer.mergeAll(
     TaskService.TaskService,
     TaskService.TaskService.of({
       create: record("task.create", (input) =>
-        Effect.fail(new TaskService.AlreadyTask({ threadId: input.threadId })),
+        Effect.fail(
+          new CoreError.Conflict({
+            reason: new CoreError.AlreadyTask({ threadId: input.threadId }),
+          }),
+        ),
       ),
       update: record("task.update", (input) =>
         Effect.fail(new CoreError.Changed({ resource: "Task", id: input.threadId })),
@@ -219,7 +232,14 @@ const conversations = Layer.mergeAll(
         Effect.fail(new CoreError.NotFound({ resource: "Thread", id })),
       ),
       unfollow: record("thread.unfollow", (input) =>
-        Effect.fail(new ThreadParticipationService.AlreadyEnded(input)),
+        Effect.fail(
+          new CoreError.Conflict({
+            reason: new CoreError.AlreadyEnded({
+              resource: "ThreadParticipation",
+              id: input.participationId,
+            }),
+          }),
+        ),
       ),
     }),
   ),
@@ -228,7 +248,9 @@ const conversations = Layer.mergeAll(
     ReadStateService.ReadStateService.of({
       markThreadRead: record("thread.markRead", ({ threadId, throughSequence }) =>
         Effect.fail(
-          new ReadStateService.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
+          new CoreError.Conflict({
+            reason: new CoreError.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
+          }),
         ),
       ),
       markGroupRead: record("group.markRead", () => Effect.void),
@@ -276,7 +298,9 @@ const operations = Layer.mergeAll(
     NotificationService.NotificationService.of({
       markSeen: record("notification.markSeen", (notificationId) =>
         notificationId === notification.id
-          ? Effect.fail(new NotificationService.AlreadyHandled({ notificationId }))
+          ? Effect.fail(
+              new CoreError.Conflict({ reason: new CoreError.AlreadyHandled({ notificationId }) }),
+            )
           : Effect.fail(new CoreError.NotFound({ resource: "Notification", id: notificationId })),
       ),
       inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),

@@ -477,7 +477,8 @@ describe("marking notifications seen", () => {
             // The human leaves Team after the notification was read as pending, before Seen.
             const racing = racingSeen(p.bound, leave(admission.id));
             expect(yield* Effect.flip(run(racing, human, markSeen(p.humanNote.id)))).toMatchObject({
-              _tag: "NotificationService.AlreadyHandled",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyHandled" },
             });
             expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
               value: { state: { _tag: "Discarded", reason: "access-lost" } },
@@ -792,7 +793,8 @@ describe("marking notifications seen", () => {
             ).toMatchObject({ _tag: "NotificationStore.Conflict" });
             expect(yield* snapshot(p)).toEqual(before);
             expect(yield* Effect.flip(run(p.bound, human, markSeen(discarded.id)))).toMatchObject({
-              _tag: "NotificationService.AlreadyHandled",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyHandled" },
             });
             const invalid = { at: seenAt };
             Reflect.set(invalid, "at", "not-a-date");

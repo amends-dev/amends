@@ -4,25 +4,7 @@
  * on.
  */
 import { Schema } from "effect";
-import * as Member from "../../workspace/Member.ts";
 import * as Group from "../Group.ts";
-import * as GroupMembership from "../GroupMembership.ts";
-
-/**
- * The member to add already holds an active admission to the group; nothing is recorded.
- */
-export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
-  "GroupMembershipService.AlreadyMember",
-  { groupId: Group.Id, memberId: Member.Id },
-) {}
-
-/**
- * The admission has already ended; repeating a departure records nothing.
- */
-export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
-  "GroupMembershipService.AlreadyRemoved",
-  GroupMembership.RemoveInput.fields,
-) {}
 
 /**
  * A direct group's members never change; including someone else needs another direct group.
@@ -39,12 +21,4 @@ export class FixedMembership extends Schema.TaggedError<FixedMembership>()(
 export class GeneralMembership extends Schema.TaggedError<GeneralMembership>()(
   "GroupMembershipService.GeneralMembership",
   { groupId: Group.Id },
-) {}
-
-/**
- * The member to add is no longer active in the workspace.
- */
-export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
-  "GroupMembershipService.InactiveMember",
-  { memberId: Member.Id },
 ) {}

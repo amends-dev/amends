@@ -108,8 +108,7 @@ export type IntakeError =
   | ThreadStore.Failure
   | ThreadMessageStore.Failure
   | ThreadQuery.FollowersError
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | TaskCommand.Error;
+  | Exclude<TaskCommand.Error, CoreError.Conflict>;
 
 /**
  * What receiving an inbound request can fail with.
@@ -191,8 +190,8 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
   });
 
   /** A participant who could not be admitted: intake admits only those it just read as able. */
-  const admitted = <A, E, R>(effect: Effect.Effect<A, E | ThreadCommand.Unavailable, R>) =>
-    Effect.catchTag(effect, "ThreadCommand.Unavailable", () =>
+  const admitted = <A, E, R>(effect: Effect.Effect<A, E | CoreError.Conflict, R>) =>
+    Effect.catchTag(effect, "CoreError.Conflict", () =>
       Effect.die("Intake could not admit a participant it read as able to take part"),
     );
 

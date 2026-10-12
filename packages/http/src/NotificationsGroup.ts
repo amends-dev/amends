@@ -55,7 +55,7 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
     HttpApiEndpoint.post("markSeen", "/:notificationId/seen", {
       params,
       success: record,
-      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.NotificationAlreadyHandled],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict],
     }),
   )
   .middleware(Authentication)

@@ -33,17 +33,10 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
-import { InactiveMember, NotRenamable } from "./internal/group-errors.ts";
+import { NotRenamable } from "./internal/group-errors.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * A member listed for a new team group is no longer active in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InactiveMember,
   /**
    * A direct group is named by its members, so it has no name to change.
    *
@@ -79,7 +72,7 @@ export type CreateError =
   | Error
   | MemberStore.Failure
   | CoreError.NotFound
-  | InactiveMember
+  | CoreError.Conflict
   | GroupStore.Failure;
 
 /**
@@ -218,7 +211,10 @@ export const make = Effect.fn("GroupService.make")(function* () {
         const member = found.get(memberId);
         if (member === undefined)
           return yield* new CoreError.NotFound({ resource: "Member", id: memberId });
-        if (member.status !== "active") return yield* new InactiveMember({ memberId });
+        if (member.status !== "active")
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.InactiveMember({ memberId }),
+          });
       }
       const createdAt = yield* DateTime.now;
       const group: Group.Group = {

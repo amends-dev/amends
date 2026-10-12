@@ -416,12 +416,12 @@ projections again, which then rebuild the commits they missed.
 ## Commit outcomes and PostgreSQL contention
 
 The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/Binding.ts) returns
-`Store.CommitUncertain` for every failed COMMIT effect, even when a particular
-database error could establish that nothing committed. This over-reports uncertainty.
-The gateway exposes `GatewayErrors.Uncertain` with the commit ID; there is no public
-HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction programs.
-Creating operations accept a request key, so their retries return the first result; other
-operations settle a repeat by their own rules, such as `AlreadyRemoved`, rather than repeating it.
+`Store.CommitUncertain` for every failed COMMIT effect, even when a particular database error could
+establish that nothing committed. This over-reports uncertainty. The gateway exposes
+`GatewayErrors.Uncertain` with the commit ID; there is no public HTTP commit-reconciliation
+endpoint. Core and adapters do not retry transaction programs. Creating operations accept a request
+key, so their retries return the first result; other operations settle a repeat by their own rules,
+such as `CoreError.Conflict` (`AlreadyEnded`), rather than repeating it.
 
 PostgreSQL's [error mapping](../adapters/storage-postgresql/src/internal/errors.ts) treats lock
 timeouts, serialization failures, and deadlocks as contention, a retryable conflict; during

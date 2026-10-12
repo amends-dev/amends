@@ -54,19 +54,9 @@ import * as Turn from "./Turn.ts";
 import * as CoreError from "../error/CoreError.ts";
 
 /**
- * The turn is not in the state the step needs: it has finished, or is not running yet.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotActive extends Schema.TaggedError<NotActive>()("TurnExecution.NotActive", {
-  turnId: Turn.Id,
-  status: Turn.Status,
-}) {}
-
-/**
- * What every execution operation can fail with: the turn's outcomes above, and the
- * failures of the stores and commit each one writes through.
+ * What every execution operation can fail with: a turn missing or not in the state the step needs
+ * (`CoreError.Conflict` with `TurnNotActive`), and the failures of the stores and commit each one
+ * writes through.
  *
  * @category errors
  * @since 0.1.0
@@ -78,7 +68,7 @@ export type Error =
   | Projection.Error
   | SessionStateStore.Failure
   | CoreError.NotFound
-  | NotActive
+  | CoreError.Conflict
   | TurnCommand.EndError;
 
 /**
@@ -808,7 +798,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           return Closing.cases.Stopped.make({});
         }
         if (turn.status !== "running")
-          return yield* new NotActive({ turnId: turn.id, status: turn.status });
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
+          });
         yield* saveSession(turn, resume);
         // A reply of only space is none, as no message holds it.
         if (!/\S/u.test(reply)) {
@@ -844,7 +836,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         turnId,
         Effect.fnUntraced(function* (turn) {
           if (!Turn.active(turn.status))
-            return yield* new NotActive({ turnId: turn.id, status: turn.status });
+            return yield* new CoreError.Conflict({
+              reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
+            });
           if (failure.resume !== undefined) yield* saveSession(turn, failure.resume);
           yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
         }),

@@ -21,16 +21,9 @@ import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";
 import * as GroupStore from "../group/GroupStore.ts";
-import { AlreadyEnded, FixedParticipation } from "./internal/thread-participation-errors.ts";
+import { FixedParticipation } from "./internal/thread-participation-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The actor's participation had already ended.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyEnded,
   /**
    * Everyone in a direct conversation takes part in all of its threads, so none is unfollowed.
    *
@@ -53,7 +46,7 @@ export type Error =
   | ThreadCommand.Error
   | GroupStore.Failure
   | CoreError.NotFound
-  | AlreadyEnded
+  | CoreError.Conflict
   | FixedParticipation;
 
 /**
@@ -162,7 +155,13 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
           resource: "ThreadParticipation",
           id: request.participationId,
         });
-      if (participant.status === "ended") return yield* new AlreadyEnded(request);
+      if (participant.status === "ended")
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.AlreadyEnded({
+            resource: "ThreadParticipation",
+            id: request.participationId,
+          }),
+        });
       // Unfollowing ends the participation quietly in the timeline. Leaving or being removed from
       // the group ends participations with the departure instead, all together and without
       // thread activity.

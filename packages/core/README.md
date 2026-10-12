@@ -131,14 +131,20 @@ they lack (`NotGranted`), a membership they do not hold (`NotMember`, `InvalidAc
 only the owner (`OwnerRequired`), the author (`NotAuthor`), the invitation's recipient
 (`NotRecipient`), a person (`HumanRequired`), or an agent (`AgentRequired`) takes. A caller recovers
 from one reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`, as lists do to
-leave out what the actor may not read. `CoreError.Unavailable` says what an operation needs cannot
-be reached or used now: storage another writer held (`Contention`) or read models another host is
-rebuilding (`Reloading`), a change feed or turn log that stopped (`ChangeFeedInterrupted`,
-`LogInterrupted`), a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no
-keys (`CredentialsUnavailable`). Operations pass it through unchanged, so a
-protocol answers it with one status and a client handles it once, and an operation that reaches a
-resource through another reports the one the caller named: a message whose thread they cannot read
-is the message not found, not the thread.
+leave out what the actor may not read. `CoreError.Conflict` says the state of what the caller acts
+on refuses the request, and its `reason` says how: a member no longer active (`InactiveMember`) or
+unable to take part (`ParticipantUnavailable`), an owner the change would reach (`OwnerProtected`),
+something done already (`AlreadyMember`, `AlreadyJoined`, `AlreadyEnded`, `AlreadyHandled`,
+`AlreadyTask`), a message deleted (`Deleted`), a turn finished or not retryable (`TurnNotActive`,
+`NotRetryable`), a read position past the timeline (`BeyondTimeline`), a recipient who cannot own
+the workspace (`InvalidRecipient`), or an invitation no longer open (`InvitationClosed`).
+`CoreError.Unavailable` says what an operation needs cannot be reached or used now: storage another
+writer held (`Contention`) or read models another host is rebuilding (`Reloading`), a change feed or
+turn log that stopped (`ChangeFeedInterrupted`, `LogInterrupted`), a channel's system out of reach
+(`ChannelUnreachable`), or a host that keeps no keys (`CredentialsUnavailable`). Operations pass it
+through unchanged, so a protocol answers it with one status and a client handles it once, and an
+operation that reaches a resource through another reports the one the caller named: a message whose
+thread they cannot read is the message not found, not the thread.
 
 ## Workspace and access
 
@@ -464,7 +470,7 @@ its agent may `cancel` an active turn, a queued one at once and a running one on
 it, and `retry` a failed or stopped turn as a new queued turn for the same agent, participation, and
 accepted work, prompted again with who asked. Only the agent's latest turn on the thread can be
 retried, while no other is active and the agent still takes part there; otherwise it is
-`NotRetryable` with the reason (`active`, `completed`, `superseded`, or `departed`). A retry takes
+`CoreError.Conflict` (`NotRetryable`) with the reason (`active`, `completed`, `superseded`, or `departed`). A retry takes
 its ID from the turn it retries, so repeating it returns the turn it created.
 
 `TurnService.watchLog` follows a turn's session log for a reader who may read its thread, as a
@@ -662,16 +668,16 @@ src/workspace/
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
-An outcome every feature reports is one kind in `CoreError`, whichever operation raises it:
-anything missing, or out of the caller's reach, is `CoreError.NotFound`; anything that changed
-since the caller read it is `CoreError.Changed`; a refusal of the actor is `CoreError.Denied`; and
-what cannot be reached now is `CoreError.Unavailable`, the last two with their reason. Each says what it is about in its fields and passes through every operation
-unchanged. Any other error belongs to the module that
-raises it, and its tag is its name there, as `MemberService.OwnerProtected` or `Store.Conflict`. The
-outcomes a service reports to callers are schemas in an `internal/` errors module, apart from the
-services, so a protocol or a browser client carries them without loading an implementation, and the
-service exports them. A query or command defines what else it raises beside itself, as
-`ThreadCommand.Unavailable`, and a service that calls it maps that to its own outcome. Helpers no consumer imports go under `internal/` too.
+An outcome every feature reports is one kind in `CoreError`, whichever operation raises it: anything
+missing, or out of the caller's reach, is `CoreError.NotFound`; anything that changed since the
+caller read it is `CoreError.Changed`; a refusal of the actor is `CoreError.Denied`; a request the
+state refuses is `CoreError.Conflict`; and what cannot be reached now is `CoreError.Unavailable`,
+the last three with their reason. Each says what it is about in its fields, and a query or command
+raises the kind itself, so it passes through every operation unchanged. Any other error belongs to
+the module that raises it, and its tag is its name there, as `GroupService.NotRenamable` or
+`Store.Conflict`. The outcomes a service reports to callers are schemas in an `internal/` errors
+module, apart from the services, so a protocol or a browser client carries them without loading an
+implementation, and the service exports them. Helpers no consumer imports go under `internal/` too.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

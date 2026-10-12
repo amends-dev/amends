@@ -140,15 +140,15 @@ group is `CoreError.NotFound`. An exact Group scope authorizes that group only; 
 every group the caller belongs to. No member-read grant is needed, and group creation authority or
 creator attribution grants no management authority.
 
-The group must exist in the workspace, and `memberId` must name an active human or agent
-membership there; missing and foreign references share the not-found outcomes. An existing active
-admission returns `GroupMembershipService.AlreadyMember` without recording anything. The other
-outcomes are `CoreError.NotFound`, for the group or the member, and `InactiveMember`.
+The group must exist in the workspace, and `memberId` must name an active human or agent membership
+there; missing and foreign references share the not-found outcomes. An existing active admission
+returns `CoreError.Conflict` (`AlreadyMember`) without recording anything. The other outcomes are
+`CoreError.NotFound`, for the group or the member, and `CoreError.Conflict` (`InactiveMember`).
 
-A successful addition returns a fresh `GroupMembership.GroupMembership` with its own admission time. It
-neither invokes an agent nor enrolls anyone in an existing thread. Concurrent additions cannot
-create competing active admissions: the later one sees `AlreadyMember` or a storage conflict,
-without an automatic retry.
+A successful addition returns a fresh `GroupMembership.GroupMembership` with its own admission time.
+It neither invokes an agent nor enrolls anyone in an existing thread. Concurrent additions cannot
+create competing active admissions: the later one sees `AlreadyMember` or storage contention
+(`CoreError.Unavailable`), without an automatic retry.
 
 ## Removing a member or leaving
 
@@ -165,13 +165,13 @@ ownership, or grants, and the group may become empty. A person who leaves or is 
 waits on the group's notifications: their pending ones from it are settled as `access-lost`; see
 [departure and pending input](thread-workflows.md#departure-and-pending-input).
 
-Both address a specific admission and return it with `status: "removed"`, keeping its group,
-member, and admission time. Missing, foreign, and wrong-group admission IDs return
-`CoreError.NotFound` for the admission, as leaving does for another member's admission. Managed
-removal returns it for the group when the group is missing, or the caller is not in it, after
-authorization.
-Repeating a departure returns `AlreadyRemoved`. Adding the member again creates a fresh admission,
-which no earlier removal or leave request can end. Leaving grants no authority to add oneself back.
+Both address a specific admission and return it with `status: "removed"`, keeping its group, member,
+and admission time. Missing, foreign, and wrong-group admission IDs return `CoreError.NotFound` for
+the admission, as leaving does for another member's admission. Managed removal returns it for the
+group when the group is missing, or the caller is not in it, after authorization. Repeating a
+departure returns `CoreError.Conflict` (`AlreadyEnded`). Adding the member again creates a fresh
+admission, which no earlier removal or leave request can end. Leaving grants no authority to add
+oneself back.
 
 Direct groups have fixed membership: adding to, removing from, or leaving one returns
 `GroupMembershipService.FixedMembership`. Including someone else needs another direct group.
@@ -201,11 +201,11 @@ stops joining future threads and leaves current thread participation unchanged. 
 value, and repeating either records nothing.
 
 The actor must be a current member of the group; otherwise, as for a missing group, the result is
-`CoreError.NotFound`. Members follow for themselves under `group.follow`, and
-unfollowing oneself needs no grant. Another member can be made to follow or unfollow only when it
-is an agent in the group and the actor holds `agent.use` for it: a person returns `CoreError.Denied` (`AgentRequired`),
-and a member outside the group or inactive returns `MemberUnavailable`. Posting in the group then
-reaches the agent without the poster's `agent.use`, as the [attention
+`CoreError.NotFound`. Members follow for themselves under `group.follow`, and unfollowing oneself
+needs no grant. Another member can be made to follow or unfollow only when it is an agent in the
+group and the actor holds `agent.use` for it: a person returns `CoreError.Denied` (`AgentRequired`),
+and a member outside the group or inactive returns `CoreError.Conflict` (`ParticipantUnavailable`).
+Posting in the group then reaches the agent without the poster's `agent.use`, as the [attention
 model](core-model.md#agreed-attention-is-directed-followed-or-ambient) agrees. Direct groups return
 `NotFollowable`: all their members already take part in every thread.
 

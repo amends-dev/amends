@@ -22,19 +22,8 @@ import * as NotificationInbox from "./NotificationInbox.ts";
 import type * as Thread from "../thread/Thread.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import { AlreadyHandled } from "./internal/notification-errors.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The notification no longer waits for its recipient: it was discarded, or settled some other way,
-   * so it cannot be marked seen.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyHandled,
-} from "./internal/notification-errors.ts";
 
 /**
  * What every notification operation can fail with: authorization, the store, and an input that
@@ -73,7 +62,7 @@ export type MarkSeenError =
   | NotificationStore.Conflict
   | CoreError.NotFound
   | CoreError.Denied
-  | AlreadyHandled;
+  | CoreError.Conflict;
 
 /**
  * The notification operations, one of `Core.Operations`.
@@ -110,7 +99,7 @@ export class NotificationService extends Context.Service<
       through: NotificationStore.Cursor,
     ) => Effect.Effect<
       number,
-      Exclude<MarkSeenError, CoreError.NotFound | AlreadyHandled>,
+      Exclude<MarkSeenError, CoreError.NotFound | CoreError.Conflict>,
       Actor.Actor
     >;
     /** How many notifications are still pending for the acting member, from anywhere. */
@@ -234,7 +223,9 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
     if (Notification.State.isAnyOf(["Seen"])(notification.state)) return notification;
     if (!Notification.State.isAnyOf(["Pending"])(notification.state))
-      return yield* new AlreadyHandled({ notificationId: notification.id });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.AlreadyHandled({ notificationId: notification.id }),
+      });
     // Leaving its group may settle it first, and the store then refuses it or records nothing:
     // what it reads as afterwards decides.
     yield* notificationStore
@@ -243,7 +234,9 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     // Another device may have seen it first; the stored time is the one that holds.
     const seen = yield* requireOwn(notification.id);
     if (Notification.State.isAnyOf(["Discarded"])(seen.state))
-      return yield* new AlreadyHandled({ notificationId: notification.id });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.AlreadyHandled({ notificationId: notification.id }),
+      });
     if (!Notification.State.isAnyOf(["Seen"])(seen.state))
       return yield* Effect.die("A seen notification still reads as unseen");
     // The recipient's other sessions hear of it as a signal.

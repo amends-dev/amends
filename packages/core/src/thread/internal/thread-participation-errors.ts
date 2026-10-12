@@ -5,15 +5,6 @@
  */
 import { Schema } from "effect";
 import * as Thread from "../Thread.ts";
-import * as ThreadParticipation from "../ThreadParticipation.ts";
-
-/**
- * The actor's participation had already ended.
- */
-export class AlreadyEnded extends Schema.TaggedError<AlreadyEnded>()(
-  "ThreadParticipationService.AlreadyEnded",
-  ThreadParticipation.UnfollowInput.fields,
-) {}
 
 /**
  * Everyone in a direct conversation takes part in all of its threads, so none is unfollowed.

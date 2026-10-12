@@ -36,16 +36,7 @@ import * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
 import * as ThreadMessageFacts from "./ThreadMessageFacts.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
-
-/**
- * A member to admit has no current group admission or active workspace membership.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()("ThreadCommand.Unavailable", {
-  memberId: Member.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * The thread's next position is not the one the caller accounted for: activity took it first.
@@ -69,7 +60,7 @@ export type Error =
   | ThreadStore.Failure
   | ThreadActivityStore.Failure
   | TaskStore.Failure
-  | Unavailable
+  | CoreError.Conflict
   | PositionChanged
   | Schema.SchemaError
   | PlatformError.PlatformError
@@ -410,10 +401,13 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   const participantOf = Effect.fnUntraced(function* (
     reference: ThreadParticipation.Reference,
     candidates: ReadonlyMap<Member.Id, ThreadQuery.Eligible>,
-  ): Effect.fn.Return<ThreadParticipation.Participant, Unavailable> {
+  ): Effect.fn.Return<ThreadParticipation.Participant, CoreError.Conflict> {
     if (!ThreadParticipation.Reference.isAnyOf(["Member"])(reference)) return reference;
     const candidate = candidates.get(reference.memberId);
-    if (candidate === undefined) return yield* new Unavailable({ memberId: reference.memberId });
+    if (candidate === undefined)
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.ParticipantUnavailable({ memberId: reference.memberId }),
+      });
     return {
       _tag: "Member",
       memberId: reference.memberId,

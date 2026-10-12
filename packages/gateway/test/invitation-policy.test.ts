@@ -67,7 +67,10 @@ describe("invitation policy", () => {
               expiresAt,
               Effect.flip(Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id)),
             ),
-          ).toMatchObject({ _tag: "InvitationService.Unavailable", reason: "expired" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "InvitationClosed", reason: "expired" },
+          });
           expect(yield* (yield* boundTo(workspace.id)).members.findActive(bob)).toEqual(
             Option.none(),
           );
@@ -111,7 +114,7 @@ describe("invitation policy", () => {
                 request(yield* future, charlie.id, BuiltinRoles.OwnerId),
               ),
             ),
-          ).toMatchObject({ _tag: "Delegation.OwnerProtected" });
+          ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "OwnerProtected" } });
         }),
       ),
     ),
@@ -212,7 +215,7 @@ describe("invitation policy", () => {
             yield* Effect.flip(
               Operations.invite(workspace.id, alice, request(yield* future, alice.id)),
             ),
-          ).toMatchObject({ _tag: "InvitationService.AlreadyMember" });
+          ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "AlreadyJoined" } });
         }),
       ),
     ),

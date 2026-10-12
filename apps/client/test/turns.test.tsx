@@ -292,14 +292,26 @@ it("names why a stop or retry was refused", async () => {
   const f = fixture();
   await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
   f.answers.push(
-    json({ _tag: "TurnService.NotRetryable", turnId: "atlas-1", reason: "superseded" }, 409),
+    json(
+      {
+        _tag: "CoreError.Conflict",
+        reason: { _tag: "NotRetryable", turnId: "atlas-1", reason: "superseded" },
+      },
+      409,
+    ),
   );
   f.views.controls.retry("atlas-1");
   await waitFor(() =>
     expect(f.views.controls.problem()).toEqual({ turnId: "atlas-1", problem: "superseded" }),
   );
   f.answers.push(
-    json({ _tag: "TurnService.NotActive", turnId: "scout-2", status: "completed" }, 409),
+    json(
+      {
+        _tag: "CoreError.Conflict",
+        reason: { _tag: "TurnNotActive", turnId: "scout-2", status: "completed" },
+      },
+      409,
+    ),
   );
   f.views.controls.stop("scout-2");
   await waitFor(() =>

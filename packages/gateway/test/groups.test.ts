@@ -266,7 +266,7 @@ describe("groups", () => {
           for (const [ids, tag] of [
             [[memberId, Member.Id.make("absent")], "CoreError.NotFound"],
             [[memberId, other.ownerMemberId], "CoreError.NotFound"],
-            [[memberId, agentId], "GroupService.InactiveMember"],
+            [[memberId, agentId], "CoreError.Conflict"],
             [[memberId, memberId], "SchemaError"],
           ] as const) {
             expect(

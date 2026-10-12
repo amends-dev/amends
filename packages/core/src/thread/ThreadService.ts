@@ -48,7 +48,7 @@ import * as Task from "../task/Task.ts";
 import * as TaskCommand from "../task/TaskCommand.ts";
 import * as TaskPermissions from "../task/TaskPermissions.ts";
 import * as TaskStore from "../task/TaskStore.ts";
-import { DirectMembersRequired, ParticipantUnavailable } from "./internal/thread-errors.ts";
+import { DirectMembersRequired } from "./internal/thread-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
   /**
@@ -58,13 +58,6 @@ export {
    * @since 0.1.0
    */
   DirectMembersRequired,
-  /**
-   * A member who was to take part cannot: they are missing, inactive, or not in the group.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ParticipantUnavailable,
 } from "./internal/thread-errors.ts";
 
 /**
@@ -76,9 +69,9 @@ export {
  */
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
-  | Exclude<GroupCommand.EstablishError, GroupCommand.Unavailable>
+  | ThreadCommand.Error
+  | TaskCommand.Error
+  | GroupCommand.EstablishError
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | GroupFollowStore.Failure
@@ -90,7 +83,7 @@ export type Error =
   | Log.WriteError
   | Projection.Error
   | CoreError.NotFound
-  | ParticipantUnavailable
+  | CoreError.Conflict
   | CoreError.Denied
   | DirectMembersRequired
   | ThreadStore.Failure
@@ -107,7 +100,7 @@ export type Error =
  */
 export type RenameError =
   | Authorization.Error
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | Exclude<ThreadCommand.Error, CoreError.Conflict>
   | GroupMembershipStore.Failure
   | TaskStore.Failure
   | CoreError.NotFound
@@ -278,10 +271,16 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     eligible: ReadonlyMap<Member.Id, ThreadQuery.Eligible>,
   ) {
     for (const memberId of participants)
-      if (!eligible.has(memberId)) return yield* new ParticipantUnavailable({ memberId });
+      if (!eligible.has(memberId))
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.ParticipantUnavailable({ memberId }),
+        });
     for (const memberId of named) {
       const member = eligible.get(memberId)?.member;
-      if (member === undefined) return yield* new ParticipantUnavailable({ memberId });
+      if (member === undefined)
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.ParticipantUnavailable({ memberId }),
+        });
       if (Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
         yield* authorization.require([
           Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
@@ -319,26 +318,22 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     },
     ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id },
   ) {
-    const unavailable = (error: ThreadCommand.Unavailable) =>
-      new ParticipantUnavailable({ memberId: error.memberId });
     const occurredAt = yield* DateTime.now;
-    const started = yield* threadCommand
-      .create({
-        threadId: ids.threadId,
-        groupId,
-        title: opening.title ?? null,
-        origin: opening.origin ?? null,
-        participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
-        message: {
-          messageId: ids.messageId,
-          author: { _tag: "Member", memberId: authorId },
-          text: opening.text,
-          mentions: opening.mentions,
-          via: null,
-        },
-        occurredAt,
-      })
-      .pipe(Effect.catchTag("ThreadCommand.Unavailable", unavailable));
+    const started = yield* threadCommand.create({
+      threadId: ids.threadId,
+      groupId,
+      title: opening.title ?? null,
+      origin: opening.origin ?? null,
+      participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
+      message: {
+        messageId: ids.messageId,
+        author: { _tag: "Member", memberId: authorId },
+        text: opening.text,
+        mentions: opening.mentions,
+        via: null,
+      },
+      occurredAt,
+    });
     // Posting reads the thread through the author's own message.
     yield* readStateStore.markThreadRead(
       {
@@ -352,15 +347,13 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     const task =
       opening.task === undefined
         ? null
-        : (yield* taskCommand
-            .create({
-              thread: started.thread,
-              ...Task.initial(opening.task),
-              createdBy: started.thread.createdBy,
-              by: { _tag: "Member", memberId: authorId },
-              occurredAt,
-            })
-            .pipe(Effect.catchTag("ThreadCommand.Unavailable", unavailable))).task;
+        : (yield* taskCommand.create({
+            thread: started.thread,
+            ...Task.initial(opening.task),
+            createdBy: started.thread.createdBy,
+            by: { _tag: "Member", memberId: authorId },
+            occurredAt,
+          })).task;
     return { thread: started.thread, message: started.message, task } satisfies Thread.Started;
   });
 
@@ -403,15 +396,15 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
       if (memberIds.length < 2) return yield* new DirectMembersRequired({});
       const missing = request.mentions.find((id) => !memberIds.includes(id));
-      if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
-      const { group, created } = yield* groupCommand
-        .establishDirect(memberIds, actor.memberId, yield* DateTime.now)
-        .pipe(
-          Effect.catchTag(
-            "GroupCommand.Unavailable",
-            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-          ),
-        );
+      if (missing !== undefined)
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.ParticipantUnavailable({ memberId: missing }),
+        });
+      const { group, created } = yield* groupCommand.establishDirect(
+        memberIds,
+        actor.memberId,
+        yield* DateTime.now,
+      );
       yield* authorization.require([
         Requirement.make(ThreadPermissions.Start, {
           _tag: "Group",
@@ -519,9 +512,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
             }),
         })
         .pipe(
-          Effect.catchTag("ThreadCommand.Unavailable", () =>
-            Effect.die("A rename admits no participant"),
-          ),
+          Effect.catchTag("CoreError.Conflict", () => Effect.die("A rename admits no participant")),
         );
       return renamed.value;
     },

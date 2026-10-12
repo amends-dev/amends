@@ -22,18 +22,8 @@ import * as ReadState from "./ReadState.ts";
 import * as ReadStateStore from "./ReadStateStore.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import { BeyondTimeline } from "./internal/read-state-errors.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The requested position is past the thread's latest recorded activity.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  BeyondTimeline,
-} from "./internal/read-state-errors.ts";
 
 /**
  * What marking a thread or a group read can fail with: the outcomes above, and the
@@ -52,7 +42,7 @@ export type Error =
   | Schema.SchemaError
   | CoreError.Denied
   | CoreError.NotFound
-  | BeyondTimeline;
+  | CoreError.Conflict;
 
 /**
  * The read-state operations, one of `Core.Operations`.
@@ -118,10 +108,12 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
     const found = yield* threadActivityStore.latest(thread.id);
     const latest = Option.isNone(found) ? 0 : found.value.sequence;
     if (request.throughSequence > latest)
-      return yield* new BeyondTimeline({
-        threadId: thread.id,
-        throughSequence: request.throughSequence,
-        latestSequence: latest,
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.BeyondTimeline({
+          threadId: thread.id,
+          throughSequence: request.throughSequence,
+          latestSequence: latest,
+        }),
       });
     const position: ReadState.ThreadPosition = {
       workspaceId,

@@ -219,9 +219,9 @@ edit time as it is now, or its deletion. A message's `via` names the agent's tur
 for an agent's reply, and is null otherwise.
 
 Message text keeps its whitespace and must contain a non-space character. Mentions name members of
-the group; a mentioned member who cannot take part is a 409 `ParticipantUnavailable`. Only people
+the group; a mentioned member who cannot take part is a 409 `CoreError.Conflict` (`ParticipantUnavailable`). Only people
 write messages and keep read positions: an agent principal gets 403. A read position past the
-thread's latest activity is a 409 `ReadStateService.BeyondTimeline` carrying the latest sequence. A
+thread's latest activity is a 409 `CoreError.Conflict` (`BeyondTimeline`) carrying the latest sequence. A
 direct group's members are fixed and it has nothing to follow, so adding, removing, and following
 there are 409s; unfollowing an ended participation or removing an ended admission is also a 409.
 Positions, read times, and what they saw reach the caller's sessions as signals on the change feed,
@@ -238,10 +238,10 @@ the caller cannot read, answers 404 as a missing one does.
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET …/groups/:groupId/tasks?limit&status&before` | The group's readable tasks, newest created first, of one `status` when given, each as a thread list item with its task; `before` is JSON of the last item's task `{ createdAt, threadId }`. |
 | `GET …/threads/:threadId/task`                    | The thread's task.                                                                                                                                                                          |
-| `POST …/threads/:threadId/task`                   | Make the conversation a task from `{ status?, priority?, assignee? }` under `task.create` on the group; 201. A thread that is a task is 409 `AlreadyTask`.                                  |
+| `POST …/threads/:threadId/task`                   | Make the conversation a task from `{ status?, priority?, assignee? }` under `task.create` on the group; 201. A thread that is a task is 409 (`AlreadyTask`).                                |
 | `PATCH …/threads/:threadId/task`                  | Change the task by `{ change }`, a `Status`, `Assignee`, or `Priority` change with `from` and `to`, under `task.update`; returns it. A stale `from` is 409 `CoreError.Changed`.             |
 
-An assignee who cannot take part in the thread is a 409 `ParticipantUnavailable`, and assigning an
+An assignee who cannot take part in the thread is a 409 `CoreError.Conflict` (`ParticipantUnavailable`), and assigning an
 agent needs `agent.use` on it (403 otherwise). Timeline items `{ activity }` of kind `task.created`
 carry the task's initial values in their details, and `task.updated` the change.
 
@@ -307,13 +307,13 @@ Turn paths sit under `/workspaces/:workspaceId` and require active membership. A
 turn of an agent on the work asked of it in a thread; the
 [core turns section](../core/README.md#turns) describes the rules.
 
-| Endpoint                         | Operation                                                                                     |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `GET …/active-turns`             | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
-| `GET …/turns/:turnId`            | One turn.                                                                                     |
-| `GET …/turns/:turnId/log/events` | Follow the turn's log as server-sent events, until the turn ends; see below.                  |
-| `POST …/turns/:turnId/cancel`    | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
-| `POST …/turns/:turnId/retry`     | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
+| Endpoint                         | Operation                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET …/active-turns`             | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.                 |
+| `GET …/turns/:turnId`            | One turn.                                                                                        |
+| `GET …/turns/:turnId/log/events` | Follow the turn's log as server-sent events, until the turn ends; see below.                     |
+| `POST …/turns/:turnId/cancel`    | Ask an active turn to stop; a queued one stops at once. A finished one is 409 (`TurnNotActive`). |
+| `POST …/turns/:turnId/retry`     | Run a failed or stopped turn again as a new turn, 201; otherwise 409 (`NotRetryable`) with why.  |
 
 Following a turn's log streams `Turn.LogMessage`s as the log grows, for a caller who may open the
 thread. `Opened` starts every subscription with the log's `items` as they stand: the messages the
@@ -352,11 +352,12 @@ route. A channel is a connection's external conversations as threads in one grou
 ## Errors
 
 Workspace IDs travel in the path so a host can route a request to the right workspace before reading
-its body. Status codes follow `ApiErrors`: not a member, denied delegation and wrong recipients are
-403; missing records are 404; ownership protection, stale assignment changes, inactive recipients,
-repeated removal, existing membership, members who cannot take part, fixed direct groups, and
-storage conflicts are 409; consumed or expired invitations are 410; rejected input, expiry, or
-permission names are 400; and an uncertain commit is 500 with its commit ID. The gateway's public
+its body. Status codes follow `ApiErrors`, one for each of core's kinds: `CoreError.Denied`, a
+refusal of the caller with its reason, is 403; `CoreError.NotFound` is 404; `CoreError.Changed`, a
+stale expectation, and `CoreError.Conflict`, a request the state of what it acts on refuses, with
+its reason, are 409; and `CoreError.Unavailable`, what cannot be reached now, such as storage
+another writer held, is 503. Fixed direct groups and rosters are 409; rejected input, expiry, or
+permission names are 400; too many streams 429; and an uncertain commit is 500 with its commit ID. The gateway's public
 outcomes are listed in [gateway](../gateway/README.md#public-outcomes); `ApiErrors` is this
 contract's error namespace.
 
@@ -428,8 +429,8 @@ Each endpoint group has two modules: one declaring it, such as `InvitationsGroup
 implementing it, `InvitationsHandlers.ts`, kept apart so a client that imports a group loads no
 handler. Keep `Api` as the aggregate contract, group classes such as `MembersGroup` as
 declarations, and `ApiErrors` as the canonical error namespace. Resource-specific names such as
-`InvitationNotOwner`, `InvitationUnavailable`, and `InvitationInvalidExpiry` identify the source of
-an outcome within that shared namespace. Their serialized error tags stay the tags declared by core
+`InvitationInvalidExpiry` and `AgentIncomplete` identify the source of an outcome within that
+shared namespace. Their serialized error tags stay the tags declared by core
 or gateway.
 
 Public response schemas use stable identifiers in OpenAPI. Status-specific variants are named here,

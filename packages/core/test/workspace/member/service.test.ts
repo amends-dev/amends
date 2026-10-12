@@ -432,7 +432,8 @@ it.effect(
       });
       const beforeRepeat = yield* fixture.snapshot;
       expect(yield* run(fixture, remove(bob.id).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberService.AlreadyRemoved",
+        _tag: "CoreError.Conflict",
+        reason: { _tag: "AlreadyEnded", resource: "Member" },
       });
       expect(yield* fixture.snapshot).toEqual(beforeRepeat);
     }),
@@ -473,9 +474,8 @@ it.effect(
       });
       for (const actor of [alice, agent]) {
         expect(yield* run(fixture, remove(alice.memberId).pipe(Effect.flip), actor)).toMatchObject({
-          _tag: "MemberService.OwnerProtected",
-          workspaceId,
-          memberId: alice.memberId,
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "OwnerProtected" },
         });
       }
       expect(yield* fixture.snapshot).toEqual(authorized);

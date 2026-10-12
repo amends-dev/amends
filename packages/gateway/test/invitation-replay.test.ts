@@ -140,7 +140,10 @@ describe("invitation replay", () => {
             expect(results.filter((result) => Result.isSuccess(result))).toHaveLength(1);
             expect(results.find((result) => Result.isFailure(result))).toMatchObject({
               _tag: "Failure",
-              failure: { _tag: "MemberService.AlreadyRemoved" },
+              failure: {
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "AlreadyEnded", resource: "Member" },
+              },
             });
             const after = yield* bound.store.read(journalLog, { limit: 20 });
             expect(after).toHaveLength(before.length + 1);
@@ -156,8 +159,8 @@ describe("invitation replay", () => {
                   Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
                 ),
               ).toMatchObject({
-                _tag: "InvitationService.Unavailable",
-                reason: "revoked",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "revoked" },
               });
             }
             expect(yield* bound.invitations.get(unrelated.details.id)).toEqual(
@@ -192,8 +195,8 @@ describe("invitation replay", () => {
                   Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
                 ),
               ).toMatchObject({
-                _tag: "InvitationService.Unavailable",
-                reason: "revoked",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "revoked" },
               });
           }),
         ),

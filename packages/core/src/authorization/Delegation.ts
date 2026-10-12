@@ -25,18 +25,10 @@ import * as Requirement from "./Requirement.ts";
 import * as BuiltinRoles from "./BuiltinRoles.ts";
 import * as Role from "./Role.ts";
 import * as RoleStore from "./RoleStore.ts";
-import { OwnerProtected, UnsupportedRole } from "./internal/delegation-errors.ts";
+import { UnsupportedRole } from "./internal/delegation-errors.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The owner is out of reach: Owner is given by ownership transfer alone, and the owner's own
-   * roles are changed by no one.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  OwnerProtected,
   /**
    * The role is not one of the three built-in ones; no other role is delegated.
    *
@@ -60,7 +52,7 @@ export type Error =
   | RoleStore.Failure
   | Schema.SchemaError
   | CoreError.Denied
-  | OwnerProtected
+  | CoreError.Conflict
   | UnsupportedRole
   | CoreError.NotFound;
 
@@ -139,9 +131,9 @@ export const recipientNeedsAssignments = (recipient: Recipient) =>
 export const recipientDenial = (
   recipient: Recipient,
   assignments: ReadonlyArray<Assignment.Assignment>,
-): OwnerProtected | CoreError.Denied | undefined => {
+): CoreError.Conflict | CoreError.Denied | undefined => {
   if (recipient.memberId === recipient.ownerId)
-    return new OwnerProtected({ workspaceId: recipient.workspaceId });
+    return new CoreError.Conflict({ reason: new CoreError.OwnerProtected() });
   if (!recipientNeedsAssignments(recipient)) return undefined;
   return assignments.some(
     ({ source }) =>
@@ -212,7 +204,8 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId }),
     ]);
-    if (roleId === BuiltinRoles.OwnerId) return yield* new OwnerProtected({ workspaceId });
+    if (roleId === BuiltinRoles.OwnerId)
+      return yield* new CoreError.Conflict({ reason: new CoreError.OwnerProtected() });
     const role = yield* loadRole(roleId);
     if (
       roleId === BuiltinRoles.AdministratorId &&
@@ -269,11 +262,10 @@ export const layer = Layer.effect(Delegation, make());
  * @category errors
  * @since 0.1.0
  */
-export type Refusal = CoreError.Denied | OwnerProtected;
+export type Refusal = CoreError.Denied | CoreError.Conflict;
 
 const isRefusal = (error: unknown): error is Refusal =>
-  Predicate.isTagged(error, "CoreError.Denied") ||
-  Predicate.isTagged(error, "Delegation.OwnerProtected");
+  Predicate.isTagged(error, "CoreError.Denied") || Predicate.isTagged(error, "CoreError.Conflict");
 
 /**
  * Whether a check of authorization and delegation allows the actor: `false` when it refuses them,

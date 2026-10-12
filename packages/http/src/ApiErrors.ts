@@ -3,28 +3,20 @@
  * its HTTP status, and the lists of them that groups spread into an endpoint's `error`. Core
  * declares no transport concerns, so the status lives here, on the contract's view of each error,
  * and the serialized tag stays the one core or the gateway declares. A name that would be ambiguous
- * in the shared namespace says its source, such as `InvitationUnavailable` or `TurnNotActive`.
+ * in the shared namespace says its source, such as `InvitationInvalidExpiry` or `AgentIncomplete`.
  * `TooManyStreams` is the contract's own, and `requestKey` is the `Idempotency-Key` header a
  * creating endpoint accepts.
  *
  * @since 0.1.0
  */
-import { AssignmentService, Delegation } from "@amends-dev/core/authorization";
-import { InvitationService, MemberService, OwnershipService } from "@amends-dev/core/workspace";
+import { Delegation } from "@amends-dev/core/authorization";
+import { InvitationService } from "@amends-dev/core/workspace";
 import * as GatewayErrors from "@amends-dev/gateway/GatewayErrors";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
 import { AgentService } from "@amends-dev/core/agent";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
-import { TurnService } from "@amends-dev/core/turn";
 import { ConnectionService } from "@amends-dev/core/connection";
-import { NotificationService } from "@amends-dev/core/notification";
-import { ReadStateService } from "@amends-dev/core/read-state";
-import { TaskService } from "@amends-dev/core/task";
-import {
-  ThreadService,
-  ThreadMessageService,
-  ThreadParticipationService,
-} from "@amends-dev/core/thread";
+import { ThreadService, ThreadParticipationService } from "@amends-dev/core/thread";
 import { Request } from "@amends-dev/core/request";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/http-api";
@@ -68,6 +60,14 @@ export const Changed = CoreError.Changed.pipe(HttpApiSchema.status(409));
  */
 export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403));
 /**
+ * The state of what the caller acts on refuses the request, for the `reason` given, such as a
+ * member already in the group, a turn that already finished, or an invitation no longer open: 409.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const Conflict = CoreError.Conflict.pipe(HttpApiSchema.status(409));
+/**
  * What the operation needs cannot be reached or used now, for the `reason` given, such as storage
  * another writer held or a host that keeps no keys: 503.
  *
@@ -101,43 +101,6 @@ export const Uncertain = GatewayErrors.Uncertain.pipe(HttpApiSchema.status(500))
  */
 export const InvalidInput = GatewayErrors.InvalidInput.pipe(HttpApiSchema.status(400));
 /**
- * The notification was already settled otherwise, so it is not marked seen; 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const NotificationAlreadyHandled = NotificationService.AlreadyHandled.pipe(
-  HttpApiSchema.status(409),
-);
-/**
- * The member is the current owner, who is not removed until ownership is transferred; 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const OwnerProtected = MemberService.OwnerProtected.pipe(HttpApiSchema.status(409));
-/**
- * The member was removed already; 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const AlreadyRemoved = MemberService.AlreadyRemoved.pipe(HttpApiSchema.status(409));
-/**
- * The invitation's recipient is an active member already; 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const AlreadyMember = InvitationService.AlreadyMember.pipe(HttpApiSchema.status(409));
-/**
- * The invitation was accepted, revoked, or has expired, as its `reason` says; 410.
- *
- * @category errors
- * @since 0.1.0
- */
-export const InvitationUnavailable = InvitationService.Unavailable.pipe(HttpApiSchema.status(410));
-/**
  * The invitation would expire no later than it is issued; 400.
  *
  * @category errors
@@ -156,7 +119,7 @@ export const InvitationInvalidExpiry = InvitationService.InvalidExpiry.pipe(
  */
 export const delegation = [
   Denied,
-  Delegation.OwnerProtected.pipe(HttpApiSchema.status(409)),
+  Conflict,
   Delegation.UnsupportedRole.pipe(HttpApiSchema.status(400)),
   NotFound,
 ] as const;
@@ -166,13 +129,7 @@ export const delegation = [
  * @category errors
  * @since 0.1.0
  */
-export const invitation = [
-  ...delegation,
-  Denied,
-  AlreadyMember,
-  InvitationUnavailable,
-  InvitationInvalidExpiry,
-] as const;
+export const invitation = [...delegation, Conflict, InvitationInvalidExpiry] as const;
 /**
  * Reading a member's access, with the delegation rules it shows: a missing member is 404, and one
  * no longer active 409.
@@ -180,10 +137,7 @@ export const invitation = [
  * @category errors
  * @since 0.1.0
  */
-export const assignmentRead = [
-  ...delegation,
-  AssignmentService.InactiveMember.pipe(HttpApiSchema.status(409)),
-] as const;
+export const assignmentRead = [...delegation, Conflict] as const;
 /**
  * Assignment outcomes: those of reading a member's access, and a missing assignment, 404, or
  * access that changed since the caller read it, 409.
@@ -201,12 +155,7 @@ export const assignment = [...assignmentRead, Changed] as const;
  * @category errors
  * @since 0.1.0
  */
-export const ownership = [
-  Denied,
-  NotFound,
-  OwnershipService.InvalidRecipient.pipe(HttpApiSchema.status(409)),
-  Changed,
-] as const;
+export const ownership = [Denied, NotFound, Conflict, Changed] as const;
 
 /**
  * Group outcomes. A group the caller does not belong to is indistinguishable from a missing one,
@@ -216,10 +165,7 @@ export const ownership = [
  * @category errors
  * @since 0.1.0
  */
-export const group = [
-  NotFound,
-  GroupService.InactiveMember.pipe(HttpApiSchema.status(409)),
-] as const;
+export const group = [NotFound, Conflict] as const;
 /**
  * A direct group is named by its members and refuses a name with 409.
  *
@@ -237,9 +183,7 @@ export const NotRenamable = GroupService.NotRenamable.pipe(HttpApiSchema.status(
  */
 export const groupMembership = [
   NotFound,
-  GroupMembershipService.InactiveMember.pipe(HttpApiSchema.status(409)),
-  GroupMembershipService.AlreadyMember.pipe(HttpApiSchema.status(409)),
-  GroupMembershipService.AlreadyRemoved.pipe(HttpApiSchema.status(409)),
+  Conflict,
   GroupMembershipService.FixedMembership.pipe(HttpApiSchema.status(409)),
   GroupMembershipService.GeneralMembership.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -254,7 +198,7 @@ export const groupMembership = [
 export const groupFollow = [
   NotFound,
   Denied,
-  GroupFollowService.MemberUnavailable.pipe(HttpApiSchema.status(409)),
+  Conflict,
   GroupFollowService.NotFollowable.pipe(HttpApiSchema.status(409)),
 ] as const;
 
@@ -269,7 +213,7 @@ export const groupFollow = [
 export const thread = [
   NotFound,
   Denied,
-  ThreadService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+  Conflict,
   ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
 ] as const;
 /**
@@ -279,11 +223,7 @@ export const thread = [
  * @category errors
  * @since 0.1.0
  */
-export const message = [
-  NotFound,
-  Denied,
-  ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
-] as const;
+export const message = [NotFound, Denied, Conflict] as const;
 /**
  * Editing a message: a missing one, or one in a thread outside the caller's groups, is 404; one
  * someone else wrote is 403; a deleted one, a stale revision, and an unavailable mention are 409.
@@ -291,13 +231,7 @@ export const message = [
  * @category errors
  * @since 0.1.0
  */
-export const messageEdit = [
-  NotFound,
-  Denied,
-  ThreadMessageService.Deleted.pipe(HttpApiSchema.status(409)),
-  Changed,
-  ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
-] as const;
+export const messageEdit = [NotFound, Denied, Conflict, Changed] as const;
 /**
  * Deleting a message: a missing or unreadable one is 404; an agent principal is 403.
  *
@@ -321,7 +255,7 @@ export const typing = [NotFound] as const;
  */
 export const participation = [
   NotFound,
-  ThreadParticipationService.AlreadyEnded.pipe(HttpApiSchema.status(409)),
+  Conflict,
   ThreadParticipationService.FixedParticipation.pipe(HttpApiSchema.status(409)),
 ] as const;
 
@@ -341,11 +275,7 @@ export const taskRead = [NotFound] as const;
  * @category errors
  * @since 0.1.0
  */
-export const taskCreate = [
-  NotFound,
-  TaskService.AlreadyTask.pipe(HttpApiSchema.status(409)),
-  TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
-] as const;
+export const taskCreate = [NotFound, Conflict] as const;
 /**
  * Changing a task: a thread missing, unreadable, or without a task is 404; a value that changed
  * meanwhile, and an assignee who cannot take part, are 409.
@@ -353,11 +283,7 @@ export const taskCreate = [
  * @category errors
  * @since 0.1.0
  */
-export const taskUpdate = [
-  NotFound,
-  Changed,
-  TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
-] as const;
+export const taskUpdate = [NotFound, Changed, Conflict] as const;
 
 /**
  * Read-state outcomes: only people keep it, and a position cannot pass the latest activity.
@@ -365,11 +291,7 @@ export const taskUpdate = [
  * @category errors
  * @since 0.1.0
  */
-export const readState = [
-  Denied,
-  NotFound,
-  ReadStateService.BeyondTimeline.pipe(HttpApiSchema.status(409)),
-] as const;
+export const readState = [Denied, NotFound, Conflict] as const;
 
 /**
  * The integration is not installed on this host.
@@ -413,21 +335,6 @@ export const AgentConnectionUnavailable = AgentService.ConnectionUnavailable.pip
  * @since 0.1.0
  */
 export const AgentIncomplete = AgentService.Incomplete.pipe(HttpApiSchema.status(422));
-
-/**
- * The turn has already finished, so there is nothing to stop.
- *
- * @category errors
- * @since 0.1.0
- */
-export const TurnNotActive = TurnService.NotActive.pipe(HttpApiSchema.status(409));
-/**
- * The turn can't run again, for the reason given.
- *
- * @category errors
- * @since 0.1.0
- */
-export const TurnNotRetryable = TurnService.NotRetryable.pipe(HttpApiSchema.status(409));
 
 /**
  * Outcomes every operation in a workspace shares: authorization, input, and storage.

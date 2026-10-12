@@ -45,8 +45,8 @@ export class MembersGroup extends HttpApiGroup.make("members")
       success: Member.Member,
       error: [
         ...ApiErrors.workspace,
-        ApiErrors.OwnerProtected,
-        ApiErrors.AlreadyRemoved,
+        ApiErrors.Conflict,
+        ApiErrors.Conflict,
         ...ApiErrors.delegation,
       ],
     }),

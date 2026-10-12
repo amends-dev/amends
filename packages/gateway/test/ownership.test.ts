@@ -132,7 +132,7 @@ describe("ownership", () => {
             expect((yield* Operations.ownership(workspace.id, bob)).canTransfer).toBe(true);
             expect(
               yield* Effect.flip(Operations.removeMember(workspace.id, alice, recipient.id)),
-            ).toMatchObject({ _tag: "MemberService.OwnerProtected" });
+            ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "OwnerProtected" } });
             expect(
               yield* Effect.flip(
                 Operations.assign(workspace.id, alice, {
@@ -172,9 +172,9 @@ describe("ownership", () => {
             const elsewhere = yield* Operations.createWorkspace(alice.id);
             const before = yield* bound.store.read(journalLog, { limit: 30 });
             for (const [memberId, tag] of [
-              [workspace.ownerMemberId, "OwnershipService.InvalidRecipient"],
-              [other.id, "OwnershipService.InvalidRecipient"],
-              [agentId, "OwnershipService.InvalidRecipient"],
+              [workspace.ownerMemberId, "CoreError.Conflict"],
+              [other.id, "CoreError.Conflict"],
+              [agentId, "CoreError.Conflict"],
               [elsewhere.ownerMemberId, "CoreError.NotFound"],
             ] as const) {
               expect(

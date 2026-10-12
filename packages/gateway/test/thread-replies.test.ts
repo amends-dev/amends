@@ -495,7 +495,11 @@ describe("thread replies", () => {
             for (const memberId of [otherId, Member.Id.make("missing")])
               expect(
                 yield* Effect.flip(run(bound, owner, reply(first.thread.id, [memberId]))),
-              ).toEqual(new ThreadMessageService.ParticipantUnavailable({ memberId }));
+              ).toEqual(
+                new CoreError.Conflict({
+                  reason: new CoreError.ParticipantUnavailable({ memberId }),
+                }),
+              );
             for (const operation of [
               reply(first.thread.id, [], " \n"),
               reply(first.thread.id, [humanId, humanId]),
@@ -541,7 +545,11 @@ describe("thread replies", () => {
             );
             expect(
               yield* Effect.flip(run(bound, owner, reply(first.thread.id, [humanId]))),
-            ).toEqual(new ThreadMessageService.ParticipantUnavailable({ memberId: humanId }));
+            ).toEqual(
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: humanId }),
+              }),
+            );
             expect(yield* Effect.flip(run(bound, human, reply(first.thread.id)))).toMatchObject({
               _tag: "CoreError.Denied",
               reason: { _tag: "InvalidActor" },
@@ -914,7 +922,10 @@ describe("thread replies", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(first.thread.id, [otherId])),
             ),
-          ).toMatchObject({ _tag: "ThreadMessageService.ParticipantUnavailable" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "ParticipantUnavailable" },
+          });
           expect(
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(Thread.Id.make("missing"))),
@@ -1064,9 +1075,7 @@ describe("thread replies", () => {
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(
-                    /^(Store.Conflict|ThreadMessageService.ParticipantUnavailable)$/,
-                  ),
+                  _tag: expect.stringMatching(/^(Store.Conflict|CoreError.Conflict)$/),
                 },
               });
           yield* Effect.scoped(
@@ -1100,7 +1109,10 @@ describe("thread replies", () => {
                   yield* Effect.flip(
                     run(bound, saved.owner, reply(saved.first.thread.id, [agentId])),
                   ),
-                ).toMatchObject({ _tag: "ThreadMessageService.ParticipantUnavailable" });
+                ).toMatchObject({
+                  _tag: "CoreError.Conflict",
+                  reason: { _tag: "ParticipantUnavailable" },
+                });
                 expect(yield* snapshot(bound, saved.first.thread.id)).toEqual(before);
               }),
             ),
@@ -1367,8 +1379,10 @@ describe("thread replies", () => {
                 edit(human, messageId, "Again", [otherId, Member.Id.make("nobody")], 2),
               ),
             ).toEqual(
-              new ThreadMessageService.ParticipantUnavailable({
-                memberId: Member.Id.make("nobody"),
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({
+                  memberId: Member.Id.make("nobody"),
+                }),
               }),
             );
             expect(yield* history(bound)).toHaveLength(before.length + 2);
@@ -1401,7 +1415,7 @@ describe("thread replies", () => {
             // A deleted message has no text to edit, and is deleted once; it no longer counts
             // as a reply, and deleting the opening message leaves the thread its title alone.
             expect(yield* Effect.flip(edit(human, messageId, "Back", [], 2))).toEqual(
-              new ThreadMessageService.Deleted({ messageId }),
+              new CoreError.Conflict({ reason: new CoreError.Deleted({ messageId }) }),
             );
             expect(yield* remove(human, messageId)).toEqual(deleted);
             expect(yield* history(bound)).toHaveLength(before.length + 3);

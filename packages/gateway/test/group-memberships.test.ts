@@ -405,8 +405,8 @@ describe("group memberships", () => {
               [foreignGroup.id, humanId, "CoreError.NotFound"],
               [group.id, Member.Id.make("missing"), "CoreError.NotFound"],
               [group.id, otherWorkspace.ownerMemberId, "CoreError.NotFound"],
-              [group.id, agentId, "GroupMembershipService.InactiveMember"],
-              [group.id, humanId, "GroupMembershipService.AlreadyMember"],
+              [group.id, agentId, "CoreError.Conflict"],
+              [group.id, humanId, "CoreError.Conflict"],
             ] as const)
               expect(yield* Effect.flip(run(bound, owner, add(groupId, memberId)))).toMatchObject({
                 _tag: tag,
@@ -716,7 +716,8 @@ describe("group memberships", () => {
             ),
           );
           expect(yield* Effect.flip(afterRemoval)).toMatchObject({
-            _tag: "GroupMembershipService.InactiveMember",
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "InactiveMember" },
           });
           expect(yield* history(bound)).toEqual(before);
           expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
@@ -829,9 +830,7 @@ describe("group memberships", () => {
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               _tag: "Some",
               value: {
-                _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyMember|Store.Conflict)$/,
-                ),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|Store.Conflict)$/),
               },
             });
         }
@@ -898,9 +897,11 @@ describe("group memberships", () => {
             yield* grant(bound, group.id);
             yield* call(humanId);
             expect(yield* Effect.flip(call(humanId))).toEqual(
-              new GroupMembershipService.AlreadyMember({
-                groupId: group.id,
-                memberId: humanId,
+              new CoreError.Conflict({
+                reason: new CoreError.AlreadyMember({
+                  groupId: group.id,
+                  memberId: humanId,
+                }),
               }),
             );
             expect(yield* Effect.flip(call(Member.Id.make("missing")))).toEqual(
@@ -916,7 +917,9 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(call(agentId))).toEqual(
-              new GroupMembershipService.InactiveMember({ memberId: agentId }),
+              new CoreError.Conflict({
+                reason: new CoreError.InactiveMember({ memberId: agentId }),
+              }),
             );
             const missing = Group.Id.make("missing");
             expect(
@@ -1050,7 +1053,8 @@ describe("group memberships", () => {
                 Object.assign({}, admission, { status: "removed" }),
               );
               expect(yield* Effect.flip(run(bound, actor, leave(admission)))).toMatchObject({
-                _tag: "GroupMembershipService.AlreadyRemoved",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
               });
               expect(
                 yield* Effect.flip(run(bound, actor, add(group.id, actor.memberId))),
@@ -1198,10 +1202,12 @@ describe("group memberships", () => {
             );
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, owner, remove(old)))).toMatchObject({
-              _tag: "GroupMembershipService.AlreadyRemoved",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
             });
             expect(yield* Effect.flip(run(bound, actor, leave(old)))).toMatchObject({
-              _tag: "GroupMembershipService.AlreadyRemoved",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
             });
             for (const input of [
               { groupId: group.id, membershipId: GroupMembership.Id.make("missing") },
@@ -1347,7 +1353,10 @@ describe("group memberships", () => {
             const before = yield* history(bound);
             expect(
               yield* Effect.flip(run(bound, owner, removeWorkspaceMember(humanId))),
-            ).toMatchObject({ _tag: "MemberService.AlreadyRemoved" });
+            ).toMatchObject({
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "Member" },
+            });
             expect(yield* history(bound)).toEqual(before);
           }),
         ),
@@ -1604,9 +1613,7 @@ describe("group memberships", () => {
           if (Exit.isFailure(outcome))
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               value: {
-                _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyRemoved|Store.Conflict)$/,
-                ),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|Store.Conflict)$/),
               },
             });
         yield* Effect.scoped(
@@ -1681,9 +1688,7 @@ describe("group memberships", () => {
             if (Exit.isFailure(outcome))
               expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(
-                    /^(GroupMembershipService.InactiveMember|Store.Conflict)$/,
-                  ),
+                  _tag: expect.stringMatching(/^(CoreError.Conflict|Store.Conflict)$/),
                 },
               });
           yield* Effect.scoped(
@@ -1817,9 +1822,11 @@ describe("group memberships", () => {
             expect(
               yield* Effect.flip(gateway.asMember(workspace.id, managerIdentity, leave(admission))),
             ).toEqual(
-              new GroupMembershipService.AlreadyRemoved({
-                groupId: group.id,
-                membershipId: admission.id,
+              new CoreError.Conflict({
+                reason: new CoreError.AlreadyEnded({
+                  resource: "GroupMembership",
+                  id: admission.id,
+                }),
               }),
             );
             expect(
@@ -1838,7 +1845,10 @@ describe("group memberships", () => {
             );
             expect(
               yield* Effect.flip(gateway.asMember(workspace.id, ownerIdentity, remove(admission))),
-            ).toMatchObject({ _tag: "GroupMembershipService.AlreadyRemoved" });
+            ).toMatchObject({
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
+            });
           }),
         ),
       ),

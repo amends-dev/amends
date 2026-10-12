@@ -8,7 +8,7 @@ describe("workspaceFailure", () => {
     expect(failure("CoreError.Changed")).toBe("changed");
     expect(failure("CoreError.Unavailable")).toBe("failed");
     expect(failure("CoreError.Denied")).toBe("denied");
-    expect(failure("MemberService.AlreadyRemoved")).toBe("gone");
+    expect(failure("CoreError.Conflict")).toBe("changed");
     expect(failure("GatewayErrors.InvalidInput")).toBe("invalid");
     expect(workspaceFailure(Cause.fail(new InvalidCommand({ message: "Expected a string" })))).toBe(
       "invalid",

@@ -29,30 +29,10 @@ import * as GroupStore from "./GroupStore.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
-import {
-  AlreadyMember,
-  AlreadyRemoved,
-  FixedMembership,
-  GeneralMembership,
-  InactiveMember,
-} from "./internal/group-membership-errors.ts";
+import { FixedMembership, GeneralMembership } from "./internal/group-membership-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 
 export {
-  /**
-   * The member to add already holds an active admission to the group; nothing is recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyMember,
-  /**
-   * The admission has already ended; repeating a departure records nothing.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyRemoved,
   /**
    * A direct group's members never change; including someone else needs another direct group.
    *
@@ -68,13 +48,6 @@ export {
    * @since 0.1.0
    */
   GeneralMembership,
-  /**
-   * The member to add is no longer active in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InactiveMember,
 } from "./internal/group-membership-errors.ts";
 
 /**
@@ -95,9 +68,7 @@ export type Error =
   | Log.WriteError
   | Projection.Error
   | CoreError.NotFound
-  | InactiveMember
-  | AlreadyMember
-  | AlreadyRemoved
+  | CoreError.Conflict
   | FixedMembership
   | GeneralMembership;
 
@@ -229,9 +200,14 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
       const member = yield* memberStore.get(memberId);
       if (Option.isNone(member))
         return yield* new CoreError.NotFound({ resource: "Member", id: memberId });
-      if (member.value.status !== "active") return yield* new InactiveMember({ memberId });
+      if (member.value.status !== "active")
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InactiveMember({ memberId }),
+        });
       if (Option.isSome(yield* groupMembershipStore.findActive(groupId, memberId)))
-        return yield* new AlreadyMember({ groupId, memberId });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.AlreadyMember({ groupId, memberId }),
+        });
       return yield* admitMember(groupId, memberId);
     },
     Publication.withActor,
@@ -275,9 +251,8 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     reason: "removed" | "left",
   ) {
     if (membership.status === "removed")
-      return yield* new AlreadyRemoved({
-        groupId: membership.groupId,
-        membershipId: membership.id,
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.AlreadyEnded({ resource: "GroupMembership", id: membership.id }),
       });
     const occurredAt = yield* DateTime.now;
     yield* groupCommand.removeMembership(

@@ -176,15 +176,16 @@ export const issueOf = (issue: Agent.Issue): AgentIssue => {
 
 const connectionUnavailable = Schema.is(ApiErrors.AgentConnectionUnavailable);
 const incomplete = Schema.is(ApiErrors.AgentIncomplete);
-const ownerRule = Schema.is(Schema.Union([Delegation.OwnerProtected, Delegation.UnsupportedRole]));
+const unsupportedRole = Schema.is(Delegation.UnsupportedRole);
 /**
  * The role the setup gives is refused: only the owner gives it, the owner is out of reach, or the
  * role is not one this workspace gives.
  */
 const roleRefused = (error: unknown) =>
   (Schema.is(ApiErrors.Denied)(error) && error.reason._tag === "OwnerRequired") ||
+  (Schema.is(ApiErrors.Conflict)(error) && error.reason._tag === "OwnerProtected") ||
   (Schema.is(ApiErrors.NotFound)(error) && error.resource === "Role") ||
-  ownerRule(error);
+  unsupportedRole(error);
 
 /**
  * Why a change failed, telling apart a connection the setup names that the reader can't use, a

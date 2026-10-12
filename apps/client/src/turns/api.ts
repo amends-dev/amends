@@ -73,8 +73,10 @@ const refusals = {
 export const turnRefusal = (cause: Cause.Cause<unknown>): TurnProblem | undefined => {
   for (const reason of cause.reasons) {
     if (!Cause.isFailReason(reason)) continue;
-    if (Schema.is(ApiErrors.TurnNotActive)(reason.error)) return "finished";
-    if (Schema.is(ApiErrors.TurnNotRetryable)(reason.error)) return refusals[reason.error.reason];
+    if (!Schema.is(ApiErrors.Conflict)(reason.error)) continue;
+    const refusal = reason.error.reason;
+    if (refusal._tag === "TurnNotActive") return "finished";
+    if (refusal._tag === "NotRetryable") return refusals[refusal.reason];
   }
   return undefined;
 };

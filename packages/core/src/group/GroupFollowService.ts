@@ -26,16 +26,9 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollow from "./GroupFollow.ts";
 import * as GroupFollowFacts from "./GroupFollowFacts.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
-import { MemberUnavailable, NotFollowable } from "./internal/group-follow-errors.ts";
+import { NotFollowable } from "./internal/group-follow-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * The named member is missing, inactive, or not a current member of the group.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberUnavailable,
   /**
    * A direct group's members already take part in all of its threads.
    *
@@ -64,7 +57,7 @@ export type Error =
   | Projection.Error
   | CoreError.NotFound
   | NotFollowable
-  | MemberUnavailable
+  | CoreError.Conflict
   | CoreError.Denied;
 
 /**
@@ -136,10 +129,14 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     const admission = yield* groupMembershipStore.findActive(group.id, request.memberId);
     const found = yield* memberStore.get(request.memberId);
     if (Option.isNone(admission) || Option.isNone(found))
-      return yield* new MemberUnavailable({ memberId: request.memberId });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.ParticipantUnavailable({ memberId: request.memberId }),
+      });
     const member = found.value;
     if (member.status !== "active")
-      return yield* new MemberUnavailable({ memberId: request.memberId });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.ParticipantUnavailable({ memberId: request.memberId }),
+      });
     if (!Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
       return yield* new CoreError.Denied({
         reason: new CoreError.AgentRequired({ memberId: request.memberId }),
