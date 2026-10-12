@@ -1,4 +1,5 @@
 import { Api, Authentication, BearerAuthentication, ChangeFeedHandlers } from "../src/index.ts";
+import * as WorkspaceMember from "../src/internal/workspace-member.ts";
 import type * as Core from "@amends-dev/core";
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
 import { Actor, Identity } from "@amends-dev/core/identity";
@@ -60,7 +61,7 @@ const client = HttpApiTest.groups(Api.Api, ["changeFeed"]).pipe(
   Effect.provide(
     Layer.mergeAll(
       ChangeFeedHandlers.layer.pipe(
-        Layer.provideMerge(BearerAuthentication.layer),
+        Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMember.layer)),
         Layer.provide(Layer.mergeAll(gateway, credentials)),
       ),
       HttpServer.layerServices,

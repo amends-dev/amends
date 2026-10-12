@@ -31,6 +31,14 @@ person may call fail with `CoreError.Denied` (`HumanRequired`) when the principa
 request without a credential the host accepts fails with `Unauthorized`. The contract does not
 define how credentials are issued; the `session` group asks the host's sign-in for one.
 
+`WorkspaceMember` is the middleware every endpoint a workspace member calls declares, after
+`Authentication`, which runs first. The server enters the workspace the path's `workspaceId` names,
+as the `Principal`'s active membership, through `Gateway.asMember`, and runs the handler there with
+core's operations and the `Actor`; a principal who is not a member gets 403 `CoreError.Denied`
+(`NotMember`). Groups whose every endpoint is a member's declare it once; invitations and workspaces
+declare it on each such endpoint, since accepting an invitation and creating a workspace have no
+membership to enter. Clients implement nothing for it.
+
 ## Endpoints
 
 - `session`: `GET /session/methods` lists the ways the host signs people in, `SignIn.Methods`:
@@ -373,14 +381,15 @@ services, then mounts the routes with `HttpRouter.serve` or `HttpRouter.toWebHan
 
 - `Routes.layer` registers every group, with the OpenAPI document at `/openapi.json`.
 - `Routes.layerDocs` serves interactive documentation at `/docs`.
-- `Routes.layerHandlers` is the group layers and authentication alone, for tests.
+- `Routes.layerHandlers` is the group layers and the middleware's server side alone, for tests.
 - `BearerAuthentication.make()` builds the contract's `Authentication` from
   `SessionTokens.SessionTokens`, and `BearerAuthentication.layer` provides it. Each request resolves
   its own bearer token and supplies its own `Principal` and `Credential`.
 
-Each workspace handler decodes the request, reads the `Principal` the authentication middleware
-provided, enters the workspace through `Gateway.asMember`, or `Gateway.inWorkspace` where no member
-acts, and calls one core service. Encoding, status codes, and error decoding come from the contract.
+Each workspace handler runs in the workspace `WorkspaceMember` entered and calls one core service,
+as `ThreadService.use((threadService) => threadService.get(params.threadId))` does; the two that no
+member calls, accepting an invitation and a channel's events, enter through `Gateway.inWorkspace`.
+Encoding, status codes, and error decoding come from the contract.
 Credential verification belongs to the middleware and domain rules to core; handlers only pass
 principals, paths, bodies, and `Idempotency-Key` headers into core's inputs, and refuse agents at
 the endpoints only a person may call.
@@ -391,8 +400,8 @@ The session and `me` handlers call the host's `SignIn`, `Accounts`, `WorkspaceDi
 `SessionTokens` directly; signing out revokes the request's `Credential`. Issuing an invitation
 finds or creates the account of the address it names before calling `InvitationService`, and the
 workspace accounts handler lists invitations, which authorizes the read, then reads the accounts of
-the members and recipients. Every other group enters a workspace and calls the core service it is
-named for: notifications call `NotificationService`, groups and threads call `GroupService`,
+the members and recipients. Every other group declares `WorkspaceMember` and calls the core service
+it is named for: notifications call `NotificationService`, groups and threads call `GroupService`,
 `GroupMembershipService`, `GroupFollowService`, `ThreadService`, `ThreadMessageService`,
 `ThreadParticipationService`, and `ReadStateService`, and so on for tasks, connections, agents,
 turns, and channels. A handler merges the path's IDs, the body, and any cursor into the operation's

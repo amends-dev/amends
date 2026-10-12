@@ -13,6 +13,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
 import { CoreError } from "@amends-dev/core/error";
@@ -59,5 +60,6 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
       error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId") {}

@@ -11,6 +11,7 @@ import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 const params = { workspaceId: Workspace.Id, memberId: Member.Id };
@@ -51,5 +52,6 @@ export class MembersGroup extends HttpApiGroup.make("members")
       ],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/members") {}

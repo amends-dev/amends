@@ -27,12 +27,13 @@ of `make` keeps that scope open for the gateway's lifetime. The gateway's operat
 - `createWorkspace(creator, input, options?)` creates a workspace with a required name and runs
   core's initialization for the creator. With `options.requestKey`, the workspace's ID derives from
   the creator and the key, so a retry returns what its first attempt created, whatever name it
-  gives. The caller has authenticated the creator and checked that they may create one. -
-  `asMember(workspaceId, identity, program)` resolves the identity's active membership into
+  gives. The caller has authenticated the creator and checked that they may create one.
+- `asMember(workspaceId, identity, program)` resolves the identity's active membership into
   `Actor.Actor`, binds the workspace, and runs the program. A non-member, or a workspace that does
   not exist, gets `CoreError.Denied` (`NotMember`) without the workspace being loaded. Programs may
   require only core's `Operations`, the actor, and `Scope`: stores, the journal, and authorization
-  are out of reach, so protocol code cannot bypass the checks inside each operation.
+  are out of reach, so protocol code cannot bypass the checks inside each operation. HTTP's
+  `WorkspaceMember` middleware runs each member request through it, once.
 - `inWorkspace(workspaceId, program)` is the same without an actor, for accepting an invitation,
   whose recipient is not yet a member, and for a host's [jobs](../core/README.md#jobs). Programs may
   require `Operations`, core's `JobServices`, and `Scope`. A workspace that was never created gets

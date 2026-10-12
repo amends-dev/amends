@@ -14,6 +14,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
 
@@ -130,5 +131,6 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       error: [...ApiErrors.workspace, ...ApiErrors.readState],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/groups") {}

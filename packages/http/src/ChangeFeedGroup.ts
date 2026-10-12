@@ -14,6 +14,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { CoreError } from "@amends-dev/core/error";
 
@@ -38,4 +39,5 @@ export class ChangeFeedGroup extends HttpApiGroup.make("changeFeed")
       error: [...ApiErrors.workspace, ApiErrors.TooManyStreams],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication) {}

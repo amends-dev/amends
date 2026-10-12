@@ -15,6 +15,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 const connection = { workspaceId: Workspace.Id, connectionId: Connection.Id };
@@ -93,5 +94,6 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/connections") {}

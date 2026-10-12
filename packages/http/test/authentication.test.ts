@@ -1,5 +1,11 @@
 import { expect, it } from "@effect/vitest";
-import { Api, Authentication, BearerAuthentication, MeHandlers } from "../src/index.ts";
+import {
+  Api,
+  Authentication,
+  BearerAuthentication,
+  MeHandlers,
+  WorkspaceMember,
+} from "../src/index.ts";
 import { Identity } from "@amends-dev/core/identity";
 import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway";
 import { Effect, Layer, Redacted, Ref } from "effect";
@@ -59,9 +65,15 @@ it.effect.each(["make", "layer"] as const)(
             return yield* next(HttpClientRequest.bearerToken(request, yield* Ref.get(token)));
           }),
         );
+        // These requests enter no workspace.
+        const workspaceMember = Layer.succeed(
+          WorkspaceMember.WorkspaceMember,
+          WorkspaceMember.WorkspaceMember.of(() => Effect.die("unused")),
+        );
         const services = Layer.mergeAll(
           MeHandlers.layer,
           clientAuthentication,
+          workspaceMember,
           HttpServer.layerServices,
         ).pipe(
           Layer.provideMerge(authentication),

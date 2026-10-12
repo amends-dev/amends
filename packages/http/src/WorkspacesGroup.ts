@@ -13,6 +13,7 @@ import { Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/worksp
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -28,18 +29,18 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       params: { workspaceId: Workspace.Id },
       success: WorkspaceSettings.View,
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
+    }).middleware(WorkspaceMember),
     HttpApiEndpoint.put("rename", "/:workspaceId/name", {
       params: { workspaceId: Workspace.Id },
       payload: WorkspaceSettings.RenameInput,
       success: Workspace.Workspace,
       error: [...ApiErrors.workspace, ApiErrors.Changed],
-    }),
+    }).middleware(WorkspaceMember),
     HttpApiEndpoint.get("members", "/:workspaceId/member-management", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(WorkspaceSettings.MemberEntry),
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
+    }).middleware(WorkspaceMember),
     HttpApiEndpoint.post("create", "/", {
       headers: ApiErrors.requestKey,
       payload: Workspace.CreateInput,
@@ -52,13 +53,13 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       params: { workspaceId: Workspace.Id },
       success: Ownership.View,
       error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
-    }),
+    }).middleware(WorkspaceMember),
     HttpApiEndpoint.post("transferOwnership", "/:workspaceId/ownership", {
       params: { workspaceId: Workspace.Id },
       payload: Ownership.TransferInput,
       success: Workspace.Workspace,
       error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
-    }),
+    }).middleware(WorkspaceMember),
   )
   .middleware(Authentication)
   .prefix("/workspaces") {}

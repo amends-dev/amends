@@ -14,6 +14,7 @@ import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -38,7 +39,7 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(Invitation.Invitation),
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
+    }).middleware(WorkspaceMember),
     HttpApiEndpoint.post("issue", "/", {
       params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
@@ -47,7 +48,7 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
         identifier: "IssuedWorkspaceInvitation",
       }),
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
+    }).middleware(WorkspaceMember),
     HttpApiEndpoint.post("accept", "/:invitationId/accept", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
       // What the recipient wants people in the workspace to call them.
@@ -59,7 +60,7 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
       success: Invitation.Invitation,
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
+    }).middleware(WorkspaceMember),
   )
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/invitations") {}

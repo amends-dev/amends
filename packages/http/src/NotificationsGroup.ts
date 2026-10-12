@@ -11,6 +11,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 const record = Notification.Notification.annotate({ identifier: "Notification" });
@@ -58,5 +59,6 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
       error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/notifications") {}

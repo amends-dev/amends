@@ -4,8 +4,8 @@ Conversations in groups: starting them, as tasks or not, renaming them, replying
 deleting messages, following, reading, tracking tasks, and the notifications and read state around
 them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadParticipationService`,
 `TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
-`Gateway.asMember`. The gateway preserves the outcomes named below and maps malformed input to
-`CoreError.Invalid` (`Malformed`). Storage and consistency failures remain failures. The [HTTP
+`Gateway.asMember`. Each reports the outcomes named below, and malformed input as
+`CoreError.Invalid` (`Malformed`); storage that fails otherwise is a defect. The [HTTP
 contract](../packages/http/README.md#conversations) exposes each operation under
 `/workspaces/:workspaceId`, with the status each outcome returns.
 

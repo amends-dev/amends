@@ -1,14 +1,13 @@
 /**
- * Implements `AccountsGroup`, the accounts behind a workspace's people. The handler enters the
- * workspace as the principal's membership through `Gateway.asMember`, lists the invitations
+ * Implements `AccountsGroup`, the accounts behind a workspace's people. In the workspace
+ * `WorkspaceMember` entered as the principal's membership, the handler lists the invitations
  * through `InvitationService.list`, which authorizes the read, and the members through
- * `MemberService.list`, then reads the accounts of the human members and the recipients through
- * the host's `Accounts.findByIds`. `Routes` composes its `layer` with the other groups'.
+ * `MemberService.list`, then reads the accounts of the human members and the recipients through the
+ * host's `Accounts.findByIds`. `Routes` composes its `layer` with the other groups'.
  *
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import { makeAsMember } from "./internal/as-member.ts";
 import { Identity } from "@amends-dev/core/identity";
 import { Invitation, InvitationService, Member, MemberService } from "@amends-dev/core/workspace";
 import { Accounts } from "@amends-dev/gateway";
@@ -26,22 +25,18 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "accounts",
   Effect.fn(function* (handlers) {
-    const asMember = yield* makeAsMember;
     const accounts = yield* Accounts.Accounts;
     return handlers.handleAll({
-      list: ({ params }) =>
-        asMember(
-          params.workspaceId,
-          Effect.gen(function* () {
-            const invitations = yield* InvitationService.InvitationService.use(
-              (invitationService) => invitationService.list,
-            );
-            const members = yield* MemberService.MemberService.use(
-              (memberService) => memberService.list,
-            );
-            return yield* accounts.findByIds(humanIdsOf(members, invitations));
-          }),
-        ),
+      list: () =>
+        Effect.gen(function* () {
+          const invitations = yield* InvitationService.InvitationService.use(
+            (invitationService) => invitationService.list,
+          );
+          const members = yield* MemberService.MemberService.use(
+            (memberService) => memberService.list,
+          );
+          return yield* accounts.findByIds(humanIdsOf(members, invitations));
+        }),
     });
   }),
 );

@@ -12,6 +12,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 const agent = { workspaceId: Workspace.Id, agentId: Agent.Id };
@@ -64,5 +65,6 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
       error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Changed],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/agents") {}

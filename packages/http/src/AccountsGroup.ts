@@ -13,6 +13,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -30,5 +31,6 @@ export class AccountsGroup extends HttpApiGroup.make("accounts")
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
   .prefix("/workspaces/:workspaceId/accounts") {}
