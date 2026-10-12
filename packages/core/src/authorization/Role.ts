@@ -25,8 +25,9 @@ export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceRoleId"));
 export type Id = typeof Id.Type;
 
 /**
- * A workspace-owned permission bundle. Assignments supply recipients and scopes. Permission
- * definitions and existing assignments must be checked when editing a role.
+ * A workspace-owned permission bundle; its assignments supply recipients and scopes. No member
+ * edits a role: only `BuiltinRoleUpgrade` renames one or replaces its permissions, bringing a
+ * built-in role to the host's revision.
  *
  * @category schemas
  * @since 0.1.0
