@@ -8,7 +8,7 @@ import * as Actor from "../../src/identity/Actor.ts";
 import * as Identity from "../../src/identity/Identity.ts";
 import * as Journal from "../../src/journal/Journal.ts";
 import * as Store from "../../src/journal/Store.ts";
-import * as ReadStateCommand from "../../src/read-state/ReadStateCommand.ts";
+import * as ReadStateStore from "../../src/read-state/ReadStateStore.ts";
 import * as SignalHub from "../../src/signal/SignalHub.ts";
 import * as Signal from "../../src/signal/Signal.ts";
 import * as ThreadCommand from "../../src/thread/ThreadCommand.ts";
@@ -100,7 +100,7 @@ const run = <A, E>(
               Layer.succeed(SignalHub.SignalHub, signalHub),
               Layer.succeed(Store.Store, (yield* make(workspaceId)).store),
               unused(ThreadCommand.ThreadCommand),
-              unused(ReadStateCommand.ReadStateCommand),
+              unused(ReadStateStore.ReadStateStore),
               unused(ThreadMessageStore.ThreadMessageStore),
               unused(Journal.Journal),
               unused(Crypto.Crypto),

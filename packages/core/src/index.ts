@@ -63,7 +63,6 @@ import * as GroupMembershipProjection from "./group/GroupMembershipProjection.ts
 import * as GroupFollowService from "./group/GroupFollowService.ts";
 import * as GroupFollowProjection from "./group/GroupFollowProjection.ts";
 import * as ReadStateService from "./read-state/ReadStateService.ts";
-import * as ReadStateCommand from "./read-state/ReadStateCommand.ts";
 import * as GroupMembershipService from "./group/GroupMembershipService.ts";
 import * as GroupMembershipPermissions from "./group/GroupMembershipPermissions.ts";
 import * as GroupPermissions from "./group/GroupPermissions.ts";
@@ -215,7 +214,6 @@ const taskCommand = TaskCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
 );
 const channelQuery = ChannelQuery.layer;
-const readStateCommand = ReadStateCommand.layer;
 const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
@@ -262,7 +260,6 @@ const operations = Layer.mergeAll(
       groupCommand,
       threadQuery,
       threadCommand,
-      readStateCommand,
       turnCommand,
       taskCommand,
       channelQuery,

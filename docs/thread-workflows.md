@@ -467,7 +467,7 @@ person has read a thread through a timeline position. It requires a human actor,
 access, and `thread.read`: missing and inaccessible threads return
 `ReadStateService.ThreadNotFound`, an agent returns `HumanRequired`, and a position past the
 latest activity returns `BeyondTimeline`. The position only moves forward. The reader's pending
-notifications from the thread up to that position become `Seen`. Reading a timeline does not mark
+notifications from the thread up to that position become `Seen` in the same write. Reading a timeline does not mark
 it read; clients call this for what they have shown.
 
 `markGroupRead({ groupId })` records that the acting person read a group now. It needs current

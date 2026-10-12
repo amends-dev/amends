@@ -22,7 +22,7 @@ import * as ThreadParticipation from "./ThreadParticipation.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as ThreadMessage from "./ThreadMessage.ts";
 import * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts";
-import * as ReadStateCommand from "../read-state/ReadStateCommand.ts";
+import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as Request from "../request/Request.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 import {
@@ -34,7 +34,6 @@ import {
   NotFound,
   ParticipantUnavailable,
 } from "./internal/thread-message-errors.ts";
-import * as Notification from "../notification/Notification.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
@@ -101,7 +100,8 @@ export {
  * @since 0.1.0
  */
 export type Error =
-  | ReadStateCommand.Error
+  | ReadStateStore.Failure
+  | ReadStateStore.Conflict
   | Authorization.Error
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
@@ -237,7 +237,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   const authorization = yield* Authorization.Authorization;
   const threadQuery = yield* ThreadQuery.ThreadQuery;
   const threadCommand = yield* ThreadCommand.ThreadCommand;
-  const readStateCommand = yield* ReadStateCommand.ReadStateCommand;
+  const readStateStore = yield* ReadStateStore.ReadStateStore;
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
   const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
@@ -363,10 +363,14 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           ),
         );
       // Replying reads the thread through the author's own message.
-      yield* readStateCommand.markThreadRead(
-        Notification.ofMember(actor.memberId, actor.identity),
-        thread,
-        published.activity.sequence,
+      yield* readStateStore.markThreadRead(
+        {
+          workspaceId,
+          memberId: actor.memberId,
+          threadId: thread.id,
+          readThrough: published.activity.sequence,
+        },
+        published.activity.occurredAt,
       );
       return published.message;
     },

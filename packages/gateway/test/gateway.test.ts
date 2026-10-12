@@ -244,7 +244,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         ReadStateStore.ReadStateStore,
         ReadStateStore.ReadStateStore.of({
           getThreadPositions: unexpected,
-          advanceThread: unexpected,
+          markThreadRead: unexpected,
           getGroupReads: unexpected,
           advanceGroup: unexpected,
         }),

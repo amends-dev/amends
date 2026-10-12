@@ -303,9 +303,9 @@ Notifications never create turns, accept their input, or run work. See
 
 `@amends-dev/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
 `markGroupRead`, over the `ReadStateStore`, which is kept outside the journal.
-`ReadStateCommand.markThreadRead` marks the reader's notifications from the thread seen and advances
-their position; marking a thread read, starting one, and replying all use it, so an author has read
-what they posted. It is what makes ambient activity visible in the
+`ReadStateStore.markThreadRead` advances the reader's position and marks their notifications from
+the thread seen in one write; marking a thread read, starting one, and replying all use it, so an
+author has read what they posted. It is what makes ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its

@@ -2,6 +2,7 @@ import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authori
 import { Group, GroupFollow, GroupMembership, GroupService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { Checkpoint, Entry, Store } from "@amends-dev/core/journal";
+import { Notification } from "@amends-dev/core/notification";
 import {
   ThreadActivity,
   ThreadActivityKind,
@@ -579,6 +580,98 @@ export const contracts = (fixture: Fixture) => {
           );
         }),
       ),
+    );
+
+    it.effect(
+      "marking a thread read settles the member's notifications from it in the same write",
+      () =>
+        fixture.withStorage((storage) =>
+          Effect.gen(function* () {
+            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            yield* initialized(bound);
+            const recordedAt = yield* DateTime.now;
+            const reader = Notification.ofMember(Member.Id.make("reader"), bob);
+            const threadId = ThreadId.Id.make("thread");
+            const note = (
+              id: string,
+              sequence: number,
+              recipient: Notification.Recipient = reader,
+              thread = threadId,
+            ): Notification.Notification => ({
+              id: Notification.Id.make(id),
+              workspaceId,
+              source: { logId: Entry.LogId.make(`${thread}-log`), entryId: Entry.Id.make(id) },
+              thread: { threadId: thread, groupId: Group.GeneralId, sequence },
+              recipient,
+              recordedAt,
+              state: Notification.State.cases.Pending.make({}),
+            });
+            yield* bound.store.transaction(
+              bound.notifications.insertMany([
+                note("first", 1),
+                note("second", 2),
+                note("later", 3),
+                note("other-thread", 1, reader, ThreadId.Id.make("other-thread")),
+                note("other-member", 1, Notification.ofMember(Member.Id.make("other"), charlie)),
+              ]),
+            );
+            const position = (readThrough: number) => ({
+              workspaceId,
+              memberId: reader.memberId,
+              threadId,
+              readThrough,
+            });
+            /** Each notification's state, Pending or when it was seen, in the order inserted. */
+            const states = Effect.forEach(
+              ["first", "second", "later", "other-thread", "other-member"],
+              (id) =>
+                Effect.map(bound.notifications.get(Notification.Id.make(id)), (found) => {
+                  const { state } = Option.getOrThrow(found);
+                  return Notification.State.isAnyOf(["Seen"])(state)
+                    ? DateTime.toEpochMillis(state.seenAt)
+                    : state._tag;
+                }),
+            );
+            const positions = Effect.map(
+              bound.readStates.getThreadPositions(reader.memberId, [threadId]),
+              (found) => found.map(({ readThrough }) => readThrough),
+            );
+
+            // A transaction that rolls back takes both parts with it.
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(
+                  Effect.andThen(
+                    bound.readStates.markThreadRead(position(2), recordedAt),
+                    Effect.fail("undo"),
+                  ),
+                ),
+              ),
+            ).toBe("undo");
+            expect(yield* states).toEqual(["Pending", "Pending", "Pending", "Pending", "Pending"]);
+            expect(yield* positions).toEqual([]);
+
+            // Only the member's pending notifications from the thread, up to the position, are seen.
+            const firstSeen = DateTime.toEpochMillis(recordedAt);
+            yield* bound.readStates.markThreadRead(position(2), recordedAt);
+            expect(yield* states).toEqual([firstSeen, firstSeen, "Pending", "Pending", "Pending"]);
+            expect(yield* positions).toEqual([2]);
+
+            // An earlier position is kept back, and a notification seen before keeps its time.
+            const later = DateTime.add(recordedAt, { minutes: 1 });
+            yield* bound.store.transaction(bound.readStates.markThreadRead(position(1), later));
+            expect(yield* positions).toEqual([2]);
+            yield* bound.readStates.markThreadRead(position(3), later);
+            expect(yield* states).toEqual([
+              firstSeen,
+              firstSeen,
+              DateTime.toEpochMillis(later),
+              "Pending",
+              "Pending",
+            ]);
+            expect(yield* positions).toEqual([3]);
+          }),
+        ),
     );
   });
 };
