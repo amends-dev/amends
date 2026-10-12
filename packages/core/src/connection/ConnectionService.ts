@@ -24,63 +24,11 @@ import * as Store from "../journal/Store.ts";
 import * as Request from "../request/Request.ts";
 import * as Connection from "./Connection.ts";
 import * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts";
-import {
-  Changed,
-  CredentialsUnavailable,
-  InvalidConnection,
-  Keyless,
-  NotFound,
-  UnknownIntegration,
-} from "./internal/connection-errors.ts";
 import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
-export {
-  /**
-   * The connection's name is no longer the one expected: someone renamed it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-  /**
-   * This host keeps no credentials, so no connection that authenticates with a key can be used.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  CredentialsUnavailable,
-  /**
-   * The integration does not take the connection: its settings, how it authenticates, or, when
-   * checking one that authenticates with a key, a missing key. The description is the integration's,
-   * for the person who gave them.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidConnection,
-  /**
-   * The connection authenticates with nothing, so it takes no key.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Keyless,
-  /**
-   * The connection is missing, removed, or not readable by the actor; the three are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * This host does not install the integration, or no longer installs the one a connection names.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  UnknownIntegration,
-} from "./internal/connection-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading connections can fail with.
@@ -90,9 +38,9 @@ export {
  */
 export type ReadError =
   | Authorization.Error
-  | ConnectionStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
-  | NotFound;
+  | CoreError.NotFound;
 
 /**
  * What every change can fail with: reading's failures, and recording the change in the journal.
@@ -102,7 +50,7 @@ export type ReadError =
  */
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 /** Storing or reading a key can also meet a host that keeps no credentials. */
-type KeyError = ConnectionCredentialStore.Failure | CredentialsUnavailable;
+type KeyError = StoreError.StoreError | CoreError.Unavailable;
 
 /**
  * What creating a connection can fail with: an integration the host does not install or that does
@@ -111,7 +59,7 @@ type KeyError = ConnectionCredentialStore.Failure | CredentialsUnavailable;
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | UnknownIntegration | InvalidConnection | KeyError;
+export type CreateError = Error | CoreError.Invalid | KeyError;
 
 /**
  * What configuring a connection can fail with: an integration the host no longer installs, or one
@@ -120,7 +68,7 @@ export type CreateError = Error | UnknownIntegration | InvalidConnection | KeyEr
  * @category errors
  * @since 0.1.0
  */
-export type ConfigureError = Error | UnknownIntegration | InvalidConnection;
+export type ConfigureError = Error | CoreError.Invalid;
 
 /**
  * What replacing a connection's key can fail with: a connection that takes no key, and storing the
@@ -129,7 +77,7 @@ export type ConfigureError = Error | UnknownIntegration | InvalidConnection;
  * @category errors
  * @since 0.1.0
  */
-export type ReplaceKeyError = Error | Keyless | KeyError;
+export type ReplaceKeyError = Error | CoreError.Invalid | KeyError;
 
 /**
  * What removing a connection can fail with: a change's failures, and deleting its key.
@@ -137,7 +85,7 @@ export type ReplaceKeyError = Error | Keyless | KeyError;
  * @category errors
  * @since 0.1.0
  */
-export type RemoveError = Error | ConnectionCredentialStore.Failure;
+export type RemoveError = Error | StoreError.StoreError;
 
 /**
  * What checking a connection can fail with: reading it, an integration the host no longer installs
@@ -146,7 +94,7 @@ export type RemoveError = Error | ConnectionCredentialStore.Failure;
  * @category errors
  * @since 0.1.0
  */
-export type CheckError = ReadError | UnknownIntegration | InvalidConnection | KeyError;
+export type CheckError = ReadError | CoreError.Invalid | KeyError;
 
 /**
  * What reading the models a connection offers can fail with: reading it, and an integration the
@@ -155,7 +103,7 @@ export type CheckError = ReadError | UnknownIntegration | InvalidConnection | Ke
  * @category errors
  * @since 0.1.0
  */
-export type ModelsError = ReadError | UnknownIntegration;
+export type ModelsError = ReadError | CoreError.Invalid;
 
 /**
  * The connection operations, one of `Core.Operations`.
@@ -179,7 +127,7 @@ export class ConnectionService extends Context.Service<
     readonly list: Effect.Effect<ReadonlyArray<Connection.View>, ReadError, Actor.Actor>;
     /**
      * The connection, under `connection.read`; a missing, removed, or unreadable one is
-     * `NotFound`.
+     * `CoreError.NotFound`.
      */
     readonly get: (
       connectionId: Connection.Id,
@@ -187,7 +135,7 @@ export class ConnectionService extends Context.Service<
     /**
      * The models the connection offers an agent, to set an agent up with one: those its integration
      * lists, and whether it also offers others by any id. A connection whose integration this host
-     * no longer installs offers nothing, and fails with `UnknownIntegration`.
+     * no longer installs offers nothing, and fails with `CoreError.Invalid` (`UnknownIntegration`).
      */
     readonly models: (
       connectionId: Connection.Id,
@@ -196,7 +144,8 @@ export class ConnectionService extends Context.Service<
      * Connect the workspace to an installed integration, with settings and a way of authenticating
      * the integration takes, and its key when it authenticates with one, stored in the same commit.
      * Needs `connection.create` on the workspace. A retry with the same request key returns the
-     * connection its first attempt created, or `NotFound` once that connection is removed.
+     * connection its first attempt created, or `CoreError.NotFound` once that connection is
+     * removed.
      */
     readonly create: (
       input: Connection.CreateInput,
@@ -204,18 +153,19 @@ export class ConnectionService extends Context.Service<
     ) => Effect.Effect<Connection.View, CreateError, Actor.Actor>;
     /**
      * Give a connection a new name, under `connection.manage`. The same name again records nothing;
-     * otherwise a name other than `expectedName` is `Changed`, and nothing is recorded.
+     * otherwise a name other than `expectedName` is `CoreError.Changed`, and nothing is recorded.
      */
     readonly rename: (
       input: Connection.RenameInput,
-    ) => Effect.Effect<Connection.View, Error | Changed, Actor.Actor>;
+    ) => Effect.Effect<Connection.View, Error | CoreError.Changed, Actor.Actor>;
     /** Replace its settings, which its integration must take, under `connection.manage`. */
     readonly configure: (
       input: Connection.ConfigureInput,
     ) => Effect.Effect<Connection.View, ConfigureError, Actor.Actor>;
     /**
      * Store a new key for a connection that authenticates with one, in place of its key, under
-     * `connection.manage`; a connection that authenticates with none is `Keyless`.
+     * `connection.manage`; a connection that authenticates with none is `CoreError.Invalid`
+     * (`Keyless`).
      */
     readonly replaceKey: (
       input: Connection.ReplaceKeyInput,
@@ -252,13 +202,18 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const connectionTarget = (connectionId: Connection.Id) =>
     Target.Reference.cases.Connection.make({ workspaceId, connectionId });
 
-  /** The integration this host installs as `integration`, or UnknownIntegration. */
+  /** The integration this host installs as `integration`, or `UnknownIntegration`. */
   const requireIntegration = (integration: string) =>
-    Effect.mapError(integrations.find(integration), () => new UnknownIntegration({ integration }));
+    Effect.mapError(
+      integrations.find(integration),
+      () => new CoreError.Invalid({ reason: new CoreError.UnknownIntegration({ integration }) }),
+    );
 
   /** Fails, as the integration describes it, for a connection the integration does not take. */
   const toInvalidConnection = (error: ConnectionContract.ConnectionError) =>
-    new InvalidConnection({ description: error.reason.description });
+    new CoreError.Invalid({
+      reason: new CoreError.IntegrationRefused({ description: error.reason.description }),
+    });
 
   /** Fails unless the integration this host installs takes `record`, as it describes it. */
   const requireValid = Effect.fnUntraced(function* (record: Connection.Connection) {
@@ -295,11 +250,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     return yield* viewOf(record, manageable);
   });
 
-  /** The active connection by ID, or NotFound. */
+  /** The active connection by ID, or `CoreError.NotFound`. */
   const requireActiveConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found) || found.value.status !== "active")
-      return yield* new NotFound({ connectionId });
+      return yield* new CoreError.NotFound({ resource: "Connection", id: connectionId });
     return found.value;
   });
 
@@ -313,33 +268,19 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       authorization,
       Requirement.make(ConnectionPermissions.Read, connectionTarget(connectionId)),
       Requirement.make(permission, connectionTarget(connectionId)),
-      () => new NotFound({ connectionId }),
+      () => new CoreError.NotFound({ resource: "Connection", id: connectionId }),
     );
     return record;
   });
 
   /** Store `apiKey` as the connection's key, in place of any it had. */
   const setKey = (connectionId: Connection.Id, apiKey: Connection.ApiKey) =>
-    connectionCredentialStore
-      .set(connectionId, { apiKey })
-      .pipe(
-        Effect.catchTag(
-          "ConnectionCredentialStore.Unavailable",
-          ({ reason }) => new CredentialsUnavailable({ reason }),
-        ),
-      );
+    connectionCredentialStore.set(connectionId, { apiKey });
 
   /** The connection's key, read for using it, or nothing for one that authenticates with none. */
   const credentialOf = Effect.fnUntraced(function* (record: Connection.Connection) {
     if (record.auth !== "apiKey") return undefined;
-    const credential = yield* connectionCredentialStore
-      .get(record.id)
-      .pipe(
-        Effect.catchTag(
-          "ConnectionCredentialStore.Unavailable",
-          ({ reason }) => new CredentialsUnavailable({ reason }),
-        ),
-      );
+    const credential = yield* connectionCredentialStore.get(record.id);
     return Option.getOrUndefined(credential);
   });
 
@@ -432,7 +373,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       );
       if (record.name === request.name) return yield* viewOf(record, true);
       if (record.name !== request.expectedName)
-        return yield* new Changed({ connectionId: record.id });
+        return yield* new CoreError.Changed({ resource: "Connection", id: record.id });
       yield* journal.publish(ConnectionFacts.Renamed, {
         workspaceId,
         connectionId: record.id,
@@ -473,7 +414,10 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         request.connectionId,
         ConnectionPermissions.Manage,
       );
-      if (record.auth !== "apiKey") return yield* new Keyless({ connectionId: record.id });
+      if (record.auth !== "apiKey")
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.Keyless({ connectionId: record.id }),
+        });
       yield* setKey(record.id, request.apiKey);
       yield* journal.publish(ConnectionFacts.KeyReplaced, {
         workspaceId,

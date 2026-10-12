@@ -20,7 +20,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -63,6 +63,8 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Thread starts in private groups: records, participation, activity, rollback, and replay. */
 
@@ -281,7 +283,9 @@ describe("threads", () => {
             const before = yield* history(bound);
             for (const id of [otherId, Member.Id.make("missing")])
               expect(yield* Effect.flip(run(bound, owner, start(group.id, [id])))).toEqual(
-                new ThreadService.ParticipantUnavailable({ memberId: id }),
+                new CoreError.Conflict({
+                  reason: new CoreError.ParticipantUnavailable({ memberId: id }),
+                }),
               );
             expect(
               yield* Effect.flip(run(bound, owner, start(group.id, [humanId, humanId]))),
@@ -307,15 +311,18 @@ describe("threads", () => {
             const { bound, owner, human, agent, group, hidden } = yield* prepare();
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, human, start(group.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: ThreadPermissions.Start.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: ThreadPermissions.Start.name } },
+              },
             });
             expect(yield* Effect.flip(run(bound, owner, start(hidden.id)))).toEqual(
-              new ThreadService.GroupNotFound({ groupId: hidden.id }),
+              new CoreError.NotFound({ resource: "Group", id: hidden.id }),
             );
             expect(
               yield* Effect.flip(run(bound, owner, start(Group.Id.make("missing")))),
-            ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* history(bound)).toEqual(before);
             yield* publish(
               bound,
@@ -338,10 +345,13 @@ describe("threads", () => {
             yield* run(bound, human, start(group.id));
             expect(yield* Effect.flip(run(bound, human, start(group.id, [agentId])))).toMatchObject(
               {
-                _tag: "Authorization.Denied",
-                requirement: {
-                  permission: { name: AgentPermissions.Use.name },
-                  target: { memberId: agentId },
+                _tag: "CoreError.Denied",
+                reason: {
+                  _tag: "NotGranted",
+                  requirement: {
+                    permission: { name: AgentPermissions.Use.name },
+                    target: { memberId: agentId },
+                  },
                 },
               },
             );
@@ -383,7 +393,8 @@ describe("threads", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, agent, start(group.id)))).toMatchObject({
-              _tag: "ThreadService.HumanAuthorRequired",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "HumanRequired" },
             });
             yield* publish(
               bound,
@@ -396,7 +407,8 @@ describe("threads", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, start(group.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -437,10 +449,13 @@ describe("threads", () => {
               ),
             );
             const denied = {
-              _tag: "Authorization.Denied",
-              requirement: {
-                permission: { name: AgentPermissions.Use.name },
-                target: { memberId: agentId },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: {
+                  permission: { name: AgentPermissions.Use.name },
+                  target: { memberId: agentId },
+                },
               },
             };
             // Creating a direct group with an agent gives it a place in every thread.
@@ -478,10 +493,7 @@ describe("threads", () => {
         Effect.gen(function* () {
           const { bound, owner, group } = yield* prepare();
           const before = yield* history(bound);
-          const failure = new NotificationStore.Failure({
-            operation: "insert",
-            cause: "injected",
-          });
+          const failure = StoreError.failed("NotificationStore", "insert")("injected");
           const broken = {
             ...bound,
             context: Context.add(bound.context, NotificationStore.NotificationStore, {
@@ -642,7 +654,7 @@ describe("threads", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "Authorization.Denied" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           const admission = Option.getOrThrow(
             yield* bound.groupMemberships.findActive(group.id, humanId),
           );
@@ -667,7 +679,10 @@ describe("threads", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadService.ParticipantUnavailable" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "ParticipantUnavailable" },
+          });
           expect(yield* history(bound)).toEqual(before);
           expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);
         }),
@@ -794,12 +809,15 @@ describe("threads", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, owner, startOnly(group.id, [otherId])),
               ),
-            ).toMatchObject({ _tag: "ThreadService.ParticipantUnavailable" });
+            ).toMatchObject({
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "ParticipantUnavailable" },
+            });
             expect(
               yield* Effect.flip(
                 gateway.asMember(workspace.id, owner, startOnly(group.id, [], " ")),
               ),
-            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+            ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
           }),
         ),
       ),
@@ -828,7 +846,11 @@ describe("threads", () => {
             ]) {
               expect(
                 yield* Effect.flip(bound.store.transaction(bound.threads.insert(record))),
-              ).toMatchObject({ _tag: "ThreadStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadStore",
+                reason: { _tag: "Rejected" },
+              });
             }
             expect(
               yield* Effect.flip(
@@ -840,7 +862,11 @@ describe("threads", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "ThreadParticipationStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(
               yield* Effect.flip(
                 bound.store.transaction(
@@ -852,7 +878,11 @@ describe("threads", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "ThreadMessageStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "ThreadMessageStore",
+              reason: { _tag: "Rejected" },
+            });
             const firstRow = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
             for (const record of [
               // A message has one activity, even in the next position of another thread.
@@ -868,11 +898,19 @@ describe("threads", () => {
             ]) {
               expect(
                 yield* Effect.flip(bound.store.transaction(bound.activities.insert(record))),
-              ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadActivityStore",
+                reason: { _tag: "Rejected" },
+              });
             }
             expect(
               yield* Effect.flip(foreign.store.transaction(foreign.threads.insert(first.thread))),
-            ).toMatchObject({ _tag: "ThreadStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "ThreadStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* bound.activities.listByThread(first.thread.id)).toEqual([first.activity]);
             expect(yield* bound.participations.listByThread(first.thread.id)).toEqual(
               sorted(first.participants),
@@ -926,9 +964,7 @@ describe("threads", () => {
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(
-                    /^(Store.Conflict|ThreadService.ParticipantUnavailable)$/,
-                  ),
+                  _tag: expect.stringMatching(/^(StoreError|CoreError.Conflict)$/),
                 },
               });
           yield* Effect.scoped(
@@ -976,15 +1012,10 @@ describe("threads", () => {
             const { bound, owner, agent, group } = yield* prepare();
             const before = yield* history(bound);
             const live = yield* bound.checkpoints.listLive(journalLog);
-            const broken = failingLate(
-              bound,
-              new Store.Failure({ operation: "commit", cause: "injected" }),
-            );
+            const broken = failingLate(bound, StoreError.failed("Store", "commit")("injected"));
             expect(
               yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
-            ).toMatchObject({
-              _tag: "Store.Failure",
-            });
+            ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
             expect(yield* history(bound)).toEqual(before);
             expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
             const result = yield* run(bound, owner, start(group.id, everyone(owner.memberId)));
@@ -1000,10 +1031,7 @@ describe("threads", () => {
                 // Leaving settles the agent's pending input with the departure itself.
                 discardPendingForGroup: () =>
                   Effect.fail(
-                    new NotificationStore.Failure({
-                      operation: "discardPendingForGroup",
-                      cause: "injected",
-                    }),
+                    StoreError.failed("NotificationStore", "discardPendingForGroup")("injected"),
                   ),
               }),
             };
@@ -1062,7 +1090,9 @@ describe("threads", () => {
 
           // Threads: a reused ID.
           expect(yield* refused(bound.threads.insert(first.thread))).toMatchObject({
-            _tag: "ThreadStore.Conflict",
+            _tag: "StoreError",
+            store: "ThreadStore",
+            reason: { _tag: "Rejected" },
           });
 
           // Participants: a reused ID.
@@ -1087,11 +1117,17 @@ describe("threads", () => {
             yield* refused(
               bound.participations.insert(Object.assign({}, joined, { threadId: first.thread.id })),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadParticipationStore",
+            reason: { _tag: "Rejected" },
+          });
 
           // Messages: a reused ID.
           expect(yield* refused(bound.messages.insert(first.message))).toMatchObject({
-            _tag: "ThreadMessageStore.Conflict",
+            _tag: "StoreError",
+            store: "ThreadMessageStore",
+            reason: { _tag: "Rejected" },
           });
 
           // Timeline: contiguous sequences and one entry per subject.
@@ -1116,7 +1152,9 @@ describe("threads", () => {
             published("same-subject", first.message.id, 2),
           ])
             expect(yield* refused(bound.activities.insert(record))).toMatchObject({
-              _tag: "ThreadActivityStore.Conflict",
+              _tag: "StoreError",
+              store: "ThreadActivityStore",
+              reason: { _tag: "Rejected" },
             });
           yield* write(bound.activities.insert(published("next", message.id, 2)));
           const occurredAt = DateTime.makeUnsafe("2026-09-23T12:00:00.000Z");
@@ -1149,7 +1187,11 @@ describe("threads", () => {
                 Object.assign({}, ended, { id: ThreadActivity.Id.make("again"), sequence: 4 }),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadActivityStore",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             (yield* bound.activities.listByThread(first.thread.id)).map(({ sequence }) => sequence),
           ).toEqual([1, 2, 3]);
@@ -1188,11 +1230,11 @@ describe("threads", () => {
           const before = yield* history(bound);
           // Only a member granted thread.rename may rename; belonging to the group is not enough.
           expect(yield* Effect.flip(rename(human, started.thread.id, "Launch plan"))).toMatchObject(
-            { _tag: "Authorization.Denied" },
+            { _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } },
           );
           // To anyone outside the group, the thread is missing.
           expect(yield* Effect.flip(rename(other, started.thread.id, "Launch plan"))).toEqual(
-            new ThreadService.NotFound({ threadId: started.thread.id }),
+            new CoreError.NotFound({ resource: "Thread", id: started.thread.id }),
           );
           expect(yield* history(bound)).toEqual(before);
           const renamed = yield* rename(owner, started.thread.id, "Launch plan");
@@ -1248,7 +1290,7 @@ describe("threads", () => {
           // Another title from a renamer who last saw none would replace the rename made
           // meanwhile, so it is refused, and nothing is recorded; from the current one, it is not.
           expect(yield* Effect.flip(rename(owner, started.thread.id, "Launch review"))).toEqual(
-            new ThreadService.Changed({ threadId: started.thread.id }),
+            new CoreError.Changed({ resource: "Thread", id: started.thread.id }),
           );
           expect(yield* history(bound)).toHaveLength(before.length + 1);
           const reviewed = yield* rename(owner, started.thread.id, "Launch review", "Launch plan");
@@ -1261,7 +1303,7 @@ describe("threads", () => {
             ).toBe("SchemaError");
           expect(
             yield* Effect.flip(rename(owner, Thread.Id.make("missing"), "Launch plan")),
-          ).toEqual(new ThreadService.NotFound({ threadId: Thread.Id.make("missing") }));
+          ).toEqual(new CoreError.NotFound({ resource: "Thread", id: Thread.Id.make("missing") }));
           // A start may title the thread; the title is the thread's own, apart from its message.
           const titled = yield* run(
             bound,
@@ -1294,7 +1336,11 @@ describe("threads", () => {
                   }),
                 ),
               ),
-            ).toMatchObject({ _tag: "ThreadStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "ThreadStore",
+              reason: { _tag: "Rejected" },
+            });
           expect(yield* bound.threads.get(started.thread.id)).toEqual(Option.some(reviewed));
         }),
       ),

@@ -12,8 +12,8 @@ import * as ThreadId from "./ThreadId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Thread from "./Thread.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * How many messages a thread holds whose content remains.
@@ -33,29 +33,6 @@ export const Count = Schema.Struct({
 export interface Count extends Schema.Schema.Type<typeof Count> {}
 
 /**
- * Storage failed while reading or writing messages.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("ThreadMessageStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID, an edit at a
- * revision other than the next, or an edit or deletion of a missing or deleted message.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("ThreadMessageStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
-
-/**
  * The message store, bound to one workspace by the host.
  *
  * What a storage adapter implements for messages.
@@ -72,43 +49,43 @@ export class ThreadMessageStore extends Context.Service<
   {
     readonly get: (
       id: ThreadMessage.Id,
-    ) => Effect.Effect<Option.Option<ThreadMessage.ThreadMessage>, Failure>;
+    ) => Effect.Effect<Option.Option<ThreadMessage.ThreadMessage>, StoreError.StoreError>;
     /**
      * Find several messages in one read. Absent IDs are omitted and each found record appears once;
      * order is unspecified, so callers index results by ID. An empty request reads nothing.
      */
     readonly getMany: (
       ids: ReadonlyArray<ThreadMessage.Id>,
-    ) => Effect.Effect<ReadonlyArray<ThreadMessage.ThreadMessage>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadMessage.ThreadMessage>, StoreError.StoreError>;
     /**
      * How many messages whose content remains each of several threads holds, in one read. Threads
      * with none, and absent IDs, are omitted; order is unspecified.
      */
     readonly countByThread: (
       ids: ReadonlyArray<ThreadId.Id>,
-    ) => Effect.Effect<ReadonlyArray<Count>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Count>, StoreError.StoreError>;
     /**
      * Reject reused IDs. The author and mentions are recorded as
      * given: publication checks that they take part. Preserve historical values on replay.
      */
     readonly insert: (
       record: ThreadMessage.ThreadMessage,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
      * Projection write that replaces a message's text and mentions at the edit's revision, the
      * next after the current one. A missing or deleted message, or another revision,
-     * conflicts.
+     * is rejected.
      */
     readonly edit: (
       edited: ThreadMessage.Edited,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
-     * Projection write that replaces a message's content with its deletion. A missing or already deleted
-     * message conflicts.
+     * Projection write that replaces a message's content with its deletion. A missing or already
+     * deleted message is rejected.
      */
     readonly delete: (
       deleted: ThreadMessage.Deleted,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/thread/ThreadMessageStore") {}
 
@@ -123,8 +100,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: ThreadMessageStore["Service"],
 ): ThreadMessageStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("ThreadMessageStore");
+  const write = StoreInput.write("ThreadMessageStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", ThreadMessage.Id, id), driver.get),
     getMany: (ids) =>
@@ -153,13 +130,13 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
       function* (id) {
         return yield* rows.get((yield* read).records.of("threadMessages"), id);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "get")),
     ),
     getMany: Effect.fn("ThreadMessageStore.memory.getMany")(
       function* (ids) {
         return yield* rows.getMany((yield* read).records.of("threadMessages"), ids);
       },
-      Effect.mapError(storeFailure(Failure, "getMany")),
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "getMany")),
     ),
     countByThread: Effect.fn("ThreadMessageStore.memory.countByThread")(
       function* (ids) {
@@ -170,33 +147,42 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
             counts.set(record.threadId, (counts.get(record.threadId) ?? 0) + 1);
         return [...counts].map(([threadId, count]) => ({ threadId, count }));
       },
-      Effect.mapError(storeFailure(Failure, "countByThread")),
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "countByThread")),
     ),
     insert: Effect.fn("ThreadMessageStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("ThreadMessageStore", "insert")),
+      );
       if (space.records.of("threadMessages").has(record.id))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Message ID already exists",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected(
+          "ThreadMessageStore",
+          "insert",
+          "Message ID already exists",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "insert")));
       space.records.of("threadMessages").set(record.id, row);
     }),
     edit: Effect.fn("ThreadMessageStore.memory.edit")(function* (edited) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "edit")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("ThreadMessageStore", "edit")),
+      );
       const found = yield* rows
         .get(space.records.of("threadMessages"), edited.messageId)
-        .pipe(Effect.mapError(storeFailure(Failure, "edit")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "edit")));
       if (Option.isNone(found) || !ThreadMessage.Content.isAnyOf(["Text"])(found.value.content))
-        return yield* new Conflict({
-          operation: "edit",
-          message: "Expected a message with text",
-        });
+        return yield* StoreError.rejected(
+          "ThreadMessageStore",
+          "edit",
+          "Expected a message with text",
+        );
       if (edited.revision !== found.value.content.revision + 1)
-        return yield* new Conflict({
-          operation: "edit",
-          message: "Expected the message's next revision",
-        });
+        return yield* StoreError.rejected(
+          "ThreadMessageStore",
+          "edit",
+          "Expected the message's next revision",
+        );
       const content: ThreadMessage.Content = {
         _tag: "Text",
         text: edited.text,
@@ -206,23 +192,26 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
       };
       const row = yield* rows
         .encode(Object.assign({}, found.value, { content }))
-        .pipe(Effect.mapError(storeFailure(Failure, "edit")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "edit")));
       space.records.of("threadMessages").set(edited.messageId, row);
     }),
     delete: Effect.fn("ThreadMessageStore.memory.delete")(function* (deleted) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "delete")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("ThreadMessageStore", "delete")),
+      );
       const found = yield* rows
         .get(space.records.of("threadMessages"), deleted.messageId)
-        .pipe(Effect.mapError(storeFailure(Failure, "delete")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "delete")));
       if (Option.isNone(found) || !hasText(found.value))
-        return yield* new Conflict({
-          operation: "delete",
-          message: "Expected a message with text",
-        });
+        return yield* StoreError.rejected(
+          "ThreadMessageStore",
+          "delete",
+          "Expected a message with text",
+        );
       const content: ThreadMessage.Content = { _tag: "Deleted", deletedAt: deleted.deletedAt };
       const row = yield* rows
         .encode(Object.assign({}, found.value, { content }))
-        .pipe(Effect.mapError(storeFailure(Failure, "delete")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "delete")));
       space.records.of("threadMessages").set(deleted.messageId, row);
     }),
   };
@@ -231,10 +220,10 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
 
 /**
  * Provide `ThreadMessageStore` in process memory, over the workspace's `Store.MemoryBinding`. It
- * keeps what the contract leaves to storage: a reused ID conflicts; an edit conflicts unless the
- * message is stored, still has text, and the edit is its next revision; and deleting conflicts
- * unless the message is stored and still has text. A deleted message keeps its row. `make` checks
- * every input first.
+ * keeps what the contract leaves to storage: a reused ID is rejected; an edit is rejected unless
+ * the message is stored, still has text, and the edit is its next revision; and deleting is
+ * rejected unless the message is stored and still has text. A deleted message keeps its row. `make`
+ * checks every input first.
  *
  * @category layers
  * @since 0.1.0

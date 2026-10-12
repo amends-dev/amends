@@ -3,9 +3,9 @@
  * table: each participation's session log, keyed by position, with each entry's kind and turn in
  * columns and the rest of it in `details` as JSON. The log takes part in no commit, so its
  * statements run apart from any transaction the caller is in, each on its own, and rebuilds keep
- * it. `SessionLogStore.make` checks every input before the driver sees it, so the driver keeps
- * only what storage keeps: an append checks the log's latest position, the key refuses a position
- * taken meanwhile, each as the store's `Conflict`, and it then notifies readers waiting through
+ * it. `SessionLogStore.make` checks every input before the driver sees it, so the driver keeps only
+ * what storage keeps: an append checks the log's latest position, the key refuses a position taken
+ * meanwhile, each as `SessionLogStore.Overtaken`, and it then notifies readers waiting through
  * `PostgresNotices`, in every process. Every statement is scoped to the binding's workspace and
  * runs under its `guard`.
  *
@@ -16,9 +16,10 @@ import { SessionLog, SessionLogStore } from "@amends-dev/core/turn";
 import { and, asc, eq, gt, max } from "drizzle-orm";
 import { Array, Context, DateTime, Deferred, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { isConstraintViolation, storeFailure } from "./internal/errors.ts";
+import { isConstraintViolation } from "./internal/errors.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import { sessionLogEntries } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const EntryJson = Schema.toCodecJson(SessionLog.Entry);
 const encodeEntry = Schema.encodeEffect(EntryJson);
@@ -82,12 +83,12 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
         .where(ofLog(participationId)),
     ).pipe(
       Effect.map((rows) => rows[0]?.head ?? 0),
-      Effect.mapError(storeFailure(SessionLogStore, "head")),
+      Effect.mapError(StoreError.failed("SessionLogStore", "head")),
     );
   const driver: SessionLogStore.SessionLogStore["Service"] = {
     head: readHead,
     append: Effect.fn("SessionLogs.append")(function* (participationId, entries, after) {
-      const conflict = new SessionLogStore.Conflict({ participationId, after });
+      const conflict = new SessionLogStore.Overtaken({ participationId, after });
       if ((yield* readHead(participationId)) !== after) return yield* conflict;
       const recordedAt = yield* DateTime.now;
       const recorded = Array.map(entries, (entry, index) => ({
@@ -102,13 +103,13 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
             columns,
           ),
         ),
-      ).pipe(Effect.mapError(storeFailure(SessionLogStore, "append")));
+      ).pipe(Effect.mapError(StoreError.failed("SessionLogStore", "append")));
       // Another writer taking a position first makes the insert, one statement, take none.
       yield* apart(db.insert(sessionLogEntries).values(rows)).pipe(
         Effect.mapError((cause) =>
           isConstraintViolation(cause)
             ? conflict
-            : new SessionLogStore.Failure({ operation: "append", cause }),
+            : StoreError.failed("SessionLogStore", "append")(cause),
         ),
       );
       yield* notices.notifyAppend(workspaceId, PostgresNotices.sessionLogKey(participationId));
@@ -126,7 +127,7 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
         );
         return yield* Effect.forEach(rows, (row) => decodeRecorded(recordedOf(row)));
       },
-      Effect.mapError(storeFailure(SessionLogStore, "read")),
+      Effect.mapError(StoreError.failed("SessionLogStore", "read")),
     ),
     waitForAppend: Effect.fn("SessionLogs.waitForAppend")(function* (participationId, after) {
       // What is stored is the truth, so other processes' appends are seen; notices only say when

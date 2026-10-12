@@ -10,7 +10,7 @@
 import * as Core from "@amends-dev/core";
 import { Authorization } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Checkpoint, Projection, Store } from "@amends-dev/core/journal";
+import { Checkpoint, Projection, Store, StoreError } from "@amends-dev/core/journal";
 import {
   type Member,
   MemberStore,
@@ -26,6 +26,7 @@ import { type Scope } from "effect";
 import * as GatewayErrors from "./GatewayErrors.ts";
 import * as WorkspaceStorage from "./WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "./internal/workspace-runtime.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /**
  * The gateway a host builds once, with `make` or `layer`: it creates workspaces and runs programs
@@ -48,7 +49,7 @@ export class Gateway extends Context.Service<
       options?: Request.Options,
     ) => Effect.Effect<
       Workspace.Workspace,
-      GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
+      CoreError.Unavailable | GatewayErrors.Uncertain | CoreError.Invalid
     >;
     /**
      * Run core operations as the identity's active membership, keeping the workspace prepared for
@@ -61,27 +62,23 @@ export class Gateway extends Context.Service<
       workspaceId: Workspace.Id,
       identity: Identity.MemberReference,
       program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
+    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.Denied, Scope.Scope>;
     /**
      * Run a program in a workspace without an actor, keeping the workspace prepared for the
      * caller's scope: invitation acceptance, where the recipient is not yet a member, and a host's
      * jobs, which call the services core gives them. Programs may require only core's operations
      * and those services, never the journal or the stores commits write. A workspace that was never
-     * created returns WorkspaceNotFound without being prepared.
+     * created returns `CoreError.NotFound` for the workspace without being prepared.
      */
     readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
       workspaceId: Workspace.Id,
       program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<
-      A,
-      GatewayErrors.PublicErrorOf<E> | GatewayErrors.WorkspaceNotFound,
-      Scope.Scope
-    >;
+    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.NotFound, Scope.Scope>;
   }
 >()("@amends-dev/gateway/Gateway") {}
 
 const isPublic = Schema.is(GatewayErrors.PublicError);
-const isConflict = Schema.is(Store.Conflict);
+const isStoreError = Schema.is(StoreError.StoreError);
 const isUncertain = Schema.is(Store.CommitUncertain);
 const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
 const isBehind = Schema.is(Projection.Behind);
@@ -110,31 +107,31 @@ const toPublicErrors = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, GatewayErrors.PublicErrorOf<E>, R> =>
   Effect.catch(effect, (error): Effect.Effect<never, GatewayErrors.PublicErrorOf<E>> => {
-    if (isConflict(error))
+    // Storage another writer held or changed meanwhile: asking again may get past it.
+    if (isStoreError(error) && error.reason._tag === "Contended")
       return Effect.fail(
-        new GatewayErrors.Conflict({
-          workspaceId,
-          operation: error.operation,
-          message: error.message,
+        new CoreError.Unavailable({
+          reason: new CoreError.Contention({
+            operation: error.operation,
+            description: error.reason.description,
+          }),
         }),
       );
     if (isUncertain(error))
       return Effect.fail(new GatewayErrors.Uncertain({ workspaceId, commitId: error.commitId }));
     if (Schema.isSchemaError(error))
-      return Effect.fail(new GatewayErrors.InvalidInput({ message: error.message }));
+      return Effect.fail(
+        new CoreError.Invalid({ reason: new CoreError.Malformed({ description: error.message }) }),
+      );
     // The runtime is prepared again for the next request, so this one may simply be retried.
     if (isBehind(error) || isUnregistered(error))
-      return Effect.fail(
-        new GatewayErrors.Conflict({
-          workspaceId,
-          operation: "commit",
-          message: "Another host changed this workspace's read models; retry once they are rebuilt",
-        }),
-      );
+      return Effect.fail(new CoreError.Unavailable({ reason: new CoreError.Reloading() }));
     if (isMismatch(error))
       return Effect.fail(
-        new GatewayErrors.InvalidInput({
-          message: `Values must belong to workspace ${error.expectedWorkspaceId}`,
+        new CoreError.Invalid({
+          reason: new CoreError.Malformed({
+            description: `Values must belong to workspace ${error.expectedWorkspaceId}`,
+          }),
         }),
       );
     if (isPublic(error)) return Effect.fail(error as Extract<E, GatewayErrors.PublicError>);
@@ -250,7 +247,7 @@ export const make = Effect.fn("Gateway.make")(function* (
   /** A workspace that was never created has no history, and is refused before it is prepared. */
   const requireCreated = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
     if (!(yield* runtimes.isPrepared(workspaceId)) && !(yield* hasHistory(workspaceId)))
-      return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+      return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId });
   });
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
@@ -263,7 +260,8 @@ export const make = Effect.fn("Gateway.make")(function* (
     const membership = Option.isSome(admittedMember)
       ? admittedMember
       : yield* Effect.orDie((yield* MemberStore.MemberStore).findActive(identity));
-    if (Option.isNone(membership)) return yield* new GatewayErrors.NotMember({ workspaceId });
+    if (Option.isNone(membership))
+      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) });
     const actor = Actor.Actor.of({ workspaceId, memberId: membership.value.id, identity });
     return yield* toPublicErrors(
       workspaceId,
@@ -340,7 +338,7 @@ export const make = Effect.fn("Gateway.make")(function* (
     const operation: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope> = program;
     const admission = yield* checkAdmission(workspaceId, identity);
     if (Admission.$is("Refused")(admission))
-      return yield* new GatewayErrors.NotMember({ workspaceId });
+      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) });
     const admittedMember = Admission.$is("Member")(admission)
       ? Option.some(admission.member)
       : Option.none<Member.Member>();

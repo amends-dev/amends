@@ -1,9 +1,9 @@
 /**
  * The read of groups that operations share: whether the actor is currently in a group's audience,
- * and through which admission. The group, thread, channel, and read-state operations check it,
- * each mapping its refusal to their own outcome. It writes nothing and checks no action permission;
- * each operation checks its own, inside its commit when it writes. Internal: not among
- * `Core.Operations`.
+ * and through which admission. The group, thread, channel, and read-state operations check it; to
+ * anyone outside the audience the group is `CoreError.NotFound`, as a missing one is, whichever
+ * operation asks. It writes nothing and checks no action permission; each operation checks its
+ * own, inside its commit when it writes. Internal: not among `Core.Operations`.
  *
  * @since 0.1.0
  */
@@ -13,17 +13,8 @@ import * as Actor from "../identity/Actor.ts";
 import * as GroupId from "./GroupId.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
-
-/**
- * The actor holds no current admission to the group, or the group is missing; the two are not told
- * apart, so nothing discloses whether a group exists. Operations map it to their own outcome.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotMember extends Schema.TaggedError<NotMember>()("GroupQuery.NotMember", {
-  groupId: GroupId.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What checking the audience can fail with.
@@ -33,9 +24,9 @@ export class NotMember extends Schema.TaggedError<NotMember>()("GroupQuery.NotMe
  */
 export type AudienceError =
   | Authorization.Error
-  | GroupMembershipStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
-  | NotMember;
+  | CoreError.NotFound;
 
 /**
  * The shared read of groups. Internal: not among `Core.Operations`.
@@ -73,7 +64,7 @@ export const make = Effect.fn("GroupQuery.make")(function* () {
     yield* authorization.require([]);
     const actor = yield* Actor.Actor;
     const found = yield* groupMembershipStore.findActive(id, actor.memberId);
-    if (Option.isNone(found)) return yield* new NotMember({ groupId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Group", id });
     return found.value;
   });
 

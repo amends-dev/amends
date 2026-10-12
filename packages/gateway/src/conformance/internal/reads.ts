@@ -82,7 +82,7 @@ export const reads = (fixture: Fixture) => {
                       yield* Effect.flip(
                         notificationService.markSeen(Notification.Id.make("missing")),
                       ),
-                    ).toMatchObject({ _tag: "NotificationService.NotFound" });
+                    ).toMatchObject({ _tag: "CoreError.NotFound" });
                     const stream = yield* (yield* ChangeFeedService.ChangeFeedService).watch();
                     expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
                       { _tag: "Ready", workspaceId: workspace.id, reset: true },
@@ -100,7 +100,7 @@ export const reads = (fixture: Fixture) => {
                       ),
                     ),
                   ),
-                ).toMatchObject({ _tag: "GatewayErrors.Conflict" });
+                ).toMatchObject({ _tag: "CoreError.Unavailable", reason: { _tag: "Contention" } });
               }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)));
               yield* Fiber.join(writing);
               expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(

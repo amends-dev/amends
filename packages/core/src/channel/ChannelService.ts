@@ -16,7 +16,6 @@ import * as ConnectionPermissions from "../connection/ConnectionPermissions.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import type * as Connection from "../connection/Connection.ts";
 import type * as Group from "../group/Group.ts";
-import type * as GroupMembershipStore from "../group/GroupMembershipStore.ts";
 import * as GroupQuery from "../group/GroupQuery.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
@@ -31,49 +30,12 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import {
-  ConnectionUnavailable,
-  GroupNotFound,
-  NotBound,
-  NotFound,
-} from "./internal/channel-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelPermissions from "./ChannelPermissions.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import * as ChannelStore from "./ChannelStore.ts";
-export {
-  /**
-   * The connection is missing or removed, the actor may not read and use it, or its integration
-   * gives no channels; the actor cannot tell these apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ConnectionUnavailable,
-  /**
-   * The destination group is missing, or the actor is not a member of it; the two are not told
-   * apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GroupNotFound,
-  /**
-   * The thread is missing, outside the actor's groups, or did not come through a channel; the three
-   * are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotBound,
-  /**
-   * The channel is missing or removed, or the actor may not read it; the three are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-} from "./internal/channel-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading channels can fail with.
@@ -81,7 +43,11 @@ export {
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = Authorization.Error | ChannelStore.Failure | Schema.SchemaError | NotFound;
+export type ReadError =
+  | Authorization.Error
+  | StoreError.StoreError
+  | Schema.SchemaError
+  | CoreError.NotFound;
 
 /**
  * What every change can fail with besides reading.
@@ -98,7 +64,7 @@ export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | P
  * @category errors
  * @since 0.1.0
  */
-export type DestinationError = GroupMembershipStore.Failure | GroupNotFound;
+export type DestinationError = StoreError.StoreError | CoreError.NotFound;
 
 /**
  * What creating a channel can fail with.
@@ -106,11 +72,7 @@ export type DestinationError = GroupMembershipStore.Failure | GroupNotFound;
  * @category errors
  * @since 0.1.0
  */
-export type CreateError =
-  | Error
-  | DestinationError
-  | ConnectionStore.Failure
-  | ConnectionUnavailable;
+export type CreateError = Error | DestinationError | StoreError.StoreError | CoreError.Invalid;
 
 /**
  * What redirecting a channel can fail with.
@@ -126,10 +88,7 @@ export type RedirectError = Error | DestinationError;
  * @category errors
  * @since 0.1.0
  */
-export type BindingError =
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | ChannelBindingStore.Failure
-  | NotBound;
+export type BindingError = ThreadQuery.AccessError | StoreError.StoreError | CoreError.NotFound;
 
 /**
  * The channel operations, one of `Core.Operations`.
@@ -153,7 +112,10 @@ export class ChannelService extends Context.Service<
     ) => Effect.Effect<Channel.Channel, CreateError, Actor.Actor>;
     /** The workspace's channels the actor may read, by name. */
     readonly list: Effect.Effect<ReadonlyArray<Channel.Channel>, ReadError, Actor.Actor>;
-    /** One channel, under `channel.read`; one the actor may not read, or removed, is `NotFound`. */
+    /**
+     * One channel, under `channel.read`; one the actor may not read, or removed, is
+     * `CoreError.NotFound`.
+     */
     readonly get: (channelId: Channel.Id) => Effect.Effect<Channel.Channel, ReadError, Actor.Actor>;
     /**
      * Send the channel's conversations to come to another group, under `channel.manage`, which the
@@ -167,7 +129,7 @@ export class ChannelService extends Context.Service<
     readonly remove: (channelId: Channel.Id) => Effect.Effect<void, Error, Actor.Actor>;
     /**
      * The external conversation a thread came from, under `thread.read`; a thread that came through
-     * no channel, or that the actor cannot read, is `NotBound`.
+     * no channel, or that the actor cannot read, is `CoreError.NotFound`.
      */
     readonly getBinding: (
       threadId: Thread.Id,
@@ -200,23 +162,17 @@ export const make = Effect.fn("ChannelService.make")(function* () {
   const channelTarget = (channelId: Channel.Id) =>
     ({ _tag: "Channel", workspaceId, channelId }) as const;
 
-  /** A channel that exists and is not removed. */
-  const requireActive = (channelId: Channel.Id) =>
-    channelQuery
-      .requireActive(channelId)
-      .pipe(Effect.catchTag("ChannelQuery.NotFound", () => new NotFound({ channelId })));
-
   /** A channel the actor may act on with `permission`; to anyone else it is missing. */
   const requirePermitted = Effect.fnUntraced(function* (
     channelId: Channel.Id,
     permission: Permission.Definition<"Channel">,
   ) {
-    const record = yield* requireActive(channelId);
+    const record = yield* channelQuery.requireActive(channelId);
     yield* Authorization.requireVisible(
       authorization,
       Requirement.make(ChannelPermissions.Read, channelTarget(channelId)),
       Requirement.make(permission, channelTarget(channelId)),
-      () => new NotFound({ channelId }),
+      () => new CoreError.NotFound({ resource: "Channel", id: channelId }),
     );
     return record;
   });
@@ -226,9 +182,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
    * choosing a destination is an audience decision for everyone in that group.
    */
   const requireDestination = Effect.fnUntraced(function* (groupId: Group.Id) {
-    yield* groupQuery
-      .requireAudience(groupId)
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
+    yield* groupQuery.requireAudience(groupId);
     yield* authorization.require([
       Requirement.make(ThreadPermissions.Start, { _tag: "Group", workspaceId, groupId }),
     ]);
@@ -239,7 +193,8 @@ export const make = Effect.fn("ChannelService.make")(function* () {
    * actor, and of an integration that gives channels. Anything else is unavailable alike.
    */
   const requireUsableConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
-    const unavailable = () => new ConnectionUnavailable({ connectionId });
+    const unavailable = () =>
+      new CoreError.Invalid({ reason: new CoreError.ConnectionUnusable({ connectionId }) });
     const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found) || found.value.status !== "active") return yield* unavailable();
     const target = { _tag: "Connection", workspaceId, connectionId } as const;
@@ -250,7 +205,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     if (!readable || !usable) return yield* unavailable();
     yield* channelQuery
       .integrationOf(found.value)
-      .pipe(Effect.catchTag("ChannelQuery.Unavailable", unavailable));
+      .pipe(Effect.catchTag("CoreError.Unavailable", unavailable));
     return found.value;
   });
 
@@ -266,7 +221,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
       );
       // A retry returns the channel its first attempt created, unless it was removed since.
       if (options.requestKey !== undefined && Option.isSome(yield* channelStore.get(channelId)))
-        return yield* requireActive(channelId);
+        return yield* channelQuery.requireActive(channelId);
       yield* requireDestination(request.groupId);
       yield* requireUsableConnection(request.connectionId);
       const created: Channel.Channel = {
@@ -333,16 +288,10 @@ export const make = Effect.fn("ChannelService.make")(function* () {
 
   // Reads are outside journal.commit; an enclosing caller transaction remains authoritative.
   const getBinding = Effect.fn("ChannelService.getBinding")(function* (threadId: Thread.Id) {
-    const thread = yield* threadQuery
-      .requireReadable(threadId)
-      .pipe(
-        Effect.catchTag(
-          "ThreadQuery.NotFound",
-          (error) => new NotBound({ threadId: error.threadId }),
-        ),
-      );
+    const thread = yield* threadQuery.requireReadable(threadId);
     const binding = yield* channelBindingStore.get(thread.id);
-    if (Option.isNone(binding)) return yield* new NotBound({ threadId: thread.id });
+    if (Option.isNone(binding))
+      return yield* new CoreError.NotFound({ resource: "ChannelBinding", id: thread.id });
     return binding.value;
   });
 

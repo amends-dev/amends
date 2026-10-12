@@ -35,12 +35,12 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       success: Schema.Array(
         Connection.IntegrationView.annotate({ identifier: "ConnectionIntegration" }),
       ),
-      error: ApiErrors.member,
+      error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(view),
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.post("create", "/", {
       params: { workspaceId: Workspace.Id },
@@ -49,23 +49,17 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       success: Connection.View.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedConnection",
       }),
-      error: [
-        ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
-        ApiErrors.UnknownIntegration,
-        ApiErrors.InvalidConnection,
-        ApiErrors.ConnectionCredentialsUnavailable,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.get("get", "/:connectionId", {
       params: connection,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.get("models", "/:connectionId/models", {
       params: connection,
       success: Connection.Models.annotate({ identifier: "ConnectionModels" }),
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound, ApiErrors.UnknownIntegration],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.post("rename", "/:connectionId/rename", {
       params: connection,
@@ -74,45 +68,29 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
         expectedName: Connection.RenameInput.fields.expectedName,
       }),
       success: view,
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound, ApiErrors.ConnectionChanged],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Changed],
     }),
     HttpApiEndpoint.put("configure", "/:connectionId/settings", {
       params: connection,
       payload: Schema.Struct({ settings: Connection.ConfigureInput.fields.settings }),
       success: view,
-      error: [
-        ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
-        ApiErrors.UnknownIntegration,
-        ApiErrors.InvalidConnection,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.put("replaceKey", "/:connectionId/key", {
       params: connection,
       payload: Schema.Struct({ apiKey: Connection.ReplaceKeyInput.fields.apiKey }),
       success: view,
-      error: [
-        ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
-        ApiErrors.Keyless,
-        ApiErrors.ConnectionCredentialsUnavailable,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.post("check", "/:connectionId/check", {
       params: connection,
       success: ConnectionContract.Health.annotate({ identifier: "ConnectionHealth" }),
-      error: [
-        ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
-        ApiErrors.UnknownIntegration,
-        ApiErrors.InvalidConnection,
-        ApiErrors.ConnectionCredentialsUnavailable,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.delete("remove", "/:connectionId", {
       params: connection,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
   )
   .middleware(Authentication)

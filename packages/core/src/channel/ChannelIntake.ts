@@ -31,39 +31,13 @@ import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import { NotFound, Rejected, Unavailable } from "./internal/channel-intake-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
-import type * as ChannelStore from "./ChannelStore.ts";
 import * as Contact from "./Contact.ts";
 import * as ContactStore from "./ContactStore.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
-export {
-  /**
-   * The channel is missing or removed, so the request reaches no channel.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * The channel's transport rejected what the host received: it is not the external system's, or
-   * its signature does not hold. Nothing was taken in.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Rejected,
-  /**
-   * The channel cannot be reached now: its connection was removed or has no key, its integration is
-   * not installed or gives no channels, or the external system could not answer. The system may send
-   * again.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Unavailable,
-} from "./internal/channel-intake-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or
@@ -113,18 +87,10 @@ export interface Received extends Schema.Schema.Type<typeof Received> {}
  * @since 0.1.0
  */
 export type IntakeError =
-  | NotFound
-  | Unavailable
-  | ChannelStore.Failure
-  | ChannelQuery.Error
-  | ChannelBindingStore.Failure
-  | ContactStore.Failure
-  | DeliveryStore.Failure
-  | ThreadStore.Failure
-  | ThreadMessageStore.Failure
-  | ThreadQuery.FollowersError
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | TaskCommand.Error;
+  | CoreError.NotFound
+  | CoreError.Unavailable
+  | StoreError.StoreError
+  | Exclude<TaskCommand.Error, CoreError.Conflict>;
 
 /**
  * What receiving an inbound request can fail with.
@@ -132,7 +98,7 @@ export type IntakeError =
  * @category errors
  * @since 0.1.0
  */
-export type ReceiveError = IntakeError | Rejected;
+export type ReceiveError = IntakeError | CoreError.Invalid;
 
 /**
  * Intake, one of `Core.JobServices`: a host calls it for what its channels receive, as no actor.
@@ -148,8 +114,9 @@ export class ChannelIntake extends Context.Service<
     /**
      * Take in a request the external system sent the host for the channel: the channel's transport
      * makes events of it, each taken in as `intake` does, in a commit of its own. A request the
-     * transport rejects is `Rejected`, and a channel whose system cannot be reached `Unavailable`; a
-     * channel missing or removed is `NotFound`.
+     * transport rejects is `CoreError.Invalid` (`Unverified`), and a channel whose system cannot be
+     * reached `CoreError.Unavailable`;
+     * a channel missing or removed is `CoreError.NotFound`.
      */
     readonly receive: (
       channelId: Channel.Id,
@@ -206,8 +173,8 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
   });
 
   /** A participant who could not be admitted: intake admits only those it just read as able. */
-  const admitted = <A, E, R>(effect: Effect.Effect<A, E | ThreadCommand.Unavailable, R>) =>
-    Effect.catchTag(effect, "ThreadCommand.Unavailable", () =>
+  const admitted = <A, E, R>(effect: Effect.Effect<A, E | CoreError.Conflict, R>) =>
+    Effect.catchTag(effect, "CoreError.Conflict", () =>
       Effect.die("Intake could not admit a participant it read as able to take part"),
     );
 
@@ -454,37 +421,25 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
   );
 
   /** The channel's transport, or why its system cannot be reached. */
-  const transportOf = (channel: Channel.Channel) =>
-    channelQuery
-      .transport(channel)
-      .pipe(
-        Effect.catchTag(
-          "ChannelQuery.Unavailable",
-          (error) => new Unavailable({ description: error.description }),
-        ),
-      );
-
-  /** The channel a request is for, which must exist and not be removed. */
-  const requireChannel = (channelId: Channel.Id) =>
-    channelQuery
-      .requireActive(channelId)
-      .pipe(Effect.catchTag("ChannelQuery.NotFound", () => new NotFound({ channelId })));
+  const transportOf = (channel: Channel.Channel) => channelQuery.transport(channel);
 
   const receive: ChannelIntake["Service"]["receive"] = Effect.fn("ChannelIntake.receive")(
     function* (channelId, inbound) {
-      const channel = yield* requireChannel(channelId);
+      const channel = yield* channelQuery.requireActive(channelId);
       const transport = yield* transportOf(channel);
-      const received = yield* transport
-        .receive(inbound)
-        .pipe(
-          Effect.catchTag("TransportError", (error) =>
-            Effect.fail(
-              error.reason === "rejected"
-                ? new Rejected({ description: error.description })
-                : new Unavailable({ description: error.description }),
-            ),
+      const received = yield* transport.receive(inbound).pipe(
+        Effect.catchTag("TransportError", (error) =>
+          Effect.fail(
+            error.reason === "rejected"
+              ? new CoreError.Invalid({
+                  reason: new CoreError.Unverified({ description: error.description }),
+                })
+              : new CoreError.Unavailable({
+                  reason: new CoreError.ChannelUnreachable({ description: error.description }),
+                }),
           ),
-        );
+        ),
+      );
       const intakes: Array<Intake> = [];
       for (const event of received.events)
         intakes.push(yield* intakeEvent(channel, transport.self, event));
@@ -494,7 +449,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
 
   const intake: ChannelIntake["Service"]["intake"] = Effect.fn("ChannelIntake.intake")(
     function* (channelId, event) {
-      const channel = yield* requireChannel(channelId);
+      const channel = yield* channelQuery.requireActive(channelId);
       const transport = yield* transportOf(channel);
       return yield* intakeEvent(channel, transport.self, event);
     },

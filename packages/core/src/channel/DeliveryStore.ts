@@ -13,31 +13,8 @@ import * as ChannelId from "./ChannelId.ts";
 import * as Delivery from "./Delivery.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing deliveries.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("DeliveryStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused id, or a change
- * to a delivery that is missing.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("DeliveryStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The delivery store, bound to one workspace by the host.
@@ -54,11 +31,13 @@ export class Conflict extends Schema.TaggedError<Conflict>()("DeliveryStore.Conf
 export class DeliveryStore extends Context.Service<
   DeliveryStore,
   {
-    readonly get: (id: Delivery.Id) => Effect.Effect<Option.Option<Delivery.Delivery>, Failure>;
+    readonly get: (
+      id: Delivery.Id,
+    ) => Effect.Effect<Option.Option<Delivery.Delivery>, StoreError.StoreError>;
     /** The thread's deliveries not yet sent or failed, by their messages' positions, then by id. */
     readonly listRequestedByThread: (
       threadId: ThreadId.Id,
-    ) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, StoreError.StoreError>;
     /**
      * The delivery that posted the message the external system knows as `externalMessageId` in a
      * conversation on a channel, if one did: what tells a post of our own, received back, from a
@@ -68,15 +47,15 @@ export class DeliveryStore extends Context.Service<
       channelId: ChannelId.Id,
       conversationId: ChannelTransport.ExternalId,
       externalMessageId: ChannelTransport.ExternalId,
-    ) => Effect.Effect<Option.Option<Delivery.Delivery>, Failure>;
+    ) => Effect.Effect<Option.Option<Delivery.Delivery>, StoreError.StoreError>;
     /** Reject a reused id. Never upsert. */
     readonly insert: (
       record: Delivery.Delivery,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-    /** Replace a stored delivery; a missing record conflicts. */
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    /** Replace a stored delivery; a missing record is rejected. */
     readonly update: (
       record: Delivery.Delivery,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/channel/DeliveryStore") {}
 
@@ -91,8 +70,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: DeliveryStore["Service"],
 ): DeliveryStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("DeliveryStore");
+  const write = StoreInput.write("DeliveryStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", Delivery.Id, id), driver.get),
     listRequestedByThread: (threadId) =>
@@ -126,7 +105,7 @@ const makeMemory = Effect.fn("DeliveryStore.makeMemory")(function* () {
       function* (id) {
         return yield* rows.get((yield* read).records.of("deliveries"), id);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "get")),
     ),
     listRequestedByThread: Effect.fn("DeliveryStore.memory.listRequestedByThread")(
       function* (threadId) {
@@ -138,7 +117,7 @@ const makeMemory = Effect.fn("DeliveryStore.makeMemory")(function* () {
               left.sequence - right.sequence || MemoryDatabase.compareBinary(left.id, right.id),
           );
       },
-      Effect.mapError(storeFailure(Failure, "listRequestedByThread")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "listRequestedByThread")),
     ),
     findByExternalMessage: Effect.fn("DeliveryStore.memory.findByExternalMessage")(
       function* (channelId, conversationId, externalMessageId) {
@@ -152,29 +131,31 @@ const makeMemory = Effect.fn("DeliveryStore.makeMemory")(function* () {
           ),
         );
       },
-      Effect.mapError(storeFailure(Failure, "findByExternalMessage")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "findByExternalMessage")),
     ),
     insert: Effect.fn("DeliveryStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("DeliveryStore", "insert")),
+      );
       if (space.records.of("deliveries").has(record.id))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Delivery ID already exists",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected("DeliveryStore", "insert", "Delivery ID already exists");
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("DeliveryStore", "insert")));
       space.records.of("deliveries").set(record.id, row);
     }),
     update: Effect.fn("DeliveryStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "update")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("DeliveryStore", "update")),
+      );
       const found = yield* rows
         .get(space.records.of("deliveries"), record.id)
-        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+        .pipe(Effect.mapError(StoreError.failed("DeliveryStore", "update")));
       if (Option.isNone(found))
-        return yield* new Conflict({
-          operation: "update",
-          message: "Expected a stored delivery",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "update")));
+        return yield* StoreError.rejected("DeliveryStore", "update", "Expected a stored delivery");
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("DeliveryStore", "update")));
       space.records.of("deliveries").set(record.id, row);
     }),
   };
@@ -183,7 +164,7 @@ const makeMemory = Effect.fn("DeliveryStore.makeMemory")(function* () {
 
 /**
  * Provide `DeliveryStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
- * what the contract leaves to storage: a reused ID conflicts, and so does an update of a missing
+ * what the contract leaves to storage: a reused ID is rejected, and so is an update of a missing
  * delivery. A thread's requested deliveries list in sequence order, then by ID. `make` checks every
  * input first.
  *

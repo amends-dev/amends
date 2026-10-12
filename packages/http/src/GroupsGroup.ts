@@ -42,7 +42,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
         }),
       },
       success: Schema.Array(Group.ListItem.annotate({ identifier: "GroupListItem" })),
-      error: [...ApiErrors.member, ...ApiErrors.group],
+      error: [...ApiErrors.workspace, ...ApiErrors.group],
     }),
     HttpApiEndpoint.get("listPublic", "/public", {
       params: { workspaceId: Workspace.Id },
@@ -53,7 +53,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
         }),
       },
       success: Schema.Array(Group.PublicItem.annotate({ identifier: "PublicGroup" })),
-      error: [...ApiErrors.member, ...ApiErrors.group],
+      error: [...ApiErrors.workspace, ...ApiErrors.group],
     }),
     HttpApiEndpoint.post("create", "/", {
       params: { workspaceId: Workspace.Id },
@@ -62,7 +62,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       success: Group.Group.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedGroup",
       }),
-      error: [...ApiErrors.member, ...ApiErrors.group],
+      error: [...ApiErrors.workspace, ...ApiErrors.group],
     }),
     HttpApiEndpoint.post("rename", "/:groupId/rename", {
       params: group,
@@ -71,17 +71,12 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
         expectedName: Group.RenameInput.fields.expectedName,
       }),
       success: Group.Group,
-      error: [
-        ...ApiErrors.member,
-        ...ApiErrors.group,
-        ApiErrors.NotRenamable,
-        ApiErrors.GroupChanged,
-      ],
+      error: [...ApiErrors.workspace, ...ApiErrors.group, ApiErrors.Invalid, ApiErrors.Changed],
     }),
     HttpApiEndpoint.get("get", "/:groupId", {
       params: group,
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.group],
+      error: [...ApiErrors.workspace, ...ApiErrors.group],
     }),
     HttpApiEndpoint.get("members", "/:groupId/members", {
       params: group,
@@ -92,7 +87,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
         }),
       },
       success: Schema.Array(membership),
-      error: [...ApiErrors.member, ...ApiErrors.groupMembership],
+      error: [...ApiErrors.workspace, ...ApiErrors.groupMembership],
     }),
     HttpApiEndpoint.post("addMember", "/:groupId/members", {
       params: group,
@@ -100,39 +95,39 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       success: GroupMembership.GroupMembership.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "AddedGroupMembership",
       }),
-      error: [...ApiErrors.member, ...ApiErrors.groupMembership],
+      error: [...ApiErrors.workspace, ...ApiErrors.groupMembership],
     }),
     HttpApiEndpoint.post("join", "/:groupId/join", {
       params: group,
       success: membership,
-      error: [...ApiErrors.member, ...ApiErrors.groupMembership],
+      error: [...ApiErrors.workspace, ...ApiErrors.groupMembership],
     }),
     HttpApiEndpoint.delete("removeMember", "/:groupId/members/:membershipId", {
       params: admission,
       success: membership,
-      error: [...ApiErrors.member, ...ApiErrors.groupMembership],
+      error: [...ApiErrors.workspace, ...ApiErrors.groupMembership],
     }),
     HttpApiEndpoint.post("leave", "/:groupId/members/:membershipId/leave", {
       params: admission,
       success: membership,
-      error: [...ApiErrors.member, ...ApiErrors.groupMembership],
+      error: [...ApiErrors.workspace, ...ApiErrors.groupMembership],
     }),
     HttpApiEndpoint.post("follow", "/:groupId/follow", {
       params: group,
       payload: follower,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ...ApiErrors.groupFollow],
+      error: [...ApiErrors.workspace, ...ApiErrors.groupFollow],
     }),
     HttpApiEndpoint.post("unfollow", "/:groupId/unfollow", {
       params: group,
       payload: follower,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ...ApiErrors.groupFollow],
+      error: [...ApiErrors.workspace, ...ApiErrors.groupFollow],
     }),
     HttpApiEndpoint.post("markRead", "/:groupId/read", {
       params: group,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ...ApiErrors.readState],
+      error: [...ApiErrors.workspace, ...ApiErrors.readState],
     }),
   )
   .middleware(Authentication)

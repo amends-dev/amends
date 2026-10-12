@@ -14,8 +14,8 @@ import * as ThreadId from "./ThreadId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Thread from "./Thread.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * One page of a thread's timeline, always in ascending sequence order. The range lies strictly
@@ -49,29 +49,6 @@ export const ReadOptions = Schema.Struct({
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
 /**
- * Storage failed while reading or writing activity.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("ThreadActivityStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID or occurrence
- * key, or a position other than the thread's next.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("ThreadActivityStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
-
-/**
  * The activity store, bound to one workspace by the host.
  *
  * What a storage adapter implements for activity.
@@ -88,25 +65,25 @@ export class ThreadActivityStore extends Context.Service<
   {
     readonly get: (
       id: ThreadActivity.Id,
-    ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, Failure>;
+    ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, StoreError.StoreError>;
     /**
      * A thread's whole timeline in sequence order. A history read for inspection; operations read
      * pages.
      */
     readonly listByThread: (
       id: ThreadId.Id,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>;
     /** Latest activity in this thread, using the caller's transaction when present. */
     readonly latest: (
       id: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, Failure>;
+    ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, StoreError.StoreError>;
     /**
      * The first activity of several threads in one read. Absent IDs are omitted and each thread
      * appears once; order is unspecified.
      */
     readonly getFirst: (
       ids: ReadonlyArray<ThreadId.Id>,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>;
     /**
      * At most limit activities of the requested range, from its requested end, in ascending
      * sequence order. No shared snapshot across pages.
@@ -114,7 +91,7 @@ export class ThreadActivityStore extends Context.Service<
     readonly readPage: (
       id: ThreadId.Id,
       options: ReadOptions,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>;
     /**
      * Reject reused IDs, a position other than the thread's next, and a
      * second activity with one occurrence key. The subject is recorded as given, checked when the
@@ -122,7 +99,7 @@ export class ThreadActivityStore extends Context.Service<
      */
     readonly insert: (
       record: ThreadActivity.ThreadActivity,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/thread/ThreadActivityStore") {}
 
@@ -137,8 +114,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: ThreadActivityStore["Service"],
 ): ThreadActivityStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("ThreadActivityStore");
+  const write = StoreInput.write("ThreadActivityStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", ThreadActivity.Id, id), driver.get),
     listByThread: (id) =>
@@ -176,19 +153,19 @@ const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
       function* (id) {
         return yield* rows.get((yield* read).records.of("threadActivities"), id);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "get")),
     ),
     listByThread: Effect.fn("ThreadActivityStore.memory.listByThread")(
       function* (input) {
         return yield* inThread(input);
       },
-      Effect.mapError(storeFailure(Failure, "listByThread")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "listByThread")),
     ),
     latest: Effect.fn("ThreadActivityStore.memory.latest")(
       function* (input) {
         return Array.last(yield* inThread(input));
       },
-      Effect.mapError(storeFailure(Failure, "latest")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "latest")),
     ),
     getFirst: Effect.fn("ThreadActivityStore.memory.getFirst")(
       function* (input) {
@@ -199,7 +176,7 @@ const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
           (record) => ids.has(record.threadId) && record.sequence === 1,
         );
       },
-      Effect.mapError(storeFailure(Failure, "getFirst")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "getFirst")),
     ),
     readPage: Effect.fn("ThreadActivityStore.memory.readPage")(
       function* (id, request) {
@@ -213,31 +190,37 @@ const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
           ? range.slice(Math.max(0, range.length - request.limit))
           : range.slice(0, request.limit);
       },
-      Effect.mapError(storeFailure(Failure, "readPage")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "readPage")),
     ),
     insert: Effect.fn("ThreadActivityStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("ThreadActivityStore", "insert")),
+      );
       const activities = yield* rows
         .all(space.records.of("threadActivities"))
-        .pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        .pipe(Effect.mapError(StoreError.failed("ThreadActivityStore", "insert")));
       const timeline = activities.filter((activity) => activity.threadId === record.threadId);
       const next =
         timeline.reduce((latest, activity) => Math.max(latest, activity.sequence), 0) + 1;
       if (record.sequence !== next)
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Activity must follow the current thread sequence",
-        });
+        return yield* StoreError.rejected(
+          "ThreadActivityStore",
+          "insert",
+          "Activity must follow the current thread sequence",
+        );
       if (
         space.records.of("threadActivities").has(record.id) ||
         (record.occurrence !== null &&
           activities.some((activity) => activity.occurrence === record.occurrence))
       )
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Activity ID reused, or its occurrence is already recorded",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected(
+          "ThreadActivityStore",
+          "insert",
+          "Activity ID reused, or its occurrence is already recorded",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("ThreadActivityStore", "insert")));
       space.records.of("threadActivities").set(record.id, row);
     }),
   };
@@ -246,9 +229,9 @@ const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
 
 /**
  * Provide `ThreadActivityStore` in process memory, over the workspace's `Store.MemoryBinding`: each
- * thread's timeline. It keeps what the contract leaves to storage: an activity conflicts unless its
- * sequence follows the thread's last, so each timeline stays contiguous from 1, and a reused ID, or
- * a second activity for one occurrence, conflicts. `make` checks every input first.
+ * thread's timeline. It keeps what the contract leaves to storage: an activity is rejected unless
+ * its sequence follows the thread's last, so each timeline stays contiguous from 1, and a reused
+ * ID, or a second activity for one occurrence, is rejected. `make` checks every input first.
  *
  * @category layers
  * @since 0.1.0

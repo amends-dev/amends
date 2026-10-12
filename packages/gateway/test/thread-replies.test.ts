@@ -24,7 +24,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -69,6 +69,8 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Replies: admission, recipients, concurrent sequencing, rollback, and replay. */
 
@@ -382,7 +384,7 @@ describe("thread replies", () => {
             const before = yield* snapshot(bound, first.thread.id);
             expect(
               yield* Effect.flip(run(bound, human, reply(first.thread.id, [agentId]))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
             // Replying where the agent already takes part reaches it without that authority.
             yield* run(bound, human, reply(first.thread.id));
@@ -408,7 +410,8 @@ describe("thread replies", () => {
             yield* grant(bound, humanId, ThreadPermissions.Read);
             const own = yield* run(bound, human, start(group.id, [humanId]));
             expect(yield* Effect.flip(run(bound, human, reply(own.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const assignment = yield* grant(
               bound,
@@ -418,7 +421,8 @@ describe("thread replies", () => {
             );
             yield* run(bound, human, reply(first.thread.id, [humanId]));
             expect(yield* Effect.flip(run(bound, human, reply(own.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const revoke = Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Revoked, {
@@ -430,7 +434,7 @@ describe("thread replies", () => {
             yield* facts(bound, revoke);
             expect(
               yield* Effect.flip(run(bound, human, reply(first.thread.id, [humanId]))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* facts(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -459,7 +463,7 @@ describe("thread replies", () => {
             );
             expect(
               yield* Effect.flip(run(bound, human, reply(first.thread.id, [humanId]))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* facts(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -471,7 +475,8 @@ describe("thread replies", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, reply(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -491,7 +496,11 @@ describe("thread replies", () => {
             for (const memberId of [otherId, Member.Id.make("missing")])
               expect(
                 yield* Effect.flip(run(bound, owner, reply(first.thread.id, [memberId]))),
-              ).toEqual(new ThreadMessageService.ParticipantUnavailable({ memberId }));
+              ).toEqual(
+                new CoreError.Conflict({
+                  reason: new CoreError.ParticipantUnavailable({ memberId }),
+                }),
+              );
             for (const operation of [
               reply(first.thread.id, [], " \n"),
               reply(first.thread.id, [humanId, humanId]),
@@ -500,19 +509,19 @@ describe("thread replies", () => {
                 _tag: "SchemaError",
               });
             expect(yield* Effect.flip(run(bound, agent, reply(first.thread.id)))).toEqual(
-              new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
             );
             expect(
               yield* Effect.flip(
                 run(bound, { ...human, identity: owner.identity }, reply(first.thread.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             const hidden = yield* run(bound, owner, create([otherId]));
             yield* grant(bound, otherId, ThreadPermissions.Start);
             const secret = yield* run(bound, actorFor(otherId), start(hidden.id));
             for (const id of [secret.thread.id, Thread.Id.make("missing")])
               expect(yield* Effect.flip(run(bound, owner, reply(id)))).toEqual(
-                new ThreadMessageService.NotFound({ threadId: id }),
+                new CoreError.NotFound({ resource: "Thread", id }),
               );
             const foreign = yield* boundTo(otherWorkspaceId);
             const foreignWorkspace = yield* initialized(foreign);
@@ -522,7 +531,7 @@ describe("thread replies", () => {
               identity: { _tag: "Human", id: foreignWorkspace.createdBy },
             });
             expect(yield* Effect.flip(run(foreign, foreignOwner, reply(first.thread.id)))).toEqual(
-              new ThreadMessageService.NotFound({ threadId: first.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: first.thread.id }),
             );
             expect(yield* messages(bound, first.thread.id)).toEqual(before.messages);
             expect(yield* bound.participations.listByThread(first.thread.id)).toEqual(
@@ -537,9 +546,14 @@ describe("thread replies", () => {
             );
             expect(
               yield* Effect.flip(run(bound, owner, reply(first.thread.id, [humanId]))),
-            ).toEqual(new ThreadMessageService.ParticipantUnavailable({ memberId: humanId }));
+            ).toEqual(
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: humanId }),
+              }),
+            );
             expect(yield* Effect.flip(run(bound, human, reply(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor" },
             });
             expect(yield* bound.activities.listByThread(first.thread.id)).toEqual([first.activity]);
             expect(
@@ -638,26 +652,19 @@ describe("thread replies", () => {
               Context.add(bound.context, ThreadMessageStore.ThreadMessageStore, {
                 ...bound.messages,
                 insert: () =>
-                  Effect.fail(
-                    new ThreadMessageStore.Failure({ operation: "insert", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("ThreadMessageStore", "insert")("injected")),
               }),
               Context.add(bound.context, ThreadActivityStore.ThreadActivityStore, {
                 ...bound.activities,
                 insert: () =>
-                  Effect.fail(
-                    new ThreadActivityStore.Failure({ operation: "insert", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("ThreadActivityStore", "insert")("injected")),
               }),
               Context.add(bound.context, NotificationStore.NotificationStore, {
                 ...bound.notifications,
                 insertMany: () =>
-                  Effect.fail(
-                    new NotificationStore.Failure({ operation: "insertMany", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("NotificationStore", "insertMany")("injected")),
               }),
-              failingLate(bound, new Store.Failure({ operation: "commit", cause: "injected" }))
-                .context,
+              failingLate(bound, StoreError.failed("Store", "commit")("injected")).context,
             ];
             for (const context of contexts) {
               const outcome = yield* Effect.exit(
@@ -781,7 +788,7 @@ describe("thread replies", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "Store.Conflict" },
+                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -909,17 +916,20 @@ describe("thread replies", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(first.thread.id, [otherId])),
             ),
-          ).toMatchObject({ _tag: "ThreadMessageService.ParticipantUnavailable" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "ParticipantUnavailable" },
+          });
           expect(
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(Thread.Id.make("missing"))),
             ),
-          ).toMatchObject({ _tag: "ThreadMessageService.NotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(first.thread.id, [], " ")),
             ),
-          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
         }),
       ),
     ),
@@ -935,13 +945,15 @@ describe("thread replies", () => {
           const context = Context.add(bound.context, ThreadActivityStore.ThreadActivityStore, {
             ...bound.activities,
             latest: () =>
-              Effect.fail(
-                new ThreadActivityStore.Failure({ operation: "latest", cause: "injected" }),
-              ),
+              Effect.fail(StoreError.failed("ThreadActivityStore", "latest")("injected")),
           });
           expect(
             yield* Effect.flip(run({ ...bound, context }, owner, reply(first.thread.id))),
-          ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadActivityStore",
+            reason: { _tag: "Failed" },
+          });
           expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
         }),
       ),
@@ -983,7 +995,7 @@ describe("thread replies", () => {
               ),
             );
             expect(yield* Effect.flip(asActor(ownReply, human))).toEqual(
-              new ThreadMessageService.NotFound({ threadId: first.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: first.thread.id }),
             );
             yield* run(
               bound,
@@ -1059,9 +1071,7 @@ describe("thread replies", () => {
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(
-                    /^(Store.Conflict|ThreadMessageService.ParticipantUnavailable)$/,
-                  ),
+                  _tag: expect.stringMatching(/^(StoreError|CoreError.Conflict)$/),
                 },
               });
           yield* Effect.scoped(
@@ -1095,7 +1105,10 @@ describe("thread replies", () => {
                   yield* Effect.flip(
                     run(bound, saved.owner, reply(saved.first.thread.id, [agentId])),
                   ),
-                ).toMatchObject({ _tag: "ThreadMessageService.ParticipantUnavailable" });
+                ).toMatchObject({
+                  _tag: "CoreError.Conflict",
+                  reason: { _tag: "ParticipantUnavailable" },
+                });
                 expect(yield* snapshot(bound, saved.first.thread.id)).toEqual(before);
               }),
             ),
@@ -1268,17 +1281,17 @@ describe("thread replies", () => {
             // Only the author edits a message; agents edit through their turns; to anyone
             // outside the group, and for a message that does not exist, there is no message.
             expect(yield* Effect.flip(edit(owner, messageId, "Final", []))).toEqual(
-              new ThreadMessageService.NotAuthor({ messageId }),
+              new CoreError.Denied({ reason: new CoreError.NotAuthor({ messageId }) }),
             );
             expect(yield* Effect.flip(edit(agent, messageId, "Final", []))).toEqual(
-              new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
             );
             expect(yield* Effect.flip(edit(other, messageId, "Final", []))).toEqual(
-              new ThreadMessageService.MessageNotFound({ messageId }),
+              new CoreError.NotFound({ resource: "ThreadMessage", id: messageId }),
             );
             const missing = ThreadMessage.Id.make("missing");
             expect(yield* Effect.flip(edit(human, missing, "Final", []))).toEqual(
-              new ThreadMessageService.MessageNotFound({ messageId: missing }),
+              new CoreError.NotFound({ resource: "ThreadMessage", id: missing }),
             );
             expect(yield* history(bound)).toEqual(before);
             // The edit newly mentions a group member who did not take part: they join and are told.
@@ -1355,24 +1368,27 @@ describe("thread replies", () => {
             // meanwhile, so it is refused; a mention who cannot take part is unavailable.
             expect(yield* edit(human, messageId, text, [otherId], 7)).toEqual(edited);
             expect(yield* Effect.flip(edit(human, messageId, "Again", [otherId], 1))).toEqual(
-              new ThreadMessageService.Changed({ messageId }),
+              new CoreError.Changed({ resource: "ThreadMessage", id: messageId }),
             );
             expect(
               yield* Effect.flip(
                 edit(human, messageId, "Again", [otherId, Member.Id.make("nobody")], 2),
               ),
             ).toEqual(
-              new ThreadMessageService.ParticipantUnavailable({
-                memberId: Member.Id.make("nobody"),
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({
+                  memberId: Member.Id.make("nobody"),
+                }),
               }),
             );
             expect(yield* history(bound)).toHaveLength(before.length + 2);
             // Only the author or a moderator of the group deletes; the owner moderates.
             expect(yield* Effect.flip(remove(other, messageId))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             expect(yield* Effect.flip(remove(agent, messageId))).toEqual(
-              new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
             );
             yield* TestClock.adjust("1 second");
             const deletedAt = yield* DateTime.now;
@@ -1395,7 +1411,7 @@ describe("thread replies", () => {
             // A deleted message has no text to edit, and is deleted once; it no longer counts
             // as a reply, and deleting the opening message leaves the thread its title alone.
             expect(yield* Effect.flip(edit(human, messageId, "Back", [], 2))).toEqual(
-              new ThreadMessageService.Deleted({ messageId }),
+              new CoreError.Conflict({ reason: new CoreError.Deleted({ messageId }) }),
             );
             expect(yield* remove(human, messageId)).toEqual(deleted);
             expect(yield* history(bound)).toHaveLength(before.length + 3);

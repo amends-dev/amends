@@ -42,6 +42,7 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * Marking notifications seen: a human's Seen is private state outside the journal. Ownership,
@@ -289,7 +290,7 @@ describe("marking notifications seen", () => {
             // Agents accept work rather than seeing it, and everyone counts only their own.
             expect(
               yield* Effect.flip(service(agent)((s) => s.markSeenThrough(through))),
-            ).toMatchObject({ _tag: "NotificationService.HumanRecipientRequired" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
             expect(yield* service(p.owner)((s) => s.countPending)).toBe(2);
             expect(
               yield* p.bound.notifications.countPendingByRecipient(
@@ -311,16 +312,12 @@ describe("marking notifications seen", () => {
             const p = yield* prepare();
             const before = yield* snapshot(p);
             for (const [actor, id, tag] of [
-              [p.owner, p.humanNote.id, "NotificationService.NotFound"],
-              [agent, p.humanNote.id, "NotificationService.NotFound"],
-              [human, p.agentNote.id, "NotificationService.NotFound"],
-              [human, Notification.Id.make("missing"), "NotificationService.NotFound"],
-              [agent, p.agentNote.id, "NotificationService.HumanRecipientRequired"],
-              [
-                changed(human, { identity: p.owner.identity }),
-                p.humanNote.id,
-                "Authorization.InvalidActor",
-              ],
+              [p.owner, p.humanNote.id, "CoreError.NotFound"],
+              [agent, p.humanNote.id, "CoreError.NotFound"],
+              [human, p.agentNote.id, "CoreError.NotFound"],
+              [human, Notification.Id.make("missing"), "CoreError.NotFound"],
+              [agent, p.agentNote.id, "CoreError.Denied"],
+              [changed(human, { identity: p.owner.identity }), p.humanNote.id, "CoreError.Denied"],
             ] as const)
               expect(yield* Effect.flip(run(p.bound, actor, markSeen(id)))).toMatchObject({
                 _tag: tag,
@@ -341,9 +338,7 @@ describe("marking notifications seen", () => {
                 );
                 expect(
                   yield* Effect.flip(notificationService.markSeen(p.humanNote.id)),
-                ).toMatchObject({
-                  _tag: "Authorization.InvalidActor",
-                });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
               }),
             );
             // Removal from the workspace ended their access, which settled what was pending.
@@ -420,9 +415,7 @@ describe("marking notifications seen", () => {
           const context = Context.add(p.bound.context, NotificationStore.NotificationStore, {
             ...p.bound.notifications,
             markSeen: () =>
-              Effect.fail(
-                new NotificationStore.Failure({ operation: "markSeen", cause: "injected" }),
-              ),
+              Effect.fail(StoreError.failed("NotificationStore", "markSeen")("injected")),
           });
           expect(
             Exit.isFailure(
@@ -483,7 +476,8 @@ describe("marking notifications seen", () => {
             // The human leaves Team after the notification was read as pending, before Seen.
             const racing = racingSeen(p.bound, leave(admission.id));
             expect(yield* Effect.flip(run(racing, human, markSeen(p.humanNote.id)))).toMatchObject({
-              _tag: "NotificationService.AlreadyHandled",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyHandled" },
             });
             expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
               value: { state: { _tag: "Discarded", reason: "access-lost" } },
@@ -667,7 +661,8 @@ describe("marking notifications seen", () => {
             ),
           );
           expect(yield* Effect.flip(operation)).toMatchObject({
-            _tag: "Authorization.InvalidActor",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "InvalidActor" },
           });
           expect(yield* snapshot(p)).toEqual(before);
         }),
@@ -785,25 +780,42 @@ describe("marking notifications seen", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Rejected" },
+            });
             const before = yield* snapshot(p);
             for (const id of [Notification.Id.make("missing"), p.agentNote.id, discarded.id])
               // A valid ID in the same call is not recorded either.
               expect(
                 yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id, id], seenAt)),
-              ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "NotificationStore",
+                reason: { _tag: "Rejected" },
+              });
             expect(
               yield* Effect.flip(foreign.notifications.markSeen([p.humanNote.id], seenAt)),
-            ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* snapshot(p)).toEqual(before);
             expect(yield* Effect.flip(run(p.bound, human, markSeen(discarded.id)))).toMatchObject({
-              _tag: "NotificationService.AlreadyHandled",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyHandled" },
             });
             const invalid = { at: seenAt };
             Reflect.set(invalid, "at", "not-a-date");
             expect(
               yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id], invalid.at)),
-            ).toMatchObject({ _tag: "NotificationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "NotificationStore",
+              reason: { _tag: "Rejected" },
+            });
             yield* p.bound.notifications.markSeen([], seenAt);
             yield* p.bound.notifications.markSeen([p.humanNote.id, p.humanNote.id], seenAt);
             const result = changed(p.humanNote, { state: seenState(seenAt) });
@@ -903,7 +915,7 @@ describe("marking notifications seen", () => {
             });
             expect(
               yield* Effect.flip(run({ ...p.bound, context }, human, markSeen(p.humanNote.id))),
-            ).toMatchObject({ _tag: "NotificationService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* snapshot(p)).toEqual(before);
           }),
         ),
@@ -933,19 +945,19 @@ describe("marking notifications seen", () => {
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, p.owner.identity, markSeen(p.humanNote.id)),
                 ),
-              ).toMatchObject({ _tag: "NotificationService.NotFound" });
+              ).toMatchObject({ _tag: "CoreError.NotFound" });
               expect(
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, agent.identity, markSeen(p.agentNote.id)),
                 ),
-              ).toMatchObject({ _tag: "NotificationService.HumanRecipientRequired" });
+              ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
               const invalid = { id: p.humanNote.id };
               Reflect.set(invalid, "id", "");
               expect(
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, human.identity, markSeen(invalid.id)),
                 ),
-              ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+              ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
             }),
           );
         }),

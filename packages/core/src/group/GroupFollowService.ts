@@ -26,42 +26,8 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollow from "./GroupFollow.ts";
 import * as GroupFollowFacts from "./GroupFollowFacts.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
-import {
-  AgentRequired,
-  GroupNotFound,
-  MemberUnavailable,
-  NotFollowable,
-} from "./internal/group-follow-errors.ts";
-export {
-  /**
-   * Only an agent can be made to follow by another member; people follow for themselves.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AgentRequired,
-  /**
-   * Missing, foreign, and groups the actor does not belong to share this outcome.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GroupNotFound,
-  /**
-   * The named member is missing, inactive, or not a current member of the group.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberUnavailable,
-  /**
-   * A direct group's members already take part in all of its threads.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFollowable,
-} from "./internal/group-follow-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What following and unfollowing can fail with: the outcomes above, and the
@@ -72,18 +38,15 @@ export {
  */
 export type Error =
   | Authorization.Error
-  | GroupStore.Failure
-  | GroupMembershipStore.Failure
-  | MemberStore.Failure
-  | GroupFollowStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error
-  | GroupNotFound
-  | NotFollowable
-  | MemberUnavailable
-  | AgentRequired;
+  | CoreError.NotFound
+  | CoreError.Invalid
+  | CoreError.Conflict
+  | CoreError.Denied;
 
 /**
  * The follow operations, one of `Core.Operations`.
@@ -133,18 +96,14 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     following: boolean,
   ) {
     const request = yield* Schema.decodeEffect(GroupFollow.Input)(input);
-    const own = yield* groupQuery
-      .requireAudience(request.groupId)
-      .pipe(
-        Effect.catchTag(
-          "GroupQuery.NotMember",
-          () => new GroupNotFound({ groupId: request.groupId }),
-        ),
-      );
+    const own = yield* groupQuery.requireAudience(request.groupId);
     const foundGroup = yield* groupStore.get(request.groupId);
     if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
     const group = foundGroup.value;
-    if (group.kind === "Direct") return yield* new NotFollowable({ groupId: group.id });
+    if (group.kind === "Direct")
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.NotFollowable({ groupId: group.id }),
+      });
     const actor = yield* Actor.Actor;
     if (request.memberId === actor.memberId) {
       // People follow for themselves under group.follow; unfollowing needs no grant.
@@ -161,12 +120,18 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     const admission = yield* groupMembershipStore.findActive(group.id, request.memberId);
     const found = yield* memberStore.get(request.memberId);
     if (Option.isNone(admission) || Option.isNone(found))
-      return yield* new MemberUnavailable({ memberId: request.memberId });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.ParticipantUnavailable({ memberId: request.memberId }),
+      });
     const member = found.value;
     if (member.status !== "active")
-      return yield* new MemberUnavailable({ memberId: request.memberId });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.ParticipantUnavailable({ memberId: request.memberId }),
+      });
     if (!Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
-      return yield* new AgentRequired({ memberId: request.memberId });
+      return yield* new CoreError.Denied({
+        reason: new CoreError.AgentRequired({ memberId: request.memberId }),
+      });
     // Directing an agent's attention is using it, in either direction.
     yield* authorization.require([
       Requirement.make(AgentPermissions.Use, {

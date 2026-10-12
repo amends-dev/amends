@@ -15,6 +15,7 @@ import * as Store from "../../src/journal/Store.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import * as Transaction from "../../src/journal/Transaction.ts";
 import { Counter, make, type Fixture } from "../memory.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
@@ -96,11 +97,7 @@ it.effect("a commit between the empty read and wait registration is not lost", (
                   yield* (yield* Store.Transaction).append({ logId: id, entries: [{ payload }] });
                 }),
               )
-              .pipe(
-                Effect.mapError(
-                  (cause) => new Store.Failure({ operation: "test external append", cause }),
-                ),
-              );
+              .pipe(Effect.mapError(StoreError.failed("Store", "test external append")));
           }
           return batches;
         }),
@@ -336,7 +333,7 @@ it.effect("consumers wait independently and interruption releases the host wait"
 it.effect("spurious wakeups re-read storage and failures terminate the tail unchanged", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const failure = new Store.Failure({ operation: "waitForAppend", cause: "connection lost" });
+    const failure = StoreError.failed("Store", "waitForAppend")("connection lost");
     let waits = 0;
     let reads = 0;
     const broken: Fixture = {

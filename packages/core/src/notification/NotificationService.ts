@@ -22,37 +22,9 @@ import * as NotificationInbox from "./NotificationInbox.ts";
 import type * as Thread from "../thread/Thread.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import {
-  AlreadyHandled,
-  HumanRecipientRequired,
-  NotFound,
-} from "./internal/notification-errors.ts";
 import * as Store from "../journal/Store.ts";
-export {
-  /**
-   * The notification no longer waits for its recipient: it was discarded, or settled some other way,
-   * so it cannot be marked seen.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyHandled,
-  /**
-   * The acting member is not a person: only people mark their notifications seen.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanRecipientRequired,
-  /**
-   * The notification is missing, or is another recipient's; the two are deliberately not told
-   * apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-} from "./internal/notification-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What every notification operation can fail with: authorization, the store, and an input that
@@ -61,7 +33,7 @@ export {
  * @category errors
  * @since 0.1.0
  */
-export type Error = Authorization.Error | NotificationStore.Failure | Schema.SchemaError;
+export type Error = Authorization.Error | StoreError.StoreError | Schema.SchemaError;
 
 /**
  * What reading a notification's source can fail with.
@@ -69,9 +41,7 @@ export type Error = Authorization.Error | NotificationStore.Failure | Schema.Sch
  * @category errors
  * @since 0.1.0
  */
-export type SourceError =
-  | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
-  | Log.ReadError;
+export type SourceError = Exclude<ThreadQuery.TimelineError, CoreError.NotFound> | Log.ReadError;
 
 /**
  * What reading the inbox can fail with: reading notifications, and reading their sources.
@@ -90,10 +60,10 @@ export type InboxError = Error | SourceError;
  */
 export type MarkSeenError =
   | Error
-  | NotificationStore.Conflict
-  | NotFound
-  | HumanRecipientRequired
-  | AlreadyHandled;
+  | StoreError.StoreError
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict;
 
 /**
  * The notification operations, one of `Core.Operations`.
@@ -128,7 +98,11 @@ export class NotificationService extends Context.Service<
      */
     readonly markSeenThrough: (
       through: NotificationStore.Cursor,
-    ) => Effect.Effect<number, Exclude<MarkSeenError, NotFound | AlreadyHandled>, Actor.Actor>;
+    ) => Effect.Effect<
+      number,
+      Exclude<MarkSeenError, CoreError.NotFound | CoreError.Conflict>,
+      Actor.Actor
+    >;
     /** How many notifications are still pending for the acting member, from anywhere. */
     readonly countPending: Effect.Effect<number, Error, Actor.Actor>;
   }
@@ -191,7 +165,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     const id = yield* Schema.decodeEffect(Notification.Id)(notificationId);
     const found = yield* notificationStore.get(id);
     if (Option.isNone(found) || !isSameRecipient(found.value.recipient, target))
-      return yield* new NotFound({ workspaceId, notificationId: id });
+      return yield* new CoreError.NotFound({ resource: "Notification", id });
     return found.value;
   });
 
@@ -219,10 +193,8 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     const event = yield* Effect.orDie(Event.decode(ThreadActivityFacts.Recorded, entry));
     return yield* threadQuery.readTimelineItem(event.payload.activity.id).pipe(
       Effect.asSome,
-      Effect.catchTags({
-        "ThreadQuery.NotFound": () => Effect.succeedNone,
-        "Authorization.Denied": () => Effect.succeedNone,
-      }),
+      Effect.catchTag("CoreError.NotFound", () => Effect.succeedNone),
+      Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeedNone),
     );
   });
   const inbox = Effect.fn("NotificationService.inbox")(function* (
@@ -249,19 +221,23 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
   ) {
     const notification = yield* requireOwn(notificationId);
     if (!Notification.Recipient.isAnyOf(["Human"])(notification.recipient))
-      return yield* new HumanRecipientRequired({});
+      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
     if (Notification.State.isAnyOf(["Seen"])(notification.state)) return notification;
     if (!Notification.State.isAnyOf(["Pending"])(notification.state))
-      return yield* new AlreadyHandled({ notificationId: notification.id });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.AlreadyHandled({ notificationId: notification.id }),
+      });
     // Leaving its group may settle it first, and the store then refuses it or records nothing:
     // what it reads as afterwards decides.
     yield* notificationStore
       .markSeen([notification.id], yield* DateTime.now)
-      .pipe(Effect.catchTag("NotificationStore.Conflict", () => Effect.void));
+      .pipe(Effect.catchReason("StoreError", "Rejected", () => Effect.void));
     // Another device may have seen it first; the stored time is the one that holds.
     const seen = yield* requireOwn(notification.id);
     if (Notification.State.isAnyOf(["Discarded"])(seen.state))
-      return yield* new AlreadyHandled({ notificationId: notification.id });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.AlreadyHandled({ notificationId: notification.id }),
+      });
     if (!Notification.State.isAnyOf(["Seen"])(seen.state))
       return yield* Effect.die("A seen notification still reads as unseen");
     // The recipient's other sessions hear of it as a signal.
@@ -279,7 +255,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
   ) {
     const target = yield* requireRecipient();
     if (!Notification.Recipient.isAnyOf(["Human"])(target))
-      return yield* new HumanRecipientRequired({});
+      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
     const through = yield* decodeCursor(input);
     const memberId = (yield* Actor.Actor).memberId;
     /** One page marked: what it listed and how many of them were due. */
@@ -307,7 +283,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       const { page, due } = yield* markPageSeen(after).pipe(
         Effect.retry({
           times: 2,
-          while: Schema.is(NotificationStore.Conflict),
+          while: (error) => error._tag === "StoreError" && error.reason._tag === "Rejected",
         }),
       );
       marked += due;

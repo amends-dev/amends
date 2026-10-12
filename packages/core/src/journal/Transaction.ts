@@ -14,6 +14,7 @@ import { Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect"
 import type { Cause, Scope } from "effect";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Store from "./Store.ts";
+import * as StoreError from "./StoreError.ts";
 
 /**
  * A write in the commit had failed, though its caller caught the failure, so the commit rolls
@@ -69,15 +70,14 @@ export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()(
 export class Concurrent extends Schema.TaggedError<Concurrent>()("Transaction.Concurrent", {}) {}
 
 /**
- * What running a commit can fail with: storage's failures, conflicts, and uncertain outcomes, and
+ * What running a commit can fail with: storage's errors and uncertain outcomes, and
  * the coordinator's own errors.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Store.Failure
-  | Store.Conflict
+  | StoreError.StoreError
   | Store.CommitUncertain
   | Aborted
   | Closed

@@ -1,10 +1,9 @@
 /**
  * The PostgreSQL driver for `ChannelStore.ChannelStore`, over the `channels` table, one row per
- * channel, removed ones included. `ChannelStore.make` checks every input before the driver sees
- * it, so the driver keeps only what storage keeps: the primary key refuses a reused ID as the
- * store's `Conflict`, and an update that finds no row conflicts. Every statement is scoped to the
- * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
- * and requires one for a write.
+ * channel, removed ones included. `ChannelStore.make` checks every input before the driver sees it,
+ * so the driver keeps only what storage keeps: the primary key rejects a reused ID, and an update
+ * that finds no row is rejected. Every statement is scoped to the binding's workspace and runs
+ * under its `guard`, which lets a read join the caller's transaction and requires one for a write.
  *
  * @since 0.1.0
  */
@@ -12,8 +11,9 @@ import { Channel, ChannelStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { channels } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ...Channel.Channel.fields, createdAt: Schema.DateTimeUtcFromDate })),
@@ -50,17 +50,20 @@ export const make = Effect.fn("Channels.make")(function* () {
           Effect.map(Array.head),
         );
       },
-      Effect.mapError(storeFailure(ChannelStore, "get")),
+      Effect.mapError(StoreError.failed("ChannelStore", "get")),
     ),
     listActive: guard(
       db
         .select()
         .from(channels)
         .where(and(eq(channels.workspaceId, workspaceId), eq(channels.status, "active"))),
-    ).pipe(Effect.flatMap(decodeRows), Effect.mapError(storeFailure(ChannelStore, "listActive"))),
+    ).pipe(
+      Effect.flatMap(decodeRows),
+      Effect.mapError(StoreError.failed("ChannelStore", "listActive")),
+    ),
     insert: Effect.fn("Channels.insert")(function* (record) {
       yield* guard(db.insert(channels).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError(ChannelStore, "insert")),
+        Effect.mapError(storeError("ChannelStore", "insert")),
       );
     }),
     update: Effect.fn("Channels.update")(function* (record) {
@@ -71,12 +74,9 @@ export const make = Effect.fn("Channels.make")(function* () {
           .where(inWorkspace(record.id))
           .returning({ id: channels.id }),
         true,
-      ).pipe(Effect.mapError(storeError(ChannelStore, "update")));
+      ).pipe(Effect.mapError(storeError("ChannelStore", "update")));
       if (updated.length === 0)
-        return yield* new ChannelStore.Conflict({
-          operation: "update",
-          message: "Expected a stored channel",
-        });
+        return yield* StoreError.rejected("ChannelStore", "update", "Expected a stored channel");
     }),
   };
   return ChannelStore.make(workspaceId, driver);

@@ -109,17 +109,18 @@ it.effect(
           if (key === null) return yield* Effect.die("Expected occurrence key");
           expect(Option.isSome(yield* journal.log.getAppend(key))).toBe(true);
           expect(
-            (yield* Effect.flip(journal.publish(Received, { ...input, amount: 99 })))._tag,
-          ).toBe("Store.Conflict");
+            yield* Effect.flip(journal.publish(Received, { ...input, amount: 99 })),
+          ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
           const version2 = Fact.make(Received.name, {
             subject: testSubject,
             version: 2,
             payload: Payload,
             occurrence: identity,
           });
-          expect((yield* Effect.flip(journal.publish(version2, input)))._tag).toBe(
-            "Store.Conflict",
-          );
+          expect(yield* Effect.flip(journal.publish(version2, input))).toMatchObject({
+            _tag: "StoreError",
+            reason: { _tag: "Rejected" },
+          });
           expect(yield* fixture.counter.get).toBe(2);
         }),
       );
@@ -171,16 +172,15 @@ it.effect(
           const journal = yield* setup;
           const manual = Occurrence.Key.make("manual-request");
           expect(
-            (yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: manual })))._tag,
-          ).toBe("Store.Conflict");
+            yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: manual })),
+          ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
           expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
           const automatic = yield* journal.publish(Received, input);
           const derived = yield* Fact.makeOccurrenceKey(Received, input);
           if (derived === null) return yield* Effect.die("Expected occurrence key");
           expect(
-            (yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: derived })))
-              ._tag,
-          ).toBe("Store.Conflict");
+            yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: derived })),
+          ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
           expect(yield* journal.publish(Received, input)).toEqual(automatic);
           const unkeyed = { ...input, requestId: null };
           const first = yield* journal.publish(Received, unkeyed);

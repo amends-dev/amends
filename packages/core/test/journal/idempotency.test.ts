@@ -15,6 +15,7 @@ import * as Transaction from "../../src/journal/Transaction.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import { Counter, make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
@@ -168,8 +169,8 @@ it.effect(
             Fact.make(Changed.name, { subject: testSubject, version: 2, payload: Schema.Finite }),
           ])
             expect(
-              (yield* Effect.flip(journal.publish(fact, 1, { idempotencyKey: key })))._tag,
-            ).toBe("Store.Conflict");
+              yield* Effect.flip(journal.publish(fact, 1, { idempotencyKey: key })),
+            ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
           const failing = yield* Journal.make({
             logId: Entry.LogId.make("failing"),
             projections: [
@@ -224,21 +225,21 @@ it.effect(
           );
           for (const input of [["one"], ["two", "one"], ["one", "changed"]])
             expect(
-              (yield* Effect.flip(executionLog.appendAll(input, { idempotencyKey: key })))._tag,
-            ).toBe("Store.Conflict");
+              yield* Effect.flip(executionLog.appendAll(input, { idempotencyKey: key })),
+            ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
           expect(
             (yield* Effect.flip(
               executionLog.appendAll([], { idempotencyKey: Occurrence.Key.make("empty") }),
             ))._tag,
           ).toBe("SchemaError");
           expect(
-            (yield* Effect.flip(
+            yield* Effect.flip(
               executionLog.append("new", {
                 idempotencyKey: Occurrence.Key.make("new"),
                 expectedAfter: Option.none(),
               }),
-            ))._tag,
-          ).toBe("Store.Conflict");
+            ),
+          ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Contended" } });
           expect(yield* executionLog.getAppend(Occurrence.Key.make("new"))).toEqual(Option.none());
           const other = log.open({ id: Entry.LogId.make("other"), schema: Schema.String });
           yield* other.append("different", { idempotencyKey: key });
@@ -288,7 +289,7 @@ it.effect(
         }),
       );
       expect((yield* fixture.snapshot).logs.get(Entry.LogId.make("guarded"))).toHaveLength(1);
-      const failure = new Store.Failure({ operation: "getAppend", cause: "lookup unavailable" });
+      const failure = StoreError.failed("Store", "getAppend")("lookup unavailable");
       const unavailable: Fixture = {
         ...fixture,
         store: { ...fixture.store, getAppend: () => Effect.fail(failure) },

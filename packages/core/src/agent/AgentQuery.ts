@@ -19,16 +19,8 @@ import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
-
-/**
- * The member is not one of the workspace's agents: it is a person, or its membership ended.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("AgentQuery.NotFound", {
-  memberId: MemberId.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading the agent of a member can fail with.
@@ -36,26 +28,17 @@ export class NotFound extends Schema.TaggedError<NotFound>()("AgentQuery.NotFoun
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = NotFound | MemberStore.Failure | AgentStore.Failure;
-
-/**
- * The agent cannot run on what it is set up with, for the issues its readiness reports.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Incomplete extends Schema.TaggedError<Incomplete>()("AgentQuery.Incomplete", {
-  issues: Schema.NonEmptyArray(Agent.Issue),
-}) {}
+export type ReadError = CoreError.NotFound | StoreError.StoreError;
 
 /**
  * What selecting can fail with: what reading the agent and the workspace's connections meets, and
- * `Incomplete`, when the agent cannot run for the issues its readiness reports.
+ * `CoreError.Invalid` (`Incomplete`), when the agent cannot run for the issues its readiness
+ * reports.
  *
  * @category errors
  * @since 0.1.0
  */
-export type SelectError = ReadError | ConnectionStore.Failure | Incomplete;
+export type SelectError = ReadError | StoreError.StoreError | CoreError.Invalid;
 
 /**
  * What building can fail with: what selecting meets, and a connection whose key cannot be read.
@@ -63,7 +46,7 @@ export type SelectError = ReadError | ConnectionStore.Failure | Incomplete;
  * @category errors
  * @since 0.1.0
  */
-export type BuildError = SelectError | ConnectionCredentialStore.Failure;
+export type BuildError = SelectError | StoreError.StoreError;
 
 /**
  * An agent ready to run on a selection, as data: what it works by, and the connections of its
@@ -108,9 +91,9 @@ export class AgentQuery extends Context.Service<
 
     /**
      * The agent of `memberId` ready to run on `selection`: its instructions, and each connection of
-     * the selection with the key it holds. Fails with `Incomplete` when a connection of the selection
-     * can no longer give its part, as when it was removed since the selection was made, or it has no
-     * key.
+     * the selection with the key it holds. Fails with `CoreError.Invalid` (`Incomplete`) when a
+     * connection of the selection can no longer give its part, as when it was removed since the
+     * selection was made, or it has no key.
      */
     readonly buildRunnable: (
       memberId: MemberId.Id,
@@ -128,7 +111,9 @@ const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
 
 /** A connection's failure to give `part`, as the issue it is to the agent. */
 const invalid = (part: Agent.Part, description: string) =>
-  new Incomplete({ issues: [{ _tag: "Invalid", part, description }] });
+  new CoreError.Invalid({
+    reason: new CoreError.Incomplete({ issues: [{ _tag: "Invalid", part, description }] }),
+  });
 
 /**
  * Capture the stores and the host's integrations; each read finds the agent by its membership.
@@ -147,12 +132,13 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
   const requireAgent = Effect.fnUntraced(function* (memberId: MemberId.Id) {
     const member = yield* memberStore.get(memberId);
     if (Option.isNone(member) || member.value.status !== "active")
-      return yield* new NotFound({ memberId });
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
     const { identity } = member.value;
     if (!Identity.MemberReference.isAnyOf(["Agent"])(identity))
-      return yield* new NotFound({ memberId });
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
     const found = yield* agentStore.get(identity.id);
-    if (Option.isNone(found)) return yield* new NotFound({ memberId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
     return found.value;
   });
 
@@ -162,7 +148,8 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     connections: AgentReadiness.Connections,
   ) {
     const issues = yield* AgentReadiness.issuesOf(setup, connections, integrations);
-    if (Array.isReadonlyArrayNonEmpty(issues)) return yield* new Incomplete({ issues });
+    if (Array.isReadonlyArrayNonEmpty(issues))
+      return yield* new CoreError.Invalid({ reason: new CoreError.Incomplete({ issues }) });
   });
 
   /**
@@ -177,7 +164,10 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     if (record.harness._tag === "Connection") return record.harness.connectionId;
     const choices = yield* AgentReadiness.harnessesToChoose(record, connections, integrations);
     const chosen = AgentReadiness.chooseHarness(choices, previous?.harness.connectionId);
-    if (chosen === undefined) return yield* new Incomplete({ issues: [{ _tag: "NoHarness" }] });
+    if (chosen === undefined)
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.Incomplete({ issues: [{ _tag: "NoHarness" }] }),
+      });
     return chosen;
   });
 
@@ -197,16 +187,16 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
       integrations,
     );
     if (resolved._tag !== "Installed")
-      return yield* new Incomplete({ issues: [{ _tag: resolved._tag, part }] });
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.Incomplete({ issues: [{ _tag: resolved._tag, part }] }),
+      });
     const { connection } = resolved;
     if (connection.auth === "none")
       return { connection, credential: null } satisfies Connection.Access;
     const credential = yield* connectionCredentialStore
       .get(connectionId)
       .pipe(
-        Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
-          invalid(part, reason),
-        ),
+        Effect.catchTag("CoreError.Unavailable", ({ reason }) => invalid(part, reason.message)),
       );
     if (Option.isNone(credential))
       return yield* invalid(part, `The connection ${connection.name} has no API key`);

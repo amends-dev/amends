@@ -248,7 +248,9 @@ it("keeps a stale role choice through a refresh and saves it against what was re
   expect(f.view.role.changed("ada")).toBe(true);
   // Someone else changed Ada's access meanwhile.
   f.server.adaAssignment = "a-ada-2";
-  f.server.roleAnswers.push(json({ _tag: "AssignmentService.Changed", memberId: "ada" }, 409));
+  f.server.roleAnswers.push(
+    json({ _tag: "CoreError.Changed", resource: "Member", id: "ada" }, 409),
+  );
   f.view.role.save("ada");
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "role", error: "changed" }));
   expect(f.view.stale()).toBe(true);

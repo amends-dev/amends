@@ -1,7 +1,7 @@
 import { Integration } from "@amends-dev/connection";
 import { Connection, ConnectionService } from "@amends-dev/core/connection";
 import { Actor, type Identity } from "@amends-dev/core/identity";
-import { Journal, Store } from "@amends-dev/core/journal";
+import { Journal } from "@amends-dev/core/journal";
 import { Request } from "@amends-dev/core/request";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
@@ -22,6 +22,8 @@ import {
   request,
   testModel,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,
@@ -215,7 +217,8 @@ describe("connections", () => {
             ];
             for (const denied of operations)
               expect(yield* Effect.flip(as(workspace.id, bob, denied))).toMatchObject({
-                _tag: "Authorization.Denied",
+                _tag: "CoreError.Denied",
+                reason: { _tag: "NotGranted" },
               });
 
             // The key is stored apart, and never reaches the journal its settings reach.
@@ -248,13 +251,13 @@ describe("connections", () => {
           expect(yield* modelsOf(offeringNone.id)).toEqual({ listed: [], unlisted: false });
           const missing = Connection.Id.make("missing");
           expect(yield* Effect.flip(modelsOf(missing))).toEqual(
-            new ConnectionService.NotFound({ connectionId: missing }),
+            new CoreError.NotFound({ resource: "Connection", id: missing }),
           );
           yield* as(workspace.id, alice, (connectionService) =>
             connectionService.remove(offering.id),
           );
           expect(yield* Effect.flip(modelsOf(offering.id))).toEqual(
-            new ConnectionService.NotFound({ connectionId: offering.id }),
+            new CoreError.NotFound({ resource: "Connection", id: offering.id }),
           );
         }),
       ),
@@ -300,7 +303,9 @@ describe("connections", () => {
                 }),
               ),
             ),
-          ).toEqual(new ConnectionService.Keyless({ connectionId: keyless.id }));
+          ).toEqual(
+            new CoreError.Invalid({ reason: new CoreError.Keyless({ connectionId: keyless.id }) }),
+          );
           expect(yield* journalText(bound)).not.toContain("sk-bad");
         }),
       ),
@@ -318,7 +323,9 @@ describe("connections", () => {
               as(workspace.id, alice, (connectionService) => connectionService.create(input)),
             );
           expect(yield* refused(changed(models, { integration: "not-installed" }))).toEqual(
-            new ConnectionService.UnknownIntegration({ integration: "not-installed" }),
+            new CoreError.Invalid({
+              reason: new CoreError.UnknownIntegration({ integration: "not-installed" }),
+            }),
           );
           const unaccepted: ReadonlyArray<Connection.CreateInput["settings"]> = [
             {},
@@ -326,23 +333,29 @@ describe("connections", () => {
           ];
           for (const settings of unaccepted) {
             const invalid = yield* refused(changed(models, { settings }));
-            expect(invalid).toBeInstanceOf(ConnectionService.InvalidConnection);
+            expect(invalid).toBeInstanceOf(CoreError.Invalid);
             expect(invalid).toMatchObject({
-              description: expect.stringContaining(
-                "The settings of Models do not match what Test models takes",
-              ),
+              reason: {
+                _tag: "IntegrationRefused",
+                description: expect.stringContaining(
+                  "The settings of Models do not match what Test models takes",
+                ),
+              },
             });
           }
           expect(
             yield* refused(changed(tools, { auth: "apiKey", apiKey: Redacted.make(goodKey) })),
           ).toEqual(
-            new ConnectionService.InvalidConnection({
-              description: "Test tools takes no authentication by apiKey",
+            new CoreError.Invalid({
+              reason: new CoreError.IntegrationRefused({
+                description: "Test tools takes no authentication by apiKey",
+              }),
             }),
           );
           // A key for a connection that authenticates with none is not a request at all.
           expect(yield* refused(changed(tools, { apiKey: Redacted.make(goodKey) }))).toMatchObject({
-            _tag: "GatewayErrors.InvalidInput",
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "Malformed" },
           });
 
           const created = yield* as(workspace.id, alice, (connectionService) =>
@@ -356,7 +369,7 @@ describe("connections", () => {
               }),
             ),
           );
-          expect(reconfigured).toBeInstanceOf(ConnectionService.InvalidConnection);
+          expect(reconfigured).toBeInstanceOf(CoreError.Invalid);
           expect(
             yield* as(workspace.id, alice, (connectionService) => connectionService.list),
           ).toEqual([created]);
@@ -393,7 +406,7 @@ describe("connections", () => {
                 }),
               ),
             ),
-          ).toEqual(new ConnectionService.Changed({ connectionId: created.id }));
+          ).toEqual(new CoreError.Changed({ resource: "Connection", id: created.id }));
           const configured = yield* as(workspace.id, alice, (connectionService) =>
             connectionService.configure({
               connectionId: created.id,
@@ -413,7 +426,7 @@ describe("connections", () => {
           yield* as(workspace.id, alice, (connectionService) =>
             connectionService.remove(created.id),
           );
-          const gone = new ConnectionService.NotFound({ connectionId: created.id });
+          const gone = new CoreError.NotFound({ resource: "Connection", id: created.id });
           expect(
             yield* as(workspace.id, alice, (connectionService) => connectionService.list),
           ).toEqual([]);
@@ -442,10 +455,7 @@ describe("connections", () => {
           const bound = yield* boundTo(workspace.id);
           const before = yield* bound.store.read(journalLog, { limit: 200 });
           const footprint = yield* storage.footprint;
-          const failure = new Store.Failure({
-            operation: "transaction",
-            cause: "Late write failed",
-          });
+          const failure = StoreError.failed("Store", "transaction")("Late write failed");
           expect(
             yield* Effect.flip(
               Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
@@ -493,7 +503,7 @@ describe("connections", () => {
               connectionService.remove(first.id),
             );
             expect(yield* Effect.flip(create(models))).toEqual(
-              new ConnectionService.NotFound({ connectionId: first.id }),
+              new CoreError.NotFound({ resource: "Connection", id: first.id }),
             );
           }),
         ),
@@ -549,12 +559,16 @@ describe("connections", () => {
               yield* Effect.flip(
                 as(workspace.id, alice, (connectionService) => connectionService.check(keyless.id)),
               ),
-            ).toEqual(new ConnectionService.UnknownIntegration({ integration: "test-tools" }));
+            ).toEqual(
+              new CoreError.Invalid({
+                reason: new CoreError.UnknownIntegration({ integration: "test-tools" }),
+              }),
+            );
             expect(
               yield* Effect.flip(
                 as(workspace.id, alice, (connectionService) => connectionService.check(keyed.id)),
               ),
-            ).toBeInstanceOf(ConnectionService.InvalidConnection);
+            ).toBeInstanceOf(CoreError.Invalid);
             // The models of a connection are its integration's, whatever its settings.
             expect(
               yield* as(workspace.id, alice, (connectionService) =>
@@ -567,7 +581,11 @@ describe("connections", () => {
                   connectionService.models(keyless.id),
                 ),
               ),
-            ).toEqual(new ConnectionService.UnknownIntegration({ integration: "test-tools" }));
+            ).toEqual(
+              new CoreError.Invalid({
+                reason: new CoreError.UnknownIntegration({ integration: "test-tools" }),
+              }),
+            );
           }).pipe(Effect.provide(gateway(host, { ...installed, integrations: [changedModels] })));
         }),
       ),

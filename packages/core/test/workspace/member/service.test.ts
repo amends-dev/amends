@@ -33,6 +33,7 @@ import * as Member from "../../../src/workspace/Member.ts";
 import * as WorkspaceStore from "../../../src/workspace/WorkspaceStore.ts";
 import * as Workspace from "../../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../../memory.ts";
+import * as StoreError from "../../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
@@ -245,10 +246,13 @@ it.effect(
       };
       for (const id of [agent.memberId, missingId]) {
         expect(yield* run(fixture, get(id).pipe(Effect.flip), alice, overrides)).toMatchObject({
-          _tag: "Authorization.Denied",
-          requirement: {
-            permission: { name: MemberPermissions.Read.name },
-            target: { memberId: id },
+          _tag: "CoreError.Denied",
+          reason: {
+            _tag: "NotGranted",
+            requirement: {
+              permission: { name: MemberPermissions.Read.name },
+              target: { memberId: id },
+            },
           },
         });
       }
@@ -259,9 +263,9 @@ it.effect(
         ),
       );
       expect(yield* run(fixture, get(missingId).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberService.NotFound",
-        workspaceId,
-        memberId: missingId,
+        _tag: "CoreError.NotFound",
+        resource: "Member",
+        id: missingId,
       });
     }),
 );
@@ -274,13 +278,13 @@ it.effect("a shared member application uses each call's actor and current member
     const read = application.get(bob.id);
     expect(yield* read.pipe(Effect.provideService(Actor.Actor, alice))).toEqual(bob);
     expect(yield* read.pipe(Effect.provideService(Actor.Actor, agent), Effect.flip)).toMatchObject({
-      _tag: "Authorization.Denied",
-      memberId: agent.memberId,
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", memberId: agent.memberId },
     });
     yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
     expect(yield* read.pipe(Effect.provideService(Actor.Actor, alice), Effect.flip)).toMatchObject({
-      _tag: "Authorization.InvalidActor",
-      reason: "membership-removed",
+      _tag: "CoreError.Denied",
+      reason: { _tag: "InvalidActor", reason: "membership-removed" },
     });
   }),
 );
@@ -353,9 +357,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
         );
       }).pipe(Effect.flip),
     );
-    expect(failure).toMatchObject({
-      _tag: "Authorization.Denied",
-    });
+    expect(failure).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
     expect(yield* fixture.snapshot).toEqual(before);
     expect(yield* run(fixture, get(bob.id))).toEqual(bob);
   }),
@@ -380,7 +382,7 @@ it.effect("member reads pass storage failures through", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
-    const storageFailure = new MemberStore.Failure({ operation: "get", cause: "unavailable" });
+    const storageFailure = StoreError.failed("MemberStore", "get")("unavailable");
     expect(
       yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
         get: (id) => (id === bob.id ? Effect.fail(storageFailure) : fixture.members.get(id)),
@@ -400,10 +402,12 @@ it.effect(
       yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
       const application = yield* run(fixture, MemberService.MemberService);
       expect(yield* run(fixture, get(bob.id).pipe(Effect.flip))).toMatchObject({
-        _tag: "Authorization.Denied",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "NotGranted" },
       });
       expect(yield* run(fixture, remove(agent.memberId).pipe(Effect.flip))).toMatchObject({
-        _tag: "Authorization.Denied",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "NotGranted" },
       });
       const removed = yield* run(fixture, remove(bob.id));
       expect(removed).toEqual({
@@ -424,12 +428,13 @@ it.effect(
           .get(bob.id)
           .pipe(Effect.provideService(Actor.Actor, staleActor), Effect.flip),
       ).toMatchObject({
-        _tag: "Authorization.InvalidActor",
-        reason: "membership-removed",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "InvalidActor", reason: "membership-removed" },
       });
       const beforeRepeat = yield* fixture.snapshot;
       expect(yield* run(fixture, remove(bob.id).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberService.AlreadyRemoved",
+        _tag: "CoreError.Conflict",
+        reason: { _tag: "AlreadyEnded", resource: "Member" },
       });
       expect(yield* fixture.snapshot).toEqual(beforeRepeat);
     }),
@@ -445,7 +450,8 @@ it.effect(
       // Ownership and read permission each confer no removal authority.
       for (const id of [bob.id, missingId, alice.memberId]) {
         expect(yield* run(fixture, remove(id).pipe(Effect.flip))).toMatchObject({
-          _tag: "Authorization.Denied",
+          _tag: "CoreError.Denied",
+          reason: { _tag: "NotGranted" },
         });
       }
       expect(yield* fixture.snapshot).toEqual(before);
@@ -465,13 +471,12 @@ it.effect(
       );
       const authorized = yield* fixture.snapshot;
       expect(yield* run(fixture, remove(missingId).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberService.NotFound",
+        _tag: "CoreError.NotFound",
       });
       for (const actor of [alice, agent]) {
         expect(yield* run(fixture, remove(alice.memberId).pipe(Effect.flip), actor)).toMatchObject({
-          _tag: "MemberService.OwnerProtected",
-          workspaceId,
-          memberId: alice.memberId,
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "OwnerProtected" },
         });
       }
       expect(yield* fixture.snapshot).toEqual(authorized);
@@ -488,7 +493,7 @@ it.effect("removal passes a failure reading ownership through and writes nothing
     const fixture = yield* make();
     yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
     const before = yield* fixture.snapshot;
-    const failure = new WorkspaceStore.Failure({ operation: "get", cause: "unavailable" });
+    const failure = StoreError.failed("WorkspaceStore", "get")("unavailable");
     expect(
       yield* run(
         fixture,
@@ -587,8 +592,8 @@ it.effect(
       // A removed actor cannot list at all.
       yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
       expect(yield* run(fixture, Effect.flip(list))).toMatchObject({
-        _tag: "Authorization.InvalidActor",
-        reason: "membership-removed",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "InvalidActor", reason: "membership-removed" },
       });
     }),
 );

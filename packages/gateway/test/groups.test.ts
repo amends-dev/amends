@@ -34,6 +34,7 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Private team and direct group creation, storage constraints, and replay. */
 
@@ -165,8 +166,11 @@ describe("groups", () => {
             asActor(create([memberId]), who).pipe(Effect.provide(core(bound)));
           const before = yield* history(bound);
           expect(yield* Effect.flip(call(actor))).toMatchObject({
-            _tag: "Authorization.Denied",
-            requirement: { permission: { name: GroupPermissions.Create.name } },
+            _tag: "CoreError.Denied",
+            reason: {
+              _tag: "NotGranted",
+              requirement: { permission: { name: GroupPermissions.Create.name } },
+            },
           });
           expect(yield* history(bound)).toEqual(before);
           const roleId = Role.Id.make("contributor");
@@ -204,7 +208,8 @@ describe("groups", () => {
             ),
           );
           expect(yield* Effect.flip(call(actor))).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
           yield* publish(
             bound,
@@ -235,7 +240,8 @@ describe("groups", () => {
             ),
           );
           expect(yield* Effect.flip(call(owner))).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
         }),
       ),
@@ -259,9 +265,9 @@ describe("groups", () => {
           const before = yield* history(bound);
           const footprint = yield* storage.footprint;
           for (const [ids, tag] of [
-            [[memberId, Member.Id.make("absent")], "GroupService.MemberNotFound"],
-            [[memberId, other.ownerMemberId], "GroupService.MemberNotFound"],
-            [[memberId, agentId], "GroupService.InactiveMember"],
+            [[memberId, Member.Id.make("absent")], "CoreError.NotFound"],
+            [[memberId, other.ownerMemberId], "CoreError.NotFound"],
+            [[memberId, agentId], "CoreError.Conflict"],
             [[memberId, memberId], "SchemaError"],
           ] as const) {
             expect(
@@ -293,10 +299,10 @@ describe("groups", () => {
             const { bound, owner } = yield* prepare();
             const before = yield* history(bound);
             const observed = yield* Ref.make(Option.none<Group.Group>());
-            const failure = new GroupMembershipStore.Failure({
-              operation: "insert",
-              cause: "injected second admission failure",
-            });
+            const failure = StoreError.failed(
+              "GroupMembershipStore",
+              "insert",
+            )("injected second admission failure");
             const broken = {
               ...bound,
               context: bound.context.pipe(
@@ -393,7 +399,10 @@ describe("groups", () => {
             }),
             owner,
           ).pipe(Effect.provide(core(bound)));
-          expect(yield* Effect.flip(revoked)).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(yield* Effect.flip(revoked)).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
           expect(yield* history(bound)).toEqual(before);
         }),
       ),
@@ -490,7 +499,9 @@ describe("groups", () => {
                 { ...group, workspaceId: otherWorkspaceId },
               ]) {
                 expect(yield* Effect.flip(bound.groups.insert(invalid))).toMatchObject({
-                  _tag: "GroupStore.Conflict",
+                  _tag: "StoreError",
+                  store: "GroupStore",
+                  reason: { _tag: "Rejected" },
                 });
                 expect(yield* bound.groups.get(group.id)).toEqual(Option.none());
               }
@@ -500,7 +511,9 @@ describe("groups", () => {
                 { ...admission, status: "removed" as const },
               ]) {
                 expect(yield* Effect.flip(bound.groupMemberships.insert(invalid))).toMatchObject({
-                  _tag: "GroupMembershipStore.Conflict",
+                  _tag: "StoreError",
+                  store: "GroupMembershipStore",
+                  reason: { _tag: "Rejected" },
                 });
                 expect(yield* bound.groupMemberships.get(admission.id)).toEqual(Option.none());
               }
@@ -509,14 +522,22 @@ describe("groups", () => {
           );
           expect(
             yield* Effect.flip(bound.store.transaction(bound.groups.insert(group))),
-          ).toMatchObject({ _tag: "GroupStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "GroupStore",
+            reason: { _tag: "Rejected" },
+          });
           for (const duplicate of [
             admission,
             { ...admission, id: GroupMembership.Id.make("another-admission") },
           ])
             expect(
               yield* Effect.flip(bound.store.transaction(bound.groupMemberships.insert(duplicate))),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
           expect(yield* bound.groupMemberships.listByGroup(group.id)).toEqual([admission]);
           yield* foreign.store.transaction(
             foreign.groups.insert({
@@ -563,7 +584,9 @@ describe("groups", () => {
                 { ...direct, createdBy: agentId },
               ])
                 expect(yield* Effect.flip(bound.groups.insert(invalid))).toMatchObject({
-                  _tag: "GroupStore.Conflict",
+                  _tag: "StoreError",
+                  store: "GroupStore",
+                  reason: { _tag: "Rejected" },
                 });
               yield* bound.groups.insert(direct);
               for (const admission of admissions) yield* bound.groupMemberships.insert(admission);
@@ -581,7 +604,11 @@ describe("groups", () => {
                 bound.groups.insert({ ...direct, id: Group.Id.make("second-direct") }),
               ),
             ),
-          ).toMatchObject({ _tag: "GroupStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "GroupStore",
+            reason: { _tag: "Rejected" },
+          });
           const team = yield* asActor(create([owner.memberId, memberId]), owner).pipe(
             Effect.provide(core(bound)),
           );
@@ -590,8 +617,8 @@ describe("groups", () => {
           );
           expect(team.kind).toBe("Team");
           const fixed = {
-            _tag: "GroupMembershipService.FixedMembership",
-            groupId: direct.id,
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "FixedMembership", groupId: direct.id },
           };
           const memberships = (
             program: (
@@ -655,7 +682,8 @@ describe("groups", () => {
           const before = yield* history(bound);
           // Only a member granted group.rename may rename; belonging to the group is not enough.
           expect(yield* Effect.flip(rename(actor, group.id, "Platform"))).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
           const renamed = yield* rename(owner, group.id, "Platform");
           expect(renamed).toEqual({ ...group, name: "Platform" });
@@ -676,8 +704,9 @@ describe("groups", () => {
           // Another name from a renamer who last saw the old one would replace a rename made
           // meanwhile, so it is refused, and nothing is recorded; from the current one, it is not.
           expect(yield* Effect.flip(rename(owner, group.id, "Design"))).toMatchObject({
-            _tag: "GroupService.Changed",
-            groupId: group.id,
+            _tag: "CoreError.Changed",
+            resource: "Group",
+            id: group.id,
           });
           expect(yield* history(bound)).toHaveLength(before.length + 1);
           expect(yield* rename(owner, group.id, "Engineering", "Platform")).toEqual(group);
@@ -688,7 +717,7 @@ describe("groups", () => {
             expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe("SchemaError");
           expect(
             yield* Effect.flip(rename(owner, Group.Id.make("missing"), "Platform")),
-          ).toMatchObject({ _tag: "GroupService.NotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           // A direct group is named by its members.
           const direct = {
             id: Group.Id.make("direct-group"),
@@ -712,7 +741,8 @@ describe("groups", () => {
             ]),
           );
           expect(yield* Effect.flip(rename(owner, direct.id, "Pair"))).toMatchObject({
-            _tag: "GroupService.NotRenamable",
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "NotRenamable" },
           });
           expect(
             yield* Effect.flip(
@@ -720,7 +750,12 @@ describe("groups", () => {
                 bound.groups.rename({ workspaceId, groupId: direct.id, name: "Pair" }),
               ),
             ),
-          ).toMatchObject({ _tag: "GroupStore.Conflict", operation: "rename" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "GroupStore",
+            operation: "rename",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             yield* Effect.flip(
               bound.store.transaction(
@@ -731,7 +766,12 @@ describe("groups", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "GroupStore.Conflict", operation: "rename" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "GroupStore",
+            operation: "rename",
+            reason: { _tag: "Rejected" },
+          });
           // Rebuilding from the journal keeps the latest name.
           yield* storage.discardProjections;
           yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
@@ -779,7 +819,12 @@ describe("groups", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "GroupStore.Conflict", operation: "recordLatest" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "GroupStore",
+            operation: "recordLatest",
+            reason: { _tag: "Rejected" },
+          });
           // Recording requires the workspace transaction.
           expect(
             yield* Effect.flip(
@@ -787,7 +832,7 @@ describe("groups", () => {
                 .recordLatest(at("2026-09-23T15:00:00.000Z"))
                 .pipe(Effect.provide(yield* write(Effect.context<Store.Transaction>()))),
             ),
-          ).toMatchObject({ _tag: "GroupStore.Failure" });
+          ).toMatchObject({ _tag: "StoreError", store: "GroupStore", reason: { _tag: "Failed" } });
           expect(yield* (yield* boundTo(otherWorkspaceId)).groups.getLatest([group.id])).toEqual(
             [],
           );

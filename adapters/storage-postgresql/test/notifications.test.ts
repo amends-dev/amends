@@ -1,11 +1,12 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Entry } from "@amends-dev/core/journal";
 import { Member } from "@amends-dev/core/workspace";
-import { Notification, type NotificationStore } from "@amends-dev/core/notification";
+import { Notification } from "@amends-dev/core/notification";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { boundTo, inDatabase, initialized, setup, workspaceId } from "./support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
@@ -33,14 +34,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* bound.store.transaction(bound.notifications.insert(value));
             const sql = yield* SqlClient.SqlClient;
             yield* sql`UPDATE notifications SET source_entry_id = '' WHERE workspace_id = ${workspaceId} AND id = ${value.id}`;
-            const reads: ReadonlyArray<Effect.Effect<unknown, NotificationStore.Failure>> = [
+            const reads: ReadonlyArray<Effect.Effect<unknown, StoreError.StoreError>> = [
               bound.notifications.get(value.id),
               bound.notifications.listLatestByRecipient(human, { limit: 20 }),
               bound.notifications.listPendingByRecipient(human, { limit: 20 }),
             ];
             for (const operation of reads)
               expect(yield* Effect.flip(operation)).toMatchObject({
-                _tag: "NotificationStore.Failure",
+                _tag: "StoreError",
+                store: "NotificationStore",
+                reason: { _tag: "Failed" },
               });
           }),
         ),

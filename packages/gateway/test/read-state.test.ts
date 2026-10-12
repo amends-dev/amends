@@ -31,6 +31,7 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Thread and group lists with unread state, forward-only read state, and settling on reading. */
 
@@ -204,7 +205,11 @@ describe("read state", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadStore",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             yield* Effect.flip(
               bound.store.transaction(
@@ -214,7 +219,11 @@ describe("read state", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "GroupStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "GroupStore",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             yield* bound.threads.getLatest([started.thread.id, Thread.Id.make("missing")]),
           ).toHaveLength(1);
@@ -250,10 +259,12 @@ describe("read state", () => {
             expect(yield* positionOf(bound, humanId, threadId)).toEqual([2]);
             expect(yield* pending(bound, humanId)).toEqual([3]);
             expect(yield* Effect.flip(run(bound, human, markRead(threadId, 4)))).toEqual(
-              new ReadStateService.BeyondTimeline({
-                threadId,
-                throughSequence: 4,
-                latestSequence: 3,
+              new CoreError.Conflict({
+                reason: new CoreError.BeyondTimeline({
+                  threadId,
+                  throughSequence: 4,
+                  latestSequence: 3,
+                }),
               }),
             );
             yield* run(bound, human, markRead(threadId, 3));
@@ -267,13 +278,13 @@ describe("read state", () => {
             // Only people with current read access keep read state.
             expect(
               yield* Effect.flip(run(bound, actorFor(agentId), markRead(threadId, 1))),
-            ).toEqual(new ReadStateService.HumanRequired({ memberId: agentId }));
+            ).toEqual(new CoreError.Denied({ reason: new CoreError.HumanRequired() }));
             expect(
               yield* Effect.flip(run(bound, actorFor(outsiderId), markRead(threadId, 1))),
-            ).toEqual(new ReadStateService.ThreadNotFound({ threadId }));
+            ).toEqual(new CoreError.NotFound({ resource: "Thread", id: threadId }));
             expect(
               yield* Effect.flip(run(bound, actorFor(plainId), markRead(threadId, 1))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             expect(yield* positionOf(bound, plainId, threadId)).toEqual([]);
           }),
         ),
@@ -307,11 +318,11 @@ describe("read state", () => {
           });
           expect(yield* readTimes).toEqual([second]);
           expect(yield* Effect.flip(run(bound, actorFor(agentId), markGroupRead(team.id)))).toEqual(
-            new ReadStateService.HumanRequired({ memberId: agentId }),
+            new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
           );
           expect(
             yield* Effect.flip(run(bound, actorFor(outsiderId), markGroupRead(team.id))),
-          ).toEqual(new ReadStateService.GroupNotFound({ groupId: team.id }));
+          ).toEqual(new CoreError.NotFound({ resource: "Group", id: team.id }));
         }),
       ),
     ),
@@ -375,7 +386,11 @@ describe("read state", () => {
                 seenAt,
               ),
             ),
-          ).toMatchObject({ _tag: "ReadStateStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ReadStateStore",
+            reason: { _tag: "Rejected" },
+          });
           // Read state references no projection rows, so rebuilding threads from the journal keeps it.
           yield* storage.discardProjections;
           yield* trusted(
@@ -490,7 +505,7 @@ describe("read state", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
         }),
       ),
     ),
@@ -580,7 +595,7 @@ describe("read state", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
           }),
         ),
       ),

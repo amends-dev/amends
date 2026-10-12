@@ -99,7 +99,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.connections
             .models({ params: { workspaceId, connectionId: anthropic.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ConnectionService.NotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
       }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),
   );
@@ -162,7 +162,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.agents
             .create({ params: { workspaceId }, headers: {}, payload })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "Authorization.Denied" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
 
         // A setup that could not run, or names a connection that gives nothing, is refused.
         const inOpencode = {
@@ -174,8 +174,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
             .create({ params: { workspaceId }, headers: {}, payload: inOpencode })
             .pipe(Effect.flip),
         ).toMatchObject({
-          _tag: "AgentService.Incomplete",
-          issues: [{ _tag: "SandboxRequired" }],
+          _tag: "CoreError.Invalid",
+          reason: { _tag: "Incomplete", issues: [{ _tag: "SandboxRequired" }] },
         });
         expect(
           yield* asAlice.agents
@@ -186,8 +186,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
             })
             .pipe(Effect.flip),
         ).toMatchObject({
-          _tag: "AgentService.Incomplete",
-          issues: [{ _tag: "Invalid", part: "model", description: "This machine gives no models" }],
+          _tag: "CoreError.Invalid",
+          reason: {
+            _tag: "Incomplete",
+            issues: [
+              { _tag: "Invalid", part: "model", description: "This machine gives no models" },
+            ],
+          },
         });
 
         // In a sandbox, opencode can run it.
@@ -226,12 +231,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asAlice.agents
             .rename({ params, payload: { name: "Other", expectedName: "Reviewer" } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "AgentService.Changed" });
+        ).toMatchObject({ _tag: "CoreError.Changed" });
 
         // An agent leaves as any member does.
         yield* asAlice.members.remove({ params: { workspaceId, memberId: created.memberId } });
         expect(yield* asBob.agents.get({ params }).pipe(Effect.flip)).toMatchObject({
-          _tag: "AgentService.NotFound",
+          _tag: "CoreError.NotFound",
         });
         expect(yield* asAlice.agents.list({ params: { workspaceId } })).toEqual([]);
       }).pipe(Effect.scoped, Effect.provide(server(url))),

@@ -31,30 +31,8 @@ import * as MemberStore from "./MemberStore.ts";
 import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
 
-import { AlreadyRemoved, NotFound, OwnerProtected } from "./internal/member-errors.ts";
-export {
-  /**
-   * The member to remove was removed already; nothing more is recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyRemoved,
-  /**
-   * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * The member is the current owner, who cannot be removed; ownership must be transferred first.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  OwnerProtected,
-} from "./internal/member-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading members can fail with: the outcome above, and the failures of what a
@@ -63,7 +41,11 @@ export {
  * @category errors
  * @since 0.1.0
  */
-export type Error = Authorization.Error | MemberStore.Failure | Schema.SchemaError | NotFound;
+export type Error =
+  | Authorization.Error
+  | StoreError.StoreError
+  | Schema.SchemaError
+  | CoreError.NotFound;
 
 /**
  * What renaming oneself can fail with: what a read can, and the failures of the commit.
@@ -85,13 +67,10 @@ export type RemoveError =
   | Error
   | PlatformError.PlatformError
   | Delegation.Error
-  | WorkspaceStore.Failure
-  | InvitationStore.Failure
-  | GroupMembershipStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | Log.WriteError
-  | OwnerProtected
-  | AlreadyRemoved;
+  | CoreError.Conflict;
 
 /**
  * The member operations, one of `Core.Operations`.
@@ -105,7 +84,7 @@ export class MemberService extends Context.Service<
     /**
      * Read an active or removed membership after requiring `member.read` on it. Authorization and
      * lookup read current state without opening a transaction, and use an existing commit when
-     * there is one. Only authorized callers can receive `NotFound`.
+     * there is one. Only authorized callers can receive `CoreError.NotFound`.
      */
     readonly get: (memberId: Member.Id) => Effect.Effect<Member.Member, Error, Actor.Actor>;
     /**
@@ -117,10 +96,10 @@ export class MemberService extends Context.Service<
     readonly list: Effect.Effect<ReadonlyArray<Member.Member>, Error, Actor.Actor>;
     /**
      * Remove a member, under `member.remove` on them and the delegation rules: the current owner is
-     * `OwnerProtected`, and a member removed already is `AlreadyRemoved`. One commit publishes the
-     * removal, ends every active group admission of the membership, and, for a person, revokes
-     * their pending invitations. The record and its grants remain for history; authorization
-     * rejects the removed member, and rejoining needs a new invitation and member ID.
+     * `CoreError.Conflict` (`OwnerProtected`), and a member removed already `AlreadyEnded`. One
+     * commit publishes the removal, ends every active group admission of the membership, and, for a
+     * person, revokes their pending invitations. The record and its grants remain for history;
+     * authorization rejects the removed member, and rejoining needs a new invitation and member ID.
      */
     readonly remove: (
       memberId: Member.Id,
@@ -168,7 +147,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
 
   const requireMember = Effect.fnUntraced(function* (id: Member.Id) {
     const found = yield* memberStore.get(id);
-    if (Option.isNone(found)) return yield* new NotFound({ workspaceId, memberId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id });
     return found.value;
   });
 
@@ -211,9 +190,11 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
       const found = yield* workspaceStore.get;
       if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
       if (found.value.ownerMemberId === id)
-        return yield* new OwnerProtected({ workspaceId, memberId: id });
+        return yield* new CoreError.Conflict({ reason: new CoreError.OwnerProtected() });
       if (member.status === "removed")
-        return yield* new AlreadyRemoved({ workspaceId, memberId: id });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.AlreadyEnded({ resource: "Member", id: id }),
+        });
       yield* delegation.requireRemoval(id);
       const removed = yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
       yield* Effect.gen(function* () {

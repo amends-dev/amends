@@ -17,6 +17,7 @@ import type * as Fact from "./Fact.ts";
 import type * as Log from "./Log.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
+import * as StoreError from "./StoreError.ts";
 
 /**
  * The decoded event supplied to a handler for this fact.
@@ -242,7 +243,7 @@ export interface Runner {
   /** Rebuild progress: the last applied entry. None before a rebuild starts. */
   readonly checkpoint: Effect.Effect<
     Option.Option<Checkpoint.Cursor>,
-    Store.Failure | Schema.SchemaError
+    StoreError.StoreError | Schema.SchemaError
   >;
   /**
    * Rebuild one step: apply the next source batch and checkpoint it in one transaction. When

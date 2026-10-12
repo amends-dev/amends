@@ -25,46 +25,9 @@ import * as Requirement from "./Requirement.ts";
 import * as BuiltinRoles from "./BuiltinRoles.ts";
 import * as Role from "./Role.ts";
 import * as RoleStore from "./RoleStore.ts";
-import {
-  Denied,
-  OwnerProtected,
-  RoleNotFound,
-  UnsupportedRole,
-} from "./internal/delegation-errors.ts";
 import * as Store from "../journal/Store.ts";
-export {
-  /**
-   * The actor may not delegate this: only the owner gives Administrator (`administrator-role`), and
-   * only the owner changes a member who holds a direct grant or a role other than Member
-   * (`protected-member`).
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Denied,
-  /**
-   * The owner is out of reach: Owner is given by ownership transfer alone, and the owner's own
-   * roles are changed by no one.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  OwnerProtected,
-  /**
-   * The built-in role is not recorded in this workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  RoleNotFound,
-  /**
-   * The role is not one of the three built-in ones; no other role is delegated.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  UnsupportedRole,
-} from "./internal/delegation-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What a delegation check can fail with: the outcomes above, authorization's, and
@@ -75,14 +38,12 @@ export {
  */
 export type Error =
   | Authorization.Error
-  | WorkspaceStore.Failure
-  | AssignmentStore.Failure
-  | RoleStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
-  | Denied
-  | OwnerProtected
-  | UnsupportedRole
-  | RoleNotFound;
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.NotFound;
 
 /**
  * The delegation rules, bound to one workspace. Read screens check current policy to show what the
@@ -97,7 +58,7 @@ export class Delegation extends Context.Service<
     /**
      * A built-in role as recorded, with each of its permissions this host declares checked to fit
      * a workspace-wide grant; one it does not declare is kept and grants nothing. Any other role
-     * is `UnsupportedRole`.
+     * is `CoreError.Invalid` (`UnsupportedRole`).
      */
     readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Role, Error>;
     /** The member's active assignments, by role and direct grant alike. */
@@ -159,15 +120,15 @@ export const recipientNeedsAssignments = (recipient: Recipient) =>
 export const recipientDenial = (
   recipient: Recipient,
   assignments: ReadonlyArray<Assignment.Assignment>,
-): OwnerProtected | Denied | undefined => {
+): CoreError.Conflict | CoreError.Denied | undefined => {
   if (recipient.memberId === recipient.ownerId)
-    return new OwnerProtected({ workspaceId: recipient.workspaceId });
+    return new CoreError.Conflict({ reason: new CoreError.OwnerProtected() });
   if (!recipientNeedsAssignments(recipient)) return undefined;
   return assignments.some(
     ({ source }) =>
       !Assignment.Source.isAnyOf(["Role"])(source) || source.roleId !== BuiltinRoles.MemberId,
   )
-    ? new Denied({ reason: "protected-member" })
+    ? new CoreError.Denied({ reason: new CoreError.OwnerRequired({ reason: "protected-member" }) })
     : undefined;
 };
 
@@ -202,9 +163,11 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   const loadRole = Effect.fn("Delegation.loadRole")(function* (roleId: Role.Id) {
     const id = yield* Schema.decodeEffect(Role.Id)(roleId);
     if (![BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
-      return yield* new UnsupportedRole({ roleId: id });
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.UnsupportedRole({ roleId: id }),
+      });
     const found = yield* roleStore.get(id);
-    if (Option.isNone(found)) return yield* new RoleNotFound({ roleId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Role", id });
     const role = found.value;
     // A permission this host does not declare, retired or added by a newer host's bundles, grants
     // nothing here, as in GrantResolver; the role still loads, with every permission it records.
@@ -232,13 +195,16 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId }),
     ]);
-    if (roleId === BuiltinRoles.OwnerId) return yield* new OwnerProtected({ workspaceId });
+    if (roleId === BuiltinRoles.OwnerId)
+      return yield* new CoreError.Conflict({ reason: new CoreError.OwnerProtected() });
     const role = yield* loadRole(roleId);
     if (
       roleId === BuiltinRoles.AdministratorId &&
       (yield* Actor.Actor).memberId !== (yield* readOwnerId())
     )
-      return yield* new Denied({ reason: "administrator-role" });
+      return yield* new CoreError.Denied({
+        reason: new CoreError.OwnerRequired({ reason: "administrator-role" }),
+      });
     return role;
   });
   const requireRecipient = Effect.fn("Delegation.requireRecipient")(function* (
@@ -281,18 +247,16 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
 export const layer = Layer.effect(Delegation, make());
 
 /**
- * What a check answers when it refuses the actor: authorization's or delegation's denial, or the
- * owner's protection.
+ * What a check answers when it refuses the actor: a denial, for whatever reason, or the owner's
+ * protection.
  *
  * @category errors
  * @since 0.1.0
  */
-export type Refusal = Authorization.Denied | Denied | OwnerProtected;
+export type Refusal = CoreError.Denied | CoreError.Conflict;
 
 const isRefusal = (error: unknown): error is Refusal =>
-  Predicate.isTagged(error, "Authorization.Denied") ||
-  Predicate.isTagged(error, "Delegation.Denied") ||
-  Predicate.isTagged(error, "Delegation.OwnerProtected");
+  Predicate.isTagged(error, "CoreError.Denied") || Predicate.isTagged(error, "CoreError.Conflict");
 
 /**
  * Whether a check of authorization and delegation allows the actor: `false` when it refuses them,

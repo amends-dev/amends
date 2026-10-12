@@ -12,6 +12,7 @@ import * as Store from "../../src/journal/Store.ts";
 import * as Subject from "../../src/journal/Subject.ts";
 import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const Noted = Fact.make("test.noted", {
   subject: () => Subject.make("test", "entity"),
@@ -52,9 +53,7 @@ it.effect(
                     .pipe(
                       Stream.take(1),
                       Stream.concat(
-                        Stream.fail(
-                          new Store.Failure({ operation: "tail", cause: "Lost connection" }),
-                        ),
+                        Stream.fail(StoreError.failed("Store", "tail")("Lost connection")),
                       ),
                     )
                 : journal.log.tail(options);

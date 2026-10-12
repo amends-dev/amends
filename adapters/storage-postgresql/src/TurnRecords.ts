@@ -1,10 +1,10 @@
 /**
  * The PostgreSQL driver for `TurnStore.TurnStore`, over the `turns` table: one row per turn, with
- * the harness, model, and sandbox it started on as columns, set all together or not at all, and
- * its retry as a pair of columns. `TurnStore.make` checks every input before the driver sees it, so
- * the driver keeps only what storage keeps: the primary key refuses a reused ID and
- * `active_turn_by_agent_thread` a second active turn for one agent and thread, inserted or
- * updated, each as the store's `Conflict`, and an update that finds no row conflicts. Every statement is scoped to the
+ * the harness, model, and sandbox it started on as columns, set all together or not at all, and its
+ * retry as a pair of columns. `TurnStore.make` checks every input before the driver sees it, so the
+ * driver keeps only what storage keeps: the primary key refuses a reused ID and
+ * `active_turn_by_agent_thread` a second active turn for one agent and thread, inserted or updated,
+ * each rejected, and an update that finds no row is rejected. Every statement is scoped to the
  * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
  * and requires one for a write.
  *
@@ -16,8 +16,9 @@ import { Member } from "@amends-dev/core/workspace";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { turns } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Turn.Turn));
 const Instant = Schema.NullOr(Schema.DateTimeUtcFromDate);
@@ -114,7 +115,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
             .where(and(inWorkspace, eq(turns.id, id))),
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(TurnStore, "get")),
+      Effect.mapError(StoreError.failed("TurnStore", "get")),
     ),
     findActive: Effect.fn("TurnRecords.findActive")(
       function* (memberId, threadId) {
@@ -125,7 +126,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
             .where(and(ofAgent(memberId, threadId), inArray(turns.status, [...activeStatuses]))),
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(TurnStore, "findActive")),
+      Effect.mapError(StoreError.failed("TurnStore", "findActive")),
     ),
     findLatest: Effect.fn("TurnRecords.findLatest")(
       function* (memberId, threadId) {
@@ -138,7 +139,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
             .limit(1),
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(TurnStore, "findLatest")),
+      Effect.mapError(StoreError.failed("TurnStore", "findLatest")),
     ),
     listActive: Effect.fn("TurnRecords.listActive")(
       function* (limit) {
@@ -151,7 +152,7 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
             .limit(limit),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(TurnStore, "listActive")),
+      Effect.mapError(StoreError.failed("TurnStore", "listActive")),
     ),
     listActiveByMember: Effect.fn("TurnRecords.listActiveByMember")(
       function* (memberId) {
@@ -169,11 +170,11 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
             .orderBy(asc(turns.createdAt), asc(turns.acceptedThroughSequence), asc(orderedId)),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(TurnStore, "listActiveByMember")),
+      Effect.mapError(StoreError.failed("TurnStore", "listActiveByMember")),
     ),
     insert: Effect.fn("TurnRecords.insert")(function* (record) {
       yield* guard(db.insert(turns).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError(TurnStore, "insert")),
+        Effect.mapError(storeError("TurnStore", "insert")),
       );
     }),
     update: Effect.fn("TurnRecords.update")(function* (record) {
@@ -184,12 +185,9 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
           .where(and(inWorkspace, eq(turns.id, record.id)))
           .returning({ id: turns.id }),
         true,
-      ).pipe(Effect.mapError(storeError(TurnStore, "update")));
+      ).pipe(Effect.mapError(storeError("TurnStore", "update")));
       if (updated.length === 0)
-        return yield* new TurnStore.Conflict({
-          operation: "update",
-          message: "Expected a stored turn",
-        });
+        return yield* StoreError.rejected("TurnStore", "update", "Expected a stored turn");
     }),
   };
   return TurnStore.make(workspaceId, driver);

@@ -683,8 +683,11 @@ it("lists public groups and joins one, refreshing the list; a group gone says so
     }
     if (path === "/workspaces/one/groups/g2/join")
       return new Response(
-        JSON.stringify({ _tag: "GroupMembershipService.GroupNotFound", groupId: "g2" }),
-        { status: 404, headers: { "content-type": "application/json" } },
+        JSON.stringify({ _tag: "CoreError.NotFound", resource: "Group", id: "g2" }),
+        {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        },
       );
     return json([]);
   });
@@ -794,9 +797,8 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
       if (memberId === "kit-one")
         return new Response(
           JSON.stringify({
-            _tag: "GroupMembershipService.AlreadyMember",
-            groupId: "g1",
-            memberId,
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "AlreadyMember", groupId: "g1", memberId },
           }),
           { status: 409, headers: { "content-type": "application/json" } },
         );
@@ -988,10 +990,13 @@ it("renames a group it may rename, from the name it started from, saving only a 
       renames.push(body);
       // As the host does, a rename from a name the group no longer has is refused.
       if (body.name !== name && body.expectedName !== name)
-        return new Response(JSON.stringify({ _tag: "GroupService.Changed", groupId: "g1" }), {
-          status: 409,
-          headers: { "content-type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ _tag: "CoreError.Changed", resource: "Group", id: "g1" }),
+          {
+            status: 409,
+            headers: { "content-type": "application/json" },
+          },
+        );
       name = body.name;
       return json({ ...group, name });
     }

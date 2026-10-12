@@ -8,7 +8,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Store, Publication } from "@amends-dev/core/journal";
+import { Journal, Publication } from "@amends-dev/core/journal";
 
 import {
   Member,
@@ -37,6 +37,7 @@ import {
   request,
   testProvenance,
 } from "./support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Ownership transfer: authority, recipients, competition, rollback, and replay. */
 
@@ -132,7 +133,7 @@ describe("ownership", () => {
             expect((yield* Operations.ownership(workspace.id, bob)).canTransfer).toBe(true);
             expect(
               yield* Effect.flip(Operations.removeMember(workspace.id, alice, recipient.id)),
-            ).toMatchObject({ _tag: "MemberService.OwnerProtected" });
+            ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "OwnerProtected" } });
             expect(
               yield* Effect.flip(
                 Operations.assign(workspace.id, alice, {
@@ -140,7 +141,7 @@ describe("ownership", () => {
                   roleId: BuiltinRoles.MemberId,
                 }),
               ),
-            ).toMatchObject({ _tag: "Delegation.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "OwnerRequired" } });
             expect(
               (yield* bound.store.read(journalLog, { limit: 30 })).at(-1)?.entries,
             ).toHaveLength(6);
@@ -172,10 +173,10 @@ describe("ownership", () => {
             const elsewhere = yield* Operations.createWorkspace(alice.id);
             const before = yield* bound.store.read(journalLog, { limit: 30 });
             for (const [memberId, tag] of [
-              [workspace.ownerMemberId, "OwnershipService.InvalidRecipient"],
-              [other.id, "OwnershipService.InvalidRecipient"],
-              [agentId, "OwnershipService.InvalidRecipient"],
-              [elsewhere.ownerMemberId, "OwnershipService.MemberNotFound"],
+              [workspace.ownerMemberId, "CoreError.Conflict"],
+              [other.id, "CoreError.Conflict"],
+              [agentId, "CoreError.Conflict"],
+              [elsewhere.ownerMemberId, "CoreError.NotFound"],
             ] as const) {
               expect(
                 yield* Effect.flip(
@@ -197,7 +198,7 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             // Having the action permission alone does not confer ownership.
             yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
@@ -222,7 +223,10 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "OwnershipService.NotOwner" });
+            ).toMatchObject({
+              _tag: "CoreError.Denied",
+              reason: { _tag: "OwnerRequired", reason: "ownership-transfer" },
+            });
             yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(RoleFacts.PermissionsChanged, {
@@ -240,7 +244,7 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           }),
         ),
       ),
@@ -282,7 +286,7 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "OwnershipService.Changed" });
+            ).toMatchObject({ _tag: "CoreError.Changed" });
             expect(yield* bound.store.read(journalLog, { limit: 30 })).toEqual(before);
             expect(
               (yield* bound.assignments.listActiveByRole(BuiltinRoles.OwnerId))[0]?.memberId,
@@ -301,10 +305,7 @@ describe("ownership", () => {
           const before = yield* bound.store.read(journalLog, { limit: 20 });
           const previous = yield* bound.assignments.listActiveByMember(workspace.ownerMemberId);
           const next = yield* bound.assignments.listActiveByMember(recipient.id);
-          const failure = new Store.Failure({
-            operation: "commit",
-            cause: "injected late failure",
-          });
+          const failure = StoreError.failed("Store", "commit")("injected late failure");
           const broken = failingLate(bound, failure);
           expect(
             yield* Effect.flatMap(OwnershipService.OwnershipService, (ownershipService) =>

@@ -11,6 +11,7 @@ import { Context, DateTime, Effect, Layer, Queue, Schema, Stream } from "effect"
 import type { Fixture, Host, Storage } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import { alice, type Bound, forWorkspace, otherWorkspaceId, workspaceId } from "../Support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const memberActor = (name: string) =>
   Actor.Actor.of({
@@ -234,11 +235,14 @@ export const signals = (fixture: Fixture) => {
               ),
             );
           const notFound = (thread: Thread.Id) =>
-            new ThreadMessageService.NotFound({ threadId: thread });
+            new CoreError.NotFound({ resource: "Thread", id: thread });
           expect(yield* typing(outsider)).toEqual(notFound(threadId));
           const missing = Thread.Id.make("missing");
           expect(yield* typing(reader, missing)).toEqual(notFound(missing));
-          expect(yield* typing(unpermitted)).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(yield* typing(unpermitted)).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
         }).pipe(Effect.scoped),
       ),
     );

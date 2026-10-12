@@ -17,7 +17,7 @@ import * as ApiErrors from "./ApiErrors.ts";
 
 const params = { workspaceId: Workspace.Id };
 const member = { ...params, memberId: Member.Id };
-const error = [...ApiErrors.member, ...ApiErrors.assignment];
+const error = [...ApiErrors.workspace, ...ApiErrors.assignment];
 
 /**
  * A member's access: the caller's own workspace-wide permissions, the built-in roles to choose
@@ -32,17 +32,17 @@ export class AssignmentsGroup extends HttpApiGroup.make("assignments")
     HttpApiEndpoint.get("permissions", "/permissions", {
       params,
       success: Schema.Array(Permission.Name),
-      error: ApiErrors.member,
+      error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.get("roles", "/roles", {
       params,
       success: Schema.Array(Assignment.RoleChoice),
-      error: [...ApiErrors.member, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.get("list", "/members/:memberId/assignments", {
       params: member,
       success: Assignment.Access,
-      error: [...ApiErrors.member, ...ApiErrors.assignmentRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.post("assign", "/assignments", {
       params,

@@ -322,14 +322,3 @@ export const LogMessage = Schema.TaggedUnion({
  * @since 0.1.0
  */
 export type LogMessage = typeof LogMessage.Type;
-
-/**
- * Following the log stopped short; the reader follows it again from the start.
- *
- * @category errors
- * @since 0.1.0
- */
-export class LogUnavailable extends Schema.TaggedError<LogUnavailable>()(
-  "Turn.LogUnavailable",
-  {},
-) {}

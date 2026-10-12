@@ -344,7 +344,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(Schema.decodeUnknownSync(Member.Member)(read.body).identity).toEqual(alice);
           const denied = await call(bob.id, "GET", path);
           expect(denied.status).toBe(403);
-          expect(denied.body).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+          expect(denied.body).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotMember" },
+          });
         });
       }),
   );
@@ -407,10 +410,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           `/workspaces/${workspace.id}/invitations/${second.details.id}/accept`,
           { name: "charlie" },
         );
-        expect(revoked.status).toBe(410);
+        expect(revoked.status).toBe(409);
         expect(revoked.body).toMatchObject({
-          _tag: "InvitationService.Unavailable",
-          reason: "revoked",
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "InvitationClosed", reason: "revoked" },
         });
         expect((await call(bobId, "DELETE", owner)).status).toBe(403);
         expect((await call(alice.id, "DELETE", owner)).status).toBe(409);
@@ -481,7 +484,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           if (chunk.done) break;
           received += decoder.decode(chunk.value, { stream: true });
         }
-        expect(received).toContain("ChangeFeed.Unavailable");
+        expect(received).toContain("CoreError.Unavailable");
       }),
     ),
   );

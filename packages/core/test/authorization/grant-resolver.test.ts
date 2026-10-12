@@ -25,6 +25,7 @@ import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
 import * as Member from "../../src/workspace/Member.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
@@ -342,10 +343,10 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
-      const assignmentFailure = new AssignmentStore.Failure({
-        operation: "listActiveByMember",
-        cause: "unavailable",
-      });
+      const assignmentFailure = StoreError.failed(
+        "AssignmentStore",
+        "listActiveByMember",
+      )("unavailable");
       expect(
         yield* run(fixture, Effect.flip(resolve), {
           assignments: { listActiveByMember: () => Effect.fail(assignmentFailure) },
@@ -359,7 +360,7 @@ it.effect(
           assigned("role", roleSource()),
         ],
       );
-      const roleFailure = new RoleStore.Failure({ operation: "get", cause: "unavailable" });
+      const roleFailure = StoreError.failed("RoleStore", "get")("unavailable");
       expect(
         yield* run(fixture, Effect.flip(resolve), {
           roles: { get: () => Effect.fail(roleFailure) },

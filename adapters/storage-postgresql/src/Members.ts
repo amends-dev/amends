@@ -3,10 +3,10 @@
  * active or removed, with its identity and the name it goes by in the workspace, which
  * `PostgresDirectory` also reads. `MemberStore.make` checks every input before the driver sees it,
  * so the driver keeps only what storage keeps: the primary key refuses a reused ID and
- * `active_member_identity` a second active membership for one identity, each as the store's
- * `Conflict`, and renaming and removal are conditional updates that conflict unless they find the
- * membership active. Every statement is scoped to the binding's workspace and runs under its
- * `guard`, which lets a read join the caller's transaction and requires one for a write.
+ * `active_member_identity` a second active membership for one identity, each rejected, and renaming
+ * and removal are conditional updates rejected unless they find the membership active. Every
+ * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read join
+ * the caller's transaction and requires one for a write.
  *
  * @since 0.1.0
  */
@@ -15,8 +15,9 @@ import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { members } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Selected in the record's shape; decoding checks the brands and the identity union. */
 const recordColumns = {
@@ -42,7 +43,7 @@ export const make = Effect.fn("Members.make")(function* () {
   const select = (operation: string, where: SQL | undefined) =>
     guard(db.select(recordColumns).from(members).where(where).orderBy(members.id)).pipe(
       Effect.flatMap(decode),
-      Effect.mapError(storeFailure(MemberStore, operation)),
+      Effect.mapError(StoreError.failed("MemberStore", operation)),
     );
   const driver: MemberStore.MemberStore["Service"] = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(members.id, id))), Array.head),
@@ -75,7 +76,7 @@ export const make = Effect.fn("Members.make")(function* () {
           status: record.status,
         }),
         true,
-      ).pipe(Effect.mapError(storeError(MemberStore, "insert")));
+      ).pipe(Effect.mapError(storeError("MemberStore", "insert")));
     }),
     rename: Effect.fn("Members.rename")(function* (id, name) {
       const rows = yield* guard(
@@ -85,12 +86,9 @@ export const make = Effect.fn("Members.make")(function* () {
           .where(and(inWorkspace, eq(members.id, id), eq(members.status, "active")))
           .returning({ id: members.id }),
         true,
-      ).pipe(Effect.mapError(storeError(MemberStore, "rename")));
+      ).pipe(Effect.mapError(storeError("MemberStore", "rename")));
       if (rows.length === 0)
-        return yield* new MemberStore.Conflict({
-          operation: "rename",
-          message: "Expected an active membership",
-        });
+        return yield* StoreError.rejected("MemberStore", "rename", "Expected an active membership");
     }),
     markRemoved: Effect.fn("Members.markRemoved")(function* (id) {
       const rows = yield* guard(
@@ -100,12 +98,13 @@ export const make = Effect.fn("Members.make")(function* () {
           .where(and(inWorkspace, eq(members.id, id), eq(members.status, "active")))
           .returning({ id: members.id }),
         true,
-      ).pipe(Effect.mapError(storeError(MemberStore, "markRemoved")));
+      ).pipe(Effect.mapError(storeError("MemberStore", "markRemoved")));
       if (rows.length === 0)
-        return yield* new MemberStore.Conflict({
-          operation: "markRemoved",
-          message: "Expected an active membership",
-        });
+        return yield* StoreError.rejected(
+          "MemberStore",
+          "markRemoved",
+          "Expected an active membership",
+        );
     }),
   };
   return MemberStore.make(workspaceId, driver);

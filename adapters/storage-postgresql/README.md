@@ -140,7 +140,7 @@ harness, model, and sandbox a turn started on as columns set all together or not
 `session_log_entries` each participation's session log, keyed by position, with each entry's kind
 and turn as columns and the rest in `details`. Session log statements run apart from any transaction
 the caller is in, since the log takes part in no commit: an append checks the log's latest position,
-the key refuses a position taken meanwhile, which is the store's `Conflict`, and it then notifies
+the key refuses a position taken meanwhile, which is the store's `Overtaken`, and it then notifies
 readers waiting for an append. Both tables, like credentials, survive rebuilds.
 
 ### Channels
@@ -176,12 +176,12 @@ first. Key and entry lookups inside the transaction answer staged appends from m
 therefore spends one statement per fact on journal bookkeeping, for its idempotency key, plus a few
 per commit.
 
-Core checks what the adapter writes before the adapter sees it: each store contract's `make`
-decodes every input against its schema and refuses records of another workspace, so an invalid
-value returns the store's `Conflict` before any statement runs. Rows read back are assembled as encoded
-records and decoded with core's schemas, so a corrupt row fails the read. A statement PostgreSQL
-refuses aborts its transaction, and the commit checks what PostgreSQL actually did, so a program
-that swallowed such a refusal fails rather than losing its writes.
+Core checks what the adapter writes before the adapter sees it: each store contract's `make` decodes
+every input against its schema and refuses records of another workspace, so an invalid value is a
+`StoreError` (`Rejected`) before any statement runs. Rows read back are assembled as encoded records
+and decoded with core's schemas, so a corrupt row fails the read. A statement PostgreSQL refuses
+aborts its transaction, and the commit checks what PostgreSQL actually did, so a program that
+swallowed such a refusal fails rather than losing its writes.
 
 ### Locks and timeouts
 

@@ -767,7 +767,10 @@ it("leaves a workspace once a commit removes the member, without signing out", a
     liveWorkspace({ name: () => "Studio", status: () => status }),
     () =>
       status === "removed"
-        ? response({ _tag: "GatewayErrors.NotMember", workspaceId: "one" }, 403)
+        ? response(
+            { _tag: "CoreError.Denied", reason: { _tag: "NotMember", workspaceId: "one" } },
+            403,
+          )
         : undefined,
   );
   await screen.findByRole("heading", { name: "Inbox" });
@@ -788,7 +791,13 @@ it("tells the reader when changes stop arriving, and clears once they resume", a
     "/workspaces/one/tasks",
     memoryStore(session("alice")).store,
     liveWorkspace({ name: () => "Studio" }),
-    () => (down ? response({ _tag: "ChangeFeed.Unavailable" }, 503) : undefined),
+    () =>
+      down
+        ? response(
+            { _tag: "CoreError.Unavailable", reason: { _tag: "ChangeFeedInterrupted" } },
+            503,
+          )
+        : undefined,
   );
   await screen.findByRole("heading", { name: "Tasks" });
   const announcer = screen.getByRole("status");

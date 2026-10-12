@@ -17,6 +17,7 @@ import * as StoredEntry from "./Entry.ts";
 import * as Occurrence from "./Occurrence.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
+import * as StoreError from "./StoreError.ts";
 
 /**
  * A log entry with its payload decoded by the log's schema.
@@ -68,7 +69,7 @@ export type WriteError = Transaction.Error | Schema.SchemaError | InvalidRespons
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = Store.Failure | Schema.SchemaError;
+export type ReadError = StoreError.StoreError | Schema.SchemaError;
 
 /**
  * A tail was consumed inside a transaction, where it could see entries that never commit and

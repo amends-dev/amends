@@ -13,8 +13,8 @@ import * as Commit from "./Commit.ts";
 import * as Entry from "./Entry.ts";
 import * as Store from "./Store.ts";
 import * as StoreInput from "./StoreInput.ts";
-import { storeFailure } from "./internal/store-failure.ts";
 import * as MemoryDatabase from "./MemoryDatabase.ts";
+import * as StoreError from "./StoreError.ts";
 
 /**
  * Names one projection version's progress on one log: the log, the projection's name, and its
@@ -106,17 +106,17 @@ export class Checkpoint extends Context.Service<
      * Progress of a consumer that reads behind the log, such as a projection being rebuilt.
      * Use the current transaction's view when present, otherwise committed state.
      */
-    readonly get: (key: Key) => Effect.Effect<Option.Option<Cursor>, Store.Failure>;
+    readonly get: (key: Key) => Effect.Effect<Option.Option<Cursor>, StoreError.StoreError>;
     /**
      * Enlist in the active Store.Transaction, alongside the projection's domain
      * writes. Reads followed by set must be serializable, including an absent key:
-     * concurrent runners must serialize or fail with Conflict, never both apply
+     * concurrent runners must serialize or be rejected, never both apply
      * the same batch. Reject expired or foreign transaction handles. Do not retry.
      */
     readonly set: (
       key: Key,
       cursor: Cursor,
-    ) => Effect.Effect<void, Store.Failure | Store.Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
      * The projection versions live on this log, in binary name order. A version is live when
      * every commit since it went live applied it, so it needs no progress of its own. Use the
@@ -124,7 +124,7 @@ export class Checkpoint extends Context.Service<
      */
     readonly listLive: (
       logId: Entry.LogId,
-    ) => Effect.Effect<ReadonlyArray<LiveVersion>, Store.Failure>;
+    ) => Effect.Effect<ReadonlyArray<LiveVersion>, StoreError.StoreError>;
     /**
      * Replace this log's live versions with exactly these, enlisted in the active
      * Store.Transaction. Reject expired or foreign transaction handles. Do not retry.
@@ -132,7 +132,7 @@ export class Checkpoint extends Context.Service<
     readonly setLive: (
       logId: Entry.LogId,
       versions: ReadonlyArray<LiveVersion>,
-    ) => Effect.Effect<void, Store.Failure | Store.Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/journal/Checkpoint") {}
 
@@ -144,22 +144,18 @@ export class Checkpoint extends Context.Service<
  * @since 0.1.0
  */
 export const make = (driver: Checkpoint["Service"]): Checkpoint["Service"] => {
-  const read = StoreInput.read(Store.Failure);
-  const write = StoreInput.write(Store.Conflict);
+  const read = StoreInput.read("Checkpoint");
+  const write = StoreInput.write("Checkpoint");
   return {
-    get: (key) => Effect.flatMap(read("checkpoint.get", Key, key), driver.get),
+    get: (key) => Effect.flatMap(read("get", Key, key), driver.get),
     set: Effect.fn("Checkpoint.set")(function* (key, cursor) {
-      return yield* driver.set(
-        yield* write("checkpoint.set", Key, key),
-        yield* write("checkpoint.set", Cursor, cursor),
-      );
+      return yield* driver.set(yield* write("set", Key, key), yield* write("set", Cursor, cursor));
     }),
-    listLive: (logId) =>
-      Effect.flatMap(read("checkpoint.listLive", Entry.LogId, logId), driver.listLive),
+    listLive: (logId) => Effect.flatMap(read("listLive", Entry.LogId, logId), driver.listLive),
     setLive: Effect.fn("Checkpoint.setLive")(function* (logId, versions) {
       return yield* driver.setLive(
-        yield* write("checkpoint.setLive", Entry.LogId, logId),
-        yield* write("checkpoint.setLive", LiveVersions, versions),
+        yield* write("setLive", Entry.LogId, logId),
+        yield* write("setLive", LiveVersions, versions),
       );
     }),
   };
@@ -181,7 +177,7 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
       function* (key) {
         return yield* rows.get((yield* read).records.of("checkpoints"), idOf(key));
       },
-      Effect.mapError(storeFailure(Store.Failure, "checkpoint.get")),
+      Effect.mapError(StoreError.failed("Checkpoint", "get")),
     ),
     set: Effect.fn("Checkpoint.memory.set")(
       function* (key, cursor) {
@@ -189,7 +185,7 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
         const row = yield* rows.encode(cursor);
         space.records.of("checkpoints").set(idOf(key), row);
       },
-      Effect.mapError(storeFailure(Store.Failure, "checkpoint.set")),
+      Effect.mapError(StoreError.failed("Checkpoint", "set")),
     ),
     listLive: Effect.fn("Checkpoint.memory.listLive")(
       function* (logId) {
@@ -203,7 +199,7 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
             )
           : [];
       },
-      Effect.mapError(storeFailure(Store.Failure, "checkpoint.listLive")),
+      Effect.mapError(StoreError.failed("Checkpoint", "listLive")),
     ),
     setLive: Effect.fn("Checkpoint.memory.setLive")(
       function* (logId, versions) {
@@ -211,7 +207,7 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
         const row = yield* liveRows.encode(versions);
         space.records.of("liveProjections").set(MemoryDatabase.keyOf(logId), row);
       },
-      Effect.mapError(storeFailure(Store.Failure, "checkpoint.setLive")),
+      Effect.mapError(StoreError.failed("Checkpoint", "setLive")),
     ),
   };
   return make(driver);
@@ -221,8 +217,8 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
  * Provide `Checkpoint` in process memory, over the workspace's `Store.MemoryBinding`: each
  * projection version's progress through one log while it is rebuilt, and the versions live on each
  * log, kept as one row per log. Both are written in the caller's transaction, with the projection's
- * rows, so progress and rows commit together. Its failures are the journal's `Store.Failure`.
- * `make` checks every input first.
+ * rows, so progress and rows commit together. Its failures are the journal's
+ * `StoreError.StoreError`. `make` checks every input first.
  *
  * @category layers
  * @since 0.1.0

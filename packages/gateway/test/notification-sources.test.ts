@@ -46,6 +46,7 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Resolving a notification's source under current access, without writing. */
 
@@ -280,7 +281,7 @@ describe("notification sources", () => {
               yield* Effect.flip(
                 run(protectedBound, { ...human, identity: owner.identity }, entryOf(note.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             yield* run(
               bound,
               owner,
@@ -289,7 +290,8 @@ describe("notification sources", () => {
               ),
             );
             expect(yield* Effect.flip(run(protectedBound, human, entryOf(note.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor" },
             });
           }),
         ),
@@ -621,7 +623,7 @@ describe("notification sources", () => {
           expect(
             yield* run({ ...bound, context: guarded }, human, sourceOf(note.id)),
           ).toBeUndefined();
-          const failure = new Store.Failure({ operation: "getEntry", cause: "injected" });
+          const failure = StoreError.failed("Store", "getEntry")("injected");
           const failing = Context.add(bound.context, Store.Store, {
             ...bound.store,
             getEntry: () => Effect.fail(failure),

@@ -183,7 +183,7 @@ have no default occurrence identity.
 
 `Journal.publish` accepts an explicit `idempotencyKey` only when the fact has no
 occurrence function or it returns `null`. Supplying one when the fact derives a
-key fails with `Store.Conflict`; callers cannot override the declared identity.
+key fails with `StoreError` (`Rejected`); callers cannot override the declared identity.
 Use an explicit key for request-level retries of a repeatable fact:
 
 ```ts
@@ -200,11 +200,11 @@ every time. The application still authorizes the operation and supplies
 UUID on every attempt identifies a different occurrence. Correlation IDs can group
 several facts and must not automatically become their shared idempotency key.
 
-| Key state                      | Outcome                                                                                          |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Absent                         | Check `expectedAfter`, if supplied, then append and persist the key in the same transaction.     |
-| Present with matching content  | Return the original entries, including their IDs, commit, positions, timestamps, and provenance. |
-| Present with different content | Fail with `Store.Conflict`; a core commit aborts even if the publication error is caught.        |
+| Key state                      | Outcome                                                                                            |
+| ------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Absent                         | Check `expectedAfter`, if supplied, then append and persist the key in the same transaction.       |
+| Present with matching content  | Return the original entries, including their IDs, commit, positions, timestamps, and provenance.   |
+| Present with different content | Fail with `StoreError` (`Rejected`); a core commit aborts even if the publication error is caught. |
 
 A matching key is resolved before evaluating the expected-position precondition.
 Retrying with a stale `expectedAfter` returns the original result when the first
@@ -243,7 +243,7 @@ check that every adapter keeps the two identical. The PostgreSQL adapter persist
 
 Rollback removes both the append and its key. After `Store.CommitUncertain`, retry
 the same keyed intent: a committed first attempt is reused, and a rolled-back one
-can be appended. Storage contention may still return `Store.Conflict`; neither
+can be appended. Storage contention may still return `StoreError` (`Contended`); neither
 core nor the adapters automatically retry transaction programs. Keys have no expiry
 and must be retained with their referenced history. Changing occurrence rules during
 local development requires a data reset; there is no receipt backfill.
@@ -623,13 +623,12 @@ models as recorded, and the storage adapters keep no foreign keys between them. 
 may therefore register the projections in any order and rebuild them to the same read models,
 which the conformance suites check by rebuilding in reverse.
 
-Checkpoint reads and writes must participate in the same host transaction as domain
-updates, including when no checkpoint exists yet, with competing writes serialized. This
-is the storage contract; PostgreSQL currently relies on a workspace advisory lock and does
-not explicitly select an isolation level. Competing runners must serialize or receive
-`Store.Conflict`; the core does not retry them. After `Store.CommitUncertain`, reconcile
-using persisted progress and domain state. A later step reads its checkpoint again before
-applying anything.
+Checkpoint reads and writes must participate in the same host transaction as domain updates,
+including when no checkpoint exists yet, with competing writes serialized. This is the storage
+contract; PostgreSQL currently relies on a workspace advisory lock and does not explicitly select an
+isolation level. Competing runners must serialize or receive `StoreError` (`Contended`); the core
+does not retry them. After `Store.CommitUncertain`, reconcile using persisted progress and domain
+state. A later step reads its checkpoint again before applying anything.
 
 A projection version identifies its read-model interpretation, separately from fact
 versions. A new version rebuilds from the beginning with its own checkpoint, and going live

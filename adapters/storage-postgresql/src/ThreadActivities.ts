@@ -1,13 +1,12 @@
 /**
- * The PostgreSQL driver for `ThreadActivityStore.ThreadActivityStore`, over the
- * `thread_activities` table: every kind of activity in one shape, its position, kind, subject, and
- * occurrence key in columns and the kind's details as JSON, so a new kind needs no migration.
- * `ThreadActivityStore.make` checks every input before the driver sees it, so the driver keeps
- * only what storage keeps: an insert conflicts unless it takes the thread's next position, and the
+ * The PostgreSQL driver for `ThreadActivityStore.ThreadActivityStore`, over the `thread_activities`
+ * table: every kind of activity in one shape, its position, kind, subject, and occurrence key in
+ * columns and the kind's details as JSON, so a new kind needs no migration.
+ * `ThreadActivityStore.make` checks every input before the driver sees it, so the driver keeps only
+ * what storage keeps: an insert is rejected unless it takes the thread's next position, and the
  * primary key refuses a reused ID and `thread_activity_occurrence` a second activity with one
- * occurrence key, each as the store's `Conflict`. Every statement is scoped to the binding's
- * workspace and runs under its `guard`, which lets a read join the caller's transaction and
- * requires one for a write.
+ * occurrence key, each rejected. Every statement is scoped to the binding's workspace and runs
+ * under its `guard`, which lets a read join the caller's transaction and requires one for a write.
  *
  * @since 0.1.0
  */
@@ -18,7 +17,8 @@ import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { threadActivities } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
+import { StoreError } from "@amends-dev/core/journal";
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.ThreadActivity));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -53,7 +53,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
             .where(and(inWorkspace, eq(threadActivities.id, id))),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ThreadActivityStore, "get")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "get")),
     ),
     listByThread: Effect.fn("ThreadActivities.listByThread")(
       function* (id) {
@@ -65,7 +65,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
             .orderBy(threadActivities.sequence),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadActivityStore, "listByThread")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "listByThread")),
     ),
     latest: Effect.fn("ThreadActivities.latest")(
       function* (id) {
@@ -78,7 +78,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
             .limit(1),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ThreadActivityStore, "latest")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "latest")),
     ),
     getFirst: Effect.fn("ThreadActivities.getFirst")(
       function* (ids) {
@@ -97,7 +97,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadActivityStore, "getFirst")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "getFirst")),
     ),
     readPage: Effect.fn("ThreadActivities.readPage")(
       function* (id, request) {
@@ -122,7 +122,7 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         ).pipe(Effect.flatMap(decodeRows));
         return newest ? rows.toReversed() : rows;
       },
-      Effect.mapError(storeFailure(ThreadActivityStore, "readPage")),
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "readPage")),
     ),
     insert: Effect.fn("ThreadActivities.insert")(function* (record) {
       const sequenceRows = yield* guard(
@@ -131,18 +131,19 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
           .from(threadActivities)
           .where(and(inWorkspace, eq(threadActivities.threadId, record.threadId))),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
+      ).pipe(Effect.mapError(storeError("ThreadActivityStore", "insert")));
       if (sequenceRows[0]?.next !== record.sequence)
-        return yield* new ThreadActivityStore.Conflict({
-          operation: "insert",
-          message: "Activity must follow the current thread sequence",
-        });
+        return yield* StoreError.rejected(
+          "ThreadActivityStore",
+          "insert",
+          "Activity must follow the current thread sequence",
+        );
 
       const { occurredAt, ...fields } = record;
       yield* guard(
         db.insert(threadActivities).values({ ...fields, occurredAt: DateTime.toDate(occurredAt) }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadActivityStore, "insert")));
+      ).pipe(Effect.mapError(storeError("ThreadActivityStore", "insert")));
     }),
   };
   return ThreadActivityStore.make(workspaceId, driver);

@@ -46,10 +46,11 @@ share in `command.ts`, and its reads in `query.ts`, as far as it has each, as
 [AGENTS.md](../AGENTS.md) describes. An HTTP group's module and its handler share a name, so
 `http/src/InvitationsGroup.ts` leads to `http/src/InvitationsHandlers.ts`.
 
-Each namespace module gives its concept one name, such as `ThreadErrors` or `ThreadActivityStore`.
-A package's index re-exports that name, and modules inside the package import the owning module
+Each namespace module gives its concept one name, such as `ThreadErrors` or `ThreadActivityStore`. A
+package's index re-exports that name, and modules inside the package import the owning module
 directly. A name that would be ambiguous in a shared namespace says what it is about, such as
-`ApiErrors.InvitationNotFound`. [Core's schema vocabulary](core/README.md#schema-and-type-names) applies throughout.
+`ThreadMessageId`. [Core's schema vocabulary](core/README.md#schema-and-type-names) applies
+throughout.
 
 A decoded TypeScript name and its encoded field name are separate contracts: renaming a field keeps
 its encoded name with a schema codec, or plans the migration, and tests both directions. Models the

@@ -79,8 +79,9 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
       options: { readonly after: number; readonly limit: number },
     ) => useSessionLogStore((sessionLogStore) => sessionLogStore.read(participationId, options)),
     /**
-     * Append `entries` to the participation's session log after `after`, or fail with `Conflict`
-     * when the log holds an entry past it: someone else wrote there meanwhile.
+     * Append `entries` to the participation's session log after `after`, or fail with
+     * `SessionLogStore.Overtaken` when the log holds an entry past it: someone else wrote there
+     * meanwhile.
      */
     appendLog: (
       participationId: ThreadParticipation.Id,

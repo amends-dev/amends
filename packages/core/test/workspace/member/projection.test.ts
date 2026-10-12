@@ -15,6 +15,7 @@ import * as MemberStore from "../../../src/workspace/MemberStore.ts";
 import * as Member from "../../../src/workspace/Member.ts";
 import * as Workspace from "../../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../../memory.ts";
+import * as StoreError from "../../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Entry.LogId.make("workspace-one/journal");
@@ -235,7 +236,12 @@ it.effect(
           const journal = yield* setup;
           expect(yield* Effect.flip(journal.replay)).toMatchObject({
             _tag: "Projection.Failure",
-            cause: { _tag: "MemberStore.Conflict", operation: "markRemoved" },
+            cause: {
+              _tag: "StoreError",
+              store: "MemberStore",
+              operation: "markRemoved",
+              reason: { _tag: "Rejected" },
+            },
           });
           expect(yield* (yield* MemberStore.MemberStore).get(firstId)).toEqual(
             Option.some({
@@ -261,7 +267,7 @@ it.effect(
 it.effect("membership changes roll back when the first commit cannot record live projections", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const failure = new Store.Failure({ operation: "checkpoint.setLive", cause: "unavailable" });
+    const failure = StoreError.failed("Checkpoint", "setLive")("unavailable");
     const broken: Fixture = {
       ...fixture,
       checkpoints: Checkpoint.Checkpoint.of({

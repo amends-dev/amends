@@ -19,7 +19,7 @@ import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Group from "../group/Group.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * Where a page of a recipient's notifications ends, by recorded time and ID: an exclusive keyset
@@ -93,29 +93,6 @@ export const PendingCount = Schema.Struct({
 export interface PendingCount extends Schema.Schema.Type<typeof PendingCount> {}
 
 /**
- * Storage failed while reading or writing notifications.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("NotificationStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID or source and
- * recipient, or a notification not in the state the write requires.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
-
-/**
  * A range of one thread's timeline positions, after one and through another, as `listByThread`
  * reads them.
  *
@@ -157,7 +134,7 @@ export class NotificationStore extends Context.Service<
     /** Find a notification in this workspace; None if absent. */
     readonly get: (
       id: Notification.Id,
-    ) => Effect.Effect<Option.Option<Notification.Notification>, Failure>;
+    ) => Effect.Effect<Option.Option<Notification.Notification>, StoreError.StoreError>;
 
     /**
      * The recipient's pending notifications, matching their kind and ID: at most limit records
@@ -167,7 +144,7 @@ export class NotificationStore extends Context.Service<
     readonly listPendingByRecipient: (
       recipient: Notification.Recipient,
       options: ReadOptions,
-    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, StoreError.StoreError>;
 
     /**
      * The recipient's newest notifications first: at most limit records before the exclusive
@@ -177,13 +154,13 @@ export class NotificationStore extends Context.Service<
     readonly listLatestByRecipient: (
       recipient: Notification.Recipient,
       options: LatestOptions,
-    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, StoreError.StoreError>;
 
     /** Same ordering and pagination, restricted to Pending records. */
     readonly listLatestPendingByRecipient: (
       recipient: Notification.Recipient,
       options: LatestOptions,
-    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, StoreError.StoreError>;
 
     /**
      * Every notification of the recipient from one thread's activity in a range of timeline
@@ -194,7 +171,7 @@ export class NotificationStore extends Context.Service<
       recipient: Notification.Recipient,
       threadId: ThreadId.Id,
       range: ThreadRange,
-    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, StoreError.StoreError>;
     /**
      * The recipient's pending notifications from one thread's activity at or before a timeline
      * position, ordered by that position, then ID in binary lexical order.
@@ -203,12 +180,12 @@ export class NotificationStore extends Context.Service<
       recipient: Notification.Recipient,
       threadId: ThreadId.Id,
       throughSequence: number,
-    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Notification.Notification>, StoreError.StoreError>;
 
     /** How many pending notifications the recipient has, from anywhere. */
     readonly countPendingByRecipient: (
       recipient: Notification.Recipient,
-    ) => Effect.Effect<number, Failure>;
+    ) => Effect.Effect<number, StoreError.StoreError>;
 
     /**
      * How many pending notifications the recipient has from thread activity in each of these
@@ -217,53 +194,53 @@ export class NotificationStore extends Context.Service<
     readonly countPendingByGroup: (
       recipient: Notification.Recipient,
       groupIds: ReadonlyArray<GroupId.Id>,
-    ) => Effect.Effect<ReadonlyArray<PendingCount>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<PendingCount>, StoreError.StoreError>;
 
     /**
-     * Projection write, enlisted with the source activity and checkpoint.
-     * Reused IDs and duplicate (source log, source entry, recipient kind, recipient ID)
-     * associations conflict atomically. Never upsert or retry internally; reject missing, foreign,
-     * or expired transaction handles.
+     * Projection write, enlisted with the source activity and checkpoint. Reused IDs and duplicate
+     * (source log, source entry, recipient kind, recipient ID) associations are rejected
+     * atomically. Never upsert or retry internally; reject missing, foreign, or expired transaction
+     * handles.
      */
     readonly insert: (
       record: Notification.Notification,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
-     * Insert several records in one projection write, with insert's conflicts,
-     * including duplicates within the request. Any conflict fails the call and writes none of them.
-     * An empty request writes nothing.
+     * Insert several records in one projection write, with insert's rejections, including
+     * duplicates within the request. Any rejection fails the call and writes none of them. An empty
+     * request writes nothing.
      */
     readonly insertMany: (
       records: ReadonlyArray<Notification.Notification>,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
      * Record that their human recipients have seen these notifications, outside the journal. Each
      * must be a human's notification in this workspace that is pending or already seen; otherwise
-     * the call conflicts and writes nothing. A notification seen before keeps its first time. The
+     * the call is rejected and writes nothing. A notification seen before keeps its first time. The
      * write joins the caller's transaction when there is one and is atomic on its own otherwise.
      */
     readonly markSeen: (
       ids: ReadonlyArray<Notification.Id>,
       seenAt: DateTime.Utc,
-    ) => Effect.Effect<void, Failure | Conflict>;
+    ) => Effect.Effect<void, StoreError.StoreError>;
     /**
      * Record that `by` accepted these pending notifications, in its commit: a turn, which takes
      * pending notifications of one agent in this workspace, or a delivery, which takes pending
-     * notifications of contacts. Anything else conflicts and writes nothing. An empty request
+     * notifications of contacts. Anything else is rejected and writes nothing. An empty request
      * writes nothing.
      */
     readonly accept: (
       ids: ReadonlyArray<Notification.Id>,
       by: Notification.AcceptedBy,
       acceptedAt: DateTime.Utc,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
      * Settle pending agent input for this ended participation, preserving source and recipient
      * history.
      */
     readonly discardPendingForParticipation: (
       id: ThreadParticipationId.Id,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
      * Settle what a member had pending from a group's threads once they no longer belong to it,
      * keeping it as history: a person's unseen notifications as `access-lost`, and an agent's
@@ -273,7 +250,7 @@ export class NotificationStore extends Context.Service<
     readonly discardPendingForGroup: (
       memberId: MemberId.Id,
       groupId: GroupId.Id,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/notification/NotificationStore") {}
 
@@ -281,12 +258,16 @@ export class NotificationStore extends Context.Service<
 const unsettled = (record: Notification.Notification) =>
   !Notification.State.isAnyOf(["Seen", "Accepted"])(record.state);
 const settled = (operation: string) => () =>
-  new Conflict({ operation, message: "Seen and Accepted are recorded with markSeen and accept" });
+  StoreError.rejected(
+    "NotificationStore",
+    operation,
+    "Seen and Accepted are recorded with markSeen and accept",
+  );
 
 /**
  * The store over a driver: each input is checked against its schema, and a record against the
- * workspace, before the driver sees it. A record inserted as Seen or Accepted conflicts, since only
- * `markSeen` and `accept` record those.
+ * workspace, before the driver sees it. A record inserted as Seen or Accepted is rejected, since
+ * only `markSeen` and `accept` record those.
  *
  * @category constructors
  * @since 0.1.0
@@ -295,8 +276,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: NotificationStore["Service"],
 ): NotificationStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("NotificationStore");
+  const write = StoreInput.write("NotificationStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", Notification.Id, id), driver.get),
     listPendingByRecipient: Effect.fn("NotificationStore.listPendingByRecipient")(
@@ -482,32 +463,35 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
       .slice(0, options.limit);
   });
 
-  /** Write every record or none: an ID or source already recorded conflicts. */
+  /** Write every record or none: an ID or source already recorded is rejected. */
   const insert = Effect.fnUntraced(function* (
     records: ReadonlyArray<Notification.Notification>,
     operation: string,
   ) {
     if (records.length === 0) return;
-    const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, operation)));
+    const space = yield* write.pipe(
+      Effect.mapError(StoreError.failed("NotificationStore", operation)),
+    );
     const stored = yield* rows
       .all(space.records.of("notifications"))
-      .pipe(Effect.mapError(storeFailure(Failure, operation)));
+      .pipe(Effect.mapError(StoreError.failed("NotificationStore", operation)));
     const ids = new Set(space.records.of("notifications").keys());
     const sources = new Set(stored.map(sourceKey));
     const written: Array<[string, string]> = [];
     for (const record of records) {
       if (ids.has(record.id) || sources.has(sourceKey(record)))
-        return yield* new Conflict({
+        return yield* StoreError.rejected(
+          "NotificationStore",
           operation,
-          message: "Notification ID or source and recipient already recorded",
-        });
+          "Notification ID or source and recipient already recorded",
+        );
       ids.add(record.id);
       sources.add(sourceKey(record));
       written.push([
         record.id,
         yield* rows
           .encode(withSeen(space, record))
-          .pipe(Effect.mapError(storeFailure(Failure, operation))),
+          .pipe(Effect.mapError(StoreError.failed("NotificationStore", operation))),
       ]);
     }
     for (const [id, row] of written) space.records.of("notifications").set(id, row);
@@ -519,21 +503,21 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
         const space = yield* read;
         return yield* rows.get(space.records.of("notifications"), id);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("NotificationStore", "get")),
     ),
     listPendingByRecipient: Effect.fn("NotificationStore.memory.listPendingByRecipient")(
       listPending,
-      Effect.mapError(storeFailure(Failure, "listPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByRecipient")),
     ),
     listLatestByRecipient: Effect.fn("NotificationStore.memory.listLatestByRecipient")(
       (recipient, options) => latest(recipient, options, false),
-      Effect.mapError(storeFailure(Failure, "listLatestByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listLatestByRecipient")),
     ),
     listLatestPendingByRecipient: Effect.fn(
       "NotificationStore.memory.listLatestPendingByRecipient",
     )(
       (recipient, options) => latest(recipient, options, true),
-      Effect.mapError(storeFailure(Failure, "listLatestPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listLatestPendingByRecipient")),
     ),
     listByThread: Effect.fn("NotificationStore.memory.listByThread")(
       function* (recipient, threadId, range) {
@@ -554,7 +538,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
               MemoryDatabase.compareBinary(left.id, right.id),
           );
       },
-      Effect.mapError(storeFailure(Failure, "listByThread")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listByThread")),
     ),
     listPendingByThread: Effect.fn("NotificationStore.memory.listPendingByThread")(
       function* (recipient, threadId, throughSequence) {
@@ -575,7 +559,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
               MemoryDatabase.compareBinary(left.id, right.id),
           );
       },
-      Effect.mapError(storeFailure(Failure, "listPendingByThread")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByThread")),
     ),
     countPendingByRecipient: Effect.fn("NotificationStore.memory.countPendingByRecipient")(
       function* (recipient) {
@@ -586,7 +570,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
             Notification.State.isAnyOf(["Pending"])(record.state),
         ).length;
       },
-      Effect.mapError(storeFailure(Failure, "countPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByRecipient")),
     ),
     countPendingByGroup: Effect.fn("NotificationStore.memory.countPendingByGroup")(
       function* (recipient, groupInput) {
@@ -603,11 +587,11 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
             counts.set(record.thread.groupId, (counts.get(record.thread.groupId) ?? 0) + 1);
         return [...counts].map(([groupId, count]) => ({ groupId, count }));
       },
-      Effect.mapError(storeFailure(Failure, "countPendingByGroup")),
+      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByGroup")),
     ),
     markSeen: Effect.fn("NotificationStore.memory.markSeen")(function* (ids, seenAt) {
       // Checked and recorded without a commit in between, as a row lock orders them on PostgreSQL:
-      // a departure that settles one first makes this conflict, and one after keeps its Seen.
+      // a departure that settles one first has the store reject this, and one after keeps its Seen.
       yield* exclusive((space) =>
         Effect.gen(function* () {
           // Check every notification before recording any of them; one seen before keeps its time.
@@ -615,17 +599,18 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
           for (const id of new Set(ids)) {
             const found = yield* rows
               .get(space.records.of("notifications"), id)
-              .pipe(Effect.mapError(storeFailure(Failure, "markSeen")));
+              .pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")));
             const record = Option.getOrUndefined(found);
             if (
               record === undefined ||
               !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
               !Notification.State.isAnyOf(["Pending", "Seen"])(record.state)
             )
-              return yield* new Conflict({
-                operation: "markSeen",
-                message: "Expected a pending notification of a human recipient",
-              });
+              return yield* StoreError.rejected(
+                "NotificationStore",
+                "markSeen",
+                "Expected a pending notification of a human recipient",
+              );
             if (Notification.State.isAnyOf(["Pending"])(record.state)) pending.push(record);
           }
           for (const record of pending) {
@@ -635,23 +620,18 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
                   state: Notification.State.cases.Seen.make({ seenAt }),
                 }),
               )
-              .pipe(Effect.mapError(storeFailure(Failure, "markSeen")));
+              .pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")));
             space.records.of("notifications").set(record.id, row);
             space.notificationsSeen.set(record.id, DateTime.toEpochMillis(seenAt));
           }
         }),
-      ).pipe(
-        // The binding's own errors, such as another host writing, are failures of the call.
-        Effect.mapError((error) =>
-          Schema.is(Store.Failure)(error) || Schema.is(Store.Conflict)(error)
-            ? new Failure({ operation: "markSeen", cause: error })
-            : error,
-        ),
       );
     }),
     accept: Effect.fn("NotificationStore.memory.accept")(function* (ids, by, acceptedAt) {
       if (ids.length === 0) return;
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "accept")));
+      const space = yield* write.pipe(
+        Effect.mapError(StoreError.failed("NotificationStore", "accept")),
+      );
       // A turn takes pending notifications of one agent; a delivery takes those of contacts.
       const takes = Notification.AcceptedBy.isAnyOf(["Turn"])(by)
         ? (recipient: Notification.Recipient, first: Notification.Recipient | undefined) =>
@@ -663,19 +643,20 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
       for (const id of new Set(ids)) {
         const found = yield* rows
           .get(space.records.of("notifications"), id)
-          .pipe(Effect.mapError(storeFailure(Failure, "accept")));
+          .pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")));
         const record = Option.getOrUndefined(found);
         if (
           record === undefined ||
           !Notification.State.isAnyOf(["Pending"])(record.state) ||
           !takes(record.recipient, accepted[0]?.recipient)
         )
-          return yield* new Conflict({
-            operation: "accept",
-            message: Notification.AcceptedBy.isAnyOf(["Turn"])(by)
+          return yield* StoreError.rejected(
+            "NotificationStore",
+            "accept",
+            Notification.AcceptedBy.isAnyOf(["Turn"])(by)
               ? "Expected pending notifications of one agent"
               : "Expected pending notifications of contacts",
-          });
+          );
         accepted.push(record);
       }
       for (const record of accepted) {
@@ -685,7 +666,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
               state: Notification.State.cases.Accepted.make({ by, acceptedAt }),
             }),
           )
-          .pipe(Effect.mapError(storeFailure(Failure, "accept")));
+          .pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")));
         space.records.of("notifications").set(record.id, row);
       }
     }),
@@ -709,7 +690,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
           space.records.of("notifications").set(record.id, row);
         }
       },
-      Effect.mapError(storeFailure(Failure, "discardPendingForParticipation")),
+      Effect.mapError(StoreError.failed("NotificationStore", "discardPendingForParticipation")),
     ),
     discardPendingForGroup: Effect.fn("NotificationStore.memory.discardPendingForGroup")(
       function* (memberId, groupId) {
@@ -731,7 +712,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
           space.records.of("notifications").set(record.id, row);
         }
       },
-      Effect.mapError(storeFailure(Failure, "discardPendingForGroup")),
+      Effect.mapError(StoreError.failed("NotificationStore", "discardPendingForGroup")),
     ),
     insert: Effect.fn("NotificationStore.memory.insert")((input) => insert([input], "insert")),
     insertMany: Effect.fn("NotificationStore.memory.insertMany")((input) =>
@@ -744,10 +725,10 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
 /**
  * Provide `NotificationStore` in process memory, over the workspace's `Store.MemoryBinding`. It
  * keeps what the contract leaves to storage: an insert writes every record or none, and a reused
- * ID, or a second notification for one source entry and recipient, conflicts. Marking seen
- * conflicts unless each notification is stored, of a human recipient, and pending or already seen,
+ * ID, or a second notification for one source entry and recipient, is rejected. Marking seen is
+ * rejected unless each notification is stored, of a human recipient, and pending or already seen,
  * and it runs through the binding's `exclusive`, so no commit lands between its check and its
- * write. Accepting conflicts unless each notification is pending and of one agent, for a turn, or
+ * write. Accepting is rejected unless each notification is pending and of one agent, for a turn, or
  * of contacts, for a delivery. A human recipient's first Seen is also kept beside the records,
  * where rebuilding projections leaves it, and is applied again when the notification is projected
  * anew. `make` checks every input first.

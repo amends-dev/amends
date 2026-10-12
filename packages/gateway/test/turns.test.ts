@@ -102,7 +102,7 @@ const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberRef
     yield* stream.pipe(
       Stream.runForEach((message) => Queue.offer(queue, message)),
       Effect.andThen(Queue.offer(queue, "done")),
-      Effect.catchTag("Turn.LogUnavailable", () => Queue.offer(queue, "unavailable")),
+      Effect.catchTag("CoreError.Unavailable", () => Queue.offer(queue, "unavailable")),
       Effect.forkScoped,
     );
     return Queue.take(queue).pipe(Effect.timeout("10 seconds"));
@@ -732,8 +732,8 @@ describe("turns", () => {
                 failure: "The model is overloaded.",
               });
               expect(yield* Effect.flip(cancel(third.turn.id))).toMatchObject({
-                _tag: "TurnService.NotActive",
-                status: "failed",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "TurnNotActive", status: "failed" },
               });
               // A turn asked to stop that its job is not running ends when the job next runs.
               yield* reply(workspace.id, threadId, "One more thing.");
@@ -826,8 +826,8 @@ describe("turns", () => {
             ]);
             // Once a retry follows it, the failed turn cannot run again.
             expect(yield* Effect.flip(retry(retried.id))).toMatchObject({
-              _tag: "TurnService.NotRetryable",
-              reason: "active",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "NotRetryable", reason: "active" },
             });
             yield* execute(workspace.id, (turnExecution) =>
               turnExecution.fail(retried.id, { reason: "Still unavailable." }),
@@ -835,8 +835,8 @@ describe("turns", () => {
             yield* reply(workspace.id, threadId, "Never mind.");
             yield* startReady(workspace.id, agent.memberId, threadId);
             expect(yield* Effect.flip(retry(retried.id))).toMatchObject({
-              _tag: "TurnService.NotRetryable",
-              reason: "superseded",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "NotRetryable", reason: "superseded" },
             });
           }),
         ),
@@ -957,7 +957,10 @@ describe("turns", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "TurnService.NotRetryable", reason: "departed" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "NotRetryable", reason: "departed" },
+          });
         }),
       ),
     ),
@@ -1315,8 +1318,8 @@ describe("turns", () => {
           yield* revokeRoles(workspace.id, reader.id);
           for (const read of reads)
             expect(yield* Effect.flip(asBob(read))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: "thread.read" } },
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted", requirement: { permission: { name: "thread.read" } } },
             });
           expect(yield* asBob((turns) => turns.listActive(10))).toEqual([]);
         }),

@@ -4,8 +4,8 @@
  * `latest_sequence` and `latest_activity_at`. A group's threads page newest first through
  * `threads_by_latest` and `threads_by_start`, from an exclusive row cursor. `ThreadStore.make`
  * checks every input before the driver sees it, so the driver keeps only what storage keeps: the
- * primary key refuses a reused ID as the store's `Conflict`, the latest activity only moves
- * forward, and renaming or recording activity of a missing thread conflicts. Every statement is
+ * primary key rejects a reused ID, the latest activity only moves
+ * forward, and renaming or recording activity of a missing thread is rejected. Every statement is
  * scoped to the binding's workspace and runs under its `guard`, which lets a read join the
  * caller's transaction and requires one for a write.
  *
@@ -17,7 +17,8 @@ import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
 import { threads } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
+import { StoreError } from "@amends-dev/core/journal";
 const validate = Schema.decodeEffect(Schema.toType(Thread.Thread));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ...Thread.Thread.fields, createdAt: Schema.DateTimeUtcFromDate })),
@@ -75,7 +76,7 @@ export const make = Effect.fn("Threads.make")(function* () {
             .where(and(inWorkspace, eq(threads.id, id))),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ThreadStore, "get")),
+      Effect.mapError(StoreError.failed("ThreadStore", "get")),
     ),
     getMany: Effect.fn("Threads.getMany")(
       function* (ids) {
@@ -87,7 +88,7 @@ export const make = Effect.fn("Threads.make")(function* () {
             .where(and(inWorkspace, inIds(threads.id, ids))),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadStore, "getMany")),
+      Effect.mapError(StoreError.failed("ThreadStore", "getMany")),
     ),
     listByGroup: Effect.fn("Threads.listByGroup")(
       function* (id) {
@@ -99,7 +100,7 @@ export const make = Effect.fn("Threads.make")(function* () {
             .orderBy(sql`${threads.id} COLLATE "C"`),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadStore, "listByGroup")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByGroup")),
     ),
     listByLatest: Effect.fn("Threads.listByLatest")(
       function* (groupId, options) {
@@ -123,7 +124,7 @@ export const make = Effect.fn("Threads.make")(function* () {
             .limit(options.limit),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadStore, "listByLatest")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByLatest")),
     ),
     listByStart: Effect.fn("Threads.listByStart")(
       function* (groupId, options) {
@@ -145,7 +146,7 @@ export const make = Effect.fn("Threads.make")(function* () {
             .limit(options.limit),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadStore, "listByStart")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByStart")),
     ),
     getLatest: Effect.fn("Threads.getLatest")(
       function* (ids) {
@@ -161,7 +162,7 @@ export const make = Effect.fn("Threads.make")(function* () {
             .where(and(inWorkspace, inIds(threads.id, ids), isNotNull(threads.latestSequence))),
         ).pipe(Effect.flatMap(decodeLatest));
       },
-      Effect.mapError(storeFailure(ThreadStore, "getLatest")),
+      Effect.mapError(StoreError.failed("ThreadStore", "getLatest")),
     ),
     recordLatest: Effect.fn("Threads.recordLatest")(function* (latest) {
       const advanced = yield* guard(
@@ -180,7 +181,7 @@ export const make = Effect.fn("Threads.make")(function* () {
           )
           .returning({ id: threads.id }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadStore, "recordLatest")));
+      ).pipe(Effect.mapError(storeError("ThreadStore", "recordLatest")));
       if (advanced.length > 0) return;
       // Nothing advanced: an earlier position changes nothing, but the thread must exist.
       const found = yield* guard(
@@ -189,12 +190,9 @@ export const make = Effect.fn("Threads.make")(function* () {
           .from(threads)
           .where(and(inWorkspace, eq(threads.id, latest.threadId))),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadStore, "recordLatest")));
+      ).pipe(Effect.mapError(storeError("ThreadStore", "recordLatest")));
       if (found.length === 0)
-        return yield* new ThreadStore.Conflict({
-          operation: "recordLatest",
-          message: "Thread is missing",
-        });
+        return yield* StoreError.rejected("ThreadStore", "recordLatest", "Thread is missing");
     }),
     rename: Effect.fn("Threads.rename")(function* (renamed) {
       const updated = yield* guard(
@@ -204,12 +202,9 @@ export const make = Effect.fn("Threads.make")(function* () {
           .where(and(inWorkspace, eq(threads.id, renamed.threadId)))
           .returning({ id: threads.id }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadStore, "rename")));
+      ).pipe(Effect.mapError(storeError("ThreadStore", "rename")));
       if (updated.length === 0)
-        return yield* new ThreadStore.Conflict({
-          operation: "rename",
-          message: "Thread is missing",
-        });
+        return yield* StoreError.rejected("ThreadStore", "rename", "Thread is missing");
     }),
     insert: Effect.fn("Threads.insert")(function* (record) {
       const creator = record.createdBy;
@@ -221,7 +216,7 @@ export const make = Effect.fn("Threads.make")(function* () {
           createdAt: DateTime.toDate(record.createdAt),
         }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadStore, "insert")));
+      ).pipe(Effect.mapError(storeError("ThreadStore", "insert")));
     }),
   };
   return ThreadStore.make(workspaceId, driver);

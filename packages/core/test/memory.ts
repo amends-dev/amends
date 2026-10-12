@@ -9,12 +9,13 @@ import { AssignmentStore, RoleStore } from "../src/authorization/index.ts";
 import type { Commit } from "../src/journal/index.ts";
 import { Checkpoint, MemoryDatabase, Store } from "../src/journal/index.ts";
 import { MemberStore, Workspace } from "../src/workspace/index.ts";
+import * as StoreError from "../src/journal/StoreError.ts";
 
 /** A projection target: a number the transaction stages, like any projected record. */
 export class Counter extends Context.Service<
   Counter,
   {
-    readonly add: (amount: number) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+    readonly add: (amount: number) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     readonly get: Effect.Effect<number>;
   }
 >()("JournalTest/Counter") {}

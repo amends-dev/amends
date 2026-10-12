@@ -32,45 +32,8 @@ import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
-import {
-  Changed,
-  InvalidRecipient,
-  MemberNotFound,
-  NotOwner,
-} from "./internal/ownership-errors.ts";
-export {
-  /**
-   * The Owner assignment is no longer the one the caller reviewed: ownership moved meanwhile, and
-   * nothing was recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-  /**
-   * The member cannot become owner: they are the owner already, removed, or an agent, as `reason`
-   * says.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidRecipient,
-  /**
-   * No membership has the ID given as the recipient.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberNotFound,
-  /**
-   * The actor is not the current owner, or is not a person; only the owner transfers, whatever
-   * their grants.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotOwner,
-} from "./internal/ownership-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the ownership operations can fail with: the outcomes above, and the failures
@@ -81,15 +44,14 @@ export {
  */
 export type Error =
   | Delegation.Error
-  | WorkspaceStore.Failure
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError
-  | NotOwner
-  | MemberNotFound
-  | InvalidRecipient
-  | Changed;
+  | CoreError.Denied
+  | CoreError.NotFound
+  | CoreError.Conflict
+  | CoreError.Changed;
 
 /**
  * The ownership operations, one of `Core.Operations`.
@@ -108,10 +70,11 @@ export class OwnershipService extends Context.Service<
     readonly get: Effect.Effect<Ownership.View, Error, Actor.Actor>;
     /**
      * Make another active human member the owner, under `workspace.transfer-ownership`, as the
-     * current owner (otherwise `NotOwner`), and against the Owner assignment the caller reviewed
-     * (otherwise `Changed`). One commit revokes both members' built-in workspace roles, makes the
-     * recipient Owner and the former owner Administrator, and moves `ownerMemberId`; direct grants,
-     * scoped assignments, the name, and `createdBy` stay. Returns the workspace as it now stands.
+     * current owner (otherwise `CoreError.Denied`, `OwnerRequired`), and against the Owner
+     * assignment the caller reviewed (otherwise `CoreError.Changed`). One commit revokes both
+     * members' built-in workspace roles, makes the recipient Owner and the former owner
+     * Administrator, and moves `ownerMemberId`; direct grants, scoped assignments, the name, and
+     * `createdBy` stay. Returns the workspace as it now stands.
      */
     readonly transfer: (
       input: Ownership.TransferInput,
@@ -155,7 +118,8 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     memberId: Member.Id,
   ) {
     const found = yield* memberStore.get(memberId);
-    if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Member", id: memberId });
     return found.value;
   });
   const readCurrentOwnership = Effect.gen(function* () {
@@ -176,7 +140,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       Identity.MemberReference.isAnyOf(["Human"])(actor.identity) &&
       (yield* authorization.require([requirement]).pipe(
         Effect.as(true),
-        Effect.catchTag("Authorization.Denied", () => Effect.succeed(false)),
+        Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false)),
       ));
     const candidates = canTransfer
       ? (yield* memberStore.list).filter(
@@ -205,16 +169,27 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
         actor.memberId !== state.owner.id ||
         !Identity.MemberReference.isAnyOf(["Human"])(actor.identity)
       )
-        return yield* new NotOwner({ workspaceId });
+        return yield* new CoreError.Denied({
+          reason: new CoreError.OwnerRequired({ reason: "ownership-transfer" }),
+        });
       if (request.expectedOwnerAssignmentId !== state.assignment.id)
-        return yield* new Changed({ workspaceId });
+        return yield* new CoreError.Changed({ resource: "Workspace", id: workspaceId });
       if (request.memberId === state.owner.id)
-        return yield* new InvalidRecipient({ memberId: request.memberId, reason: "same-owner" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvalidRecipient({
+            memberId: request.memberId,
+            reason: "same-owner",
+          }),
+        });
       const recipient = yield* requireMember(request.memberId);
       if (recipient.status !== "active")
-        return yield* new InvalidRecipient({ memberId: recipient.id, reason: "removed" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "removed" }),
+        });
       if (!Identity.MemberReference.isAnyOf(["Human"])(recipient.identity))
-        return yield* new InvalidRecipient({ memberId: recipient.id, reason: "agent" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvalidRecipient({ memberId: recipient.id, reason: "agent" }),
+        });
       const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId);
       yield* delegation.loadRole(BuiltinRoles.AdministratorId);
       if (!ownerRole.permissions.includes(OwnershipPermissions.Transfer.name))

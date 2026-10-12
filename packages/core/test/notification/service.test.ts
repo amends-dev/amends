@@ -26,6 +26,8 @@ import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
 import * as TestSignalHub from "../signal-hub.ts";
 import * as SignalHub from "../../src/signal/SignalHub.ts";
+import * as CoreError from "../../src/error/CoreError.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
@@ -241,10 +243,7 @@ it.effect(
           const notificationService = yield* NotificationService.NotificationService;
           for (const id of [theirs.id, agents.id, Notification.Id.make("absent")]) {
             expect(yield* Effect.flip(notificationService.markSeen(id))).toEqual(
-              new NotificationService.NotFound({
-                workspaceId,
-                notificationId: id,
-              }),
+              new CoreError.NotFound({ resource: "Notification", id }),
             );
           }
         }),
@@ -281,7 +280,7 @@ it.effect(
               expect(error._tag).toBe(
                 actor.workspaceId === otherWorkspaceId
                   ? "Authorization.WorkspaceMismatch"
-                  : "Authorization.InvalidActor",
+                  : "CoreError.Denied",
               );
             }
           }),
@@ -319,8 +318,8 @@ it.effect("inbox reads join an outer commit and observe staged membership remova
           ),
         );
         expect(error).toMatchObject({
-          _tag: "Authorization.InvalidActor",
-          reason: "membership-removed",
+          _tag: "CoreError.Denied",
+          reason: { _tag: "InvalidActor", reason: "membership-removed" },
         });
         expect(yield* notificationService.countPending).toBe(1);
         expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
@@ -413,7 +412,7 @@ it.effect("notification storage failures retain their cause", () =>
   Effect.gen(function* () {
     const fixture = yield* make(workspaceId);
     yield* seed(fixture);
-    const failure = new NotificationStore.Failure({ operation: "read", cause: "unavailable" });
+    const failure = StoreError.failed("NotificationStore", "read")("unavailable");
     const fail = () => Effect.fail(failure);
     yield* run(
       fixture,

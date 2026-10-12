@@ -32,16 +32,19 @@ export const retryDelays = Schedule.min([
 
 /**
  * Whether a request failed because its workspace was never created, directly or as a run's cause:
- * the gateway's `WorkspaceNotFound`, or a runner's `RunFailed` that carries it.
+ * the gateway's `CoreError.NotFound` for the workspace, or a runner's `RunFailed` that carries it.
  *
  * @category utils
  * @since 0.1.0
  */
-export const isWorkspaceNotFound = (error: unknown) =>
-  Predicate.isTagged(
-    Predicate.hasProperty(error, "cause") ? error.cause : error,
-    "GatewayErrors.WorkspaceNotFound",
+export const isWorkspaceNotFound = (error: unknown) => {
+  const failure = Predicate.hasProperty(error, "cause") ? error.cause : error;
+  return (
+    Predicate.isTagged(failure, "CoreError.NotFound") &&
+    Predicate.hasProperty(failure, "resource") &&
+    failure.resource === "Workspace"
   );
+};
 
 /**
  * Do `work` for a request of `job`, trying again after each failure, `times` more at most, as

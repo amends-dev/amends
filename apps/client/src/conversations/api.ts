@@ -476,7 +476,7 @@ export const renameGroup = (workspace: string) => (api: Api, rename: GroupRename
       })
       .pipe(
         Effect.tapError((error) =>
-          Schema.is(ApiErrors.GroupChanged)(error)
+          Schema.is(ApiErrors.Changed)(error)
             ? Reactivity.invalidate([workspaceKey(workspace, "groups")])
             : Effect.void,
         ),
@@ -536,7 +536,7 @@ export const changeMembership = (workspace: string) => (api: Api, change: Member
             api.groups.addMember({ params, payload: { memberId: id } }),
           ).pipe(
             Effect.asVoid,
-            Effect.catchTag("GroupMembershipService.AlreadyMember", () => Effect.void),
+            Effect.catchReason("CoreError.Conflict", "AlreadyMember", () => Effect.void),
           ),
         ).pipe(Effect.ensuring(invalidate));
         return;

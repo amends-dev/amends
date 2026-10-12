@@ -2,9 +2,9 @@
  * The operations on turns an actor calls: reading a thread's turns as `Turn.View`s and the
  * workspace's active ones, following a turn's session log as it grows, asking an active turn to
  * stop, and retrying a failed or stopped one. A turn in a thread outside the reader's audience is
- * `NotFound`; reading needs `thread.read` on the thread, and stopping or retrying needs directing
- * the turn's agent. Running turns is `TurnExecution`'s, for each agent's turn job; this service
- * only asks, through the commits it makes.
+ * `CoreError.NotFound`; reading needs `thread.read` on the thread, and stopping or retrying needs
+ * directing the turn's agent. Running turns is `TurnExecution`'s, for each agent's turn job; this
+ * service only asks, through the commits it makes.
  *
  * @since 0.1.0
  */
@@ -40,7 +40,6 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import type * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts";
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
-import { NotActive, NotFound, NotRetryable } from "./internal/turn-errors.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnCommand from "./TurnCommand.ts";
 import * as TurnFacts from "./TurnFacts.ts";
@@ -48,63 +47,40 @@ import * as SessionLog from "./SessionLog.ts";
 import * as SessionLogStore from "./SessionLogStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
-export {
-  /**
-   * The turn has already finished, or is not in the state the operation needs.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotActive,
-  /**
-   * Missing turns, and turns in threads the reader cannot open, share this outcome.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * The turn cannot be retried now, for `reason`: it is still active, it completed, a later turn of
-   * its agent superseded it, or its agent no longer takes part in the thread.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotRetryable,
-} from "./internal/turn-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
- * What reading a turn can fail with: `NotFound`, a denied `thread.read`, and the failures of what
- * a read depends on.
+ * What reading a turn can fail with: `CoreError.NotFound`, a denied `thread.read`, and the failures
+ * of what a read depends on.
  *
  * @category errors
  * @since 0.1.0
  */
 export type ReadError =
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | Exclude<Authorization.Error, Authorization.Denied>
-  | TurnStore.Failure
-  | ThreadParticipationStore.Failure
+  | ThreadQuery.AccessError
+  | Authorization.Error
+  | StoreError.StoreError
   | Schema.SchemaError
-  | NotFound;
+  | CoreError.NotFound;
 
 /**
- * What listing active turns can fail with: `ReadError` but `NotFound`, since turns the reader may
- * not read are left out.
+ * What listing active turns can fail with: `ReadError` but `CoreError.NotFound`, since turns the
+ * reader may not read are left out.
  *
  * @category errors
  * @since 0.1.0
  */
-export type ActiveError = Exclude<ReadError, NotFound>;
+export type ActiveError = Exclude<ReadError, CoreError.NotFound>;
 
 /**
  * What opening a turn's log can fail with: `ReadError`, the session log store's failures, and
- * `Turn.LogUnavailable`.
+ * `CoreError.Unavailable`.
  *
  * @category errors
  * @since 0.1.0
  */
-export type WatchError = ReadError | SessionLogStore.Failure | Turn.LogUnavailable;
+export type WatchError = ReadError | StoreError.StoreError | CoreError.Unavailable;
 
 /**
  * What stopping or retrying a turn can fail with beyond its own outcome: `ReadError`, and the
@@ -116,25 +92,27 @@ export type WatchError = ReadError | SessionLogStore.Failure | Turn.LogUnavailab
 export type ChangeError =
   | ReadError
   | PlatformError.PlatformError
-  | SessionLogStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | TurnCommand.EndError;
 
 /**
- * What `cancel` can fail with: `ChangeError`, or `NotActive` for a turn that already ended.
+ * What `cancel` can fail with: `ChangeError`, or `CoreError.Conflict` (`TurnNotActive`) for a turn
+ * that already ended.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CancelError = ChangeError | NotActive;
+export type CancelError = ChangeError | CoreError.Conflict;
 
 /**
- * What `retry` can fail with: `ChangeError`, or `NotRetryable` with the reason.
+ * What `retry` can fail with: `ChangeError`, or `CoreError.Conflict` (`NotRetryable`) with the
+ * reason.
  *
  * @category errors
  * @since 0.1.0
  */
-export type RetryError = ChangeError | NotRetryable;
+export type RetryError = ChangeError | CoreError.Conflict;
 
 /**
  * The turn operations, one of `Core.Operations`.
@@ -147,7 +125,8 @@ export class TurnService extends Context.Service<
   {
     /**
      * A turn in a thread the reader may read: in its group's audience, with `thread.read` on it, as
-     * its timeline requires. Outside the audience it is NotFound; without the permission, Denied.
+     * its timeline requires. Outside the audience it is `CoreError.NotFound`; without the
+     * permission, Denied.
      */
     readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Actor>;
     /**
@@ -160,22 +139,22 @@ export class TurnService extends Context.Service<
     /**
      * Follow a turn's log, for a reader who may read its thread: its items as they stand, then
      * those its session log adds as the turn works, with the step it is writing, until the turn's
-     * end commits and every item is delivered. The caller owns the subscription scope. The stream fails with
-     * LogUnavailable when following cannot go on, including once the reader may no longer read the
-     * thread, which it checks with each batch and whenever a commit changes their groups or grants;
-     * following again starts from the items as they stand.
+     * end commits and every item is delivered. The caller owns the subscription scope. The stream
+     * fails with `CoreError.Unavailable`, `LogInterrupted`, when following cannot go on, including
+     * once the reader may no longer read the thread, which it checks with each batch and whenever a
+     * commit changes their groups or grants; following again starts from the items as they stand.
      */
     readonly watchLog: (
       turnId: Turn.Id,
     ) => Effect.Effect<
-      Stream.Stream<Turn.LogMessage, Turn.LogUnavailable>,
+      Stream.Stream<Turn.LogMessage, CoreError.Unavailable>,
       WatchError,
       Actor.Actor | Scope.Scope
     >;
     /**
      * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
      * queued turn stops at once, since nothing runs it yet; a running one stops once its job
-     * confirms it. A turn already stopping stays as it is; a finished one is NotActive.
+     * confirms it. A turn already stopping stays as it is; a finished one is `CoreError.Conflict`.
      */
     readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Actor>;
     /**
@@ -183,8 +162,8 @@ export class TurnService extends Context.Service<
      * agent: a new turn for the same agent and input, which continues the session that turn left
      * and tells the agent who asked, on what the agent is set up with now. Only the agent's latest
      * turn on the thread can be retried, while the agent still takes part there; otherwise it is
-     * NotRetryable. A turn is retried at most once, so asking again returns the turn its retry
-     * created.
+     * `CoreError.Conflict`. A turn is retried at most once, so asking again returns the turn its
+     * retry created.
      */
     readonly retry: (turnId: Turn.Id) => Effect.Effect<Turn.View, RetryError, Actor.Actor>;
   }
@@ -243,10 +222,13 @@ export const make = Effect.fn("TurnService.make")(function* () {
   /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
   const requireReadableTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turnStore.get(turnId);
-    if (Option.isNone(found)) return yield* new NotFound({ turnId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Turn", id: turnId });
     const turn = found.value;
     yield* requireReadableThread(turn.threadId).pipe(
-      Effect.catchTag("ThreadQuery.NotFound", () => Effect.fail(new NotFound({ turnId }))),
+      Effect.catchTag("CoreError.NotFound", () =>
+        Effect.fail(new CoreError.NotFound({ resource: "Turn", id: turnId })),
+      ),
     );
     return turn;
   });
@@ -305,10 +287,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
       if (opened.has(turn.threadId)) continue;
       const may = yield* threadQuery.requireAccess(turn.threadId).pipe(
         Effect.as(true),
-        Effect.catchTags({
-          "ThreadQuery.NotFound": () => Effect.succeed(false),
-          "Authorization.Denied": () => Effect.succeed(false),
-        }),
+        Effect.catchTag("CoreError.NotFound", () => Effect.succeed(false)),
+        Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false)),
       );
       opened.set(turn.threadId, may);
     }
@@ -318,7 +298,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
     return yield* toViews(active.filter((turn) => readable.has(turn.threadId)));
   });
 
-  const toLogUnavailable = () => new Turn.LogUnavailable({});
+  const logInterrupted = () =>
+    new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() });
 
   const watchLog = Effect.fn("TurnService.watchLog")(function* (turnId: Turn.Id) {
     const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
@@ -327,14 +308,14 @@ export const make = Effect.fn("TurnService.make")(function* () {
     const live = yield* signalHub.subscribe;
     const committed = yield* changeFeedSource
       .subscribe(Option.none())
-      .pipe(Effect.mapError(toLogUnavailable));
+      .pipe(Effect.mapError(logInterrupted));
     const turn = yield* requireReadableTurn(id);
     // Following outlasts the request that opened it, so its access checks name the reader.
     const actor = yield* Actor.Actor;
     /** The reader still may read the thread, or following ends. */
     const checkStillReadable = requireReadableThread(turn.threadId).pipe(
       Effect.provideService(Actor.Actor, actor),
-      Effect.mapError(toLogUnavailable),
+      Effect.mapError(logInterrupted),
     );
 
     const reader = SessionLog.reader(turn.id, turn.logAfter);
@@ -393,7 +374,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
           Option.some(page.at(-1)?.position ?? after),
         ] as const;
       }),
-    ).pipe(Stream.mapError(toLogUnavailable));
+    ).pipe(Stream.mapError(logInterrupted));
     const draftedInputs = live.pipe(
       Stream.filter(
         (signal): signal is Extract<Signal.Signal, { readonly _tag: "TurnDraft" }> =>
@@ -419,7 +400,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
         ...(endsTurn(delivery, turn.id) ? [Input.Ended()] : []),
       ]),
       Stream.flattenIterable,
-      Stream.mapError(toLogUnavailable),
+      Stream.mapError(logInterrupted),
     );
     /** The turn as it ended, with what is left of its log: every entry precedes its end. */
     const readEnding = Effect.gen(function* () {
@@ -427,14 +408,14 @@ export const make = Effect.fn("TurnService.make")(function* () {
       const ended = yield* turnStore.get(turn.id);
       reader.end(Option.match(ended, { onNone: () => [], onSome: ({ messageIds }) => messageIds }));
       return [...(yield* changeMessages), endedMessage];
-    }).pipe(Effect.mapError(toLogUnavailable));
+    }).pipe(Effect.mapError(logInterrupted));
     /**
      * What each input tells the reader, one at a time, so reads and what was sent agree. Once the
      * reader's access changes, it is checked before anything more is sent, drafts included.
      */
     const messagesFor = (
       input: Input,
-    ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, Turn.LogUnavailable> =>
+    ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, CoreError.Unavailable> =>
       Input.$match(input, {
         Drafted: ({ draft }) => Effect.succeed([draft]),
         AccessChanged: () => Effect.as(checkStillReadable, []),
@@ -463,7 +444,9 @@ export const make = Effect.fn("TurnService.make")(function* () {
       const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
       yield* authorization.require([directAgentRequirement(turn)]);
       if (!Turn.active(turn.status))
-        return yield* new NotActive({ turnId: turn.id, status: turn.status });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
+        });
       if (turn.status === "cancelling") return yield* toView(turn);
       return yield* toView(yield* turnCommand.requestStop(turn, "requested"));
     },
@@ -483,7 +466,10 @@ export const make = Effect.fn("TurnService.make")(function* () {
       if (Option.isSome(yield* turnStore.get(retryId)))
         return yield* toView(yield* requireReadableTurn(retryId));
       const reason = yield* whyNotRetryable(turn);
-      if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
+      if (reason !== undefined)
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.NotRetryable({ turnId: turn.id, reason }),
+        });
       // The same input, in the same session, created after the turn it retries, even on a clock
       // that has not moved, so it is the agent's latest there.
       const now = yield* DateTime.now;

@@ -19,7 +19,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Fact, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Fact, Journal, Publication } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -70,6 +70,8 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Following and unfollowing threads: quiet activity, stale departures, settlement, and replay. */
 
@@ -388,9 +390,11 @@ describe("thread participation", () => {
             expect(
               yield* Effect.flip(run(bound, human, unfollow(first.thread.id, initial.id))),
             ).toEqual(
-              new ThreadParticipationService.AlreadyEnded({
-                threadId: first.thread.id,
-                participationId: initial.id,
+              new CoreError.Conflict({
+                reason: new CoreError.AlreadyEnded({
+                  resource: "ThreadParticipation",
+                  id: initial.id,
+                }),
               }),
             );
             expect(yield* bound.participations.get(returned.id)).toMatchObject({
@@ -516,7 +520,8 @@ describe("thread participation", () => {
             yield* grant(bound, humanId, ThreadPermissions.Read);
             yield* grant(bound, humanId, ThreadMessagePermissions.Publish);
             expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const assignment = yield* grant(
               bound,
@@ -530,7 +535,7 @@ describe("thread participation", () => {
             const participant = yield* asActor(service.follow(first.thread.id), human);
             expect(
               yield* Effect.flip(asActor(service.follow(second.thread.id), human)),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* facts(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -543,7 +548,7 @@ describe("thread participation", () => {
             );
             expect(
               yield* Effect.flip(asActor(service.follow(first.thread.id), human)),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* asActor(
               service.unfollow({ threadId: first.thread.id, participationId: participant.id }),
               human,
@@ -575,13 +580,14 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, human, follow(second.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const hidden = yield* run(bound, owner, create([otherId]));
             yield* grant(bound, otherId, ThreadPermissions.Start);
             const secret = yield* run(bound, actorFor(otherId), start(hidden.id));
             expect(yield* Effect.flip(run(bound, owner, follow(secret.thread.id)))).toEqual(
-              new ThreadParticipationService.ThreadNotFound({ threadId: secret.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: secret.thread.id }),
             );
           }),
         ),
@@ -604,10 +610,7 @@ describe("thread participation", () => {
               expect(
                 yield* Effect.flip(run(bound, actor, unfollow(first.thread.id, agentPart.id))),
               ).toEqual(
-                new ThreadParticipationService.NotFound({
-                  threadId: first.thread.id,
-                  participationId: agentPart.id,
-                }),
+                new CoreError.NotFound({ resource: "ThreadParticipation", id: agentPart.id }),
               );
             yield* grant(bound, humanId, ThreadParticipationPermissions.Follow);
             const own = yield* run(bound, human, follow(first.thread.id));
@@ -621,7 +624,7 @@ describe("thread participation", () => {
               [first.thread.id, ThreadParticipation.Id.make("missing")],
             ] as const)
               expect(yield* Effect.flip(run(bound, human, unfollow(threadId, id)))).toEqual(
-                new ThreadParticipationService.NotFound({ threadId, participationId: id }),
+                new CoreError.NotFound({ resource: "ThreadParticipation", id }),
               );
             const foreign = yield* boundTo(otherWorkspaceId);
             const workspace = yield* initialized(foreign);
@@ -631,13 +634,13 @@ describe("thread participation", () => {
               identity: { _tag: "Human", id: workspace.createdBy },
             });
             expect(yield* Effect.flip(run(foreign, actor, follow(first.thread.id)))).toMatchObject({
-              _tag: "ThreadParticipationService.ThreadNotFound",
+              _tag: "CoreError.NotFound",
             });
             expect(
               yield* Effect.flip(
                 run(bound, { ...human, identity: owner.identity }, follow(first.thread.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             const record = Option.getOrThrow(yield* bound.participations.get(own.id));
             yield* run(
               bound,
@@ -652,11 +655,11 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
-              _tag: "ThreadParticipationService.ThreadNotFound",
+              _tag: "CoreError.NotFound",
             });
             expect(
               yield* Effect.flip(run(bound, human, unfollow(first.thread.id, own.id))),
-            ).toMatchObject({ _tag: "ThreadParticipationService.ThreadNotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             yield* run(
               bound,
               owner,
@@ -665,7 +668,8 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor" },
             });
           }),
         ),
@@ -684,7 +688,7 @@ describe("thread participation", () => {
             const before = yield* snapshot(bound, first.thread.id);
             const failingCommit = failingLate(
               bound,
-              new Store.Failure({ operation: "commit", cause: "injected" }),
+              StoreError.failed("Store", "commit")("injected"),
             ).context;
             const failingActivity = Context.add(
               bound.context,
@@ -692,9 +696,7 @@ describe("thread participation", () => {
               {
                 ...bound.activities,
                 insert: () =>
-                  Effect.fail(
-                    new ThreadActivityStore.Failure({ operation: "insert", cause: "injected" }),
-                  ),
+                  Effect.fail(StoreError.failed("ThreadActivityStore", "insert")("injected")),
               },
             );
             for (const context of [failingCommit, failingActivity]) {
@@ -712,9 +714,7 @@ describe("thread participation", () => {
             const failingCleanup = Context.add(bound.context, NotificationStore.NotificationStore, {
               ...bound.notifications,
               discardPendingForParticipation: () =>
-                Effect.fail(
-                  new NotificationStore.Failure({ operation: "discard", cause: "injected" }),
-                ),
+                Effect.fail(StoreError.failed("NotificationStore", "discard")("injected")),
             });
             for (const context of [failingCommit, failingCleanup]) {
               expect(
@@ -773,7 +773,8 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, revoked))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
           }),
@@ -823,7 +824,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "Store.Conflict" },
+                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -891,7 +892,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "Store.Conflict" },
+                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -1020,15 +1021,18 @@ describe("thread participation", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, owner, unfollow(first.thread.id, result.id)),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationService.AlreadyEnded" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "AlreadyEnded", resource: "ThreadParticipation" },
+          });
           expect(
             yield* Effect.flip(
               gateway.asMember(workspace.id, owner, follow(Thread.Id.make("missing"))),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationService.ThreadNotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(
             yield* Effect.flip(gateway.asMember(workspace.id, owner, follow("" as Thread.Id))),
-          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
           expect(
             yield* Effect.flip(
               gateway.asMember(
@@ -1037,7 +1041,7 @@ describe("thread participation", () => {
                 unfollow(first.thread.id, ThreadParticipation.Id.make("missing")),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationService.NotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
         }),
       ),
     ),
@@ -1066,7 +1070,11 @@ describe("thread participation", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadActivityStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadActivityStore",
+            reason: { _tag: "Rejected" },
+          });
           const departure = {
             workspaceId,
             threadId: first.thread.id,
@@ -1081,13 +1089,21 @@ describe("thread participation", () => {
               yield* Effect.flip(
                 bound.store.transaction(bound.participations.end(bad, yield* DateTime.now)),
               ),
-            ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "ThreadParticipationStore",
+              reason: { _tag: "Rejected" },
+            });
           yield* run(bound, human, unfollow(first.thread.id, participant.id));
           expect(
             yield* Effect.flip(
               bound.store.transaction(bound.participations.end(departure, yield* DateTime.now)),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "ThreadParticipationStore",
+            reason: { _tag: "Rejected" },
+          });
         }),
       ),
     ),
@@ -1246,10 +1262,10 @@ describe("thread participation", () => {
                 endByAdmission: (id, endedAt) =>
                   ++departures === 2
                     ? Effect.fail(
-                        new ThreadParticipationStore.Failure({
-                          operation: "endByAdmission",
-                          cause: "second departure failed",
-                        }),
+                        StoreError.failed(
+                          "ThreadParticipationStore",
+                          "endByAdmission",
+                        )("second departure failed"),
                       )
                     : bound.participations.endByAdmission(id, endedAt),
               },
@@ -1477,8 +1493,8 @@ describe("thread participation", () => {
           expect(
             yield* Effect.flip(run(bound, owner, unfollow(started.thread.id, own.id))),
           ).toMatchObject({
-            _tag: "ThreadParticipationService.FixedParticipation",
-            threadId: started.thread.id,
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "FixedParticipation", threadId: started.thread.id },
           });
           expect(yield* snapshot(bound, started.thread.id)).toEqual(before);
         }),
@@ -1711,7 +1727,11 @@ describe("thread participation", () => {
             ])
               expect(
                 yield* Effect.flip(bound.store.transaction(bound.participations.insert(invalid))),
-              ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadParticipationStore",
+                reason: { _tag: "Rejected" },
+              });
           }),
         ),
       ),

@@ -7,7 +7,7 @@
  * human notification again restores it in the same statement. `NotificationStore.make` checks
  * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
  * key refuses a reused ID and `notifications_by_source_recipient` a second notification of one
- * source entry for one recipient, each as the store's `Conflict`, and `markSeen` and `accept` check
+ * source entry for one recipient, each rejected, and `markSeen` and `accept` check
  * every notification first, writing nothing unless each is eligible. Every statement is scoped to
  * the binding's workspace and runs under its `guard`, which lets a read join the caller's
  * transaction and requires one for a write, except `markSeen`, which also runs on its own.
@@ -19,10 +19,11 @@ import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { inIds } from "./internal/id-list.ts";
 import { insertChunked } from "./internal/parameters.ts";
 import { notificationSeen, notifications } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Notification));
 const decodeRows = Schema.decodeUnknownEffect(
@@ -212,7 +213,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         extra: 2,
       }),
       true,
-    ).pipe(Effect.mapError(storeError(NotificationStore, operation)));
+    ).pipe(Effect.mapError(storeError("NotificationStore", operation)));
   });
 
   const driver: NotificationStore.NotificationStore["Service"] = {
@@ -225,7 +226,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           Effect.map(Array.head),
         );
       },
-      Effect.mapError(storeFailure(NotificationStore, "get")),
+      Effect.mapError(StoreError.failed("NotificationStore", "get")),
     ),
     countPendingByRecipient: Effect.fn("Notifications.countPendingByRecipient")(
       function* (target) {
@@ -244,7 +245,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         );
         return yield* Schema.decodeEffect(Schema.Int)(row?.count ?? 0);
       },
-      Effect.mapError(storeFailure(NotificationStore, "countPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByRecipient")),
     ),
     countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
       function* (target, groupIds) {
@@ -268,7 +269,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           rows,
         );
       },
-      Effect.mapError(storeFailure(NotificationStore, "countPendingByGroup")),
+      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByGroup")),
     ),
     listByThread: Effect.fn("Notifications.listByThread")(
       function* (target, threadId, range) {
@@ -287,7 +288,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
             .orderBy(asc(notifications.threadSequence), asc(orderedId)),
         ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
       },
-      Effect.mapError(storeFailure(NotificationStore, "listByThread")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listByThread")),
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
       function* (target, threadId, through) {
@@ -306,19 +307,19 @@ export const make = Effect.fn("Notifications.make")(function* () {
             .orderBy(asc(notifications.threadSequence), asc(orderedId)),
         ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
       },
-      Effect.mapError(storeFailure(NotificationStore, "listPendingByThread")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByThread")),
     ),
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
       listPending,
-      Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByRecipient")),
     ),
     listLatestByRecipient: Effect.fn("Notifications.listLatestByRecipient")(
       (recipient, options) => latest(recipient, options, false),
-      Effect.mapError(storeFailure(NotificationStore, "listLatestByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listLatestByRecipient")),
     ),
     listLatestPendingByRecipient: Effect.fn("Notifications.listLatestPendingByRecipient")(
       (recipient, options) => latest(recipient, options, true),
-      Effect.mapError(storeFailure(NotificationStore, "listLatestPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listLatestPendingByRecipient")),
     ),
     markSeen: Effect.fn("Notifications.markSeen")(function* (ids, seenAt) {
       const unique = [...new Set(ids)];
@@ -336,12 +337,13 @@ export const make = Effect.fn("Notifications.make")(function* () {
               inArray(notifications.state, ["Pending", "Seen"]),
             ),
           ),
-      ).pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
+      ).pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")));
       if (eligible.length !== unique.length)
-        return yield* new NotificationStore.Conflict({
-          operation: "markSeen",
-          message: "Expected a pending notification of a human recipient",
-        });
+        return yield* StoreError.rejected(
+          "NotificationStore",
+          "markSeen",
+          "Expected a pending notification of a human recipient",
+        );
       // The row keeps the first time, and notification_seen keeps it through rebuilds. Updating
       // the row first serializes concurrent calls on its lock, and the later one finds it Seen.
       const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt);
@@ -356,7 +358,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           INSERT INTO notification_seen (workspace_id, notification_id, seen_at)
           SELECT ${workspaceId}::text, id, seen_at FROM seen
           ON CONFLICT DO NOTHING`),
-      ).pipe(Effect.mapError(storeError(NotificationStore, "markSeen")));
+      ).pipe(Effect.mapError(storeError("NotificationStore", "markSeen")));
     }),
     accept: Effect.fn("Notifications.accept")(function* (ids, by, acceptedAt) {
       const unique = [...new Set(ids)];
@@ -376,17 +378,18 @@ export const make = Effect.fn("Notifications.make")(function* () {
               eq(notifications.state, "Pending"),
             ),
           ),
-      ).pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
+      ).pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")));
       if (
         eligible.length !== unique.length ||
         (byTurn && new Set(eligible.map((row) => row.memberId)).size !== 1)
       )
-        return yield* new NotificationStore.Conflict({
-          operation: "accept",
-          message: byTurn
+        return yield* StoreError.rejected(
+          "NotificationStore",
+          "accept",
+          byTurn
             ? "Expected pending notifications of one agent"
             : "Expected pending notifications of contacts",
-        });
+        );
       yield* guard(
         db
           .update(notifications)
@@ -399,7 +402,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           })
           .where(and(inWorkspace, inIds(notifications.id, unique))),
         true,
-      ).pipe(Effect.mapError(storeError(NotificationStore, "accept")));
+      ).pipe(Effect.mapError(storeError("NotificationStore", "accept")));
     }),
     discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
       function* (id) {
@@ -416,7 +419,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
               ),
             ),
           true,
-        ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForParticipation")));
+        ).pipe(Effect.mapError(storeError("NotificationStore", "discardPendingForParticipation")));
       },
     ),
     discardPendingForGroup: Effect.fn("Notifications.discardPendingForGroup")(
@@ -441,7 +444,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
                 ),
               ),
             true,
-          ).pipe(Effect.mapError(storeError(NotificationStore, "discardPendingForGroup")));
+          ).pipe(Effect.mapError(storeError("NotificationStore", "discardPendingForGroup")));
       },
     ),
     insert: Effect.fn("Notifications.insert")((input) => insert([input], "insert")),

@@ -26,6 +26,7 @@ import * as Publication from "./Publication.ts";
 import type * as Reaction from "./Reaction.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
+import * as StoreError from "./StoreError.ts";
 
 /**
  * The journal of one log, through which every domain publishes its facts. Domains obtain it with
@@ -71,7 +72,7 @@ export class Journal extends Context.Service<
      * its own. A cause the attribution names must be a recorded event with the same workspace and
      * correlation. The key comes from the fact's occurrence rule; explicit keys are allowed only
      * when no key is derived. Matching retries return the original event without applying
-     * projections or reactions; conflicting content aborts. A commit's first publication fails
+     * projections or reactions; content that differs aborts. A commit's first publication fails
      * with `Projection.Behind` or `Projection.Unregistered` unless the projections live on the log
      * are exactly the registered ones.
      */
@@ -252,10 +253,11 @@ export const make = Effect.fn("Journal.make")(function* <
         const subject = yield* Fact.makeSubject(fact, payload);
         const occurrenceKey = yield* Fact.makeOccurrenceKey(fact, payload);
         if (occurrenceKey !== null && request.idempotencyKey !== undefined)
-          return yield* new Store.Conflict({
-            operation: "publish",
-            message: "A fact's declared occurrence identity cannot be overridden",
-          });
+          return yield* StoreError.rejected(
+            "Store",
+            "publish",
+            "A fact's declared occurrence identity cannot be overridden",
+          );
         const appendOptions =
           occurrenceKey === null ? request : { ...request, idempotencyKey: occurrenceKey };
         if (appendOptions.idempotencyKey !== undefined) {
@@ -270,10 +272,11 @@ export const make = Effect.fn("Journal.make")(function* <
               entry.payload.subject !== subject ||
               !Store.samePayloads([entry.payload.payload], [encoded])
             )
-              return yield* new Store.Conflict({
-                operation: "publish",
-                message: "Idempotency key is already associated with different content",
-              });
+              return yield* StoreError.rejected(
+                "Store",
+                "publish",
+                "Idempotency key is already associated with different content",
+              );
             yield* validateProvenance(entry.payload.provenance);
             return yield* Event.decode(fact, entry);
           }

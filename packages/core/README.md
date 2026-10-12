@@ -33,7 +33,7 @@ The package root composes one workspace's core:
 Each domain is a subpath export with the records, facts, stores, projections, and operations it
 implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journal`, `/group`,
 `/thread`, `/task`, `/channel`, `/connection`, `/agent`, `/turn`, `/notification`, `/read-state`,
-`/change-feed`, `/signal`, and `/request`.
+`/change-feed`, `/signal`, `/request`, and `/error`.
 
 ## Domains
 
@@ -118,6 +118,40 @@ it creates that way, so a retry runs the operation's checks, finds the record by
 it instead of creating another. The key alone names the request: a retry gets what the key created,
 whatever it asks for. A turn retry derives its turn's ID from the turn it retries. See
 [retrying safely](../../docs/thread-workflows.md#retrying-safely).
+
+### Errors by kind
+
+`@amends-dev/core/error` holds `CoreError`, the outcomes every feature reports, each one class
+whichever operation raises it, carrying in its fields what it is about and in its `message` what
+happened. `CoreError.NotFound` names the `resource` and the `id` the caller asked for; a missing
+resource and one out of the caller's reach answer alike. `CoreError.Changed` names one that changed
+since the caller read it: a name, title, revision, or set of roles they expected is no longer so,
+and nothing was recorded. `CoreError.Denied` refuses the actor, and its `reason` says why: a grant
+they lack (`NotGranted`), a membership they do not hold (`NotMember`, `InvalidActor`), or an action
+only the owner (`OwnerRequired`), the author (`NotAuthor`), the invitation's recipient
+(`NotRecipient`), a person (`HumanRequired`), or an agent (`AgentRequired`) takes. A caller recovers
+from one reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`, as lists do to
+leave out what the actor may not read. `CoreError.Conflict` says the state of what the caller acts
+on refuses the request, and its `reason` says how: a member no longer active (`InactiveMember`) or
+unable to take part (`ParticipantUnavailable`), an owner the change would reach (`OwnerProtected`),
+something done already (`AlreadyMember`, `AlreadyJoined`, `AlreadyEnded`, `AlreadyHandled`,
+`AlreadyTask`), a message deleted (`Deleted`), a turn finished or not retryable (`TurnNotActive`,
+`NotRetryable`), a read position past the timeline (`BeyondTimeline`), a recipient who cannot own
+the workspace (`InvalidRecipient`), or an invitation no longer open (`InvitationClosed`).
+`CoreError.Invalid` says the request cannot be done as asked, whatever the state, and its `reason`
+says why: values that do not hold (`Malformed`, `PastExpiry`, `DirectMembersRequired`), a role or
+integration this workspace does not have (`UnsupportedRole`, `UnknownIntegration`), a roster fixed
+by the kind of group (`NotRenamable`, `FixedMembership`, `GeneralMembership`, `NotFollowable`,
+`FixedParticipation`), a connection that refuses or cannot be used (`IntegrationRefused`, `Keyless`,
+`ConnectionUnusable`), an agent setup that cannot run (`Incomplete`), or a channel request its
+transport rejects (`Unverified`). `CoreError.Unavailable` says what an operation needs cannot be
+reached or used now: storage another writer held (`Contention`) or read models another host is
+rebuilding (`Reloading`), a change feed or turn log that stopped (`ChangeFeedInterrupted`,
+`LogInterrupted`), a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no
+keys (`CredentialsUnavailable`). Operations pass it through unchanged, so a protocol answers it with
+one status and a client handles it once, and an operation that reaches a resource through another
+reports the one the caller named: a message whose thread they cannot read is the message not found,
+not the thread.
 
 ## Workspace and access
 
@@ -326,12 +360,13 @@ removes them. A view is the record without its key, `manageable`, and its readin
 the host no longer installs it.
 
 Creating takes the key with the connection, when it authenticates with one and only then, and the
-integration validates its settings and auth method first (`UnknownIntegration`,
-`InvalidConnection`). The key goes to `ConnectionCredentialStore`, one credential per connection, in
-the commit that records the connection; replacing it overwrites it, and removal deletes it and keeps
-the record, so a retried create finds the connection and answers `NotFound`. No fact, change-feed
-event, or view carries a key. `check` reads the key and asks the integration to check the connection
-with its system, returning `Health`, and holds no commit open while the system answers.
+integration validates its settings and auth method first (`CoreError.Invalid` with
+`UnknownIntegration` or `IntegrationRefused`). The key goes to `ConnectionCredentialStore`, one
+credential per connection, in the commit that records the connection; replacing it overwrites it,
+and removal deletes it and keeps the record, so a retried create finds the connection and answers
+`NotFound`. No fact, change-feed event, or view carries a key. `check` reads the key and asks the
+integration to check the connection with its system, returning `Health`, and holds no commit open
+while the system answers.
 
 `connection.create` works on the workspace, and `connection.read`, `connection.manage`, and
 `connection.use` on each connection. Members read and use connections; administrators and the owner
@@ -353,11 +388,11 @@ membership, and `Configured` replaces its setup as a whole.
 configures, and renames them. Creating adds the agent's membership with `MemberCommand.add`, with a
 role the actor must be able to grant; its role changes, and it is removed, as any member's is.
 Creating and configuring refuse a connection the actor may not read and use, or that is not active
-(`ConnectionUnavailable`, naming the part), and a setup that cannot run (`Incomplete`), except that
-an agent on `Auto` may wait for a connection that gives a harness. A view carries the agent's
-readiness, as `AgentReadiness` finds it against the workspace's connections and the host's
-integrations: `Ready`; or `Incomplete` with issues naming a part whose connection was `Removed`,
-whose integration is `Uninstalled`, or that does not give the part as the agent takes it
+(`CoreError.Invalid` with `ConnectionUnusable`, naming the part), and a setup that cannot run
+(`Incomplete`), except that an agent on `Auto` may wait for a connection that gives a harness. A
+view carries the agent's readiness, as `AgentReadiness` finds it against the workspace's connections
+and the host's integrations: `Ready`; or `Incomplete` with issues naming a part whose connection was
+`Removed`, whose integration is `Uninstalled`, or that does not give the part as the agent takes it
 (`Invalid`), `SandboxRequired` when its harness's agent works only in a sandbox and it has none, and
 `NoHarness` when, on `Auto`, no connection gives a harness it can run on.
 
@@ -368,7 +403,7 @@ harness it can run on. `buildRunnable` gives the agent ready to run on a selecti
 (`AgentQuery.Runnable`): its instructions, and the connections of the selection's harness, model,
 and sandbox, each with its key, beside the model as its integration's endpoint takes it. Whoever
 runs the agent builds its harness and sandbox from these with the host's integrations, so core runs
-nothing of an agent. Both fail with `AgentQuery.Incomplete` when the agent cannot run.
+nothing of an agent. Both fail with `CoreError.Invalid` (`Incomplete`) when the agent cannot run.
 
 `agent.create` works on the workspace, and `agent.read` and `agent.configure` on the agent's
 membership. Members read agents; administrators and the owner create and configure them.
@@ -424,7 +459,7 @@ commit.
 
 Each participation has a session log, the record of the agent's conversation in the thread, apart
 from the journal and every commit (`SessionLogStore`: `head`, `append` after the position the writer
-read to, which a log past it refuses with `Conflict`, `read` past a position, and `waitForAppend`).
+read to, which a log past it refuses with `Overtaken`, `read` past a position, and `waitForAppend`).
 Its entries (`SessionLog.Entry`) are `Joined`, the conversation the agent joined, and, each naming
 its turn, `Prompted`, `Started` when a run started the turn, on which harness agent and with what
 continues the turn when the agent gives that, each `Step`, and `Interrupted` when a run stopped
@@ -438,13 +473,14 @@ reasoning or tool calls.
 `TurnService` lets a reader who may read a thread `get` its turns as `Turn.View`s, with whether the
 reader may stop (`stoppable`) or retry (`retryable`) them now, and `listActive` the workspace's
 active turns in threads the reader may read. A turn in a thread outside the reader's audience is
-`NotFound`, and one in a thread they may not read is `Authorization.Denied`. A reader who may direct
-its agent may `cancel` an active turn, a queued one at once and a running one once its job confirms
-it, and `retry` a failed or stopped turn as a new queued turn for the same agent, participation, and
-accepted work, prompted again with who asked. Only the agent's latest turn on the thread can be
-retried, while no other is active and the agent still takes part there; otherwise it is
-`NotRetryable` with the reason (`active`, `completed`, `superseded`, or `departed`). A retry takes
-its ID from the turn it retries, so repeating it returns the turn it created.
+`NotFound`, and one in a thread they may not read is `CoreError.Denied` (`NotGranted`). A reader who
+may direct its agent may `cancel` an active turn, a queued one at once and a running one once its
+job confirms it, and `retry` a failed or stopped turn as a new queued turn for the same agent,
+participation, and accepted work, prompted again with who asked. Only the agent's latest turn on the
+thread can be retried, while no other is active and the agent still takes part there; otherwise it
+is `CoreError.Conflict` (`NotRetryable`) with the reason (`active`, `completed`, `superseded`, or
+`departed`). A retry takes its ID from the turn it retries, so repeating it returns the turn it
+created.
 
 `TurnService.watchLog` follows a turn's session log for a reader who may read its thread, as a
 stream of `Turn.LogMessage`s: `Opened` with the items as they stand, `Changed` with the items each
@@ -454,7 +490,8 @@ following mid-step sees the step from the next draft that starts at its part's b
 the step is logged. Its subscriptions register before the turn and log are read, so nothing in
 between is missed. Each append checks that the reader may still read the thread, as does each commit
 that changes the reader's groups, grants, or role; following ends once the commit that took the
-reader's access is delivered. A stream that cannot go on fails with `Turn.LogUnavailable`.
+reader's access is delivered. A stream that cannot go on fails with `CoreError.Unavailable`
+(`LogInterrupted`).
 
 A turn's changes also show in its thread's timeline as `TurnActivity` kinds, recorded in the commits
 that make them: `turn.created` where the agent took on the work, or where a retry asked again,
@@ -573,13 +610,13 @@ process memory: the reference implementation of the storage contracts, which enf
 maps what the PostgreSQL adapter enforces with keys and indexes, and which core's tests run over.
 Nothing survives the process.
 
-Every store contract builds its store with `make(workspaceId, driver)`, over the driver an
-adapter implements: the store checks each input against its schema, and a record against the
-workspace, through `StoreInput`, before the driver sees it. The checkpoint and session log stores,
-whose inputs name no workspace, take the driver alone, and `Store.make` reads the workspace from
-its driver. A driver keeps only what storage keeps, such as reused IDs and conditional writes, and
-an adapter's module returns the contract's `make` over its driver from its constructor, as each
-`layerMemory` does.
+Every store contract builds its store with `make(workspaceId, driver)`, over the driver an adapter
+implements: the store checks each input against its schema, and a record against the workspace,
+through `StoreInput`, before the driver sees it. The checkpoint and session log stores, whose inputs
+name no workspace, take the driver alone, and `Store.make` reads the workspace from its driver. A
+driver keeps only what storage keeps, such as reused IDs and conditional writes, which it rejects
+with `StoreError` (`Rejected`), and an adapter's module returns the contract's `make` over its
+driver from its constructor, as each `layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
   workspace has one `Space`: its commits, log batches, keyed append slices, projected records by
@@ -604,7 +641,7 @@ thread sequences. Lists order IDs by their UTF-8 bytes, as binary collation does
 
 A transaction copies its workspace's maps, runs against the copy, and on success makes the copy
 the committed state; a failure or interruption discards it. A workspace another connection is
-writing reports `Store.Conflict` at once, as a lock wait that timed out immediately would;
+writing reports `StoreError` (`Contended`) at once, as a lock wait that timed out immediately would;
 the same connection's writers wait for each other. Each log has a lock shared by every host: a
 transaction takes it on its first append to the log, or lookup of one of its keys, refreshes its
 copy of that log from committed state, and keeps it until it ends; a standalone append takes only
@@ -629,24 +666,28 @@ and flat in the feature directory, as the Effect repository lays its modules out
 src/workspace/
   Member.ts             domain schemas, value types, and pure functions
   MemberId.ts           the ID alone, where references would otherwise make a cycle
-  MemberService.ts      the operations actors call, authorized, and the outcomes they report
+  MemberService.ts      the operations actors call, authorized, failing with CoreError's kinds
   MemberCommand.ts      the internal writes other operations share
   MemberStore.ts        the persistence contract adapters implement
   MemberFacts.ts        versioned declarations of recorded changes
   MemberProjection.ts   replays the facts into the store, exported as `definition`
   MemberPermissions.ts  the permissions the feature owns
-  internal/member-errors.ts
-                        those outcomes, as schemas only
 ```
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
-Every error belongs to the module that raises it, and its tag is its name there, as
-`MemberService.NotFound` or `Store.Conflict`. The outcomes a service reports to callers are schemas
-in an `internal/` errors module, apart from the services, so a protocol or a browser client carries
-them without loading an implementation, and the service exports them. A query defines what it
-raises beside itself, as `ThreadQuery.NotFound`, and a service that calls it maps that to its own
-outcome. Helpers no consumer imports go under `internal/` too.
+An outcome every feature reports is one kind in `CoreError`, whichever operation raises it: anything
+missing, or out of the caller's reach, is `CoreError.NotFound`; anything that changed since the
+caller read it is `CoreError.Changed`; a refusal of the actor is `CoreError.Denied`; a request the
+state refuses is `CoreError.Conflict`; a request that cannot be done as asked is
+`CoreError.Invalid`; and what cannot be reached now is `CoreError.Unavailable`, the last four with
+their reason. Each says what it is about in its fields, and a query or command raises the kind
+itself, so it passes through every operation unchanged and a protocol or a browser client carries it
+without loading an implementation. Every store fails with one `StoreError`, naming the store and the
+operation, whose reason says whether storage `Failed`, `Rejected` a write, or was `Contended`; the
+gateway answers contention with `CoreError.Unavailable` and turns the rest into defects. Any other
+error belongs to the module that raises it, and its tag is its name there, as
+`SessionLogStore.Overtaken`. Helpers no consumer imports go under `internal/`.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

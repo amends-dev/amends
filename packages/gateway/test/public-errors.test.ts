@@ -41,7 +41,7 @@ type ErrorsOf<Service> = { [Key in keyof Service]: Failure<Service[Key]> }[keyof
 type Internal = {
   readonly _tag:
     | `${string}.Failure`
-    | `${string}Store.Conflict`
+    | "StoreError"
     | `${string}.InvalidResponse`
     | `${string}.WorkspaceMismatch`
     | `Transaction.${string}`
@@ -51,10 +51,9 @@ type Internal = {
     | "ThreadActivityKind.Mismatch"
     | "SchemaError"
     | "PlatformError"
-    // Shared publishing declares these, but these operations never raise them: none asks for a
-    // timeline position, and departures and self-follows admit only current members.
-    | "ThreadCommand.PositionChanged"
-    | "ThreadCommand.Unavailable";
+    // Shared publishing declares it, but these operations never raise it: none asks for a timeline
+    // position.
+    | "ThreadCommand.PositionChanged";
 };
 /** An error that is neither: it would reach callers as a server error without anyone deciding so. */
 type Unclassified<Service> = Exclude<ErrorsOf<Service>, GatewayErrors.PublicError | Internal>;

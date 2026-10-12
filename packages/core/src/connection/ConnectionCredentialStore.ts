@@ -13,30 +13,9 @@ import type { Option } from "effect";
 import * as Store from "../journal/Store.ts";
 import * as Connection from "./Connection.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing credentials.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("ConnectionCredentialStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * This host keeps no credentials, as when it has no key to protect them with.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()(
-  "ConnectionCredentialStore.Unavailable",
-  { reason: Schema.String },
-) {}
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * Protected storage for connections' credentials, one for each connection that authenticates with
@@ -58,15 +37,18 @@ export class ConnectionCredentialStore extends Context.Service<
     readonly set: (
       connectionId: Connection.Id,
       credential: ConnectionContract.Credential,
-    ) => Effect.Effect<void, Failure | Unavailable, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError | CoreError.Unavailable, Store.Transaction>;
     /** The connection's credential, for using it. No operation returns one to a reader. */
     readonly get: (
       connectionId: Connection.Id,
-    ) => Effect.Effect<Option.Option<ConnectionContract.Credential>, Failure | Unavailable>;
+    ) => Effect.Effect<
+      Option.Option<ConnectionContract.Credential>,
+      StoreError.StoreError | CoreError.Unavailable
+    >;
     /** Delete the connection's credential; one already gone is left so. */
     readonly remove: (
       connectionId: Connection.Id,
-    ) => Effect.Effect<void, Failure, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/connection/ConnectionCredentialStore") {}
 
@@ -79,7 +61,7 @@ export class ConnectionCredentialStore extends Context.Service<
 export const make = (
   driver: ConnectionCredentialStore["Service"],
 ): ConnectionCredentialStore["Service"] => {
-  const read = StoreInput.read(Failure);
+  const read = StoreInput.read("ConnectionCredentialStore");
   return {
     set: Effect.fn("ConnectionCredentialStore.set")(function* (connectionId, credential) {
       return yield* driver.set(
@@ -109,19 +91,19 @@ const makeMemory = Effect.fn("ConnectionCredentialStore.makeMemory")(function* (
         const row = yield* rows.encode(credential);
         (yield* write).connectionCredentials.set(connectionId, row);
       },
-      Effect.mapError(storeFailure(Failure, "set")),
+      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "set")),
     ),
     get: Effect.fn("ConnectionCredentialStore.memory.get")(
       function* (connectionId) {
         return yield* rows.get((yield* read).connectionCredentials, connectionId);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "get")),
     ),
     remove: Effect.fn("ConnectionCredentialStore.memory.remove")(
       function* (connectionId) {
         (yield* write).connectionCredentials.delete(connectionId);
       },
-      Effect.mapError(storeFailure(Failure, "remove")),
+      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "remove")),
     ),
   };
   return make(driver);

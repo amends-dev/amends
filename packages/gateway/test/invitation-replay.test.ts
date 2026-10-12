@@ -2,7 +2,7 @@ import { AssignmentFacts, BuiltinRoles, Assignment } from "@amends-dev/core/auth
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Journal, Publication } from "@amends-dev/core/journal";
 
 import { InvitationService, Member, MemberService } from "@amends-dev/core/workspace";
 
@@ -26,6 +26,7 @@ import {
   request,
   testProvenance,
 } from "./support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Acceptance and removal roll back together, and replay restores invitation records. */
 
@@ -47,10 +48,7 @@ describe("invitation replay", () => {
             const bound = yield* boundTo(workspace.id);
             const before = yield* bound.store.read(journalLog, { limit: 20 });
             const footprint = yield* storage.footprint;
-            const error = new Store.Failure({
-              operation: "commit",
-              cause: "injected late failure",
-            });
+            const error = StoreError.failed("Store", "commit")("injected late failure");
             const broken = failingLate(bound, error);
             const failure = yield* Effect.flatMap(
               InvitationService.InvitationService,
@@ -106,10 +104,7 @@ describe("invitation replay", () => {
             const before = yield* bound.store.read(journalLog, { limit: 20 });
             const live = yield* bound.checkpoints.listLive(journalLog);
             const grants = yield* bound.assignments.listActiveByMember(member.id);
-            const error = new Store.Failure({
-              operation: "commit",
-              cause: "injected late failure",
-            });
+            const error = StoreError.failed("Store", "commit")("injected late failure");
             const broken = failingLate(bound, error);
             const failure = yield* Effect.flatMap(MemberService.MemberService, (memberService) =>
               memberService.remove(member.id),
@@ -131,7 +126,7 @@ describe("invitation replay", () => {
             // A member ID from another workspace cannot be addressed through this context.
             expect(
               yield* Effect.flip(Operations.removeMember(workspace.id, alice, other.ownerMemberId)),
-            ).toMatchObject({ _tag: "MemberService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             const results = yield* Effect.forEach(
               [1, 2],
               () => Operations.removeMember(workspace.id, alice, member.id).pipe(Effect.result),
@@ -140,7 +135,10 @@ describe("invitation replay", () => {
             expect(results.filter((result) => Result.isSuccess(result))).toHaveLength(1);
             expect(results.find((result) => Result.isFailure(result))).toMatchObject({
               _tag: "Failure",
-              failure: { _tag: "MemberService.AlreadyRemoved" },
+              failure: {
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "AlreadyEnded", resource: "Member" },
+              },
             });
             const after = yield* bound.store.read(journalLog, { limit: 20 });
             expect(after).toHaveLength(before.length + 1);
@@ -156,8 +154,8 @@ describe("invitation replay", () => {
                   Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
                 ),
               ).toMatchObject({
-                _tag: "InvitationService.Unavailable",
-                reason: "revoked",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "revoked" },
               });
             }
             expect(yield* bound.invitations.get(unrelated.details.id)).toEqual(
@@ -169,9 +167,7 @@ describe("invitation replay", () => {
             expect(yield* bound.assignments.listActiveByMember(member.id)).toEqual(grants);
             expect(
               yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
-            ).toMatchObject({
-              _tag: "GatewayErrors.NotMember",
-            });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
             expect((yield* Operations.getMember(other.id, bob, other.ownerMemberId)).status).toBe(
               "active",
             );
@@ -186,9 +182,7 @@ describe("invitation replay", () => {
             });
             expect(
               yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
-            ).toMatchObject({
-              _tag: "GatewayErrors.NotMember",
-            });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
             expect(yield* bound.store.read(journalLog, { limit: 20 })).toEqual(after);
             for (const record of pending)
               expect(
@@ -196,8 +190,8 @@ describe("invitation replay", () => {
                   Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
                 ),
               ).toMatchObject({
-                _tag: "InvitationService.Unavailable",
-                reason: "revoked",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "revoked" },
               });
           }),
         ),

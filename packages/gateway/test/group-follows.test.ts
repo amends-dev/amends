@@ -31,6 +31,7 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Following groups: joining later threads, ending with the admission, and storage constraints. */
 
@@ -201,14 +202,19 @@ describe("group follows", () => {
             const plain = actorFor(plainId);
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, owner, follow(team.id, humanId)))).toEqual(
-              new GroupFollowService.AgentRequired({ memberId: humanId }),
+              new CoreError.Denied({ reason: new CoreError.AgentRequired({ memberId: humanId }) }),
             );
             expect(yield* Effect.flip(run(bound, plain, follow(team.id, agentId)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: AgentPermissions.Use.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: AgentPermissions.Use.name } },
+              },
             });
             expect(yield* Effect.flip(run(bound, owner, follow(team.id, outsiderId)))).toEqual(
-              new GroupFollowService.MemberUnavailable({ memberId: outsiderId }),
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: outsiderId }),
+              }),
             );
             expect(yield* history(bound)).toEqual(before);
             yield* run(bound, owner, follow(team.id, agentId));
@@ -217,12 +223,11 @@ describe("group follows", () => {
             expect(yield* participantsOf(bound, reached)).toEqual([agentId, plainId].sort());
             expect(yield* inbox(bound, agentId)).toHaveLength(1);
             expect(yield* Effect.flip(run(bound, plain, post(team.id, [agentId])))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             expect(yield* Effect.flip(run(bound, plain, unfollow(team.id, agentId)))).toMatchObject(
-              {
-                _tag: "Authorization.Denied",
-              },
+              { _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } },
             );
             yield* run(bound, owner, unfollow(team.id, agentId));
             expect(yield* participantsOf(bound, yield* run(bound, plain, post(team.id)))).toEqual([
@@ -245,12 +250,15 @@ describe("group follows", () => {
             expect(
               yield* Effect.flip(run(bound, actorFor(plainId), follow(team.id, plainId))),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: GroupPermissions.Follow.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: GroupPermissions.Follow.name } },
+              },
             });
             expect(
               yield* Effect.flip(run(bound, actorFor(outsiderId), follow(team.id, outsiderId))),
-            ).toEqual(new GroupFollowService.GroupNotFound({ groupId: team.id }));
+            ).toEqual(new CoreError.NotFound({ resource: "Group", id: team.id }));
             const direct = yield* run(
               bound,
               owner,
@@ -264,7 +272,11 @@ describe("group follows", () => {
             );
             expect(
               yield* Effect.flip(run(bound, owner, follow(direct.thread.groupId, owner.memberId))),
-            ).toEqual(new GroupFollowService.NotFollowable({ groupId: direct.thread.groupId }));
+            ).toEqual(
+              new CoreError.Invalid({
+                reason: new CoreError.NotFollowable({ groupId: direct.thread.groupId }),
+              }),
+            );
             // Leaving the group ends the follow; joining again does not restore it.
             yield* run(bound, human, follow(team.id, humanId));
             const admission = Option.getOrThrow(
@@ -350,7 +362,9 @@ describe("group follows", () => {
               record("ended", { status: "ended", endedAt: followedAt }),
             ])
               expect(yield* Effect.flip(write(bound.groupFollows.insert(bad)))).toMatchObject({
-                _tag: "GroupFollowStore.Conflict",
+                _tag: "StoreError",
+                store: "GroupFollowStore",
+                reason: { _tag: "Rejected" },
               });
             expect(yield* bound.groupFollows.listActiveByGroup(team.id)).toEqual([record("first")]);
             expect(yield* bound.groupFollows.findActive(admission.id)).toEqual(
@@ -369,11 +383,19 @@ describe("group follows", () => {
             ])
               expect(
                 yield* Effect.flip(write(bound.groupFollows.end(bad, followedAt))),
-              ).toMatchObject({ _tag: "GroupFollowStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "GroupFollowStore",
+                reason: { _tag: "Rejected" },
+              });
             yield* write(bound.groupFollows.end(ending, followedAt));
             expect(
               yield* Effect.flip(write(bound.groupFollows.end(ending, followedAt))),
-            ).toMatchObject({ _tag: "GroupFollowStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupFollowStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* bound.groupFollows.get(ending.followId)).toEqual(
               Option.some(record("first", { status: "ended", endedAt: followedAt })),
             );

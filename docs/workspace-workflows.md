@@ -49,9 +49,9 @@ Removal also, in the same commit and without further grants:
 - ends every active group admission of that workspace member, recording `workspace-removed`
   with the removal as its cause; see [group departures](group-workflows.md#workspace-member-removal).
 
-A failure rolls all of it back. Repeating a removal returns `MemberService.AlreadyRemoved`
+A failure rolls all of it back. Repeating a removal returns `CoreError.Conflict` (`AlreadyEnded`)
 without recording anything; the caller must still be active and authorized. Missing members
-return `MemberService.NotFound`, only after authorization.
+return `CoreError.NotFound`, only after authorization.
 
 The removed membership and its assignments remain historical records that authorized readers can
 inspect. Active-membership checks deny its later operations, including calls with an actor resolved
@@ -241,7 +241,7 @@ rule (`Delegation.recipientDenial`) that role changes and removals enforce.
 
 `PUT …/name` accepts `{ name, expectedName }`, requires `workspace.rename`, and
 records `workspace.renamed` with the old and new name. A different current name
-returns 409 `WorkspaceSettingsService.Changed`; retrying an already-applied name succeeds
+returns 409 `CoreError.Changed`; retrying an already-applied name succeeds
 without another fact. This compares names, not a version: a rename away and back
 is not detected. Creation attribution and ownership remain unchanged. The built-in
 Owner bundle includes rename permission. The directory reads the updated

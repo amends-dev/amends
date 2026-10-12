@@ -29,51 +29,8 @@ import * as InvitationStore from "./InvitationStore.ts";
 import * as Member from "./Member.ts";
 import * as MemberCommand from "./MemberCommand.ts";
 import * as MemberStore from "./MemberStore.ts";
-import {
-  AlreadyMember,
-  InvalidExpiry,
-  NotFound,
-  NotRecipient,
-  Unavailable,
-} from "./internal/invitation-errors.ts";
-export {
-  /**
-   * The person has an active membership already, so they can neither be invited nor accept.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AlreadyMember,
-  /**
-   * The expiry given is not after now.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidExpiry,
-  /**
-   * No invitation has this ID in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * The authenticated person is not whom the invitation names; only the named recipient may accept.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotRecipient,
-  /**
-   * The invitation cannot be accepted or revoked now: it has expired, was revoked, or was accepted
-   * already, as `reason` says.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Unavailable,
-} from "./internal/invitation-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the invitation operations can fail with: the outcomes above, and the
@@ -88,14 +45,12 @@ export type Error =
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError
-  | InvitationStore.Failure
-  | MemberStore.Failure
+  | StoreError.StoreError
   | MemberCommand.Error
-  | NotFound
-  | NotRecipient
-  | AlreadyMember
-  | Unavailable
-  | InvalidExpiry;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid;
 
 /**
  * The invitation operations, one of `Core.Operations`.
@@ -186,7 +141,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   const requireInvitation = Effect.fnUntraced(function* (id: Invitation.Id) {
     const validId = yield* Schema.decodeEffect(Invitation.Id)(id);
     const found = yield* invitationStore.get(validId);
-    if (Option.isNone(found)) return yield* new NotFound({ invitationId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Invitation", id });
     return found.value;
   });
   const requireUnjoined = Effect.fnUntraced(function* (recipientId: Identity.HumanId) {
@@ -195,7 +150,9 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         yield* memberStore.findActive(Identity.Reference.cases.Human.make({ id: recipientId })),
       )
     )
-      return yield* new AlreadyMember({ recipientId });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.AlreadyJoined({ recipientId }),
+      });
   });
 
   const issue = Effect.fn("InvitationService.issue")(
@@ -212,7 +169,8 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       )
         return yield* requireInvitation(invitationId);
       const issuedAt = yield* DateTime.now;
-      if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
+      if (!DateTime.isGreaterThan(request.expiresAt, issuedAt))
+        return yield* new CoreError.Invalid({ reason: new CoreError.PastExpiry() });
       yield* requireUnjoined(request.recipientId);
       const details: Invitation.Issuance = {
         id: invitationId,
@@ -242,7 +200,10 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     const name = yield* Schema.decodeEffect(Member.NewName)(chosenName);
     const invitation = yield* requireInvitation(id);
     const { details, state } = invitation;
-    if (details.recipientId !== recipient) return yield* new NotRecipient({ invitationId: id });
+    if (details.recipientId !== recipient)
+      return yield* new CoreError.Denied({
+        reason: new CoreError.NotRecipient({ invitationId: id }),
+      });
     // Repeated acceptance returns the original receipt, without restoring grants
     // or reactivating a membership that has since been removed.
     if (Invitation.State.isAnyOf(["Accepted"])(state)) {
@@ -252,16 +213,22 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       return member.value;
     }
     if (Invitation.State.isAnyOf(["Revoked"])(state))
-      return yield* new Unavailable({ invitationId: id, reason: "revoked" });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.InvitationClosed({ invitationId: id, reason: "revoked" }),
+      });
     const acceptedAt = yield* DateTime.now;
     if (!DateTime.isGreaterThan(details.expiresAt, acceptedAt))
-      return yield* new Unavailable({ invitationId: id, reason: "expired" });
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.InvitationClosed({ invitationId: id, reason: "expired" }),
+      });
     yield* requireUnjoined(recipient);
     const inviter = yield* memberStore.get(details.inviterMemberId);
     if (Option.isNone(inviter))
-      return yield* new Authorization.InvalidActor({
-        memberId: details.inviterMemberId,
-        reason: "membership-missing",
+      return yield* new CoreError.Denied({
+        reason: new CoreError.InvalidActor({
+          memberId: details.inviterMemberId,
+          reason: "membership-missing",
+        }),
       });
     // Only this authority check uses the recorded inviter, never recipient input.
     yield* authorizeInvitation(details).pipe(
@@ -304,7 +271,9 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       const actor = yield* Actor.Actor;
       if (Invitation.State.isAnyOf(["Revoked"])(invitation.state)) return invitation;
       if (Invitation.State.isAnyOf(["Accepted"])(invitation.state))
-        return yield* new Unavailable({ invitationId: id, reason: "accepted" });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvitationClosed({ invitationId: id, reason: "accepted" }),
+        });
       const state = Invitation.State.cases.Revoked.make({
         revokedBy: actor.memberId,
         revokedAt: yield* DateTime.now,

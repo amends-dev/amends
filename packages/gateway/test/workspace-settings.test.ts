@@ -1,5 +1,5 @@
 import { Actor, type Identity } from "@amends-dev/core/identity";
-import { Journal, Store } from "@amends-dev/core/journal";
+import { Journal } from "@amends-dev/core/journal";
 import { BuiltinRoles, type Role } from "@amends-dev/core/authorization";
 import { Identity as Identities } from "@amends-dev/core/identity";
 import { Workspace, WorkspaceSettingsService } from "@amends-dev/core/workspace";
@@ -19,6 +19,7 @@ import {
   journalLog,
   request,
 } from "./support.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const read = (id: Workspace.Id, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
@@ -82,7 +83,7 @@ describe("workspace settings", () => {
           expect(yield* bound.store.read(journalLog, { limit: 50 })).toEqual(journal);
           expect(
             yield* Effect.flip(rename(workspace.id, alice, "Stale", workspace.name)),
-          ).toMatchObject({ _tag: "WorkspaceSettingsService.Changed" });
+          ).toMatchObject({ _tag: "CoreError.Changed" });
           const workspaceDirectory = yield* WorkspaceDirectory.WorkspaceDirectory;
           expect((yield* workspaceDirectory.list(alice)).memberships[0]?.workspace.name).toBe(
             "Studio",
@@ -134,7 +135,7 @@ describe("workspace settings", () => {
             });
             expect(
               yield* Effect.flip(rename(workspace.id, bob, "No", workspace.name)),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* Operations.assign(workspace.id, alice, {
               memberId: member.id,
               roleId: BuiltinRoles.AdministratorId,
@@ -285,12 +286,13 @@ describe("workspace settings", () => {
           ])
             expect(
               yield* Effect.flip(bound.store.transaction(bound.workspace.rename(change))),
-            ).toMatchObject({ _tag: "WorkspaceStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "WorkspaceStore",
+              reason: { _tag: "Rejected" },
+            });
           const before = yield* bound.store.read(journalLog, { limit: 50 });
-          const failure = new Store.Failure({
-            operation: "transaction",
-            cause: "Late write failed",
-          });
+          const failure = StoreError.failed("Store", "transaction")("Late write failed");
           const broken = failingLate(bound, failure);
           expect(
             yield* Effect.flip(

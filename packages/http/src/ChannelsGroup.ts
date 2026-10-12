@@ -39,35 +39,35 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
     HttpApiEndpoint.get("list", "/channels", {
       params: workspace,
       success: Schema.Array(record),
-      error: [...ApiErrors.member, ...ApiErrors.channelRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
     }),
     HttpApiEndpoint.post("create", "/channels", {
       params: workspace,
       headers: ApiErrors.requestKey,
       payload: Channel.CreateInput,
       success: record.pipe(HttpApiSchema.status(201)),
-      error: [...ApiErrors.member, ...ApiErrors.channelCreate],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelCreate],
     }),
     HttpApiEndpoint.get("get", "/channels/:channelId", {
       params: channel,
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.channelRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
     }),
     HttpApiEndpoint.post("redirect", "/channels/:channelId/redirect", {
       params: channel,
       payload: Schema.Struct({ groupId: Group.Id }),
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.channelRedirect],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
     }),
     HttpApiEndpoint.delete("remove", "/channels/:channelId", {
       params: channel,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ...ApiErrors.channelRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
     }),
     HttpApiEndpoint.get("binding", "/threads/:threadId/channel", {
       params: thread,
       success: ChannelBinding.ChannelBinding.annotate({ identifier: "ChannelBinding" }),
-      error: [...ApiErrors.member, ...ApiErrors.channelBinding],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelBinding],
     }),
   )
   .middleware(Authentication)
@@ -86,6 +86,6 @@ export class ChannelEventsGroup extends HttpApiGroup.make("channelEvents").add(
     params: channel,
     payload: text,
     success: text,
-    error: [ApiErrors.WorkspaceNotFound, ...ApiErrors.workspace, ...ApiErrors.channelEvents],
+    error: [...ApiErrors.workspace, ...ApiErrors.channelEvents],
   }),
 ) {}

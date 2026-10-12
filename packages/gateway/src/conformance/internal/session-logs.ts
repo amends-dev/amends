@@ -122,7 +122,7 @@ export const sessionLogs = (fixture: Fixture) => {
           for (const after of [0, 2])
             expect(
               yield* Effect.flip(one.sessionLogs.append(participation, [step, interrupted], after)),
-            ).toMatchObject({ _tag: "SessionLogStore.Conflict", after });
+            ).toMatchObject({ _tag: "SessionLogStore.Overtaken", after });
           expect(yield* one.sessionLogs.head(participation)).toBe(1);
 
           // Of two writers that read the log to the same entry, one appends and the other is refused.
@@ -134,7 +134,7 @@ export const sessionLogs = (fixture: Fixture) => {
           );
           expect(outcomes.filter(Result.isSuccess)).toHaveLength(1);
           expect(outcomes.filter(Result.isFailure).map(({ failure }) => failure._tag)).toEqual([
-            "SessionLogStore.Conflict",
+            "SessionLogStore.Overtaken",
           ]);
           expect(
             (yield* other.sessionLogs.read(participation, { after: 0, limit: 10 })).map(

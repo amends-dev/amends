@@ -4,7 +4,7 @@
  * membership; any entitlement check is the host's. The other endpoints need active membership and
  * call `WorkspaceSettingsService` (`get`, `rename`, `members`) and `OwnershipService` (`get`,
  * `transfer`); transferring ownership needs the current human owner. An agent gets
- * `ApiErrors.HumanRequired` from `create` and `transferOwnership`. `WorkspacesHandlers` implements
+ * `ApiErrors.Denied` from `create` and `transferOwnership`. `WorkspacesHandlers` implements
  * it.
  *
  * @since 0.1.0
@@ -27,18 +27,18 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
     HttpApiEndpoint.get("settings", "/:workspaceId/settings", {
       params: { workspaceId: Workspace.Id },
       success: WorkspaceSettings.View,
-      error: [...ApiErrors.member, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.put("rename", "/:workspaceId/name", {
       params: { workspaceId: Workspace.Id },
       payload: WorkspaceSettings.RenameInput,
       success: Workspace.Workspace,
-      error: [...ApiErrors.member, ApiErrors.WorkspaceChanged],
+      error: [...ApiErrors.workspace, ApiErrors.Changed],
     }),
     HttpApiEndpoint.get("members", "/:workspaceId/member-management", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(WorkspaceSettings.MemberEntry),
-      error: [...ApiErrors.member, ...ApiErrors.delegation, ApiErrors.MemberNotFound],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.post("create", "/", {
       headers: ApiErrors.requestKey,
@@ -46,28 +46,18 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       success: Workspace.Workspace.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedWorkspace",
       }),
-      error: [
-        ApiErrors.HumanRequired,
-        ApiErrors.Conflict,
-        ApiErrors.Uncertain,
-        ApiErrors.InvalidInput,
-      ],
+      error: [ApiErrors.Denied, ApiErrors.Unavailable, ApiErrors.Uncertain, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.get("ownership", "/:workspaceId/ownership", {
       params: { workspaceId: Workspace.Id },
       success: Ownership.View,
-      error: [...ApiErrors.member, ...ApiErrors.ownership, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.post("transferOwnership", "/:workspaceId/ownership", {
       params: { workspaceId: Workspace.Id },
       payload: Ownership.TransferInput,
       success: Workspace.Workspace,
-      error: [
-        ApiErrors.HumanRequired,
-        ...ApiErrors.member,
-        ...ApiErrors.ownership,
-        ...ApiErrors.delegation,
-      ],
+      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
     }),
   )
   .middleware(Authentication)

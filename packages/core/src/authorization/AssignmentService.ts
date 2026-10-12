@@ -27,38 +27,8 @@ import * as Assignment from "./Assignment.ts";
 import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
-import { Changed, InactiveMember, MemberNotFound, NotFound } from "./internal/assignment-errors.ts";
-export {
-  /**
-   * The member's workspace role assignments are no longer the ones the caller expected: someone
-   * changed them meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-  /**
-   * The member has been removed; roles are given to and taken from active members only.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InactiveMember,
-  /**
-   * No member with this ID is recorded in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberNotFound,
-  /**
-   * No assignment with this ID is recorded for the member.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-} from "./internal/assignment-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the assignment operations can fail with: the outcomes above, delegation's,
@@ -69,14 +39,13 @@ export {
  */
 export type Error =
   | Delegation.Error
-  | MemberStore.Failure
+  | StoreError.StoreError
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError
-  | MemberNotFound
-  | InactiveMember
-  | NotFound
-  | Changed;
+  | CoreError.NotFound
+  | CoreError.Conflict
+  | CoreError.Changed;
 
 /**
  * What reading a member's access can fail with: the delegation checks it shows, and a member who
@@ -85,16 +54,7 @@ export type Error =
  * @category errors
  * @since 0.1.0
  */
-export type ListError = Delegation.Error | MemberNotFound | InactiveMember;
-
-/**
- * What `permissions` can fail with: authorization's failures but never `Denied`, since reading
- * one's own permissions needs only active membership.
- *
- * @category errors
- * @since 0.1.0
- */
-export type PermissionsError = Exclude<Authorization.Error, Authorization.Denied>;
+export type ListError = Delegation.Error | CoreError.NotFound | CoreError.Conflict;
 
 /**
  * The assignment operations, one of `Core.Operations`.
@@ -112,7 +72,7 @@ export class AssignmentService extends Context.Service<
      */
     readonly permissions: Effect.Effect<
       ReadonlyArray<Permission.Name>,
-      PermissionsError,
+      Authorization.Error,
       Actor.Actor
     >;
     /** The three built-in roles, each with whether the actor may give it, under active membership. */
@@ -138,8 +98,8 @@ export class AssignmentService extends Context.Service<
     ) => Effect.Effect<Assignment.Assignment, Error, Actor.Actor>;
     /**
      * End one of a member's assignments, under `assignment.manage` and the delegation rules for the
-     * member and, for a role assignment, its role. Another member's assignment is `NotFound`; one
-     * already revoked is returned as it is.
+     * member and, for a role assignment, its role. Another member's assignment is
+     * `CoreError.NotFound`; one already revoked is returned as it is.
      */
     readonly revoke: (
       memberId: Member.Id,
@@ -148,7 +108,8 @@ export class AssignmentService extends Context.Service<
     /**
      * Replace a member's workspace roles with one, under `assignment.manage` and the delegation
      * rules for the member, the new role, and each role replaced. The roles must be the ones the
-     * caller saw, or the change is `Changed`; a member holding that role alone is left as they are.
+     * caller saw, or the change is `CoreError.Changed`; a member holding that role alone is left as
+     * they are.
      */
     readonly change: (
       input: Assignment.ChangeInput,
@@ -210,7 +171,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   ) {
     const id = yield* Schema.decodeEffect(Member.Id)(memberId);
     const found = yield* memberStore.get(id);
-    if (Option.isNone(found)) return yield* new MemberNotFound({ memberId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id });
     return found.value;
   });
   const authorizeRecipient = Effect.fn("AssignmentService.authorizeRecipient")(function* (
@@ -218,7 +179,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   ) {
     yield* authorization.require([manageRequirement]);
     const record = yield* requireMember(memberId);
-    if (record.status !== "active") return yield* new InactiveMember({ memberId });
+    if (record.status !== "active")
+      return yield* new CoreError.Conflict({ reason: new CoreError.InactiveMember({ memberId }) });
     yield* delegation.requireRecipient(memberId);
   });
   const listRoleChoices = Effect.gen(function* () {
@@ -272,9 +234,11 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       yield* authorizeRecipient(memberId);
       const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
       const found = yield* assignmentStore.get(id);
-      if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
+      if (Option.isNone(found))
+        return yield* new CoreError.NotFound({ resource: "Assignment", id });
       const record = found.value;
-      if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
+      if (record.memberId !== memberId)
+        return yield* new CoreError.NotFound({ resource: "Assignment", id });
       if (Assignment.Source.isAnyOf(["Role"])(record.source))
         yield* delegation.requireGrant(record.source.roleId);
       if (record.status === "revoked") return record;
@@ -294,7 +258,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
         current.length !== request.expectedAssignmentIds.length ||
         current.some(({ id }) => !request.expectedAssignmentIds.includes(id))
       )
-        return yield* new Changed({ memberId: request.memberId });
+        return yield* new CoreError.Changed({ resource: "Member", id: request.memberId });
       for (const record of current) yield* delegation.requireGrant(record.source.roleId);
       const same = current.find(({ source }) => source.roleId === request.roleId);
       if (current.length === 1 && same !== undefined) return same;

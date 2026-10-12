@@ -71,18 +71,27 @@ describe("store validation", () => {
                   { ...role, id: Role.Id.make("invalid"), permissions: [permission, permission] },
                 ]) {
                   expect(yield* Effect.flip(bound.roles.insert(record))).toMatchObject({
-                    _tag: "RoleStore.Conflict",
+                    _tag: "StoreError",
+                    store: "RoleStore",
                     operation: "insert",
+                    reason: { _tag: "Rejected" },
                   });
                 }
                 expect(yield* bound.roles.get(Role.Id.make("invalid"))).toEqual(Option.none());
                 expect(yield* Effect.flip(bound.roles.rename(roleId, ""))).toMatchObject({
-                  _tag: "RoleStore.Conflict",
+                  _tag: "StoreError",
+                  store: "RoleStore",
                   operation: "rename",
+                  reason: { _tag: "Rejected" },
                 });
                 expect(
                   yield* Effect.flip(bound.roles.setPermissions(roleId, [permission, permission])),
-                ).toMatchObject({ _tag: "RoleStore.Conflict", operation: "setPermissions" });
+                ).toMatchObject({
+                  _tag: "StoreError",
+                  store: "RoleStore",
+                  operation: "setPermissions",
+                  reason: { _tag: "Rejected" },
+                });
                 expect(yield* bound.roles.get(roleId)).toEqual(Option.some(role));
                 yield* bound.roles.rename(roleId, "Renamed");
                 yield* bound.roles.setPermissions(roleId, []);
@@ -136,8 +145,10 @@ describe("store validation", () => {
             yield* bound.store.transaction(
               Effect.gen(function* () {
                 expect(yield* Effect.flip(bound.assignments.insert(record))).toMatchObject({
-                  _tag: "AssignmentStore.Conflict",
+                  _tag: "StoreError",
+                  store: "AssignmentStore",
                   operation: "insert",
+                  reason: { _tag: "Rejected" },
                 });
                 expect(yield* bound.assignments.get(record.id)).toEqual(Option.none());
                 yield* bound.assignments.insert(valid);
@@ -182,8 +193,10 @@ describe("store validation", () => {
             yield* bound.store.transaction(
               Effect.gen(function* () {
                 expect(yield* Effect.flip(bound.invitations.insert(record))).toMatchObject({
-                  _tag: "InvitationStore.Conflict",
+                  _tag: "StoreError",
+                  store: "InvitationStore",
                   operation: "insert",
+                  reason: { _tag: "Rejected" },
                 });
                 expect(
                   yield* Effect.flip(
@@ -192,7 +205,12 @@ describe("store validation", () => {
                       details: { ...valid.details, expiresAt: issuedAt },
                     }),
                   ),
-                ).toMatchObject({ _tag: "InvitationStore.Conflict", operation: "insert" });
+                ).toMatchObject({
+                  _tag: "StoreError",
+                  store: "InvitationStore",
+                  operation: "insert",
+                  reason: { _tag: "Rejected" },
+                });
                 expect(yield* bound.invitations.get(record.details.id)).toEqual(Option.none());
                 yield* bound.invitations.insert(valid);
               }),
@@ -229,12 +247,22 @@ describe("store validation", () => {
                 };
                 expect(
                   yield* Effect.flip(bound.checkpoints.set(key, { ...cursor, index: -1 })),
-                ).toMatchObject({ _tag: "Store.Conflict", operation: "checkpoint.set" });
+                ).toMatchObject({
+                  _tag: "StoreError",
+                  store: "Checkpoint",
+                  operation: "set",
+                  reason: { _tag: "Rejected" },
+                });
                 expect(
                   yield* Effect.flip(
                     bound.checkpoints.set({ ...key, version: Number.NaN }, cursor),
                   ),
-                ).toMatchObject({ _tag: "Store.Conflict", operation: "checkpoint.set" });
+                ).toMatchObject({
+                  _tag: "StoreError",
+                  store: "Checkpoint",
+                  operation: "set",
+                  reason: { _tag: "Rejected" },
+                });
                 expect(yield* bound.checkpoints.get(key)).toEqual(Option.none());
                 yield* bound.checkpoints.set(key, cursor);
                 return { key, cursor };
@@ -271,8 +299,10 @@ describe("store validation", () => {
                     }),
                   ),
                 ).toMatchObject({
-                  _tag: "WorkspaceStore.Conflict",
+                  _tag: "StoreError",
+                  store: "WorkspaceStore",
                   operation: "insert",
+                  reason: { _tag: "Rejected" },
                 });
                 expect(yield* bound.workspace.get).toEqual(Option.none());
               }
@@ -309,7 +339,9 @@ describe("store validation", () => {
           yield* bound.store.transaction(
             Effect.gen(function* () {
               expect(yield* Effect.flip(bound.members.insert(invalid))).toMatchObject({
-                _tag: "MemberStore.Conflict",
+                _tag: "StoreError",
+                store: "MemberStore",
+                reason: { _tag: "Rejected" },
               });
               expect(yield* bound.members.get(invalid.id)).toEqual(Option.none());
               yield* bound.members.insert(

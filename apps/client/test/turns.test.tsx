@@ -292,14 +292,26 @@ it("names why a stop or retry was refused", async () => {
   const f = fixture();
   await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
   f.answers.push(
-    json({ _tag: "TurnService.NotRetryable", turnId: "atlas-1", reason: "superseded" }, 409),
+    json(
+      {
+        _tag: "CoreError.Conflict",
+        reason: { _tag: "NotRetryable", turnId: "atlas-1", reason: "superseded" },
+      },
+      409,
+    ),
   );
   f.views.controls.retry("atlas-1");
   await waitFor(() =>
     expect(f.views.controls.problem()).toEqual({ turnId: "atlas-1", problem: "superseded" }),
   );
   f.answers.push(
-    json({ _tag: "TurnService.NotActive", turnId: "scout-2", status: "completed" }, 409),
+    json(
+      {
+        _tag: "CoreError.Conflict",
+        reason: { _tag: "TurnNotActive", turnId: "scout-2", status: "completed" },
+      },
+      409,
+    ),
   );
   f.views.controls.stop("scout-2");
   await waitFor(() =>
@@ -332,7 +344,10 @@ function eventStream(request: Request) {
     send: (message: unknown) => write("message", message),
     unavailable: () => {
       write("effect/http-api/stream/failure", [
-        { _tag: "Fail", error: { _tag: "Turn.LogUnavailable" } },
+        {
+          _tag: "Fail",
+          error: { _tag: "CoreError.Unavailable", reason: { _tag: "LogInterrupted" } },
+        },
       ]);
       controller.close();
     },
@@ -525,15 +540,18 @@ it("follows a turn's log again after it drops, opening with the items as they st
 });
 
 const refusals = {
-  gone: () => json({ _tag: "TurnService.NotFound", turnId: "atlas-1" }, 404),
+  gone: () => json({ _tag: "CoreError.NotFound", resource: "Turn", id: "atlas-1" }, 404),
   denied: () =>
     json(
       {
-        _tag: "Authorization.Denied",
-        memberId: "owner",
-        requirement: {
-          permission: { name: "thread.read", targetKind: "Thread" },
-          target: { _tag: "Thread", workspaceId: "one", threadId: "thread" },
+        _tag: "CoreError.Denied",
+        reason: {
+          _tag: "NotGranted",
+          memberId: "owner",
+          requirement: {
+            permission: { name: "thread.read", targetKind: "Thread" },
+            target: { _tag: "Thread", workspaceId: "one", threadId: "thread" },
+          },
         },
       },
       403,

@@ -29,8 +29,8 @@ import type * as Entry from "../journal/Entry.ts";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
 import type * as Log from "../journal/Log.ts";
-import * as ChangeFeed from "./ChangeFeed.ts";
 import * as ChangeFeedEvents from "./ChangeFeedEvents.ts";
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * One committed batch of the journal, with the events the feed may deliver from it.
@@ -61,7 +61,7 @@ export interface Subscription {
    * Every later commit in position order, history first. Fails when delivery cannot continue,
    * including at a commit this host cannot read.
    */
-  readonly deliveries: Stream.Stream<Delivery, ChangeFeed.Unavailable>;
+  readonly deliveries: Stream.Stream<Delivery, CoreError.Unavailable>;
 }
 
 /**
@@ -81,7 +81,7 @@ export class ChangeFeedSource extends Context.Service<
      */
     readonly subscribe: (
       after: Option.Option<Entry.Position>,
-    ) => Effect.Effect<Subscription, ChangeFeed.Unavailable, Scope.Scope>;
+    ) => Effect.Effect<Subscription, CoreError.Unavailable, Scope.Scope>;
   }
 >()("@amends-dev/core/change-feed/ChangeFeedSource") {}
 
@@ -147,7 +147,8 @@ interface Follower {
 const backoffAfter = (failures: number) =>
   Duration.millis(Math.min(5_000, 100 * 2 ** Math.min(failures - 1, 6)));
 
-const toUnavailable = () => new ChangeFeed.Unavailable({});
+const toUnavailable = () =>
+  new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() });
 const isReadable = (delivery: Prepared) => delivery.unreadable.length === 0;
 
 /**
@@ -306,7 +307,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
       Stream.mapError(toUnavailable),
     );
     const live = Stream.fromEffectRepeat(PubSub.take(subscription)).pipe(
-      Stream.flatMap((item): Stream.Stream<Prepared, ChangeFeed.Unavailable> => {
+      Stream.flatMap((item): Stream.Stream<Prepared, CoreError.Unavailable> => {
         if (Item.$is("Stopped")(item)) return Stream.fail(toUnavailable());
         const lagged = item.sequence !== expected;
         expected = item.sequence + 1n;
@@ -325,7 +326,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         Stream.concat(live),
         // The subscriber reconnects from its last cursor, where this commit makes it reset.
         Stream.mapEffect(
-          ({ unreadable, ...delivery }): Effect.Effect<Delivery, ChangeFeed.Unavailable> =>
+          ({ unreadable, ...delivery }): Effect.Effect<Delivery, CoreError.Unavailable> =>
             unreadable.length === 0 ? Effect.succeed(delivery) : Effect.fail(toUnavailable()),
         ),
         Stream.mapError(toUnavailable),

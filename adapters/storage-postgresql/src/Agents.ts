@@ -4,7 +4,7 @@
  * `model_effort` the model's default, and a null `sandbox_connection_id` no sandbox.
  * `AgentStore.make` checks every input before the driver sees it, so the driver keeps only what
  * storage keeps: the primary key refuses a reused ID and `agents_by_member` a second agent for one
- * membership, each as the store's `Conflict`, and an update that finds no row conflicts. Every
+ * membership, each rejected, and an update that finds no row is rejected. Every
  * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read join
  * the caller's transaction and requires one for a write.
  *
@@ -14,8 +14,9 @@ import { Agent, AgentStore } from "@amends-dev/core/agent";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { agents } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 type Row = typeof agents.$inferSelect;
 
@@ -79,15 +80,15 @@ export const make = Effect.fn("Agents.make")(function* () {
           Effect.map(Array.head),
         );
       },
-      Effect.mapError(storeFailure(AgentStore, "get")),
+      Effect.mapError(StoreError.failed("AgentStore", "get")),
     ),
     list: guard(db.select().from(agents).where(eq(agents.workspaceId, workspaceId))).pipe(
       Effect.flatMap(decodeRows),
-      Effect.mapError(storeFailure(AgentStore, "list")),
+      Effect.mapError(StoreError.failed("AgentStore", "list")),
     ),
     insert: Effect.fn("Agents.insert")(function* (record) {
       yield* guard(db.insert(agents).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError(AgentStore, "insert")),
+        Effect.mapError(storeError("AgentStore", "insert")),
       );
     }),
     update: Effect.fn("Agents.update")(function* (record) {
@@ -98,12 +99,9 @@ export const make = Effect.fn("Agents.make")(function* () {
           .where(inWorkspace(record.id))
           .returning({ id: agents.id }),
         true,
-      ).pipe(Effect.mapError(storeError(AgentStore, "update")));
+      ).pipe(Effect.mapError(storeError("AgentStore", "update")));
       if (updated.length === 0)
-        return yield* new AgentStore.Conflict({
-          operation: "update",
-          message: "Expected a stored agent",
-        });
+        return yield* StoreError.rejected("AgentStore", "update", "Expected a stored agent");
     }),
   };
   return AgentStore.make(workspaceId, driver);

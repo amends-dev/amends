@@ -17,7 +17,7 @@ import * as ApiErrors from "./ApiErrors.ts";
 const agent = { workspaceId: Workspace.Id, agentId: Agent.Id };
 const view = Agent.View.annotate({ identifier: "Agent" });
 /** Outcomes of a setup: a connection the caller cannot give the agent, or one that cannot run. */
-const setup = [ApiErrors.AgentConnectionUnavailable, ApiErrors.AgentIncomplete] as const;
+const setup = [ApiErrors.Invalid, ApiErrors.Invalid] as const;
 
 /**
  * The workspace's agents, each a member working on the harness, model, and sandbox its
@@ -32,7 +32,7 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(view),
-      error: ApiErrors.member,
+      error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.post("create", "/", {
       params: { workspaceId: Workspace.Id },
@@ -41,18 +41,18 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
       success: Agent.View.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedAgent",
       }),
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound, ...setup, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...setup, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.get("get", "/:agentId", {
       params: agent,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.put("configure", "/:agentId/configuration", {
       params: agent,
       payload: Agent.Configuration,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound, ...setup],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ...setup],
     }),
     HttpApiEndpoint.post("rename", "/:agentId/rename", {
       params: agent,
@@ -61,7 +61,7 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
         expectedName: Agent.RenameInput.fields.expectedName,
       }),
       success: view,
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound, ApiErrors.AgentChanged],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Changed],
     }),
   )
   .middleware(Authentication)

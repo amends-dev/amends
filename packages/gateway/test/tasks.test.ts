@@ -35,6 +35,7 @@ import {
   testProvenance,
   workspaceId,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Tasks: creation with a thread or in one, changes and whom they reach, and the task store. */
 
@@ -306,8 +307,11 @@ describe("tasks", () => {
             expect(
               yield* Effect.flip(run(bound, human, start({ groupId: group.id, task: {} }))),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: TaskPermissions.Create.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: TaskPermissions.Create.name } },
+              },
             });
             yield* grant(bound, humanId, TaskPermissions.Create, groupTarget);
             const hidden = yield* run(bound, owner, create([owner.memberId]));
@@ -318,25 +322,32 @@ describe("tasks", () => {
                 run(bound, human, start({ groupId: group.id, task: { assignee: agentId } })),
               ),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: AgentPermissions.Use.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: AgentPermissions.Use.name } },
+              },
             });
             expect(
               yield* Effect.flip(
                 run(bound, human, start({ groupId: group.id, task: { assignee: otherId } })),
               ),
-            ).toEqual(new ThreadService.ParticipantUnavailable({ memberId: otherId }));
+            ).toEqual(
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: otherId }),
+              }),
+            );
             expect(
               yield* Effect.flip(
                 run(bound, human, start({ groupId: group.id, origin: secret.thread.id })),
               ),
-            ).toEqual(new ThreadService.NotFound({ threadId: secret.thread.id }));
+            ).toEqual(new CoreError.NotFound({ resource: "Thread", id: secret.thread.id }));
             expect(yield* history(bound)).toEqual(before);
             expect(yield* Effect.flip(run(bound, human, taskOf(secret.thread.id)))).toEqual(
-              new TaskService.NotFound({ threadId: secret.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: secret.thread.id }),
             );
             expect(yield* Effect.flip(run(bound, owner, taskOf(secret.thread.id)))).toEqual(
-              new TaskService.NotFound({ threadId: secret.thread.id }),
+              new CoreError.NotFound({ resource: "Task", id: secret.thread.id }),
             );
           }),
         ),
@@ -370,14 +381,17 @@ describe("tasks", () => {
             expect(task).toMatchObject({ threadId, status: "triage", assignee: null });
             expect(yield* run(bound, owner, taskOf(threadId))).toEqual(task);
             expect(yield* Effect.flip(run(bound, owner, createTask({ threadId })))).toEqual(
-              new TaskService.AlreadyTask({ threadId }),
+              new CoreError.Conflict({ reason: new CoreError.AlreadyTask({ threadId }) }),
             );
             expect(yield* Effect.flip(run(bound, other, createTask({ threadId })))).toEqual(
-              new TaskService.NotFound({ threadId }),
+              new CoreError.NotFound({ resource: "Thread", id: threadId }),
             );
             expect(yield* Effect.flip(run(bound, human, createTask({ threadId })))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: TaskPermissions.Create.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: TaskPermissions.Create.name } },
+              },
             });
             expect(yield* participants(bound, threadId)).toEqual([
               [`Member:${owner.memberId}`, 1],
@@ -460,7 +474,7 @@ describe("tasks", () => {
                   update(threadId, { _tag: "Status", from: "triage", to: "doing" }),
                 ),
               ),
-            ).toEqual(new TaskService.Changed({ threadId }));
+            ).toEqual(new CoreError.Changed({ resource: "Task", id: threadId }));
             expect(
               yield* run(
                 bound,
@@ -523,8 +537,11 @@ describe("tasks", () => {
                 run(bound, agent, update(threadId, { _tag: "Status", from: "done", to: "doing" })),
               ),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: TaskPermissions.Update.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: TaskPermissions.Update.name } },
+              },
             });
             yield* grant(bound, agentId, TaskPermissions.Update, {
               _tag: "Thread",
@@ -549,7 +566,7 @@ describe("tasks", () => {
                   update(threadId, { _tag: "Priority", from: "urgent", to: "low" }),
                 ),
               ),
-            ).toEqual(new TaskService.NotFound({ threadId }));
+            ).toEqual(new CoreError.NotFound({ resource: "Thread", id: threadId }));
             expect(
               yield* Effect.flip(
                 run(
@@ -558,7 +575,11 @@ describe("tasks", () => {
                   update(threadId, { _tag: "Assignee", from: agentId, to: otherId }),
                 ),
               ),
-            ).toEqual(new TaskService.ParticipantUnavailable({ memberId: otherId }));
+            ).toEqual(
+              new CoreError.Conflict({
+                reason: new CoreError.ParticipantUnavailable({ memberId: otherId }),
+              }),
+            );
           }),
         ),
       ),
@@ -591,7 +612,9 @@ describe("tasks", () => {
             [foreign, foreign.tasks.insert(task)],
           ] as const) {
             expect(yield* Effect.flip(store.store.transaction(write))).toMatchObject({
-              _tag: "TaskStore.Conflict",
+              _tag: "StoreError",
+              store: "TaskStore",
+              reason: { _tag: "Rejected" },
             });
           }
           expect(yield* bound.tasks.get(task.threadId)).toEqual(Option.some(task));

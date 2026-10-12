@@ -2,7 +2,7 @@
  * The PostgreSQL driver for `ContactStore.ContactStore`, over the `contacts` table: the people the
  * workspace has heard from through its channels, one row each. `ContactStore.make` checks every
  * input before the driver sees it, so the driver keeps only what storage keeps: the primary key
- * refuses a reused ID as the store's `Conflict`, and an update that finds no row conflicts. Every
+ * rejects a reused ID, and an update that finds no row is rejected. Every
  * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read
  * join the caller's transaction and requires one for a write.
  *
@@ -12,9 +12,10 @@ import { Contact, ContactStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { inIds } from "./internal/id-list.ts";
 import { contacts } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ...Contact.Contact.fields, createdAt: Schema.DateTimeUtcFromDate })),
@@ -49,7 +50,7 @@ export const make = Effect.fn("Contacts.make")(function* () {
             .where(and(inWorkspace, eq(contacts.id, id))),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ContactStore, "get")),
+      Effect.mapError(StoreError.failed("ContactStore", "get")),
     ),
     getMany: Effect.fn("Contacts.getMany")(
       function* (ids) {
@@ -61,11 +62,11 @@ export const make = Effect.fn("Contacts.make")(function* () {
             .where(and(inWorkspace, inIds(contacts.id, ids))),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ContactStore, "getMany")),
+      Effect.mapError(StoreError.failed("ContactStore", "getMany")),
     ),
     insert: Effect.fn("Contacts.insert")(function* (record) {
       yield* guard(db.insert(contacts).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError(ContactStore, "insert")),
+        Effect.mapError(storeError("ContactStore", "insert")),
       );
     }),
     update: Effect.fn("Contacts.update")(function* (record) {
@@ -76,12 +77,9 @@ export const make = Effect.fn("Contacts.make")(function* () {
           .where(and(inWorkspace, eq(contacts.id, record.id)))
           .returning({ id: contacts.id }),
         true,
-      ).pipe(Effect.mapError(storeError(ContactStore, "update")));
+      ).pipe(Effect.mapError(storeError("ContactStore", "update")));
       if (updated.length === 0)
-        return yield* new ContactStore.Conflict({
-          operation: "update",
-          message: "Expected a stored contact",
-        });
+        return yield* StoreError.rejected("ContactStore", "update", "Expected a stored contact");
     }),
   };
   return ContactStore.make(workspaceId, driver);

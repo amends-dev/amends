@@ -272,7 +272,9 @@ it("ends and refreshes the directory when the member loses the workspace", async
   let denied = false;
   const f = fixture({
     changes: () =>
-      denied ? json({ _tag: "GatewayErrors.NotMember", workspaceId: "one" }, 403) : undefined,
+      denied
+        ? json({ _tag: "CoreError.Denied", reason: { _tag: "NotMember", workspaceId: "one" } }, 403)
+        : undefined,
   });
   const first = await f.connected(0);
   first.send(ready("2", true));

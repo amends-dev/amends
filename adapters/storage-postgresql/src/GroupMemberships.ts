@@ -3,8 +3,8 @@
  * `group_memberships` table: each admission of a member to a group, active or removed.
  * `GroupMembershipStore.make` checks every input before the driver sees it, so the driver keeps
  * only what storage keeps: the primary key refuses a reused ID and `active_group_membership` a
- * second active admission for one group and member, each as the store's `Conflict`, and removal is
- * a conditional update that conflicts unless it finds the addressed admission active; readmission
+ * second active admission for one group and member, each rejected, and removal is
+ * a conditional update rejected unless it finds the addressed admission active; readmission
  * takes a fresh ID. `summarize` counts several groups' admissions in one grouped query. Every
  * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read
  * join the caller's transaction and requires one for a write.
@@ -16,8 +16,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { groupMemberships } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -51,7 +52,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             .where(and(inWorkspace, eq(groupMemberships.id, id))),
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "get")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "get")),
     ),
     getMany: Effect.fn("GroupMemberships.getMany")(
       function* (ids) {
@@ -63,7 +64,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             .where(and(inWorkspace, inIds(groupMemberships.id, ids))),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "getMany")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "getMany")),
     ),
     findActive: Effect.fn("GroupMemberships.findActive")(
       function* (groupId, memberId) {
@@ -81,7 +82,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "findActive")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "findActive")),
     ),
     findActiveMany: Effect.fn("GroupMemberships.findActiveMany")(
       function* (groupId, memberIds) {
@@ -100,7 +101,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "findActiveMany")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "findActiveMany")),
     ),
     summarize: Effect.fn("GroupMemberships.summarize")(
       function* (groupIds, memberId) {
@@ -123,7 +124,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             .groupBy(groupMemberships.groupId),
         ).pipe(Effect.flatMap(decodeSummaries));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "summarize")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "summarize")),
     ),
     listByGroup: Effect.fn("GroupMemberships.listByGroup")(
       function* (groupId) {
@@ -135,7 +136,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             .orderBy(sql`${groupMemberships.id} COLLATE "C"`),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "listByGroup")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "listByGroup")),
     ),
     pageActiveByGroup: Effect.fn("GroupMemberships.pageActiveByGroup")(
       function* (groupId, options) {
@@ -156,7 +157,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             .limit(options.limit),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByGroup")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "pageActiveByGroup")),
     ),
     pageActiveByMember: Effect.fn("GroupMemberships.pageActiveByMember")(
       function* (memberId, options) {
@@ -179,7 +180,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             .limit(options.limit),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "pageActiveByMember")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "pageActiveByMember")),
     ),
     listActiveByMember: Effect.fn("GroupMemberships.listActiveByMember")(
       function* (memberId) {
@@ -197,7 +198,7 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
             .orderBy(sql`${groupMemberships.id} COLLATE "C"`),
         ).pipe(Effect.flatMap(decode));
       },
-      Effect.mapError(storeFailure(GroupMembershipStore, "listActiveByMember")),
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "listActiveByMember")),
     ),
     markRemoved: Effect.fn("GroupMemberships.markRemoved")(function* (removal) {
       const rows = yield* guard(
@@ -215,19 +216,20 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
           )
           .returning({ id: groupMemberships.id }),
         true,
-      ).pipe(Effect.mapError(storeError(GroupMembershipStore, "markRemoved")));
+      ).pipe(Effect.mapError(storeError("GroupMembershipStore", "markRemoved")));
       if (rows.length === 0)
-        return yield* new GroupMembershipStore.Conflict({
-          operation: "markRemoved",
-          message: "Expected the specified active group admission",
-        });
+        return yield* StoreError.rejected(
+          "GroupMembershipStore",
+          "markRemoved",
+          "Expected the specified active group admission",
+        );
     }),
     insert: Effect.fn("GroupMemberships.insert")(function* (record) {
       const { admittedAt, ...fields } = record;
       yield* guard(
         db.insert(groupMemberships).values({ ...fields, admittedAt: DateTime.toDate(admittedAt) }),
         true,
-      ).pipe(Effect.mapError(storeError(GroupMembershipStore, "insert")));
+      ).pipe(Effect.mapError(storeError("GroupMembershipStore", "insert")));
     }),
   };
   return GroupMembershipStore.make(workspaceId, driver);

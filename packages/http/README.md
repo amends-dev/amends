@@ -27,20 +27,20 @@ and the gateway declare, imported from those packages.
 `Authentication` is bearer middleware that provides `Principal`, the authenticated human or agent
 identity, and `Credential`, the token the request presented. A server implements it by verifying the
 credential, and a client by attaching one with `HttpApiMiddleware.layerClient`. Endpoints only a
-person may call fail with `HumanRequired` when the principal is an agent, and a request without a
-credential the host accepts fails with `Unauthorized`. The contract does not define how credentials
-are issued; the `session` group asks the host's sign-in for one.
+person may call fail with `CoreError.Denied` (`HumanRequired`) when the principal is an agent, and a
+request without a credential the host accepts fails with `Unauthorized`. The contract does not
+define how credentials are issued; the `session` group asks the host's sign-in for one.
 
 ## Endpoints
 
 - `session`: `GET /session/methods` lists the ways the host signs people in, `SignIn.Methods`:
   whether it sends email codes, and its identity providers. `POST /session/email` requests a
   one-time code for an address and `POST /session/code` exchanges it for a `SignIn.Session`, a token
-  and the account it signs in as. None needs a credential.
-- `me`: `GET /me` returns the principal's `Accounts.Account`, its human ID and address; an agent
-  gets 403 `HumanRequired`, and a session no account holds 401. `GET /me/workspaces` lists the
-  principal's memberships and pending invitations. `DELETE /me/session` signs out: the host stops
-  honoring the presented token.
+  and the account it signs in as. None needs a credential. - `me`: `GET /me` returns the principal's
+  `Accounts.Account`, its human ID and address; an agent gets 403 `CoreError.Denied`
+  (`HumanRequired`), and a session no account holds 401. `GET /me/workspaces` lists the principal's
+  memberships and pending invitations. `DELETE /me/session` signs out: the host stops honoring the
+  presented token.
 - `accounts`: `GET /workspaces/:workspaceId/accounts` returns the accounts of the workspace's human
   members and of its invitations' recipients, to someone who may manage invitations, so settings can
   show addresses beside names.
@@ -50,7 +50,7 @@ are issued; the `session` group asks the host's sign-in for one.
   non-empty, and trimmed; the returned `Workspace.Workspace` includes the workspace's.
   `GET /workspaces/:workspaceId/settings` returns metadata and action/role flags;
   `GET …/member-management` adds access and removal flags to readable members. `PUT …/name` accepts
-  `{ name, expectedName }` and returns the renamed workspace (409 `WorkspaceSettingsService.Changed` when
+  `{ name, expectedName }` and returns the renamed workspace (409 `CoreError.Changed` when
   the previous name no longer matches). `GET /workspaces/:workspaceId/ownership` returns current
   ownership and eligible candidates. `POST` to that path accepts
   `{ memberId, expectedOwnerAssignmentId }` and transfers ownership atomically, returning the
@@ -72,7 +72,7 @@ are issued; the `session` group asks the host's sign-in for one.
   address to its account, creating one the first time, and the invitation records that account's
   human ID as `recipientId`.
   `POST …/:invitationId/accept` and `POST …/:invitationId/revoke` change state; accepting in a
-  workspace that was never created returns 404 with `GatewayErrors.WorkspaceNotFound`. Acceptance takes
+  workspace that was never created returns 404 with `CoreError.NotFound`. Acceptance takes
   `{ name }`, the new member's name.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
@@ -158,10 +158,10 @@ SSE comments keep idle connections open without producing application messages, 
 no SSE event IDs. Responses use `Cache-Control: no-store` and disable proxy buffering where
 supported. Missing/rejected credentials return 401; absent active membership returns 403; a caller
 at the server's limit of open streams for the workspace, or for itself within it, gets 429
-`ApiErrors.TooManyStreams` with the limit it met. Failures after streaming starts use Effect's SSE failure
-encoding with `ChangeFeed.Unavailable` and no other detail; reconnect with the last cursor to
-continue. A commit the server cannot read, such as a fact version a newer server wrote during a
-deployment, also ends the stream, and reconnecting then resets. See
+`ApiErrors.TooManyStreams` with the limit it met. Failures after streaming starts use Effect's SSE
+failure encoding with `CoreError.Unavailable` (`ChangeFeedInterrupted`) and no other detail;
+reconnect with the last cursor to continue. A commit the server cannot read, such as a fact version
+a newer server wrote during a deployment, also ends the stream, and reconnecting then resets. See
 [known limitations](../../docs/current-status.md) for delivery and edge controls.
 
 ### Conversations
@@ -172,35 +172,35 @@ group or thread the caller cannot read answers 404 exactly as a missing one does
 [group](../../docs/group-workflows.md) and [thread](../../docs/thread-workflows.md) workflows
 describe the rules behind each operation.
 
-| Endpoint                                             | Operation                                                                                                                                                         |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following.                                                                    |
-| `POST …/groups`                                      | Create a team from `{ name, memberIds, visibility? }`, private unless `Public`; 201 with the group.                                                               |
-| `GET …/groups/public?limit&after`                    | Public groups the caller may join, in group-ID order, each with `members` and `joined`.                                                                           |
-| `POST …/groups/:groupId/join`                        | Join a public group as the caller; returns the admission. Private, direct, and missing groups are 404.                                                            |
-| `GET …/groups/:groupId`                              | One group.                                                                                                                                                        |
-| `POST …/groups/:groupId/rename`                      | Give a team group `{ name, expectedName }` under `group.rename`; returns it. A direct group, or a name no longer `expectedName` (`GroupService.Changed`), is 409. |
-| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                                                                                         |
-| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                                                                                     |
-| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                       |
-| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                       |
-| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                               |
-| `POST …/groups/:groupId/read`                        | Record that the caller read the group now; 204.                                                                                                                   |
-| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, each with its task or null, the caller's position, and unread.                                               |
-| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, each with its task or null, opening message, and reply count.                                            |
-| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions, title?, origin?, task? }`; 201 with the thread, its opening message, and its task or null. See [tasks](#tasks).            |
-| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions, title? }`, reusing their direct group; 201 with `task` null.                                             |
-| `GET …/threads/:threadId`                            | One thread.                                                                                                                                                       |
-| `POST …/threads/:threadId/rename`                    | Give a thread `{ title, expectedTitle }` under `thread.rename`; returns it. A title no longer `expectedTitle` (`ThreadService.Changed`) is 409.                   |
-| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                              |
-| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                   |
-| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                            |
-| `PUT …/messages/:messageId`                          | Edit one's own message from `{ text, mentions, expectedRevision }`; returns it. Another's is 403 `NotAuthor`; a deleted one or a stale revision is 409.           |
-| `DELETE …/messages/:messageId`                       | Delete one's own message, or any under `thread.moderate` on the group; returns it with its content deleted.                                                       |
-| `POST …/threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                       |
-| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                      |
-| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                      |
-| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                 |
+| Endpoint                                             | Operation                                                                                                                                                                         |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following.                                                                                    |
+| `POST …/groups`                                      | Create a team from `{ name, memberIds, visibility? }`, private unless `Public`; 201 with the group.                                                                               |
+| `GET …/groups/public?limit&after`                    | Public groups the caller may join, in group-ID order, each with `members` and `joined`.                                                                                           |
+| `POST …/groups/:groupId/join`                        | Join a public group as the caller; returns the admission. Private, direct, and missing groups are 404.                                                                            |
+| `GET …/groups/:groupId`                              | One group.                                                                                                                                                                        |
+| `POST …/groups/:groupId/rename`                      | Give a team group `{ name, expectedName }` under `group.rename`; returns it. A direct group is 422 (`NotRenamable`), and a name no longer `expectedName` 409 `CoreError.Changed`. |
+| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                                                                                                         |
+| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                                                                                                     |
+| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                                       |
+| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                                       |
+| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                                               |
+| `POST …/groups/:groupId/read`                        | Record that the caller read the group now; 204.                                                                                                                                   |
+| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, each with its task or null, the caller's position, and unread.                                                               |
+| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, each with its task or null, opening message, and reply count.                                                            |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions, title?, origin?, task? }`; 201 with the thread, its opening message, and its task or null. See [tasks](#tasks).                            |
+| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions, title? }`, reusing their direct group; 201 with `task` null.                                                             |
+| `GET …/threads/:threadId`                            | One thread.                                                                                                                                                                       |
+| `POST …/threads/:threadId/rename`                    | Give a thread `{ title, expectedTitle }` under `thread.rename`; returns it. A title no longer `expectedTitle` (`CoreError.Changed`) is 409.                                       |
+| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                                              |
+| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                                   |
+| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                                            |
+| `PUT …/messages/:messageId`                          | Edit one's own message from `{ text, mentions, expectedRevision }`; returns it. Another's is 403 `CoreError.Denied` (`NotAuthor`); a deleted one or a stale revision is 409.      |
+| `DELETE …/messages/:messageId`                       | Delete one's own message, or any under `thread.moderate` on the group; returns it with its content deleted.                                                                       |
+| `POST …/threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                                       |
+| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                                      |
+| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                                      |
+| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                                 |
 
 Every page takes an integer `limit` from 1 to 100 and an exclusive boundary from the last item of
 the previous page; an empty page ends the traversal. Groups, rosters, and participants pass that
@@ -219,13 +219,14 @@ edit time as it is now, or its deletion. A message's `via` names the agent's tur
 for an agent's reply, and is null otherwise.
 
 Message text keeps its whitespace and must contain a non-space character. Mentions name members of
-the group; a mentioned member who cannot take part is a 409 `ParticipantUnavailable`. Only people
-write messages and keep read positions: an agent principal gets 403. A read position past the
-thread's latest activity is a 409 `ReadStateService.BeyondTimeline` carrying the latest sequence. A
-direct group's members are fixed and it has nothing to follow, so adding, removing, and following
-there are 409s; unfollowing an ended participation or removing an ended admission is also a 409.
-Positions, read times, and what they saw reach the caller's sessions as signals on the change feed,
-and the conversation's facts reach the group's readers as commits.
+the group; a mentioned member who cannot take part is a 409 `CoreError.Conflict`
+(`ParticipantUnavailable`). Only people write messages and keep read positions: an agent principal
+gets 403. A read position past the thread's latest activity is a 409 `CoreError.Conflict`
+(`BeyondTimeline`) carrying the latest sequence. A direct group's members are fixed and it has
+nothing to follow, so adding, removing, and following there are 422 `CoreError.Invalid`; unfollowing
+an ended participation or removing an ended admission is a 409. Positions, read times, and what they
+saw reach the caller's sessions as signals on the change feed, and the conversation's facts reach
+the group's readers as commits.
 
 ### Tasks
 
@@ -238,12 +239,13 @@ the caller cannot read, answers 404 as a missing one does.
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET …/groups/:groupId/tasks?limit&status&before` | The group's readable tasks, newest created first, of one `status` when given, each as a thread list item with its task; `before` is JSON of the last item's task `{ createdAt, threadId }`. |
 | `GET …/threads/:threadId/task`                    | The thread's task.                                                                                                                                                                          |
-| `POST …/threads/:threadId/task`                   | Make the conversation a task from `{ status?, priority?, assignee? }` under `task.create` on the group; 201. A thread that is a task is 409 `AlreadyTask`.                                  |
-| `PATCH …/threads/:threadId/task`                  | Change the task by `{ change }`, a `Status`, `Assignee`, or `Priority` change with `from` and `to`, under `task.update`; returns it. A stale `from` is 409 `Changed`.                       |
+| `POST …/threads/:threadId/task`                   | Make the conversation a task from `{ status?, priority?, assignee? }` under `task.create` on the group; 201. A thread that is a task is 409 (`AlreadyTask`).                                |
+| `PATCH …/threads/:threadId/task`                  | Change the task by `{ change }`, a `Status`, `Assignee`, or `Priority` change with `from` and `to`, under `task.update`; returns it. A stale `from` is 409 `CoreError.Changed`.             |
 
-An assignee who cannot take part in the thread is a 409 `ParticipantUnavailable`, and assigning an
-agent needs `agent.use` on it (403 otherwise). Timeline items `{ activity }` of kind `task.created`
-carry the task's initial values in their details, and `task.updated` the change.
+An assignee who cannot take part in the thread is a 409 `CoreError.Conflict`
+(`ParticipantUnavailable`), and assigning an agent needs `agent.use` on it (403 otherwise). Timeline
+items `{ activity }` of kind `task.created` carry the task's initial values in their details, and
+`task.updated` the change.
 
 ### Connections
 
@@ -259,7 +261,7 @@ rules.
 | `POST …/connections`                       | Add one from `{ integration, name, settings, auth, apiKey? }`, with the key exactly when `auth` is `apiKey`; 201 with it.                     |
 | `GET …/connections/:connectionId`          | One connection.                                                                                                                               |
 | `GET …/connections/:connectionId/models`   | The models its integration offers, as `{ listed, unlisted }`: those it lists from the catalog, and whether it takes a model it does not list. |
-| `POST …/connections/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionService.Changed`.                                  |
+| `POST …/connections/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `CoreError.Changed`.                                          |
 | `PUT …/connections/:connectionId/settings` | Replace its settings from `{ settings }`.                                                                                                     |
 | `PUT …/connections/:connectionId/key`      | Replace its key with `{ apiKey }`.                                                                                                            |
 | `POST …/connections/:connectionId/check`   | Ask its system whether it works as set up, answering `Connection.Health`; stores nothing.                                                     |
@@ -271,9 +273,10 @@ and booleans with titles and descriptions, for a client to render. A connection 
 `Invalid` with what the integration refused, or `Uninstalled`), and `manageable`, whether the caller
 may change it. A connection the caller may not read answers 404 as a missing one does, as does a
 retried create whose connection was removed since. An integration this host lacks is 422
-`ConnectionService.UnknownIntegration`; settings or a way of authenticating it does not take are 422
-`InvalidConnection`; a key for a connection that authenticates with nothing is 422 `Keyless`. A host
-without a credential key answers a key with 503 `ConnectionService.CredentialsUnavailable`.
+`CoreError.Invalid` (`UnknownIntegration`); settings or a way of authenticating it does not take are
+422 (`IntegrationRefused`); a key for a connection that authenticates with nothing is 422
+(`Keyless`). A host
+without a credential key answers a key with 503 `CoreError.Unavailable` (`CredentialsUnavailable`).
 
 ### Agents
 
@@ -282,13 +285,13 @@ read agents; the built-in administrator tier adds, configures, and renames them.
 removal are its membership's, through `assignments` and `DELETE …/members/:memberId`. The
 [core section](../core/README.md#agents) describes the rules.
 
-| Endpoint                              | Operation                                                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `GET …/agents`                        | The agents the caller may read, by name.                                                                            |
-| `POST …/agents`                       | Add one from `{ name, roleId, instructions, harness, model, sandbox }`; 201 with it.                                |
-| `GET …/agents/:agentId`               | One agent.                                                                                                          |
-| `PUT …/agents/:agentId/configuration` | Replace `{ instructions, harness, model, sandbox }` as a whole.                                                     |
-| `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentService.Changed`. |
+| Endpoint                              | Operation                                                                                                        |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `GET …/agents`                        | The agents the caller may read, by name.                                                                         |
+| `POST …/agents`                       | Add one from `{ name, roleId, instructions, harness, model, sandbox }`; 201 with it.                             |
+| `GET …/agents/:agentId`               | One agent.                                                                                                       |
+| `PUT …/agents/:agentId/configuration` | Replace `{ instructions, harness, model, sandbox }` as a whole.                                                  |
+| `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `CoreError.Changed`. |
 
 `harness` is `{ _tag: "Connection", connectionId }` or `{ _tag: "Auto" }`; `model` is
 `{ connectionId, id, effort? }`, a model `GET …/connections/:connectionId/models` offers; and
@@ -297,8 +300,8 @@ membership's `memberId` and name, `configurable` and `usable` (whether the calle
 the caller, and its readiness, `Ready` or `Incomplete` with its issues. One the caller may not read,
 or whose membership ended, answers 404, as does a retried create whose agent was removed since. A
 connection that is missing or removed, or that the caller may not read and use, is 422
-`AgentService.ConnectionUnavailable` naming the part; a setup that could not run is 422
-`AgentService.Incomplete` with its issues, except that an agent on `Auto` may wait for a harness.
+`CoreError.Invalid` (`ConnectionUnusable`) naming the part; a setup that could not run is 422
+(`Incomplete`) with its issues, except that an agent on `Auto` may wait for a harness.
 The initial role follows the delegation rules, as for agents.
 
 ### Turns
@@ -307,13 +310,13 @@ Turn paths sit under `/workspaces/:workspaceId` and require active membership. A
 turn of an agent on the work asked of it in a thread; the
 [core turns section](../core/README.md#turns) describes the rules.
 
-| Endpoint                         | Operation                                                                                     |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `GET …/active-turns`             | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
-| `GET …/turns/:turnId`            | One turn.                                                                                     |
-| `GET …/turns/:turnId/log/events` | Follow the turn's log as server-sent events, until the turn ends; see below.                  |
-| `POST …/turns/:turnId/cancel`    | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
-| `POST …/turns/:turnId/retry`     | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
+| Endpoint                         | Operation                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET …/active-turns`             | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.                 |
+| `GET …/turns/:turnId`            | One turn.                                                                                        |
+| `GET …/turns/:turnId/log/events` | Follow the turn's log as server-sent events, until the turn ends; see below.                     |
+| `POST …/turns/:turnId/cancel`    | Ask an active turn to stop; a queued one stops at once. A finished one is 409 (`TurnNotActive`). |
+| `POST …/turns/:turnId/retry`     | Run a failed or stopped turn again as a new turn, 201; otherwise 409 (`NotRetryable`) with why.  |
 
 Following a turn's log streams `Turn.LogMessage`s as the log grows, for a caller who may open the
 thread. `Opened` starts every subscription with the log's `items` as they stand: the messages the
@@ -322,9 +325,9 @@ that stopped short. `Changed` carries `changes`, each an `index` and the `item` 
 (`responseId`, `part`, `offset`, `text`) carries more of the step being written before it finishes,
 continuing its part at `offset` characters; it may be missed, and the step replaces it. `Ended`
 follows the turn's end once every item is delivered, and the stream closes. A stream that cannot go
-on, including once the caller can no longer open the thread, ends with `Turn.LogUnavailable`, and
-following again opens with the items as they stand. Log streams count within the same limits as
-change streams.
+on, including once the caller can no longer open the thread, ends with `CoreError.Unavailable`
+(`LogInterrupted`), and following again opens with the items as they stand. Log streams count within
+the same limits as change streams.
 
 A turn reads as `Turn.View`: its status, how far into the thread its input reaches
 (`acceptedThroughSequence`), the harness, model, and sandbox it started on (`selection`), the turn
@@ -339,26 +342,28 @@ Channel paths sit under `/workspaces/:workspaceId` and require active membership
 route. A channel is a connection's external conversations as threads in one group;
 [channels](../../docs/thread-workflows.md#channels) describes the rules.
 
-| Endpoint                              | Operation                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/channels`                      | The channels the caller may read, by name.                                                                                                                                                                                                                                                                                                                |
-| `POST …/channels`                     | Create a channel from `{ connectionId, groupId, name, opensTasks }` under `channel.create`; 201. A connection that gives no channels, or that the caller may not use, is 422 `ConnectionUnavailable`; a group the caller does not belong to is 404 `GroupNotFound`.                                                                                       |
-| `GET …/channels/:channelId`           | One channel; one the caller may not read, or removed, is 404.                                                                                                                                                                                                                                                                                             |
-| `POST …/channels/:channelId/redirect` | Send new conversations to `{ groupId }` under `channel.manage`; returns the channel.                                                                                                                                                                                                                                                                      |
-| `DELETE …/channels/:channelId`        | Remove the channel under `channel.manage`; 204. Its threads and their bindings remain.                                                                                                                                                                                                                                                                    |
-| `GET …/threads/:threadId/channel`     | The conversation the thread came from: its channel, group, `conversation`, and when it was bound. A thread that came through no channel is 404 `NotBound`.                                                                                                                                                                                                |
-| `POST …/channels/:channelId/events`   | What the channel's external system sends, as text with its headers, with no session. The channel's transport verifies it and intake takes it in; the answer is the text the transport says to give, or empty. A request the transport rejects is 400 `Rejected`, a system that cannot be reached 503 `Unavailable`, and a channel missing or removed 404. |
+| Endpoint                              | Operation                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/channels`                      | The channels the caller may read, by name.                                                                                                                                                                                                                                                                                                                                                  |
+| `POST …/channels`                     | Create a channel from `{ connectionId, groupId, name, opensTasks }` under `channel.create`; 201. A connection that gives no channels, or that the caller may not use, is 422 `CoreError.Invalid` (`ConnectionUnusable`); a group the caller does not belong to is 404 `CoreError.NotFound`.                                                                                                 |
+| `GET …/channels/:channelId`           | One channel; one the caller may not read, or removed, is 404.                                                                                                                                                                                                                                                                                                                               |
+| `POST …/channels/:channelId/redirect` | Send new conversations to `{ groupId }` under `channel.manage`; returns the channel.                                                                                                                                                                                                                                                                                                        |
+| `DELETE …/channels/:channelId`        | Remove the channel under `channel.manage`; 204. Its threads and their bindings remain.                                                                                                                                                                                                                                                                                                      |
+| `GET …/threads/:threadId/channel`     | The conversation the thread came from: its channel, group, `conversation`, and when it was bound. A thread that came through no channel is 404 `CoreError.NotFound`.                                                                                                                                                                                                                        |
+| `POST …/channels/:channelId/events`   | What the channel's external system sends, as text with its headers, with no session. The channel's transport verifies it and intake takes it in; the answer is the text the transport says to give, or empty. A request the transport rejects is 422 `CoreError.Invalid` (`Unverified`), a system that cannot be reached 503 `CoreError.Unavailable`, and a channel missing or removed 404. |
 
 ## Errors
 
 Workspace IDs travel in the path so a host can route a request to the right workspace before reading
-its body. Status codes follow `ApiErrors`: not a member, denied delegation and wrong recipients are
-403; missing records are 404; ownership protection, stale assignment changes, inactive recipients,
-repeated removal, existing membership, members who cannot take part, fixed direct groups, and
-storage conflicts are 409; consumed or expired invitations are 410; rejected input, expiry, or
-permission names are 400; and an uncertain commit is 500 with its commit ID. The gateway's public
-outcomes are listed in [gateway](../gateway/README.md#public-outcomes); `ApiErrors` is this
-contract's error namespace.
+its body. Status codes follow `ApiErrors`, one for each of core's kinds: `CoreError.Denied`, a
+refusal of the caller with its reason, is 403; `CoreError.NotFound` is 404; `CoreError.Changed`, a
+stale expectation, and `CoreError.Conflict`, a request the state of what it acts on refuses, with
+its reason, are 409; `CoreError.Invalid`, a request that cannot be done as asked whatever the
+state, such as values core refuses, a fixed roster, or a setup that cannot run, is 422; and
+`CoreError.Unavailable`, what cannot be reached now, such as storage another writer held, is 503. A
+request the contract itself cannot read is 400, too many streams 429, and an uncertain commit 500
+with its commit ID. The gateway's public outcomes are listed in
+[gateway](../gateway/README.md#public-outcomes); `ApiErrors` is this contract's error namespace.
 
 ## Serving the contract
 
@@ -408,7 +413,8 @@ keys.
 
 Both streams share `Streams`, which also contains unexpected failures: Effect's SSE encoder would
 send a stream's whole failure cause to the client, so the handler logs it and ends the change feed
-with `ChangeFeed.Unavailable`, or a turn log with `Turn.LogUnavailable`, alone.
+with `CoreError.Unavailable` (`ChangeFeedInterrupted`), or a turn log with `CoreError.Unavailable`
+(`LogInterrupted`), alone.
 
 Each process serves a limited number of streams at once, change feeds and turn logs together.
 `Streams.Limits`, a context reference, allows a thousand per workspace and twenty per member of it
@@ -427,10 +433,8 @@ first, begins the drain.
 Each endpoint group has two modules: one declaring it, such as `InvitationsGroup.ts`, and one
 implementing it, `InvitationsHandlers.ts`, kept apart so a client that imports a group loads no
 handler. Keep `Api` as the aggregate contract, group classes such as `MembersGroup` as
-declarations, and `ApiErrors` as the canonical error namespace. Resource-specific names such as
-`InvitationNotOwner`, `InvitationUnavailable`, and `InvitationInvalidExpiry` identify the source of
-an outcome within that shared namespace. Their serialized error tags stay the tags declared by core
-or gateway.
+declarations, and `ApiErrors` as the canonical error namespace. Each of core's kinds keeps
+its name there, as `ApiErrors.Conflict`, and its serialized tag stays the one core declares.
 
 Public response schemas use stable identifiers in OpenAPI. Status-specific variants are named here,
 such as `CreatedWorkspace` and `IssuedWorkspaceInvitation`. The gateway's codecs encode a session's

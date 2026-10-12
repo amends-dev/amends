@@ -22,45 +22,9 @@ import * as ReadState from "./ReadState.ts";
 import * as ReadStateStore from "./ReadStateStore.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import {
-  BeyondTimeline,
-  GroupNotFound,
-  HumanRequired,
-  ThreadNotFound,
-} from "./internal/read-state-errors.ts";
 import * as Store from "../journal/Store.ts";
-export {
-  /**
-   * The requested position is past the thread's latest recorded activity.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  BeyondTimeline,
-  /**
-   * The group is missing, or the actor is not a member of it; the two are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GroupNotFound,
-  /**
-   * The acting member is an agent: only people keep read state, and agents' turns track their input
-   * progress.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanRequired,
-  /**
-   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
-   * told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ThreadNotFound,
-} from "./internal/read-state-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What marking a thread or a group read can fail with: the outcomes above, and the
@@ -71,16 +35,13 @@ export {
  */
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | Exclude<GroupQuery.AudienceError, GroupQuery.NotMember>
-  | ThreadActivityStore.Failure
-  | ReadStateStore.Failure
-  | ReadStateStore.Conflict
+  | ThreadQuery.AccessError
+  | GroupQuery.AudienceError
+  | StoreError.StoreError
   | Schema.SchemaError
-  | HumanRequired
-  | ThreadNotFound
-  | GroupNotFound
-  | BeyondTimeline;
+  | CoreError.Denied
+  | CoreError.NotFound
+  | CoreError.Conflict;
 
 /**
  * The read-state operations, one of `Core.Operations`.
@@ -127,7 +88,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
   const requireHuman = Effect.fnUntraced(function* () {
     const actor = yield* Actor.Actor;
     if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-      return yield* new HumanRequired({ memberId: actor.memberId });
+      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
     return actor.memberId;
   });
   const markThreadRead = Effect.fn("ReadStateService.markThreadRead")(function* (
@@ -135,13 +96,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkThreadReadInput)(input);
     const memberId = yield* requireHuman();
-    const thread = yield* threadQuery
-      .requireAccess(request.threadId)
-      .pipe(
-        Effect.catchTag("ThreadQuery.NotFound", (error) =>
-          Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
-        ),
-      );
+    const thread = yield* threadQuery.requireAccess(request.threadId);
     yield* authorization.require([
       Requirement.make(ThreadPermissions.Read, {
         _tag: "Thread",
@@ -152,10 +107,12 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
     const found = yield* threadActivityStore.latest(thread.id);
     const latest = Option.isNone(found) ? 0 : found.value.sequence;
     if (request.throughSequence > latest)
-      return yield* new BeyondTimeline({
-        threadId: thread.id,
-        throughSequence: request.throughSequence,
-        latestSequence: latest,
+      return yield* new CoreError.Conflict({
+        reason: new CoreError.BeyondTimeline({
+          threadId: thread.id,
+          throughSequence: request.throughSequence,
+          latestSequence: latest,
+        }),
       });
     const position: ReadState.ThreadPosition = {
       workspaceId,
@@ -182,13 +139,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkGroupReadInput)(input);
     const memberId = yield* requireHuman();
-    yield* groupQuery
-      .requireAudience(request.groupId)
-      .pipe(
-        Effect.catchTag("GroupQuery.NotMember", () =>
-          Effect.fail(new GroupNotFound({ groupId: request.groupId })),
-        ),
-      );
+    yield* groupQuery.requireAudience(request.groupId);
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, {
         _tag: "Group",

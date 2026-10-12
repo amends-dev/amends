@@ -33,6 +33,7 @@ import * as MemberStore from "../../src/workspace/MemberStore.ts";
 import * as Member from "../../src/workspace/Member.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
+import * as StoreError from "../../src/journal/StoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
@@ -183,9 +184,8 @@ it.effect("authorization reads each caller's actor and uses an agent's own grant
       .transaction(authorization.require([removeBob]).pipe(Effect.flip))
       .pipe(Effect.provideService(Actor.Actor, agent));
     expect(agentDenied).toMatchObject({
-      _tag: "Authorization.Denied",
-      memberId: agent.memberId,
-      requirement: removeBob,
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", memberId: agent.memberId, requirement: removeBob },
     });
     yield* fixture.store
       .transaction(authorization.require([readBob]))
@@ -193,7 +193,10 @@ it.effect("authorization reads each caller's actor and uses an agent's own grant
     const humanDenied = yield* fixture.store
       .transaction(authorization.require([readBob]).pipe(Effect.flip))
       .pipe(Effect.provideService(Actor.Actor, alice));
-    expect(humanDenied).toMatchObject({ _tag: "Authorization.Denied", memberId: alice.memberId });
+    expect(humanDenied).toMatchObject({
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", memberId: alice.memberId },
+    });
   }),
 );
 
@@ -202,8 +205,8 @@ it.effect("authorization requires a matching permission and scope for the actual
     const fixture = yield* make();
     yield* seed(fixture, [alice]);
     expect(yield* run(fixture, Effect.flip(check([readBob])))).toMatchObject({
-      _tag: "Authorization.Denied",
-      requirement: readBob,
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", requirement: readBob },
     });
     yield* seed(
       fixture,
@@ -212,12 +215,12 @@ it.effect("authorization requires a matching permission and scope for the actual
     );
     yield* run(fixture, check([readBob]));
     expect(yield* run(fixture, Effect.flip(check([readCharlie])))).toMatchObject({
-      _tag: "Authorization.Denied",
-      requirement: readCharlie,
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", requirement: readCharlie },
     });
     expect(yield* run(fixture, Effect.flip(check([removeBob])))).toMatchObject({
-      _tag: "Authorization.Denied",
-      requirement: removeBob,
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", requirement: removeBob },
     });
     yield* seed(
       fixture,
@@ -234,7 +237,8 @@ it.effect("authorization requires a matching permission and scope for the actual
     );
     yield* run(fixture, check([removeBob, removeCharlie, createInWorkspace]));
     expect(yield* run(fixture, Effect.flip(check([readCharlie])))).toMatchObject({
-      _tag: "Authorization.Denied",
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted" },
     });
   }),
 );
@@ -269,8 +273,8 @@ it.effect("every requirement must be satisfied across role and direct assignment
     expect(
       yield* run(fixture, Effect.flip(check([readBob, removeBob, removeCharlie]))),
     ).toMatchObject({
-      _tag: "Authorization.Denied",
-      requirement: removeCharlie,
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", requirement: removeCharlie },
     });
   }),
 );
@@ -297,7 +301,8 @@ it.effect("permitted reports each requirement in order without failing on denial
     expect(yield* run(fixture, permitted([readBob]), bob)).toEqual([false]);
     // The actor check still fails rather than reporting denials.
     expect(yield* run(fixture, Effect.flip(permitted([readBob])), charlie)).toMatchObject({
-      _tag: "Authorization.InvalidActor",
+      _tag: "CoreError.Denied",
+      reason: { _tag: "InvalidActor" },
     });
   }),
 );
@@ -334,12 +339,12 @@ it.effect(
       yield* run(fixture, check([removeBob]));
       // Possessing an administrator-tier permission does not imply viewer-tier access.
       expect(yield* run(fixture, Effect.flip(check([readBob])))).toMatchObject({
-        _tag: "Authorization.Denied",
-        requirement: readBob,
+        _tag: "CoreError.Denied",
+        reason: { _tag: "NotGranted", requirement: readBob },
       });
       expect(yield* run(fixture, Effect.flip(check([removeCharlie])))).toMatchObject({
-        _tag: "Authorization.Denied",
-        requirement: removeCharlie,
+        _tag: "CoreError.Denied",
+        reason: { _tag: "NotGranted", requirement: removeCharlie },
       });
     }),
 );
@@ -352,9 +357,8 @@ it.effect(
       yield* seed(fixture, [], [direct("remove", alice.memberId, MemberPermissions.Remove)]);
       for (const requirements of [[], [removeBob]]) {
         expect(yield* run(fixture, Effect.flip(check(requirements)))).toMatchObject({
-          _tag: "Authorization.InvalidActor",
-          memberId: alice.memberId,
-          reason: "membership-missing",
+          _tag: "CoreError.Denied",
+          reason: { _tag: "InvalidActor", memberId: alice.memberId, reason: "membership-missing" },
         });
       }
       yield* seed(fixture, [alice]);
@@ -363,9 +367,8 @@ it.effect(
       yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
       for (const requirements of [[], [removeBob]]) {
         expect(yield* run(fixture, Effect.flip(check(requirements)))).toMatchObject({
-          _tag: "Authorization.InvalidActor",
-          memberId: alice.memberId,
-          reason: "membership-removed",
+          _tag: "CoreError.Denied",
+          reason: { _tag: "InvalidActor", memberId: alice.memberId, reason: "membership-removed" },
         });
       }
     }),
@@ -382,8 +385,8 @@ it.effect("acting identity must match both the membership's identity kind and ID
     for (const identity of wrongIdentities) {
       const mismatched = Actor.Actor.of({ workspaceId, memberId: alice.memberId, identity });
       expect(yield* run(fixture, Effect.flip(check([removeBob])), mismatched)).toMatchObject({
-        _tag: "Authorization.InvalidActor",
-        reason: "identity-mismatch",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "InvalidActor", reason: "identity-mismatch" },
       });
     }
   }),
@@ -512,7 +515,7 @@ it.effect(
             }),
           ),
         );
-        expect(denied._tag).toBe("Authorization.Denied");
+        expect(denied._tag).toBe("CoreError.Denied");
         expect(yield* fixture.snapshot).toEqual(before);
         yield* journal
           .publish(RoleFacts.PermissionsChanged, {
@@ -523,7 +526,7 @@ it.effect(
           .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         expect(
           yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
-        ).toMatchObject({ _tag: "Authorization.Denied" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
         yield* journal
           .publish(RoleFacts.PermissionsChanged, {
             roleId,
@@ -536,7 +539,7 @@ it.effect(
           .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         expect(
           yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
-        ).toMatchObject({ _tag: "Authorization.Denied" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
         yield* journal
           .publish(AssignmentFacts.Created, {
             assignmentId: Assignment.Id.make("reassigned"),
@@ -558,8 +561,8 @@ it.effect(
           ),
         );
         expect(inactive).toMatchObject({
-          _tag: "Authorization.InvalidActor",
-          reason: "membership-removed",
+          _tag: "CoreError.Denied",
+          reason: { _tag: "InvalidActor", reason: "membership-removed" },
         });
         expect(yield* fixture.snapshot).toEqual(beforeRemoval);
         yield* journal
@@ -567,7 +570,10 @@ it.effect(
           .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         expect(
           yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
-        ).toMatchObject({ _tag: "Authorization.InvalidActor", reason: "membership-removed" });
+        ).toMatchObject({
+          _tag: "CoreError.Denied",
+          reason: { _tag: "InvalidActor", reason: "membership-removed" },
+        });
       }).pipe(
         Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
         Effect.provideService(Store.Store, fixture.store),
@@ -584,7 +590,7 @@ it.effect("a membership storage failure fails authorization", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [alice], [direct("read", alice.memberId, MemberPermissions.Read)]);
-    const failure = new MemberStore.Failure({ operation: "get", cause: "unavailable" });
+    const failure = StoreError.failed("MemberStore", "get")("unavailable");
     expect(
       yield* run(fixture, Effect.flip(check([readBob])), alice, {
         members: { get: () => Effect.fail(failure) },
@@ -615,7 +621,7 @@ it.effect(
           }),
         ],
       );
-      const failure = new RoleStore.Failure({ operation: "get", cause: "unavailable" });
+      const failure = StoreError.failed("RoleStore", "get")("unavailable");
       expect(
         yield* run(fixture, Effect.flip(check([readBob])), alice, {
           roles: { get: () => Effect.fail(failure) },

@@ -25,72 +25,11 @@ import * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as Request from "../request/Request.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
-import {
-  Changed,
-  Deleted,
-  HumanAuthorRequired,
-  MessageNotFound,
-  NotAuthor,
-  NotFound,
-  ParticipantUnavailable,
-} from "./internal/thread-message-errors.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
-export {
-  /**
-   * The message's revision is no longer the one the editor expected: someone edited it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-  /**
-   * The message was deleted, so it has no text to edit.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Deleted,
-  /**
-   * An agent asked to publish; only people publish through the service, and agents' messages come
-   * from their turns.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanAuthorRequired,
-  /**
-   * The message is missing, in another workspace, or in a thread outside the actor's groups; the
-   * three are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MessageNotFound,
-  /**
-   * Someone other than the message's author asked to edit it; only the author edits a message.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotAuthor,
-  /**
-   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
-   * told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * A mentioned member cannot take part: they are missing, inactive, or not in the group.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ParticipantUnavailable,
-} from "./internal/thread-message-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What publishing can fail with: the outcomes above, and the failures of what
@@ -100,15 +39,13 @@ export {
  * @since 0.1.0
  */
 export type Error =
-  | ReadStateStore.Failure
-  | ReadStateStore.Conflict
+  | StoreError.StoreError
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | NotFound
-  | ParticipantUnavailable
-  | HumanAuthorRequired
-  | ThreadMessageStore.Failure;
+  | ThreadQuery.AccessError
+  | ThreadCommand.Error
+  | CoreError.NotFound
+  | CoreError.Conflict
+  | CoreError.Denied;
 
 /**
  * What editing a message can fail with.
@@ -118,15 +55,13 @@ export type Error =
  */
 export type EditError =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | MessageNotFound
-  | HumanAuthorRequired
-  | NotAuthor
-  | Deleted
-  | Changed
-  | ParticipantUnavailable
-  | ThreadMessageStore.Failure;
+  | ThreadQuery.AccessError
+  | ThreadCommand.Error
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Changed
+  | StoreError.StoreError;
 
 /**
  * What deleting a message can fail with.
@@ -136,11 +71,11 @@ export type EditError =
  */
 export type DeleteError =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | MessageNotFound
-  | HumanAuthorRequired
-  | ThreadMessageStore.Failure;
+  | ThreadQuery.AccessError
+  | Exclude<ThreadCommand.Error, CoreError.Conflict>
+  | CoreError.NotFound
+  | CoreError.Denied
+  | StoreError.StoreError;
 
 /**
  * What saying one is typing can fail with.
@@ -148,10 +83,7 @@ export type DeleteError =
  * @category errors
  * @since 0.1.0
  */
-export type TypingError =
-  | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | NotFound;
+export type TypingError = Authorization.Error | ThreadQuery.AccessError | CoreError.NotFound;
 
 /**
  * The message operations, one of `Core.Operations`.
@@ -175,9 +107,9 @@ export class ThreadMessageService extends Context.Service<
     /**
      * Replace the text and mentions of a message the actor wrote, at its next revision, under
      * `thread.publish` on its thread. The same text and mentions again record nothing; otherwise a
-     * revision other than `expectedRevision` is `Changed`, and nothing is recorded. Members the edit
-     * newly mentions join and are told, under the rules of a reply; a deleted message is `Deleted`.
-     * Returns the message as edited.
+     * revision other than `expectedRevision` is `CoreError.Changed`, and nothing is recorded.
+     * Members the edit newly mentions join and are told, under the rules of a reply; a deleted
+     * message is `Deleted`. Returns the message as edited.
      */
     readonly edit: (
       input: ThreadMessage.EditInput,
@@ -256,14 +188,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
 
   /** The thread, once the actor may read it and publish there. */
   const requirePublishable = Effect.fnUntraced(function* (threadId: Thread.Id) {
-    const thread = yield* threadQuery
-      .requireAccess(threadId)
-      .pipe(
-        Effect.catchTag(
-          "ThreadQuery.NotFound",
-          (error) => new NotFound({ threadId: error.threadId }),
-        ),
-      );
+    const thread = yield* threadQuery.requireAccess(threadId);
     yield* authorization.require([
       Requirement.make(ThreadMessagePermissions.Publish, {
         _tag: "Thread",
@@ -284,10 +209,16 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
    */
   const requireMessage = Effect.fnUntraced(function* (messageId: ThreadMessage.Id) {
     const found = yield* threadMessageStore.get(messageId);
-    if (Option.isNone(found)) return yield* new MessageNotFound({ messageId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "ThreadMessage", id: messageId });
     const thread = yield* threadQuery
       .requireAccess(found.value.threadId)
-      .pipe(Effect.catchTag("ThreadQuery.NotFound", () => new MessageNotFound({ messageId })));
+      .pipe(
+        Effect.catchTag(
+          "CoreError.NotFound",
+          () => new CoreError.NotFound({ resource: "ThreadMessage", id: messageId }),
+        ),
+      );
     return { message: found.value, thread };
   });
 
@@ -305,7 +236,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const thread = yield* requirePublishable(request.threadId);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
       const messageId = yield* deriveReplyId(options.requestKey);
       const retried = yield* findRetriedReply(options.requestKey, messageId);
       if (Option.isSome(retried)) return retried.value;
@@ -333,7 +264,9 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           continue;
         const entry = eligible.get(reference.memberId);
         if (entry === undefined)
-          return yield* new ParticipantUnavailable({ memberId: reference.memberId });
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.ParticipantUnavailable({ memberId: reference.memberId }),
+          });
         // Mentioning an agent directs it; replying where it already takes part does not.
         if (
           Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity) &&
@@ -347,21 +280,14 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
             }),
           ]);
       }
-      const published = yield* threadCommand
-        .publishMessage({
-          ...request,
-          messageId,
-          author: { _tag: "Member", memberId: actor.memberId },
-          via: null,
-          participants: selected,
-          occurredAt: yield* DateTime.now,
-        })
-        .pipe(
-          Effect.catchTag(
-            "ThreadCommand.Unavailable",
-            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-          ),
-        );
+      const published = yield* threadCommand.publishMessage({
+        ...request,
+        messageId,
+        author: { _tag: "Member", memberId: actor.memberId },
+        via: null,
+        participants: selected,
+        occurredAt: yield* DateTime.now,
+      });
       // Replying reads the thread through the author's own message.
       yield* readStateStore.markThreadRead(
         {
@@ -385,8 +311,11 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const { message, thread } = yield* requireMessage(request.messageId);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      if (!wroteBy(message, actor)) return yield* new NotAuthor({ messageId: message.id });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
+      if (!wroteBy(message, actor))
+        return yield* new CoreError.Denied({
+          reason: new CoreError.NotAuthor({ messageId: message.id }),
+        });
       yield* authorization.require([
         Requirement.make(ThreadMessagePermissions.Publish, {
           _tag: "Thread",
@@ -395,12 +324,14 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
         }),
       ]);
       if (!ThreadMessage.Content.isAnyOf(["Text"])(message.content))
-        return yield* new Deleted({ messageId: message.id });
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.Deleted({ messageId: message.id }),
+        });
       const content = message.content;
       if (content.text === request.text && sameMentions(content.mentions, request.mentions))
         return message;
       if (content.revision !== request.expectedRevision)
-        return yield* new Changed({ messageId: message.id });
+        return yield* new CoreError.Changed({ resource: "ThreadMessage", id: message.id });
       // Those the edit newly mentions must be able to take part, as a reply's mentions must, and
       // newly mentioning an agent not yet taking part directs it, so needs the author's agent use.
       const joining = request.mentions.filter((memberId) => !content.mentions.includes(memberId));
@@ -413,7 +344,10 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const eligible = yield* threadQuery.eligibleMembers(thread.groupId, joining);
       for (const memberId of joining) {
         const entry = eligible.get(memberId);
-        if (entry === undefined) return yield* new ParticipantUnavailable({ memberId });
+        if (entry === undefined)
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.ParticipantUnavailable({ memberId }),
+          });
         if (
           Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity) &&
           !participating.has(memberId)
@@ -422,19 +356,12 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
             Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
           ]);
       }
-      const edited = yield* threadCommand
-        .editMessage({
-          message,
-          text: request.text,
-          mentions: request.mentions,
-          occurredAt: yield* DateTime.now,
-        })
-        .pipe(
-          Effect.catchTag(
-            "ThreadCommand.Unavailable",
-            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-          ),
-        );
+      const edited = yield* threadCommand.editMessage({
+        message,
+        text: request.text,
+        mentions: request.mentions,
+        occurredAt: yield* DateTime.now,
+      });
       return edited.message;
     },
     Publication.withActor,
@@ -448,7 +375,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const { message, thread } = yield* requireMessage(id);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
       // The author deletes their own message as they published it; anyone else moderates the group.
       yield* authorization.require([
         wroteBy(message, actor)
@@ -467,7 +394,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const deleted = yield* threadCommand
         .deleteMessage({ message, occurredAt: yield* DateTime.now })
         .pipe(
-          Effect.catchTag("ThreadCommand.Unavailable", () =>
+          Effect.catchTag("CoreError.Conflict", () =>
             Effect.die("A deletion admits no participant"),
           ),
         );

@@ -27,6 +27,7 @@ import * as ChangeFeedEvents from "./ChangeFeedEvents.ts";
 import * as ChangeFeedSource from "./ChangeFeedSource.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * The change feed for the acting member.
@@ -48,8 +49,8 @@ export class ChangeFeedService extends Context.Service<
     readonly watch: (
       options?: ChangeFeed.WatchOptions,
     ) => Effect.Effect<
-      Stream.Stream<ChangeFeed.Message, ChangeFeed.Unavailable>,
-      Authorization.Error | ChangeFeed.Unavailable | Schema.SchemaError,
+      Stream.Stream<ChangeFeed.Message, CoreError.Unavailable>,
+      Authorization.Error | CoreError.Unavailable | Schema.SchemaError,
       Actor.Actor | Scope.Scope
     >;
   }
@@ -130,7 +131,9 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
     // reloads them. Read first, a change committed in between would be neither.
     yield* authorization.require([]);
     let access = yield* resolveAccess(actor).pipe(
-      Effect.mapError(() => new ChangeFeed.Unavailable({})),
+      Effect.mapError(
+        () => new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() }),
+      ),
     );
     const ready = ChangeFeed.Message.cases.Ready.make({
       workspaceId,
@@ -165,9 +168,19 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
                 p.access.memberId === actor.memberId,
             );
             return removed
-              ? message.pipe(Stream.concat(Stream.fail(new ChangeFeed.Unavailable({}))))
+              ? message.pipe(
+                  Stream.concat(
+                    Stream.fail(
+                      new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() }),
+                    ),
+                  ),
+                )
               : message;
-          }).pipe(Effect.mapError(() => new ChangeFeed.Unavailable({}))),
+          }).pipe(
+            Effect.mapError(
+              () => new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() }),
+            ),
+          ),
         ),
       ),
     );

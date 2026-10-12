@@ -28,10 +28,10 @@ describe("invitation policy", () => {
               yield* Effect.flip(
                 Operations.acceptInvitation(a.id, charlie.id, invitation.details.id),
               ),
-            ).toMatchObject({ _tag: "InvitationService.NotRecipient" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotRecipient" } });
             expect(
               yield* Effect.flip(Operations.acceptInvitation(b.id, bob.id, invitation.details.id)),
-            ).toMatchObject({ _tag: "InvitationService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
               before,
             );
@@ -40,7 +40,7 @@ describe("invitation policy", () => {
               yield* Effect.flip(
                 Operations.acceptInvitation(a.id, charlie.id, invitation.details.id),
               ),
-            ).toMatchObject({ _tag: "InvitationService.NotRecipient" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotRecipient" } });
             expect(yield* (yield* boundTo(b.id)).members.findActive(bob)).toEqual(Option.none());
           }),
         ),
@@ -57,7 +57,7 @@ describe("invitation policy", () => {
           const expiresAt = DateTime.add(now, { seconds: 30 });
           expect(
             yield* at(now, Effect.flip(Operations.invite(workspace.id, alice, request(now)))),
-          ).toMatchObject({ _tag: "InvitationService.InvalidExpiry" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "PastExpiry" } });
           const invitation = yield* at(
             now,
             Operations.invite(workspace.id, alice, request(expiresAt)),
@@ -67,7 +67,10 @@ describe("invitation policy", () => {
               expiresAt,
               Effect.flip(Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id)),
             ),
-          ).toMatchObject({ _tag: "InvitationService.Unavailable", reason: "expired" });
+          ).toMatchObject({
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "InvitationClosed", reason: "expired" },
+          });
           expect(yield* (yield* boundTo(workspace.id)).members.findActive(bob)).toEqual(
             Option.none(),
           );
@@ -101,7 +104,7 @@ describe("invitation policy", () => {
                 request(yield* future, charlie.id, BuiltinRoles.AdministratorId),
               ),
             ),
-          ).toMatchObject({ _tag: "Delegation.Denied" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "OwnerRequired" } });
           yield* Operations.invite(workspace.id, bob, request(yield* future, charlie.id));
           expect(
             yield* Effect.flip(
@@ -111,7 +114,7 @@ describe("invitation policy", () => {
                 request(yield* future, charlie.id, BuiltinRoles.OwnerId),
               ),
             ),
-          ).toMatchObject({ _tag: "Delegation.OwnerProtected" });
+          ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "OwnerProtected" } });
         }),
       ),
     ),
@@ -176,10 +179,10 @@ describe("invitation policy", () => {
             );
             expect(failure._tag).toBe(
               change === "permission"
-                ? "Authorization.Denied"
+                ? "CoreError.Denied"
                 : change === "membership"
-                  ? "Authorization.InvalidActor"
-                  : "Delegation.Denied",
+                  ? "CoreError.Denied"
+                  : "CoreError.Denied",
             );
             expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
             expect(yield* bound.invitations.get(invitation.details.id)).toMatchObject({
@@ -212,7 +215,7 @@ describe("invitation policy", () => {
             yield* Effect.flip(
               Operations.invite(workspace.id, alice, request(yield* future, alice.id)),
             ),
-          ).toMatchObject({ _tag: "InvitationService.AlreadyMember" });
+          ).toMatchObject({ _tag: "CoreError.Conflict", reason: { _tag: "AlreadyJoined" } });
         }),
       ),
     ),

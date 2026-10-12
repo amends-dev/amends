@@ -258,7 +258,7 @@ function fixture() {
     }
     const id = path.split("/")[4];
     const stored = server.agents.find((agent) => agent.id === id);
-    if (!stored) return json({ _tag: "AgentService.NotFound", agentId: id }, 404);
+    if (!stored) return json({ _tag: "CoreError.NotFound", resource: "Agent", id }, 404);
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/configuration")) Object.assign(stored, body);
     return json(viewOf(stored));
@@ -462,7 +462,10 @@ it("says which connection the host refused and why a setup couldn't run, keeping
   f.view.create.fields().onModelChange("claude-opus-5-5");
   f.server.answers.push(
     json(
-      { _tag: "AgentService.ConnectionUnavailable", part: "model", connectionId: "openrouter" },
+      {
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "ConnectionUnusable", part: "model", connectionId: "openrouter" },
+      },
       422,
     ),
   );
@@ -471,7 +474,13 @@ it("says which connection the host refused and why a setup couldn't run, keeping
     expect(f.view.failure()).toEqual({ action: "create", error: "unavailable", part: "model" }),
   );
   f.server.answers.push(
-    json({ _tag: "AgentService.Incomplete", issues: [{ _tag: "SandboxRequired" }] }, 422),
+    json(
+      {
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "SandboxRequired" }] },
+      },
+      422,
+    ),
   );
   f.view.create.save();
   await waitFor(() =>
@@ -481,10 +490,27 @@ it("says which connection the host refused and why a setup couldn't run, keeping
       issues: [{ kind: "sandbox-required" }],
     }),
   );
-  f.server.answers.push(json({ _tag: "Delegation.Denied", reason: "administrator-role" }, 403));
+  f.server.answers.push(
+    json(
+      { _tag: "CoreError.Denied", reason: { _tag: "OwnerRequired", reason: "administrator-role" } },
+      403,
+    ),
+  );
   f.view.create.save();
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "role-denied" }));
-  expect(f.view.stale()).toBe(false);
+  // An owner the role would reach is refused the same.
+  f.server.answers.push(
+    json({ _tag: "CoreError.Conflict", reason: { _tag: "OwnerProtected" } }, 409),
+  );
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "role-denied" }));
+  // A role the workspace does not record is refused the same; anything else missing is gone.
+  f.server.answers.push(json({ _tag: "CoreError.NotFound", resource: "Role", id: "member" }, 404));
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "role-denied" }));
+  f.server.answers.push(json({ _tag: "CoreError.NotFound", resource: "Agent", id: "scout" }, 404));
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "gone" }));
   expect(f.view.create.name()).toBe("Scout");
 });
 
@@ -499,7 +525,9 @@ it("stops showing what the host refused as the fields that may resolve it change
     { _tag: "SandboxRequired" },
     { _tag: "Invalid", part: "model", description: "OpenRouter offers no model sonnet." },
   ];
-  f.server.answers.push(json({ _tag: "AgentService.Incomplete", issues: refused }, 422));
+  f.server.answers.push(
+    json({ _tag: "CoreError.Invalid", reason: { _tag: "Incomplete", issues: refused } }, 422),
+  );
   f.view.create.save();
   await waitFor(() => expect(f.view.failure()?.issues).toHaveLength(2));
 
@@ -518,7 +546,10 @@ it("stops showing what the host refused as the fields that may resolve it change
   // A connection the host refused stops showing once another is chosen, until the next save.
   f.server.answers.push(
     json(
-      { _tag: "AgentService.ConnectionUnavailable", part: "model", connectionId: "openrouter" },
+      {
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "ConnectionUnusable", part: "model", connectionId: "openrouter" },
+      },
       422,
     ),
   );
@@ -566,7 +597,9 @@ it("keeps a rename draft through a conflict, and removes an agent by its members
   await waitFor(() => expect(f.view.agent("reviewer")).toBeDefined());
   f.view.rename.setName("reviewer", "Critic");
   f.server.agents[0]!.name = "Reviewer two";
-  f.server.answers.push(json({ _tag: "AgentService.Changed", agentId: "reviewer" }, 409));
+  f.server.answers.push(
+    json({ _tag: "CoreError.Changed", resource: "Agent", id: "reviewer" }, 409),
+  );
   f.view.rename.save("reviewer");
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "rename", error: "changed" }));
   expect(f.view.stale()).toBe(true);

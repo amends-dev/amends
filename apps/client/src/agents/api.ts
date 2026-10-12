@@ -173,9 +173,16 @@ export const issueOf = (issue: Agent.Issue): AgentIssue => {
   }
 };
 
-const connectionUnavailable = Schema.is(ApiErrors.AgentConnectionUnavailable);
-const incomplete = Schema.is(ApiErrors.AgentIncomplete);
-const delegation = Schema.is(Schema.Union(ApiErrors.delegation));
+const invalid = Schema.is(ApiErrors.Invalid);
+/**
+ * The role the setup gives is refused: only the owner gives it, the owner is out of reach, or the
+ * role is not one this workspace gives.
+ */
+const roleRefused = (error: unknown) =>
+  (Schema.is(ApiErrors.Denied)(error) && error.reason._tag === "OwnerRequired") ||
+  (Schema.is(ApiErrors.Conflict)(error) && error.reason._tag === "OwnerProtected") ||
+  (Schema.is(ApiErrors.NotFound)(error) && error.resource === "Role") ||
+  (invalid(error) && error.reason._tag === "UnsupportedRole");
 
 /**
  * Why a change failed, telling apart a connection the setup names that the reader can't use, a
@@ -185,11 +192,12 @@ const delegation = Schema.is(Schema.Union(ApiErrors.delegation));
 export function agentsFailure(cause: Cause.Cause<unknown>): Omit<AgentsFailure, "action"> {
   for (const reason of cause.reasons) {
     if (!Cause.isFailReason(reason)) continue;
-    if (connectionUnavailable(reason.error))
-      return { error: "unavailable", part: reason.error.part };
-    if (incomplete(reason.error))
-      return { error: "incomplete", issues: reason.error.issues.map(issueOf) };
-    if (delegation(reason.error)) return { error: "role-denied" };
+    const refused = invalid(reason.error) ? reason.error.reason : undefined;
+    if (refused?._tag === "ConnectionUnusable" && refused.part !== undefined)
+      return { error: "unavailable", part: refused.part };
+    if (refused?._tag === "Incomplete")
+      return { error: "incomplete", issues: refused.issues.map(issueOf) };
+    if (roleRefused(reason.error)) return { error: "role-denied" };
   }
   return { error: workspaceFailure(cause) };
 }

@@ -74,10 +74,10 @@ describe("invitations", () => {
                   "Bob\u200B",
                 ])
                   expect(
-                    (yield* Effect.flip(
+                    yield* Effect.flip(
                       Operations.renameMember(workspace.id, bob, name as Member.Name),
-                    ))._tag,
-                  ).toMatch(/SchemaError|InvalidInput/);
+                    ),
+                  ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
                 return { workspaceId: workspace.id, members: yield* bound.members.list };
               }),
             ),
@@ -146,7 +146,7 @@ describe("invitations", () => {
                   yield* Effect.flip(
                     Operations.invite(workspace.id, bob, request(yield* future, charlie.id)),
                   ),
-                ).toMatchObject({ _tag: "Authorization.Denied" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
                 const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
                 expect(before).toHaveLength(3);
                 // The member, their role, their admission to general, and the acceptance.
@@ -164,7 +164,7 @@ describe("invitations", () => {
                   yield* Effect.flip(
                     Operations.getMember(workspace.id, bob, workspace.ownerMemberId),
                   ),
-                ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
                 const freshInvite = yield* Operations.invite(workspace.id, alice, {
                   recipientId: bob.id,
                   expiresAt: yield* future,
@@ -181,7 +181,7 @@ describe("invitations", () => {
                   yield* Effect.flip(
                     Operations.removeMember(workspace.id, bob, workspace.ownerMemberId),
                   ),
-                ).toMatchObject({ _tag: "Authorization.Denied" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
               }),
             ),
           );
@@ -225,7 +225,10 @@ describe("invitations", () => {
                     saved.invitation.details.id,
                   ),
                 ),
-              ).toMatchObject({ _tag: "InvitationService.Unavailable", reason: "revoked" });
+              ).toMatchObject({
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "revoked" },
+              });
               const replacement = yield* Operations.invite(
                 saved.workspace.id,
                 alice,
@@ -241,8 +244,8 @@ describe("invitations", () => {
                   Operations.revokeInvitation(saved.workspace.id, alice, replacement.details.id),
                 ),
               ).toMatchObject({
-                _tag: "InvitationService.Unavailable",
-                reason: "accepted",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "InvitationClosed", reason: "accepted" },
               });
             }),
           ),
@@ -273,7 +276,7 @@ describe("invitations", () => {
             const failure = results.find((value) => Result.isFailure(value));
             expect(failure).toMatchObject({
               _tag: "Failure",
-              failure: { _tag: "InvitationService.AlreadyMember" },
+              failure: { _tag: "CoreError.Conflict", reason: { _tag: "AlreadyJoined" } },
             });
             const bound = yield* boundTo(workspace.id);
             const member = yield* bound.members.findActive(bob);
@@ -329,10 +332,20 @@ describe("invitations", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "InvitationStore.Conflict", operation: "settle" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "InvitationStore",
+            operation: "settle",
+            reason: { _tag: "Rejected" },
+          });
           expect(
             yield* Effect.flip(bound.store.transaction(bound.invitations.insert(pending("first")))),
-          ).toMatchObject({ _tag: "InvitationStore.Conflict", operation: "insert" });
+          ).toMatchObject({
+            _tag: "StoreError",
+            store: "InvitationStore",
+            operation: "insert",
+            reason: { _tag: "Rejected" },
+          });
           expect(yield* bound.invitations.get(Invitation.Id.make("first"))).toEqual(
             Option.some({
               details: details("first"),

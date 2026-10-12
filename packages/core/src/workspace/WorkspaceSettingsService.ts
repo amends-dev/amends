@@ -29,17 +29,8 @@ import * as WorkspaceFacts from "./WorkspaceFacts.ts";
 import * as Workspace from "./Workspace.ts";
 import * as WorkspaceSettings from "./WorkspaceSettings.ts";
 import * as WorkspaceSettingsPermissions from "./WorkspaceSettingsPermissions.ts";
-import { Changed } from "./internal/workspace-settings-errors.ts";
-export {
-  /**
-   * The workspace's name is no longer the one the renamer expected: someone renamed it meanwhile,
-   * and nothing was recorded.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-} from "./internal/workspace-settings-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What reading the member-management view can fail with: the delegation checks it shows, and
@@ -51,17 +42,17 @@ export {
 export type MembersError = Delegation.Error | MemberService.Error;
 
 /**
- * What renaming can fail with: authorization, `Changed`, and the failures of reading the workspace
- * and of the commit.
+ * What renaming can fail with: authorization, `CoreError.Changed`, and the failures of reading the
+ * workspace and of the commit.
  *
  * @category errors
  * @since 0.1.0
  */
 export type RenameError =
   | Authorization.Error
-  | WorkspaceStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
-  | Changed
+  | CoreError.Changed
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError;
@@ -92,9 +83,9 @@ export class WorkspaceSettingsService extends Context.Service<
     >;
     /**
      * Rename the workspace, under `workspace.rename`. The same name again records nothing;
-     * otherwise a current name other than `expectedName` is `Changed`, and nothing is recorded.
-     * Names are compared, not versions, so a rename away and back goes unnoticed. Publishes
-     * `WorkspaceFacts.Renamed` in one commit and returns the renamed workspace.
+     * otherwise a current name other than `expectedName` is `CoreError.Changed`, and nothing is
+     * recorded. Names are compared, not versions, so a rename away and back goes unnoticed.
+     * Publishes `WorkspaceFacts.Renamed` in one commit and returns the renamed workspace.
      */
     readonly rename: (
       input: WorkspaceSettings.RenameInput,
@@ -198,7 +189,8 @@ export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
       yield* authorization.require([renamePermission]);
       const workspace = yield* readWorkspace;
       if (workspace.name === request.name) return workspace;
-      if (workspace.name !== request.expectedName) return yield* new Changed({ workspaceId });
+      if (workspace.name !== request.expectedName)
+        return yield* new CoreError.Changed({ resource: "Workspace", id: workspaceId });
       yield* journal.publish(WorkspaceFacts.Renamed, {
         workspaceId,
         previousName: workspace.name,

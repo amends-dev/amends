@@ -4,7 +4,7 @@
  * its details, which the transport defines, as JSON. `ChannelBindingStore.make` checks every input
  * before the driver sees it, so the driver keeps only what storage keeps: the primary key refuses a
  * thread bound already and `channel_bindings_by_conversation` a conversation bound to another
- * thread of the channel, each as the store's `Conflict`. Every statement is scoped to the
+ * thread of the channel, each rejected. Every statement is scoped to the
  * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
  * and requires one for a write.
  *
@@ -14,8 +14,9 @@ import { ChannelBinding, ChannelBindingStore } from "@amends-dev/core/channel";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { channelBindings } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(ChannelBinding.ChannelBinding));
 const decode = Schema.decodeUnknownEffect(
@@ -55,7 +56,7 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
             .where(and(inWorkspace, eq(channelBindings.threadId, threadId))),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ChannelBindingStore, "get")),
+      Effect.mapError(StoreError.failed("ChannelBindingStore", "get")),
     ),
     findByConversation: Effect.fn("ChannelBindings.findByConversation")(
       function* (channelId, conversationId) {
@@ -72,7 +73,7 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ChannelBindingStore, "findByConversation")),
+      Effect.mapError(StoreError.failed("ChannelBindingStore", "findByConversation")),
     ),
     insert: Effect.fn("ChannelBindings.insert")(function* (record) {
       yield* guard(
@@ -86,7 +87,7 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
           boundAt: DateTime.toDate(record.boundAt),
         }),
         true,
-      ).pipe(Effect.mapError(storeError(ChannelBindingStore, "insert")));
+      ).pipe(Effect.mapError(storeError("ChannelBindingStore", "insert")));
     }),
   };
   return ChannelBindingStore.make(workspaceId, driver);

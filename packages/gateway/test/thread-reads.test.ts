@@ -68,6 +68,8 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Thread discovery, metadata, timeline pages, and participant summaries. */
 
@@ -355,14 +357,12 @@ describe("thread reads", () => {
             const { bound, reader, agent, group, first, second } = yield* prepare();
             expect(yield* run(bound, reader, list(group.id))).toEqual([]);
             expect(yield* Effect.flip(run(bound, reader, get(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: "thread.read" } },
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted", requirement: { permission: { name: "thread.read" } } },
             });
             yield* grant(bound, readerId, GroupPermissions.Read);
             expect(yield* Effect.flip(run(bound, reader, timeline(first.thread.id)))).toMatchObject(
-              {
-                _tag: "Authorization.Denied",
-              },
+              { _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } },
             );
             const assignment = yield* grant(
               bound,
@@ -375,7 +375,8 @@ describe("thread reads", () => {
             expect(yield* run(bound, agent, timeline(first.thread.id))).toHaveLength(1);
             expect(yield* run(bound, agent, participants(first.thread.id))).toHaveLength(2);
             expect(yield* Effect.flip(run(bound, reader, get(second.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             yield* publish(
               bound,
@@ -413,11 +414,11 @@ describe("thread reads", () => {
                 > = [get(id), timeline(id), participants(id)];
                 for (const call of calls)
                   expect(yield* Effect.flip(run(bound, actor, call))).toEqual(
-                    new ThreadService.NotFound({ threadId: id }),
+                    new CoreError.NotFound({ resource: "Thread", id }),
                   );
               }
             expect(yield* Effect.flip(run(bound, owner, list(hidden.id)))).toEqual(
-              new ThreadService.GroupNotFound({ groupId: hidden.id }),
+              new CoreError.NotFound({ resource: "Group", id: hidden.id }),
             );
             yield* publish(
               bound,
@@ -430,7 +431,8 @@ describe("thread reads", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, get(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -476,7 +478,11 @@ describe("thread reads", () => {
               ).toMatchObject({ _tag: "SchemaError" });
               expect(
                 yield* Effect.flip(bound.activities.readPage(first.thread.id, options as never)),
-              ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadActivityStore",
+                reason: { _tag: "Failed" },
+              });
             }
           }),
         ),
@@ -542,7 +548,11 @@ describe("thread reads", () => {
               ).toMatchObject({ _tag: "SchemaError" });
               expect(
                 yield* Effect.flip(bound.activities.readPage(first.thread.id, options)),
-              ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "ThreadActivityStore",
+                reason: { _tag: "Failed" },
+              });
             }
             const foreign = yield* boundTo(otherWorkspaceId);
             expect(yield* foreign.activities.readPage(first.thread.id, { limit: 10 })).toEqual([]);
@@ -578,12 +588,12 @@ describe("thread reads", () => {
                     }),
                 );
                 expect(yield* Effect.flip(threadService.get(first.thread.id))).toEqual(
-                  new ThreadService.NotFound({ threadId: first.thread.id }),
+                  new CoreError.NotFound({ resource: "Thread", id: first.thread.id }),
                 );
                 expect(
                   yield* Effect.flip(threadService.listInGroup(group.id, { limit: 100 })),
                 ).toMatchObject({
-                  _tag: "ThreadService.GroupNotFound",
+                  _tag: "CoreError.NotFound",
                 });
                 yield* asActor(
                   Effect.flatMap(
@@ -617,7 +627,8 @@ describe("thread reads", () => {
                 ];
                 for (const call of calls)
                   expect(yield* Effect.flip(call)).toMatchObject({
-                    _tag: "Authorization.InvalidActor",
+                    _tag: "CoreError.Denied",
+                    reason: { _tag: "InvalidActor" },
                   });
               }),
             );
@@ -705,7 +716,8 @@ describe("thread reads", () => {
                   ),
                 );
                 expect(yield* Effect.flip(threadService.get(first.thread.id))).toMatchObject({
-                  _tag: "Authorization.Denied",
+                  _tag: "CoreError.Denied",
+                  reason: { _tag: "NotGranted" },
                 });
                 expect(yield* threadService.listInGroup(group.id, { limit: 100 })).toEqual([]);
               }),
@@ -772,7 +784,7 @@ describe("thread reads", () => {
                   expect(yield* asActor(list(group.id), reader)).toEqual([]);
                   expect(
                     yield* Effect.flip(asActor(timeline(first.thread.id), reader)),
-                  ).toMatchObject({ _tag: "Authorization.Denied" });
+                  ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
                   yield* journal.publish(GroupMembershipFacts.Removed, {
                     workspaceId,
                     groupId: group.id,
@@ -781,7 +793,7 @@ describe("thread reads", () => {
                     reason: "removed",
                   });
                   expect(yield* Effect.flip(asActor(get(first.thread.id), reader))).toMatchObject({
-                    _tag: "ThreadService.NotFound",
+                    _tag: "CoreError.NotFound",
                   });
                   return yield* Effect.fail("rollback");
                 }).pipe(Publication.withActor),
@@ -823,7 +835,7 @@ describe("thread reads", () => {
             yield* grant(bound, memberId, ThreadPermissions.Read);
             const visitor = Actor.Actor.of({ workspaceId, memberId, identity });
             expect(yield* Effect.flip(run(bound, visitor, get(first.thread.id)))).toMatchObject({
-              _tag: "ThreadService.NotFound",
+              _tag: "CoreError.NotFound",
             });
             yield* run(
               bound,
@@ -875,15 +887,15 @@ describe("thread reads", () => {
             ).toBe(false);
             expect(
               yield* Effect.flip(run(bound, actorFor(agentId), get(first.thread.id))),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             const impostor = Actor.Actor.of({
               workspaceId,
               memberId: owner.memberId,
               identity: readerIdentity,
             });
             expect(yield* Effect.flip(run(bound, impostor, get(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
-              reason: "identity-mismatch",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor", reason: "identity-mismatch" },
             });
             expect(
               yield* Effect.flip(
@@ -937,7 +949,7 @@ describe("thread reads", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, readerIdentity, get(opened.thread.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* grant(bound, readerId, ThreadPermissions.Read);
             expect(
               yield* gateway.asMember(workspace.id, readerIdentity, get(opened.thread.id)),
@@ -951,7 +963,7 @@ describe("thread reads", () => {
             for (const id of [foreignThread.thread.id, Thread.Id.make("missing")])
               expect(
                 yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, get(id))),
-              ).toEqual(new ThreadService.NotFound({ threadId: id }));
+              ).toEqual(new CoreError.NotFound({ resource: "Thread", id }));
             expect(
               yield* Effect.flip(
                 gateway.asMember(
@@ -960,7 +972,7 @@ describe("thread reads", () => {
                   timeline(opened.thread.id, { limit: 0 }),
                 ),
               ),
-            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+            ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
           }),
         ),
       ),
@@ -978,16 +990,13 @@ describe("thread reads", () => {
             context: Context.add(bound.context, ThreadActivityStore.ThreadActivityStore, {
               ...bound.activities,
               readPage: () =>
-                Effect.fail(
-                  new ThreadActivityStore.Failure({
-                    operation: "readPage",
-                    cause: "failed storage",
-                  }),
-                ),
+                Effect.fail(StoreError.failed("ThreadActivityStore", "readPage")("failed storage")),
             }),
           };
           expect(yield* Effect.flip(run(failing, owner, timeline(first.thread.id)))).toMatchObject({
-            _tag: "ThreadActivityStore.Failure",
+            _tag: "StoreError",
+            store: "ThreadActivityStore",
+            reason: { _tag: "Failed" },
           });
           expect(yield* history(bound)).toEqual(before);
         }),

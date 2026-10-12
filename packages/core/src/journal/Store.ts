@@ -16,7 +16,7 @@ import * as Occurrence from "./Occurrence.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as StoreInput from "./StoreInput.ts";
 import * as MemoryDatabase from "./MemoryDatabase.ts";
-import { storeFailure } from "./internal/store-failure.ts";
+import * as StoreError from "./StoreError.ts";
 
 /**
  * What an entry stores. Domain journals provide a fact header, `Event.Header`, beside the encoded
@@ -144,7 +144,7 @@ export const AppendOptions = Schema.Struct({
   expectedAfter: Schema.optionalKey(Schema.Option(LogEntry.Position)),
   /**
    * Names the append: a retry with the same content returns the original entries, and different
-   * content conflicts.
+   * content is rejected.
    */
   idempotencyKey: Schema.optionalKey(Occurrence.Key),
 });
@@ -258,30 +258,6 @@ export const sameContents = (
   ) && left.every((entry, index) => sameHeader(entry.fact, right[index]?.fact));
 
 /**
- * Storage failed while reading or writing a log, a checkpoint, or a transaction.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("Store.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored or with the workspace: a malformed or foreign input, an
- * expected position that has moved, an idempotency key recorded with other content, or
- * contention that storage reports rather than waits out.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("Store.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
-
-/**
  * Storage could not confirm whether a commit took effect. `commitId` names it for reconciliation;
  * retrying the same keyed intent reuses a first attempt that committed.
  *
@@ -313,7 +289,7 @@ export class Transaction extends Context.Service<
      * visible in increasing order, with no late insertion below a visible cursor.
      * Check expectedAfter atomically against the transaction's current log view.
      * Resolve a matching idempotency key first: return its original entries without
-     * appending or checking expectedAfter. Different bytes, fact metadata, or count conflict.
+     * appending or checking expectedAfter. Different bytes, fact metadata, or count are rejected.
      * Persist the key and append slice in this same transaction; rollback releases it.
      * Copy input bytes and reject expired handles. Returned entries are provisional.
      * Appending to a log holds it against standalone appends until the transaction ends, so its
@@ -321,7 +297,7 @@ export class Transaction extends Context.Service<
      */
     readonly append: (
       request: AppendInput,
-    ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict>;
+    ) => Effect.Effect<ReadonlyArray<Entry>, StoreError.StoreError>;
     /**
      * Run `effect` once this transaction has committed, after it releases what it held; never
      * when it rolls back or its outcome is uncertain. A failure of `effect` is logged and leaves
@@ -329,7 +305,9 @@ export class Transaction extends Context.Service<
      * read now, such as a request for a runner, whose readers would otherwise find it later.
      * Reject expired handles.
      */
-    readonly afterCommit: (effect: Effect.Effect<void>) => Effect.Effect<void, Failure>;
+    readonly afterCommit: (
+      effect: Effect.Effect<void>,
+    ) => Effect.Effect<void, StoreError.StoreError>;
   }
 >()("@amends-dev/core/journal/Store/Transaction") {}
 
@@ -353,7 +331,7 @@ export class Store extends Context.Service<
     readonly getAppend: (
       logId: LogEntry.LogId,
       key: Occurrence.Key,
-    ) => Effect.Effect<Option.Option<AppendReceipt>, Failure>;
+    ) => Effect.Effect<Option.Option<AppendReceipt>, StoreError.StoreError>;
     /**
      * Host transaction primitive. Provides Transaction and enlists all log writes
      * and domain projection stores and checkpoints in one serializable commit.
@@ -365,7 +343,7 @@ export class Store extends Context.Service<
      */
     readonly transaction: <A, E, R>(
       program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, E | Failure | Conflict | CommitUncertain, Exclude<R, Transaction>>;
+    ) => Effect.Effect<A, E | StoreError.StoreError | CommitUncertain, Exclude<R, Transaction>>;
     /**
      * Append to one log in a commit of its own, outside the workspace's write order: it waits
      * only for that log's other writers, including a transaction that holds the log, never for
@@ -375,7 +353,7 @@ export class Store extends Context.Service<
      */
     readonly append: (
       request: AppendInput,
-    ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict | CommitUncertain>;
+    ) => Effect.Effect<ReadonlyArray<Entry>, StoreError.StoreError | CommitUncertain>;
 
     /**
      * One entry of the log by ID, or None. Reads use the current transaction when present,
@@ -384,19 +362,19 @@ export class Store extends Context.Service<
     readonly getEntry: (
       logId: LogEntry.LogId,
       entryId: LogEntry.Id,
-    ) => Effect.Effect<Option.Option<Entry>, Failure>;
+    ) => Effect.Effect<Option.Option<Entry>, StoreError.StoreError>;
     /** The batch commit `commitId` appended to the log, or None when it did not touch the log. */
     readonly get: (
       logId: LogEntry.LogId,
       commitId: Commit.Id,
-    ) => Effect.Effect<Option.Option<Batch>, Failure>;
+    ) => Effect.Effect<Option.Option<Batch>, StoreError.StoreError>;
     /**
      * The position of this log's latest batch, or None for an empty log. Use the current
      * transaction's view when present, otherwise committed state.
      */
     readonly head: (
       logId: LogEntry.LogId,
-    ) => Effect.Effect<Option.Option<LogEntry.Position>, Failure>;
+    ) => Effect.Effect<Option.Option<LogEntry.Position>, StoreError.StoreError>;
     /**
      * Read complete batches for this log after the exclusive cursor, in increasing
      * position order. A commit touching other logs does not appear here. Never split
@@ -406,7 +384,7 @@ export class Store extends Context.Service<
     readonly read: (
       logId: LogEntry.LogId,
       options: ReadOptions,
-    ) => Effect.Effect<ReadonlyArray<Batch>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Batch>, StoreError.StoreError>;
 
     /**
      * Filter in storage and page individual facts by (position, index), across versions by
@@ -415,7 +393,7 @@ export class Store extends Context.Service<
     readonly readFacts: (
       logId: LogEntry.LogId,
       options: ReadFactsOptions,
-    ) => Effect.Effect<ReadonlyArray<Entry>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Entry>, StoreError.StoreError>;
 
     /**
      * Wait outside a transaction for committed entries beyond the exclusive cursor
@@ -429,7 +407,7 @@ export class Store extends Context.Service<
     readonly waitForAppend: (
       logId: LogEntry.LogId,
       after: Option.Option<LogEntry.Position>,
-    ) => Effect.Effect<void, Failure>;
+    ) => Effect.Effect<void, StoreError.StoreError>;
   }
 >()("@amends-dev/core/journal/Store") {}
 
@@ -459,8 +437,8 @@ export const runAfterCommit = (effects: ReadonlyArray<Effect.Effect<void>>) =>
  * @since 0.1.0
  */
 export const make = (driver: Store["Service"]): Store["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, driver.workspaceId);
+  const read = StoreInput.read("Store");
+  const write = StoreInput.write("Store", driver.workspaceId);
   const appendInput = (request: AppendInput) =>
     write("append", AppendInput, request).pipe(
       Effect.filterOrFail(
@@ -469,7 +447,7 @@ export const make = (driver: Store["Service"]): Store["Service"] => {
             (entry) =>
               entry.fact === undefined || entry.fact.provenance.workspaceId === driver.workspaceId,
           ),
-        () => new Conflict({ operation: "append", message: "Fact belongs to another workspace" }),
+        () => StoreError.rejected("Store", "append", "Fact belongs to another workspace"),
       ),
     );
   const checked = (transaction: Transaction["Service"]): Transaction["Service"] => ({
@@ -561,10 +539,10 @@ const memoryAfterCommit = (session: MemoryTransaction["Service"], effect: Effect
   Effect.suspend(() => {
     if (!session.active)
       return Effect.fail(
-        new Failure({
-          operation: "afterCommit",
-          cause: "Missing, closed, or foreign workspace transaction",
-        }),
+        StoreError.failed(
+          "Store",
+          "afterCommit",
+        )("Missing, closed, or foreign workspace transaction"),
       );
     session.afterCommit.push(effect);
     return Effect.void;
@@ -589,18 +567,18 @@ export class MemoryBinding extends Context.Service<
      * What a read sees: the live transaction of this workspace on this connection, or committed
      * state outside any transaction. Any other transaction is a foreign or expired handle.
      */
-    readonly read: Effect.Effect<MemoryDatabase.Space, Failure>;
+    readonly read: Effect.Effect<MemoryDatabase.Space, StoreError.StoreError>;
     /** What a projection write changes: the caller's transaction, which it requires. */
-    readonly write: Effect.Effect<MemoryDatabase.Space, Failure>;
+    readonly write: Effect.Effect<MemoryDatabase.Space, StoreError.StoreError>;
     /** What a write outside the journal changes: the caller's transaction, or committed state. */
-    readonly join: Effect.Effect<MemoryDatabase.Space, Failure>;
+    readonly join: Effect.Effect<MemoryDatabase.Space, StoreError.StoreError>;
     /**
      * Run a write outside the journal that reads before it writes: in the caller's transaction, or
      * else holding the workspace's writer over committed state, so no commit lands in between.
      */
     readonly exclusive: <A, E, R>(
       write: (space: MemoryDatabase.Space) => Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, E | Failure | Conflict, R>;
+    ) => Effect.Effect<A, E | StoreError.StoreError, R>;
     /**
      * The store's transaction primitive, given how to expose the native handle for the session
      * it opens. See `Store` for the contract. With `workspace: false` it does not take the
@@ -610,7 +588,7 @@ export class MemoryBinding extends Context.Service<
       program: Effect.Effect<A, E, R>,
       native: (session: MemoryTransaction["Service"]) => Transaction["Service"],
       options?: { readonly workspace?: boolean },
-    ) => Effect.Effect<A, E | Failure | Conflict | CommitUncertain, Exclude<R, Transaction>>;
+    ) => Effect.Effect<A, E | StoreError.StoreError | CommitUncertain, Exclude<R, Transaction>>;
   }
 >()("@amends-dev/core/journal/Store/MemoryBinding") {}
 
@@ -635,10 +613,10 @@ const makeMemoryBinding = Effect.fn("Store.makeMemoryBinding")(function* (
       current.value.workspaceId !== workspaceId ||
       current.value.commit.id !== native.value.id
     )
-      return yield* new Failure({
-        operation: "transaction",
-        cause: "Missing, closed, or foreign workspace transaction",
-      });
+      return yield* StoreError.failed(
+        "Store",
+        "transaction",
+      )("Missing, closed, or foreign workspace transaction");
     return current;
   });
   const read = Effect.map(session, (current) =>
@@ -648,10 +626,10 @@ const makeMemoryBinding = Effect.fn("Store.makeMemoryBinding")(function* (
     Option.isSome(current)
       ? Effect.succeed(current.value.space)
       : Effect.fail(
-          new Failure({
-            operation: "transaction",
-            cause: "Missing, closed, or foreign workspace transaction",
-          }),
+          StoreError.failed(
+            "Store",
+            "transaction",
+          )("Missing, closed, or foreign workspace transaction"),
         ),
   );
   const join = Effect.map(session, (current) =>
@@ -664,10 +642,11 @@ const makeMemoryBinding = Effect.fn("Store.makeMemoryBinding")(function* (
     yield* restore(gate.take(1));
     if (database.writers.has(workspaceId)) {
       yield* gate.release(1);
-      return yield* new Conflict({
-        operation: "transaction",
-        message: "Another host is writing this workspace",
-      });
+      return yield* StoreError.contended(
+        "Store",
+        "transaction",
+        "Another host is writing this workspace",
+      );
     }
     database.writers.set(workspaceId, memoryConnection);
   });
@@ -701,10 +680,10 @@ const makeMemoryBinding = Effect.fn("Store.makeMemoryBinding")(function* (
     const exclusive = options.workspace !== false;
     yield* read;
     if (Option.isSome(yield* Effect.serviceOption(Transaction)))
-      return yield* new Failure({
-        operation: "transaction",
-        cause: "Native transactions cannot nest; use journal.commit",
-      });
+      return yield* StoreError.failed(
+        "Store",
+        "transaction",
+      )("Native transactions cannot nest; use journal.commit");
     return yield* Effect.uninterruptibleMask((restore) =>
       Effect.gen(function* () {
         // This host's writers wait for each other; another host's writer is contention.
@@ -790,7 +769,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
     const commit = space.commits.get(batch.commitId);
     const entries = yield* copyEntries(batch.entries);
     if (commit === undefined || !Array.isReadonlyArrayNonEmpty(entries))
-      return yield* new Failure({ operation: "read", cause: "Incomplete log batch" });
+      return yield* StoreError.failed("Store", "read")("Incomplete log batch");
     return { logId, position: batch.position, commit: Object.assign({}, commit), entries };
   });
 
@@ -837,22 +816,20 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
   ) {
     const current = yield* Effect.serviceOption(MemoryTransaction);
     if (!session.active || Option.isNone(current) || current.value !== session)
-      return yield* new Failure({
-        operation: "append",
-        cause: "Closed or foreign append handle",
-      });
+      return yield* StoreError.failed("Store", "append")("Closed or foreign append handle");
     yield* hold(session, request.logId);
     const space = session.space;
     if (request.idempotencyKey !== undefined) {
       const previous = yield* receiptOf(space, request.logId, request.idempotencyKey).pipe(
-        Effect.mapError(storeFailure(Failure, "append")),
+        Effect.mapError(StoreError.failed("Store", "append")),
       );
       if (Option.isSome(previous)) {
         if (!sameContents(request.entries, previous.value.entries))
-          return yield* new Conflict({
-            operation: "append",
-            message: "Idempotency key is already associated with different content",
-          });
+          return yield* StoreError.rejected(
+            "Store",
+            "append",
+            "Idempotency key is already associated with different content",
+          );
         return previous.value.entries;
       }
     }
@@ -861,10 +838,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
     if (request.expectedAfter !== undefined) {
       const actual = Option.map(last, (batch) => batch.position);
       if (!Option.makeEquivalence<number>((a, b) => a === b)(actual, request.expectedAfter))
-        return yield* new Conflict({
-          operation: "append",
-          message: "Expected log position changed",
-        });
+        return yield* StoreError.contended("Store", "append", "Expected log position changed");
     }
     if (request.entries.length === 0) return [];
     // A commit's appends to one log share a position and extend its indexes.
@@ -907,7 +881,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
         firstIndex: existing.length,
         entryCount: written.length,
       });
-    return yield* copyEntries(written).pipe(Effect.mapError(storeFailure(Failure, "append")));
+    return yield* copyEntries(written).pipe(Effect.mapError(StoreError.failed("Store", "append")));
   });
 
   const driver: Store["Service"] = {
@@ -921,7 +895,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
         if (entry === undefined) return Option.none();
         return Option.some(yield* copyEntry(entry));
       },
-      Effect.mapError(storeFailure(Failure, "getEntry")),
+      Effect.mapError(StoreError.failed("Store", "getEntry")),
     ),
     readFacts: Effect.fn("Store.memory.readFacts")(
       function* (logId, options) {
@@ -938,7 +912,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
           );
         return yield* copyEntries(matching.slice(0, options.limit));
       },
-      Effect.mapError(storeFailure(Failure, "readFacts")),
+      Effect.mapError(StoreError.failed("Store", "readFacts")),
     ),
     getAppend: Effect.fn("Store.memory.getAppend")(
       function* (logId, key) {
@@ -948,7 +922,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
         if (Option.isSome(session)) yield* hold(session.value, logId);
         return yield* receiptOf(space, logId, key);
       },
-      Effect.mapError(storeFailure(Failure, "getAppend")),
+      Effect.mapError(StoreError.failed("Store", "getAppend")),
     ),
     transaction: (program) =>
       transaction(program, (session) => ({
@@ -958,10 +932,10 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
       })),
     append: Effect.fn("Store.memory.appendAlone")(function* (request) {
       if (Option.isSome(yield* Effect.serviceOption(Transaction)))
-        return yield* new Failure({
-          operation: "append",
-          cause: "A standalone append cannot run inside a transaction; use its append",
-        });
+        return yield* StoreError.failed(
+          "Store",
+          "append",
+        )("A standalone append cannot run inside a transaction; use its append");
       // Its own commit, holding only the log: the workspace's transactions do not wait for it.
       return yield* transaction(
         Effect.flatMap(Transaction, (storeTransaction) => storeTransaction.append(request)),
@@ -981,14 +955,14 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
           ? Option.none()
           : Option.some(yield* batchOf(space, logId, batch));
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("Store", "get")),
     ),
     head: Effect.fn("Store.memory.head")(
       function* (logId) {
         const space = yield* read;
         return Option.map(Array.last(space.logs.get(logId) ?? []), (batch) => batch.position);
       },
-      Effect.mapError(storeFailure(Failure, "head")),
+      Effect.mapError(StoreError.failed("Store", "head")),
     ),
     read: Effect.fn("Store.memory.read")(
       function* (logId, options) {
@@ -999,15 +973,15 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
           .slice(0, options.limit);
         return yield* Effect.forEach(selected, (batch) => batchOf(space, logId, batch));
       },
-      Effect.mapError(storeFailure(Failure, "read")),
+      Effect.mapError(StoreError.failed("Store", "read")),
     ),
     waitForAppend: Effect.fn("Store.memory.waitForAppend")(function* (logId, after) {
       if (Option.isSome(yield* Effect.serviceOption(Transaction)))
-        return yield* new Failure({
-          operation: "waitForAppend",
-          cause: "Cannot wait inside a transaction",
-        });
-      yield* read.pipe(Effect.mapError(storeFailure(Failure, "waitForAppend")));
+        return yield* StoreError.failed(
+          "Store",
+          "waitForAppend",
+        )("Cannot wait inside a transaction");
+      yield* read.pipe(Effect.mapError(StoreError.failed("Store", "waitForAppend")));
       while (true) {
         // Take the signal before checking committed state, so no append falls between the two.
         const appended = database.appended;

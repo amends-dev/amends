@@ -31,42 +31,12 @@ import * as MemberFacts from "../workspace/MemberFacts.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
-import { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./internal/agent-errors.ts";
 import * as AgentFacts from "./AgentFacts.ts";
 import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
-export {
-  /**
-   * The agent's name is no longer the one expected: someone renamed it meanwhile.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Changed,
-  /**
-   * The connection named for a part of the agent's setup is missing or removed, or the actor may not
-   * read and use it, which they cannot tell apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ConnectionUnavailable,
-  /**
-   * The agent cannot run as it would be set up, for the issues its readiness would report.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Incomplete,
-  /**
-   * Missing agents, agents whose membership ended, and agents the actor may not read share this.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-} from "./internal/agent-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What listing agents can fail with.
@@ -74,11 +44,7 @@ export {
  * @category errors
  * @since 0.1.0
  */
-export type ListError =
-  | Authorization.Error
-  | AgentStore.Failure
-  | MemberStore.Failure
-  | ConnectionStore.Failure;
+export type ListError = Authorization.Error | StoreError.StoreError;
 
 /**
  * What reading one agent can fail with: listing's failures, a malformed ID, and a missing agent.
@@ -86,7 +52,7 @@ export type ListError =
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = ListError | Schema.SchemaError | NotFound;
+export type ReadError = ListError | Schema.SchemaError | CoreError.NotFound;
 
 /**
  * What every change can fail with: what reading meets, and what writing its commit meets.
@@ -97,21 +63,13 @@ export type ReadError = ListError | Schema.SchemaError | NotFound;
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 
 /**
- * A setup naming a connection the actor may not give an agent, or one that cannot run.
- *
- * @category errors
- * @since 0.1.0
- */
-export type SetupError = ConnectionUnavailable | Incomplete;
-
-/**
  * What creating can fail with. Creating also adds a membership, with a role the actor must be
  * able to grant.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | SetupError | Delegation.Error | MemberCommand.Error;
+export type CreateError = Error | CoreError.Invalid | Delegation.Error | MemberCommand.Error;
 
 /**
  * What configuring can fail with.
@@ -119,7 +77,7 @@ export type CreateError = Error | SetupError | Delegation.Error | MemberCommand.
  * @category errors
  * @since 0.1.0
  */
-export type ConfigureError = Error | SetupError;
+export type ConfigureError = Error | CoreError.Invalid;
 
 /**
  * What renaming can fail with: a rename made meanwhile, besides what every change meets.
@@ -127,7 +85,7 @@ export type ConfigureError = Error | SetupError;
  * @category errors
  * @since 0.1.0
  */
-export type RenameError = Error | Changed;
+export type RenameError = Error | CoreError.Changed;
 
 /**
  * The agent operations an actor calls. An agent is a member, so its role is changed, and it is
@@ -157,7 +115,7 @@ export class AgentService extends Context.Service<
     readonly configure: (
       input: Agent.ConfigureInput,
     ) => Effect.Effect<Agent.View, ConfigureError, Actor.Actor>;
-    /** Rename its membership; a rename made meanwhile conflicts. */
+    /** Rename its membership; a rename made meanwhile is rejected. */
     readonly rename: (
       input: Agent.RenameInput,
     ) => Effect.Effect<Agent.View, RenameError, Actor.Actor>;
@@ -194,13 +152,17 @@ export const make = Effect.fn("AgentService.make")(function* () {
       AgentReadiness.readinessOf,
     );
 
-  /** The agent by ID with its name while its membership lasts, and NotFound once it ended. */
+  /**
+   * The agent by ID with its name while its membership lasts, and `CoreError.NotFound` once it
+   * ended.
+   */
   const requireActiveAgent = Effect.fnUntraced(function* (agentId: Agent.Id) {
     const found = yield* agentStore.get(agentId);
-    if (Option.isNone(found)) return yield* new NotFound({ agentId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Agent", id: agentId });
     const member = yield* memberStore.get(found.value.memberId);
     if (Option.isNone(member) || member.value.status !== "active")
-      return yield* new NotFound({ agentId });
+      return yield* new CoreError.NotFound({ resource: "Agent", id: agentId });
     return { record: found.value, name: member.value.name };
   });
 
@@ -215,7 +177,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
       authorization,
       Requirement.make(AgentPermissions.Read, target),
       Requirement.make(permission, target),
-      () => new NotFound({ agentId }),
+      () => new CoreError.NotFound({ resource: "Agent", id: agentId }),
     );
     return agent;
   });
@@ -249,12 +211,15 @@ export const make = Effect.fn("AgentService.make")(function* () {
       const [readable = false, usable = false] = permitted.slice(index * 2, index * 2 + 2);
       const active = connections.some((connection) => connection.id === connectionId);
       if (!readable || !usable || !active)
-        return yield* new ConnectionUnavailable({ part, connectionId });
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.ConnectionUnusable({ part, connectionId }),
+        });
     }
     const issues = (yield* AgentReadiness.issuesOf(setup, connections, integrations)).filter(
       (issue) => issue._tag !== "NoHarness",
     );
-    if (Array.isReadonlyArrayNonEmpty(issues)) return yield* new Incomplete({ issues });
+    if (Array.isReadonlyArrayNonEmpty(issues))
+      return yield* new CoreError.Invalid({ reason: new CoreError.Incomplete({ issues }) });
   });
 
   /** The agents whose membership lasts, each with its name, in no particular order. */
@@ -389,7 +354,8 @@ export const make = Effect.fn("AgentService.make")(function* () {
         AgentPermissions.Configure,
       );
       if (name === request.name) return yield* viewForActor(record, name);
-      if (name !== request.expectedName) return yield* new Changed({ agentId: record.id });
+      if (name !== request.expectedName)
+        return yield* new CoreError.Changed({ resource: "Agent", id: record.id });
       yield* journal.publish(MemberFacts.Renamed, {
         workspaceId,
         memberId: record.memberId,

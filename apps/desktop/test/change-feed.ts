@@ -128,7 +128,10 @@ export function withChangeFeed(
       send: (message) => write("message", message),
       unavailable: () => {
         write("effect/http-api/stream/failure", [
-          { _tag: "Fail", error: { _tag: "ChangeFeed.Unavailable" } },
+          {
+            _tag: "Fail",
+            error: { _tag: "CoreError.Unavailable", reason: { _tag: "ChangeFeedInterrupted" } },
+          },
         ]);
         try {
           controller.close();

@@ -4,9 +4,9 @@
  * columns. A thread's requested deliveries read through a partial index by sequence, and an echo is
  * recognized through the index by channel, conversation, and external message ID.
  * `DeliveryStore.make` checks every input before the driver sees it, so the driver keeps only what
- * storage keeps: the primary key refuses a reused ID as the store's `Conflict`, and an update that
- * finds no row conflicts. Every statement is scoped to the binding's workspace and runs under its
- * `guard`, which lets a read join the caller's transaction and requires one for a write.
+ * storage keeps: the primary key rejects a reused ID, and an update that finds no row is rejected.
+ * Every statement is scoped to the binding's workspace and runs under its `guard`, which lets a
+ * read join the caller's transaction and requires one for a write.
  *
  * @since 0.1.0
  */
@@ -14,8 +14,9 @@ import { Delivery, DeliveryStore } from "@amends-dev/core/channel";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { channelDeliveries } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -64,7 +65,7 @@ export const make = Effect.fn("Deliveries.make")(function* () {
             .where(and(inWorkspace, eq(channelDeliveries.id, id))),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(DeliveryStore, "get")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "get")),
     ),
     listRequestedByThread: Effect.fn("Deliveries.listRequestedByThread")(
       function* (threadId) {
@@ -85,7 +86,7 @@ export const make = Effect.fn("Deliveries.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(DeliveryStore, "listRequestedByThread")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "listRequestedByThread")),
     ),
     findByExternalMessage: Effect.fn("Deliveries.findByExternalMessage")(
       function* (channelId, conversationId, externalMessageId) {
@@ -103,11 +104,11 @@ export const make = Effect.fn("Deliveries.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(DeliveryStore, "findByExternalMessage")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "findByExternalMessage")),
     ),
     insert: Effect.fn("Deliveries.insert")(function* (record) {
       yield* guard(db.insert(channelDeliveries).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError(DeliveryStore, "insert")),
+        Effect.mapError(storeError("DeliveryStore", "insert")),
       );
     }),
     update: Effect.fn("Deliveries.update")(function* (record) {
@@ -118,12 +119,9 @@ export const make = Effect.fn("Deliveries.make")(function* () {
           .where(and(inWorkspace, eq(channelDeliveries.id, record.id)))
           .returning({ id: channelDeliveries.id }),
         true,
-      ).pipe(Effect.mapError(storeError(DeliveryStore, "update")));
+      ).pipe(Effect.mapError(storeError("DeliveryStore", "update")));
       if (updated.length === 0)
-        return yield* new DeliveryStore.Conflict({
-          operation: "update",
-          message: "Expected a stored delivery",
-        });
+        return yield* StoreError.rejected("DeliveryStore", "update", "Expected a stored delivery");
     }),
   };
   return DeliveryStore.make(workspaceId, driver);

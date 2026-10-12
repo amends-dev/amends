@@ -311,7 +311,7 @@ it.effect("expected positions and replay cursors are scoped to their log", () =>
         const conflict = yield* Effect.flip(
           turn.append({ _tag: "Finished" }, { expectedAfter: Option.none() }),
         );
-        expect(conflict._tag).toBe("Store.Conflict");
+        expect(conflict).toMatchObject({ _tag: "StoreError", reason: { _tag: "Contended" } });
         const resumed = yield* Stream.runCollect(turn.stream({ after: first.position, limit: 1 }));
         expect(resumed).toHaveLength(1);
         expect(resumed[0]?.entries[0]?.payload._tag).toBe("Finished");

@@ -19,6 +19,7 @@ import { ClusterSchema, Entity, Sharding } from "effect/cluster";
 import { Rpc } from "effect/rpc";
 import * as DeliveryRunner from "./DeliveryRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * A request to deliver what the thread's contacts were told, keyed by the commit that stored it;
@@ -88,11 +89,7 @@ export const layerRequests = Layer.effect(
         });
         yield* deliveryJobClient(entityId(deliver))
           .Deliver(deliver, { discard: true })
-          .pipe(
-            Effect.mapError(
-              (cause) => new Store.Failure({ operation: "request delivery job", cause }),
-            ),
-          );
+          .pipe(Effect.mapError(StoreError.failed("Store", "request delivery job")));
         yield* storeTransaction.afterCommit(sharding.pollStorage);
       }),
     });

@@ -17,6 +17,7 @@ import * as Identity from "../../src/identity/Identity.ts";
 import * as Member from "../../src/workspace/Member.ts";
 import * as MemberStore from "../../src/workspace/MemberStore.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
+import * as CoreError from "../../src/error/CoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 
@@ -177,7 +178,11 @@ const queryIn = (world: World = {}) => {
       get: (connectionId) => {
         if (world.credentialsUnavailable !== undefined) {
           return Effect.fail(
-            new ConnectionCredentialStore.Unavailable({ reason: world.credentialsUnavailable }),
+            new CoreError.Unavailable({
+              reason: new CoreError.CredentialsUnavailable({
+                description: world.credentialsUnavailable,
+              }),
+            }),
           );
         }
         const key = keys.get(connectionId);
@@ -240,12 +245,12 @@ describe("what an agent runs a turn on", () => {
       });
 
       expect(yield* Effect.flip(modelGone.select(agentMemberId, undefined))).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "Removed", part: "model" }],
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "Removed", part: "model" }] },
       });
       expect(yield* Effect.flip(noHarness.select(agentMemberId, undefined))).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "NoHarness" }],
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "NoHarness" }] },
       });
     }),
   );
@@ -265,7 +270,7 @@ describe("what an agent runs a turn on", () => {
 
       for (const memberId of [person.id, agentMemberId]) {
         expect(yield* Effect.flip(agentQuery.select(memberId, undefined))).toEqual(
-          new AgentQuery.NotFound({ memberId }),
+          new CoreError.NotFound({ resource: "Agent", id: memberId }),
         );
       }
     }),
@@ -317,24 +322,30 @@ describe("an agent ready to run", () => {
       expect(
         yield* Effect.flip(harnessGone.buildRunnable(agentMemberId, selection())),
       ).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "Removed", part: "harness" }],
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "Removed", part: "harness" }] },
       });
       expect(yield* Effect.flip(keyless.buildRunnable(agentMemberId, selection()))).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [
-          {
-            _tag: "Invalid",
-            part: "model",
-            description: "The connection conn-models has no API key",
-          },
-        ],
+        _tag: "CoreError.Invalid",
+        reason: {
+          _tag: "Incomplete",
+          issues: [
+            {
+              _tag: "Invalid",
+              part: "model",
+              description: "The connection conn-models has no API key",
+            },
+          ],
+        },
       });
       expect(
         yield* Effect.flip(keepsNoKeys.buildRunnable(agentMemberId, selection())),
       ).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "Invalid", part: "model", description: "No key protects credentials" }],
+        _tag: "CoreError.Invalid",
+        reason: {
+          _tag: "Incomplete",
+          issues: [{ _tag: "Invalid", part: "model", description: "No key protects credentials" }],
+        },
       });
     }),
   );

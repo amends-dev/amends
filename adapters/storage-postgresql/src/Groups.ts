@@ -4,8 +4,8 @@
  * member set, and the `groups_kind` check rejects rows that mix them. `GroupStore.make` checks
  * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
  * key refuses a reused ID and `direct_groups_by_members` a second direct group for one member set,
- * each as the store's `Conflict`; renaming conflicts unless it finds a team group, and
- * `latest_activity_at` only moves forward, a missing group conflicting. A direct row whose key
+ * each rejected; renaming is rejected unless it finds a team group, and
+ * `latest_activity_at` only moves forward, a missing group rejected. A direct row whose key
  * disagrees with its members fails the read. Every statement is scoped to the binding's workspace
  * and runs under its `guard`, which lets a read join the caller's transaction and requires one for
  * a write.
@@ -17,8 +17,9 @@ import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
 import { groups } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Group));
 const decodeRows = Schema.decodeUnknownEffect(
@@ -87,7 +88,7 @@ export const make = Effect.fn("Groups.make")(function* () {
           Effect.map(Array.head),
         );
       },
-      Effect.mapError(storeFailure(GroupStore, "get")),
+      Effect.mapError(StoreError.failed("GroupStore", "get")),
     ),
     getMany: Effect.fn("Groups.getMany")(
       function* (ids) {
@@ -99,7 +100,7 @@ export const make = Effect.fn("Groups.make")(function* () {
             .where(and(eq(groups.workspaceId, workspaceId), inIds(groups.id, ids))),
         ).pipe(Effect.flatMap((rows) => decode(rows.map(toRecord))));
       },
-      Effect.mapError(storeFailure(GroupStore, "getMany")),
+      Effect.mapError(StoreError.failed("GroupStore", "getMany")),
     ),
     pagePublic: Effect.fn("Groups.pagePublic")(
       function* (options) {
@@ -120,7 +121,7 @@ export const make = Effect.fn("Groups.make")(function* () {
         ).pipe(Effect.flatMap((rows) => decode(rows.map(toRecord))));
         return found.flatMap((group) => (group.kind === "Team" ? [group] : []));
       },
-      Effect.mapError(storeFailure(GroupStore, "pagePublic")),
+      Effect.mapError(StoreError.failed("GroupStore", "pagePublic")),
     ),
     findDirect: Effect.fn("Groups.findDirect")(
       function* (memberIds) {
@@ -139,7 +140,7 @@ export const make = Effect.fn("Groups.make")(function* () {
           record.kind === "Direct" ? Option.some(record) : Option.none(),
         );
       },
-      Effect.mapError(storeFailure(GroupStore, "findDirect")),
+      Effect.mapError(StoreError.failed("GroupStore", "findDirect")),
     ),
     getLatest: Effect.fn("Groups.getLatest")(
       function* (ids) {
@@ -157,7 +158,7 @@ export const make = Effect.fn("Groups.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeLatest));
       },
-      Effect.mapError(storeFailure(GroupStore, "getLatest")),
+      Effect.mapError(StoreError.failed("GroupStore", "getLatest")),
     ),
     rename: Effect.fn("Groups.rename")(function* (renamed) {
       const updated = yield* guard(
@@ -173,12 +174,9 @@ export const make = Effect.fn("Groups.make")(function* () {
           )
           .returning({ id: groups.id }),
         true,
-      ).pipe(Effect.mapError(storeError(GroupStore, "rename")));
+      ).pipe(Effect.mapError(storeError("GroupStore", "rename")));
       if (updated.length === 0)
-        return yield* new GroupStore.Conflict({
-          operation: "rename",
-          message: "Expected a team group",
-        });
+        return yield* StoreError.rejected("GroupStore", "rename", "Expected a team group");
     }),
     recordLatest: Effect.fn("Groups.recordLatest")(function* (latest) {
       const at = DateTime.toDate(latest.occurredAt);
@@ -195,7 +193,7 @@ export const make = Effect.fn("Groups.make")(function* () {
           )
           .returning({ id: groups.id }),
         true,
-      ).pipe(Effect.mapError(storeError(GroupStore, "recordLatest")));
+      ).pipe(Effect.mapError(storeError("GroupStore", "recordLatest")));
       if (advanced.length > 0) return;
       // Nothing advanced: an earlier time changes nothing, but the group must exist.
       const found = yield* guard(
@@ -204,16 +202,13 @@ export const make = Effect.fn("Groups.make")(function* () {
           .from(groups)
           .where(and(eq(groups.workspaceId, workspaceId), eq(groups.id, latest.groupId))),
         true,
-      ).pipe(Effect.mapError(storeError(GroupStore, "recordLatest")));
+      ).pipe(Effect.mapError(storeError("GroupStore", "recordLatest")));
       if (found.length === 0)
-        return yield* new GroupStore.Conflict({
-          operation: "recordLatest",
-          message: "Group is missing",
-        });
+        return yield* StoreError.rejected("GroupStore", "recordLatest", "Group is missing");
     }),
     insert: Effect.fn("Groups.insert")(function* (record) {
       yield* guard(db.insert(groups).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError(GroupStore, "insert")),
+        Effect.mapError(storeError("GroupStore", "insert")),
       );
     }),
   };

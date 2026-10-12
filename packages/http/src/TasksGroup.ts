@@ -44,24 +44,24 @@ export class TasksGroup extends HttpApiGroup.make("tasks")
         }),
       },
       success: Schema.Array(Thread.ListItem.annotate({ identifier: "ThreadListItem" })),
-      error: [...ApiErrors.member, ...ApiErrors.taskRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.taskRead],
     }),
     HttpApiEndpoint.get("get", "/threads/:threadId/task", {
       params: thread,
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.taskRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.taskRead],
     }),
     HttpApiEndpoint.post("create", "/threads/:threadId/task", {
       params: thread,
       payload: Task.Options,
       success: record.pipe(HttpApiSchema.status(201)),
-      error: [...ApiErrors.member, ...ApiErrors.taskCreate],
+      error: [...ApiErrors.workspace, ...ApiErrors.taskCreate],
     }),
     HttpApiEndpoint.patch("update", "/threads/:threadId/task", {
       params: thread,
       payload: Schema.Struct({ change: Task.UpdateInput.fields.change }),
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.taskUpdate],
+      error: [...ApiErrors.workspace, ...ApiErrors.taskUpdate],
     }),
   )
   .middleware(Authentication)

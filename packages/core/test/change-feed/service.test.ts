@@ -63,6 +63,7 @@ import * as TestSignalHub from "../signal-hub.ts";
 import * as Notification from "../../src/notification/Notification.ts";
 import * as Signal from "../../src/signal/Signal.ts";
 import * as SignalHub from "../../src/signal/SignalHub.ts";
+import * as CoreError from "../../src/error/CoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const at = DateTime.makeUnsafe("2026-09-20T12:00:00.123Z");
@@ -931,7 +932,7 @@ it.effect("the reader's removal from the workspace is delivered, then the stream
       });
       const exit = yield* Fiber.await(feed.fiber);
       expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
-        Option.some(new ChangeFeed.Unavailable({})),
+        Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })),
       );
     }),
   ),
@@ -992,7 +993,7 @@ it.effect(
         ]);
         const exit = yield* Fiber.await(feed.fiber);
         expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
-          Option.some(new ChangeFeed.Unavailable({})),
+          Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })),
         );
         expect(yield* Queue.size(feed.queue)).toBe(0);
       }),
@@ -1052,7 +1053,7 @@ it.effect(
         );
         const exit = yield* Fiber.await(feed.fiber);
         expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
-          Option.some(new ChangeFeed.Unavailable({})),
+          Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })),
         );
         expect(yield* Queue.size(feed.queue)).toBe(0);
         // Reconnecting from the last cursor resets rather than resuming across it.
@@ -1087,7 +1088,7 @@ it.effect(
         yield* commit(publish(Damaged, "not a member"));
         const exit = yield* Fiber.await(feed.fiber);
         expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
-          Option.some(new ChangeFeed.Unavailable({})),
+          Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })),
         );
         // Reconnecting from the last cursor resets, and later commits keep arriving.
         const resumed = yield* listen({ after: before });
@@ -1103,7 +1104,7 @@ it.effect("a removed member cannot subscribe", () =>
     Effect.gen(function* () {
       yield* fixture.store.transaction(fixture.members.markRemoved(actor.memberId));
       const error = yield* Effect.flip((yield* ChangeFeedService.ChangeFeedService).watch());
-      expect(error).toMatchObject({ _tag: "Authorization.InvalidActor" });
+      expect(error).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
     }),
   ),
 );

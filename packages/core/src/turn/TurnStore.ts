@@ -15,31 +15,8 @@ import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Thread from "../thread/Thread.ts";
 import * as Member from "../workspace/Member.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing turns.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("TurnStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
-
-/**
- * A write disagreed with what is stored: a malformed or foreign record, a reused ID, a second
- * active turn for the same agent and thread, or a missing turn.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Conflict extends Schema.TaggedError<Conflict>()("TurnStore.Conflict", {
-  operation: Schema.String,
-  message: Schema.String,
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The turn store, bound to one workspace by the host: what a storage adapter implements for
@@ -56,12 +33,12 @@ export class TurnStore extends Context.Service<
   TurnStore,
   {
     /** The turn, if stored. */
-    readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Turn>, Failure>;
+    readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>;
     /** The agent's active turn on the thread: queued, running, or cancelling. */
     readonly findActive: (
       memberId: MemberId.Id,
       threadId: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<Turn.Turn>, Failure>;
+    ) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>;
     /**
      * The agent's most recent turn on the thread, active or finished: by creation, then by how far
      * its accepted input reaches, which a later turn always extends.
@@ -69,27 +46,29 @@ export class TurnStore extends Context.Service<
     readonly findLatest: (
       memberId: MemberId.Id,
       threadId: ThreadId.Id,
-    ) => Effect.Effect<Option.Option<Turn.Turn>, Failure>;
+    ) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>;
     /** Every active turn in the workspace, oldest first, at most `limit`. */
-    readonly listActive: (limit: number) => Effect.Effect<ReadonlyArray<Turn.Turn>, Failure>;
+    readonly listActive: (
+      limit: number,
+    ) => Effect.Effect<ReadonlyArray<Turn.Turn>, StoreError.StoreError>;
     /** The agent's active turns, one at most per thread, oldest first. */
     readonly listActiveByMember: (
       memberId: MemberId.Id,
-    ) => Effect.Effect<ReadonlyArray<Turn.Turn>, Failure>;
+    ) => Effect.Effect<ReadonlyArray<Turn.Turn>, StoreError.StoreError>;
     /**
      * Reject reused IDs and a second active turn for the same agent
      * and thread. Never upsert.
      */
     readonly insert: (
       record: Turn.Turn,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
     /**
-     * Replace a stored turn. A missing record conflicts, and so does a change that would give its
+     * Replace a stored turn. A missing record is rejected, and so is a change that would give its
      * agent a second active turn on the thread.
      */
     readonly update: (
       record: Turn.Turn,
-    ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/turn/TurnStore") {}
 
@@ -104,8 +83,8 @@ export const make = (
   workspaceId: WorkspaceId.Id,
   driver: TurnStore["Service"],
 ): TurnStore["Service"] => {
-  const read = StoreInput.read(Failure);
-  const write = StoreInput.write(Conflict, workspaceId);
+  const read = StoreInput.read("TurnStore");
+  const write = StoreInput.write("TurnStore", workspaceId);
   return {
     get: (id) => Effect.flatMap(read("get", Turn.Id, id), driver.get),
     findActive: Effect.fn("TurnStore.findActive")(function* (memberId, threadId) {
@@ -148,7 +127,7 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
   const all = (operation: string) =>
     Effect.gen(function* () {
       return yield* rows.all((yield* read).records.of("turns"));
-    }).pipe(Effect.mapError(storeFailure(Failure, operation)));
+    }).pipe(Effect.mapError(StoreError.failed("TurnStore", operation)));
   /** An agent has at most one active turn on a thread. */
   const secondActive = (records: ReadonlyArray<Turn.Turn>, record: Turn.Turn) =>
     Turn.active(record.status) &&
@@ -173,7 +152,7 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
       function* (id) {
         return yield* rows.get((yield* read).records.of("turns"), id);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("TurnStore", "get")),
     ),
     findActive: Effect.fn("TurnStore.memory.findActive")(function* (memberId, threadId) {
       const records = yield* ofAgent("findActive", memberId, threadId);
@@ -194,42 +173,42 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
         .toSorted(byCreated);
     }),
     insert: Effect.fn("TurnStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "insert")));
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("TurnStore", "insert")));
       if (space.records.of("turns").has(record.id))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "Turn ID already exists",
-        });
+        return yield* StoreError.rejected("TurnStore", "insert", "Turn ID already exists");
       const records = yield* rows
         .all(space.records.of("turns"))
-        .pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        .pipe(Effect.mapError(StoreError.failed("TurnStore", "insert")));
       if (secondActive(records, record))
-        return yield* new Conflict({
-          operation: "insert",
-          message: "The agent already has an active turn on this thread",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "insert")));
+        return yield* StoreError.rejected(
+          "TurnStore",
+          "insert",
+          "The agent already has an active turn on this thread",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("TurnStore", "insert")));
       space.records.of("turns").set(record.id, row);
     }),
     update: Effect.fn("TurnStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(storeFailure(Failure, "update")));
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("TurnStore", "update")));
       const found = yield* rows
         .get(space.records.of("turns"), record.id)
-        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+        .pipe(Effect.mapError(StoreError.failed("TurnStore", "update")));
       if (Option.isNone(found))
-        return yield* new Conflict({
-          operation: "update",
-          message: "Expected a stored turn",
-        });
+        return yield* StoreError.rejected("TurnStore", "update", "Expected a stored turn");
       const records = yield* rows
         .all(space.records.of("turns"))
-        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+        .pipe(Effect.mapError(StoreError.failed("TurnStore", "update")));
       if (secondActive(records, record))
-        return yield* new Conflict({
-          operation: "update",
-          message: "The agent already has an active turn on this thread",
-        });
-      const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "update")));
+        return yield* StoreError.rejected(
+          "TurnStore",
+          "update",
+          "The agent already has an active turn on this thread",
+        );
+      const row = yield* rows
+        .encode(record)
+        .pipe(Effect.mapError(StoreError.failed("TurnStore", "update")));
       space.records.of("turns").set(record.id, row);
     }),
   };
@@ -238,8 +217,8 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
 
 /**
  * Provide `TurnStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps what
- * the contract leaves to storage: a reused ID conflicts, and so does a second active turn of one
- * agent on one thread, inserted or updated; an update of a missing turn conflicts. An agent's
+ * the contract leaves to storage: a reused ID is rejected, and so is a second active turn of one
+ * agent on one thread, inserted or updated; an update of a missing turn is rejected. An agent's
  * turns on a thread order by creation time, then how far each accepted input, then ID. `make`
  * checks every input first.
  *

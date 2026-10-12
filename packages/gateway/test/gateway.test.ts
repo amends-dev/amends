@@ -22,15 +22,10 @@ import { AssignmentStore, Authorization, RoleStore } from "@amends-dev/core/auth
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
 import { Checkpoint, Commit, Entry, Store } from "@amends-dev/core/journal";
-import {
-  Notification,
-  NotificationService,
-  NotificationStore,
-} from "@amends-dev/core/notification";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   InvitationStore,
   Member,
-  MemberService,
   MemberStore,
   Workspace,
   WorkspaceStore,
@@ -55,6 +50,8 @@ import * as GatewayErrors from "../src/GatewayErrors.ts";
 import * as Gateway from "../src/Gateway.ts";
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -406,24 +403,18 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           program: Effect.Effect<A, E>,
         ): Effect.Effect<
           A,
-          | GatewayErrors.PublicErrorOf<E>
-          | GatewayErrors.NotMember
-          | GatewayErrors.WorkspaceNotFound,
+          GatewayErrors.PublicErrorOf<E> | CoreError.Denied | CoreError.NotFound,
           Scope.Scope
         > =>
           entry === "inWorkspace"
             ? gateway.inWorkspace(workspaceId, program)
             : gateway.asMember(workspaceId, alice, program);
         const conflict = yield* Effect.flip(
-          enter(
-            Effect.fail(new Store.Conflict({ operation: "append", message: "Changed position" })),
-          ),
+          enter(Effect.fail(StoreError.contended("Store", "append", "Changed position"))),
         );
         expect(conflict).toMatchObject({
-          _tag: "GatewayErrors.Conflict",
-          workspaceId,
-          operation: "append",
-          message: "Changed position",
+          _tag: "CoreError.Unavailable",
+          reason: { _tag: "Contention", operation: "append", description: "Changed position" },
         });
         const uncertain = yield* Effect.flip(
           enter(
@@ -441,7 +432,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           commitId: "commit",
         });
         const invalid = yield* Effect.flip(enter(Schema.decodeEffect(Schema.NonEmptyString)("")));
-        expect(invalid).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+        expect(invalid).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
         const mismatch = yield* Effect.flip(
           enter(
             Effect.fail(
@@ -453,14 +444,14 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           ),
         );
         expect(mismatch).toMatchObject({
-          _tag: "GatewayErrors.InvalidInput",
-          message: "Values must belong to workspace workspace",
+          _tag: "CoreError.Invalid",
+          reason: { _tag: "Malformed", description: "Values must belong to workspace workspace" },
         });
-        const missing = new MemberService.NotFound({ workspaceId, memberId });
+        const missing = new CoreError.NotFound({ resource: "Member", id: memberId });
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing);
-        const missingNotification = new NotificationService.NotFound({
-          workspaceId,
-          notificationId: Notification.Id.make("missing"),
+        const missingNotification = new CoreError.NotFound({
+          resource: "Notification",
+          id: Notification.Id.make("missing"),
         });
         expect(yield* Effect.flip(enter(Effect.fail(missingNotification)))).toBe(
           missingNotification,
@@ -474,14 +465,11 @@ it.effect(
   () =>
     run((gateway) =>
       Effect.gen(function* () {
-        const failure = new MemberStore.Failure({
-          operation: "get",
-          cause: new Error("database detail"),
-        });
+        const failure = StoreError.failed("MemberStore", "get")(new Error("database detail"));
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
         ).toBe(failure);
-        const malformed = { _tag: "MemberService.NotFound", workspaceId, memberId: 42 };
+        const malformed = { _tag: "CoreError.NotFound", resource: "Member", id: 42 };
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(malformed)))),
         ).toBe(malformed);
@@ -498,7 +486,7 @@ it.effect("projection replay failures are defects before the operation runs", ()
     const operation = Effect.sync(() => {
       called = true;
     });
-    const failure = new Store.Failure({ operation: "read", cause: new Error("unavailable") });
+    const failure = StoreError.failed("Store", "read")(new Error("unavailable"));
     const badReplay = yield* run(
       (gateway) => Effect.exit(gateway.inWorkspace(workspaceId, operation)),
       { read: () => Effect.fail(failure) },
@@ -557,7 +545,10 @@ it.effect("one gateway resolves each caller's current membership and stops after
               }),
             ),
           );
-          expect(rejected).toMatchObject({ _tag: "GatewayErrors.NotMember", workspaceId });
+          expect(rejected).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotMember", workspaceId },
+          });
           expect(called).toBe(false);
           expect(seen).toEqual([alice, agent, alice]);
         }),
@@ -679,10 +670,10 @@ it.effect("a workspace that was never created is refused without being prepared"
       findActive: () => Effect.succeedNone,
     });
     expect(yield* Effect.flip(gateway.asMember(workspaceId, alice, Effect.void))).toEqual(
-      new GatewayErrors.NotMember({ workspaceId }),
+      new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) }),
     );
     expect(yield* Effect.flip(gateway.inWorkspace(workspaceId, Effect.void))).toEqual(
-      new GatewayErrors.WorkspaceNotFound({ workspaceId }),
+      new CoreError.NotFound({ resource: "Workspace", id: workspaceId }),
     );
     // Nothing was booted, and nothing was written: setLive would have failed the request.
     expect(boots.reads).toBe(0);
@@ -705,7 +696,9 @@ it.effect("a non-member of a created workspace is refused without preparing it",
         }),
       ),
     );
-    expect(refused).toEqual(new GatewayErrors.NotMember({ workspaceId }));
+    expect(refused).toEqual(
+      new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) }),
+    );
     expect(called).toBe(false);
     expect(boots.reads).toBe(0);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
@@ -769,7 +762,7 @@ it.effect("read models awaiting a rebuild are prepared first, then resolve membe
     expect(boots.reads).toBe(1);
     // The rebuilt read models still refuse someone who is not a member.
     expect(yield* Effect.flip(gateway.asMember(workspaceId, agent, Effect.void))).toEqual(
-      new GatewayErrors.NotMember({ workspaceId }),
+      new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) }),
     );
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );
@@ -834,7 +827,7 @@ it.effect("an open lease keeps its workspace prepared past the time-to-live", ()
 
 it.effect("a failed boot is discarded and a later acquisition retries once", () =>
   Effect.gen(function* () {
-    const failure = new Store.Failure({ operation: "read", cause: "boot failed" });
+    const failure = StoreError.failed("Store", "read")("boot failed");
     let reads = 0;
     let executed = 0;
     yield* Effect.scoped(

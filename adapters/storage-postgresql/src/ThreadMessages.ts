@@ -3,10 +3,10 @@
  * table: a message's author, how it came about, and its content each as a kind column beside that
  * kind's own columns, which the table's checks keep from mixing. `ThreadMessageStore.make` checks
  * every input before the driver sees it, so the driver keeps only what storage keeps: the primary
- * key refuses a reused ID as the store's `Conflict`, and an edit or deletion is a conditional
- * update that conflicts unless the message still has text, at the revision before for an edit.
- * Every statement is scoped to the binding's workspace and runs under its `guard`, which lets a
- * read join the caller's transaction and requires one for a write.
+ * key rejects a reused ID, and an edit or deletion is a conditional update rejected unless the
+ * message still has text, at the revision before for an edit. Every statement is scoped to the
+ * binding's workspace and runs under its `guard`, which lets a read join the caller's transaction
+ * and requires one for a write.
  *
  * @since 0.1.0
  */
@@ -17,7 +17,8 @@ import { and, count, eq } from "drizzle-orm";
 import { threadMessages } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
-import { storeError, storeFailure } from "./internal/errors.ts";
+import { storeError } from "./internal/errors.ts";
+import { StoreError } from "@amends-dev/core/journal";
 const validate = Schema.decodeEffect(Schema.toType(ThreadMessage.ThreadMessage));
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -150,15 +151,15 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
         )
         .returning({ id: threadMessages.id }),
       true,
-    ).pipe(Effect.mapError(storeError(ThreadMessageStore, operation)));
+    ).pipe(Effect.mapError(storeError("ThreadMessageStore", operation)));
     if (updated.length === 0)
-      return yield* new ThreadMessageStore.Conflict({
+      return yield* StoreError.rejected(
+        "ThreadMessageStore",
         operation,
-        message:
-          expectedRevision === undefined
-            ? "Expected a message with text"
-            : "Expected a message with text at the revision before",
-      });
+        expectedRevision === undefined
+          ? "Expected a message with text"
+          : "Expected a message with text at the revision before",
+      );
   });
   const driver: ThreadMessageStore.ThreadMessageStore["Service"] = {
     get: Effect.fn("ThreadMessages.get")(
@@ -170,7 +171,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
             .where(and(inWorkspace, eq(threadMessages.id, id))),
         ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(ThreadMessageStore, "get")),
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "get")),
     ),
     getMany: Effect.fn("ThreadMessages.getMany")(
       function* (ids) {
@@ -182,7 +183,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
             .where(and(inWorkspace, inIds(threadMessages.id, ids))),
         ).pipe(Effect.flatMap(decodeRows));
       },
-      Effect.mapError(storeFailure(ThreadMessageStore, "getMany")),
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "getMany")),
     ),
     countByThread: Effect.fn("ThreadMessages.countByThread")(
       function* (ids) {
@@ -201,7 +202,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
             .groupBy(threadMessages.threadId),
         ).pipe(Effect.flatMap(decodeCounts));
       },
-      Effect.mapError(storeFailure(ThreadMessageStore, "countByThread")),
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "countByThread")),
     ),
     insert: Effect.fn("ThreadMessages.insert")(function* (record) {
       yield* guard(
@@ -215,7 +216,7 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
           ...contentColumns(record.content),
         }),
         true,
-      ).pipe(Effect.mapError(storeError(ThreadMessageStore, "insert")));
+      ).pipe(Effect.mapError(storeError("ThreadMessageStore", "insert")));
     }),
     edit: Effect.fn("ThreadMessages.edit")(function* (edited) {
       yield* replaceContent(

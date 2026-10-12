@@ -7,8 +7,8 @@
  * commit of its own that holds only its log. `JournalEntry` maps entries to their columns.
  * `Store.make` checks every input before the driver sees it, so the driver keeps only what storage
  * keeps: a key reused with different content, a log that moved past `expectedAfter`, and
- * contention, each a `Store.Conflict`. A commit that appended notifies once it commits, waking
- * `waitForAppend` in every process; the binding's poll interval covers a lost notice.
+ * contention, each a `StoreError.StoreError`. A commit that appended notifies once it commits,
+ * waking `waitForAppend` in every process; the binding's poll interval covers a lost notice.
  *
  * @since 0.1.0
  */
@@ -18,9 +18,10 @@ import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect
 import * as JournalEntry from "./JournalEntry.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import * as Binding from "./Binding.ts";
-import { isContention, storeError, storeFailure } from "./internal/errors.ts";
+import { isContention, raceError } from "./internal/errors.ts";
 import { insertChunked } from "./internal/parameters.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./internal/schema.ts";
+import { StoreError } from "@amends-dev/core/journal";
 
 const BatchHeaderRow = Schema.Struct({
   logId: Entry.LogId,
@@ -170,9 +171,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     return yield* Effect.forEach(selected, (header) => {
       const values = byPosition[String(header.position)];
       if (values === undefined || !Array.isReadonlyArrayNonEmpty(values))
-        return Effect.fail(
-          new Store.Failure({ operation: "read", cause: "Log batch without entries" }),
-        );
+        return Effect.fail(StoreError.failed("Store", "read")("Log batch without entries"));
       const batch: Store.Batch = {
         logId: header.logId,
         position: header.position,
@@ -244,7 +243,7 @@ export const make = Effect.fn("Journal.make")(function* () {
       entries.length = 0;
       keys.length = 0;
     },
-    Effect.mapError(storeError(Store, "append")),
+    Effect.mapError(raceError("Store", "append")),
   );
 
   const stagingOf = (session: Binding.TransactionState) => {
@@ -288,8 +287,8 @@ export const make = Effect.fn("Journal.make")(function* () {
       .pipe(
         Effect.mapError((cause) =>
           isContention(cause)
-            ? new Store.Conflict({ operation: "append", message: "Another writer holds the log" })
-            : new Store.Failure({ operation: "append", cause }),
+            ? StoreError.contended("Store", "append", "Another writer holds the log")
+            : StoreError.failed("Store", "append")(cause),
         ),
       );
     staging.held.add(logId);
@@ -317,22 +316,20 @@ export const make = Effect.fn("Journal.make")(function* () {
   ) {
     const current = yield* Effect.serviceOption(Binding.CurrentTransaction);
     if (!session.active || Option.isNone(current) || current.value !== session)
-      return yield* new Store.Failure({
-        operation: "append",
-        cause: "Closed or foreign append handle",
-      });
+      return yield* StoreError.failed("Store", "append")("Closed or foreign append handle");
     const staging = stagingOf(session);
     yield* hold(staging, request.logId);
     if (request.idempotencyKey !== undefined) {
       const previous = yield* receiptIn(staging, request.logId, request.idempotencyKey).pipe(
-        Effect.mapError(storeFailure(Store, "append")),
+        Effect.mapError(StoreError.failed("Store", "append")),
       );
       if (Option.isSome(previous)) {
         if (!Store.sameContents(request.entries, previous.value.entries))
-          return yield* new Store.Conflict({
-            operation: "append",
-            message: "Idempotency key is already associated with different content",
-          });
+          return yield* StoreError.rejected(
+            "Store",
+            "append",
+            "Idempotency key is already associated with different content",
+          );
         return previous.value.entries;
       }
     }
@@ -354,14 +351,11 @@ export const make = Effect.fn("Journal.make")(function* () {
                 ),
               ),
               Effect.map((rows) => Option.map(Array.head(rows), (row) => row.position)),
-              Effect.mapError(storeError(Store, "append")),
+              Effect.mapError(StoreError.failed("Store", "append")),
             );
     if (request.expectedAfter !== undefined) {
       if (!Option.makeEquivalence<number>((a, b) => a === b)(last, request.expectedAfter))
-        return yield* new Store.Conflict({
-          operation: "append",
-          message: "Expected log position changed",
-        });
+        return yield* StoreError.contended("Store", "append", "Expected log position changed");
     }
     if (request.entries.length === 0) return [];
     const batch =
@@ -438,7 +432,7 @@ export const make = Effect.fn("Journal.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeEntries), Effect.map(Array.head));
       },
-      Effect.mapError(storeFailure(Store, "getEntry")),
+      Effect.mapError(StoreError.failed("Store", "getEntry")),
     ),
     readFacts: Effect.fn("Journal.readFacts")(function* (logId, options) {
       return yield* flushed(
@@ -465,7 +459,7 @@ export const make = Effect.fn("Journal.make")(function* () {
             .limit(options.limit)
             .pipe(Effect.flatMap(decodeEntries)),
         ),
-      ).pipe(Effect.mapError(storeFailure(Store, "readFacts")));
+      ).pipe(Effect.mapError(StoreError.failed("Store", "readFacts")));
     }),
     getAppend: (logId, key) =>
       guard(
@@ -475,7 +469,7 @@ export const make = Effect.fn("Journal.make")(function* () {
             ? receiptIn(stagingOf(session.value), logId, key)
             : storedAppend(logId, key),
         ),
-      ).pipe(Effect.mapError(storeFailure(Store, "getAppend"))),
+      ).pipe(Effect.mapError(StoreError.failed("Store", "getAppend"))),
     transaction: (program) =>
       transaction(program, (session) => ({
         id: session.commit.id,
@@ -484,10 +478,10 @@ export const make = Effect.fn("Journal.make")(function* () {
       })),
     append: Effect.fn("Journal.appendAlone")(function* (request) {
       if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
-        return yield* new Store.Failure({
-          operation: "append",
-          cause: "A standalone append cannot run inside a transaction; use its append",
-        });
+        return yield* StoreError.failed(
+          "Store",
+          "append",
+        )("A standalone append cannot run inside a transaction; use its append");
       // Its own commit, holding only the log: the workspace's transactions do not wait for it.
       return yield* transaction(
         Effect.flatMap(Store.Transaction, (storeTransaction) => storeTransaction.append(request)),
@@ -502,7 +496,7 @@ export const make = Effect.fn("Journal.make")(function* () {
     get: Effect.fn("Journal.get")(function* (logId, commitId) {
       return yield* flushed(
         guard(batches(headers().where(and(scoped(logId), eq(logBatches.commitId, commitId))))),
-      ).pipe(Effect.map(Array.head), Effect.mapError(storeFailure(Store, "get")));
+      ).pipe(Effect.map(Array.head), Effect.mapError(StoreError.failed("Store", "get")));
     }),
     head: Effect.fn("Journal.head")(function* (logId) {
       return yield* flushed(
@@ -519,7 +513,7 @@ export const make = Effect.fn("Journal.make")(function* () {
           Schema.decodeEffect(Schema.Array(Schema.Struct({ position: Entry.Position })))(rows),
         ),
         Effect.map((rows) => Option.map(Array.head(rows), (row) => row.position)),
-        Effect.mapError(storeFailure(Store, "head")),
+        Effect.mapError(StoreError.failed("Store", "head")),
       );
     }),
     read: Effect.fn("Journal.read")(function* (logId, options) {
@@ -532,14 +526,14 @@ export const make = Effect.fn("Journal.make")(function* () {
               .limit(options.limit),
           ),
         ),
-      ).pipe(Effect.mapError(storeFailure(Store, "read")));
+      ).pipe(Effect.mapError(StoreError.failed("Store", "read")));
     }),
     waitForAppend: Effect.fn("Journal.waitForAppend")(function* (logId, after) {
       if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
-        return yield* new Store.Failure({
-          operation: "waitForAppend",
-          cause: "Cannot wait inside a transaction",
-        });
+        return yield* StoreError.failed(
+          "Store",
+          "waitForAppend",
+        )("Cannot wait inside a transaction");
       const appended = guard(
         db
           .select({ position: logBatches.position })
@@ -556,7 +550,7 @@ export const make = Effect.fn("Journal.make")(function* () {
           .limit(1),
       ).pipe(
         Effect.map((rows) => rows.length > 0),
-        Effect.mapError(storeFailure(Store, "waitForAppend")),
+        Effect.mapError(StoreError.failed("Store", "waitForAppend")),
       );
       // Committed state is the truth, so other processes and lost acknowledgments are visible;
       // notifications only say when to look again, and the interval covers any that are lost.

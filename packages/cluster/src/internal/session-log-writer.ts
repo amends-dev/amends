@@ -170,7 +170,7 @@ export const open = Effect.fn("SessionLogWriter.open")(function* (
     const { head } = yield* Ref.get(written);
     const appended = yield* workspace
       .appendLog(participationId, more, head)
-      .pipe(Effect.catchTag("SessionLogStore.Conflict", () => new Superseded({ turnId })));
+      .pipe(Effect.catchTag("SessionLogStore.Overtaken", () => new Superseded({ turnId })));
     yield* Ref.update(written, (before) => ({
       head: appended.at(-1)?.position ?? before.head,
       entries: [...before.entries, ...more],

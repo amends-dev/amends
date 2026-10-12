@@ -12,42 +12,14 @@ import {
   type Integration,
   Integrations,
 } from "@amends-dev/connection";
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import * as Connection from "../connection/Connection.ts";
 import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import * as Channel from "./Channel.ts";
 import * as ChannelStore from "./ChannelStore.ts";
-
-/**
- * The channel is missing or removed.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("ChannelQuery.NotFound", {
-  channelId: Channel.Id,
-}) {}
-
-/**
- * The channel's external system cannot be reached as the channel stands: its connection was
- * removed or has no key, this host keeps no keys, its integration is not installed or gives no
- * channels, or the integration refused the connection.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()("ChannelQuery.Unavailable", {
-  description: Schema.String,
-}) {}
-
-/**
- * What reaching a channel's system can fail with, besides it being unavailable.
- *
- * @category errors
- * @since 0.1.0
- */
-export type Error = ConnectionStore.Failure | ConnectionCredentialStore.Failure;
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The shared reads of channels. Internal: not among `Core.Operations`.
@@ -58,25 +30,28 @@ export type Error = ConnectionStore.Failure | ConnectionCredentialStore.Failure;
 export class ChannelQuery extends Context.Service<
   ChannelQuery,
   {
-    /** The channel, which must exist and not be removed; otherwise it is `NotFound`. */
+    /** The channel, which must exist and not be removed; otherwise it is `CoreError.NotFound`. */
     readonly requireActive: (
       channelId: Channel.Id,
-    ) => Effect.Effect<Channel.Channel, ChannelStore.Failure | NotFound>;
+    ) => Effect.Effect<Channel.Channel, StoreError.StoreError | CoreError.NotFound>;
     /** The integration of a connection, which must be installed and give channels. */
     readonly integrationOf: (
       connection: Connection.Connection,
-    ) => Effect.Effect<Integration.Integration, Unavailable>;
+    ) => Effect.Effect<Integration.Integration, CoreError.Unavailable>;
     /**
      * The channel's connection as its integration takes it, with its key, for whoever reaches the
      * system on the channel's behalf outside core, as the delivery job does.
      */
     readonly access: (
       channel: Channel.Channel,
-    ) => Effect.Effect<Connection.Access, Error | Unavailable>;
+    ) => Effect.Effect<Connection.Access, StoreError.StoreError | CoreError.Unavailable>;
     /** The channel's transport, made by its integration from that access. */
     readonly transport: (
       channel: Channel.Channel,
-    ) => Effect.Effect<ChannelTransport.ChannelTransport, Error | Unavailable>;
+    ) => Effect.Effect<
+      ChannelTransport.ChannelTransport,
+      StoreError.StoreError | CoreError.Unavailable
+    >;
   }
 >()("@amends-dev/core/channel/ChannelQuery") {}
 
@@ -95,7 +70,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
   const requireActive = Effect.fn("ChannelQuery.requireActive")(function* (channelId: Channel.Id) {
     const found = yield* channelStore.get(channelId);
     if (Option.isNone(found) || found.value.status !== "active")
-      return yield* new NotFound({ channelId });
+      return yield* new CoreError.NotFound({ resource: "Channel", id: channelId });
     return found.value;
   });
 
@@ -104,12 +79,16 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
   ) {
     const integration = yield* Effect.option(integrations.find(connection.integration));
     if (Option.isNone(integration))
-      return yield* new Unavailable({
-        description: `The integration ${connection.integration} is not installed here.`,
+      return yield* new CoreError.Unavailable({
+        reason: new CoreError.ChannelUnreachable({
+          description: `The integration ${connection.integration} is not installed here.`,
+        }),
       });
     if (!integration.value.provides.includes("channels"))
-      return yield* new Unavailable({
-        description: `${integration.value.name} gives no channels.`,
+      return yield* new CoreError.Unavailable({
+        reason: new CoreError.ChannelUnreachable({
+          description: `${integration.value.name} gives no channels.`,
+        }),
       });
     return integration.value;
   });
@@ -118,7 +97,11 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
   const resolve = Effect.fnUntraced(function* (channel: Channel.Channel) {
     const found = yield* connectionStore.get(channel.connectionId);
     if (Option.isNone(found) || found.value.status !== "active")
-      return yield* new Unavailable({ description: "The channel's connection was removed." });
+      return yield* new CoreError.Unavailable({
+        reason: new CoreError.ChannelUnreachable({
+          description: "The channel's connection was removed.",
+        }),
+      });
     const integration = yield* integrationOf(found.value);
     return { record: found.value, integration };
   });
@@ -128,19 +111,25 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
     record: Connection.Connection,
   ): Effect.fn.Return<
     ConnectionContract.Credential | null,
-    ConnectionCredentialStore.Failure | Unavailable
+    StoreError.StoreError | CoreError.Unavailable
   > {
     if (record.auth !== "apiKey") return null;
-    const credential = yield* connectionCredentialStore
-      .get(record.id)
-      .pipe(
-        Effect.catchTag(
-          "ConnectionCredentialStore.Unavailable",
-          ({ reason }) => new Unavailable({ description: reason }),
-        ),
-      );
+    const credential = yield* connectionCredentialStore.get(record.id).pipe(
+      // A host that keeps no keys cannot reach the channel's system either.
+      Effect.catchTag(
+        "CoreError.Unavailable",
+        ({ reason }) =>
+          new CoreError.Unavailable({
+            reason: new CoreError.ChannelUnreachable({ description: reason.message }),
+          }),
+      ),
+    );
     if (Option.isNone(credential))
-      return yield* new Unavailable({ description: `The connection ${record.name} has no key.` });
+      return yield* new CoreError.Unavailable({
+        reason: new CoreError.ChannelUnreachable({
+          description: `The connection ${record.name} has no key.`,
+        }),
+      });
     return credential.value;
   });
 
@@ -155,7 +144,14 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
     const credential = yield* credentialOf(record);
     return yield* integration
       .channelTransport(Connection.connectionOf(record), credential ?? undefined)
-      .pipe(Effect.mapError((error) => new Unavailable({ description: error.reason.description })));
+      .pipe(
+        Effect.mapError(
+          (error) =>
+            new CoreError.Unavailable({
+              reason: new CoreError.ChannelUnreachable({ description: error.reason.description }),
+            }),
+        ),
+      );
   });
 
   return ChannelQuery.of({ requireActive, integrationOf, access, transport });

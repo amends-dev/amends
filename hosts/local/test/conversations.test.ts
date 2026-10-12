@@ -85,23 +85,23 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         const outside = { workspaceId, groupId: mine.id };
         expect(yield* asAlice.groups.get({ params: outside }).pipe(Effect.flip)).toMatchObject({
-          _tag: "GroupService.NotFound",
+          _tag: "CoreError.NotFound",
         });
         expect(
           yield* asAlice.groups
             .addMember({ params: outside, payload: { memberId: aliceId } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         expect(
           yield* asAlice.groups
             .rename({ params: outside, payload: { name: "Ours", expectedName: "Mine" } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupService.NotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         expect(
           yield* asAlice.groups
             .members({ params: outside, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         // Bob leaves his group again; the rest of the conversation happens in Design.
         const [kept] = yield* asBob.groups.members({ params: outside, query: { limit: 10 } });
         yield* asBob.groups.leave({ params: { ...outside, membershipId: kept!.id } });
@@ -152,7 +152,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { name: "Plans", expectedName: "Design" },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupService.Changed", groupId: group.id });
+        ).toMatchObject({ _tag: "CoreError.Changed", resource: "Group", id: group.id });
         yield* asAlice.groups.rename({
           params: { workspaceId, groupId: group.id },
           payload: { name: "Design", expectedName: "Product design" },
@@ -295,7 +295,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { throughSequence: latest + 1 },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ReadStateService.BeyondTimeline", latestSequence: latest });
+        ).toMatchObject({
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "BeyondTimeline", latestSequence: latest },
+        });
         yield* asBob.groups.markRead({ params: { workspaceId, groupId } });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({ newActivity: false });
@@ -315,7 +318,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.threads
             .unfollow({ params: { workspaceId, threadId }, payload: { participationId: own.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadParticipationService.AlreadyEnded" });
+        ).toMatchObject({
+          _tag: "CoreError.Conflict",
+          reason: { _tag: "AlreadyEnded", resource: "ThreadParticipation" },
+        });
         const followed = yield* asBob.threads.follow({ params: { workspaceId, threadId } });
         expect(followed.participant).toEqual({ _tag: "Member", memberId: bobId });
         expect(followed.id).not.toBe(own.id);
@@ -340,7 +346,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asAlice.groups
             .follow({ params: { workspaceId, groupId }, payload: { memberId: bobId } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupFollowService.AgentRequired" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "AgentRequired" } });
 
         // Leaving the group ends Bob's access to it and its threads.
         const admission = roster.find((entry) => entry.memberId === bobId)!;
@@ -408,7 +414,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.threads
             .list({ params: { workspaceId, groupId }, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         // Joining admits him, once; he then reads its threads like any member.
         const joined = yield* asBob.groups.join({ params: { workspaceId, groupId } });
         expect(joined).toMatchObject({ groupId, memberId: bobId, status: "active" });
@@ -427,7 +433,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.groups
             .join({ params: { workspaceId, groupId: secret.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
       }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),
   );
@@ -466,7 +472,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { participationId: own.id },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadParticipationService.FixedParticipation" });
+        ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "FixedParticipation" } });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({
           group: { id: groupId, kind: "Direct", memberIds: [aliceId, bobId].sort() },
@@ -527,13 +533,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
             responseMode: "response-only",
           }),
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status)));
-        expect(fixed).toEqual([409, 409, 409]);
+        expect(fixed).toEqual([422, 422, 422]);
         const outsider = yield* client("carol");
         expect(
           yield* outsider.groups
             .list({ params: { workspaceId }, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
 
         const http = yield* HttpClient.HttpClient;
         const authorization = { authorization: "Bearer alice" };
@@ -551,10 +557,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(response.status).toBe(400);
         }
         const timeline = `/workspaces/${workspaceId}/threads/${direct.thread.id}/timeline`;
-        for (const query of ["limit=10&from=middle", "limit=10&afterSequence=5&beforeSequence=5"])
-          expect((yield* http.get(`${timeline}?${query}`, { headers: authorization })).status).toBe(
-            400,
+        // A query the contract cannot read is 400; an empty range it reads but core refuses is 422.
+        const timelineStatus = (query: string) =>
+          Effect.map(
+            http.get(`${timeline}?${query}`, { headers: authorization }),
+            (response) => response.status,
           );
+        expect(yield* timelineStatus("limit=10&from=middle")).toBe(400);
+        expect(yield* timelineStatus("limit=10&afterSequence=5&beforeSequence=5")).toBe(422);
         const blank = yield* http.post(
           `/workspaces/${workspaceId}/threads/${direct.thread.id}/messages`,
           {

@@ -9,6 +9,7 @@ import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect";
 import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
+import { CoreError } from "@amends-dev/core/error";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const workspaceId = Workspace.Id.make("workspace-one");
@@ -43,7 +44,7 @@ const gateway = Layer.succeed(
     ) =>
       Effect.provide(Effect.provideService(program, Actor.Actor, actor), failing) as Effect.Effect<
         A,
-        GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember,
+        GatewayErrors.PublicErrorOf<E> | CoreError.Denied,
         Scope.Scope
       >,
   }),
@@ -89,7 +90,7 @@ it.effect(
       );
       expect(messages.map((message) => message._tag)).toEqual(["Ready"]);
       expect(Exit.isFailure(exit) && Exit.findErrorOption(exit)).toEqual(
-        Option.some(new ChangeFeed.Unavailable({})),
+        Option.some(new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() })),
       );
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(false);
       expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).not.toContain("hunter2");

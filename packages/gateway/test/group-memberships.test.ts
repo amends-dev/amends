@@ -22,7 +22,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
 import {
   Invitation,
   InvitationFacts,
@@ -51,6 +51,8 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 /** Group admission and departure: authority, workspace removal, concurrency, and replay. */
 
@@ -197,8 +199,10 @@ describe("group memberships", () => {
             const own = Option.getOrThrow(
               yield* bound.groupMemberships.findActive(Group.GeneralId, owner.memberId),
             );
-            const refused = new GroupMembershipService.GeneralMembership({
-              groupId: Group.GeneralId,
+            const refused = new CoreError.Invalid({
+              reason: new CoreError.GeneralMembership({
+                groupId: Group.GeneralId,
+              }),
             });
             // Nobody, person or agent, leaves it or is removed, however broad the authority.
             expect(yield* Effect.flip(run(bound, owner, leave(own)))).toEqual(refused);
@@ -264,8 +268,11 @@ describe("group memberships", () => {
             expect(
               yield* Effect.flip(run(bound, manager, add(otherGroup.id, humanId))),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { target: { _tag: "Group", groupId: otherGroup.id } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { target: { _tag: "Group", groupId: otherGroup.id } },
+              },
             });
             expect(yield* history(bound)).toEqual(after);
             expect(
@@ -306,9 +313,7 @@ describe("group memberships", () => {
             const created = yield* run(bound, manager, create("Created by manager", [managerId]));
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, manager, add(created.id, humanId)))).toMatchObject(
-              {
-                _tag: "Authorization.Denied",
-              },
+              { _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } },
             );
             expect(yield* history(bound)).toEqual(before);
             const roleId = Role.Id.make("group-coordinator");
@@ -352,7 +357,8 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, manager, add(group.id, agentId)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             yield* publish(
               bound,
@@ -365,7 +371,8 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, add(group.id, agentId)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -397,12 +404,12 @@ describe("group memberships", () => {
             const membership = yield* run(bound, owner, add(group.id, humanId));
             const before = yield* history(bound);
             for (const [groupId, memberId, tag] of [
-              [Group.Id.make("missing"), humanId, "GroupMembershipService.GroupNotFound"],
-              [foreignGroup.id, humanId, "GroupMembershipService.GroupNotFound"],
-              [group.id, Member.Id.make("missing"), "GroupMembershipService.MemberNotFound"],
-              [group.id, otherWorkspace.ownerMemberId, "GroupMembershipService.MemberNotFound"],
-              [group.id, agentId, "GroupMembershipService.InactiveMember"],
-              [group.id, humanId, "GroupMembershipService.AlreadyMember"],
+              [Group.Id.make("missing"), humanId, "CoreError.NotFound"],
+              [foreignGroup.id, humanId, "CoreError.NotFound"],
+              [group.id, Member.Id.make("missing"), "CoreError.NotFound"],
+              [group.id, otherWorkspace.ownerMemberId, "CoreError.NotFound"],
+              [group.id, agentId, "CoreError.Conflict"],
+              [group.id, humanId, "CoreError.Conflict"],
             ] as const)
               expect(yield* Effect.flip(run(bound, owner, add(groupId, memberId)))).toMatchObject({
                 _tag: tag,
@@ -471,12 +478,15 @@ describe("group memberships", () => {
             expect(yield* flags(human, lobby.id)).toEqual([true, false, true]);
             const agentThere = yield* run(bound, human, add(lobby.id, agentId));
             expect(yield* Effect.flip(run(bound, human, remove(agentThere)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: "group.moderate" } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: "group.moderate" } },
+              },
             });
             // The owner moderates, but only from inside the group, which they join first.
             expect(yield* Effect.flip(run(bound, owner, remove(agentThere)))).toMatchObject({
-              _tag: "GroupMembershipService.GroupNotFound",
+              _tag: "CoreError.NotFound",
             });
             yield* run(
               bound,
@@ -604,14 +614,16 @@ describe("group memberships", () => {
             yield* bound.store.transaction(bound.groups.insert(direct));
             for (const id of [group.id, direct.id, Group.Id.make("missing")])
               expect(yield* Effect.flip(run(bound, human, join(id)))).toMatchObject({
-                _tag: "GroupMembershipService.GroupNotFound",
-                groupId: id,
+                _tag: "CoreError.NotFound",
+                resource: "Group",
+                id: id,
               });
             // Someone without group.join neither finds public groups nor joins one.
             const agent = memberActor(agentId);
             expect(yield* run(bound, agent, listPublic({ limit: 10 }))).toEqual([]);
             expect(yield* Effect.flip(run(bound, agent, join(lobby.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             // Leaving works as for any team group, and the listing follows.
             yield* run(bound, human, leave(joined));
@@ -636,10 +648,7 @@ describe("group memberships", () => {
           const { bound, group, owner } = yield* prepare();
           const before = yield* history(bound);
           const live = yield* bound.checkpoints.listLive(journalLog);
-          const failure = new Store.Failure({
-            operation: "commit",
-            cause: "injected late failure",
-          });
+          const failure = StoreError.failed("Store", "commit")("injected late failure");
           const broken = failingLate(bound, failure);
           expect(yield* Effect.flip(run(broken, owner, add(group.id, humanId)))).toEqual(failure);
           expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
@@ -690,7 +699,10 @@ describe("group memberships", () => {
               ),
             ),
           );
-          expect(yield* Effect.flip(afterRevoke)).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(yield* Effect.flip(afterRevoke)).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
           const afterRemoval = run(
             bound,
             owner,
@@ -704,7 +716,8 @@ describe("group memberships", () => {
             ),
           );
           expect(yield* Effect.flip(afterRemoval)).toMatchObject({
-            _tag: "GroupMembershipService.InactiveMember",
+            _tag: "CoreError.Conflict",
+            reason: { _tag: "InactiveMember" },
           });
           expect(yield* history(bound)).toEqual(before);
           expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
@@ -746,9 +759,7 @@ describe("group memberships", () => {
                 );
                 expect(
                   yield* Effect.flip(run(bound, manager, add(group.id, agentId))),
-                ).toMatchObject({
-                  _tag: "Authorization.InvalidActor",
-                });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
                 return { group, membership, history: yield* history(bound) };
               }),
             ),
@@ -819,9 +830,7 @@ describe("group memberships", () => {
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               _tag: "Some",
               value: {
-                _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyMember|Store.Conflict)$/,
-                ),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
               },
             });
         }
@@ -882,20 +891,21 @@ describe("group memberships", () => {
             const call = (memberId: Member.Id) =>
               gateway.asMember(workspace.id, managerIdentity, add(group.id, memberId));
             expect(yield* Effect.flip(call(humanId))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             yield* grant(bound, group.id);
             yield* call(humanId);
             expect(yield* Effect.flip(call(humanId))).toEqual(
-              new GroupMembershipService.AlreadyMember({
-                groupId: group.id,
-                memberId: humanId,
+              new CoreError.Conflict({
+                reason: new CoreError.AlreadyMember({
+                  groupId: group.id,
+                  memberId: humanId,
+                }),
               }),
             );
             expect(yield* Effect.flip(call(Member.Id.make("missing")))).toEqual(
-              new GroupMembershipService.MemberNotFound({
-                memberId: Member.Id.make("missing"),
-              }),
+              new CoreError.NotFound({ resource: "Member", id: Member.Id.make("missing") }),
             );
             yield* publish(
               bound,
@@ -907,14 +917,16 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(call(agentId))).toEqual(
-              new GroupMembershipService.InactiveMember({ memberId: agentId }),
+              new CoreError.Conflict({
+                reason: new CoreError.InactiveMember({ memberId: agentId }),
+              }),
             );
             const missing = Group.Id.make("missing");
             expect(
               yield* Effect.flip(
                 gateway.asMember(workspace.id, ownerIdentity, add(missing, humanId)),
               ),
-            ).toEqual(new GroupMembershipService.GroupNotFound({ groupId: missing }));
+            ).toEqual(new CoreError.NotFound({ resource: "Group", id: missing }));
             yield* publish(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -926,7 +938,8 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(call(agentId))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -947,7 +960,8 @@ describe("group memberships", () => {
             const elsewhere = yield* run(bound, owner, add(otherGroup.id, humanId));
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, manager, remove(elsewhere)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             expect(yield* history(bound)).toEqual(before);
             yield* TestClock.adjust("5 seconds");
@@ -1031,7 +1045,7 @@ describe("group memberships", () => {
               )) {
                 expect(yield* Effect.flip(run(bound, actor, leave(other.admission)))).toMatchObject(
                   {
-                    _tag: "GroupMembershipService.NotFound",
+                    _tag: "CoreError.NotFound",
                   },
                 );
               }
@@ -1039,11 +1053,12 @@ describe("group memberships", () => {
                 Object.assign({}, admission, { status: "removed" }),
               );
               expect(yield* Effect.flip(run(bound, actor, leave(admission)))).toMatchObject({
-                _tag: "GroupMembershipService.AlreadyRemoved",
+                _tag: "CoreError.Conflict",
+                reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
               });
               expect(
                 yield* Effect.flip(run(bound, actor, add(group.id, actor.memberId))),
-              ).toMatchObject({ _tag: "Authorization.Denied" });
+              ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
               expect(yield* bound.members.get(actor.memberId)).toMatchObject({
                 value: { status: "active" },
               });
@@ -1109,7 +1124,8 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, manager, remove(membership)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             yield* publish(
               bound,
@@ -1134,7 +1150,8 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, manager, remove(next)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             yield* publish(
               bound,
@@ -1147,7 +1164,8 @@ describe("group memberships", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, remove(next)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -1184,10 +1202,12 @@ describe("group memberships", () => {
             );
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, owner, remove(old)))).toMatchObject({
-              _tag: "GroupMembershipService.AlreadyRemoved",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
             });
             expect(yield* Effect.flip(run(bound, actor, leave(old)))).toMatchObject({
-              _tag: "GroupMembershipService.AlreadyRemoved",
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
             });
             for (const input of [
               { groupId: group.id, membershipId: GroupMembership.Id.make("missing") },
@@ -1206,7 +1226,7 @@ describe("group memberships", () => {
                       ),
                     ),
                   ),
-                ).toMatchObject({ _tag: "GroupMembershipService.NotFound" });
+                ).toMatchObject({ _tag: "CoreError.NotFound" });
               }
             }
             expect(yield* history(bound)).toEqual(before);
@@ -1280,7 +1300,7 @@ describe("group memberships", () => {
                     leave(active.find((value) => value.memberId === memberId) ?? old),
                   ),
                 ),
-              ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+              ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             }
             for (const membership of [old, ...active])
               expect(yield* bound.groupMemberships.get(membership.id)).toEqual(
@@ -1333,7 +1353,10 @@ describe("group memberships", () => {
             const before = yield* history(bound);
             expect(
               yield* Effect.flip(run(bound, owner, removeWorkspaceMember(humanId))),
-            ).toMatchObject({ _tag: "MemberService.AlreadyRemoved" });
+            ).toMatchObject({
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "Member" },
+            });
             expect(yield* history(bound)).toEqual(before);
           }),
         ),
@@ -1351,10 +1374,7 @@ describe("group memberships", () => {
             const membership = yield* run(bound, owner, add(group.id, humanId));
             const before = yield* history(bound);
             const live = yield* bound.checkpoints.listLive(journalLog);
-            const failure = new Store.Failure({
-              operation: "commit",
-              cause: "injected late failure",
-            });
+            const failure = StoreError.failed("Store", "commit")("injected late failure");
             const broken = failingLate(bound, failure);
             for (const operation of [remove, leave]) {
               const actor = operation === remove ? owner : memberActor(humanId);
@@ -1396,10 +1416,10 @@ describe("group memberships", () => {
           const admissions = yield* bound.groupMemberships.listActiveByMember(humanId);
           const before = yield* history(bound);
           const live = yield* bound.checkpoints.listLive(journalLog);
-          const failure = new GroupMembershipStore.Failure({
-            operation: "markRemoved",
-            cause: "second departure",
-          });
+          const failure = StoreError.failed(
+            "GroupMembershipStore",
+            "markRemoved",
+          )("second departure");
           const broken = {
             ...bound,
             context: Context.add(bound.context, GroupMembershipStore.GroupMembershipStore, {
@@ -1452,7 +1472,7 @@ describe("group memberships", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "Authorization.Denied" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           expect(
             yield* Effect.flip(
               run(
@@ -1470,7 +1490,7 @@ describe("group memberships", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
           expect(yield* history(bound)).toEqual(before);
           expect(yield* bound.groupMemberships.get(admission.id)).toEqual(Option.some(admission));
         }),
@@ -1590,9 +1610,7 @@ describe("group memberships", () => {
           if (Exit.isFailure(outcome))
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               value: {
-                _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyRemoved|Store.Conflict)$/,
-                ),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
               },
             });
         yield* Effect.scoped(
@@ -1667,9 +1685,7 @@ describe("group memberships", () => {
             if (Exit.isFailure(outcome))
               expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(
-                    /^(GroupMembershipService.InactiveMember|Store.Conflict)$/,
-                  ),
+                  _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
                 },
               });
           yield* Effect.scoped(
@@ -1724,7 +1740,11 @@ describe("group memberships", () => {
                 yield* Effect.flip(
                   bound.store.transaction(bound.groupMemberships.markRemoved(invalid)),
                 ),
-              ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+              ).toMatchObject({
+                _tag: "StoreError",
+                store: "GroupMembershipStore",
+                reason: { _tag: "Rejected" },
+              });
               expect(yield* bound.groupMemberships.listActiveByMember(humanId)).toEqual(expected);
             }
             expect(
@@ -1734,12 +1754,20 @@ describe("group memberships", () => {
                   bound.groupMemberships.markRemoved({ ...removal, reason: "unknown" }),
                 ),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(
               yield* Effect.flip(
                 foreign.store.transaction(foreign.groupMemberships.markRemoved(removal)),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             yield* bound.store.transaction(bound.groupMemberships.markRemoved(removal));
             expect(yield* bound.groupMemberships.get(first.id)).toEqual(
               Option.some(Object.assign({}, first, { status: "removed" })),
@@ -1749,13 +1777,21 @@ describe("group memberships", () => {
               yield* Effect.flip(
                 bound.store.transaction(bound.groupMemberships.markRemoved(removal)),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             const fresh = yield* run(bound, owner, add(group.id, humanId));
             expect(
               yield* Effect.flip(
                 bound.store.transaction(bound.groupMemberships.markRemoved(removal)),
               ),
-            ).toMatchObject({ _tag: "GroupMembershipStore.Conflict" });
+            ).toMatchObject({
+              _tag: "StoreError",
+              store: "GroupMembershipStore",
+              reason: { _tag: "Rejected" },
+            });
             expect(yield* bound.groupMemberships.findActive(group.id, humanId)).toEqual(
               Option.some(fresh),
             );
@@ -1798,14 +1834,16 @@ describe("group memberships", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, managerIdentity, remove(admission)),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* gateway.asMember(workspace.id, managerIdentity, leave(admission));
             expect(
               yield* Effect.flip(gateway.asMember(workspace.id, managerIdentity, leave(admission))),
             ).toEqual(
-              new GroupMembershipService.AlreadyRemoved({
-                groupId: group.id,
-                membershipId: admission.id,
+              new CoreError.Conflict({
+                reason: new CoreError.AlreadyEnded({
+                  resource: "GroupMembership",
+                  id: admission.id,
+                }),
               }),
             );
             expect(
@@ -1817,14 +1855,17 @@ describe("group memberships", () => {
                 ),
               ),
             ).toEqual(
-              new GroupMembershipService.NotFound({
-                groupId: group.id,
-                membershipId: GroupMembership.Id.make("missing"),
+              new CoreError.NotFound({
+                resource: "GroupMembership",
+                id: GroupMembership.Id.make("missing"),
               }),
             );
             expect(
               yield* Effect.flip(gateway.asMember(workspace.id, ownerIdentity, remove(admission))),
-            ).toMatchObject({ _tag: "GroupMembershipService.AlreadyRemoved" });
+            ).toMatchObject({
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "AlreadyEnded", resource: "GroupMembership" },
+            });
           }),
         ),
       ),
@@ -1879,7 +1920,7 @@ describe("group memberships", () => {
             expect(fresh.id).not.toBe(admission.id);
             expect(
               yield* Effect.flip(run(bound, { ...actor, memberId: newMemberId }, leave(admission))),
-            ).toMatchObject({ _tag: "GroupMembershipService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* bound.groupMemberships.findActive(group.id, newMemberId)).toEqual(
               Option.some(fresh),
             );
@@ -1921,7 +1962,11 @@ describe("group memberships", () => {
                       .publish(GroupMembershipFacts.Removed, { ...event.payload, reason: "left" })
                       .pipe(Effect.provideService(Publication.Publication, event.provenance)),
                   ),
-                ).toMatchObject({ _tag: "Store.Conflict" });
+                ).toMatchObject({
+                  _tag: "StoreError",
+                  store: "Store",
+                  reason: { _tag: "Rejected" },
+                });
               }),
             );
             expect(yield* history(bound)).toEqual(before);

@@ -51,43 +51,24 @@ import * as SessionLogStore from "./SessionLogStore.ts";
 import * as SessionStateStore from "./SessionStateStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
- * The workspace has no turn with this ID.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("TurnExecution.NotFound", {
-  turnId: Turn.Id,
-}) {}
-
-/**
- * The turn is not in the state the step needs: it has finished, or is not running yet.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotActive extends Schema.TaggedError<NotActive>()("TurnExecution.NotActive", {
-  turnId: Turn.Id,
-  status: Turn.Status,
-}) {}
-
-/**
- * What every execution operation can fail with: the turn's outcomes above, and the
- * failures of the stores and commit each one writes through.
+ * What every execution operation can fail with: a turn missing or not in the state the step needs
+ * (`CoreError.Conflict` with `TurnNotActive`), and the failures of the stores and commit each one
+ * writes through.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | TurnStore.Failure
+  | StoreError.StoreError
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Projection.Error
-  | SessionStateStore.Failure
-  | NotFound
-  | NotActive
+  | CoreError.NotFound
+  | CoreError.Conflict
   | TurnCommand.EndError;
 
 /**
@@ -99,10 +80,8 @@ export type Error =
  */
 export type AcceptError =
   | Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
-  | NotificationStore.Failure
-  | MemberStore.Failure
-  | SessionLogStore.Failure;
+  | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
+  | StoreError.StoreError;
 
 /**
  * What `start` can fail with: `Error`, and the failures of reading what the agent is told and of
@@ -113,12 +92,8 @@ export type AcceptError =
  */
 export type StartError =
   | Error
-  | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
-  | NotificationStore.Failure
-  | MemberStore.Failure
-  | ContactStore.Failure
-  | TaskStore.Failure
-  | ThreadParticipationStore.Failure
+  | Exclude<ThreadQuery.TimelineError, CoreError.NotFound>
+  | StoreError.StoreError
   | AgentQuery.BuildError;
 
 /**
@@ -128,13 +103,7 @@ export type StartError =
  * @category errors
  * @since 0.1.0
  */
-export type JoinedConversationError =
-  | Error
-  | MemberStore.Failure
-  | ContactStore.Failure
-  | ThreadParticipationStore.Failure
-  | ThreadActivityStore.Failure
-  | ThreadMessageStore.Failure;
+export type JoinedConversationError = Error | StoreError.StoreError;
 
 /**
  * What `close` can fail with: `Error`, and the failures of checking the agent's access and
@@ -145,8 +114,8 @@ export type JoinedConversationError =
  */
 export type CloseError =
   | Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
-  | ThreadQuery.ParticipantsError
+  | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
+  | StoreError.StoreError
   | ThreadCommand.Error;
 
 /**
@@ -258,7 +227,7 @@ export class TurnExecution extends Context.Service<
     readonly fail: (
       turnId: Turn.Id,
       failure: { readonly reason: string; readonly resume?: SessionStateStore.Resume | undefined },
-    ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
+    ) => Effect.Effect<void, Error | StoreError.StoreError>;
     /**
      * End a turn its job stopped, or that it was not running, keeping a session it started: one
      * asked to stop, or whose participation ended. Any other turn is left as it is.
@@ -266,28 +235,12 @@ export class TurnExecution extends Context.Service<
     readonly confirmStopped: (
       turnId: Turn.Id,
       stopped: { readonly resume?: SessionStateStore.Resume | undefined },
-    ) => Effect.Effect<void, Error | ThreadParticipationStore.Failure>;
+    ) => Effect.Effect<void, Error | StoreError.StoreError>;
   }
 >()("@amends-dev/core/turn/TurnExecution") {}
 
 /** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
-
-/** Why the agent cannot run, as the turn that failed for it says. */
-const describeIssue = (issue: Agent.Issue): string => {
-  switch (issue._tag) {
-    case "Removed":
-      return `The connection for the agent's ${issue.part} was removed.`;
-    case "Uninstalled":
-      return `The integration of the agent's ${issue.part} connection is not installed here.`;
-    case "Invalid":
-      return issue.description;
-    case "SandboxRequired":
-      return "The agent's harness works only in a sandbox, and the agent has none.";
-    case "NoHarness":
-      return "No connection gives a harness the agent can run on.";
-  }
-};
 
 /**
  * The execution over the workspace's stores, the turn and thread commands, `AgentQuery`, the
@@ -320,7 +273,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const requireTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turnStore.get(turnId);
-    if (Option.isNone(found)) return yield* new NotFound({ turnId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Turn", id: turnId });
     return found.value;
   });
 
@@ -549,10 +503,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
     const thread = yield* threadQuery.requireAccess(threadId).pipe(
       Effect.asSome,
-      Effect.catchTags({
-        "ThreadQuery.NotFound": () => Effect.succeedNone,
-        "Authorization.Denied": () => Effect.succeedNone,
-      }),
+      Effect.catchTag("CoreError.NotFound", () => Effect.succeedNone),
+      Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeedNone),
     );
     if (Option.isNone(thread)) return undefined;
     const notificationIds = accepted.map(({ id }) => id);
@@ -711,25 +663,25 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             const runnable = yield* agentQuery.buildRunnable(turn.memberId, selection);
             return yield* readyTurn(turn, selection, runnable);
           }).pipe(
+            // The agent's membership ended, or the thread is gone or closed to the agent: the turn
+            // fails rather than tells nothing.
+            Effect.catchReason("CoreError.Denied", "NotGranted", () =>
+              endAsIdle(turn, {
+                outcome: "failed",
+                reason: "The agent can no longer read the thread.",
+              }),
+            ),
             // The agent cannot run on what is selected for it: the turn fails, saying why.
             Effect.catchTags({
-              "AgentQuery.Incomplete": ({ issues }) =>
+              "CoreError.Invalid": ({ reason }) =>
+                endAsIdle(turn, { outcome: "failed", reason: reason.message }),
+              "CoreError.NotFound": ({ resource }) =>
                 endAsIdle(turn, {
                   outcome: "failed",
-                  reason: issues.map(describeIssue).join(" "),
-                }),
-              "AgentQuery.NotFound": () =>
-                endAsIdle(turn, { outcome: "failed", reason: "The agent can no longer run." }),
-              // The thread is gone or closed to the agent: the turn fails rather than tells nothing.
-              "ThreadQuery.NotFound": () =>
-                endAsIdle(turn, {
-                  outcome: "failed",
-                  reason: "The agent can no longer read the thread.",
-                }),
-              "Authorization.Denied": () =>
-                endAsIdle(turn, {
-                  outcome: "failed",
-                  reason: "The agent can no longer read the thread.",
+                  reason:
+                    resource === "Agent"
+                      ? "The agent can no longer run."
+                      : "The agent can no longer read the thread.",
                 }),
             }),
           );
@@ -773,10 +725,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const readReplyParticipants = Effect.fnUntraced(function* (turn: Turn.Turn) {
     const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
       Effect.asSome,
-      Effect.catchTags({
-        "ThreadQuery.NotFound": () => Effect.succeedNone,
-        "Authorization.Denied": () => Effect.succeedNone,
-      }),
+      Effect.catchTag("CoreError.NotFound", () => Effect.succeedNone),
+      Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeedNone),
     );
     if (Option.isNone(thread)) return Result.fail("The agent can no longer open this thread.");
     const [mayPublish] = yield* authorization.permitted([
@@ -817,7 +767,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           return Closing.cases.Stopped.make({});
         }
         if (turn.status !== "running")
-          return yield* new NotActive({ turnId: turn.id, status: turn.status });
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
+          });
         yield* saveSession(turn, resume);
         // A reply of only space is none, as no message holds it.
         if (!/\S/u.test(reply)) {
@@ -853,7 +805,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         turnId,
         Effect.fnUntraced(function* (turn) {
           if (!Turn.active(turn.status))
-            return yield* new NotActive({ turnId: turn.id, status: turn.status });
+            return yield* new CoreError.Conflict({
+              reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
+            });
           if (failure.resume !== undefined) yield* saveSession(turn, failure.resume);
           yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
         }),

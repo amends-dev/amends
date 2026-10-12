@@ -150,7 +150,7 @@ function fixture() {
     }
     const id = path.split("/")[4];
     const stored = server.connections.find((connection) => connection.id === id);
-    if (!stored) return json({ _tag: "ConnectionService.NotFound", connectionId: id }, 404);
+    if (!stored) return json({ _tag: "CoreError.NotFound", resource: "Connection", id }, 404);
     if (path.endsWith("/check")) return json({ status: "healthy" });
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/settings"))
@@ -386,8 +386,8 @@ it("says what the integration refused, and tells a host without key storage apar
   f.server.answers.push(
     json(
       {
-        _tag: "ConnectionService.InvalidConnection",
-        description: "Search server takes no retries.",
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "IntegrationRefused", description: "Search server takes no retries." },
       },
       422,
     ),
@@ -401,7 +401,13 @@ it("says what the integration refused, and tells a host without key storage apar
     }),
   );
   f.server.answers.push(
-    json({ _tag: "ConnectionService.CredentialsUnavailable", reason: "No credential key" }, 503),
+    json(
+      {
+        _tag: "CoreError.Unavailable",
+        reason: { _tag: "CredentialsUnavailable", description: "No credential key" },
+      },
+      503,
+    ),
   );
   f.view.create.save();
   await waitFor(() =>
@@ -443,7 +449,10 @@ it("keeps why a check could not run with the connection it checked", async () =>
   const f = fixture();
   await waitFor(() => expect(f.view.connection("docs")).toBeDefined());
   f.server.answers.push(
-    json({ _tag: "ConnectionService.InvalidConnection", description: "No URL." }, 422),
+    json(
+      { _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused", description: "No URL." } },
+      422,
+    ),
   );
   f.view.check.run("docs");
   expect(f.view.pending()).toBe("check");
@@ -467,7 +476,9 @@ it("keeps a rename draft through a conflict and saves it against the name review
   await waitFor(() => expect(f.view.connection("docs")).toBeDefined());
   f.view.rename.setName("docs", "Team search");
   f.server.connections[0]!.name = "Docs";
-  f.server.answers.push(json({ _tag: "ConnectionService.Changed", connectionId: "docs" }, 409));
+  f.server.answers.push(
+    json({ _tag: "CoreError.Changed", resource: "Connection", id: "docs" }, 409),
+  );
   f.view.rename.save("docs");
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "rename", error: "changed" }));
   expect(f.view.stale()).toBe(true);

@@ -207,8 +207,8 @@ it.effect("publication retries and replay decoding reject changed subject intent
           subject: () => Subject.make("test", "other"),
         });
         expect(
-          (yield* Effect.flip(journal.publish(changed, 1, { idempotencyKey: key })))._tag,
-        ).toBe("Store.Conflict");
+          yield* Effect.flip(journal.publish(changed, 1, { idempotencyKey: key })),
+        ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
         const page = yield* journal.read({ subject: testSubject(), limit: 10 });
         const entry = page[0];
         if (entry === undefined) return yield* Effect.die("Missing event");

@@ -26,130 +26,47 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * Every failure the workspace, member, access, invitation, conversation, connection, agent, turn,
- * and channel endpoints report.
+ * The workspace, member, access, invitation, conversation, connection, agent, turn, and channel
+ * endpoints.
  */
+type Endpoints =
+  | "workspaces"
+  | "members"
+  | "assignments"
+  | "invitations"
+  | "groups"
+  | "threads"
+  | "tasks"
+  | "notifications"
+  | "connections"
+  | "agents"
+  | "turns"
+  | "channels";
+/** Every failure those endpoints report. */
 type Reported =
-  | Failure<Client["workspaces"][keyof Client["workspaces"]]>
-  | Failure<Client["members"][keyof Client["members"]]>
-  | Failure<Client["assignments"][keyof Client["assignments"]]>
-  | Failure<Client["invitations"][keyof Client["invitations"]]>
-  | Failure<Client["groups"][keyof Client["groups"]]>
-  | Failure<Client["threads"][keyof Client["threads"]]>
-  | Failure<Client["tasks"][keyof Client["tasks"]]>
-  | Failure<Client["notifications"][keyof Client["notifications"]]>
-  | Failure<Client["connections"][keyof Client["connections"]]>
-  | Failure<Client["agents"][keyof Client["agents"]]>
-  | Failure<Client["turns"][keyof Client["turns"]]>
-  | Failure<Client["channels"][keyof Client["channels"]]>
+  | { readonly [Group in Endpoints]: Failure<Client[Group][keyof Client[Group]]> }[Endpoints]
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
-  "WorkspaceSettingsService.Changed": "changed",
-  "AssignmentService.Changed": "changed",
-  "OwnershipService.Changed": "changed",
-  "GatewayErrors.Conflict": "changed",
-  "Authorization.Denied": "denied",
-  "Authorization.InvalidActor": "denied",
-  "Delegation.Denied": "denied",
-  "Delegation.OwnerProtected": "denied",
-  "GatewayErrors.NotMember": "denied",
-  "MemberService.OwnerProtected": "denied",
-  "OwnershipService.NotOwner": "denied",
-  "InvitationService.NotRecipient": "denied",
-  "ApiErrors.HumanRequired": "denied",
-  "AssignmentService.NotFound": "gone",
-  "AssignmentService.MemberNotFound": "gone",
-  "AssignmentService.InactiveMember": "gone",
-  "Delegation.RoleNotFound": "gone",
-  "GatewayErrors.WorkspaceNotFound": "gone",
-  "InvitationService.AlreadyMember": "gone",
-  "InvitationService.NotFound": "gone",
-  "InvitationService.Unavailable": "gone",
-  "MemberService.AlreadyRemoved": "gone",
-  "MemberService.NotFound": "gone",
-  "OwnershipService.InvalidRecipient": "gone",
-  "OwnershipService.MemberNotFound": "gone",
-  // Conversations: someone else changed what the reader acted on, or it left their reach.
-  "GroupMembershipService.AlreadyMember": "changed",
-  "GroupService.Changed": "changed",
-  "ReadStateService.BeyondTimeline": "changed",
-  "ThreadParticipationService.AlreadyEnded": "changed",
-  "NotificationService.AlreadyHandled": "changed",
-  // Connections: renamed meanwhile, or naming an integration this host no longer has;
-  // `connectionsFailure` tells the integration's refusals apart.
-  "ConnectionService.Changed": "changed",
-  "ConnectionService.UnknownIntegration": "changed",
-  "ConnectionService.NotFound": "gone",
-  "ConnectionService.InvalidConnection": "invalid",
-  "ConnectionService.Keyless": "invalid",
-  // Agents: renamed meanwhile, or gone; a connection no longer usable, or a setup that cannot
-  // run, is refused with the draft kept, and `agentsFailure` tells them apart.
-  "AgentService.Changed": "changed",
-  "AgentService.NotFound": "gone",
-  "AgentService.ConnectionUnavailable": "invalid",
-  "AgentService.Incomplete": "invalid",
-  // Turns: one that finished or moved on meanwhile, or that left the reader's reach;
-  // `turnProblems` tells the refusals apart.
-  "TurnService.NotActive": "changed",
-  "TurnService.NotRetryable": "changed",
-  "TurnService.NotFound": "gone",
-  // Channels: one gone or out of reach, a group the reader left, a thread bound to no conversation;
-  // a connection that gives no channels, or the reader may not use, is refused with the draft kept.
-  "ChannelService.NotFound": "gone",
-  "ChannelService.GroupNotFound": "gone",
-  "ChannelService.NotBound": "gone",
-  "ChannelService.ConnectionUnavailable": "invalid",
-  // Following a turn's log stopped short, or too many streams are open: following again may work.
-  "Turn.LogUnavailable": "failed",
+  // What the reader expected changed since they read it.
+  "CoreError.Changed": "changed",
+  // The state of what the reader acted on refuses it, such as a member removed or a turn finished
+  // meanwhile; `turnRefusal` tells a turn's reasons apart.
+  "CoreError.Conflict": "changed",
+  // The reader may not do this, for the reason it gives.
+  "CoreError.Denied": "denied",
+  // Anything the reader named that is missing or out of their reach.
+  "CoreError.NotFound": "gone",
+  // The request cannot be done as asked, and the draft is kept, such as a name that does not hold,
+  // a connection the reader can't use, or a setup that cannot run; `connectionsFailure` and
+  // `agentsFailure` tell the reasons they show apart.
+  "CoreError.Invalid": "invalid",
+  // What the request needs cannot be reached now, such as storage another writer held or a turn's
+  // log that stopped short, or too many streams are open: asking again may work. A host that keeps
+  // no keys is one too; `connectionsFailure` tells it apart.
+  "CoreError.Unavailable": "failed",
   "ApiErrors.TooManyStreams": "failed",
-  // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
-  "ConnectionService.CredentialsUnavailable": "failed",
-  "GroupFollowService.AgentRequired": "denied",
-  "ReadStateService.HumanRequired": "denied",
-  "ThreadService.HumanAuthorRequired": "denied",
-  "ThreadMessageService.HumanAuthorRequired": "denied",
-  "NotificationService.HumanRecipientRequired": "denied",
-  "GroupService.NotFound": "gone",
-  "GroupService.NotRenamable": "invalid",
-  "GroupService.MemberNotFound": "gone",
-  "GroupService.InactiveMember": "gone",
-  "GroupMembershipService.GroupNotFound": "gone",
-  "GroupMembershipService.MemberNotFound": "gone",
-  "GroupMembershipService.NotFound": "gone",
-  "GroupMembershipService.InactiveMember": "gone",
-  "GroupMembershipService.AlreadyRemoved": "gone",
-  "GroupFollowService.GroupNotFound": "gone",
-  "GroupFollowService.MemberUnavailable": "gone",
-  "ReadStateService.ThreadNotFound": "gone",
-  "ReadStateService.GroupNotFound": "gone",
-  "ThreadService.NotFound": "gone",
-  "ThreadService.GroupNotFound": "gone",
-  "ThreadService.ParticipantUnavailable": "gone",
-  "ThreadMessageService.NotFound": "gone",
-  "ThreadMessageService.ParticipantUnavailable": "gone",
-  "ThreadMessageService.MessageNotFound": "gone",
-  "ThreadMessageService.NotAuthor": "denied",
-  "ThreadMessageService.Deleted": "gone",
-  "ThreadMessageService.Changed": "changed",
-  "TaskService.NotFound": "gone",
-  "TaskService.GroupNotFound": "gone",
-  "TaskService.ParticipantUnavailable": "gone",
-  "TaskService.AlreadyTask": "changed",
-  "TaskService.Changed": "changed",
-  "ThreadParticipationService.ThreadNotFound": "gone",
-  "ThreadParticipationService.NotFound": "gone",
-  "NotificationService.NotFound": "gone",
   "Client.InvalidCommand": "invalid",
-  "GroupMembershipService.FixedMembership": "invalid",
-  "GroupMembershipService.GeneralMembership": "invalid",
-  "ThreadParticipationService.FixedParticipation": "invalid",
-  "GroupFollowService.NotFollowable": "invalid",
-  "ThreadService.DirectMembersRequired": "invalid",
-  "ThreadService.Changed": "changed",
-  "GatewayErrors.InvalidInput": "invalid",
-  "InvitationService.InvalidExpiry": "invalid",
-  "Delegation.UnsupportedRole": "invalid",
   // Rejected credentials sign out in the HTTP layer; the rest are transport or host failures.
   "Authentication.Unauthorized": "failed",
   "GatewayErrors.Uncertain": "failed",

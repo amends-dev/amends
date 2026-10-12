@@ -5,7 +5,7 @@ import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { expect, it } from "@effect/vitest";
 import { Api, Authentication, Routes } from "../src/index.ts";
 import type * as Core from "@amends-dev/core";
-import { Authorization, Requirement, Target } from "@amends-dev/core/authorization";
+import { Requirement, Target } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { Entry } from "@amends-dev/core/journal";
 import { Notification, NotificationService } from "@amends-dev/core/notification";
@@ -46,6 +46,7 @@ import { DateTime, Effect, Layer, Redacted } from "effect";
 import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
+import { CoreError } from "@amends-dev/core/error";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const bob = Identity.HumanId.make("bob");
@@ -73,12 +74,14 @@ const record =
     calls.push({ operation, arguments: args });
     return respond(...args);
   };
-const denied = new Authorization.Denied({
-  memberId,
-  requirement: Requirement.make(
-    MemberPermissions.Read,
-    Target.Reference.cases.Member.make({ workspaceId, memberId }),
-  ),
+const denied = new CoreError.Denied({
+  reason: new CoreError.NotGranted({
+    memberId,
+    requirement: Requirement.make(
+      MemberPermissions.Read,
+      Target.Reference.cases.Member.make({ workspaceId, memberId }),
+    ),
+  }),
 });
 const actor = Actor.Actor.of({ workspaceId, memberId, identity: alice });
 const pending = ({
@@ -124,7 +127,9 @@ const conversations = Layer.mergeAll(
     GroupService.GroupService.of({
       createTeam: record("group.create", () => Effect.succeed(team)),
       rename: record("group.rename", () => Effect.succeed(team)),
-      get: record("group.get", (id) => Effect.fail(new GroupService.NotFound({ groupId: id }))),
+      get: record("group.get", (id) =>
+        Effect.fail(new CoreError.NotFound({ resource: "Group", id })),
+      ),
       listMine: record("group.listMine", () => Effect.succeed([])),
       listPublic: record("group.listPublic", () => Effect.succeed([])),
     }),
@@ -133,16 +138,27 @@ const conversations = Layer.mergeAll(
     GroupMembershipService.GroupMembershipService,
     GroupMembershipService.GroupMembershipService.of({
       add: record("group.add", (input) =>
-        Effect.fail(new GroupMembershipService.AlreadyMember(input)),
+        Effect.fail(new CoreError.Conflict({ reason: new CoreError.AlreadyMember(input) })),
       ),
       join: record("group.join", (groupId) =>
-        Effect.fail(new GroupMembershipService.GroupNotFound({ groupId })),
+        Effect.fail(new CoreError.NotFound({ resource: "Group", id: groupId })),
       ),
       remove: record("group.remove", (input) =>
-        Effect.fail(new GroupMembershipService.FixedMembership({ groupId: input.groupId })),
+        Effect.fail(
+          new CoreError.Invalid({
+            reason: new CoreError.FixedMembership({ groupId: input.groupId }),
+          }),
+        ),
       ),
       leave: record("group.leave", (input) =>
-        Effect.fail(new GroupMembershipService.AlreadyRemoved(input)),
+        Effect.fail(
+          new CoreError.Conflict({
+            reason: new CoreError.AlreadyEnded({
+              resource: "GroupMembership",
+              id: input.membershipId,
+            }),
+          }),
+        ),
       ),
       listCurrent: record("group.members", () => Effect.succeed([])),
     }),
@@ -152,7 +168,11 @@ const conversations = Layer.mergeAll(
     GroupFollowService.GroupFollowService.of({
       follow: record("group.follow", () => Effect.void),
       unfollow: record("group.unfollow", (input) =>
-        Effect.fail(new GroupFollowService.NotFollowable({ groupId: input.groupId })),
+        Effect.fail(
+          new CoreError.Invalid({
+            reason: new CoreError.NotFollowable({ groupId: input.groupId }),
+          }),
+        ),
       ),
     }),
   ),
@@ -160,14 +180,18 @@ const conversations = Layer.mergeAll(
     ThreadService.ThreadService,
     ThreadService.ThreadService.of({
       startInGroup: record("thread.start", () =>
-        Effect.fail(new ThreadService.ParticipantUnavailable({ memberId })),
+        Effect.fail(
+          new CoreError.Conflict({ reason: new CoreError.ParticipantUnavailable({ memberId }) }),
+        ),
       ),
       startDirect: record("thread.startDirect", () =>
-        Effect.fail(new ThreadService.DirectMembersRequired()),
+        Effect.fail(new CoreError.Invalid({ reason: new CoreError.DirectMembersRequired() })),
       ),
-      get: record("thread.get", (id) => Effect.fail(new ThreadService.NotFound({ threadId: id }))),
+      get: record("thread.get", (id) =>
+        Effect.fail(new CoreError.NotFound({ resource: "Thread", id })),
+      ),
       rename: record("thread.rename", (input) =>
-        Effect.fail(new ThreadService.Changed({ threadId: input.threadId })),
+        Effect.fail(new CoreError.Changed({ resource: "Thread", id: input.threadId })),
       ),
       listInGroup: record("thread.list", () => Effect.succeed([])),
       listOpenings: record("thread.openings", () => Effect.succeed([])),
@@ -179,12 +203,18 @@ const conversations = Layer.mergeAll(
     TaskService.TaskService,
     TaskService.TaskService.of({
       create: record("task.create", (input) =>
-        Effect.fail(new TaskService.AlreadyTask({ threadId: input.threadId })),
+        Effect.fail(
+          new CoreError.Conflict({
+            reason: new CoreError.AlreadyTask({ threadId: input.threadId }),
+          }),
+        ),
       ),
       update: record("task.update", (input) =>
-        Effect.fail(new TaskService.Changed({ threadId: input.threadId })),
+        Effect.fail(new CoreError.Changed({ resource: "Task", id: input.threadId })),
       ),
-      get: record("task.get", (id) => Effect.fail(new TaskService.NotFound({ threadId: id }))),
+      get: record("task.get", (id) =>
+        Effect.fail(new CoreError.NotFound({ resource: "Task", id })),
+      ),
       listInGroup: record("task.list", () => Effect.succeed([])),
     }),
   ),
@@ -192,13 +222,13 @@ const conversations = Layer.mergeAll(
     ThreadMessageService.ThreadMessageService,
     ThreadMessageService.ThreadMessageService.of({
       publish: record("thread.publish", () =>
-        Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
+        Effect.fail(new CoreError.Denied({ reason: new CoreError.HumanRequired() })),
       ),
       edit: record("thread.edit", (input) =>
-        Effect.fail(new ThreadMessageService.Changed({ messageId: input.messageId })),
+        Effect.fail(new CoreError.Changed({ resource: "ThreadMessage", id: input.messageId })),
       ),
       delete: record("thread.delete", (id) =>
-        Effect.fail(new ThreadMessageService.MessageNotFound({ messageId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "ThreadMessage", id })),
       ),
       typing: record("thread.typing", () => Effect.void),
     }),
@@ -207,10 +237,17 @@ const conversations = Layer.mergeAll(
     ThreadParticipationService.ThreadParticipationService,
     ThreadParticipationService.ThreadParticipationService.of({
       follow: record("thread.follow", (id) =>
-        Effect.fail(new ThreadParticipationService.ThreadNotFound({ threadId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "Thread", id })),
       ),
       unfollow: record("thread.unfollow", (input) =>
-        Effect.fail(new ThreadParticipationService.AlreadyEnded(input)),
+        Effect.fail(
+          new CoreError.Conflict({
+            reason: new CoreError.AlreadyEnded({
+              resource: "ThreadParticipation",
+              id: input.participationId,
+            }),
+          }),
+        ),
       ),
     }),
   ),
@@ -219,7 +256,9 @@ const conversations = Layer.mergeAll(
     ReadStateService.ReadStateService.of({
       markThreadRead: record("thread.markRead", ({ threadId, throughSequence }) =>
         Effect.fail(
-          new ReadStateService.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
+          new CoreError.Conflict({
+            reason: new CoreError.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
+          }),
         ),
       ),
       markGroupRead: record("group.markRead", () => Effect.void),
@@ -237,17 +276,21 @@ const channels = Layer.mergeAll(
         return Effect.succeed([]);
       }),
       create: record("channel.create", (input) =>
-        Effect.fail(new ChannelService.ConnectionUnavailable({ connectionId: input.connectionId })),
+        Effect.fail(
+          new CoreError.Invalid({
+            reason: new CoreError.ConnectionUnusable({ connectionId: input.connectionId }),
+          }),
+        ),
       ),
       get: record("channel.get", (id) =>
-        Effect.fail(new ChannelService.NotFound({ channelId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "Channel", id })),
       ),
       redirect: record("channel.redirect", (input) =>
-        Effect.fail(new ChannelService.GroupNotFound({ groupId: input.groupId })),
+        Effect.fail(new CoreError.NotFound({ resource: "Group", id: input.groupId })),
       ),
       remove: record("channel.remove", () => Effect.void),
       getBinding: record("channel.binding", (id) =>
-        Effect.fail(new ChannelService.NotBound({ threadId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "ChannelBinding", id })),
       ),
     }),
   ),
@@ -267,8 +310,10 @@ const operations = Layer.mergeAll(
     NotificationService.NotificationService.of({
       markSeen: record("notification.markSeen", (notificationId) =>
         notificationId === notification.id
-          ? Effect.fail(new NotificationService.AlreadyHandled({ notificationId }))
-          : Effect.fail(new NotificationService.NotFound({ workspaceId, notificationId })),
+          ? Effect.fail(
+              new CoreError.Conflict({ reason: new CoreError.AlreadyHandled({ notificationId }) }),
+            )
+          : Effect.fail(new CoreError.NotFound({ resource: "Notification", id: notificationId })),
       ),
       inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),
       markSeenThrough: record("notification.markSeenThrough", () => Effect.succeed(2)),
@@ -281,7 +326,7 @@ const operations = Layer.mergeAll(
       get: record("get", (target) =>
         target === memberId
           ? Effect.succeed(member)
-          : Effect.fail(new MemberService.NotFound({ workspaceId, memberId: target })),
+          : Effect.fail(new CoreError.NotFound({ resource: "Member", id: target })),
       ),
       remove: record("remove", () => Effect.fail(denied)),
       rename: record("rename", (name) =>
@@ -335,11 +380,13 @@ const gateway = Layer.succeed(
     ) => {
       calls.push({ operation: "asMember", arguments: [id, identity] });
       if (identity.id !== alice.id)
-        return Effect.fail(new GatewayErrors.NotMember({ workspaceId: id }));
+        return Effect.fail(
+          new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId: id }) }),
+        );
       return Effect.provide(
         Effect.provideService(program, Actor.Actor, actor),
         operations,
-      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
+      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.Denied, Scope.Scope>;
     },
   }),
 );
@@ -493,9 +540,9 @@ it.effect("marking a missing notification seen exposes a typed 404", () =>
         .pipe(Effect.flip),
     );
     expect(missing).toMatchObject({
-      _tag: "NotificationService.NotFound",
-      workspaceId,
-      notificationId: "missing",
+      _tag: "CoreError.NotFound",
+      resource: "Notification",
+      id: "missing",
     });
   }),
 );
@@ -521,19 +568,26 @@ it.effect("domain outcomes keep their tags and statuses", () =>
         .get({ params: { workspaceId, memberId: Member.Id.make("missing") } })
         .pipe(Effect.flip),
     );
-    expect(missing).toMatchObject({ _tag: "MemberService.NotFound", memberId: "missing" });
+    expect(missing).toMatchObject({
+      _tag: "CoreError.NotFound",
+      resource: "Member",
+      id: "missing",
+    });
     const notMember = yield* run("bob", (client) =>
       client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
     );
-    expect(notMember).toMatchObject({ _tag: "GatewayErrors.NotMember", workspaceId });
+    expect(notMember).toMatchObject({
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotMember", workspaceId },
+    });
     const forbidden = yield* run("alice", (client) =>
       client.members
         .remove({ params: { workspaceId, memberId }, responseMode: "decoded-and-response" })
         .pipe(Effect.flip),
     );
     expect(forbidden).toMatchObject({
-      _tag: "Authorization.Denied",
-      requirement: { permission: { name: "member.read" } },
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", requirement: { permission: { name: "member.read" } } },
     });
     const statuses = yield* run("alice", (client) =>
       Effect.all([
@@ -581,7 +635,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
         .create({ headers: {}, payload: { name: "Test workspace", memberName: member.name } })
         .pipe(Effect.flip),
     );
-    expect(refused).toMatchObject({ _tag: "ApiErrors.HumanRequired" });
+    expect(refused).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
     const accepted = yield* run("alice", (client) =>
       client.invitations.accept({
         params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
@@ -693,7 +747,7 @@ it.effect("a person reads their account, and signs out with the credential they 
       email: "alice@example.com",
     });
     const agent = yield* run("agent", (client) => Effect.flip(client.me.account()));
-    expect(agent).toMatchObject({ _tag: "ApiErrors.HumanRequired" });
+    expect(agent).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
     // A session no account holds is not honored.
     const unknown = yield* run("carol", (client) =>
       client.me.account({ responseMode: "response-only" }),
@@ -881,7 +935,7 @@ it.effect(
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
       );
       expect(statuses).toEqual([
-        201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 409,
+        201, 200, 200, 404, 200, 409, 422, 409, 404, 204, 422, 204, 200, 200, 409, 422, 404, 409,
         200, 200, 403, 409, 404, 404, 409, 409, 200, 404, 409, 409, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([

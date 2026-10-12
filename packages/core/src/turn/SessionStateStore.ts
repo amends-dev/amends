@@ -13,19 +13,8 @@ import type { Option } from "effect";
 import * as Store from "../journal/Store.ts";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import { storeFailure } from "../journal/internal/store-failure.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-
-/**
- * Storage failed while reading or writing session states.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("SessionStateStore.Failure", {
-  operation: Schema.String,
-  cause: Schema.Defect(),
-}) {}
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What an agent's harness session resumes from, beside its conversation, which the session log
@@ -85,12 +74,12 @@ export class SessionStateStore extends Context.Service<
     /** The participation's session as its last turn left it, or none before its first ended. */
     readonly get: (
       participationId: ThreadParticipationId.Id,
-    ) => Effect.Effect<Option.Option<Saved>, Failure>;
+    ) => Effect.Effect<Option.Option<Saved>, StoreError.StoreError>;
     /** Store the participation's session, in place of any it had. */
     readonly set: (
       participationId: ThreadParticipationId.Id,
       saved: Saved,
-    ) => Effect.Effect<void, Failure, Store.Transaction>;
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
   }
 >()("@amends-dev/core/turn/SessionStateStore") {}
 
@@ -101,7 +90,7 @@ export class SessionStateStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (driver: SessionStateStore["Service"]): SessionStateStore["Service"] => {
-  const read = StoreInput.read(Failure);
+  const read = StoreInput.read("SessionStateStore");
   return {
     get: (participationId) =>
       Effect.flatMap(read("get", ThreadParticipationId.Id, participationId), driver.get),
@@ -127,14 +116,14 @@ const makeMemory = Effect.fn("SessionStateStore.makeMemory")(function* () {
       function* (participationId) {
         return yield* rows.get((yield* read).sessionStates, participationId);
       },
-      Effect.mapError(storeFailure(Failure, "get")),
+      Effect.mapError(StoreError.failed("SessionStateStore", "get")),
     ),
     set: Effect.fn("SessionStateStore.memory.set")(
       function* (participationId, saved) {
         const row = yield* rows.encode(saved);
         (yield* write).sessionStates.set(participationId, row);
       },
-      Effect.mapError(storeFailure(Failure, "set")),
+      Effect.mapError(StoreError.failed("SessionStateStore", "set")),
     ),
   };
   return make(driver);

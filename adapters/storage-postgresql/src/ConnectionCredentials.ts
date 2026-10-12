@@ -18,11 +18,15 @@ import { and, eq } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import * as Binding from "./Binding.ts";
 import * as CredentialKey from "./CredentialKey.ts";
-import { storeFailure } from "./internal/errors.ts";
-import { connectionCredentials } from "./internal/schema.ts";
 
-const unavailable = new ConnectionCredentialStore.Unavailable({
-  reason: "This host has no credential key, so it stores no credentials.",
+import { connectionCredentials } from "./internal/schema.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
+
+const unavailable = new CoreError.Unavailable({
+  reason: new CoreError.CredentialsUnavailable({
+    description: "This host has no credential key, so it stores no credentials.",
+  }),
 });
 /** A credential as the JSON that is sealed. */
 const CredentialJson = Schema.fromJsonString(Schema.toCodecJson(Connection.Credential));
@@ -53,7 +57,7 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
       if (Option.isNone(credentialKey)) return yield* unavailable;
       const sealed = yield* encodeCredential(credential).pipe(
         Effect.flatMap((json) => credentialKey.value.seal(json, bindingOf(connectionId))),
-        Effect.mapError(storeFailure(ConnectionCredentialStore, "set")),
+        Effect.mapError(StoreError.failed("ConnectionCredentialStore", "set")),
       );
       yield* guard(
         db
@@ -64,13 +68,13 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
             set: { sealed },
           }),
         true,
-      ).pipe(Effect.mapError(storeFailure(ConnectionCredentialStore, "set")));
+      ).pipe(Effect.mapError(StoreError.failed("ConnectionCredentialStore", "set")));
     }),
     get: Effect.fn("ConnectionCredentials.get")(function* (connectionId) {
       if (Option.isNone(credentialKey)) return yield* unavailable;
       const rows = yield* guard(
         db.select().from(connectionCredentials).where(ofConnection(connectionId)),
-      ).pipe(Effect.mapError(storeFailure(ConnectionCredentialStore, "get")));
+      ).pipe(Effect.mapError(StoreError.failed("ConnectionCredentialStore", "get")));
       const found = Array.head(rows);
       if (Option.isNone(found)) return Option.none();
       return yield* credentialKey.value
@@ -78,12 +82,12 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
         .pipe(
           Effect.flatMap(decodeCredential),
           Effect.asSome,
-          Effect.mapError(storeFailure(ConnectionCredentialStore, "get")),
+          Effect.mapError(StoreError.failed("ConnectionCredentialStore", "get")),
         );
     }),
     remove: Effect.fn("ConnectionCredentials.remove")(function* (connectionId) {
       yield* guard(db.delete(connectionCredentials).where(ofConnection(connectionId)), true).pipe(
-        Effect.mapError(storeFailure(ConnectionCredentialStore, "remove")),
+        Effect.mapError(StoreError.failed("ConnectionCredentialStore", "remove")),
       );
     }),
   };

@@ -6,7 +6,7 @@ import { Group } from "@amends-dev/core/group";
 import { Commit, Store } from "@amends-dev/core/journal";
 import { ThreadId, ThreadMessage } from "@amends-dev/core/thread";
 import { Workspace } from "@amends-dev/core/workspace";
-import { Gateway, GatewayErrors } from "@amends-dev/gateway";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Duration, Effect, Layer } from "effect";
 import {
@@ -20,6 +20,7 @@ import {
 import { TestClock } from "effect/testing";
 import * as DeliveryJob from "../../src/DeliveryJob.ts";
 import * as JobRequests from "../../src/JobRequests.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Cluster in memory, reading for due messages every second of the test clock. */
 const cluster = Sharding.layer.pipe(
@@ -114,7 +115,7 @@ const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
       Effect.provideContext(
         Effect.gen(function* () {
           if (options.created === false)
-            return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+            return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId });
           return yield* program;
         }),
         services,

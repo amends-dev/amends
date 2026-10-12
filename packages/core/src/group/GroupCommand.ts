@@ -24,16 +24,8 @@ import * as GroupFacts from "./GroupFacts.ts";
 import * as GroupStore from "./GroupStore.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipFacts from "./GroupMembershipFacts.ts";
-
-/**
- * A requested member is missing or no longer active in this workspace.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Unavailable extends Schema.TaggedError<Unavailable>()("GroupCommand.Unavailable", {
-  memberId: Member.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
+import * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What admitting a member can fail with: publishing the admission.
@@ -59,9 +51,8 @@ export type RemoveError = Log.WriteError | Projection.Error;
  * @since 0.1.0
  */
 export type EstablishError =
-  | Unavailable
-  | GroupStore.Failure
-  | MemberStore.Failure
+  | CoreError.Conflict
+  | StoreError.StoreError
   | Schema.SchemaError
   | AdmitError;
 
@@ -192,7 +183,10 @@ export const make = Effect.fn("GroupCommand.make")(function* () {
       (yield* memberStore.getMany(requested)).map((member) => [member.id, member] as const),
     );
     for (const memberId of requested)
-      if (found.get(memberId)?.status !== "active") return yield* new Unavailable({ memberId });
+      if (found.get(memberId)?.status !== "active")
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.ParticipantUnavailable({ memberId }),
+        });
     const group: Group.Direct = {
       id: Group.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,

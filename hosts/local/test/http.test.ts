@@ -186,31 +186,44 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(outcome.members.find((member) => member.id === outcome.joined.id)?.name).toBe(
             "Bob Chen",
           );
-          expect(outcome.outsider).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+          expect(outcome.outsider).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotMember" },
+          });
           expect(outcome.invitation.state).toEqual({ _tag: "Pending" });
           expect(outcome.wrongRecipient).toMatchObject({
-            _tag: "InvitationService.NotRecipient",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotRecipient" },
           });
           expect(outcome.joined).toMatchObject({
             identity: { _tag: "Human", id: outcome.invitation.details.recipientId },
             status: "active",
           });
           expect(outcome.readByBob.id).toBe(outcome.owner.id);
-          expect(outcome.cannotInvite).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(outcome.cannotInvite).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
           expect(
             outcome.members.map((member) => member.id).sort((a, b) => a.localeCompare(b)),
           ).toEqual([outcome.owner.id, outcome.joined.id].sort((a, b) => a.localeCompare(b)));
           expect(outcome.invitations).toMatchObject([
             { details: { id: outcome.invitation.details.id }, state: { _tag: "Accepted" } },
           ]);
-          expect(outcome.cannotList).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(outcome.cannotList).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
           expect(outcome.removed).toMatchObject({ id: outcome.joined.id, status: "removed" });
           expect(
             outcome.afterRemovalList
               .map((member) => member.status)
               .sort((a, b) => a.localeCompare(b)),
           ).toEqual(["active", "removed"]);
-          expect(outcome.afterRemoval).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+          expect(outcome.afterRemoval).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotMember" },
+          });
           expect(outcome.missingStatus).toBe(404);
         }),
       ),
@@ -320,7 +333,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(outcome.invitees).toEqual([account]);
           expect(outcome.noAccount.status).toBe(401);
           expect(outcome.members).toEqual([account]);
-          expect(outcome.cannotList).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(outcome.cannotList).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
           expect(outcome.signedOut.status).toBe(204);
           expect(outcome.before).toEqual({ memberships: [], invitations: [] });
           expect(outcome.after.memberships).toMatchObject([

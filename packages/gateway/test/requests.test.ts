@@ -1,6 +1,6 @@
 import { GroupService, GroupMembershipService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Entry, Store } from "@amends-dev/core/journal";
+import { Entry } from "@amends-dev/core/journal";
 import { Request } from "@amends-dev/core/request";
 import { ThreadService, ThreadMessageService } from "@amends-dev/core/thread";
 import { InvitationService, Member } from "@amends-dev/core/workspace";
@@ -19,6 +19,8 @@ import {
   request,
   workspaceId,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
+import { StoreError } from "@amends-dev/core/journal";
 
 const memberActor = (name: string) =>
   Actor.Actor.of({
@@ -146,7 +148,7 @@ describe("request keys", () => {
           ),
         );
         expect(yield* Effect.flip(as(other, start("Hello")))).toEqual(
-          new ThreadService.GroupNotFound({ groupId: group.id }),
+          new CoreError.NotFound({ resource: "Group", id: group.id }),
         );
       }),
     ),
@@ -156,7 +158,7 @@ describe("request keys", () => {
     withStorage((storage) =>
       Effect.gen(function* () {
         const { bound, owner, group, as, start } = yield* world(storage);
-        const failure = new Store.Failure({ operation: "commit", cause: "injected" });
+        const failure = StoreError.failed("Store", "commit")("injected");
         const failing = yield* Layer.build(core(failingLate(bound, failure)));
         expect(Exit.isFailure(yield* Effect.exit(as(owner, start("Hello"), failing)))).toBe(true);
         expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);

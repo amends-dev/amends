@@ -51,7 +51,9 @@ export const standaloneAppends = (fixture: Fixture) => {
             expect(appended).toMatchObject({ logId: execution, position: 0, index: 0 });
             // The workspace itself is still busy for a transaction.
             expect(yield* Effect.flip(other.store.transaction(Effect.void))).toMatchObject({
-              _tag: "Store.Conflict",
+              _tag: "StoreError",
+              store: "Store",
+              reason: { _tag: "Contended" },
             });
             yield* held.release;
             expect((yield* held.done)._tag).toBe("Success");
@@ -171,11 +173,13 @@ export const standaloneAppends = (fixture: Fixture) => {
           const original = yield* alone(other, 1, { idempotencyKey: key });
           expect(yield* alone(writer, 1, { idempotencyKey: key })).toEqual(original);
           expect(yield* Effect.flip(alone(writer, 2, { idempotencyKey: key }))).toMatchObject({
-            _tag: "Store.Conflict",
+            _tag: "StoreError",
+            store: "Store",
+            reason: { _tag: "Rejected" },
           });
           expect(
             yield* Effect.flip(alone(writer, 2, { expectedAfter: Option.none() })),
-          ).toMatchObject({ _tag: "Store.Conflict" });
+          ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } });
           // A transaction already open when another host appends still sees that append.
           const entered = yield* Deferred.make<void>();
           const appended = yield* Deferred.make<void>();
@@ -214,7 +218,7 @@ export const standaloneAppends = (fixture: Fixture) => {
                 Effect.suspend(() => writer.store.append({ logId: execution, entries: [] })),
               ),
             ),
-          ).toMatchObject({ _tag: "Store.Failure" });
+          ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
           expect((yield* writer.store.read(execution, { limit: 10 })).length).toBe(3);
         }),
       ),
