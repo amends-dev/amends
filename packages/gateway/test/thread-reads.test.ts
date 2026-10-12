@@ -960,7 +960,7 @@ describe("thread reads", () => {
                   timeline(opened.thread.id, { limit: 0 }),
                 ),
               ),
-            ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
           }),
         ),
       ),

@@ -167,7 +167,7 @@ export const factMetadata = (fixture: Fixture) => {
               },
             ]) {
               expect((yield* Effect.flip(append({ ...content, fact })))._tag).toBe(
-                "JournalStore.Conflict",
+                "Store.Conflict",
               );
             }
             const foreign = {
@@ -177,20 +177,16 @@ export const factMetadata = (fixture: Fixture) => {
                 provenance: Object.assign({}, provenance, { workspaceId: otherWorkspaceId }),
               },
             };
-            expect((yield* Effect.flip(append(foreign)))._tag).toBe("JournalStore.Conflict");
+            expect((yield* Effect.flip(append(foreign)))._tag).toBe("Store.Conflict");
             const missingAttribution = { ...content, fact: { ...content.fact } };
             Reflect.deleteProperty(missingAttribution.fact, "provenance");
-            expect((yield* Effect.flip(append(missingAttribution)))._tag).toBe(
-              "JournalStore.Conflict",
-            );
+            expect((yield* Effect.flip(append(missingAttribution)))._tag).toBe("Store.Conflict");
             const missingSubject = { ...content, fact: { ...content.fact } };
             Reflect.deleteProperty(missingSubject.fact, "subject");
-            expect((yield* Effect.flip(append(missingSubject)))._tag).toBe("JournalStore.Conflict");
+            expect((yield* Effect.flip(append(missingSubject)))._tag).toBe("Store.Conflict");
             const nullAttribution = { ...content, fact: { ...content.fact } };
             Reflect.set(nullAttribution.fact, "provenance", null);
-            expect((yield* Effect.flip(append(nullAttribution)))._tag).toBe(
-              "JournalStore.Conflict",
-            );
+            expect((yield* Effect.flip(append(nullAttribution)))._tag).toBe("Store.Conflict");
             expect(Option.isSome(yield* bound.store.getAppend(journalLog, key))).toBe(true);
             expect(
               yield* bound.store.readFacts(journalLog, { name: Changed.name, limit: 10 }),

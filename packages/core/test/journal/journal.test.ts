@@ -142,7 +142,7 @@ it.effect("a caught projection failure still rolls back all logs and projection 
             }),
           ),
         );
-        expect(failure._tag).toBe("Commit.Aborted");
+        expect(failure._tag).toBe("Transaction.Aborted");
         expect((yield* fixture.snapshot).logs.size).toBe(0);
         expect(yield* (yield* Counter).get).toBe(0);
         yield* logs.commit(Effect.void);
@@ -249,7 +249,7 @@ it.effect("projections cannot recursively append execution or fact entries", () 
         expect(failure).toMatchObject({
           _tag: "Projection.Failure",
           phase: "apply",
-          cause: { _tag: "Commit.WriteForbidden" },
+          cause: { _tag: "Transaction.WriteForbidden" },
         });
         expect((yield* fixture.snapshot).logs.size).toBe(0);
       }),
@@ -287,7 +287,7 @@ it.effect("escaped transaction contexts cannot append after completion", () =>
         const failure = yield* Effect.flip(
           turn.append({ _tag: "Finished" }).pipe(Effect.provideContext(captured)),
         );
-        expect(failure._tag).toBe("Commit.Closed");
+        expect(failure._tag).toBe("Transaction.Closed");
         expect(yield* fixture.attempts).toBe(1);
         expect((yield* fixture.snapshot).logs.size).toBe(0);
       }),
@@ -311,7 +311,7 @@ it.effect("expected positions and replay cursors are scoped to their log", () =>
         const conflict = yield* Effect.flip(
           turn.append({ _tag: "Finished" }, { expectedAfter: Option.none() }),
         );
-        expect(conflict._tag).toBe("JournalStore.Conflict");
+        expect(conflict._tag).toBe("Store.Conflict");
         const resumed = yield* Stream.runCollect(turn.stream({ after: first.position, limit: 1 }));
         expect(resumed).toHaveLength(1);
         expect(resumed[0]?.entries[0]?.payload._tag).toBe("Finished");

@@ -100,7 +100,9 @@ it("retains credentials after a host failure and exposes retry to the consumer",
 });
 it("invalidates rejected credentials without selecting a route or showing a page", async () => {
   const store = mount(alice, () =>
-    Promise.resolve(response({ _tag: "Api.Unauthorized", message: "Unauthorized" }, 401)),
+    Promise.resolve(
+      response({ _tag: "Authentication.Unauthorized", message: "Unauthorized" }, 401),
+    ),
   );
   await waitFor(() => expect(screen.getByLabelText("State")).toHaveTextContent("SignedOut"));
   expect(store.read()).toBeUndefined();

@@ -5,7 +5,7 @@ deleting messages, following, reading, tracking tasks, and the notifications and
 them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadParticipationService`,
 `TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
 `Gateway.asMember`. The gateway preserves the
-outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
+outcomes named below and maps malformed input to `GatewayErrors.InvalidInput`. Storage and consistency
 failures remain failures. The [HTTP contract](../packages/http/README.md#conversations) exposes
 each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
 

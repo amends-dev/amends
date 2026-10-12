@@ -180,7 +180,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         Effect.catchTag("ChangeFeedEvents.UnknownVersion", () => skipUnreadable("unknown-version")),
         Effect.catchTags({
           SchemaError: () => skipUnreadable("undecodable"),
-          "Journal.FactMismatch": () => skipUnreadable("undecodable"),
+          "Event.FactMismatch": () => skipUnreadable("undecodable"),
         }),
       );
       if (Option.isSome(prepared)) events.push(prepared.value);

@@ -334,7 +334,7 @@ it.effect(
               }),
             ),
           );
-          expect(failure._tag).toBe("Commit.Aborted");
+          expect(failure._tag).toBe("Transaction.Aborted");
           expect(yield* fixture.snapshot).toEqual(before);
         }),
       );

@@ -781,7 +781,7 @@ describe("thread replies", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "JournalStore.Conflict" },
+                value: { _tag: "Store.Conflict" },
               });
           yield* Effect.scoped(
             runHost(
@@ -919,7 +919,7 @@ describe("thread replies", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(first.thread.id, [], " ")),
             ),
-          ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
         }),
       ),
     ),
@@ -1060,7 +1060,7 @@ describe("thread replies", () => {
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
                   _tag: expect.stringMatching(
-                    /^(JournalStore.Conflict|ThreadMessageService.ParticipantUnavailable)$/,
+                    /^(Store.Conflict|ThreadMessageService.ParticipantUnavailable)$/,
                   ),
                 },
               });

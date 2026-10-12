@@ -263,7 +263,7 @@ export const sameContents = (
  * @category errors
  * @since 0.1.0
  */
-export class Failure extends Schema.TaggedError<Failure>()("JournalStore.Failure", {
+export class Failure extends Schema.TaggedError<Failure>()("Store.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
@@ -276,7 +276,7 @@ export class Failure extends Schema.TaggedError<Failure>()("JournalStore.Failure
  * @category errors
  * @since 0.1.0
  */
-export class Conflict extends Schema.TaggedError<Conflict>()("JournalStore.Conflict", {
+export class Conflict extends Schema.TaggedError<Conflict>()("Store.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
@@ -289,7 +289,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()("JournalStore.Confl
  * @since 0.1.0
  */
 export class CommitUncertain extends Schema.TaggedError<CommitUncertain>()(
-  "JournalStore.CommitUncertain",
+  "Store.CommitUncertain",
   { commitId: Commit.Id, cause: Schema.Defect() },
 ) {}
 

@@ -70,7 +70,9 @@ it("composes validated client state with UI and signs out through the desktop ro
 });
 it("clears a rejected session and renders the desktop sign-in form", async () => {
   const store = mount("/workspaces/one", "expired", () =>
-    Promise.resolve(response({ _tag: "Api.Unauthorized", message: "Unauthorized" }, 401)),
+    Promise.resolve(
+      response({ _tag: "Authentication.Unauthorized", message: "Unauthorized" }, 401),
+    ),
   );
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(store.read()).toBeUndefined();

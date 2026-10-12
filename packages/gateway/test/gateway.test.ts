@@ -420,7 +420,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           ),
         );
         expect(conflict).toMatchObject({
-          _tag: "Gateway.Conflict",
+          _tag: "GatewayErrors.Conflict",
           workspaceId,
           operation: "append",
           message: "Changed position",
@@ -436,12 +436,12 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           ),
         );
         expect(yield* Schema.encodeEffect(GatewayErrors.PublicError)(uncertain)).toEqual({
-          _tag: "Gateway.Uncertain",
+          _tag: "GatewayErrors.Uncertain",
           workspaceId,
           commitId: "commit",
         });
         const invalid = yield* Effect.flip(enter(Schema.decodeEffect(Schema.NonEmptyString)("")));
-        expect(invalid).toMatchObject({ _tag: "Gateway.InvalidInput" });
+        expect(invalid).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
         const mismatch = yield* Effect.flip(
           enter(
             Effect.fail(
@@ -453,7 +453,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           ),
         );
         expect(mismatch).toMatchObject({
-          _tag: "Gateway.InvalidInput",
+          _tag: "GatewayErrors.InvalidInput",
           message: "Values must belong to workspace workspace",
         });
         const missing = new MemberService.NotFound({ workspaceId, memberId });
@@ -557,7 +557,7 @@ it.effect("one gateway resolves each caller's current membership and stops after
               }),
             ),
           );
-          expect(rejected).toMatchObject({ _tag: "Gateway.NotMember", workspaceId });
+          expect(rejected).toMatchObject({ _tag: "GatewayErrors.NotMember", workspaceId });
           expect(called).toBe(false);
           expect(seen).toEqual([alice, agent, alice]);
         }),

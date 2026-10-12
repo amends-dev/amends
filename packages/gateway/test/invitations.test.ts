@@ -164,7 +164,7 @@ describe("invitations", () => {
                   yield* Effect.flip(
                     Operations.getMember(workspace.id, bob, workspace.ownerMemberId),
                   ),
-                ).toMatchObject({ _tag: "Gateway.NotMember" });
+                ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
                 const freshInvite = yield* Operations.invite(workspace.id, alice, {
                   recipientId: bob.id,
                   expiresAt: yield* future,

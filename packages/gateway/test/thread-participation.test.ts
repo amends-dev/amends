@@ -823,7 +823,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "JournalStore.Conflict" },
+                value: { _tag: "Store.Conflict" },
               });
           yield* Effect.scoped(
             runHost(
@@ -891,7 +891,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "JournalStore.Conflict" },
+                value: { _tag: "Store.Conflict" },
               });
           yield* Effect.scoped(
             runHost(
@@ -1028,7 +1028,7 @@ describe("thread participation", () => {
           ).toMatchObject({ _tag: "ThreadParticipationService.ThreadNotFound" });
           expect(
             yield* Effect.flip(gateway.asMember(workspace.id, owner, follow("" as Thread.Id))),
-          ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
           expect(
             yield* Effect.flip(
               gateway.asMember(

@@ -44,10 +44,10 @@ type Internal = {
     | `${string}Store.Conflict`
     | `${string}.InvalidResponse`
     | `${string}.WorkspaceMismatch`
-    | `Commit.${string}`
+    | `Transaction.${string}`
     | `Projection.${string}`
-    | "JournalStore.CommitUncertain"
-    | "Journal.FactMismatch"
+    | "Store.CommitUncertain"
+    | "Event.FactMismatch"
     | "ThreadActivityKind.Mismatch"
     | "SchemaError"
     | "PlatformError"

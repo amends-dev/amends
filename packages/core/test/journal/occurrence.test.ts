@@ -110,7 +110,7 @@ it.effect(
           expect(Option.isSome(yield* journal.log.getAppend(key))).toBe(true);
           expect(
             (yield* Effect.flip(journal.publish(Received, { ...input, amount: 99 })))._tag,
-          ).toBe("JournalStore.Conflict");
+          ).toBe("Store.Conflict");
           const version2 = Fact.make(Received.name, {
             subject: testSubject,
             version: 2,
@@ -118,7 +118,7 @@ it.effect(
             occurrence: identity,
           });
           expect((yield* Effect.flip(journal.publish(version2, input)))._tag).toBe(
-            "JournalStore.Conflict",
+            "Store.Conflict",
           );
           expect(yield* fixture.counter.get).toBe(2);
         }),
@@ -172,7 +172,7 @@ it.effect(
           const manual = Occurrence.Key.make("manual-request");
           expect(
             (yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: manual })))._tag,
-          ).toBe("JournalStore.Conflict");
+          ).toBe("Store.Conflict");
           expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
           const automatic = yield* journal.publish(Received, input);
           const derived = yield* Fact.makeOccurrenceKey(Received, input);
@@ -180,7 +180,7 @@ it.effect(
           expect(
             (yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: derived })))
               ._tag,
-          ).toBe("JournalStore.Conflict");
+          ).toBe("Store.Conflict");
           expect(yield* journal.publish(Received, input)).toEqual(automatic);
           const unkeyed = { ...input, requestId: null };
           const first = yield* journal.publish(Received, unkeyed);
@@ -268,13 +268,13 @@ it.effect("registered fact versions cannot change their subject or occurrence ru
         });
         for (const fact of [unkeyed, changed, otherSubject]) {
           expect((yield* Effect.flip(journal.publish(fact, input)))._tag).toBe(
-            "Journal.FactMismatch",
+            "Event.FactMismatch",
           );
           const conflicting = Projection.make("other", { version: 1 }).on(fact, () => Effect.void);
           expect(
             (yield* Effect.flip(Journal.make({ logId, projections: [projection, conflicting] })))
               ._tag,
-          ).toBe("Journal.FactMismatch");
+          ).toBe("Event.FactMismatch");
         }
         expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
       }),

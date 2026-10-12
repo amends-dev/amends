@@ -344,7 +344,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(Schema.decodeUnknownSync(Member.Member)(read.body).identity).toEqual(alice);
           const denied = await call(bob.id, "GET", path);
           expect(denied.status).toBe(403);
-          expect(denied.body).toMatchObject({ _tag: "Gateway.NotMember" });
+          expect(denied.body).toMatchObject({ _tag: "GatewayErrors.NotMember" });
         });
       }),
   );

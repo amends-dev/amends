@@ -82,7 +82,7 @@ describe("workspace settings", () => {
           expect(yield* bound.store.read(journalLog, { limit: 50 })).toEqual(journal);
           expect(
             yield* Effect.flip(rename(workspace.id, alice, "Stale", workspace.name)),
-          ).toMatchObject({ _tag: "WorkspaceSettings.Changed" });
+          ).toMatchObject({ _tag: "WorkspaceSettingsService.Changed" });
           const workspaceDirectory = yield* WorkspaceDirectory.WorkspaceDirectory;
           expect((yield* workspaceDirectory.list(alice)).memberships[0]?.workspace.name).toBe(
             "Studio",

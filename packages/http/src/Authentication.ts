@@ -43,7 +43,7 @@ export class Credential extends Context.Service<Credential, Redacted.Redacted<st
  * @since 0.1.0
  */
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
-  "Api.Unauthorized",
+  "Authentication.Unauthorized",
   { message: Schema.String },
   { httpApiStatus: 401 },
 ) {}

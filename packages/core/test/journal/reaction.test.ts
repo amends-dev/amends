@@ -135,7 +135,7 @@ it.effect("a reaction that fails fails the commit, which publishes nothing", () 
       return { failure, entries: yield* journal.log.read({ limit: 10 }) };
     }).pipe(publishing, Effect.provide(plain));
     expect(outcome.failure).toMatchObject({
-      _tag: "JournalStore.Failure",
+      _tag: "Store.Failure",
       operation: "record request",
     });
     expect(outcome.entries).toEqual([]);

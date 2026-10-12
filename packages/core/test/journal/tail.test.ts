@@ -267,7 +267,7 @@ it.effect("tails ignore rolled-back appends and observe commits with lost acknow
         ).toBe("rollback");
         yield* fixture.loseNextAcknowledgment;
         expect((yield* Effect.flip(journal.publish(Changed, 1)))._tag).toBe(
-          "JournalStore.CommitUncertain",
+          "Store.CommitUncertain",
         );
         const batches = yield* Fiber.join(tail);
         const entry = batches[0]?.entries[0];

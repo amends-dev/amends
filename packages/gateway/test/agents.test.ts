@@ -387,7 +387,7 @@ describe("agents", () => {
             // Instructions with surrounding space are not a request at all.
             expect(
               yield* refused(changed(input, { instructions: " Review each change. " })),
-            ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
 
             expect(yield* bound.store.read(journalLog, { limit: 200 })).toEqual(before);
             expect(yield* bound.agents.list).toEqual([]);

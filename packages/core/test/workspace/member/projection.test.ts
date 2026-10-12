@@ -192,7 +192,7 @@ it.effect(
               }),
             ),
           );
-          expect(failure._tag).toBe("Commit.Aborted");
+          expect(failure._tag).toBe("Transaction.Aborted");
           const state = yield* fixture.snapshot;
           expect(state.members.size).toBe(0);
           expect(state.logs.size).toBe(0);

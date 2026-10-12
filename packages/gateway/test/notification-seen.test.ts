@@ -945,7 +945,7 @@ describe("marking notifications seen", () => {
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, human.identity, markSeen(invalid.id)),
                 ),
-              ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+              ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
             }),
           );
         }),

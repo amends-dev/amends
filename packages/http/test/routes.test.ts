@@ -525,7 +525,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
     const notMember = yield* run("bob", (client) =>
       client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
     );
-    expect(notMember).toMatchObject({ _tag: "Gateway.NotMember", workspaceId });
+    expect(notMember).toMatchObject({ _tag: "GatewayErrors.NotMember", workspaceId });
     const forbidden = yield* run("alice", (client) =>
       client.members
         .remove({ params: { workspaceId, memberId }, responseMode: "decoded-and-response" })
@@ -560,7 +560,7 @@ it.effect("missing or rejected credentials are unauthorized before any gateway c
     const rejected = yield* run("invalid", (client) =>
       client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
     );
-    expect(rejected).toMatchObject({ _tag: "Api.Unauthorized" });
+    expect(rejected).toMatchObject({ _tag: "Authentication.Unauthorized" });
     expect(calls).toEqual([]);
   }),
 );
@@ -581,7 +581,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
         .create({ headers: {}, payload: { name: "Test workspace", memberName: member.name } })
         .pipe(Effect.flip),
     );
-    expect(refused).toMatchObject({ _tag: "Api.HumanRequired" });
+    expect(refused).toMatchObject({ _tag: "ApiErrors.HumanRequired" });
     const accepted = yield* run("alice", (client) =>
       client.invitations.accept({
         params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
@@ -693,7 +693,7 @@ it.effect("a person reads their account, and signs out with the credential they 
       email: "alice@example.com",
     });
     const agent = yield* run("agent", (client) => Effect.flip(client.me.account()));
-    expect(agent).toMatchObject({ _tag: "Api.HumanRequired" });
+    expect(agent).toMatchObject({ _tag: "ApiErrors.HumanRequired" });
     // A session no account holds is not honored.
     const unknown = yield* run("carol", (client) =>
       client.me.account({ responseMode: "response-only" }),

@@ -209,7 +209,9 @@ it("clears rejected credentials on creation", async () => {
   const f = fixture();
   await f.ready();
   f.controller.submit("Studio");
-  (await f.at(1)).resolve(json({ _tag: "Api.Unauthorized", message: "Unauthorized" }, 401));
+  (await f.at(1)).resolve(
+    json({ _tag: "Authentication.Unauthorized", message: "Unauthorized" }, 401),
+  );
   await waitFor(() => expect(f.store.read()).toBeUndefined());
 });
 it.each(["hide", "replace"] as const)("ignores late creation after %s", async (action) => {

@@ -77,7 +77,7 @@ Commits persist events and projection records together. `Projection.Behind` refu
 registered projection is not live, and `Projection.Unregistered` while one this host does not run
 is, as when a host with a different projection set booted. Either stops sharing the prepared
 runtime: the next request prepares the workspace again, and the failed request, which committed
-nothing, gets `Gateway.Conflict` to retry. Boot is not an online migration: the directory reads
+nothing, gets `GatewayErrors.Conflict` to retry. Boot is not an online migration: the directory reads
 projection tables directly.
 
 ## Host contracts

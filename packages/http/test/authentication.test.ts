@@ -83,7 +83,7 @@ it.effect.each(["make", "layer"] as const)(
           yield* client.me.signOut();
           const rejected = yield* Effect.flip(client.me.workspaces());
           expect(rejected).toMatchObject({
-            _tag: "Api.Unauthorized",
+            _tag: "Authentication.Unauthorized",
             message: "The bearer token has expired",
           });
           yield* Ref.set(token, "alice");

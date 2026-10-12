@@ -334,7 +334,7 @@ export const contracts = (fixture: Fixture) => {
                     ),
                   ),
               ),
-            ).toMatchObject({ _tag: "JournalStore.Failure" });
+            ).toMatchObject({ _tag: "Store.Failure" });
             yield* bound.store.transaction(bound.checkpoints.setLive(logId, versions));
             expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
             expect(yield* bound.checkpoints.listLive(otherLog)).toEqual([]);
@@ -349,7 +349,7 @@ export const contracts = (fixture: Fixture) => {
                   ]),
                 ),
               ),
-            ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.setLive" });
+            ).toMatchObject({ _tag: "Store.Conflict", operation: "checkpoint.setLive" });
             expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
             // A set replaces the whole register, and a rolled-back one changes nothing.
             yield* bound.store.transaction(

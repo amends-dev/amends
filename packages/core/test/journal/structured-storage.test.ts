@@ -208,7 +208,7 @@ it.effect("publication retries and replay decoding reject changed subject intent
         });
         expect(
           (yield* Effect.flip(journal.publish(changed, 1, { idempotencyKey: key })))._tag,
-        ).toBe("JournalStore.Conflict");
+        ).toBe("Store.Conflict");
         const page = yield* journal.read({ subject: testSubject(), limit: 10 });
         const entry = page[0];
         if (entry === undefined) return yield* Effect.die("Missing event");
@@ -219,7 +219,7 @@ it.effect("publication retries and replay decoding reject changed subject intent
               payload: Object.assign({}, entry.payload, { subject: Subject.make("test", "wrong") }),
             }),
           ))._tag,
-        ).toBe("Journal.FactMismatch");
+        ).toBe("Event.FactMismatch");
         expect(page).toHaveLength(1);
       }),
     );

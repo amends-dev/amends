@@ -533,7 +533,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* outsider.groups
             .list({ params: { workspaceId }, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "Gateway.NotMember" });
+        ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
 
         const http = yield* HttpClient.HttpClient;
         const authorization = { authorization: "Bearer alice" };

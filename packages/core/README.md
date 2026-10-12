@@ -601,7 +601,7 @@ thread sequences. Lists order IDs by their UTF-8 bytes, as binary collation does
 
 A transaction copies its workspace's maps, runs against the copy, and on success makes the copy
 the committed state; a failure or interruption discards it. A workspace another connection is
-writing reports `JournalStore.Conflict` at once, as a lock wait that timed out immediately would;
+writing reports `Store.Conflict` at once, as a lock wait that timed out immediately would;
 the same connection's writers wait for each other. Each log has a lock shared by every host: a
 transaction takes it on its first append to the log, or lookup of one of its keys, refreshes its
 copy of that log from committed state, and keeps it until it ends; a standalone append takes only
@@ -638,10 +638,12 @@ src/workspace/
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
-The outcomes a caller can act on are schemas in an `internal/` errors module, apart from the
-services, so a protocol or a browser client carries them without loading an implementation; the
-service that reports them exports them under its name, which their tags carry, as
-`MemberService.NotFound`. Helpers no consumer imports go under `internal/` too.
+Every error belongs to the module that raises it, and its tag is its name there, as
+`MemberService.NotFound` or `Store.Conflict`. The outcomes a service reports to callers are schemas
+in an `internal/` errors module, apart from the services, so a protocol or a browser client carries
+them without loading an implementation, and the service exports them. A query defines what it
+raises beside itself, as `ThreadQuery.NotFound`, and a service that calls it maps that to its own
+outcome. Helpers no consumer imports go under `internal/` too.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

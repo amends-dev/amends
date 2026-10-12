@@ -165,7 +165,7 @@ it.effect("each evaluation of the transaction constructor owns a separate coordi
       const first = yield* acquire;
       const second = yield* acquire;
       const failure = yield* Effect.flip(first.run(second.run(Effect.void)));
-      expect(failure._tag).toBe("Commit.Foreign");
+      expect(failure._tag).toBe("Transaction.Foreign");
       expect(yield* fixture.attempts).toBe(1);
       yield* second.run(second.run(Effect.void));
       expect(yield* fixture.attempts).toBe(2);

@@ -778,14 +778,14 @@ describe("notifications", () => {
             expect(
               yield* Effect.flip(gateway.asMember(workspaceId, anotherIdentity, list)),
             ).toMatchObject({
-              _tag: "Gateway.NotMember",
+              _tag: "GatewayErrors.NotMember",
             });
             expect(yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before);
             yield* a.store.transaction(a.members.markRemoved(workspace.ownerMemberId));
             expect(
               yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, list)),
             ).toMatchObject({
-              _tag: "Gateway.NotMember",
+              _tag: "GatewayErrors.NotMember",
             });
             expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual(
               inboxOf(foreign),

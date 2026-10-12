@@ -283,7 +283,7 @@ describe("built-in roles", () => {
           if (Exit.isFailure(exit))
             expect(Exit.findErrorOption(exit)).toMatchObject({
               _tag: "Some",
-              value: { _tag: "JournalStore.Conflict" },
+              value: { _tag: "Store.Conflict" },
             });
         const revised = (yield* history(bound))
           .flatMap((batch) => batch.entries)

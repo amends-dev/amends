@@ -147,7 +147,7 @@ export const storageCodec: Codec.EntryCodec<typeof Envelope> = {
  * @category errors
  * @since 0.1.0
  */
-export class FactMismatch extends Schema.TaggedError<FactMismatch>()("Journal.FactMismatch", {
+export class FactMismatch extends Schema.TaggedError<FactMismatch>()("Event.FactMismatch", {
   name: Schema.String,
   version: Schema.Finite,
 }) {}

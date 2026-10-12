@@ -162,14 +162,14 @@ it.effect(
         broken,
         Effect.gen(function* () {
           const replay = yield* runner;
-          expect((yield* Effect.flip(replay.step))._tag).toBe("JournalStore.Failure");
+          expect((yield* Effect.flip(replay.step))._tag).toBe("Store.Failure");
           // The first commit to an empty log makes its projections live, so it fails with them.
           const journal = yield* Journal.make({
             logId: Entry.LogId.make("new-domain"),
             projections: [definition],
           });
           expect((yield* Effect.flip(journal.publish(Changed, { amount: 5 })))._tag).toBe(
-            "JournalStore.Failure",
+            "Store.Failure",
           );
           expect(yield* (yield* Counter).get).toBe(0);
           expect((yield* fixture.snapshot).checkpoints.size).toBe(0);
@@ -545,7 +545,7 @@ it.effect(
           yield* journal.publish(Changed, { amount: 4 });
           const bound = yield* runner;
           yield* fixture.loseNextAcknowledgment;
-          expect((yield* Effect.flip(bound.step))._tag).toBe("JournalStore.CommitUncertain");
+          expect((yield* Effect.flip(bound.step))._tag).toBe("Store.CommitUncertain");
           expect(yield* fixture.attempts).toBe(2);
           expect(Option.isSome(yield* bound.checkpoint)).toBe(true);
           expect(yield* (yield* Counter).get).toBe(4);
@@ -580,12 +580,12 @@ it.effect("replay handlers cannot append and a caught failure poisons the outer 
         expect(yield* Effect.flip(bound.step)).toMatchObject({
           _tag: "Projection.Failure",
           phase: "apply",
-          cause: { _tag: "Commit.WriteForbidden" },
+          cause: { _tag: "Transaction.WriteForbidden" },
         });
         const result = yield* Effect.flip(
           journal.commit(bound.step.pipe(Effect.catch(() => Effect.void))),
         );
-        expect(result._tag).toBe("Commit.Aborted");
+        expect(result._tag).toBe("Transaction.Aborted");
         expect(yield* (yield* Counter).get).toBe(0);
         expect(Option.isNone(yield* bound.checkpoint)).toBe(true);
         expect((yield* fixture.snapshot).logs.size).toBe(1);
@@ -690,7 +690,7 @@ it.effect("historical decoding resolves services, runs once per event, and canno
           }),
         );
         const failure = yield* Effect.flip(fresh.step);
-        expect(failure._tag).toBe("Commit.Aborted");
+        expect(failure._tag).toBe("Transaction.Aborted");
         expect(yield* (yield* Counter).get).toBe(5);
         expect(Option.isNone(yield* fresh.checkpoint)).toBe(true);
         expect((yield* fixture.snapshot).logs.size).toBe(1);
@@ -753,7 +753,7 @@ it.effect("live projection application rejects entries from another native trans
         if (entry === undefined) throw new Error("Missing source entry");
         const bound = yield* runner;
         const failure = yield* Effect.flip(journal.commit(bound.apply(entry, event)));
-        expect(failure._tag).toBe("Commit.Foreign");
+        expect(failure._tag).toBe("Transaction.Foreign");
         expect(yield* (yield* Counter).get).toBe(0);
         expect(Option.isNone(yield* bound.checkpoint)).toBe(true);
       }),

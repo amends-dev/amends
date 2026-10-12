@@ -85,9 +85,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(yield* asAda.me.account()).toEqual(session.account);
         // A human ID is not a token, as development sign-in would take it.
         const byId = yield* client(session.account.id);
-        expect(yield* Effect.flip(byId.me.account())).toMatchObject({ _tag: "Api.Unauthorized" });
+        expect(yield* Effect.flip(byId.me.account())).toMatchObject({
+          _tag: "Authentication.Unauthorized",
+        });
         yield* asAda.me.signOut();
-        expect(yield* Effect.flip(asAda.me.account())).toMatchObject({ _tag: "Api.Unauthorized" });
+        expect(yield* Effect.flip(asAda.me.account())).toMatchObject({
+          _tag: "Authentication.Unauthorized",
+        });
       }).pipe(Effect.scoped, Effect.provide(fixture.layer));
     }),
   );

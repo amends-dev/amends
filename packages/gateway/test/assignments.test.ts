@@ -58,7 +58,7 @@ describe("assignments", () => {
             ),
           ).toMatchObject({ _tag: "AssignmentService.MemberNotFound" });
           expect(yield* Effect.flip(Operations.access(other.id, bob, viewer.id))).toMatchObject({
-            _tag: "Gateway.NotMember",
+            _tag: "GatewayErrors.NotMember",
           });
           expect(
             yield* Effect.flip(
@@ -107,7 +107,7 @@ describe("assignments", () => {
                 id: Identity.HumanId.make("stranger"),
               }),
             ),
-          ).toMatchObject({ _tag: "Gateway.NotMember" });
+          ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
         }),
       ),
     ),
@@ -278,7 +278,7 @@ describe("assignments", () => {
                 expect(results.filter(Result.isSuccess)).toHaveLength(1);
                 const rejected = results.find((result) => Result.isFailure(result));
                 // A writer that waited sees the winner's change; one that gave up reports contention.
-                expect(["AssignmentService.Changed", "Gateway.Conflict"]).toContain(
+                expect(["AssignmentService.Changed", "GatewayErrors.Conflict"]).toContain(
                   rejected !== undefined && Result.isFailure(rejected)
                     ? rejected.failure._tag
                     : undefined,

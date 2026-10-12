@@ -128,7 +128,7 @@ it("retries at once after a failed request or invalid input, and waits for a ref
         puts.length === 1
           ? new Response("Host unavailable", { status: 503 })
           : new Response(
-              JSON.stringify({ _tag: "WorkspaceSettings.Changed", workspaceId: "one" }),
+              JSON.stringify({ _tag: "WorkspaceSettingsService.Changed", workspaceId: "one" }),
               {
                 status: 409,
                 headers: { "content-type": "application/json" },

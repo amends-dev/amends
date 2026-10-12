@@ -198,7 +198,7 @@ it.effect("foreign workspaces, dangling causes and changed correlations reject w
             }),
           ),
         );
-        expect(failure._tag).toBe("Commit.Aborted");
+        expect(failure._tag).toBe("Transaction.Aborted");
         expect(
           (yield* journal.log.read({ limit: 10 })).flatMap((batch) => batch.entries),
         ).toHaveLength(1);

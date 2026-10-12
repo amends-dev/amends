@@ -385,7 +385,7 @@ outer commit succeeds.
 A commit runs its storage work one step at a time: await each publication, append, and log read
 before starting the next. A step nested in the running one on the same fiber, such as a
 publication's own append and projection updates, runs within it. Starting a step while another
-fiber's is running is a defect, `Commit.Concurrent`, that aborts the commit. Waiting instead could
+fiber's is running is a defect, `Transaction.Concurrent`, that aborts the commit. Waiting instead could
 deadlock a forked fiber on its parent's step, and let a read interleave with writes the store has
 staged. Work outside storage can still run concurrently inside a commit's program.
 
@@ -431,7 +431,7 @@ Expected projection decoder and handler failures become `Projection.Failure`, wi
 the projection key, source entry cursor, `decode` or `apply` phase, and the original
 error in `cause`. This keeps the journal's error contract independent of registered
 handlers. Defects and interruption keep their Effect causes. A caught failure is
-still reported at the outer commit boundary as `Commit.Aborted`.
+still reported at the outer commit boundary as `Transaction.Aborted`.
 
 Adapters report unconfirmed commit outcomes with `Store.CommitUncertain`, including
 the commit ID for lookup and reconciliation. The core does not automatically retry

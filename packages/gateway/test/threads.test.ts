@@ -799,7 +799,7 @@ describe("threads", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, owner, startOnly(group.id, [], " ")),
               ),
-            ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
           }),
         ),
       ),
@@ -927,7 +927,7 @@ describe("threads", () => {
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
                   _tag: expect.stringMatching(
-                    /^(JournalStore.Conflict|ThreadService.ParticipantUnavailable)$/,
+                    /^(Store.Conflict|ThreadService.ParticipantUnavailable)$/,
                   ),
                 },
               });
@@ -983,7 +983,7 @@ describe("threads", () => {
             expect(
               yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
             ).toMatchObject({
-              _tag: "JournalStore.Failure",
+              _tag: "Store.Failure",
             });
             expect(yield* history(bound)).toEqual(before);
             expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);

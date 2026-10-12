@@ -820,7 +820,7 @@ describe("group memberships", () => {
               _tag: "Some",
               value: {
                 _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyMember|JournalStore.Conflict)$/,
+                  /^(GroupMembershipService.AlreadyMember|Store.Conflict)$/,
                 ),
               },
             });
@@ -1591,7 +1591,7 @@ describe("group memberships", () => {
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               value: {
                 _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyRemoved|JournalStore.Conflict)$/,
+                  /^(GroupMembershipService.AlreadyRemoved|Store.Conflict)$/,
                 ),
               },
             });
@@ -1668,7 +1668,7 @@ describe("group memberships", () => {
               expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                 value: {
                   _tag: expect.stringMatching(
-                    /^(GroupMembershipService.InactiveMember|JournalStore.Conflict)$/,
+                    /^(GroupMembershipService.InactiveMember|Store.Conflict)$/,
                   ),
                 },
               });
@@ -1921,7 +1921,7 @@ describe("group memberships", () => {
                       .publish(GroupMembershipFacts.Removed, { ...event.payload, reason: "left" })
                       .pipe(Effect.provideService(Publication.Publication, event.provenance)),
                   ),
-                ).toMatchObject({ _tag: "JournalStore.Conflict" });
+                ).toMatchObject({ _tag: "Store.Conflict" });
               }),
             );
             expect(yield* history(bound)).toEqual(before);

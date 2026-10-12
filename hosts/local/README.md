@@ -163,7 +163,7 @@ address. A code becomes usable after delivery succeeds, can be used once, and ex
 ten-minute deadline. A failed or interrupted delivery removes its own attempt without deleting a
 newer one, and restarting the server discards pending codes.
 
-Requests without a token receive 401. Non-members receive 403 with `Gateway.NotMember`, and core's
+Requests without a token receive 401. Non-members receive 403 with `GatewayErrors.NotMember`, and core's
 outcomes keep their tags, such as `MemberService.NotFound` with 404.
 
 ## Modules

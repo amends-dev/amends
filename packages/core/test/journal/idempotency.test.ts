@@ -160,7 +160,7 @@ it.effect(
               }),
             ),
           );
-          expect(error._tag).toBe("Commit.Aborted");
+          expect(error._tag).toBe("Transaction.Aborted");
           expect(yield* journal.log.getAppend(second)).toEqual(Option.none());
           expect(yield* fixture.counter.get).toBe(1);
           for (const fact of [
@@ -169,7 +169,7 @@ it.effect(
           ])
             expect(
               (yield* Effect.flip(journal.publish(fact, 1, { idempotencyKey: key })))._tag,
-            ).toBe("JournalStore.Conflict");
+            ).toBe("Store.Conflict");
           const failing = yield* Journal.make({
             logId: Entry.LogId.make("failing"),
             projections: [
@@ -225,7 +225,7 @@ it.effect(
           for (const input of [["one"], ["two", "one"], ["one", "changed"]])
             expect(
               (yield* Effect.flip(executionLog.appendAll(input, { idempotencyKey: key })))._tag,
-            ).toBe("JournalStore.Conflict");
+            ).toBe("Store.Conflict");
           expect(
             (yield* Effect.flip(
               executionLog.appendAll([], { idempotencyKey: Occurrence.Key.make("empty") }),
@@ -238,7 +238,7 @@ it.effect(
                 expectedAfter: Option.none(),
               }),
             ))._tag,
-          ).toBe("JournalStore.Conflict");
+          ).toBe("Store.Conflict");
           expect(yield* executionLog.getAppend(Occurrence.Key.make("new"))).toEqual(Option.none());
           const other = log.open({ id: Entry.LogId.make("other"), schema: Schema.String });
           yield* other.append("different", { idempotencyKey: key });

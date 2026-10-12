@@ -46,7 +46,7 @@ import { HttpApiSchema } from "effect/http-api";
  * @since 0.1.0
  */
 export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
-  "Api.HumanRequired",
+  "ApiErrors.HumanRequired",
   {},
   { httpApiStatus: 403 },
 ) {}
@@ -59,7 +59,7 @@ export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
  * @since 0.1.0
  */
 export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
-  "Api.TooManyStreams",
+  "ApiErrors.TooManyStreams",
   { limit: Schema.Literals(["workspace", "member"]) },
   { httpApiStatus: 429 },
 ) {}

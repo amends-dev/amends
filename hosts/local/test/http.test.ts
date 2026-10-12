@@ -186,7 +186,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(outcome.members.find((member) => member.id === outcome.joined.id)?.name).toBe(
             "Bob Chen",
           );
-          expect(outcome.outsider).toMatchObject({ _tag: "Gateway.NotMember" });
+          expect(outcome.outsider).toMatchObject({ _tag: "GatewayErrors.NotMember" });
           expect(outcome.invitation.state).toEqual({ _tag: "Pending" });
           expect(outcome.wrongRecipient).toMatchObject({
             _tag: "InvitationService.NotRecipient",
@@ -210,7 +210,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               .map((member) => member.status)
               .sort((a, b) => a.localeCompare(b)),
           ).toEqual(["active", "removed"]);
-          expect(outcome.afterRemoval).toMatchObject({ _tag: "Gateway.NotMember" });
+          expect(outcome.afterRemoval).toMatchObject({ _tag: "GatewayErrors.NotMember" });
           expect(outcome.missingStatus).toBe(404);
         }),
       ),

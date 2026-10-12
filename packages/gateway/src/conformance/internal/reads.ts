@@ -100,7 +100,7 @@ export const reads = (fixture: Fixture) => {
                       ),
                     ),
                   ),
-                ).toMatchObject({ _tag: "Gateway.Conflict" });
+                ).toMatchObject({ _tag: "GatewayErrors.Conflict" });
               }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)));
               yield* Fiber.join(writing);
               expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
