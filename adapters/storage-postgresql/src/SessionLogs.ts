@@ -146,7 +146,7 @@ export const make = Effect.fn("SessionLogs.make")(function* () {
       );
     }),
   };
-  return SessionLogStore.make(workspaceId, driver);
+  return SessionLogStore.make(driver);
 });
 
 /**

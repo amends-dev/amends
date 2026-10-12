@@ -575,9 +575,11 @@ Nothing survives the process.
 
 Every store contract builds its store with `make(workspaceId, driver)`, over the driver an
 adapter implements: the store checks each input against its schema, and a record against the
-workspace, through `StoreInput`, before the driver sees it. A driver keeps only what storage
-keeps, such as reused IDs and conditional writes, and an adapter's module returns
-`XStore.make(workspaceId, driver)` from its constructor, as each `layerMemory` does.
+workspace, through `StoreInput`, before the driver sees it. The checkpoint and session log stores,
+whose inputs name no workspace, take the driver alone, and `Store.make` reads the workspace from
+its driver. A driver keeps only what storage keeps, such as reused IDs and conditional writes, and
+an adapter's module returns the contract's `make` over its driver from its constructor, as each
+`layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
   workspace has one `Space`: its commits, log batches, keyed append slices, projected records by

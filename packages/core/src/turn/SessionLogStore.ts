@@ -11,7 +11,6 @@ import { Array, Context, DateTime, Deferred, Effect, Layer, Schema } from "effec
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as SessionLog from "./SessionLog.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Store from "../journal/Store.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 import { storeFailure } from "../journal/internal/store-failure.ts";
@@ -99,10 +98,7 @@ export class SessionLogStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (
-  workspaceId: WorkspaceId.Id,
-  driver: SessionLogStore["Service"],
-): SessionLogStore["Service"] => {
+export const make = (driver: SessionLogStore["Service"]): SessionLogStore["Service"] => {
   const read = StoreInput.read(Failure);
   return {
     head: (participationId) =>
@@ -180,7 +176,7 @@ const makeMemory = Effect.fn("SessionLogStore.makeMemory")(function* () {
       },
     ),
   };
-  return make(workspaceId, driver);
+  return make(driver);
 });
 
 /**
