@@ -367,7 +367,7 @@ harness it can run on. `buildRunnable` gives the agent ready to run on a selecti
 (`AgentQuery.Runnable`): its instructions, and the connections of the selection's harness, model,
 and sandbox, each with its key, beside the model as its integration's endpoint takes it. Whoever
 runs the agent builds its harness and sandbox from these with the host's integrations, so core runs
-nothing of an agent. Both fail with `Incomplete` when the agent cannot run.
+nothing of an agent. Both fail with `AgentQuery.Incomplete` when the agent cannot run.
 
 `agent.create` works on the workspace, and `agent.read` and `agent.configure` on the agent's
 membership. Members read agents; administrators and the owner create and configure them.

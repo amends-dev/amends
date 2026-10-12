@@ -43,7 +43,6 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
-import { NotActive, NotFound } from "./internal/turn-errors.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnCommand from "./TurnCommand.ts";
 import * as TurnFacts from "./TurnFacts.ts";
@@ -52,6 +51,27 @@ import * as SessionLogStore from "./SessionLogStore.ts";
 import * as SessionStateStore from "./SessionStateStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
+
+/**
+ * The workspace has no turn with this ID.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class NotFound extends Schema.TaggedError<NotFound>()("TurnExecution.NotFound", {
+  turnId: Turn.Id,
+}) {}
+
+/**
+ * The turn is not in the state the step needs: it has finished, or is not running yet.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class NotActive extends Schema.TaggedError<NotActive>()("TurnExecution.NotActive", {
+  turnId: Turn.Id,
+  status: Turn.Status,
+}) {}
 
 /**
  * What every execution operation can fail with: the turn's outcomes above, and the
@@ -693,7 +713,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           }).pipe(
             // The agent cannot run on what is selected for it: the turn fails, saying why.
             Effect.catchTags({
-              "AgentService.Incomplete": ({ issues }) =>
+              "AgentQuery.Incomplete": ({ issues }) =>
                 endAsIdle(turn, {
                   outcome: "failed",
                   reason: issues.map(describeIssue).join(" "),

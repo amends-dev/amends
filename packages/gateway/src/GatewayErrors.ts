@@ -196,6 +196,7 @@ export const PublicError = Schema.Union([
   ChannelService.GroupNotFound,
   ChannelService.ConnectionUnavailable,
   ChannelService.NotBound,
+  ChannelIntake.NotFound,
   ChannelIntake.Rejected,
   ChannelIntake.Unavailable,
 ]);

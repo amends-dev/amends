@@ -17,7 +17,6 @@ import * as Identity from "../identity/Identity.ts";
 import * as MemberId from "../workspace/MemberId.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
-import { Incomplete } from "./internal/agent-errors.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
 
@@ -38,6 +37,16 @@ export class NotFound extends Schema.TaggedError<NotFound>()("AgentQuery.NotFoun
  * @since 0.1.0
  */
 export type ReadError = NotFound | MemberStore.Failure | AgentStore.Failure;
+
+/**
+ * The agent cannot run on what it is set up with, for the issues its readiness reports.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class Incomplete extends Schema.TaggedError<Incomplete>()("AgentQuery.Incomplete", {
+  issues: Schema.NonEmptyArray(Agent.Issue),
+}) {}
 
 /**
  * What selecting can fail with: what reading the agent and the workspace's connections meets, and

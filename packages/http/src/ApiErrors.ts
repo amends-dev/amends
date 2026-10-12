@@ -653,7 +653,7 @@ export const channelBinding = [ChannelService.NotBound.pipe(HttpApiSchema.status
  * @since 0.1.0
  */
 export const channelEvents = [
-  ...channelRead,
+  ChannelIntake.NotFound.pipe(HttpApiSchema.status(404)),
   ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
   ChannelIntake.Unavailable.pipe(HttpApiSchema.status(503)),
 ] as const;

@@ -301,7 +301,7 @@ describe("channels", () => {
                   }),
                 ),
               ),
-            ).toEqual(new ChannelService.NotFound({ channelId: Channel.Id.make("missing") }));
+            ).toEqual(new ChannelIntake.NotFound({ channelId: Channel.Id.make("missing") }));
           }),
         ),
       ),
@@ -658,7 +658,7 @@ describe("channels", () => {
                   channelIntake.receive(channel.id, { headers: {}, body: body([]) }),
                 ),
               ),
-            ).toEqual(new ChannelService.NotFound({ channelId: channel.id }));
+            ).toEqual(new ChannelIntake.NotFound({ channelId: channel.id }));
             expect(yield* bound.channelBindings.get(threadId)).toMatchObject(
               Option.some({ channelId: channel.id }),
             );

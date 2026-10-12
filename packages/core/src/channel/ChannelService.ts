@@ -200,12 +200,18 @@ export const make = Effect.fn("ChannelService.make")(function* () {
   const channelTarget = (channelId: Channel.Id) =>
     ({ _tag: "Channel", workspaceId, channelId }) as const;
 
+  /** A channel that exists and is not removed. */
+  const requireActive = (channelId: Channel.Id) =>
+    channelQuery
+      .requireActive(channelId)
+      .pipe(Effect.catchTag("ChannelQuery.NotFound", () => new NotFound({ channelId })));
+
   /** A channel the actor may act on with `permission`; to anyone else it is missing. */
   const requirePermitted = Effect.fnUntraced(function* (
     channelId: Channel.Id,
     permission: Permission.Definition<"Channel">,
   ) {
-    const record = yield* channelQuery.requireActive(channelId);
+    const record = yield* requireActive(channelId);
     yield* Authorization.requireVisible(
       authorization,
       Requirement.make(ChannelPermissions.Read, channelTarget(channelId)),
@@ -260,7 +266,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
       );
       // A retry returns the channel its first attempt created, unless it was removed since.
       if (options.requestKey !== undefined && Option.isSome(yield* channelStore.get(channelId)))
-        return yield* channelQuery.requireActive(channelId);
+        return yield* requireActive(channelId);
       yield* requireDestination(request.groupId);
       yield* requireUsableConnection(request.connectionId);
       const created: Channel.Channel = {

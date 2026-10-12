@@ -1,8 +1,7 @@
 /**
  * The outcomes `AgentService` reports that a caller can act on. They are schemas, so protocols
  * carry them to clients; the service's error types add the failures of what it depends on.
- * `AgentService` re-exports them, and `AgentQuery` fails with `Incomplete` too, when the agent of
- * a turn cannot run.
+ * `AgentService` re-exports them.
  */
 import { Schema } from "effect";
 import * as Connection from "../../connection/Connection.ts";
