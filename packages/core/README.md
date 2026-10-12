@@ -73,19 +73,19 @@ later write. Stores still require a valid workspace transaction for every mutati
 inside an existing commit uses that transaction and sees its staged changes.
 
 Core trusts what storage returns: the adapters decode each record and scope it to its workspace, and
-the [storage conformance suites](../storage-conformance/README.md) check that. Operations use stored
+the [storage conformance suites](../gateway/README.md#conformance) check that. Operations use stored
 records as they come, and a record core itself wrote that is missing is a defect rather than a typed
 error. Core validates what crosses into it instead: callers' input, an actor or target from another
 workspace, and what a turn's runner or harness reports.
 
 A host binds the journal store to one workspace, and that binding is the only place a service learns
-which workspace it serves: services that need the workspace ID read it from `Store.Service`.
+which workspace it serves: services that need the workspace ID read it from `Store.Store`.
 Projection stores and signals are bound the same way. Job requests name their workspace, taken from
 the fact that asks for them, since the host runs every workspace's jobs.
 
 ### Publication
 
-Every `Journal.publish(fact, payload)` reads `Publication.Service` when it runs: workspace,
+Every `Journal.publish(fact, payload)` reads `Publication.Publication` when it runs: workspace,
 performer, immediate cause, correlation ID, and occurrence time. `Publication.withActor` establishes
 that context when it is absent and reuses it in nested operations; `Publication.make` supports
 explicit context for authenticated identities before membership and for system performers;
@@ -139,7 +139,7 @@ the
 
 ### Permissions and built-in roles
 
-Declare a permission beside its owning feature and register it in `core.ts`. Every declaration
+Declare a permission beside its owning feature and register it in `index.ts`. Every declaration
 chooses its `builtinTier`, `member`, `administrator`, or `owner`; groups supply a name prefix and a
 default target kind, but never a tier:
 
@@ -231,7 +231,7 @@ mentions pages the thread's active participants, the people it notifies. See
 
 ### Activity kinds
 
-An activity has one shape for every kind, `ThreadActivity.Record`: its position, a dotted `kind`
+An activity has one shape for every kind, `ThreadActivity.ThreadActivity`: its position, a dotted `kind`
 such as `message.published` and the `version` of its details, its `subject`, an `occurrence` key,
 `newActivity`, and the kind's `details` as encoded JSON. Storage, facts, and the change feed carry
 that shape, so a new kind or version changes none of them and needs no migration. Every kind is
@@ -264,14 +264,14 @@ domain's step, which publishes the domain fact and returns the kind, details, an
 A kind appears in timelines through a resolver its domain registers, such as
 `ThreadMessageTimeline.resolver` or `TurnTimeline.resolver`. Each loads what its kinds reference in
 one batch per page and returns typed items, and adds its item type to `ThreadActivityKind.Item` by
-module augmentation. `src/core.ts` registers the resolvers, and `ThreadTimeline.Item` is the closed
+module augmentation. `src/index.ts` registers the resolvers, and `ThreadTimeline.Item` is the closed
 schema of every item, for protocols that encode timelines: a new kind adds its resolver to the first
 and its item schema to the second. Reading a kind without a resolver is a defect,
 `ThreadActivityResolvers.Unknown`.
 
 ## Tasks
 
-`@amends-dev/core/task` builds on threads. `Task.Record` is a row keyed by its thread, with a
+`@amends-dev/core/task` builds on threads. `Task.Task` is a row keyed by its thread, with a
 status, priority, and assignee. `TaskService` (`create`, `update`, `get`, `listInGroup`) is the
 operations, and `TaskCommand` the writes that create a task with its thread or in an existing
 conversation and change it one way at a time, at the thread's next position, telling and admitting
@@ -280,7 +280,7 @@ group's thread lists carry each thread's task. See [tasks](../../docs/thread-wor
 
 ## Notifications
 
-`@amends-dev/core/notification` holds `Notification.Record`, the `NotificationStore` contract,
+`@amends-dev/core/notification` holds `Notification.Notification`, the `NotificationStore` contract,
 `NotificationService`, and the projection that generates notifications. A notification references a
 source log entry and a human, agent, contact, or triage recipient (one triage recipient per
 workspace), and is `Pending`; `Discarded` when its agent participation ends or its person leaves the
@@ -342,7 +342,7 @@ integrations as `Integrations`.
 ## Agents
 
 `@amends-dev/core/agent` holds a workspace's agents. An agent is a workspace member that works:
-`Agent.Record` keeps its instructions; its `harness`, the harnesses of one of the workspace's
+`Agent.Agent` keeps its instructions; its `harness`, the harnesses of one of the workspace's
 connections, or `Auto`, for amends to choose among them; its `model`, one a connection offers, by
 id, with an `effort`; and its `sandbox`, the sandboxes of a connection, or none. Its name, role, and
 departure are its membership's. `AgentFacts.Created` records an agent in the commit that adds its
@@ -376,7 +376,7 @@ thread, and stopping or retrying its [turns](#turns).
 
 ## Turns
 
-`@amends-dev/core/turn` holds agents' turns in threads. A `Turn.Record` is one harness turn of one
+`@amends-dev/core/turn` holds agents' turns in threads. A `Turn.Turn` is one harness turn of one
 agent in one thread: `queued` until its job starts it, `running`, `cancelling` once asked to stop,
 then `completed`, `failed`, or `cancelled`, never reopening. An agent has at most one active turn
 per thread, which the stores enforce, and work that arrives while it is active waits for the next. A
@@ -465,11 +465,11 @@ no one and are not new activity; the replies are. A client folds a turn's items 
 
 `@amends-dev/core/channel` is a connection's external conversations as threads in one group, as
 [threads](../../docs/threads.md#channels) fixes it and
-[channels](../../docs/thread-workflows.md#channels) describes. `Channel.Record` names the
+[channels](../../docs/thread-workflows.md#channels) describes. `Channel.Channel` names the
 connection, the group new conversations open in, and whether they open tasks;
-`ChannelBinding.Record` is a bound thread's conversation, keyed by the thread, as the connection's
-[transport](../channel/README.md) identifies it; `Contact.Record` is a person heard from through a
-channel, named as the system names them; and `Delivery.Record` is one message's delivery to a
+`ChannelBinding.ChannelBinding` is a bound thread's conversation, keyed by the thread, as the connection's
+[transport](../channel/README.md) identifies it; `Contact.Contact` is a person heard from through a
+channel, named as the system names them; and `Delivery.Delivery` is one message's delivery to a
 conversation, `requested`, `sent`, or `failed`.
 
 `ChannelService` (`create`, `list`, `get`, `redirect`, `remove`, `getBinding`) is the operations,
@@ -496,9 +496,9 @@ stored fails the commit, and neither replay nor a retried publication asks again
   carries what the thread's contacts were told to the conversation, through `DeliveryExecution`.
   Activity that tells a contact something requests it.
 
-`TurnJobs.Service` and `DeliveryJobs.Service` are host services, shared by every workspace, which
-deliver each request to whatever runs the jobs; each one's `layerNoRunner` accepts requests and runs
-nothing. A host's jobs reach `JobServices` through the gateway's `inWorkspace`.
+`TurnJobs.TurnJobs` and `DeliveryJobs.DeliveryJobs` are host services, shared by every workspace,
+which deliver each request to whatever runs the jobs; each one's `layerNoRunner` accepts requests
+and runs nothing. A host's jobs reach `JobServices` through the gateway's `inWorkspace`.
 [Cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` run them, as the local host does.
 
 ## Change feed
@@ -526,16 +526,16 @@ its view. `Ready`'s cursor is null only for an empty journal.
 
 A reader sees an event when they hold a scope in its fact's
 [audience](../../docs/journal.md#fact-audiences), the workspace, their membership or identity, or a
-group they belong to, and any read permission the registry in `src/change-feed/events.ts` names for
-it: `invitation.manage` for invitations, `member.read` and `assignment.read` for membership and
-access changes, `group.read` for group facts, and `thread.read` for thread facts. A registration can
-name the member a fact concerns, who sees it without the permission. Their membership, admissions,
-and grants are read after the subscription registers and reloaded before filtering a commit that
-changes them, so a commit that admits the reader delivers what it admits. The commit that removes
-the reader from the workspace is delivered, then the stream ends. Registry views give some facts
-their public shape: activity omits its recipients, and participation omits routing identities and
-admissions. A core test checks that the registry holds every fact that declares an audience, at each
-version, and no other.
+group they belong to, and any read permission the registry in `src/change-feed/ChangeFeedEvents.ts`
+names for it: `invitation.manage` for invitations, `member.read` and `assignment.read` for
+membership and access changes, `group.read` for group facts, and `thread.read` for thread facts. A
+registration can name the member a fact concerns, who sees it without the permission. Their
+membership, admissions, and grants are read after the subscription registers and reloaded before
+filtering a commit that changes them, so a commit that admits the reader delivers what it admits.
+The commit that removes the reader from the workspace is delivered, then the stream ends. Registry
+views give some facts their public shape: activity omits its recipients, and participation omits
+routing identities and admissions. A core test checks that the registry holds every fact that
+declares an audience, at each version, and no other.
 
 Recorded thread activity also carries the notifications it creates: each recipient's arrives in the
 same `Committed` message, exactly as the inbox lists it, and nobody else sees it. A commit with
@@ -546,24 +546,71 @@ contract reuses these message schemas.
 
 ## Signals
 
-`@amends-dev/core/signal` holds what is happening now and is never stored: `Signal.Value` is
+`@amends-dev/core/signal` holds what is happening now and is never stored: `Signal.Signal` is
 `Typing`, `ThreadRead`, `GroupRead`, `NotificationsSeen`, or `TurnDraft`. `Signal.changeFeedReachOf`
 gives each its audience on the change feed: typing reaches the thread's group with `thread.read`,
 the three read-state signals only the member whose state changed, so their other sessions stay
 current, and a turn's drafts nobody there, only readers following the turn's log.
 
-`SignalHub.Service` is the workspace's delivery, which storage binds with the stores: `publish`
+`SignalHub.SignalHub` is the workspace's delivery, which storage binds with the stores: `publish`
 offers a signal to the subscribers present at that moment, in every process over the same storage,
 and `subscribe` returns those published until its scope closes. Delivery is best effort: publishing
 never fails the operation, and a subscriber that falls behind or loses its connection misses
-signals. `SignalHub.makeLocal` is one process's hub for every workspace, which storage adapters bind
-to each workspace and relay between processes.
+signals. `LocalSignalHub` is one process's hub for every workspace, which storage adapters bind to
+each workspace and relay between processes.
 
 `ThreadMessageService.typing(threadId)` tells the thread's readers that the acting member is
 composing there for the next six seconds. It requires current group access and `thread.publish`, and
 returns `NotFound` for missing and inaccessible threads alike; repeats from the same member in the
 same thread within two seconds are dropped. `ReadStateService` and `NotificationService.markSeen`
 and `markSeenThrough` publish the read-state signals after their writes.
+
+## Memory
+
+Every store contract, and the signal hub, has a `layerMemory` beside it that implements it in
+process memory: the reference implementation of the storage contracts, which enforces with plain
+maps what the PostgreSQL adapter enforces with keys and indexes, and which core's tests run over.
+Nothing survives the process.
+
+Every store contract builds its store with `make(workspaceId, driver)`, over the driver an
+adapter implements: the store checks each input against its schema, and a record against the
+workspace, through `StoreInput`, before the driver sees it. A driver keeps only what storage
+keeps, such as reused IDs and conditional writes, and an adapter's module returns
+`XStore.make(workspaceId, driver)` from its constructor, as each `layerMemory` does.
+
+- `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
+  workspace has one `Space`: its commits, log batches, keyed append slices, projected records by
+  kind, with the live projection versions and rebuild checkpoints, and private read state. Beside
+  the workspaces sit the session logs, and tables and locks by name, created on first use, for what
+  a host stores across its workspaces, such as its accounts. `MemoryDatabase.makeRows` is how a
+  store keeps one kind of record.
+- `MemoryDatabase.Connection` is one host's connection: its transactions take turns on a
+  one-permit gate, as on one database connection.
+- `Store.layerMemory(workspaceId)` binds one workspace over the connection: it provides the
+  workspace's logs and the `Store.MemoryBinding` that every other store's `layerMemory`, and the
+  signal hub's, reads and writes through. The gateway's
+  [memory workspace storage](../gateway/README.md#memory) merges them all for each workspace it
+  opens.
+
+Records are the JSON of their encoded form, keyed by ID. Stored values never change: writes
+replace them, and every read decodes a fresh record; journal entries are copied on the way in and
+out. The stores check what the PostgreSQL adapter enforces with keys and unique indexes: reused
+IDs, one active membership per identity, one agent per membership, one direct group per member
+set, one active follow per admission, one active participation per participant, and contiguous
+thread sequences. Lists order IDs by their UTF-8 bytes, as binary collation does.
+
+A transaction copies its workspace's maps, runs against the copy, and on success makes the copy
+the committed state; a failure or interruption discards it. A workspace another connection is
+writing reports `JournalStore.Conflict` at once, as a lock wait that timed out immediately would;
+the same connection's writers wait for each other. Each log has a lock shared by every host: a
+transaction takes it on its first append to the log, or lookup of one of its keys, refreshes its
+copy of that log from committed state, and keeps it until it ends; a standalone append takes only
+its log's lock, so it never waits for the workspace. Reads outside a transaction see committed
+state, and inside one its copy; a handle from another connection, workspace, or closed transaction
+fails. Read-state writes outside a transaction apply at once, so a commit keeps the later of its
+own and the committed values. Session logs take part in no transaction: an append is kept at once
+and wakes waiting readers, as a commit's appends do. The signal hub offers each signal to the
+subscribers present, through the `LocalSignalHub` the database holds; nothing is kept.
 
 ## Conventions
 
@@ -572,31 +619,32 @@ and `markSeenThrough` publish the read-state signals after their writes.
 A feature owns a domain concept, its rules, and its lifecycle, and keeps the models, operations,
 facts, projection, permissions, and store contract that evolve together in one directory. Add files
 when those responsibilities exist; a small feature needs no empty version of every module.
-Membership shows the layout:
+Membership, in the workspace feature, shows the layout: one module per namespace, named after it
+and flat in the feature directory, as the Effect repository lays its modules out.
 
 ```text
-src/workspace/member/
-  member.ts       domain schemas, value types, and pure functions
-  id.ts           the ID alone, where references would otherwise make a cycle
-  service.ts      the operations actors call, authorized
-  command.ts      the internal writes other operations share
-  errors.ts       outcomes a caller can act on, as schemas only
-  store.ts        the persistence contract adapters implement
-  facts.ts        versioned declarations of recorded changes
-  projection.ts   replays the facts into the store, exported as `definition`
-  permissions.ts  the permissions the feature owns
+src/workspace/
+  Member.ts             domain schemas, value types, and pure functions
+  MemberId.ts           the ID alone, where references would otherwise make a cycle
+  MemberService.ts      the operations actors call, authorized, and the outcomes they report
+  MemberCommand.ts      the internal writes other operations share
+  MemberStore.ts        the persistence contract adapters implement
+  MemberFacts.ts        versioned declarations of recorded changes
+  MemberProjection.ts   replays the facts into the store, exported as `definition`
+  MemberPermissions.ts  the permissions the feature owns
+  internal/member-errors.ts
+                        those outcomes, as schemas only
 ```
 
-The internal reads other operations share go in one `query.ts`. A command may read through the
-query; a query never writes; and a step with one caller stays a private function of that caller. Use
-short filenames within a feature and descriptive namespaces: `member/store.ts` exports
-`MemberStore`, and `member/service.ts` exports `MemberService`.
+The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
+the query; a query never writes; and a step with one caller stays a private function of that caller.
+The outcomes a caller can act on are schemas in an `internal/` errors module, apart from the
+services, so a protocol or a browser client carries them without loading an implementation; the
+service that reports them exports them under its name, which their tags carry, as
+`MemberService.NotFound`. Helpers no consumer imports go under `internal/` too.
 
-The thread, task, and channel features are written as the published packages are, and the other
-domains follow when touched: one module per namespace, named after it and flat in the feature
-directory (`thread/ThreadMessageService.ts` exports `ThreadMessageService`), helpers no consumer
-imports under `internal/`, a header paragraph and `@since` on every module, `@category` and `@since`
-on every export, and a service key that names its module, such as
+Every module is written as the published packages are: a header paragraph and `@since` on every
+module, `@category` and `@since` on every export, and a service key that names its module, such as
 `@amends-dev/core/thread/ThreadStore`; see [threads](../../docs/threads.md#code-conventions).
 
 ### Dependencies and exports
@@ -607,29 +655,30 @@ without re-evaluating authority or time; services coordinate authorization, stor
 A workflow may use another feature's models, facts, or stores when it owns their coordination, as
 removing a member revokes pending invitations and ends group admissions in the same commit.
 
-Inside core, import the owning leaf module directly; each leaf establishes its namespace with a
-self-export, and public barrels relay those names. The domain `index.ts` files define the public
-surface. Reserve `Schema.suspend` for schemas that need deferred construction, such as recursive
-data; ID leaves break model cycles.
+Inside core, import the owning leaf module directly, with `import * as`. Each feature's `index.ts`
+is a barrel that `bun run barrels` writes, as Effect's codegen writes its own: every module of the
+feature as its namespace, with `export * as`, and never what is under `internal/`. Reserve
+`Schema.suspend` for schemas that need deferred construction, such as recursive data; ID leaves
+break model cycles.
 
 ### Schema and type names
 
 Name an exported schema for its domain meaning and role, read with its module qualifier:
-`Member.Record`, `Identity.Reference`, `Permission.Definition`. Ordinary records use `Schema.Struct`
-and a same-name interface; unions and scalar schemas use a same-name type. Typed errors keep tagged
-error schemas.
+`Member.Member`, `Identity.Reference`, `Permission.Definition`. A module's main type takes the
+module's name, as Effect's `Entity.Entity` does: the complete record with its identity, such as
+`Member.Member` or `Event.Event`, or the value a focused module is about, such as `Grant.Grant`.
+Ordinary records use `Schema.Struct` and a same-name interface; unions and scalar schemas use a
+same-name type. Typed errors keep tagged error schemas.
 
-| Name                 | Meaning and examples                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| `Record`             | A complete domain record with its identity: `Member.Record`, `Event.Record`.           |
-| `Value`              | The primary value object of a focused module: `Actor.Value`, `Grant.Value`.            |
-| `Reference`          | Enough to identify an entity or target: `Identity.Reference`, `Target.Reference`.      |
-| `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.    |
-| `<Operation>Input`   | Data supplied to one operation: `Invitation.IssueInput`, `Store.AppendInput`.          |
-| `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`.                              |
-| `State`              | A lifecycle variant with data: `Invitation.State`.                                     |
-| `Status`             | A simple lifecycle label: `Member.Status`.                                             |
-| `Interface`          | The contract of a context service: `MemberService.Interface`, `MemberStore.Interface`. |
+| Name                 | Meaning and examples                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Reference`          | Enough to identify an entity or target: `Identity.Reference`, `Target.Reference`.                                                                               |
+| `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.                                                                             |
+| `<Operation>Input`   | Data supplied to one operation: `Invitation.IssueInput`, `Store.AppendInput`.                                                                                   |
+| `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`.                                                                                                       |
+| `State`              | A lifecycle variant with data: `Invitation.State`.                                                                                                              |
+| `Status`             | A simple lifecycle label: `Member.Status`.                                                                                                                      |
+| `Foo["Service"]`     | The shape of a context service, read off its class, which is named after its module: `MemberStore.MemberStore["Service"]` is what a storage adapter implements. |
 
 Inline payload structs can stay inside their fact declarations; read their types through
 `Fact.Payload<typeof MemberFacts.Added>`. Schemas used as public HTTP models carry stable
@@ -637,9 +686,10 @@ identifiers, such as `Workspace` and `WorkspaceMember`; status-specific variants
 HTTP contract.
 
 Source names and serialized names are separate contracts. Preserve fact names, versions, brands,
-error tags, service keys, projection keys, and encoded fields when reorganizing code. During
-development, change schemas in place at version 1 and reset development data: keep one current
-database baseline, with no upgrade migrations, backfills, or legacy decoding.
+error tags, projection keys, and encoded fields when reorganizing code. A service key is not
+serialized: it names its module, such as `@amends-dev/core/thread/ThreadStore`, and moves with it.
+During development, change schemas in place at version 1 and reset development data: keep one
+current database baseline, with no upgrade migrations, backfills, or legacy decoding.
 
 ### Constructors and layers
 
@@ -648,9 +698,10 @@ implementation exports `make`, which constructs it, and `layer`, which provides 
 `make`. Core's constructors use `Effect.fn("Module.make")`, acquire their state and dependencies
 inside the Effect, so evaluating one twice builds two implementations, and return `Service.of(...)`.
 Actor identity and the active transaction are resolved during each operation, never at construction.
-Contracts implemented elsewhere, such as stores, `SignalHub.Service`, `Actor.Service`,
-`Publication.Service`, and `Store.Transaction`, have no `make` or `layer` here. `core.ts` composes
-the layers and implements nothing itself.
+Contracts implemented elsewhere, such as stores, `SignalHub.SignalHub`, `Actor.Actor`,
+`Publication.Publication`, and `Store.Transaction`, have no `layer` here: a store contract's `make`
+checks an adapter's driver, and its `layerMemory` is the reference implementation in process memory.
+`index.ts` composes the layers and implements nothing itself.
 
 ```ts
 import { Log, Transaction } from "@amends-dev/core/journal";
@@ -658,7 +709,7 @@ import { Effect } from "effect";
 
 const makeLogs = Effect.gen(function* () {
   const transaction = yield* Transaction.make();
-  return yield* Log.make().pipe(Effect.provideService(Transaction.Service, transaction));
+  return yield* Log.make().pipe(Effect.provideService(Transaction.Transaction, transaction));
 });
 ```
 
@@ -674,9 +725,10 @@ keep their domain verbs, such as `publish`, `resolve`, `issue`, and `accept`.
 bun run test packages/core
 ```
 
-Core's tests follow its domain and feature directories under `test/`, over in-memory stores
-(`test/memory-store.ts`); tests across authorization features live in `test/authorization/`.
-Behavior that storage adapters must share belongs in the
-[storage conformance suites](../storage-conformance/README.md), which run core over each adapter.
+Core's tests follow its domain and feature directories under `test/`, over its
+[memory storage](#memory) (`test/memory.ts`); tests across authorization features live in `test/authorization/`.
+What storage adapters must promise belongs in the
+[storage conformance suites](../gateway/README.md#conformance), and core's operations are tested
+as a host runs them in the [gateway's tests](../gateway/README.md#development).
 Construction tests exercise transaction ownership, rollback, dependency capture, and lifetimes
 rather than object shape. See [testing](../../docs/testing.md).

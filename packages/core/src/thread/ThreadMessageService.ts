@@ -7,24 +7,24 @@
  *
  * @since 0.1.0
  */
-import { Identity } from "../identity/identity.ts";
+import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Schema } from "effect";
-import { Authorization } from "../authorization/authorization.ts";
-import { Requirement } from "../authorization/requirement.ts";
-import { AgentPermissions } from "../agent/permissions.ts";
-import { Actor } from "../identity/actor.ts";
-import { Journal } from "../journal/journal.ts";
-import { Publication } from "../journal/publication.ts";
-import { Store } from "../journal/store.ts";
-import { ThreadCommand } from "./ThreadCommand.ts";
-import { ThreadQuery } from "./ThreadQuery.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
-import type { Member } from "../workspace/member/member.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
-import { ThreadMessagePermissions } from "./ThreadMessagePermissions.ts";
-import { ReadStateCommand } from "../read-state/command.ts";
-import { Request } from "../request/request.ts";
-import { ThreadMessageStore } from "./ThreadMessageStore.ts";
+import * as Authorization from "../authorization/Authorization.ts";
+import * as Requirement from "../authorization/Requirement.ts";
+import * as AgentPermissions from "../agent/AgentPermissions.ts";
+import * as Actor from "../identity/Actor.ts";
+import * as Journal from "../journal/Journal.ts";
+import * as Publication from "../journal/Publication.ts";
+import * as Store from "../journal/Store.ts";
+import * as ThreadCommand from "./ThreadCommand.ts";
+import * as ThreadQuery from "./ThreadQuery.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
+import type * as Member from "../workspace/Member.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts";
+import * as ReadStateCommand from "../read-state/ReadStateCommand.ts";
+import * as Request from "../request/Request.ts";
+import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 import {
   Changed,
   Deleted,
@@ -33,23 +33,68 @@ import {
   NotAuthor,
   NotFound,
   ParticipantUnavailable,
-} from "./ThreadMessageErrors.ts";
-import { Notification } from "../notification/notification.ts";
-import { Signal } from "../signal/signal.ts";
-import { SignalHub } from "../signal/hub.ts";
-import type { Thread } from "./Thread.ts";
+} from "./internal/thread-message-errors.ts";
+import * as Notification from "../notification/Notification.ts";
+import * as Signal from "../signal/Signal.ts";
+import * as SignalHub from "../signal/SignalHub.ts";
+import type * as Thread from "./Thread.ts";
 export {
+  /**
+   * The message's revision is no longer the one the editor expected: someone edited it meanwhile.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Changed,
+  /**
+   * The message was deleted, so it has no text to edit.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   Deleted,
+  /**
+   * An agent asked to publish; only people publish through the service, and agents' messages come
+   * from their turns.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   HumanAuthorRequired,
+  /**
+   * The message is missing, in another workspace, or in a thread outside the actor's groups; the
+   * three are not told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   MessageNotFound,
+  /**
+   * Someone other than the message's author asked to edit it; only the author edits a message.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotAuthor,
+  /**
+   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
+   * told apart.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   NotFound,
+  /**
+   * A mentioned member cannot take part: they are missing, inactive, or not in the group.
+   *
+   * @category errors
+   * @since 0.1.0
+   */
   ParticipantUnavailable,
-} from "./ThreadMessageErrors.ts";
+} from "./internal/thread-message-errors.ts";
 
 /**
- * What publishing can fail with: the outcomes in `ThreadMessageErrors`, and the failures of what
+ * What publishing can fail with: the outcomes above, and the failures of what
  * publishing depends on.
  *
  * @category errors
@@ -109,56 +154,51 @@ export type TypingError =
   | NotFound;
 
 /**
+ * The message operations, one of `Core.Operations`.
+ *
  * The message operations.
  *
  * @category services
  * @since 0.1.0
  */
-export interface Interface {
-  /**
-   * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
-   * Mentioned agents need the author's agent-use authority; agents already taking part do not.
-   */
-  readonly publish: (
-    input: ThreadMessage.PublishInput,
-    options?: Request.Options,
-  ) => Effect.Effect<ThreadMessage.Record, Error, Actor.Service>;
-  /**
-   * Replace the text and mentions of a message the actor wrote, at its next revision, under
-   * `thread.publish` on its thread. The same text and mentions again record nothing; otherwise a
-   * revision other than `expectedRevision` is `Changed`, and nothing is recorded. Members the edit
-   * newly mentions join and are told, under the rules of a reply; a deleted message is `Deleted`.
-   * Returns the message as edited.
-   */
-  readonly edit: (
-    input: ThreadMessage.EditInput,
-  ) => Effect.Effect<ThreadMessage.Record, EditError, Actor.Service>;
-  /**
-   * Delete a message: its own author's under `thread.publish` on the thread, anyone's under
-   * `thread.moderate` on the thread's group. Its text is gone, its place in the thread stays, and
-   * no one is told; one already deleted records nothing. Returns the message as deleted.
-   */
-  readonly delete: (
-    messageId: ThreadMessage.Id,
-  ) => Effect.Effect<ThreadMessage.Record, DeleteError, Actor.Service>;
-  /**
-   * Tell the thread's readers that the acting member is composing a message there, for the next
-   * few seconds. Requires current group access and `thread.publish`, as publishing does. Repeats
-   * from the same member in the same thread within a moment are dropped, so a client may send it
-   * whenever the member types.
-   */
-  readonly typing: (threadId: Thread.Id) => Effect.Effect<void, TypingError, Actor.Service>;
-}
-
-/**
- * The message operations, one of `Core.Operations`.
- *
- * @category services
- * @since 0.1.0
- */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadMessageService",
-) {}
+export class ThreadMessageService extends Context.Service<
+  ThreadMessageService,
+  {
+    /**
+     * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
+     * Mentioned agents need the author's agent-use authority; agents already taking part do not.
+     */
+    readonly publish: (
+      input: ThreadMessage.PublishInput,
+      options?: Request.Options,
+    ) => Effect.Effect<ThreadMessage.ThreadMessage, Error, Actor.Actor>;
+    /**
+     * Replace the text and mentions of a message the actor wrote, at its next revision, under
+     * `thread.publish` on its thread. The same text and mentions again record nothing; otherwise a
+     * revision other than `expectedRevision` is `Changed`, and nothing is recorded. Members the edit
+     * newly mentions join and are told, under the rules of a reply; a deleted message is `Deleted`.
+     * Returns the message as edited.
+     */
+    readonly edit: (
+      input: ThreadMessage.EditInput,
+    ) => Effect.Effect<ThreadMessage.ThreadMessage, EditError, Actor.Actor>;
+    /**
+     * Delete a message: its own author's under `thread.publish` on the thread, anyone's under
+     * `thread.moderate` on the thread's group. Its text is gone, its place in the thread stays, and
+     * no one is told; one already deleted records nothing. Returns the message as deleted.
+     */
+    readonly delete: (
+      messageId: ThreadMessage.Id,
+    ) => Effect.Effect<ThreadMessage.ThreadMessage, DeleteError, Actor.Actor>;
+    /**
+     * Tell the thread's readers that the acting member is composing a message there, for the next
+     * few seconds. Requires current group access and `thread.publish`, as publishing does. Repeats
+     * from the same member in the same thread within a moment are dropped, so a client may send it
+     * whenever the member types.
+     */
+    readonly typing: (threadId: Thread.Id) => Effect.Effect<void, TypingError, Actor.Actor>;
+  }
+>()("@amends-dev/core/thread/ThreadMessageService") {}
 
 /**
  * Whom a reply by `authorId` selects to take part: its author, and those it addresses: the
@@ -168,7 +208,7 @@ export class Service extends Context.Service<Service, Interface>()(
 const selectedFor = (
   authorId: Member.Id,
   mentions: ReadonlyArray<Member.Id>,
-  current: ReadonlyArray<ThreadParticipation.Record>,
+  current: ReadonlyArray<ThreadParticipation.ThreadParticipation>,
 ): ReadonlyArray<ThreadParticipation.Reference> => {
   const author: ThreadParticipation.Reference = { _tag: "Member", memberId: authorId };
   const addressed: ReadonlyArray<ThreadParticipation.Reference> =
@@ -194,21 +234,21 @@ const typingEvery = Duration.seconds(2);
  * @since 0.1.0
  */
 export const make = Effect.fn("ThreadMessageService.make")(function* () {
-  const authorization = yield* Authorization.Service;
-  const threadQuery = yield* ThreadQuery.Service;
-  const threadCommand = yield* ThreadCommand.Service;
-  const readStateCommand = yield* ReadStateCommand.Service;
-  const threadMessageStore = yield* ThreadMessageStore.Service;
-  const journal = yield* Journal.Service;
+  const authorization = yield* Authorization.Authorization;
+  const threadQuery = yield* ThreadQuery.ThreadQuery;
+  const threadCommand = yield* ThreadCommand.ThreadCommand;
+  const readStateCommand = yield* ReadStateCommand.ReadStateCommand;
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
+  const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
-  const signalHub = yield* SignalHub.Service;
-  const { workspaceId } = yield* Store.Service;
+  const signalHub = yield* SignalHub.SignalHub;
+  const { workspaceId } = yield* Store.Store;
   /**
    * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
    * from its author and key, so a retry names the message its first attempt published.
    */
   const deriveReplyId = Effect.fnUntraced(function* (key: Request.Key | undefined) {
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     return ThreadMessage.Id.make(
       yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId]),
     );
@@ -252,7 +292,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   });
 
   /** Whether the actor wrote the message; only a member writes through the service. */
-  const wroteBy = (message: ThreadMessage.Record, actor: Actor.Value) =>
+  const wroteBy = (message: ThreadMessage.ThreadMessage, actor: Actor.Actor["Service"]) =>
     ThreadMessage.Author.isAnyOf(["Member"])(message.author) &&
     message.author.memberId === actor.memberId;
 
@@ -263,7 +303,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input);
       const thread = yield* requirePublishable(request.threadId);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const messageId = yield* deriveReplyId(options.requestKey);
@@ -339,7 +379,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     function* (input: ThreadMessage.EditInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.EditInput))(input);
       const { message, thread } = yield* requireMessage(request.messageId);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       if (!wroteBy(message, actor)) return yield* new NotAuthor({ messageId: message.id });
@@ -402,7 +442,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     function* (messageId: ThreadMessage.Id) {
       const id = yield* Schema.decodeEffect(ThreadMessage.Id)(messageId);
       const { message, thread } = yield* requireMessage(id);
-      const actor = yield* Actor.Service;
+      const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       // The author deletes their own message as they published it; anyone else moderates the group.
@@ -438,7 +478,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   const lastTyping = new Map<string, number>();
   const typing = Effect.fn("ThreadMessageService.typing")(function* (threadId: Thread.Id) {
     const thread = yield* requirePublishable(threadId);
-    const actor = yield* Actor.Service;
+    const actor = yield* Actor.Actor;
     const now = yield* DateTime.now;
     const at = DateTime.toEpochMillis(now);
     const key = JSON.stringify([actor.memberId, thread.id]);
@@ -450,7 +490,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
         if (at - time >= Duration.toMillis(typingFor)) lastTyping.delete(entry);
     lastTyping.set(key, at);
     yield* signalHub.publish(
-      Signal.Value.cases.Typing.make({
+      Signal.Signal.cases.Typing.make({
         workspaceId,
         groupId: thread.groupId,
         threadId: thread.id,
@@ -459,7 +499,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       }),
     );
   });
-  return Service.of({ publish, edit, delete: deleteMessage, typing });
+  return ThreadMessageService.of({ publish, edit, delete: deleteMessage, typing });
 });
 
 /**
@@ -469,6 +509,4 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Service, make());
-
-export * as ThreadMessageService from "./ThreadMessageService.ts";
+export const layer = Layer.effect(ThreadMessageService, make());

@@ -5,10 +5,9 @@
  * @since 0.1.0
  */
 
+// @barrel: Auto-generated exports. Do not edit manually.
+
 /**
- * The provider that creates each sandbox in Daytona's cloud and resumes it by its id, with the
- * options it takes for every sandbox and for one.
- *
  * @since 0.1.0
  */
 export * as DaytonaSandboxProvider from "./DaytonaSandboxProvider.ts";

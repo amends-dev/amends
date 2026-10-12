@@ -13,8 +13,8 @@ import {
   ShardingConfig,
 } from "effect/cluster";
 import { TestClock } from "effect/testing";
-import { JobRequests } from "../../src/jobs/requests.ts";
-import { TurnJob } from "../../src/jobs/turn-job.ts";
+import * as JobRequests from "../../src/JobRequests.ts";
+import * as TurnJob from "../../src/TurnJob.ts";
 import {
   type FakeWorkspace,
   type FakeWorkspaceOptions,
@@ -48,7 +48,7 @@ const turnJobsFor = (
     Layer.provideMerge(cluster),
     Layer.provide(
       Layer.merge(
-        Layer.succeed(Gateway.Service, workspace.gateway),
+        Layer.succeed(Gateway.Gateway, workspace.gateway),
         integrationsFor(makeScriptedAgent(script).agent),
       ),
     ),
@@ -59,7 +59,7 @@ const turnJobsFor = (
 /** Run `request` in a commit `commitId`, then what it asked to run once the commit is done. */
 const inCommit = <E>(
   commitId: string,
-  request: (turnJobs: TurnJobs.Interface) => Effect.Effect<void, E, Store.Transaction>,
+  request: (turnJobs: TurnJobs.TurnJobs["Service"]) => Effect.Effect<void, E, Store.Transaction>,
 ) =>
   Effect.gen(function* () {
     const afterCommit: Array<Effect.Effect<void>> = [];
@@ -68,7 +68,7 @@ const inCommit = <E>(
       append: () => Effect.die("The test commit appends nothing"),
       afterCommit: (effect) => Effect.sync(() => void afterCommit.push(effect)),
     });
-    yield* Effect.flatMap(TurnJobs.Service, request).pipe(
+    yield* Effect.flatMap(TurnJobs.TurnJobs, request).pipe(
       Effect.provideService(Store.Transaction, storeTransaction),
     );
     yield* Effect.forEach(afterCommit, (effect) => effect, { discard: true });

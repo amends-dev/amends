@@ -61,7 +61,7 @@ export interface TurnEntry {
 export const activeState = (state: TurnState) =>
   state === "queued" || state === "working" || state === "stopping";
 
-const states: Readonly<Record<Turn.Record["status"], TurnState>> = {
+const states: Readonly<Record<Turn.Turn["status"], TurnState>> = {
   queued: "queued",
   running: "working",
   cancelling: "stopping",

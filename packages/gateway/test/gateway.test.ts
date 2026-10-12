@@ -51,10 +51,10 @@ import {
   Stream,
 } from "effect";
 import { TestClock } from "effect/testing";
-import { GatewayErrors } from "../src/errors.ts";
-import { Gateway } from "../src/gateway.ts";
-import { WorkspaceStorage } from "../src/storage.ts";
-import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
+import * as GatewayErrors from "../src/GatewayErrors.ts";
+import * as Gateway from "../src/Gateway.ts";
+import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
+import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -63,10 +63,10 @@ const memberId = Member.Id.make("member");
 const unexpected = () => Effect.die(new Error("Unexpected storage operation in gateway test"));
 interface BindingOptions {
   readonly workspaceId?: Workspace.Id;
-  readonly findActive?: MemberStore.Interface["findActive"];
-  readonly read?: Store.Interface["read"];
-  readonly head?: Store.Interface["head"];
-  readonly listLive?: Checkpoint.Interface["listLive"];
+  readonly findActive?: MemberStore.MemberStore["Service"]["findActive"];
+  readonly read?: Store.Store["Service"]["read"];
+  readonly head?: Store.Store["Service"]["head"];
+  readonly listLive?: Checkpoint.Checkpoint["Service"]["listLive"];
 }
 
 /**
@@ -76,8 +76,8 @@ interface BindingOptions {
 const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorage.Bindings> => {
   const boundWorkspaceId = options.workspaceId ?? workspaceId;
   return Context.make(
-    Store.Service,
-    Store.Service.of({
+    Store.Store,
+    Store.Store.of({
       readFacts: () => Effect.succeed([]),
       getEntry: () => Effect.succeedNone,
       transaction: (program) =>
@@ -99,8 +99,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
   )
     .pipe(
       Context.add(
-        Checkpoint.Service,
-        Checkpoint.Service.of({
+        Checkpoint.Checkpoint,
+        Checkpoint.Checkpoint.of({
           get: () => Effect.succeedNone,
           set: unexpected,
           listLive: options.listLive ?? (() => Effect.succeed([])),
@@ -108,8 +108,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        WorkspaceStore.Service,
-        WorkspaceStore.Service.of({
+        WorkspaceStore.WorkspaceStore,
+        WorkspaceStore.WorkspaceStore.of({
           // Booting checks the built-in roles of an initialized workspace; these boot none.
           get: Effect.succeedNone,
           insert: unexpected,
@@ -118,8 +118,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        MemberStore.Service,
-        MemberStore.Service.of({
+        MemberStore.MemberStore,
+        MemberStore.MemberStore.of({
           get: unexpected,
           getMany: unexpected,
           findActive:
@@ -139,8 +139,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        InvitationStore.Service,
-        InvitationStore.Service.of({
+        InvitationStore.InvitationStore,
+        InvitationStore.InvitationStore.of({
           get: unexpected,
           list: unexpected(),
           listPendingByRecipient: unexpected,
@@ -149,8 +149,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        NotificationStore.Service,
-        NotificationStore.Service.of({
+        NotificationStore.NotificationStore,
+        NotificationStore.NotificationStore.of({
           discardPendingForParticipation: unexpected,
           discardPendingForGroup: unexpected,
           markSeen: unexpected,
@@ -167,14 +167,14 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           insertMany: unexpected,
         }),
       ),
-      Context.add(TaskStore.Service, {
+      Context.add(TaskStore.TaskStore, {
         get: unexpected,
         getMany: unexpected,
         listByGroup: unexpected,
         insert: unexpected,
         apply: unexpected,
       }),
-      Context.add(ThreadStore.Service, {
+      Context.add(ThreadStore.ThreadStore, {
         get: unexpected,
         getMany: unexpected,
         listByGroup: unexpected,
@@ -185,7 +185,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         getLatest: unexpected,
         recordLatest: unexpected,
       }),
-      Context.add(ThreadParticipationStore.Service, {
+      Context.add(ThreadParticipationStore.ThreadParticipationStore, {
         get: unexpected,
         getMany: unexpected,
         listByThread: unexpected,
@@ -195,7 +195,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         insert: unexpected,
         end: unexpected,
       }),
-      Context.add(ThreadMessageStore.Service, {
+      Context.add(ThreadMessageStore.ThreadMessageStore, {
         get: unexpected,
         getMany: unexpected,
         countByThread: unexpected,
@@ -203,7 +203,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         edit: unexpected,
         delete: unexpected,
       }),
-      Context.add(ThreadActivityStore.Service, {
+      Context.add(ThreadActivityStore.ThreadActivityStore, {
         latest: unexpected,
         get: unexpected,
         listByThread: unexpected,
@@ -212,8 +212,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         insert: unexpected,
       }),
       Context.add(
-        GroupStore.Service,
-        GroupStore.Service.of({
+        GroupStore.GroupStore,
+        GroupStore.GroupStore.of({
           get: unexpected,
           getMany: unexpected,
           findDirect: unexpected,
@@ -225,8 +225,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        GroupMembershipStore.Service,
-        GroupMembershipStore.Service.of({
+        GroupMembershipStore.GroupMembershipStore,
+        GroupMembershipStore.GroupMembershipStore.of({
           get: unexpected,
           getMany: unexpected,
           findActive: unexpected,
@@ -241,8 +241,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        ReadStateStore.Service,
-        ReadStateStore.Service.of({
+        ReadStateStore.ReadStateStore,
+        ReadStateStore.ReadStateStore.of({
           getThreadPositions: unexpected,
           advanceThread: unexpected,
           getGroupReads: unexpected,
@@ -250,8 +250,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        GroupFollowStore.Service,
-        GroupFollowStore.Service.of({
+        GroupFollowStore.GroupFollowStore,
+        GroupFollowStore.GroupFollowStore.of({
           get: unexpected,
           findActive: unexpected,
           findActiveMany: unexpected,
@@ -261,8 +261,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        TurnStore.Service,
-        TurnStore.Service.of({
+        TurnStore.TurnStore,
+        TurnStore.TurnStore.of({
           get: unexpected,
           findActive: unexpected,
           findLatest: unexpected,
@@ -273,8 +273,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        RoleStore.Service,
-        RoleStore.Service.of({
+        RoleStore.RoleStore,
+        RoleStore.RoleStore.of({
           get: unexpected,
           insert: unexpected,
           rename: unexpected,
@@ -284,8 +284,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        AssignmentStore.Service,
-        AssignmentStore.Service.of({
+        AssignmentStore.AssignmentStore,
+        AssignmentStore.AssignmentStore.of({
           get: unexpected,
           listActiveByMember: unexpected,
           listActiveByRole: unexpected,
@@ -295,24 +295,24 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       ),
     )
     .pipe(
-      Context.add(ChannelStore.Service, {
+      Context.add(ChannelStore.ChannelStore, {
         get: unexpected,
         listActive: unexpected(),
         insert: unexpected,
         update: unexpected,
       }),
-      Context.add(ChannelBindingStore.Service, {
+      Context.add(ChannelBindingStore.ChannelBindingStore, {
         get: unexpected,
         findByConversation: unexpected,
         insert: unexpected,
       }),
-      Context.add(ContactStore.Service, {
+      Context.add(ContactStore.ContactStore, {
         get: unexpected,
         getMany: unexpected,
         insert: unexpected,
         update: unexpected,
       }),
-      Context.add(DeliveryStore.Service, {
+      Context.add(DeliveryStore.DeliveryStore, {
         get: unexpected,
         listRequestedByThread: unexpected,
         findByExternalMessage: unexpected,
@@ -320,12 +320,12 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         update: unexpected,
       }),
       Context.add(
-        SessionStateStore.Service,
-        SessionStateStore.Service.of({ get: unexpected, set: unexpected }),
+        SessionStateStore.SessionStateStore,
+        SessionStateStore.SessionStateStore.of({ get: unexpected, set: unexpected }),
       ),
       Context.add(
-        SessionLogStore.Service,
-        SessionLogStore.Service.of({
+        SessionLogStore.SessionLogStore,
+        SessionLogStore.SessionLogStore.of({
           head: unexpected,
           append: unexpected,
           read: unexpected,
@@ -333,8 +333,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        ConnectionStore.Service,
-        ConnectionStore.Service.of({
+        ConnectionStore.ConnectionStore,
+        ConnectionStore.ConnectionStore.of({
           get: unexpected,
           listActive: unexpected(),
           insert: unexpected,
@@ -342,16 +342,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        ConnectionCredentialStore.Service,
-        ConnectionCredentialStore.Service.of({
+        ConnectionCredentialStore.ConnectionCredentialStore,
+        ConnectionCredentialStore.ConnectionCredentialStore.of({
           set: unexpected,
           get: unexpected,
           remove: unexpected,
         }),
       ),
       Context.add(
-        AgentStore.Service,
-        AgentStore.Service.of({
+        AgentStore.AgentStore,
+        AgentStore.AgentStore.of({
           get: unexpected,
           list: unexpected(),
           insert: unexpected,
@@ -360,17 +360,17 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       ),
       // Signals no test here observes: published into nothing, and no subscriber ever hears one.
       Context.add(
-        SignalHub.Service,
-        SignalHub.Service.of({
+        SignalHub.SignalHub,
+        SignalHub.SignalHub.of({
           publish: () => Effect.void,
           subscribe: Effect.succeed(Stream.never),
         }),
       ),
     );
 };
-const host = (storage: WorkspaceStorage.Interface) =>
+const host = (storage: WorkspaceStorage.WorkspaceStorage["Service"]) =>
   Layer.mergeAll(
-    Layer.succeed(WorkspaceStorage.Service, storage),
+    Layer.succeed(WorkspaceStorage.WorkspaceStorage, storage),
     TurnJobs.layerNoRunner,
     DeliveryJobs.layerNoRunner,
     Layer.succeed(
@@ -379,7 +379,7 @@ const host = (storage: WorkspaceStorage.Interface) =>
     ),
   );
 const run = <A, E>(
-  program: (gateway: Gateway.Interface) => Effect.Effect<A, E, Scope.Scope>,
+  program: (gateway: Gateway.Gateway["Service"]) => Effect.Effect<A, E, Scope.Scope>,
   options: BindingOptions = {},
 ) =>
   Effect.flatMap(Gateway.make(), program).pipe(
@@ -514,13 +514,13 @@ it.effect.each(["make", "layer"] as const)(
     Effect.gen(function* () {
       const failure = new Error("Cannot bind workspace");
       const requested: Array<Workspace.Id> = [];
-      const storage = WorkspaceStorage.Service.of({
+      const storage = WorkspaceStorage.WorkspaceStorage.of({
         forWorkspace: (id) =>
           Effect.sync(() => {
             requested.push(id);
           }).pipe(Effect.andThen(Effect.die(failure))),
       });
-      const program = (gateway: Gateway.Interface) =>
+      const program = (gateway: Gateway.Gateway["Service"]) =>
         Effect.gen(function* () {
           expect(requested).toEqual([]);
           const exit = yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.void));
@@ -530,7 +530,7 @@ it.effect.each(["make", "layer"] as const)(
       const configured =
         construction === "make"
           ? Effect.flatMap(Gateway.make(), program)
-          : Effect.flatMap(Gateway.Service, program).pipe(Effect.provide(Gateway.layer()));
+          : Effect.flatMap(Gateway.Gateway, program).pipe(Effect.provide(Gateway.layer()));
       yield* configured.pipe(Effect.scoped, Effect.provide(host(storage)));
     }),
 );
@@ -542,8 +542,8 @@ it.effect("one gateway resolves each caller's current membership and stops after
     yield* run(
       (gateway) =>
         Effect.gen(function* () {
-          const first = yield* gateway.asMember(workspaceId, alice, Actor.Service);
-          const second = yield* gateway.asMember(workspaceId, agent, Actor.Service);
+          const first = yield* gateway.asMember(workspaceId, alice, Actor.Actor);
+          const second = yield* gateway.asMember(workspaceId, agent, Actor.Actor);
           expect(first).toEqual({ workspaceId, memberId, identity: alice });
           expect(second).toEqual({ workspaceId, memberId, identity: agent });
           active = false;
@@ -589,7 +589,7 @@ it.effect("concurrent requests share boot and later requests do not replay or re
       Effect.gen(function* () {
         const entered = yield* Deferred.make<void>();
         const resume = yield* Deferred.make<void>();
-        const storage = WorkspaceStorage.Service.of({
+        const storage = WorkspaceStorage.WorkspaceStorage.of({
           forWorkspace: () =>
             Effect.sync(() => {
               bound += 1;
@@ -636,14 +636,14 @@ it.effect("concurrent requests share boot and later requests do not replay or re
 /** Admission against one workspace's stores, counting boots by their replay's read. */
 const admitting = Effect.fnUntraced(function* (
   options: BindingOptions & {
-    readonly setLive?: Checkpoint.Interface["setLive"];
+    readonly setLive?: Checkpoint.Checkpoint["Service"]["setLive"];
     /** Runs as a boot replays, as a rebuild would restore the read models. */
     readonly onBoot?: () => void;
   },
 ) {
   const boots = { reads: 0 };
   const gateway = yield* Gateway.make().pipe(
-    Effect.provideService(WorkspaceStorage.Service, {
+    Effect.provideService(WorkspaceStorage.WorkspaceStorage, {
       forWorkspace: () =>
         Effect.succeed(
           Context.add(
@@ -657,8 +657,8 @@ const admitting = Effect.fnUntraced(function* (
                   }),
               }),
             ),
-            Checkpoint.Service,
-            Checkpoint.Service.of({
+            Checkpoint.Checkpoint,
+            Checkpoint.Checkpoint.of({
               get: () => Effect.succeedNone,
               set: unexpected,
               listLive: options.listLive ?? (() => Effect.succeed([])),
@@ -729,7 +729,7 @@ it.effect(
             });
           }),
       });
-      expect(yield* gateway.asMember(workspaceId, alice, Actor.Service)).toEqual({
+      expect(yield* gateway.asMember(workspaceId, alice, Actor.Actor)).toEqual({
         workspaceId,
         memberId,
         identity: alice,
@@ -737,7 +737,7 @@ it.effect(
       expect(boots.reads).toBe(1);
       expect(lookups).toEqual([alice]);
       // A prepared workspace resolves each later caller inside it, without another admission view.
-      yield* gateway.asMember(workspaceId, agent, Actor.Service);
+      yield* gateway.asMember(workspaceId, agent, Actor.Actor);
       expect(lookups).toEqual([alice, agent]);
       expect(boots.reads).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
@@ -765,7 +765,7 @@ it.effect("read models awaiting a rebuild are prepared first, then resolve membe
         rebuilt = true;
       },
     });
-    expect((yield* gateway.asMember(workspaceId, alice, Actor.Service)).identity).toEqual(alice);
+    expect((yield* gateway.asMember(workspaceId, alice, Actor.Actor)).identity).toEqual(alice);
     expect(boots.reads).toBe(1);
     // The rebuilt read models still refuse someone who is not a member.
     expect(yield* Effect.flip(gateway.asMember(workspaceId, agent, Effect.void))).toEqual(
@@ -778,7 +778,7 @@ it.effect("read models awaiting a rebuild are prepared first, then resolve membe
 const counted = Effect.fnUntraced(function* (options: Gateway.Options) {
   const boots = { bound: 0, reads: 0 };
   const gateway = yield* Gateway.make(options).pipe(
-    Effect.provideService(WorkspaceStorage.Service, {
+    Effect.provideService(WorkspaceStorage.WorkspaceStorage, {
       forWorkspace: () =>
         Effect.sync(() => {
           boots.bound += 1;
@@ -887,7 +887,7 @@ it.effect("interrupting a caller leaves shared boot available to the next reques
           yield* Fiber.interrupt(first);
           expect(Exit.hasInterrupts(yield* Fiber.await(first))).toBe(true);
           const second = yield* gateway
-            .asMember(workspaceId, alice, Actor.Service)
+            .asMember(workspaceId, alice, Actor.Actor)
             .pipe(Effect.forkChild({ startImmediately: true }));
           yield* Deferred.succeed(resume, undefined);
           expect((yield* Fiber.join(second)).identity).toEqual(alice);
@@ -937,10 +937,10 @@ it.effect("workspace runtimes are isolated and a new host boots from storage aga
       yield* Effect.scoped(
         Effect.gen(function* () {
           const gateway = yield* Gateway.make();
-          expect((yield* gateway.asMember(workspaceId, alice, Actor.Service)).workspaceId).toBe(
+          expect((yield* gateway.asMember(workspaceId, alice, Actor.Actor)).workspaceId).toBe(
             workspaceId,
           );
-          expect((yield* gateway.asMember(other, agent, Actor.Service)).workspaceId).toBe(other);
+          expect((yield* gateway.asMember(other, agent, Actor.Actor)).workspaceId).toBe(other);
           yield* gateway.inWorkspace(workspaceId, Effect.void);
         }),
       ).pipe(Effect.provide(host(storage)));
@@ -957,7 +957,7 @@ it.effect(
         const gateway = yield* Gateway.make();
         const inRequest = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
           effect.pipe(
-            Effect.provideService(Actor.Service, { workspaceId, memberId, identity: alice }),
+            Effect.provideService(Actor.Actor, { workspaceId, memberId, identity: alice }),
             Effect.provideService(Store.Transaction, {
               id: Commit.Id.make("request"),
               append: unexpected,
@@ -970,7 +970,7 @@ it.effect(
         yield* gateway.inWorkspace(
           workspaceId,
           Effect.gen(function* () {
-            expect(Option.isNone(yield* Effect.serviceOption(Actor.Service))).toBe(true);
+            expect(Option.isNone(yield* Effect.serviceOption(Actor.Actor))).toBe(true);
             expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
           }),
         );
@@ -980,7 +980,7 @@ it.effect(
         host({
           forWorkspace: (id) =>
             Effect.gen(function* () {
-              expect(Option.isNone(yield* Effect.serviceOption(Actor.Service))).toBe(true);
+              expect(Option.isNone(yield* Effect.serviceOption(Actor.Actor))).toBe(true);
               expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
               return bindings({ workspaceId: id });
             }),

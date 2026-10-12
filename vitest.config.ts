@@ -18,7 +18,6 @@ export default defineConfig({
           testTimeout: 20_000,
           include: [
             "packages/*/test/**/*.test.ts",
-            "adapters/storage-memory/test/**/*.test.ts",
             "adapters/sandbox-local/test/**/*.test.ts",
             "adapters/sandbox-daytona/test/**/*.test.ts",
             "adapters/harness-*/test/**/*.test.ts",

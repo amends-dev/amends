@@ -32,11 +32,11 @@ agent examples below illustrate consumers rather than available application oper
   held, never after a rollback; hosts use it to tell a reader that something the commit stored,
   such as a Cluster request, can be read now.
 
-The core imports Effect only. Hosts choose storage and provide `Store.Service`,
-`Checkpoint.Service`, and the domain store services used by projection handlers.
+The core imports Effect only. Hosts choose storage and provide `Store.Store`,
+`Checkpoint.Checkpoint`, and the domain store services used by projection handlers.
 `Log.layer` builds the common log service and transaction coordinator from that
 store, which is bound to one workspace.
-`Journal.layer({ logId, projections })` builds `Journal.Service`, whose
+`Journal.layer({ logId, projections })` builds `Journal.Journal`, whose
 interface stays the same as projections are added. `Journal.make` remains available
 as its constructor and returns that same interface.
 
@@ -59,7 +59,7 @@ const JournalLive = Journal.layer({
 }).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostServices));
 ```
 
-Domains obtain the configured implementation with `yield* Journal.Service`.
+Domains obtain the configured implementation with `yield* Journal.Journal`.
 All normal writers to a domain log must use the same projection registrations.
 
 ## Storage envelope
@@ -75,8 +75,8 @@ The PostgreSQL adapter stores `subject`, `fact_name`, and `fact_version` as colu
 `log_entries`. Separate indexes cover workspace/log/name and workspace/log/subject,
 each ordered by position and entry index. Provenance's performer, cause, correlation,
 and occurrence time have separate columns. Workspace IDs in PostgreSQL
-provenance are reconstructed from the containing row; writes validate workspace
-consistency before omitting those repeated IDs. Neither adapter duplicates the
+provenance are reconstructed from the containing row; the journal store checks that
+every appended fact names the workspace before the adapter omits those repeated IDs. Neither adapter duplicates the
 fact header inside a second binary wrapper.
 
 Generic execution logs have no fact header and continue to encode their complete
@@ -93,7 +93,7 @@ Generic execution logs still have no fact header.
 
 ## Fact subjects and filtered reads
 
-Every fact declares a pure `subject(payload)` function returning a `Subject.Value`.
+Every fact declares a pure `subject(payload)` function returning a `Subject.Subject`.
 Use `Subject.make("thread", threadId)` to construct a `kind:id` key. The namespace
 starts with a lowercase letter and contains only lowercase letters, digits, or
 hyphens; IDs are nonempty and may contain colons. Thus different entity kinds
@@ -196,7 +196,7 @@ const rename = Effect.gen(function* () {
 `Log.append` and `Log.appendAll` continue to accept explicit keys because execution
 entries have no fact definition. Calls without a derived or explicit key append
 every time. The application still authorizes the operation and supplies
-`Publication.Service`. Reuse the occurrence inputs or explicit key on retry; a new
+`Publication.Publication`. Reuse the occurrence inputs or explicit key on retry; a new
 UUID on every attempt identifies a different occurrence. Correlation IDs can group
 several facts and must not automatically become their shared idempotency key.
 
@@ -237,7 +237,7 @@ Reads inside a transaction see its own staged keys.
 The returned entries remain provisional until their owning commit succeeds.
 `Store.getAppend` supplies a validated receipt with the key, commit, first index,
 count, and exact entries. The entries a keyed append returns are its receipt; the log does not
-read the receipt back, and the [conformance suites](../packages/storage-conformance/README.md)
+read the receipt back, and the [conformance suites](../packages/gateway/README.md#conformance)
 check that every adapter keeps the two identical. The PostgreSQL adapter persists receipts in
 `log_append_keys`, using a unique workspace/log/key constraint and its existing writer serialization.
 
@@ -275,7 +275,7 @@ separate receipt is recorded. Logs written before this change still hold interna
 
 ## Event provenance
 
-Every new `journal.publish(fact, payload)` requires `Publication.Service` in its
+Every new `journal.publish(fact, payload)` requires `Publication.Publication` in its
 Effect context. This service holds the operation's `Event.Provenance`. The journal
 reads it at publication time, validates and snapshots it, then persists it as
 structured event metadata and exposes it on decoded
@@ -305,7 +305,7 @@ the existing context, including any explicit overrides. Publishing another fact
 does not regenerate the correlation or timestamp.
 
 Services capture cryptography during construction and provide it to
-the wrapper; identity is resolved when the operation runs. `Publication.Service`
+the wrapper; identity is resolved when the operation runs. `Publication.Publication`
 belongs around the operation's effect, never in a shared application layer.
 `Journal.make` and `Journal.layer` do not capture it. A direct publication without
 the service is a missing dependency at compile time and a defect at runtime;
@@ -342,7 +342,7 @@ parent. Events in one commit are not automatically causes of one another.
 
 For bootstrap and invitation acceptance, call `Publication.make(workspaceId,
 performer, occurredAt?)` with the authenticated identity and provide the result
-around the publication block using `Effect.provideService(Publication.Service,
+around the publication block using `Effect.provideService(Publication.Publication,
 provenance)`. These operations explicitly establish their authenticated performer's
 context because membership may not exist yet. Acceptance records the
 recipient even though its authority check temporarily evaluates the inviter.
@@ -507,7 +507,7 @@ domain events. For a consumer-owned `handleBatch` effect:
 
 ```ts
 const followJournal = Effect.gen(function* () {
-  const journal = yield* Journal.Service;
+  const journal = yield* Journal.Journal;
   yield* journal.log.tail({ limit: 32 }).pipe(Stream.runForEach(handleBatch));
 });
 ```
@@ -570,7 +570,7 @@ registered projection that is not live. For example, using the host layer above:
 
 ```ts
 const initialize = Effect.gen(function* () {
-  const journal = yield* Journal.Service;
+  const journal = yield* Journal.Journal;
   yield* journal.replay;
 }).pipe(Effect.provide(JournalLive));
 ```
@@ -641,8 +641,8 @@ between projection versions.
 
 ## Verification
 
-`bun run test packages/core/test` exercises the portable implementation with a test-only
-memory adapter, including cross-log atomicity, rollback, nested publication, rejecting concurrent
+`bun run test packages/core/test` exercises the portable implementation over its
+[memory storage](../packages/core/README.md#memory), including cross-log atomicity, rollback, nested publication, rejecting concurrent
 storage work in one commit, interruption, cursor isolation, and uncertain outcomes. Projection tests
 also cover resume, batch rollback, checkpoint failures, concurrent runners, version
 routing, going live after a rebuild, the live-version checks on commit, retired and
@@ -658,9 +658,8 @@ and that a journal that does not run a live projection cannot publish to its log
 Direct entry-lookup tests cover codec decoding, log/workspace isolation, buffer ownership,
 staged visibility, rollback, and use by authorized notification-source reads.
 Storage adapters must satisfy the same transaction and log contracts. The
-[PostgreSQL](../adapters/storage-postgresql/README.md) and
-[memory](../adapters/storage-memory/README.md) adapters run these contracts through the
-conformance suites, over independent connections, including standalone appends beside a
+[PostgreSQL](../adapters/storage-postgresql/README.md) adapter and the memory implementation run
+these contracts through the [conformance suites](../packages/gateway/README.md#conformance), over independent connections, including standalone appends beside a
 transaction that holds the workspace or the log; PostgreSQL suites require an available
 server as described in the [testing guide](testing.md). The
 [local host](../hosts/local/README.md) composes the PostgreSQL adapter. The core's own

@@ -8,6 +8,8 @@
  * `toolkit` makes that toolkit from the one it presents, which is the model's to search and call.
  * Running a tool is the presented toolkit's own, so what it decides stays decided: a tool that needs
  * approval needs it when the model calls it through `tool_call`, and a call fails as it fails there.
+ *
+ * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/ai";
@@ -46,7 +48,12 @@ interface Entry {
   readonly descriptionWords: ReadonlyArray<string>;
 }
 
-/** Options of `toolkit`. */
+/**
+ * What `toolkit` takes besides the toolkit it presents.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** How many tools a search returns when it does not ask for a number. Five by default. */
   readonly limit?: number;
@@ -54,6 +61,9 @@ export interface Options {
 
 /**
  * Makes the toolkit of `tool_search` and `tool_call` over `presented`. Building contacts nothing.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const toolkit = Effect.fn("ToolSearch.toolkit")(function* <
   Tools extends Record<string, Tool.Any>,

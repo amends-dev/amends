@@ -4,8 +4,9 @@ import { fileURLToPath } from "node:url";
 import { build, type Rollup } from "vite";
 
 /**
- * Span names of server-side implementations. Effect keeps them as strings through minification,
- * so any of them in the bundle means the implementation behind it was bundled too.
+ * Names that server-side implementations carry, span names and the HTTP server's service keys.
+ * Effect keeps them as strings through minification, so any of them in the bundle means the
+ * implementation behind it was bundled too.
  */
 const serverCode = [
   "Journal.publish",
@@ -14,9 +15,12 @@ const serverCode = [
   "ThreadService.make",
   "InvitationService.issue",
   "Gateway.make",
+  "BearerAuthentication.make",
+  "@amends-dev/http/Streams",
+  "@amends-dev/http/Draining",
 ];
 
-it("the browser bundle carries core's schemas and errors, but none of its implementation", async () => {
+it("the browser bundle carries core's schemas, errors, and the HTTP contract, but no server code", async () => {
   const output = (await build({
     configFile: fileURLToPath(new URL("../vite.config.ts", import.meta.url)),
     root: fileURLToPath(new URL("..", import.meta.url)),

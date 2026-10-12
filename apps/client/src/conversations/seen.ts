@@ -33,7 +33,7 @@ export interface SeenAllController {
   /** Why the last attempt failed. */
   readonly error: Accessor<WorkspaceFailure | undefined>;
   /** Mark everything still pending seen, up to and including the newest notification shown. */
-  readonly markAllSeen: (through: Pick<Notification.Record, "recordedAt" | "id">) => void;
+  readonly markAllSeen: (through: Pick<Notification.Notification, "recordedAt" | "id">) => void;
 }
 /** Mark all of the reader's notifications seen, up to the newest they are shown. */
 export function useMarkAllSeen(
@@ -42,7 +42,7 @@ export function useMarkAllSeen(
 ): SeenAllController {
   const [error, setError] = createSignal<WorkspaceFailure>();
   const request = useMutation(markSeenThrough(workspaceId));
-  async function markAll(through: Pick<Notification.Record, "recordedAt" | "id">) {
+  async function markAll(through: Pick<Notification.Notification, "recordedAt" | "id">) {
     setError(undefined);
     const exit = await request.run(through);
     if (exit === undefined || Exit.isSuccess(exit)) return;

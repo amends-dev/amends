@@ -1,31 +1,31 @@
-import { Publication } from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/Publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
-import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
-import { AssignmentProjection } from "../../src/authorization/assignment/projection.ts";
-import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
-import { Assignment } from "../../src/authorization/assignment/assignment.ts";
-import { Grant } from "../../src/authorization/grant.ts";
-import { RoleFacts } from "../../src/authorization/role/facts.ts";
-import { RoleProjection } from "../../src/authorization/role/projection.ts";
-import { RoleStore } from "../../src/authorization/role/store.ts";
-import { Role } from "../../src/authorization/role/role.ts";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { MemberFacts } from "../../src/workspace/member/facts.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
-import { MemberProjection } from "../../src/workspace/member/projection.ts";
-import { MemberStore } from "../../src/workspace/member/store.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import * as AssignmentFacts from "../../src/authorization/AssignmentFacts.ts";
+import * as AssignmentProjection from "../../src/authorization/AssignmentProjection.ts";
+import * as AssignmentStore from "../../src/authorization/AssignmentStore.ts";
+import * as Assignment from "../../src/authorization/Assignment.ts";
+import * as Grant from "../../src/authorization/Grant.ts";
+import * as RoleFacts from "../../src/authorization/RoleFacts.ts";
+import * as RoleProjection from "../../src/authorization/RoleProjection.ts";
+import * as RoleStore from "../../src/authorization/RoleStore.ts";
+import * as Role from "../../src/authorization/Role.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Identity from "../../src/identity/Identity.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Transaction from "../../src/journal/Transaction.ts";
+import * as MemberFacts from "../../src/workspace/MemberFacts.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as MemberProjection from "../../src/workspace/MemberProjection.ts";
+import * as MemberStore from "../../src/workspace/MemberStore.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
+import { make, type Fixture } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Log.Id.make("workspace-one/journal");
@@ -35,12 +35,12 @@ const roleAssignmentId = Assignment.Id.make("role-assignment");
 const directAssignmentId = Assignment.Id.make("direct-assignment");
 const roleSource = Assignment.Source.cases.Role.make({
   roleId,
-  scope: Scope.Value.cases.Workspace.make({ workspaceId }),
+  scope: Scope.Scope.cases.Workspace.make({ workspaceId }),
 });
 const directSource = Assignment.Source.cases.Direct.make({
   grant: Grant.make(
     MemberPermissions.Read,
-    Scope.Value.cases.Target.make({
+    Scope.Scope.cases.Target.make({
       target: Target.Reference.cases.Member.make({
         workspaceId,
         memberId: Member.Id.make("subject"),
@@ -80,23 +80,23 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    | Publication.Service
-    | Log.Service
-    | Transaction.Service
-    | Checkpoint.Service
-    | RoleStore.Service
-    | AssignmentStore.Service
-    | MemberStore.Service
+    | Publication.Publication
+    | Log.Log
+    | Transaction.Transaction
+    | Checkpoint.Checkpoint
+    | RoleStore.RoleStore
+    | AssignmentStore.AssignmentStore
+    | MemberStore.MemberStore
   >,
 ) =>
   program.pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-    Effect.provideService(RoleStore.Service, fixture.roles(workspaceId)),
-    Effect.provideService(AssignmentStore.Service, fixture.assignments(workspaceId)),
-    Effect.provideService(MemberStore.Service, fixture.members(workspaceId)),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
+    Effect.provideService(RoleStore.RoleStore, fixture.roles),
+    Effect.provideService(AssignmentStore.AssignmentStore, fixture.assignments),
+    Effect.provideService(MemberStore.MemberStore, fixture.members),
   );
 it.effect(
   "live role and assignment projections preserve role references, queries, and revocation history",
@@ -107,8 +107,8 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const roleStore = yield* RoleStore.Service;
-          const assignmentStore = yield* AssignmentStore.Service;
+          const roleStore = yield* RoleStore.RoleStore;
+          const assignmentStore = yield* AssignmentStore.AssignmentStore;
           const otherMemberId = Member.Id.make("other-recipient");
           const otherAssignmentId = Assignment.Id.make("other-recipient-assignment");
           yield* journal.commit(
@@ -253,10 +253,10 @@ it.effect(
           expect((yield* fixture.snapshot).roles.size).toBe(0);
           expect((yield* fixture.snapshot).assignments.size).toBe(0);
           yield* (yield* setup).replay;
-          expect(yield* (yield* RoleStore.Service).get(roleId)).toEqual(
+          expect(yield* (yield* RoleStore.RoleStore).get(roleId)).toEqual(
             Option.some({ ...initialRole, name: "Replayed role", permissions: [] }),
           );
-          const assignmentStore = yield* AssignmentStore.Service;
+          const assignmentStore = yield* AssignmentStore.AssignmentStore;
           expect(Option.map(yield* assignmentStore.get(roleAssignmentId), (a) => a.status)).toEqual(
             Option.some("revoked"),
           );
@@ -284,9 +284,9 @@ it.effect(
           yield* fresh.replay;
           expect(yield* fixture.snapshot).toEqual(before);
           yield* fresh.publish(RoleFacts.Renamed, { roleId, workspaceId, name: "After catch-up" });
-          expect(Option.map(yield* (yield* RoleStore.Service).get(roleId), (r) => r.name)).toEqual(
-            Option.some("After catch-up"),
-          );
+          expect(
+            Option.map(yield* (yield* RoleStore.RoleStore).get(roleId), (r) => r.name),
+          ).toEqual(Option.some("After catch-up"));
         }),
       );
     }),
@@ -420,7 +420,7 @@ it.effect("a failed role replay batch restores its prior name, permissions, and 
           _tag: "Projection.Failure",
           cause: { _tag: "RoleStore.Conflict", operation: "rename" },
         });
-        expect(yield* (yield* RoleStore.Service).get(roleId)).toEqual(Option.some(initialRole));
+        expect(yield* (yield* RoleStore.RoleStore).get(roleId)).toEqual(Option.some(initialRole));
         const cursor = yield* fixture.checkpoints.get({
           logId,
           name: RoleProjection.definition.name,
@@ -464,7 +464,7 @@ it.effect(
             _tag: "Projection.Failure",
             cause: { _tag: "AssignmentStore.Conflict", operation: "markRevoked" },
           });
-          const assignmentStore = yield* AssignmentStore.Service;
+          const assignmentStore = yield* AssignmentStore.AssignmentStore;
           expect((yield* assignmentStore.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
             roleAssignmentId,
           ]);
@@ -486,18 +486,19 @@ it.effect(
     Effect.gen(function* () {
       const fixture = yield* make();
       const foreign = Workspace.Id.make("another-workspace");
+      const other = yield* fixture.bind(foreign);
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const roleStore = yield* RoleStore.Service;
-          const assignmentStore = yield* AssignmentStore.Service;
+          const roleStore = yield* RoleStore.RoleStore;
+          const assignmentStore = yield* AssignmentStore.AssignmentStore;
           const permissions = [MemberPermissions.Read.name];
           const target = Target.Reference.cases.Member.make({
             workspaceId,
             memberId: Member.Id.make("subject"),
           });
           const localDirect = Assignment.Source.cases.Direct.make({
-            grant: Grant.make(MemberPermissions.Read, Scope.Value.cases.Target.make({ target })),
+            grant: Grant.make(MemberPermissions.Read, Scope.Scope.cases.Target.make({ target })),
           });
           yield* fixture.store.transaction(
             Effect.gen(function* () {
@@ -516,17 +517,24 @@ it.effect(
                 source: localDirect,
                 status: "active",
               });
-              yield* fixture
-                .roles(foreign)
-                .insert({ ...initialRole, workspaceId: foreign, name: "Foreign role" });
-              yield* fixture.assignments(foreign).insert({
+            }),
+          );
+          // The other workspace's records land in a commit of its own, as another workspace's do.
+          yield* other.store.transaction(
+            Effect.gen(function* () {
+              yield* other.roles.insert({
+                ...initialRole,
+                workspaceId: foreign,
+                name: "Foreign role",
+              });
+              yield* other.assignments.insert({
                 id: roleAssignmentId,
                 workspaceId: foreign,
                 memberId,
                 status: "active",
                 source: Assignment.Source.cases.Role.make({
                   roleId,
-                  scope: Scope.Value.cases.Workspace.make({ workspaceId: foreign }),
+                  scope: Scope.Scope.cases.Workspace.make({ workspaceId: foreign }),
                 }),
               });
             }),
@@ -536,7 +544,7 @@ it.effect(
           const role = yield* roleStore.get(roleId);
           if (Option.isNone(role)) throw new Error("Missing role");
           expect(role.value.permissions).toEqual([MemberPermissions.Read.name]);
-          expect(Option.map(yield* fixture.roles(foreign).get(roleId), (r) => r.name)).toEqual(
+          expect(Option.map(yield* other.roles.get(roleId), (r) => r.name)).toEqual(
             Option.some("Foreign role"),
           );
           Reflect.set(role.value.permissions, 0, MemberPermissions.Remove.name);
@@ -545,14 +553,14 @@ it.effect(
           if (
             Option.isNone(direct) ||
             !Assignment.Source.isAnyOf(["Direct"])(direct.value.source) ||
-            !Scope.Value.isAnyOf(["Target"])(direct.value.source.grant.scope)
+            !Scope.Scope.isAnyOf(["Target"])(direct.value.source.grant.scope)
           )
             throw new Error("Missing direct target");
           Reflect.set(direct.value.source.grant.scope.target, "workspaceId", foreign);
           const list = yield* assignmentStore.listActiveByMember(memberId);
           expect(list).toHaveLength(2);
           expect(yield* assignmentStore.listActiveByRole(roleId)).toHaveLength(1);
-          expect(yield* fixture.assignments(foreign).listActiveByMember(memberId)).toHaveLength(1);
+          expect(yield* other.assignments.listActiveByMember(memberId)).toHaveLength(1);
           for (const assignment of list) Reflect.set(assignment, "status", "revoked");
           const byRole = yield* assignmentStore.listActiveByRole(roleId);
           for (const assignment of byRole) {
@@ -583,8 +591,8 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const roleStore = yield* RoleStore.Service;
-          const assignmentStore = yield* AssignmentStore.Service;
+          const roleStore = yield* RoleStore.RoleStore;
+          const assignmentStore = yield* AssignmentStore.AssignmentStore;
           const expired = yield* fixture.store.transaction(Effect.context<Store.Transaction>());
           const operations: ReadonlyArray<
             Effect.Effect<

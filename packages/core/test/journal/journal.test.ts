@@ -1,17 +1,17 @@
 import { Subject } from "@amends-dev/core/journal";
-import { Publication } from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/Publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
 import { Cause, Deferred, Effect, Exit, Fiber, Option, Result, Schema, Stream } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Store } from "../../src/journal/store.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { Counter, make, type Fixture } from "../memory-store.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Projection from "../../src/journal/Projection.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
+import * as Transaction from "../../src/journal/Transaction.ts";
+import { Counter, make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
@@ -33,18 +33,18 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Publication.Service | Log.Service | Transaction.Service | Counter | Checkpoint.Service
+    Publication.Publication | Log.Log | Transaction.Transaction | Counter | Checkpoint.Checkpoint
   >,
 ) =>
   program.pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
+    Effect.provideService(Store.Store, fixture.store),
     Effect.provideService(Counter, fixture.counter),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
   );
 const setup = Effect.gen(function* () {
-  const log = yield* Log.Service;
+  const log = yield* Log.Log;
   const journal = yield* Journal.make({ logId: Log.Id.make("domain"), projections: [projection] });
   const turn = log.open({ id: Log.Id.make("turn/one"), schema: Harness });
   return { logs: log, journal, turn };
@@ -153,12 +153,12 @@ it.effect("storage work started concurrently in one commit is a defect, and writ
       fixture,
       Effect.gen(function* () {
         const { journal, turn } = yield* setup;
-        const transaction = yield* Transaction.Service;
+        const transaction = yield* Transaction.Transaction;
         const concurrent = (exit: Exit.Exit<unknown, unknown>) =>
           Exit.isFailure(exit) &&
           Result.getOrUndefined(Cause.findDefect(exit.cause)) instanceof Transaction.Concurrent;
         const publish = (amount: number) => journal.publish(Changed, { amount });
-        const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Publication.Service>> = [
+        const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Publication.Publication>> = [
           // Publications side by side.
           Effect.forEach([1, 2, 3, 4], publish, { concurrency: "unbounded" }),
           // A read beside a write, which the store could interleave with what it has staged.
@@ -328,7 +328,7 @@ it.effect("readers reject batches from another log", () =>
     );
     const corrupt = {
       ...fixture,
-      store: Store.Service.of({
+      store: Store.Store.of({
         ...fixture.store,
         read: (_id, options) => fixture.store.read(Log.Id.make("domain"), options),
       }),
@@ -359,7 +359,7 @@ it.effect("replay continues through short pages and respects consumer demand", (
     let reads = 0;
     const shortPages = {
       ...fixture,
-      store: Store.Service.of({
+      store: Store.Store.of({
         ...fixture.store,
         read: (id, options) =>
           fixture.store

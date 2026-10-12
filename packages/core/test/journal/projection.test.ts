@@ -1,19 +1,19 @@
 import { Subject } from "@amends-dev/core/journal";
-import { Publication } from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/Publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, Option, Ref, Schema, SchemaGetter } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Codec } from "../../src/journal/codec.ts";
-import { Entry } from "../../src/journal/entry.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Store } from "../../src/journal/store.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { Counter, make, type Fixture } from "../memory-store.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Codec from "../../src/journal/Codec.ts";
+import * as Entry from "../../src/journal/Entry.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Projection from "../../src/journal/Projection.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
+import * as Transaction from "../../src/journal/Transaction.ts";
+import { Counter, make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
@@ -42,14 +42,14 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Publication.Service | Log.Service | Transaction.Service | Counter | Checkpoint.Service
+    Publication.Publication | Log.Log | Transaction.Transaction | Counter | Checkpoint.Checkpoint
   >,
 ) =>
   program.pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter),
   );
 it.effect(
@@ -151,7 +151,7 @@ it.effect(
         Effect.fail(new Store.Failure({ operation, cause: "unavailable" }));
       const broken = {
         ...fixture,
-        checkpoints: Checkpoint.Service.of({
+        checkpoints: Checkpoint.Checkpoint.of({
           ...fixture.checkpoints,
           set: () => unavailable("checkpoint.set"),
           setLive: () => unavailable("checkpoint.setLive"),
@@ -177,7 +177,7 @@ it.effect(
       );
       const progressUnavailable = {
         ...fixture,
-        checkpoints: Checkpoint.Service.of({
+        checkpoints: Checkpoint.Checkpoint.of({
           ...fixture.checkpoints,
           set: () => unavailable("checkpoint.set"),
         }),
@@ -266,7 +266,7 @@ it.effect("live publication reads no log batches or progress, and checks live ve
   Effect.gen(function* () {
     const fixture = yield* make();
     const reads: Array<string> = [];
-    const store = Store.Service.of({
+    const store = Store.Store.of({
       ...fixture.store,
       get: (id, commitId) =>
         fixture.store
@@ -277,7 +277,7 @@ it.effect("live publication reads no log batches or progress, and checks live ve
           .read(id, options)
           .pipe(Effect.tap(() => Effect.sync(() => reads.push("read")))),
     });
-    const checkpoints = Checkpoint.Service.of({
+    const checkpoints = Checkpoint.Checkpoint.of({
       ...fixture.checkpoints,
       get: (key) =>
         fixture.checkpoints
@@ -488,7 +488,7 @@ it.effect("invalid or partial durable checkpoints fail before applying more even
           }),
         );
         const bound = yield* runner;
-        const checkpoint = yield* Checkpoint.Service;
+        const checkpoint = yield* Checkpoint.Checkpoint;
         for (const entryId of [first.id, Entry.Id.make("missing-entry")]) {
           yield* journal.commit(
             checkpoint.set(bound.key, {
@@ -566,7 +566,7 @@ it.effect("replay handlers cannot append and a caught failure poisons the outer 
       Effect.gen(function* () {
         const journal = yield* source;
         yield* journal.publish(Changed, { amount: 1 });
-        const turn = (yield* Log.Service).open({
+        const turn = (yield* Log.Log).open({
           id: Log.Id.make("turn/one"),
           schema: Schema.String,
         });
@@ -668,7 +668,7 @@ it.effect("historical decoding resolves services, runs once per event, and canno
         yield* journal.publish(Decoded, 3).pipe(Effect.provideService(Decoder, decoder));
         expect(yield* (yield* Counter).get).toBe(5);
         expect(yield* Ref.get(decodes)).toBe(3);
-        const turn = (yield* Log.Service).open({
+        const turn = (yield* Log.Log).open({
           id: Log.Id.make("decoder-log"),
           schema: Schema.String,
         });
@@ -702,7 +702,7 @@ it.effect("corrupt fact payloads roll back earlier handlers in the same replay b
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const raw = (yield* Log.Service).open({
+        const raw = (yield* Log.Log).open({
           id: logId,
           schema: Journal.Envelope,
           storageCodec: Journal.storageCodec,

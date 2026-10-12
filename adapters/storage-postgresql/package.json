@@ -21,7 +21,6 @@
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends-dev/storage-conformance": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "drizzle-kit": "1.0.0-rc.5-5935859"
   }

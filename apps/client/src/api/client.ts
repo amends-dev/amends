@@ -1,4 +1,5 @@
-import { Api as Contract, Authentication, Unauthorized } from "@amends-dev/api-http";
+import * as Contract from "@amends-dev/http/Api";
+import * as Authentication from "@amends-dev/http/Authentication";
 import { Cause, Effect, Layer, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
@@ -27,7 +28,7 @@ const httpClientOf = (options: ApiClientOptions) => {
   ).pipe(Layer.provide(transport));
   return Layer.mergeAll(
     session ? signingOut : transport,
-    HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+    HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
       next(session ? HttpClientRequest.bearerToken(request, session.token) : request),
     ),
   );
@@ -36,7 +37,7 @@ const httpClientOf = (options: ApiClientOptions) => {
 /** The typed API for one credential: each session gets its own client, runtime, and reads. */
 export function createApiClient(options: ApiClientOptions) {
   class Client extends AtomHttpApi.Service<Client>()("@amends-dev/client/api/ApiClient", {
-    api: Contract,
+    api: Contract.Api,
     baseUrl: options.baseUrl,
     httpClient: httpClientOf(options),
   }) {}
@@ -49,7 +50,7 @@ export function createApiClient(options: ApiClientOptions) {
  * expire on its own.
  */
 export const revokeSession = (options: ApiClientOptions) =>
-  HttpApiClient.make(Contract, { baseUrl: options.baseUrl }).pipe(
+  HttpApiClient.make(Contract.Api, { baseUrl: options.baseUrl }).pipe(
     Effect.flatMap((api) => api.me.signOut()),
     Effect.provide(httpClientOf(options)),
     Effect.timeout("10 seconds"),
@@ -59,6 +60,6 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 /** The generated HTTP client operations call. */
 export type Api = ApiClient["Service"];
 
-const unauthorized = Schema.is(Unauthorized);
+const unauthorized = Schema.is(Authentication.Unauthorized);
 export const isUnauthorized = (cause: Cause.Cause<unknown>): boolean =>
   cause.reasons.some((reason) => Cause.isFailReason(reason) && unauthorized(reason.error));

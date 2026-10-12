@@ -7,6 +7,8 @@
  *
  * Which of a tool's decisions is the right one is the host's to say, from what it has stored. A
  * source's hints are its own claims, so no decision is made from them here.
+ *
+ * @since 0.1.0
  */
 import { Array as Arr, Effect, Schema, Struct } from "effect";
 import type { ToolDefinition } from "./ToolDefinition.ts";
@@ -15,29 +17,60 @@ import { NotFoundError, ToolSourceError } from "./ToolSourceError.ts";
 
 /**
  * What the model may do with a tool: call it, call it once the person has approved the call, or not
- * be given it.
+ * be given it. A schema, so that a host can store its policy.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Decision = Schema.Literals(["allow", "approve", "block"]);
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Decision = typeof Decision.Type;
 
-/** A source, with the definitions of the tools of it that the workspace has. */
+/**
+ * A source, with the definitions of the tools of it that the workspace has, from which `toolkit`
+ * builds the model's tools without asking the source.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Member {
   readonly source: ToolSource;
+
+  /** The definitions of the source's tools that the host holds in its catalog. */
   readonly definitions: ReadonlyArray<ToolDefinition>;
 }
 
-/** Tools the model would know by one name. */
+/**
+ * Tools the model would know by one name, as `NameClash` reports them.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Clash = Schema.Struct({
+  /** The name the model would know each of them by. */
   name: Schema.String,
 
   /** Each tool by its source's name for it, which is how it is told from the others. */
   tools: Schema.Array(Schema.Struct({ source: Schema.String, tool: Schema.String })),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Clash extends Schema.Schema.Type<typeof Clash> {}
 
-/** More than one tool has the same name, so the model could not tell which one it calls. */
+/**
+ * More than one tool has the same name, so the model could not tell which one it calls. `toolkit`
+ * fails with it, holding every clash.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NameClash extends Schema.TaggedError<NameClash>(
   "@amends-dev/toolkit/Assembly/NameClash",
 )("NameClash", { clashes: Schema.NonEmptyArray(Clash) }) {
@@ -57,6 +90,12 @@ const modelApiNameLength = 64;
 /** A name is cut to its fingerprint and an underscore at least, with a few characters before them. */
 const shortestNameLength = 16;
 
+/**
+ * What `toolkit` takes besides its members and the decision for each tool.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /**
    * The longest name a tool may have, for an agent that adds to the names it is given and so takes
@@ -69,7 +108,12 @@ export interface Options {
  * Builds the toolkit of `members`. The tools of a member that `decide` blocks are left out, and the
  * names of the others must be distinct, or the assembly fails with the names that are not.
  *
- * Building contacts none of the sources.
+ * A model knows a tool by its source's name and its own, as `github__create_issue`, and a tool
+ * that `decide` asks to `approve` needs approval before it runs. Building contacts none of the
+ * sources.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const toolkit = Effect.fn("Assembly.toolkit")(function* (
   members: ReadonlyArray<Member>,

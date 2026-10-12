@@ -1,7 +1,7 @@
 import { type Integration, Integrations } from "@amends-dev/connection";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { LocalHost } from "../src/host.ts";
+import * as LocalHost from "../src/LocalHost.ts";
 
 it.effect(
   "the host installs integrations of every capability, with distinct ids, reaching nothing yet",

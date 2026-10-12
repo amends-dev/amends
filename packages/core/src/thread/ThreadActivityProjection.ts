@@ -6,9 +6,9 @@
  * @since 0.1.0
  */
 import { Effect } from "effect";
-import { Projection } from "../journal/projection.ts";
-import { ThreadActivityFacts } from "./ThreadActivityFacts.ts";
-import { ThreadActivityStore } from "./ThreadActivityStore.ts";
+import * as Projection from "../journal/Projection.ts";
+import * as ThreadActivityFacts from "./ThreadActivityFacts.ts";
+import * as ThreadActivityStore from "./ThreadActivityStore.ts";
 
 /**
  * Inserts each recorded activity. Its recipients are read by the notification projection, not
@@ -20,9 +20,7 @@ import { ThreadActivityStore } from "./ThreadActivityStore.ts";
 export const definition = Projection.make("thread.activity", { version: 1 }).on(
   ThreadActivityFacts.Recorded,
   Effect.fn("ThreadActivityProjection.recorded")(function* ({ payload }) {
-    const threadActivityStore = yield* ThreadActivityStore.Service;
+    const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
     yield* threadActivityStore.insert(payload.activity);
   }),
 );
-
-export * as ThreadActivityProjection from "./ThreadActivityProjection.ts";

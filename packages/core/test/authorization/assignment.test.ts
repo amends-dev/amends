@@ -1,16 +1,16 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
-import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
-import { Assignment } from "../../src/authorization/assignment/assignment.ts";
-import { Grant } from "../../src/authorization/grant.ts";
-import { Permission } from "../../src/authorization/permission.ts";
-import { Role } from "../../src/authorization/role/role.ts";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { Codec } from "../../src/journal/codec.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as AssignmentFacts from "../../src/authorization/AssignmentFacts.ts";
+import * as Assignment from "../../src/authorization/Assignment.ts";
+import * as Grant from "../../src/authorization/Grant.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as Role from "../../src/authorization/Role.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Codec from "../../src/journal/Codec.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-1");
 const recipientId = Member.Id.make("recipient");
@@ -22,16 +22,16 @@ const ManageWorkspace = Permission.make("test.workspace.manage", {
 });
 const sourcesIn = (workspaceId: Workspace.Id): ReadonlyArray<Assignment.Source> => {
   const scopedPermissions = [
-    [MemberPermissions.Remove, Scope.Value.cases.Workspace.make({ workspaceId })],
+    [MemberPermissions.Remove, Scope.Scope.cases.Workspace.make({ workspaceId })],
     [
       MemberPermissions.Remove,
-      Scope.Value.cases.Target.make({
+      Scope.Scope.cases.Target.make({
         target: Target.Reference.cases.Member.make({ workspaceId, memberId: targetMemberId }),
       }),
     ],
     [
       ManageWorkspace,
-      Scope.Value.cases.Target.make({
+      Scope.Scope.cases.Target.make({
         target: Target.Reference.cases.Workspace.make({ workspaceId }),
       }),
     ],
@@ -49,7 +49,7 @@ it.effect(
   "assignments retain role references or direct grants within the recipient's workspace",
   () =>
     Effect.gen(function* () {
-      const decode = Schema.decodeUnknownEffect(Assignment.Record);
+      const decode = Schema.decodeUnknownEffect(Assignment.Assignment);
       for (const source of sourcesIn(workspaceId)) {
         for (const status of Assignment.Status.literals) {
           const input = {
@@ -59,7 +59,7 @@ it.effect(
             source,
             status,
           };
-          expect(Assignment.Record.make(input)).toEqual(input);
+          expect(Assignment.Assignment.make(input)).toEqual(input);
           expect(yield* decode(input)).toEqual(input);
         }
       }
@@ -70,7 +70,7 @@ it.effect(
   "both assignment sources reject foreign workspace and exact-target scopes, including after revocation",
   () =>
     Effect.gen(function* () {
-      const decode = Schema.decodeUnknownEffect(Assignment.Record);
+      const decode = Schema.decodeUnknownEffect(Assignment.Assignment);
       for (const source of sourcesIn(Workspace.Id.make("workspace-2"))) {
         for (const status of Assignment.Status.literals) {
           const input = {
@@ -80,7 +80,7 @@ it.effect(
             source,
             status,
           };
-          expect(() => Assignment.Record.make(input)).toThrow("Schema validation failed");
+          expect(() => Assignment.Assignment.make(input)).toThrow("Schema validation failed");
           const error = yield* decode(input).pipe(Effect.flip);
           expect(error.message).toContain("Assignment scope must belong to its workspace");
           expect(error.message).toContain('["source"]');

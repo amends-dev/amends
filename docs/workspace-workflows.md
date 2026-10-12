@@ -1,7 +1,7 @@
 # Workspace workflows
 
 Workspace creation, membership, invitations, access, and ownership transfer, as the HTTP API
-exposes them. The [HTTP contract](../packages/api-http/README.md) lists the endpoints, and the
+exposes them. The [HTTP contract](../packages/http/README.md) lists the endpoints, and the
 [local host guide](../hosts/local/README.md) covers server setup and development authentication.
 The examples assume the local host on port 8787 started with `AMENDS_SIGN_IN=development`, whose
 bearer tokens are human IDs.

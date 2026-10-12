@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
-import { Agent } from "../../src/agent/agent.ts";
+import * as Agent from "../../src/agent/Agent.ts";
 
 const accepts = (schema: Schema.Decoder<unknown>, value: unknown) =>
   Schema.decodeUnknownExit(schema)(value)._tag === "Success";

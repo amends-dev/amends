@@ -3,7 +3,7 @@ import { Cause, Deferred, Effect, Exit, Fiber, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import { TestClock } from "effect/testing";
 import * as Assembly from "../../src/Assembly.ts";
-import * as CodeMode from "../../src/code/index.ts";
+import * as CodeMode from "../../src/CodeMode.ts";
 import type { ToolDefinition } from "../../src/ToolDefinition.ts";
 import type { ToolSource } from "../../src/ToolSource.ts";
 import * as ToolSourceError from "../../src/ToolSourceError.ts";

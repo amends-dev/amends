@@ -9,12 +9,12 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Connection } from "../connection/connection.ts";
-import { GroupId } from "../group/id.ts";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { ChannelId } from "./ChannelId.ts";
+import * as Connection from "../connection/Connection.ts";
+import * as GroupId from "../group/GroupId.ts";
+import * as Text from "../text/Text.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import * as ChannelId from "./ChannelId.ts";
 
 /**
  * Names a channel; `ChannelId.Id`, where models that only refer to channels import it from.
@@ -73,7 +73,7 @@ export type Status = typeof Status.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Channel = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   /** The connection whose transport receives the channel's events and posts its replies. */
@@ -92,7 +92,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Channel extends Schema.Schema.Type<typeof Channel> {}
 
 /**
  * The record with some fields changed.
@@ -100,7 +100,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Channel, changes: Partial<Channel>): Channel =>
   Object.assign({}, record, changes);
 
 /**
@@ -167,5 +167,3 @@ export const Reference = Schema.Struct({ workspaceId: WorkspaceId.Id, channelId:
  * @since 0.1.0
  */
 export interface Reference extends Schema.Schema.Type<typeof Reference> {}
-
-export * as Channel from "./Channel.ts";

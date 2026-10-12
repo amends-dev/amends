@@ -1,4 +1,4 @@
-import { Api, Authentication } from "@amends-dev/api-http";
+import { Api, Authentication } from "@amends-dev/http";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Group } from "@amends-dev/core/group";
 import { Identity } from "@amends-dev/core/identity";
@@ -10,17 +10,17 @@ import { Effect, Layer, Redacted, Schedule } from "effect";
 import { Base64 } from "effect/encoding";
 import { HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
-import { LocalHost } from "../src/host.ts";
-import { LocalServer } from "../src/server.ts";
+import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
+import * as LocalHost from "../src/LocalHost.ts";
+import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
 
 const alice = Identity.HumanId.make("alice");
 const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
-const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
 /**
  * The real routes, gateway, PostgreSQL storage, and turn jobs on Cluster behind a Bun test server,

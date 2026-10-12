@@ -1,24 +1,24 @@
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Exit, Option } from "effect";
-import { Agent } from "../../src/agent/agent.ts";
-import { AgentFacts } from "../../src/agent/facts.ts";
-import { AgentProjection } from "../../src/agent/projection.ts";
-import { AgentStore } from "../../src/agent/store.ts";
-import { Connection } from "../../src/connection/connection.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
-import { make } from "../memory-store.ts";
+import * as Agent from "../../src/agent/Agent.ts";
+import * as AgentFacts from "../../src/agent/AgentFacts.ts";
+import * as AgentProjection from "../../src/agent/AgentProjection.ts";
+import * as AgentStore from "../../src/agent/AgentStore.ts";
+import * as Connection from "../../src/connection/Connection.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
+import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Log.Id.make("workspace-one/journal");
 
-const created: Agent.Record = {
+const created: Agent.Agent = {
   id: Agent.Id.make("agent-one"),
   workspaceId,
   memberId: Member.Id.make("member-agent"),
@@ -32,10 +32,10 @@ const created: Agent.Record = {
 
 /** Agents in memory, refusing a reused id and a missing one as storage does. */
 const agentsInMemory = () => {
-  const records = new Map<string, Agent.Record>();
+  const records = new Map<string, Agent.Agent>();
   const conflict = (operation: string, message: string) =>
     Effect.fail(new AgentStore.Conflict({ operation, message }));
-  return AgentStore.Service.of({
+  return AgentStore.AgentStore.of({
     get: (id) => Effect.sync(() => Option.fromNullishOr(records.get(id))),
     list: Effect.sync(() => [...records.values()]),
     insert: (record) =>
@@ -51,8 +51,10 @@ const agentsInMemory = () => {
 
 /** Publishes in one commit, projecting agents into `agentStore`. */
 const commit = (
-  agentStore: AgentStore.Interface,
-  publish: (journal: Journal.Interface) => Effect.Effect<unknown, unknown, Publication.Service>,
+  agentStore: AgentStore.AgentStore["Service"],
+  publish: (
+    journal: Journal.Journal["Service"],
+  ) => Effect.Effect<unknown, unknown, Publication.Publication>,
 ) =>
   Effect.gen(function* () {
     const fixture = yield* make();
@@ -60,11 +62,11 @@ const commit = (
       const journal = yield* Journal.make({ logId, projections: [AgentProjection.definition] });
       yield* journal.commit(publish(journal));
     }).pipe(
-      Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+      Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
       Effect.provide(Log.layer),
-      Effect.provideService(Store.Service, fixture.store),
-      Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-      Effect.provideService(AgentStore.Service, agentStore),
+      Effect.provideService(Store.Store, fixture.store),
+      Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
+      Effect.provideService(AgentStore.AgentStore, agentStore),
     );
   });
 

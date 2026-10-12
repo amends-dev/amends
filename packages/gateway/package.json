@@ -6,10 +6,10 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./accounts": "./src/accounts.ts",
-    "./directory": "./src/directory.ts",
-    "./errors": "./src/errors.ts",
-    "./sign-in": "./src/sign-in.ts"
+    "./conformance/internal/*": null,
+    "./*": "./src/*.ts",
+    "./internal/*": null,
+    "./conformance": "./src/conformance/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -18,5 +18,18 @@
     "@amends-dev/connection": "workspace:*",
     "@amends-dev/core": "workspace:*",
     "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@amends-dev/channel": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
+    "@effect/vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/vitest": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@effect/vitest": {
+      "optional": true
+    }
   }
 }

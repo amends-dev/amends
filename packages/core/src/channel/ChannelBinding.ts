@@ -8,10 +8,10 @@
  */
 import { ChannelTransport } from "@amends-dev/channel";
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/ThreadId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { ChannelId } from "./ChannelId.ts";
+import * as GroupId from "../group/GroupId.ts";
+import * as ThreadId from "../thread/ThreadId.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as ChannelId from "./ChannelId.ts";
 
 /**
  * A thread's binding to the external conversation it came from.
@@ -19,7 +19,7 @@ import { ChannelId } from "./ChannelId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const ChannelBinding = Schema.Struct({
   threadId: ThreadId.Id,
   workspaceId: WorkspaceId.Id,
   channelId: ChannelId.Id,
@@ -37,6 +37,4 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
-
-export * as ChannelBinding from "./ChannelBinding.ts";
+export interface ChannelBinding extends Schema.Schema.Type<typeof ChannelBinding> {}

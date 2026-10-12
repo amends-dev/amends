@@ -5,10 +5,10 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Subject } from "../journal/subject.ts";
-import { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
-import { ThreadMessageId } from "./ThreadMessageId.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import * as ThreadMessageId from "./ThreadMessageId.ts";
 
 const subject = ({ messageId }: { readonly messageId: ThreadMessageId.Id }) =>
   Subject.make("message", messageId);
@@ -72,5 +72,3 @@ export const Deleted = ThreadActivityKind.make("message.deleted", {
  * @since 0.1.0
  */
 export type Deleted = ThreadActivityKind.Activity<typeof Deleted>;
-
-export * as ThreadMessageActivity from "./ThreadMessageActivity.ts";

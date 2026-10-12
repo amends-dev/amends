@@ -1,6 +1,6 @@
 /**
  * The integrations of model providers: one for each provider the model catalog lists, which gives
- * the provider's models in the catalog, and `openai-compatible`, which gives any model of an API
+ * the provider's models in the catalog, and `openAiCompatible`, which gives any model of an API
  * that serves the Chat Completions protocol at a URL the connection gives, such as a model server
  * on a company's network.
  *
@@ -14,6 +14,8 @@
  * the request is incomplete, which costs nothing. A few providers look at the request before the
  * key, so a wrong key there shows only when a turn runs. Checking a connection to an
  * OpenAI-compatible API asks it which models it has.
+ *
+ * @since 0.1.0
  */
 import type { ModelEndpoint } from "@amends-dev/harness";
 import { Effect, Redacted, Result, Schema } from "effect";
@@ -22,14 +24,26 @@ import { type Health, healthOf, UnsupportedError } from "./Connection.ts";
 import * as Integration from "./Integration.ts";
 import * as ModelCatalog from "./ModelCatalog.ts";
 
-/** The integrations of the catalog's providers, which check connections over the host's client. */
+/**
+ * The integrations of the catalog's providers, which check connections over the host's client,
+ * read from the `ModelCatalog` the host provides.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const catalogProviders = Effect.gen(function* () {
   const catalog = yield* ModelCatalog.ModelCatalog;
   const client = yield* HttpClient.HttpClient;
   return (yield* catalog.providers).map((provider) => providerIntegration(provider, client));
 });
 
-/** The integration of an OpenAI-compatible API, which checks connections over the host's client. */
+/**
+ * The integration of an OpenAI-compatible API, `openai-compatible`, which checks connections over
+ * the host's client.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const openAiCompatible = Effect.map(HttpClient.HttpClient, (client) =>
   Integration.make({
     id: "openai-compatible",

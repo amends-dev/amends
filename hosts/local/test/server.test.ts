@@ -18,7 +18,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
   it.live("names and messages storage cannot keep as given are refused as invalid", () =>
     temporary(async (url) =>
       withServer(url, async (call) => {
-        const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+        const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(
           (await call(alice.id, "POST", "/workspaces", { name: "Names", memberName: "alice" }))
             .body,
         );
@@ -56,7 +56,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         withServer(
           url,
           async (call, base) => {
-            const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+            const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(
               (await call(alice.id, "POST", "/workspaces", { name: "Pool", memberName: "alice" }))
                 .body,
             );
@@ -97,7 +97,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
     () =>
       temporary(async (url) =>
         withServer(url, async (call) => {
-          const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+          const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(
             (
               await call(alice.id, "POST", "/workspaces", {
                 name: "Ownership",
@@ -112,7 +112,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(initial.canTransfer).toBe(true);
           expect(initial.candidates).toEqual([]);
           const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
-          const invitation = Schema.decodeUnknownSync(Invitation.Record)(
+          const invitation = Schema.decodeUnknownSync(Invitation.Invitation)(
             (
               await call(alice.id, "POST", `${base}/invitations`, {
                 email: "bob@example.com",
@@ -123,7 +123,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           );
           // Development tokens are human IDs: Bob's is his account's, which the invitation names.
           const bobId = invitation.details.recipientId;
-          const member = Schema.decodeUnknownSync(Member.Record)(
+          const member = Schema.decodeUnknownSync(Member.Member)(
             (
               await call(bobId, "POST", `${base}/invitations/${invitation.details.id}/accept`, {
                 name: "bob",
@@ -183,7 +183,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
     () =>
       temporary(async (url) =>
         withServer(url, async (call) => {
-          const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+          const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(
             (await call(alice.id, "POST", "/workspaces", { name: "Roles", memberName: "alice" }))
               .body,
           );
@@ -211,9 +211,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
             expiresAt,
             roleId: BuiltinRoles.MemberId,
           });
-          const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
+          const invitation = Schema.decodeUnknownSync(Invitation.Invitation)(issued.body);
           const bobId = invitation.details.recipientId;
-          const joined = Schema.decodeUnknownSync(Member.Record)(
+          const joined = Schema.decodeUnknownSync(Member.Member)(
             (
               await call(bobId, "POST", `${base}/invitations/${invitation.details.id}/accept`, {
                 name: "bob",
@@ -231,7 +231,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           };
           const changed = await call(alice.id, "PUT", `${base}/assignments`, input);
           expect(changed.status).toBe(200);
-          const assignment = Schema.decodeUnknownSync(Assignment.Record)(changed.body);
+          const assignment = Schema.decodeUnknownSync(Assignment.Assignment)(changed.body);
           expect((await call(alice.id, "PUT", `${base}/assignments`, input)).status).toBe(409);
           const choices = Schema.decodeUnknownSync(Schema.Array(Assignment.RoleChoice))(
             (await call(bobId, "GET", `${base}/roles`)).body,
@@ -312,7 +312,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           memberName: "alice",
         });
         expect(created.status).toBe(201);
-        const record = Schema.decodeUnknownSync(Workspace.Record)(created.body);
+        const record = Schema.decodeUnknownSync(Workspace.Workspace)(created.body);
         expect(record.name).toBe("Design & Engineering");
         return record;
       });
@@ -334,14 +334,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
             memberName: "alice",
           });
           expect(created.status).toBe(201);
-          return Schema.decodeUnknownSync(Workspace.Record)(created.body);
+          return Schema.decodeUnknownSync(Workspace.Workspace)(created.body);
         });
         // A fresh server process reads what the previous one committed.
         await withServer(url, async (call) => {
           const path = `/workspaces/${workspace.id}/members/${workspace.ownerMemberId}`;
           const read = await call(alice.id, "GET", path);
           expect(read.status).toBe(200);
-          expect(Schema.decodeUnknownSync(Member.Record)(read.body).identity).toEqual(alice);
+          expect(Schema.decodeUnknownSync(Member.Member)(read.body).identity).toEqual(alice);
           const denied = await call(bob.id, "GET", path);
           expect(denied.status).toBe(403);
           expect(denied.body).toMatchObject({ _tag: "Gateway.NotMember" });
@@ -358,14 +358,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
           memberName: "alice",
         });
         expect(created.status).toBe(201);
-        const workspace = Schema.decodeUnknownSync(Workspace.Record)(created.body);
+        const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(created.body);
         const issued = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
           email: "bob@example.com",
           expiresAt,
           roleId: BuiltinRoles.MemberId,
         });
         expect(issued.status).toBe(201);
-        const invitation = Schema.decodeUnknownSync(Invitation.Record)(issued.body);
+        const invitation = Schema.decodeUnknownSync(Invitation.Invitation)(issued.body);
         const bobId = invitation.details.recipientId;
         const accept = `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`;
         expect((await call(charlie.id, "POST", accept, { name: "charlie" })).status).toBe(403);
@@ -375,7 +375,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         return {
           workspace,
           invitation,
-          member: Schema.decodeUnknownSync(Member.Record)(accepted.body),
+          member: Schema.decodeUnknownSync(Member.Member)(accepted.body),
         };
       });
       const { workspace, invitation, member } = first;
@@ -398,7 +398,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           },
         );
         expect(issuedAgain.status).toBe(201);
-        const second = Schema.decodeUnknownSync(Invitation.Record)(issuedAgain.body);
+        const second = Schema.decodeUnknownSync(Invitation.Invitation)(issuedAgain.body);
         const revoke = `/workspaces/${workspace.id}/invitations/${second.details.id}/revoke`;
         expect((await call(alice.id, "POST", revoke)).status).toBe(200);
         const revoked = await call(
@@ -457,7 +457,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
   it.live("stopping the host ends open change streams at once, telling them to reconnect", () =>
     temporary(async (url) =>
       withServer(url, async (call, base, stop) => {
-        const workspace = Schema.decodeUnknownSync(Workspace.Record)(
+        const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(
           (await call(alice.id, "POST", "/workspaces", { name: "Streams", memberName: "alice" }))
             .body,
         );

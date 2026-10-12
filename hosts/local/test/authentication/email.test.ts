@@ -1,22 +1,22 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Api, Authentication } from "@amends-dev/api-http";
+import { Api, Authentication } from "@amends-dev/http";
 import { Accounts, SignIn } from "@amends-dev/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Effect, Layer, Logger, Redacted } from "effect";
 import { Base64 } from "effect/encoding";
 import { HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import { EmailAuthentication } from "../../src/authentication/email.ts";
-import { LocalHost } from "../../src/host.ts";
-import { LocalServer } from "../../src/server.ts";
+import * as EmailAuthentication from "../../src/EmailAuthentication.ts";
+import * as LocalHost from "../../src/LocalHost.ts";
+import * as LocalServer from "../../src/LocalServer.ts";
 import { setup } from "../database.ts";
 
 const ada = Accounts.Email.make("ada@example.com");
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
 const client = (token: string) =>
-  HttpApiClient.make(Api).pipe(
+  HttpApiClient.make(Api.Api).pipe(
     Effect.provide(
-      HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+      HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
         next(HttpClientRequest.bearerToken(request, token)),
       ),
     ),

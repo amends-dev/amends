@@ -6,7 +6,7 @@ them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadPartici
 `TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
 `Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
-failures remain failures. The [HTTP contract](../packages/api-http/README.md#conversations) exposes
+failures remain failures. The [HTTP contract](../packages/http/README.md#conversations) exposes
 each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
 
 ## Starting a conversation
@@ -18,7 +18,7 @@ import { Effect } from "effect";
 
 const start = (groupId: Group.Id) =>
   Effect.gen(function* () {
-    const threads = yield* ThreadService.Service;
+    const threads = yield* ThreadService.ThreadService;
     return yield* threads.startInGroup({
       groupId,
       text: "Here's the proposal",
@@ -191,7 +191,7 @@ up (`failed`). A message deleted before it was sent, a channel removed meanwhile
 that can no longer be reached fail the delivery as it stands. Edits and deletions of a sent message
 are not carried yet. Over HTTP, channels sit under `/workspaces/:workspaceId/channels`, and systems'
 requests arrive at `POST …/channels/:channelId/events` without a session
-([channels over HTTP](../packages/api-http/README.md#channels)).
+([channels over HTTP](../packages/http/README.md#channels)).
 
 ## Participation and recipients
 
@@ -227,7 +227,7 @@ import { Effect } from "effect";
 
 const reply = (threadId: Thread.Id) =>
   Effect.gen(function* () {
-    const messages = yield* ThreadMessageService.Service;
+    const messages = yield* ThreadMessageService.ThreadMessageService;
     return yield* messages.publish({ threadId, text: "Here's my feedback", mentions: [] });
   });
 ```
@@ -442,7 +442,7 @@ discarded agent notifications both show their source.
 ## Marking a notification seen
 
 `NotificationService.markSeen(notificationId)` records that the acting human saw their
-notification and returns the updated `Notification.Record`. It requires active workspace
+notification and returns the updated `Notification.Notification`. It requires active workspace
 membership and ownership, but no action grant or thread access: a person can clear an old
 notification after leaving its group or losing `thread.read`. It does not resolve the source,
 rejoin participation, or mark the conversation read.

@@ -20,5 +20,3 @@ export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadId"));
  * @since 0.1.0
  */
 export type Id = typeof Id.Type;
-
-export * as ThreadId from "./ThreadId.ts";

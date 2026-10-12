@@ -5,9 +5,9 @@
  * @since 0.1.0
  */
 import { Effect } from "effect";
-import { Projection } from "../journal/projection.ts";
-import { ThreadMessageFacts } from "./ThreadMessageFacts.ts";
-import { ThreadMessageStore } from "./ThreadMessageStore.ts";
+import * as Projection from "../journal/Projection.ts";
+import * as ThreadMessageFacts from "./ThreadMessageFacts.ts";
+import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 
 /**
  * Inserts each published message, and replaces its content on each edit and deletion. The group
@@ -22,23 +22,21 @@ export const definition = Projection.make("thread.message", { version: 1 })
     Effect.fn("ThreadMessageProjection.published")(function* ({
       payload: { groupId: _group, ...payload },
     }) {
-      const threadMessageStore = yield* ThreadMessageStore.Service;
+      const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
       yield* threadMessageStore.insert(payload);
     }),
   )
   .on(
     ThreadMessageFacts.Edited,
     Effect.fn("ThreadMessageProjection.edited")(function* ({ payload }) {
-      const threadMessageStore = yield* ThreadMessageStore.Service;
+      const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
       yield* threadMessageStore.edit(payload);
     }),
   )
   .on(
     ThreadMessageFacts.Deleted,
     Effect.fn("ThreadMessageProjection.deleted")(function* ({ payload }) {
-      const threadMessageStore = yield* ThreadMessageStore.Service;
+      const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
       yield* threadMessageStore.delete(payload);
     }),
   );
-
-export * as ThreadMessageProjection from "./ThreadMessageProjection.ts";

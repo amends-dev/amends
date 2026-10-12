@@ -5,11 +5,11 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { GroupId } from "../group/id.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
+import * as Fact from "../journal/Fact.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as Group from "../group/Group.ts";
+import * as GroupId from "../group/GroupId.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
 
 /**
  * A message was published, as its record says, with its thread's group, whose members may read
@@ -23,7 +23,7 @@ export const Published = Fact.make("thread.message.published", {
   subject: (payload) => Subject.make("thread-message", payload.id),
   occurrence: (payload) => [payload.id],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: Schema.Struct({ ...ThreadMessage.Record.fields, groupId: GroupId.Id }),
+  payload: Schema.Struct({ ...ThreadMessage.ThreadMessage.fields, groupId: GroupId.Id }),
 });
 
 /**
@@ -54,5 +54,3 @@ export const Deleted = Fact.make("thread.message.deleted", {
   audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: ThreadMessage.Deleted,
 });
-
-export * as ThreadMessageFacts from "./ThreadMessageFacts.ts";

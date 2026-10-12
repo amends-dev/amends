@@ -1,27 +1,68 @@
-import { Layer } from "effect";
-import { PostgresAccounts } from "./accounts.ts";
-import { PostgresDirectory } from "./directory.ts";
-import { PostgresSignInStorage } from "./sign-in-storage.ts";
-import { PostgresStorage } from "./storage.ts";
+/**
+ * Workspace storage over PostgreSQL, for the local host: core's stores and each workspace's signal
+ * hub, the workspace directory, the host's accounts, and sign-in storage, written with Drizzle and
+ * run through `@effect/sql-pg`. `PostgresStorage.layer` provides them all over a
+ * `PostgresDatabase.layer`, and `PostgresClusterStorage` keeps up Effect Cluster's tables beside
+ * them. `PostgresDatabase` holds the pool's `PostgresNotices`, `PostgresTurns`, and
+ * `PostgresReads`, and `PostgresSignalHub` binds the notices to each workspace. Each store's
+ * driver, over one workspace's binding, stays inside the package.
+ *
+ * @since 0.1.0
+ */
 
-export { PostgresAccounts } from "./accounts.ts";
-export { PostgresClusterStorage } from "./cluster-storage.ts";
-export { PostgresDatabase } from "./database.ts";
-export { PostgresDirectory } from "./directory.ts";
-export { PostgresSignInStorage } from "./sign-in-storage.ts";
-export { PostgresStorage } from "./storage.ts";
+// @barrel(Postgres*.ts): Auto-generated exports. Do not edit manually.
 
 /**
- * The gateway contracts this adapter implements, over one connected database: workspace
- * storage, with its signal hub, the directory, the host's accounts, and sign-in storage.
- * A host provides PostgresDatabase.layer(config) and cryptography beneath, and the gateway above.
- *
- * @category layers
+ * @since 0.1.0
  */
-export const layer = (options: PostgresStorage.Options = {}) =>
-  Layer.mergeAll(
-    PostgresStorage.layer(options),
-    PostgresDirectory.layer,
-    PostgresAccounts.layer,
-    PostgresSignInStorage.layer,
-  );
+export * as PostgresAccounts from "./PostgresAccounts.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresClusterStorage from "./PostgresClusterStorage.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresDatabase from "./PostgresDatabase.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresDirectory from "./PostgresDirectory.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresNotices from "./PostgresNotices.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresReads from "./PostgresReads.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresSignalHub from "./PostgresSignalHub.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresSignInStorage from "./PostgresSignInStorage.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresStorage from "./PostgresStorage.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresTurns from "./PostgresTurns.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as PostgresWorkspaceStorage from "./PostgresWorkspaceStorage.ts";

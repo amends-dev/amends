@@ -24,49 +24,49 @@ import {
 } from "@amends-dev/core/group";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Exit, Fiber, Layer, Option, Queue, Schema, Scope, Stream } from "effect";
-import { Assignment } from "../../src/authorization/assignment/assignment.ts";
-import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
-import { Authorization } from "../../src/authorization/authorization.ts";
-import { GrantResolver } from "../../src/authorization/grant-resolver.ts";
-import { PermissionCatalog } from "../../src/authorization/permission-catalog.ts";
-import type { Permission } from "../../src/authorization/permission.ts";
-import { RoleStore } from "../../src/authorization/role/store.ts";
-import { Scope as GrantScope } from "../../src/authorization/scope.ts";
-import { ChangeFeedService } from "../../src/change-feed/service.ts";
-import { ChangeFeed } from "../../src/change-feed/change-feed.ts";
-import { ChangeFeedSource } from "../../src/change-feed/source.ts";
-import { Actor } from "../../src/identity/actor.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Invitation } from "../../src/workspace/invitation/invitation.ts";
-import { InvitationPermissions } from "../../src/workspace/invitation/permissions.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
-import { AssignmentPermissions } from "../../src/authorization/assignment/permissions.ts";
-import { InvitationFacts } from "../../src/workspace/invitation/facts.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberFacts } from "../../src/workspace/member/facts.ts";
-import { MemberStore } from "../../src/workspace/member/store.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
-import { WorkspaceFacts } from "../../src/workspace/facts.ts";
-import { Role } from "../../src/authorization/role/role.ts";
-import { RoleFacts } from "../../src/authorization/role/facts.ts";
-import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import * as Assignment from "../../src/authorization/Assignment.ts";
+import * as AssignmentStore from "../../src/authorization/AssignmentStore.ts";
+import * as Authorization from "../../src/authorization/Authorization.ts";
+import * as GrantResolver from "../../src/authorization/GrantResolver.ts";
+import * as PermissionCatalog from "../../src/authorization/PermissionCatalog.ts";
+import type * as Permission from "../../src/authorization/Permission.ts";
+import * as RoleStore from "../../src/authorization/RoleStore.ts";
+import * as GrantScope from "../../src/authorization/Scope.ts";
+import * as ChangeFeedService from "../../src/change-feed/ChangeFeedService.ts";
+import * as ChangeFeed from "../../src/change-feed/ChangeFeed.ts";
+import * as ChangeFeedSource from "../../src/change-feed/ChangeFeedSource.ts";
+import * as Actor from "../../src/identity/Actor.ts";
+import * as Identity from "../../src/identity/Identity.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Invitation from "../../src/workspace/Invitation.ts";
+import * as InvitationPermissions from "../../src/workspace/InvitationPermissions.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as AssignmentPermissions from "../../src/authorization/AssignmentPermissions.ts";
+import * as InvitationFacts from "../../src/workspace/InvitationFacts.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberFacts from "../../src/workspace/MemberFacts.ts";
+import * as MemberStore from "../../src/workspace/MemberStore.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
+import * as WorkspaceFacts from "../../src/workspace/WorkspaceFacts.ts";
+import * as Role from "../../src/authorization/Role.ts";
+import * as RoleFacts from "../../src/authorization/RoleFacts.ts";
+import * as AssignmentFacts from "../../src/authorization/AssignmentFacts.ts";
+import { make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
-import { TestSignalHub } from "../signal-hub.ts";
-import { Notification } from "../../src/notification/notification.ts";
-import { Signal } from "../../src/signal/signal.ts";
-import { SignalHub } from "../../src/signal/hub.ts";
+import * as TestSignalHub from "../signal-hub.ts";
+import * as Notification from "../../src/notification/Notification.ts";
+import * as Signal from "../../src/signal/Signal.ts";
+import * as SignalHub from "../../src/signal/SignalHub.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const at = DateTime.makeUnsafe("2026-09-20T12:00:00.123Z");
 const alice: Identity.MemberReference = { _tag: "Human", id: Identity.HumanId.make("alice") };
-const actor = Actor.Value.make({
+const actor = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice-member"),
   identity: alice,
@@ -126,14 +126,14 @@ const workspaceGrant = (permission: Permission.Definition) =>
   Assignment.Source.cases.Direct.make({
     grant: {
       permission: permission.name,
-      scope: GrantScope.Value.cases.Workspace.make({ workspaceId }),
+      scope: GrantScope.Scope.cases.Workspace.make({ workspaceId }),
     },
   });
 const threadGrant = (id: Thread.Id) =>
   Assignment.Source.cases.Direct.make({
     grant: {
       permission: ThreadPermissions.Read.name,
-      scope: GrantScope.Value.cases.Target.make({
+      scope: GrantScope.Scope.cases.Target.make({
         target: { _tag: "Thread", workspaceId, threadId: id },
       }),
     },
@@ -180,10 +180,10 @@ const racing = () => {
   };
 };
 type Services =
-  | ChangeFeedService.Service
-  | Journal.Service
-  | SignalHub.Service
-  | Actor.Service
+  | ChangeFeedService.ChangeFeedService
+  | Journal.Journal
+  | SignalHub.SignalHub
+  | Actor.Actor
   | Scope.Scope;
 
 const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options: Options = {}) =>
@@ -197,7 +197,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     ];
     yield* fixture.store.transaction(
       Effect.gen(function* () {
-        yield* fixture.members(workspaceId).insert({
+        yield* fixture.members.insert({
           id: actor.memberId,
           workspaceId,
           identity: actor.identity,
@@ -205,7 +205,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
           status: "active",
         });
         for (const [index, source] of grants.entries())
-          yield* fixture.assignments(workspaceId).insert({
+          yield* fixture.assignments.insert({
             id: Assignment.Id.make(`grant-${index}`),
             workspaceId,
             memberId: actor.memberId,
@@ -217,9 +217,9 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     const admitted = new Set<Group.Id>();
     const memberRead = racing();
     const accessRead = racing();
-    const members = fixture.members(workspaceId);
+    const members = fixture.members;
     const unexpected = () => Effect.die(new Error("Unexpected membership store use"));
-    const memberships = GroupMembershipStore.Service.of({
+    const memberships = GroupMembershipStore.GroupMembershipStore.of({
       get: unexpected,
       getMany: unexpected,
       findActive: unexpected,
@@ -238,15 +238,15 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       markRemoved: unexpected,
     });
     const host = Layer.mergeAll(
-      Layer.succeed(Store.Service, fixture.store),
-      Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+      Layer.succeed(Store.Store, fixture.store),
+      Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
       Layer.succeed(
-        MemberStore.Service,
+        MemberStore.MemberStore,
         Object.assign({}, members, { get: (id: Member.Id) => memberRead.after(members.get(id)) }),
       ),
-      Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
-      Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
-      Layer.succeed(GroupMembershipStore.Service, memberships),
+      Layer.succeed(RoleStore.RoleStore, fixture.roles),
+      Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
+      Layer.succeed(GroupMembershipStore.GroupMembershipStore, memberships),
       TestSignalHub.layer,
       PermissionCatalog.layer([
         ThreadPermissions.Read,
@@ -272,25 +272,27 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       admitted,
       afterMemberRead: memberRead.set,
       afterAccessRead: accessRead.set,
-    }).pipe(Effect.provide(configured), Effect.provideService(Actor.Service, actor));
+    }).pipe(Effect.provide(configured), Effect.provideService(Actor.Actor, actor));
   }).pipe(Effect.scoped);
 
 /** Publish facts in one commit with trusted test attribution. */
-const commit = (program: Effect.Effect<unknown, unknown, Journal.Service | Publication.Service>) =>
-  Effect.flatMap(Journal.Service, (journal) =>
+const commit = (
+  program: Effect.Effect<unknown, unknown, Journal.Journal | Publication.Publication>,
+) =>
+  Effect.flatMap(Journal.Journal, (journal) =>
     journal
       .commit(program)
       .pipe(
-        Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-        Effect.provideService(Journal.Service, journal),
+        Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+        Effect.provideService(Journal.Journal, journal),
       ),
   ).pipe(Effect.orDie);
 const publish = <F extends Fact.Definition>(fact: F, payload: Fact.Payload<NoInfer<F>>) =>
-  Effect.flatMap(Journal.Service, (journal) => journal.publish(fact, payload));
+  Effect.flatMap(Journal.Journal, (journal) => journal.publish(fact, payload));
 
 /** Open a subscription and buffer its messages; the stream's end shows in its fiber. */
 const listen = Effect.fnUntraced(function* (options?: ChangeFeed.WatchOptions) {
-  const stream = yield* (yield* ChangeFeedService.Service).watch(options);
+  const stream = yield* (yield* ChangeFeedService.ChangeFeedService).watch(options);
   const queue = yield* Queue.unbounded<ChangeFeed.Message>();
   const fiber = yield* stream.pipe(
     Stream.runForEach((message) => Queue.offer(queue, message)),
@@ -303,10 +305,10 @@ const committed = (message: ChangeFeed.Message) => {
     throw new Error(`Expected a commit, got ${message._tag}`);
   return message;
 };
-const signal = (value: Signal.Value) =>
-  Effect.flatMap(SignalHub.Service, (signalHub) => signalHub.publish(value));
+const signal = (value: Signal.Signal) =>
+  Effect.flatMap(SignalHub.SignalHub, (signalHub) => signalHub.publish(value));
 const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
-  Signal.Value.cases.Typing.make({
+  Signal.Signal.cases.Typing.make({
     workspaceId,
     groupId: group,
     threadId: thread,
@@ -314,15 +316,15 @@ const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
     until: at,
   });
 const groupRead = (memberId: Member.Id, group = groupId) =>
-  Signal.Value.cases.GroupRead.make({ workspaceId, memberId, groupId: group, readAt: at });
-const sameSignal = Schema.toEquivalence(Signal.Value);
+  Signal.Signal.cases.GroupRead.make({ workspaceId, memberId, groupId: group, readAt: at });
+const sameSignal = Schema.toEquivalence(Signal.Signal);
 /** The signals delivered before a marker the reader is known to receive. */
 const signalsUntil = Effect.fnUntraced(function* (
   next: Effect.Effect<ChangeFeed.Message>,
-  marker: Signal.Value,
+  marker: Signal.Signal,
 ) {
   yield* signal(marker);
-  const received: Array<Signal.Value> = [];
+  const received: Array<Signal.Signal> = [];
   for (;;) {
     const message = yield* next;
     if (!ChangeFeed.Message.isAnyOf(["Signal"])(message))
@@ -424,7 +426,7 @@ it.effect("a cursor past the head, or further behind than the replay limit, rese
 it.effect("invalid cursors are rejected before subscribing", () =>
   run(() =>
     Effect.gen(function* () {
-      const changeFeedService = yield* ChangeFeedService.Service;
+      const changeFeedService = yield* ChangeFeedService.ChangeFeedService;
       for (const after of ["-1", "01", "1.5", "x", "9007199254740993"]) {
         const error = yield* Effect.flip(
           changeFeedService.watch({ after: after as ChangeFeed.Cursor }),
@@ -720,13 +722,13 @@ it.effect(
           admitted.add(groupId);
           const feed = yield* listen();
           yield* feed.next;
-          const readThread = Signal.Value.cases.ThreadRead.make({
+          const readThread = Signal.Signal.cases.ThreadRead.make({
             workspaceId,
             memberId: actor.memberId,
             threadId,
             readThrough: 3,
           });
-          const seen = Signal.Value.cases.NotificationsSeen.make({
+          const seen = Signal.Signal.cases.NotificationsSeen.make({
             workspaceId,
             memberId: bobMember,
             notificationIds: [Notification.Id.make("notification")],
@@ -887,7 +889,7 @@ it.effect("an exact member-read grant shows that member's changes, and not other
         Assignment.Source.cases.Direct.make({
           grant: {
             permission: MemberPermissions.Read.name,
-            scope: GrantScope.Value.cases.Target.make({
+            scope: GrantScope.Scope.cases.Target.make({
               target: { _tag: "Member", workspaceId, memberId: bobMember },
             }),
           },
@@ -938,7 +940,7 @@ it.effect("a revocation that commits while the reader subscribes still applies t
   run(({ admitted, afterAccessRead }) =>
     Effect.gen(function* () {
       admitted.add(groupId);
-      const journal = yield* Journal.Service;
+      const journal = yield* Journal.Journal;
       // The reader's admissions are read, and then their removal from the group commits.
       afterAccessRead(
         Effect.suspend(() => {
@@ -952,7 +954,7 @@ it.effect("a revocation that commits while the reader subscribes still applies t
               reason: "removed",
             }),
           );
-        }).pipe(Effect.asVoid, Effect.provideService(Journal.Service, journal)),
+        }).pipe(Effect.asVoid, Effect.provideService(Journal.Journal, journal)),
       );
       const feed = yield* listen();
       yield* feed.next;
@@ -973,13 +975,13 @@ it.effect(
   () =>
     run(({ fixture, afterMemberRead }) =>
       Effect.gen(function* () {
-        const journal = yield* Journal.Service;
+        const journal = yield* Journal.Journal;
         // The reader's active membership is checked, and then their removal commits.
         afterMemberRead(
           Effect.andThen(
-            fixture.store.transaction(fixture.members(workspaceId).markRemoved(actor.memberId)),
+            fixture.store.transaction(fixture.members.markRemoved(actor.memberId)),
             commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId })),
-          ).pipe(Effect.asVoid, Effect.orDie, Effect.provideService(Journal.Service, journal)),
+          ).pipe(Effect.asVoid, Effect.orDie, Effect.provideService(Journal.Journal, journal)),
         );
         const feed = yield* listen();
         yield* feed.next;
@@ -1000,7 +1002,7 @@ it.effect("a slow subscriber catches up from the journal instead of losing commi
   run(
     () =>
       Effect.gen(function* () {
-        const changeFeedService = yield* ChangeFeedService.Service;
+        const changeFeedService = yield* ChangeFeedService.ChangeFeedService;
         const slow = yield* changeFeedService.watch();
         const fast = yield* listen();
         yield* fast.next;
@@ -1098,8 +1100,8 @@ it.effect(
 it.effect("a removed member cannot subscribe", () =>
   run(({ fixture }) =>
     Effect.gen(function* () {
-      yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(actor.memberId));
-      const error = yield* Effect.flip((yield* ChangeFeedService.Service).watch());
+      yield* fixture.store.transaction(fixture.members.markRemoved(actor.memberId));
+      const error = yield* Effect.flip((yield* ChangeFeedService.ChangeFeedService).watch());
       expect(error).toMatchObject({ _tag: "Authorization.InvalidActor" });
     }),
   ),

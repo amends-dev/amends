@@ -1,12 +1,12 @@
 import { expect, it } from "@effect/vitest";
 import { DateTime, Schema } from "effect";
-import { Group } from "../../src/group/group.ts";
-import { GroupMembership } from "../../src/group/membership/membership.ts";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { ThreadId } from "../../src/thread/ThreadId.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Member } from "../../src/workspace/member/member.ts";
+import * as Group from "../../src/group/Group.ts";
+import * as GroupMembership from "../../src/group/GroupMembership.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as ThreadId from "../../src/thread/ThreadId.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
+import * as Member from "../../src/workspace/Member.ts";
 
 it("creation accepts an explicit empty audience but rejects duplicate members and blank or untrimmed names", () => {
   const decode = Schema.decodeUnknownOption(Group.CreateTeamInput);
@@ -32,7 +32,7 @@ it("persisted team groups are private or public; other kinds and visibilities ar
     createdBy: "member",
     createdAt: "2026-09-21T12:00:00.000Z",
   };
-  const decode = Schema.decodeUnknownOption(Group.Record);
+  const decode = Schema.decodeUnknownOption(Group.Group);
   expect(decode(record)._tag).toBe("Some");
   expect(decode({ ...record, visibility: "Public" })._tag).toBe("Some");
   for (const invalid of [
@@ -52,7 +52,7 @@ it("direct groups hold two or more ordered members, including their creator, and
     createdBy: "bob",
     createdAt: "2026-09-21T12:00:00.000Z",
   };
-  const decode = Schema.decodeUnknownOption(Group.Record);
+  const decode = Schema.decodeUnknownOption(Group.Group);
   expect(decode(record)._tag).toBe("Some");
   for (const invalid of [
     { ...record, memberIds: ["alice"] },
@@ -90,9 +90,9 @@ it("adding a member requires both nonempty membership and group IDs", () => {
 it("exact group grants stay separate from other groups, workspaces, and same-ID threads", () => {
   const workspaceId = WorkspaceId.Id.make("workspace");
   const group = Target.Reference.cases.Group.make({ workspaceId, groupId: Group.Id.make("same") });
-  const exact = Scope.Value.cases.Target.make({ target: group });
+  const exact = Scope.Scope.cases.Target.make({ target: group });
   expect(Scope.covers(exact, group)).toBe(true);
-  expect(Scope.covers(Scope.Value.cases.Workspace.make({ workspaceId }), group)).toBe(true);
+  expect(Scope.covers(Scope.Scope.cases.Workspace.make({ workspaceId }), group)).toBe(true);
   for (const other of [
     { ...group, groupId: Group.Id.make("other") },
     { ...group, workspaceId: WorkspaceId.Id.make("other") },
@@ -106,7 +106,7 @@ it("lists a group with what is new to its reader and what their grants let them 
     const minutes = String(minute).padStart(2, "0");
     return DateTime.makeUnsafe(`2026-10-09T12:${minutes}:00.000Z`);
   };
-  const team: Group.Record = {
+  const team: Group.Group = {
     id: Group.Id.make("team"),
     workspaceId: WorkspaceId.Id.make("workspace"),
     kind: "Team",
@@ -115,7 +115,7 @@ it("lists a group with what is new to its reader and what their grants let them 
     createdBy: Member.Id.make("alice"),
     createdAt: at(0),
   };
-  const direct: Group.Record = {
+  const direct: Group.Group = {
     id: Group.Id.make("direct"),
     workspaceId: team.workspaceId,
     kind: "Direct",

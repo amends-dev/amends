@@ -7,13 +7,13 @@
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
-import type { Thread } from "./Thread.ts";
-import type { ThreadActivity } from "./ThreadActivity.ts";
-import { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { ThreadActivityResolvers } from "./ThreadActivityResolvers.ts";
-import { ThreadMessageActivity } from "./ThreadMessageActivity.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
-import { ThreadMessageStore } from "./ThreadMessageStore.ts";
+import type * as Thread from "./Thread.ts";
+import type * as ThreadActivity from "./ThreadActivity.ts";
+import * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
+import * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 
 /**
  * A published message in its thread's timeline, with its content as it is now.
@@ -23,7 +23,7 @@ import { ThreadMessageStore } from "./ThreadMessageStore.ts";
  */
 export const PublishedItem = Schema.Struct({
   activity: ThreadMessageActivity.Published.Activity,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
 });
 
 /**
@@ -40,7 +40,7 @@ export interface PublishedItem extends Schema.Schema.Type<typeof PublishedItem> 
  */
 export const EditedItem = Schema.Struct({
   activity: ThreadMessageActivity.Edited.Activity,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
 });
 
 /**
@@ -57,7 +57,7 @@ export interface EditedItem extends Schema.Schema.Type<typeof EditedItem> {}
  */
 export const DeletedItem = Schema.Struct({
   activity: ThreadMessageActivity.Deleted.Activity,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
 });
 
 /**
@@ -81,7 +81,7 @@ declare module "./ThreadActivityKind.ts" {
 }
 
 const decode = (
-  activity: ThreadActivity.Record,
+  activity: ThreadActivity.ThreadActivity,
 ): Effect.Effect<
   ThreadMessageActivity.Published | ThreadMessageActivity.Edited | ThreadMessageActivity.Deleted,
   ThreadActivityKind.Mismatch | Schema.SchemaError
@@ -99,10 +99,10 @@ const decode = (
  * @since 0.1.0
  */
 export const resolver = Effect.gen(function* () {
-  const threadMessageStore = yield* ThreadMessageStore.Service;
+  const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
   const resolve = Effect.fn("ThreadMessageTimeline.resolve")(function* (
-    _thread: Thread.Record,
-    listed: ReadonlyArray<ThreadActivity.Record>,
+    _thread: Thread.Thread,
+    listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
     const activities = yield* Effect.orDie(Effect.forEach(listed, (activity) => decode(activity)));
     const rows = yield* threadMessageStore
@@ -134,5 +134,3 @@ export const resolver = Effect.gen(function* () {
     resolve,
   } satisfies ThreadActivityResolvers.Resolver;
 });
-
-export * as ThreadMessageTimeline from "./ThreadMessageTimeline.ts";

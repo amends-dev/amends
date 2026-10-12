@@ -21,10 +21,9 @@ remaining gaps with links to their owning code.
 | [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                                        |
 | [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                                 |
 | [Gateway](../packages/gateway/README.md)                             | Workspace boot, identity resolution, host contracts, and bus lifetime.                                                          |
-| [HTTP contract](../packages/api-http/README.md)                      | Endpoint groups, wire formats, authentication, and SSE semantics.                                                               |
-| [HTTP server](../packages/server-http/README.md)                     | Handler registration, request scopes, and authentication wiring.                                                                |
+| [HTTP](../packages/http/README.md)                                   | Endpoint groups, wire formats, authentication, SSE semantics, and handler registration.                                         |
 | [Adapters](../adapters/README.md)                                    | Store validation, construction, and migration conventions.                                                                      |
-| [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                                    |
+| [Storage conformance](../packages/gateway/README.md#conformance)     | Test suites every storage adapter runs, and the fixture an adapter supplies.                                                    |
 | [Harness](../packages/harness/README.md)                             | The harness contract: an agent's sessions and turns in one stream format, and the bridge into sandboxes.                        |
 | [Sandbox](../packages/sandbox/README.md)                             | The sandbox contract: Effect's file system and processes inside, ports, network, lifecycle, and the suites every provider runs. |
 | [Channel](../packages/channel/README.md)                             | The channel transport contract: receiving what an external system sends and replying in its conversations.                      |
@@ -35,7 +34,7 @@ remaining gaps with links to their owning code.
 | [Local sandboxes](../adapters/sandbox-local/README.md)               | Sandboxes as directories on this machine for the sandbox contract, for development and tests.                                   |
 | [Daytona sandboxes](../adapters/sandbox-daytona/README.md)           | Sandboxes on Daytona for the sandbox contract, and running their tests with an API key.                                         |
 | [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: the turn job that runs agents' turns, job retries, and pruning.                        |
-| [Memory storage](../adapters/storage-memory/README.md)               | The in-memory reference implementation of the storage contracts.                                                                |
+| [Memory storage](../packages/core/README.md#memory)                  | The in-memory reference implementation of the storage contracts, in core and the gateway.                                       |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                                    |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                                          |
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)             | Platform-owned routing and composition of client and UI.                                                                        |

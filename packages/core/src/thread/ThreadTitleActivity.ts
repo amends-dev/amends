@@ -5,8 +5,8 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Thread } from "./Thread.ts";
-import { ThreadActivityKind } from "./ThreadActivityKind.ts";
+import * as Thread from "./Thread.ts";
+import * as ThreadActivityKind from "./ThreadActivityKind.ts";
 
 /**
  * The thread was given a title, or its title changed. It is about its thread, and a thread is
@@ -31,5 +31,3 @@ export const Renamed = ThreadActivityKind.make("thread.renamed", {
  * @since 0.1.0
  */
 export type Renamed = ThreadActivityKind.Activity<typeof Renamed>;
-
-export * as ThreadTitleActivity from "./ThreadTitleActivity.ts";

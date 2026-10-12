@@ -6,13 +6,13 @@
  *
  * @since 0.1.0
  */
-import { Audience } from "../journal/audience.ts";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { Channel } from "./Channel.ts";
-import { ChannelBinding } from "./ChannelBinding.ts";
-import { Contact } from "./Contact.ts";
+import * as Audience from "../journal/Audience.ts";
+import * as Fact from "../journal/Fact.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as Group from "../group/Group.ts";
+import * as Channel from "./Channel.ts";
+import * as ChannelBinding from "./ChannelBinding.ts";
+import * as Contact from "./Contact.ts";
 
 const workspace = () => [Audience.workspace];
 
@@ -27,7 +27,7 @@ export const Created = Fact.make("channel.created", {
   subject: (payload) => Subject.make("channel", payload.id),
   occurrence: (payload) => [payload.id],
   audience: workspace,
-  payload: Channel.Record,
+  payload: Channel.Channel,
 });
 
 /**
@@ -68,7 +68,7 @@ export const Bound = Fact.make("channel.bound", {
   subject: (payload) => Subject.make("channel-binding", payload.threadId),
   occurrence: (payload) => [payload.threadId],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: ChannelBinding.Record,
+  payload: ChannelBinding.ChannelBinding,
 });
 
 /**
@@ -82,7 +82,7 @@ export const ContactCreated = Fact.make("channel.contact.created", {
   subject: (payload) => Subject.make("contact", payload.id),
   occurrence: (payload) => [payload.id],
   audience: workspace,
-  payload: Contact.Record,
+  payload: Contact.Contact,
 });
 
 /**
@@ -97,5 +97,3 @@ export const ContactRenamed = Fact.make("channel.contact.renamed", {
   audience: workspace,
   payload: Contact.Renamed,
 });
-
-export * as ChannelFacts from "./ChannelFacts.ts";

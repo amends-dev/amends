@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { ConfigProvider, Duration, Effect, Redacted } from "effect";
-import { LocalConfig } from "../src/config.ts";
+import * as LocalConfig from "../src/LocalConfig.ts";
 
 const load = (values: Record<string, unknown>) =>
   LocalConfig.load().pipe(

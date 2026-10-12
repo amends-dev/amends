@@ -66,7 +66,7 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
       if (
         path === "apps/client/package.json" &&
         ((name.startsWith("@amends-dev/") &&
-          !["@amends-dev/api-http", "@amends-dev/gateway"].includes(name) &&
+          !["@amends-dev/core", "@amends-dev/gateway", "@amends-dev/http"].includes(name) &&
           !screenTypes) ||
           name.startsWith("@tauri-apps/") ||
           name === "@solidjs/router" ||
@@ -153,18 +153,20 @@ for await (const path of new Bun.Glob(
     const uiImport = dependency === "@amends-dev/ui" || dependency.startsWith("@amends-dev/ui/");
     const clientImport =
       dependency === "@amends-dev/client" || dependency.startsWith("@amends-dev/client/");
-    // Shared API plumbing and each feature's api.ts reach the HTTP contract.
+    // Shared API plumbing and each feature's api.ts reach the HTTP contract, never its handlers,
+    // and the schemas it carries: core's features and the gateway's.
     // Client may name the screens' types, never import UI code.
     const screenTypeImport = uiImport && !runtime.has(dependency);
     const contractImport =
       (path.startsWith("apps/client/src/api/") ||
         /^apps\/client\/src\/[^/]+\/api\.ts$/.test(path)) &&
-      [
-        "@amends-dev/api-http",
-        "@amends-dev/gateway/accounts",
-        "@amends-dev/gateway/sign-in",
-        "@amends-dev/gateway/directory",
-      ].includes(dependency);
+      (/^@amends-dev\/http\/(Api|ApiErrors|Authentication|\w+Group)$/.test(dependency) ||
+        /^@amends-dev\/core\/[a-z-]+$/.test(dependency) ||
+        [
+          "@amends-dev/gateway/Accounts",
+          "@amends-dev/gateway/SignIn",
+          "@amends-dev/gateway/WorkspaceDirectory",
+        ].includes(dependency));
     if (
       path.startsWith("apps/ui/") &&
       ((dependency.startsWith("@amends-dev/") && !uiImport && !iconImport) ||

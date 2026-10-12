@@ -1,10 +1,62 @@
-export { Accounts } from "./accounts.ts";
-export { EmailSender } from "./email-sender.ts";
-export { EmailSignIn } from "./email-sign-in.ts";
-export { SessionTokens } from "./session-tokens.ts";
-export { WorkspaceDirectory } from "./directory.ts";
-export { GatewayErrors } from "./errors.ts";
-export { Gateway } from "./gateway.ts";
-export { SignIn } from "./sign-in.ts";
-export { SignInStorage } from "./sign-in-storage.ts";
-export { WorkspaceStorage } from "./storage.ts";
+/**
+ * How a host enters core: `Gateway` creates workspaces and runs programs in them, as a member or
+ * without an actor, and `GatewayErrors` names what those programs may fail with. The other modules
+ * are the contracts a host implements beside it, for storage, accounts, sign-in, session tokens,
+ * email, and the workspace directory; `EmailSignIn` implements sign-in and session tokens over
+ * three of them. Each storage contract's `layerMemory` implements it in process memory, and
+ * `@amends-dev/gateway/conformance` holds the suites every storage adapter runs against itself.
+ *
+ * @since 0.1.0
+ */
+
+// @barrel: Auto-generated exports. Do not edit manually.
+
+/**
+ * @since 0.1.0
+ */
+export * as Accounts from "./Accounts.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as EmailSender from "./EmailSender.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as EmailSignIn from "./EmailSignIn.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as Gateway from "./Gateway.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as GatewayErrors from "./GatewayErrors.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as SessionTokens from "./SessionTokens.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as SignIn from "./SignIn.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as SignInStorage from "./SignInStorage.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as WorkspaceDirectory from "./WorkspaceDirectory.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as WorkspaceStorage from "./WorkspaceStorage.ts";

@@ -7,16 +7,16 @@ import {
 import { Harness } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Option, Redacted, Result } from "effect";
-import { Agent } from "../../src/agent/agent.ts";
-import { AgentQuery } from "../../src/agent/query.ts";
-import { AgentStore } from "../../src/agent/store.ts";
-import { Connection } from "../../src/connection/connection.ts";
-import { ConnectionCredentialStore } from "../../src/connection/credential-store.ts";
-import { ConnectionStore } from "../../src/connection/store.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberStore } from "../../src/workspace/member/store.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Agent from "../../src/agent/Agent.ts";
+import * as AgentQuery from "../../src/agent/AgentQuery.ts";
+import * as AgentStore from "../../src/agent/AgentStore.ts";
+import * as Connection from "../../src/connection/Connection.ts";
+import * as ConnectionCredentialStore from "../../src/connection/ConnectionCredentialStore.ts";
+import * as ConnectionStore from "../../src/connection/ConnectionStore.ts";
+import * as Identity from "../../src/identity/Identity.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberStore from "../../src/workspace/MemberStore.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 
@@ -90,7 +90,7 @@ const connection = (
   integration: string,
   createdAt: string,
   auth: ConnectionContract.AuthMethod = "none",
-): Connection.Record => ({
+): Connection.Connection => ({
   id: Connection.Id.make(id),
   workspaceId,
   integration,
@@ -111,7 +111,7 @@ const boxes = connection("conn-boxes", "boxes", "2026-10-06T12:00:00.000Z");
 const agentMemberId = Member.Id.make("member-agent");
 const agentId = Agent.Id.make("agent-one");
 
-const agent = (fields: Partial<Agent.Record> = {}): Agent.Record => ({
+const agent = (fields: Partial<Agent.Agent> = {}): Agent.Agent => ({
   id: agentId,
   workspaceId,
   memberId: agentMemberId,
@@ -125,16 +125,16 @@ const agent = (fields: Partial<Agent.Record> = {}): Agent.Record => ({
 });
 
 interface World {
-  readonly agent?: Agent.Record;
-  readonly members?: ReadonlyArray<Member.Record>;
-  readonly connections?: ReadonlyArray<Connection.Record>;
+  readonly agent?: Agent.Agent;
+  readonly members?: ReadonlyArray<Member.Member>;
+  readonly connections?: ReadonlyArray<Connection.Connection>;
   readonly keys?: ReadonlyMap<Connection.Id, string>;
   /** Why this host keeps no credentials, when it keeps none. */
   readonly credentialsUnavailable?: string;
 }
 
 /** The agent's membership, active unless `status` says otherwise. */
-const agentMember = (status: Member.Status = "active"): Member.Record => ({
+const agentMember = (status: Member.Status = "active"): Member.Member => ({
   id: agentMemberId,
   workspaceId,
   identity: { _tag: "Agent", id: agentId },
@@ -150,7 +150,7 @@ const queryIn = (world: World = {}) => {
   const keys = world.keys ?? new Map([[models.id, "sk-models"]]);
   const unused = (what: string) => () => Effect.die(`No test ${what}`);
   const stores = Layer.mergeAll(
-    Layer.succeed(MemberStore.Service, {
+    Layer.succeed(MemberStore.MemberStore, {
       get: (memberId) => Effect.succeed(Option.fromUndefinedOr(members.get(memberId))),
       getMany: unused("reads several members"),
       findActive: unused("finds a membership"),
@@ -159,20 +159,20 @@ const queryIn = (world: World = {}) => {
       rename: unused("renames a member"),
       markRemoved: unused("removes a member"),
     }),
-    Layer.succeed(AgentStore.Service, {
+    Layer.succeed(AgentStore.AgentStore, {
       get: (id) => Effect.succeed(id === record.id ? Option.some(record) : Option.none()),
       list: Effect.succeed([record]),
       insert: unused("adds an agent"),
       update: unused("changes an agent"),
     }),
-    Layer.succeed(ConnectionStore.Service, {
+    Layer.succeed(ConnectionStore.ConnectionStore, {
       get: (id) =>
         Effect.succeed(Option.fromUndefinedOr(connections.find((found) => found.id === id))),
       listActive: Effect.succeed(connections),
       insert: unused("adds a connection"),
       update: unused("changes a connection"),
     }),
-    Layer.succeed(ConnectionCredentialStore.Service, {
+    Layer.succeed(ConnectionCredentialStore.ConnectionCredentialStore, {
       set: unused("stores a key"),
       get: (connectionId) => {
         if (world.credentialsUnavailable !== undefined) {
@@ -252,7 +252,7 @@ describe("what an agent runs a turn on", () => {
 
   it.effect("is not found for a person, or an agent whose membership ended", () =>
     Effect.gen(function* () {
-      const person: Member.Record = {
+      const person: Member.Member = {
         id: Member.Id.make("member-person"),
         workspaceId,
         identity: { _tag: "Human", id: Identity.HumanId.make("alice") },

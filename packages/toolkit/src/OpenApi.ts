@@ -7,27 +7,52 @@
  * Each operation becomes a tool whose input has a property for each parameter, named as the
  * parameter is, and a property `body` for the JSON body. An operation that cannot be made a tool, as
  * one with a body that is not JSON, is left out with the reason, so a host can show what it lost.
+ *
+ * @since 0.1.0
  */
 import { Effect, Result, Schema, Struct } from "effect";
 import type { Method, Operation, Parameter } from "./Http.ts";
 import type { Annotations } from "./ToolDefinition.ts";
 
-/** An operation that was left out of the tools, and why. */
+/**
+ * An operation that was left out of the tools, and why.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Skipped {
   /** The operation as the document has it, such as `POST /pets`. */
   readonly operation: string;
+
+  /** Why the operation cannot be a tool, such as a body that is not JSON, for a person to read. */
   readonly reason: string;
 }
 
+/**
+ * What `readOperations` reads of a document: the operations that are tools, the addresses of the
+ * servers it names, and the operations it left out.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Imported {
+  /** The operations that are tools, whose names are distinct. */
   readonly operations: ReadonlyArray<Operation>;
 
   /** The addresses the document gives for the API, which the host may offer as its base URL. */
   readonly servers: ReadonlyArray<string>;
+
+  /** The operations that are not tools, each with why. */
   readonly skipped: ReadonlyArray<Skipped>;
 }
 
-/** The document is not an OpenAPI 3 document, so there is nothing to read. */
+/**
+ * The document is not an OpenAPI 3 document, so there is nothing to read. An operation that
+ * cannot be a tool does not fail the read: it is in `skipped`.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidSpecError extends Schema.TaggedError<InvalidSpecError>(
   "@amends-dev/toolkit/OpenApi/InvalidSpecError",
 )("InvalidSpecError", { description: Schema.String }) {
@@ -54,7 +79,13 @@ const stringAt = (object: Schema.JsonObject, key: string) => {
 
 const methods: ReadonlyArray<Method> = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH"];
 
-/** Reads the operations of the API that `document` specifies. */
+/**
+ * Reads the operations of the API that `document` specifies, which is JSON already read. Nothing
+ * it refers to outside itself is fetched.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const readOperations = (document: Json): Effect.Effect<Imported, InvalidSpecError> =>
   Effect.fromResult(readDocument(document));
 

@@ -7,11 +7,11 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { Notification } from "../notification/notification.ts";
-import { Delivery } from "./Delivery.ts";
+import * as Fact from "../journal/Fact.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as Group from "../group/Group.ts";
+import * as Notification from "../notification/Notification.ts";
+import * as Delivery from "./Delivery.ts";
 
 const audience = (payload: { readonly groupId: Group.Id }) => [Group.audienceOf(payload.groupId)];
 
@@ -28,7 +28,7 @@ export const Created = Fact.make("channel.delivery.created", {
   occurrence: (payload) => [payload.id],
   audience,
   payload: Schema.Struct({
-    ...Delivery.Record.fields,
+    ...Delivery.Delivery.fields,
     notificationIds: Schema.NonEmptyArray(Notification.Id),
   }),
 });
@@ -60,5 +60,3 @@ export const Failed = Fact.make("channel.delivery.failed", {
   audience,
   payload: Delivery.Failed,
 });
-
-export * as DeliveryFacts from "./DeliveryFacts.ts";

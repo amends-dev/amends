@@ -9,7 +9,7 @@ import {
   Sharding,
   ShardingConfig,
 } from "effect/cluster";
-import { JobPruning } from "../../src/jobs/pruning.ts";
+import * as JobPruning from "../../src/JobPruning.ts";
 
 /** Cluster in memory, reading for due messages every second of the test clock. */
 const cluster = Sharding.layer.pipe(

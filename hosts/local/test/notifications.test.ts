@@ -1,18 +1,18 @@
-import { Api, Authentication } from "@amends-dev/api-http";
+import { Api, Authentication } from "@amends-dev/http";
 import { Identity } from "@amends-dev/core/identity";
 import { Entry, Store } from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import { Member, MemberStore, Workspace } from "@amends-dev/core/workspace";
 import { SessionTokens } from "@amends-dev/gateway";
-import { PostgresDatabase, PostgresStorage } from "@amends-dev/storage-postgresql";
+import { PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import { DevelopmentSignIn } from "../src/authentication/sign-in.ts";
-import { LocalHost } from "../src/host.ts";
-import { LocalServer } from "../src/server.ts";
+import * as DevelopmentSignIn from "../src/DevelopmentSignIn.ts";
+import * as LocalHost from "../src/LocalHost.ts";
+import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -20,10 +20,10 @@ const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("alice") });
 const outsider = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("outsider") });
 const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
+  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
-const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
+const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 
 /** Real HTTP, gateway and storage; explicit session tokens also exercise an agent principal. */
 const server = (url: string) => {
@@ -34,8 +34,8 @@ const server = (url: string) => {
     ["outsider", outsider],
   ]);
   const sessionTokens = Layer.succeed(
-    SessionTokens.Service,
-    SessionTokens.Service.of({
+    SessionTokens.SessionTokens,
+    SessionTokens.SessionTokens.of({
       resolve: (token) => {
         const identity = identities.get(Redacted.value(token));
         return identity === undefined
@@ -65,7 +65,7 @@ const record = (
   workspaceId: Workspace.Id,
   id: string,
   recipient: Notification.Recipient,
-): Notification.Record => ({
+): Notification.Notification => ({
   id: Notification.Id.make(id),
   workspaceId,
   source: { logId: Entry.LogId.make("fixture"), entryId: Entry.Id.make(id) },
@@ -115,11 +115,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
           );
           // Agent admission is not implemented yet; seed the read models to reach an agent recipient.
           yield* Effect.gen(function* () {
-            const storage = yield* PostgresStorage.make();
+            const storage = yield* PostgresWorkspaceStorage.make();
             const context = yield* storage.forWorkspace(workspace.id);
-            const notifications = Context.get(context, NotificationStore.Service);
-            const members = Context.get(context, MemberStore.Service);
-            yield* Context.get(context, Store.Service).transaction(
+            const notifications = Context.get(context, NotificationStore.NotificationStore);
+            const members = Context.get(context, MemberStore.MemberStore);
+            yield* Context.get(context, Store.Store).transaction(
               Effect.gen(function* () {
                 yield* members.insert({
                   id: bobMemberId,
@@ -139,8 +139,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
               }),
             );
             const other = yield* storage.forWorkspace(otherWorkspace.id);
-            yield* Context.get(other, Store.Service).transaction(
-              Context.get(other, NotificationStore.Service).insert(foreign),
+            yield* Context.get(other, Store.Store).transaction(
+              Context.get(other, NotificationStore.NotificationStore).insert(foreign),
             );
           }).pipe(Effect.provide(PostgresDatabase.layer({ url: Redacted.make(url) })));
           // Newest first, and without sources the reader cannot reach, as with these fixtures.

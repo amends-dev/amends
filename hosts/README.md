@@ -13,10 +13,9 @@ the repository root with
 ## What a host depends on
 
 A host depends on the [gateway](../packages/gateway/README.md), whose contracts it implements, and
-on the handler packages it serves, such as `@amends-dev/server-http`, which owns its protocol's
-server side, authentication included. It does not depend on a protocol's contract package, such as
-`@amends-dev/api-http`, which is for clients; a host's tests may take one as a development
-dependency to act as a client.
+on the protocol packages it serves, such as `@amends-dev/http`, whose handlers own the protocol's
+server side, authentication included. A host's tests act as a client through the same package's
+contract.
 
 Each host extends `../../tsconfig.base.json`, enables its own runtime's types, and has a
 `typecheck` script.

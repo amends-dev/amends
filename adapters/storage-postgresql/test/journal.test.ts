@@ -1,12 +1,8 @@
 import { Entry, Store } from "@amends-dev/core/journal";
-import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
-import { harness } from "./harness.ts";
 import { database, inDatabase, setup, views, workspaceId } from "./support.ts";
-
-Suites.journal(harness);
 
 const execution = Entry.LogId.make("execution");
 const { available, withDatabase } = setup();

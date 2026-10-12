@@ -9,10 +9,10 @@
  */
 import { ChannelTransport } from "@amends-dev/channel";
 import { Schema } from "effect";
-import { Identity } from "../identity/identity.ts";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { ChannelId } from "./ChannelId.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Text from "../text/Text.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as ChannelId from "./ChannelId.ts";
 
 /**
  * Names a contact; `Identity.ContactId`, derived from the channel and the external user, so that
@@ -71,7 +71,7 @@ export const nameOf = (sender: string): Name => {
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Contact = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   channelId: ChannelId.Id,
@@ -85,7 +85,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Contact extends Schema.Schema.Type<typeof Contact> {}
 
 /**
  * The record with some fields changed.
@@ -93,7 +93,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Record, changes: Partial<Record>): Record =>
+export const change = (record: Contact, changes: Partial<Contact>): Contact =>
   Object.assign({}, record, changes);
 
 /**
@@ -109,5 +109,3 @@ export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, contactId: I
  * @since 0.1.0
  */
 export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
-
-export * as Contact from "./Contact.ts";

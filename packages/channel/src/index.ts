@@ -8,10 +8,9 @@
  * @since 0.1.0
  */
 
+// @barrel: Auto-generated exports. Do not edit manually.
+
 /**
- * The transport contract: external ids, conversations, senders, the events a system sends, what
- * posting takes and gives, and the error a transport fails with.
- *
  * @since 0.1.0
  */
 export * as ChannelTransport from "./ChannelTransport.ts";

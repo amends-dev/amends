@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Context, Effect, Layer, Logger, Schema, Stream } from "effect";
 import { McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
-import * as Mcp from "../../src/mcp/index.ts";
+import * as Mcp from "../../src/Mcp.ts";
 import * as ToolSource from "../../src/ToolSource.ts";
 
 const Echo = Tool.make("echo", {
