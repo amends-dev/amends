@@ -7,9 +7,8 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { NotificationService } from "@amends-dev/core/notification";
-import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
@@ -24,48 +23,36 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "notifications",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
+    const asMember = yield* makeAsMember;
     return handlers.handleAll({
       inbox: ({ params, query }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
-              notificationService.inbox(query),
-            ),
+        asMember(
+          params.workspaceId,
+          NotificationService.NotificationService.use((notificationService) =>
+            notificationService.inbox(query),
           ),
         ),
       count: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
-              Effect.map(notificationService.countPending, (pending) => ({ pending })),
-            ),
+        asMember(
+          params.workspaceId,
+          NotificationService.NotificationService.use((notificationService) =>
+            Effect.map(notificationService.countPending, (pending) => ({ pending })),
           ),
         ),
       markSeenThrough: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
-              Effect.map(notificationService.markSeenThrough(payload.through), (marked) => ({
-                marked,
-              })),
-            ),
+        asMember(
+          params.workspaceId,
+          NotificationService.NotificationService.use((notificationService) =>
+            Effect.map(notificationService.markSeenThrough(payload.through), (marked) => ({
+              marked,
+            })),
           ),
         ),
       markSeen: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
-              notificationService.markSeen(params.notificationId),
-            ),
+        asMember(
+          params.workspaceId,
+          NotificationService.NotificationService.use((notificationService) =>
+            notificationService.markSeen(params.notificationId),
           ),
         ),
     });

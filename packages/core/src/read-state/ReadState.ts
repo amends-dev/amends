@@ -2,8 +2,7 @@
  * Read state is how far a person has read: each thread by timeline sequence, and each group by when
  * they last read it. It is private to the member and kept outside the journal, in `ReadStateStore`;
  * what lies past a position is unread, so nothing is recorded per message. `ReadStateService` is
- * the operations that advance it, and `ReadStateCommand` the write thread and message operations
- * share. Agents keep no read state.
+ * the operations that advance it. Agents keep no read state.
  *
  * @since 0.1.0
  */
@@ -12,15 +11,6 @@ import * as GroupId from "../group/GroupId.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as MemberId from "../workspace/MemberId.ts";
-import type * as Notification from "../notification/Notification.ts";
-
-/**
- * A person whose reading this is, as their notifications address them. Agents keep no read state.
- *
- * @category models
- * @since 0.1.0
- */
-export type Reader = Extract<Notification.Recipient, { readonly _tag: "Human" }>;
 
 /**
  * How far a human member has read a thread, by timeline sequence. Private to that member.

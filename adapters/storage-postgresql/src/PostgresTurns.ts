@@ -6,8 +6,9 @@
  *
  * @since 0.1.0
  */
-import { Effect, Semaphore } from "effect";
+import { Effect } from "effect";
 import type { Duration } from "effect";
+import * as Lanes from "./internal/lanes.ts";
 
 /**
  * The writer queue of one pool, keyed by workspace, or by workspace and log.
@@ -29,11 +30,6 @@ export interface PostgresTurns {
   ) => Effect.Effect<A, E | E2, R>;
 }
 
-interface Lane {
-  readonly semaphore: Semaphore.Semaphore;
-  users: number;
-}
-
 /**
  * A writer queue with no writers waiting; `PostgresDatabase.make` makes one for each pool.
  *
@@ -41,54 +37,37 @@ interface Lane {
  * @since 0.1.0
  */
 export const make = (): PostgresTurns => {
-  // A lane lives while it has writers, so keys never accumulate.
-  const lanes = new Map<string, Lane>();
-  const join = (key: string) =>
-    Effect.sync(() => {
-      const lane = lanes.get(key) ?? { semaphore: Semaphore.makeUnsafe(1), users: 0 };
-      lane.users += 1;
-      lanes.set(key, lane);
-      return lane;
-    });
-  const leave = (key: string, lane: Lane) =>
-    Effect.sync(() => {
-      lane.users -= 1;
-      if (lane.users === 0 && lanes.get(key) === lane) lanes.delete(key);
-    });
-
+  const lanes = Lanes.make();
   const run = <A, E, R, E2>(
     key: string,
     patience: Duration.Duration,
     onTimeout: () => E2,
     effect: Effect.Effect<A, E, R>,
   ): Effect.Effect<A, E | E2, R> =>
-    Effect.acquireUseRelease(
-      join(key),
-      (lane) =>
-        Effect.suspend(() => {
-          // Whichever of the turn and the deadline comes first decides, and both check and set
-          // this synchronously, so a turn that starts is never timed out, and one granted after
-          // the deadline gives its permit straight back.
-          let state: "waiting" | "started" | "expired" = "waiting";
-          const turn = lane.semaphore.withPermits(1)(
-            Effect.suspend((): Effect.Effect<A, E | E2, R> => {
-              if (state === "expired") return Effect.fail(onTimeout());
-              state = "started";
-              return effect;
+    lanes(key, 1, (semaphore) =>
+      Effect.suspend(() => {
+        // Whichever of the turn and the deadline comes first decides, and both check and set
+        // this synchronously, so a turn that starts is never timed out, and one granted after
+        // the deadline gives its permit straight back.
+        let state: "waiting" | "started" | "expired" = "waiting";
+        const turn = semaphore.withPermits(1)(
+          Effect.suspend((): Effect.Effect<A, E | E2, R> => {
+            if (state === "expired") return Effect.fail(onTimeout());
+            state = "started";
+            return effect;
+          }),
+        );
+        const deadline = Effect.sleep(patience).pipe(
+          Effect.andThen(
+            Effect.suspend((): Effect.Effect<never, E2> => {
+              if (state !== "waiting") return Effect.never;
+              state = "expired";
+              return Effect.fail(onTimeout());
             }),
-          );
-          const deadline = Effect.sleep(patience).pipe(
-            Effect.andThen(
-              Effect.suspend((): Effect.Effect<never, E2> => {
-                if (state !== "waiting") return Effect.never;
-                state = "expired";
-                return Effect.fail(onTimeout());
-              }),
-            ),
-          );
-          return Effect.raceFirst(turn, deadline);
-        }),
-      (lane) => leave(key, lane),
+          ),
+        );
+        return Effect.raceFirst(turn, deadline);
+      }),
     );
 
   return { run };

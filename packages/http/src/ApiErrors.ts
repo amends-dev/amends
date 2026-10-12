@@ -9,12 +9,7 @@
  *
  * @since 0.1.0
  */
-import {
-  AssignmentService,
-  Authorization,
-  Delegation,
-  PermissionCatalog,
-} from "@amends-dev/core/authorization";
+import { AssignmentService, Authorization, Delegation } from "@amends-dev/core/authorization";
 import {
   InvitationService,
   MemberService,
@@ -46,7 +41,7 @@ import { HttpApiSchema } from "effect/http-api";
  * @since 0.1.0
  */
 export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
-  "Api.HumanRequired",
+  "ApiErrors.HumanRequired",
   {},
   { httpApiStatus: 403 },
 ) {}
@@ -59,7 +54,7 @@ export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
  * @since 0.1.0
  */
 export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
-  "Api.TooManyStreams",
+  "ApiErrors.TooManyStreams",
   { limit: Schema.Literals(["workspace", "member"]) },
   { httpApiStatus: 429 },
 ) {}
@@ -135,13 +130,6 @@ export const Denied = Authorization.Denied.pipe(HttpApiSchema.status(403));
  * @since 0.1.0
  */
 export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status(403));
-/**
- * A permission name that no feature declared on this host; 400.
- *
- * @category errors
- * @since 0.1.0
- */
-export const UnknownPermission = PermissionCatalog.Unknown.pipe(HttpApiSchema.status(400));
 /**
  * No membership has this ID in the workspace; 404. Only a caller authorized on that member learns
  * it.
@@ -263,17 +251,27 @@ export const invitation = [
   InvitationInvalidExpiry,
 ] as const;
 /**
- * Assignment outcomes, with the delegation rules: a missing assignment or member is 404, and a
- * member no longer active, or access that changed since the caller read it, is 409.
+ * Reading a member's access, with the delegation rules it shows: a missing member is 404, and one
+ * no longer active 409.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const assignmentRead = [
+  ...delegation,
+  AssignmentService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  AssignmentService.InactiveMember.pipe(HttpApiSchema.status(409)),
+] as const;
+/**
+ * Assignment outcomes: those of reading a member's access, and a missing assignment, 404, or
+ * access that changed since the caller read it, 409.
  *
  * @category errors
  * @since 0.1.0
  */
 export const assignment = [
-  ...delegation,
+  ...assignmentRead,
   AssignmentService.NotFound.pipe(HttpApiSchema.status(404)),
-  AssignmentService.MemberNotFound.pipe(HttpApiSchema.status(404)),
-  AssignmentService.InactiveMember.pipe(HttpApiSchema.status(409)),
   AssignmentService.Changed.pipe(HttpApiSchema.status(409)),
 ] as const;
 
@@ -590,14 +588,7 @@ export const TurnNotRetryable = TurnService.NotRetryable.pipe(HttpApiSchema.stat
  * @category errors
  * @since 0.1.0
  */
-export const workspace = [
-  Denied,
-  InvalidActor,
-  UnknownPermission,
-  InvalidInput,
-  Conflict,
-  Uncertain,
-] as const;
+export const workspace = [Denied, InvalidActor, InvalidInput, Conflict, Uncertain] as const;
 
 /**
  * Outcomes every member operation shares: the workspace set plus membership.
@@ -653,7 +644,7 @@ export const channelBinding = [ChannelService.NotBound.pipe(HttpApiSchema.status
  * @since 0.1.0
  */
 export const channelEvents = [
-  ...channelRead,
+  ChannelIntake.NotFound.pipe(HttpApiSchema.status(404)),
   ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
   ChannelIntake.Unavailable.pipe(HttpApiSchema.status(503)),
 ] as const;

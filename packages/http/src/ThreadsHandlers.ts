@@ -8,19 +8,18 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { ReadStateService } from "@amends-dev/core/read-state";
 import {
   ThreadService,
   ThreadMessageService,
   ThreadParticipationService,
 } from "@amends-dev/core/thread";
-import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register thread handlers, capturing the gateway and reading the principal per request.
+ * Register thread handlers, each entering the workspace as the request's principal.
  *
  * @category layers
  * @since 0.1.0
@@ -29,175 +28,125 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "threads",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
+    const asMember = yield* makeAsMember;
     return handlers.handleAll({
       list: ({ params, query }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.listInGroup(params.groupId, query),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) =>
+            threadService.listInGroup(params.groupId, query),
           ),
         ),
       openings: ({ params, query }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.listOpenings(params.groupId, query),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) =>
+            threadService.listOpenings(params.groupId, query),
           ),
         ),
       start: ({ params, headers, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.startInGroup(
-                { groupId: params.groupId, ...payload },
-                { requestKey: headers["idempotency-key"] },
-              ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) =>
+            threadService.startInGroup(
+              { groupId: params.groupId, ...payload },
+              { requestKey: headers["idempotency-key"] },
             ),
           ),
         ),
       startDirect: ({ params, headers, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.startDirect(payload, { requestKey: headers["idempotency-key"] }),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) =>
+            threadService.startDirect(payload, { requestKey: headers["idempotency-key"] }),
           ),
         ),
       get: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.get(params.threadId),
-            ),
-          ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) => threadService.get(params.threadId)),
         ),
       rename: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.rename({
-                threadId: params.threadId,
-                title: payload.title,
-                expectedTitle: payload.expectedTitle,
-              }),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) =>
+            threadService.rename({
+              threadId: params.threadId,
+              title: payload.title,
+              expectedTitle: payload.expectedTitle,
+            }),
           ),
         ),
       timeline: ({ params, query }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.readTimeline(params.threadId, query),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) =>
+            threadService.readTimeline(params.threadId, query),
           ),
         ),
       participants: ({ params, query }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-              threadService.listParticipants(params.threadId, query),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadService.ThreadService.use((threadService) =>
+            threadService.listParticipants(params.threadId, query),
           ),
         ),
       publish: ({ params, headers, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-              threadMessageService.publish(
-                { threadId: params.threadId, ...payload },
-                { requestKey: headers["idempotency-key"] },
-              ),
+        asMember(
+          params.workspaceId,
+          ThreadMessageService.ThreadMessageService.use((threadMessageService) =>
+            threadMessageService.publish(
+              { threadId: params.threadId, ...payload },
+              { requestKey: headers["idempotency-key"] },
             ),
           ),
         ),
       edit: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-              threadMessageService.edit({ messageId: params.messageId, ...payload }),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadMessageService.ThreadMessageService.use((threadMessageService) =>
+            threadMessageService.edit({ messageId: params.messageId, ...payload }),
           ),
         ),
       delete: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-              threadMessageService.delete(params.messageId),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadMessageService.ThreadMessageService.use((threadMessageService) =>
+            threadMessageService.delete(params.messageId),
           ),
         ),
       follow: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(
-              ThreadParticipationService.ThreadParticipationService,
-              (threadParticipationService) => threadParticipationService.follow(params.threadId),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadParticipationService.ThreadParticipationService.use((threadParticipationService) =>
+            threadParticipationService.follow(params.threadId),
           ),
         ),
       unfollow: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(
-              ThreadParticipationService.ThreadParticipationService,
-              (threadParticipationService) =>
-                threadParticipationService.unfollow({
-                  threadId: params.threadId,
-                  participationId: payload.participationId,
-                }),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadParticipationService.ThreadParticipationService.use((threadParticipationService) =>
+            threadParticipationService.unfollow({
+              threadId: params.threadId,
+              participationId: payload.participationId,
+            }),
           ),
         ),
       typing: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-              threadMessageService.typing(params.threadId),
-            ),
+        asMember(
+          params.workspaceId,
+          ThreadMessageService.ThreadMessageService.use((threadMessageService) =>
+            threadMessageService.typing(params.threadId),
           ),
         ),
       markRead: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(ReadStateService.ReadStateService, (readStateService) =>
-              readStateService.markThreadRead({
-                threadId: params.threadId,
-                throughSequence: payload.throughSequence,
-              }),
-            ),
+        asMember(
+          params.workspaceId,
+          ReadStateService.ReadStateService.use((readStateService) =>
+            readStateService.markThreadRead({
+              threadId: params.threadId,
+              throughSequence: payload.throughSequence,
+            }),
           ),
         ),
     });

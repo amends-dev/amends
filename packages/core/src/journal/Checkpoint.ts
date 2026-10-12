@@ -13,7 +13,6 @@ import * as Commit from "./Commit.ts";
 import * as Entry from "./Entry.ts";
 import * as Store from "./Store.ts";
 import * as StoreInput from "./StoreInput.ts";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import { storeFailure } from "./internal/store-failure.ts";
 import * as MemoryDatabase from "./MemoryDatabase.ts";
 
@@ -138,18 +137,15 @@ export class Checkpoint extends Context.Service<
 >()("@amends-dev/core/journal/Checkpoint") {}
 
 /**
- * The store over a driver: each input is checked against its schema, and a record against the
- * workspace, before the driver sees it.
+ * The store over a driver: each input is checked against its schema before the driver sees it.
+ * Checkpoints name no workspace; the driver keeps them in the one it is bound to.
  *
  * @category constructors
  * @since 0.1.0
  */
-export const make = (
-  workspaceId: WorkspaceId.Id,
-  driver: Checkpoint["Service"],
-): Checkpoint["Service"] => {
+export const make = (driver: Checkpoint["Service"]): Checkpoint["Service"] => {
   const read = StoreInput.read(Store.Failure);
-  const write = StoreInput.write(Store.Conflict, workspaceId);
+  const write = StoreInput.write(Store.Conflict);
   return {
     get: (key) => Effect.flatMap(read("checkpoint.get", Key, key), driver.get),
     set: Effect.fn("Checkpoint.set")(function* (key, cursor) {
@@ -179,7 +175,7 @@ const idOf = (key: Key) => MemoryDatabase.keyOf(key.logId, key.name, key.version
  * projection's rows, and the versions that are live.
  */
 const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const { read, write } = yield* Store.MemoryBinding;
   const driver: Checkpoint["Service"] = {
     get: Effect.fn("Checkpoint.memory.get")(
       function* (key) {
@@ -218,7 +214,7 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
       Effect.mapError(storeFailure(Store.Failure, "checkpoint.setLive")),
     ),
   };
-  return make(workspaceId, driver);
+  return make(driver);
 });
 
 /**

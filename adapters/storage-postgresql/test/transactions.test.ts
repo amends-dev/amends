@@ -91,12 +91,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const busy = yield* host.forWorkspace(first);
           const holder = yield* holding(busy);
           expect(yield* Effect.flip(append(busy))).toMatchObject({
-            _tag: "JournalStore.Conflict",
+            _tag: "Store.Conflict",
             message: expect.stringContaining("this process's other writers to the workspace"),
           });
           // The holder has the pool's one connection, so another workspace finds none free.
           expect(yield* Effect.flip(append(yield* host.forWorkspace(second)))).toMatchObject({
-            _tag: "JournalStore.Conflict",
+            _tag: "Store.Conflict",
             message: expect.stringContaining("a database connection"),
           });
           yield* holder.release;
@@ -115,7 +115,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const bound = yield* host.forWorkspace(first);
           const failure = yield* Effect.flip(append(bound, Effect.sleep("2 seconds")));
           expect(failure).toMatchObject({
-            _tag: "JournalStore.Failure",
+            _tag: "Store.Failure",
             cause: expect.stringContaining("ran longer than"),
           });
           expect(yield* bound.store.head(execution)).toEqual(Option.none());
@@ -283,7 +283,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             const bound = yield* storage.forWorkspace(workspaceId);
             const failure = yield* Effect.flip(initialized(bound));
             expect(failure).toMatchObject({
-              _tag: "JournalStore.CommitUncertain",
+              _tag: "Store.CommitUncertain",
               commitId: expect.any(String),
             });
             expect(commits).toBe(1);

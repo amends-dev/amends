@@ -23,6 +23,7 @@ import * as Actor from "../../src/identity/Actor.ts";
 import * as Identity from "../../src/identity/Identity.ts";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Store from "../../src/journal/Store.ts";
 import * as MemberFacts from "../../src/workspace/MemberFacts.ts";
@@ -424,10 +425,8 @@ it.effect("requirements are validated against canonical permission definitions",
       targetKind: "Member",
       builtinTier: "member",
     });
-    expect(
-      yield* run(fixture, Effect.flip(check([Requirement.make(unregistered, bobTarget)]))),
-    ).toMatchObject({ _tag: "PermissionCatalog.Unknown", name: unregistered.name });
-    // A requirement whose target is not the kind the catalog declares is a bug, not a denial.
+    // A requirement naming a permission the host does not declare, or a target other than the
+    // kind the catalog declares, is a bug, not a denial.
     const wrongDefinition = Permission.make(MemberPermissions.Remove.name, {
       targetKind: "Workspace",
       builtinTier: "administrator",
@@ -437,7 +436,7 @@ it.effect("requirements are validated against canonical permission definitions",
       permission: MemberPermissions.Remove,
       target: workspaceTarget,
     };
-    for (const requirement of [wrongKind, malformed])
+    for (const requirement of [Requirement.make(unregistered, bobTarget), wrongKind, malformed])
       expect(Exit.hasDies(yield* Effect.exit(run(fixture, check([requirement]))))).toBe(true);
   }),
 );
@@ -474,7 +473,7 @@ it.effect(
       yield* Effect.gen(function* () {
         const authorization = yield* Authorization.Authorization;
         const journal = yield* Journal.make({
-          logId: Log.Id.make("workspace-one/journal"),
+          logId: Entry.LogId.make("workspace-one/journal"),
           projections: [
             MemberProjection.definition,
             RoleProjection.definition,

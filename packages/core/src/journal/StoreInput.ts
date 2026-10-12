@@ -46,8 +46,9 @@ export const read =
     decoder(schema)(input).pipe(Effect.mapError((cause) => new Failure({ operation, cause })));
 
 /**
- * A write's inputs, checked against their schemas; a malformed one conflicts, and so does a
- * record of another workspace.
+ * A write's inputs, checked against their schemas; a malformed one conflicts. Given the store's
+ * workspace, a record of another workspace conflicts too; a store whose inputs name no workspace,
+ * as the checkpoint store's, gives none.
  *
  * @category constructors
  * @since 0.1.0
@@ -55,13 +56,13 @@ export const read =
 export const write =
   <C>(
     Conflict: new (fields: { readonly operation: string; readonly message: string }) => C,
-    workspaceId: WorkspaceId.Id,
+    workspaceId?: WorkspaceId.Id,
   ) =>
   <S extends Schema.Top>(operation: string, schema: S, input: S["Type"]) =>
     decoder(schema)(input).pipe(
       Effect.mapError((cause) => new Conflict({ operation, message: cause.message })),
       Effect.filterOrFail(
-        (value) => !foreign(value, workspaceId),
+        (value) => workspaceId === undefined || !foreign(value, workspaceId),
         () => new Conflict({ operation, message: "Expected a record in this workspace" }),
       ),
     );

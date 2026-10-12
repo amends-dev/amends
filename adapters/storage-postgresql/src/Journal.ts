@@ -12,7 +12,7 @@
  *
  * @since 0.1.0
  */
-import { Commit, Entry, Store } from "@amends-dev/core/journal";
+import { Commit, Entry, Occurrence, Store } from "@amends-dev/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import * as JournalEntry from "./JournalEntry.ts";
@@ -32,7 +32,7 @@ const BatchHeaderRow = Schema.Struct({
 const AppendHeaderRows = Schema.Array(
   Schema.Struct({
     logId: Entry.LogId,
-    key: Store.IdempotencyKey,
+    key: Occurrence.Key,
     commitId: Commit.Id,
     firstIndex: Schema.Natural,
     entryCount: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -61,7 +61,7 @@ interface Staging {
 /** Entries per insert, fewer than their parameters allow, since each carries its payload. */
 const entriesPerInsert = 500;
 
-const receiptKey = (logId: Entry.LogId, key: Store.IdempotencyKey) => JSON.stringify([logId, key]);
+const receiptKey = (logId: Entry.LogId, key: Occurrence.Key) => JSON.stringify([logId, key]);
 const copyEntry = (entry: Store.Entry): Store.Entry =>
   Object.assign({}, entry, { payload: entry.payload.slice() });
 const copyReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
@@ -100,7 +100,7 @@ export const make = Effect.fn("Journal.make")(function* () {
 
   const storedAppend = Effect.fn("Journal.storedAppend")(function* (
     logId: Entry.LogId,
-    key: Store.IdempotencyKey,
+    key: Occurrence.Key,
   ) {
     const found = yield* db
       .select({
@@ -299,7 +299,7 @@ export const make = Effect.fn("Journal.make")(function* () {
   const receiptIn = Effect.fnUntraced(function* (
     staging: Staging,
     logId: Entry.LogId,
-    key: Store.IdempotencyKey,
+    key: Occurrence.Key,
   ) {
     const id = receiptKey(logId, key);
     const known = staging.receipts.get(id);

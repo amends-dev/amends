@@ -4,7 +4,7 @@ import { BuiltinRoles, Role, RoleFacts } from "@amends-dev/core/authorization";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import {
-  type Checkpoint,
+  Entry,
   Fact,
   Journal,
   Log,
@@ -12,6 +12,7 @@ import {
   Publication,
   Store,
   Subject,
+  type Checkpoint,
 } from "@amends-dev/core/journal";
 import {
   ThreadService,
@@ -59,7 +60,7 @@ export const journal = (fixture: Fixture) => {
             const open = (bound: Bound) =>
               Log.Log.pipe(
                 Effect.map((logs) =>
-                  logs.open({ id: Log.Id.make("execution"), schema: Schema.String }),
+                  logs.open({ id: Entry.LogId.make("execution"), schema: Schema.String }),
                 ),
                 Effect.provide(core(bound)),
               );
@@ -72,7 +73,7 @@ export const journal = (fixture: Fixture) => {
             expect((yield* logB.read({ limit: 10 }))[0]?.entries[0]?.payload).toBe("b");
             expect(
               yield* Effect.flip(writer.append("conflict", { expectedAfter: Option.none() })),
-            ).toMatchObject({ _tag: "JournalStore.Conflict" });
+            ).toMatchObject({ _tag: "Store.Conflict" });
             const waiting = yield* Deferred.make<void>();
             const watched = {
               ...a,
@@ -96,9 +97,11 @@ export const journal = (fixture: Fixture) => {
             expect(batches[0]?.entries[0]?.payload).toBe("from another host");
             expect(
               yield* Effect.flip(
-                a.store.transaction(a.store.waitForAppend(Log.Id.make("execution"), Option.none())),
+                a.store.transaction(
+                  a.store.waitForAppend(Entry.LogId.make("execution"), Option.none()),
+                ),
               ),
-            ).toMatchObject({ _tag: "JournalStore.Failure" });
+            ).toMatchObject({ _tag: "Store.Failure" });
           }),
         ),
     );
@@ -111,7 +114,7 @@ export const journal = (fixture: Fixture) => {
             const host = yield* storage.connect();
             const a = yield* forWorkspace(host, workspaceId);
             const b = yield* forWorkspace(host, otherWorkspaceId);
-            const execution = Log.Id.make("execution");
+            const execution = Entry.LogId.make("execution");
             const logs = yield* Log.Log.pipe(Effect.provide(core(a)));
             const log = logs.open({ id: execution, schema: Schema.String });
             expect(yield* a.store.head(execution)).toEqual(Option.none());
@@ -432,7 +435,7 @@ export const journal = (fixture: Fixture) => {
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
-          const logId = Log.Id.make("rebuild-conformance");
+          const logId = Entry.LogId.make("rebuild-conformance");
           const Counted = Fact.make("conformance.counted", {
             subject: () => Subject.make("test", "counted"),
             version: 1,
@@ -487,7 +490,7 @@ export const journal = (fixture: Fixture) => {
         Effect.gen(function* () {
           const newerHost = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const olderHost = yield* forWorkspace(yield* storage.connect(), workspaceId);
-          const logId = Log.Id.make("retire-conformance");
+          const logId = Entry.LogId.make("retire-conformance");
           const Counted = Fact.make("conformance.counted", {
             subject: () => Subject.make("test", "counted"),
             version: 1,

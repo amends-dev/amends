@@ -9,16 +9,16 @@
  */
 import { Context, Effect, Layer, Schema } from "effect";
 import * as Permission from "./Permission.ts";
-import { Unknown } from "./internal/permission-catalog-errors.ts";
-export {
-  /**
-   * The name is not a declared permission: no feature registered it with this host.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Unknown,
-} from "./internal/permission-catalog-errors.ts";
+
+/**
+ * The name is not a declared permission: no feature registered it with this host.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class Unknown extends Schema.TaggedError<Unknown>()("PermissionCatalog.Unknown", {
+  name: Permission.Name,
+}) {}
 
 /**
  * Two registered declarations share a name.

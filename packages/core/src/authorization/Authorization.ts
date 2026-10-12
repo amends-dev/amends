@@ -63,7 +63,6 @@ export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
 export type Error =
   | MemberStore.Failure
   | GrantResolver.Error
-  | PermissionCatalog.Unknown
   | WorkspaceMismatch
   | InvalidActor
   | Denied;
@@ -148,8 +147,15 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
 
     for (const requirement of requirements) {
       yield* requireWorkspace(workspaceId, requirement.target.workspaceId);
-      const permission = yield* permissionCatalog.get(requirement.permission.name);
-      // Requirements name permissions as the catalog declares them; another target kind is a bug.
+      // Requirements name permissions as the catalog declares them, so an undeclared permission,
+      // or another target kind, is a bug in the host or the operation, not a caller's mistake.
+      const permission = yield* permissionCatalog
+        .get(requirement.permission.name)
+        .pipe(
+          Effect.catchTag("PermissionCatalog.Unknown", ({ name }) =>
+            Effect.die(`Permission ${name} is not declared to this host`),
+          ),
+        );
       if (!Target.Reference.isAnyOf([permission.targetKind])(requirement.target))
         return yield* Effect.die(
           `Permission ${permission.name} requires a ${permission.targetKind} target`,

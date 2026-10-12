@@ -11,6 +11,7 @@ import { Identity } from "@amends-dev/core/identity";
 import * as Api from "./Api.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { Gateway } from "@amends-dev/gateway";
 import { OwnershipService, WorkspaceSettingsService } from "@amends-dev/core/workspace";
 import { Effect } from "effect";
@@ -27,51 +28,34 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "workspaces",
   Effect.fn(function* (handlers) {
+    const asMember = yield* makeAsMember;
     const gateway = yield* Gateway.Gateway;
     return handlers.handleAll({
       settings: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(
-              WorkspaceSettingsService.WorkspaceSettingsService,
-              (workspaceSettingsService) => workspaceSettingsService.get,
-            ),
+        asMember(
+          params.workspaceId,
+          WorkspaceSettingsService.WorkspaceSettingsService.use(
+            (workspaceSettingsService) => workspaceSettingsService.get,
           ),
         ),
       members: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(
-              WorkspaceSettingsService.WorkspaceSettingsService,
-              (workspaceSettingsService) => workspaceSettingsService.members,
-            ),
+        asMember(
+          params.workspaceId,
+          WorkspaceSettingsService.WorkspaceSettingsService.use(
+            (workspaceSettingsService) => workspaceSettingsService.members,
           ),
         ),
       rename: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(
-              WorkspaceSettingsService.WorkspaceSettingsService,
-              (workspaceSettingsService) => workspaceSettingsService.rename(payload),
-            ),
+        asMember(
+          params.workspaceId,
+          WorkspaceSettingsService.WorkspaceSettingsService.use((workspaceSettingsService) =>
+            workspaceSettingsService.rename(payload),
           ),
         ),
       ownership: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(
-              OwnershipService.OwnershipService,
-              (ownershipService) => ownershipService.get,
-            ),
-          ),
+        asMember(
+          params.workspaceId,
+          OwnershipService.OwnershipService.use((ownershipService) => ownershipService.get),
         ),
       transferOwnership: ({ params, payload }) =>
         Effect.gen(function* () {

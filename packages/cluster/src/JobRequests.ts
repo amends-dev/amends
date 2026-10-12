@@ -40,7 +40,7 @@ export const retryDelays = Schedule.min([
 export const isWorkspaceNotFound = (error: unknown) =>
   Predicate.isTagged(
     Predicate.hasProperty(error, "cause") ? error.cause : error,
-    "Gateway.WorkspaceNotFound",
+    "GatewayErrors.WorkspaceNotFound",
   );
 
 /**

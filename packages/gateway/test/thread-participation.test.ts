@@ -19,7 +19,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Fact, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Fact, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -103,7 +103,7 @@ describe("thread participation", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const notifications = (bound: Bound, id: Member.Id) =>
     listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
       limit: 100,
@@ -823,7 +823,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "JournalStore.Conflict" },
+                value: { _tag: "Store.Conflict" },
               });
           yield* Effect.scoped(
             runHost(
@@ -891,7 +891,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "JournalStore.Conflict" },
+                value: { _tag: "Store.Conflict" },
               });
           yield* Effect.scoped(
             runHost(
@@ -1028,7 +1028,7 @@ describe("thread participation", () => {
           ).toMatchObject({ _tag: "ThreadParticipationService.ThreadNotFound" });
           expect(
             yield* Effect.flip(gateway.asMember(workspace.id, owner, follow("" as Thread.Id))),
-          ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
           expect(
             yield* Effect.flip(
               gateway.asMember(

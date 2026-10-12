@@ -2,6 +2,7 @@ import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authori
 import { Group, GroupFollow, GroupMembership, GroupService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { Checkpoint, Entry, Store } from "@amends-dev/core/journal";
+import { Notification } from "@amends-dev/core/notification";
 import {
   ThreadActivity,
   ThreadActivityKind,
@@ -11,9 +12,10 @@ import {
   ThreadParticipation,
   ThreadService,
 } from "@amends-dev/core/thread";
+import { Turn } from "@amends-dev/core/turn";
 import { Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { DateTime, Effect, Option } from "effect";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import {
@@ -332,7 +334,7 @@ export const contracts = (fixture: Fixture) => {
                     ),
                   ),
               ),
-            ).toMatchObject({ _tag: "JournalStore.Failure" });
+            ).toMatchObject({ _tag: "Store.Failure" });
             yield* bound.store.transaction(bound.checkpoints.setLive(logId, versions));
             expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
             expect(yield* bound.checkpoints.listLive(otherLog)).toEqual([]);
@@ -347,7 +349,7 @@ export const contracts = (fixture: Fixture) => {
                   ]),
                 ),
               ),
-            ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.setLive" });
+            ).toMatchObject({ _tag: "Store.Conflict", operation: "checkpoint.setLive" });
             expect(sorted(yield* bound.checkpoints.listLive(logId))).toEqual(versions);
             // A set replaces the whole register, and a rolled-back one changes nothing.
             yield* bound.store.transaction(
@@ -514,6 +516,160 @@ export const contracts = (fixture: Fixture) => {
                 ({ sequence }) => sequence,
               ),
             ).toEqual([1, 2]);
+          }),
+        ),
+    );
+
+    it.effect("turn storage keeps one active turn per agent and thread, inserted or updated", () =>
+      fixture.withStorage((storage) =>
+        Effect.gen(function* () {
+          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          yield* initialized(bound);
+          const createdAt = yield* DateTime.now;
+          const turn = (id: string, status: Turn.Status, thread = "thread"): Turn.Turn => ({
+            id: Turn.Id.make(id),
+            workspaceId,
+            groupId: Group.GeneralId,
+            threadId: ThreadId.Id.make(thread),
+            agentId: Identity.AgentId.make("agent"),
+            memberId: Member.Id.make("agent-member"),
+            participationId: ThreadParticipation.Id.make(`${thread}-participation`),
+            retry: null,
+            status,
+            acceptedThroughSequence: 1,
+            logAfter: 0,
+            selection: null,
+            messageIds: [],
+            failure: null,
+            cancelReason: null,
+            createdAt,
+            startedAt: null,
+            finishedAt: Turn.active(status) ? null : createdAt,
+          });
+          const refused = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+            Effect.flip(bound.store.transaction(program));
+          const write = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+            bound.store.transaction(program);
+          const conflict = { _tag: "TurnStore.Conflict" };
+
+          // Inserting: a reused ID, and a second active turn of the agent on the thread.
+          const first = turn("first", "queued");
+          yield* write(bound.turns.insert(first));
+          expect(yield* refused(bound.turns.insert(first))).toMatchObject(conflict);
+          expect(yield* refused(bound.turns.insert(turn("second", "queued")))).toMatchObject(
+            conflict,
+          );
+          yield* write(bound.turns.insert(turn("elsewhere", "queued", "other-thread")));
+
+          // Updating: a finished turn may not become active while another is.
+          const second = turn("second", "failed");
+          yield* write(bound.turns.insert(second));
+          const reactivated: Turn.Turn = Object.assign({}, second, {
+            status: "running" as const,
+            finishedAt: null,
+          });
+          expect(yield* refused(bound.turns.update(reactivated))).toMatchObject(conflict);
+          yield* write(
+            bound.turns.update(
+              Object.assign({}, first, { status: "completed" as const, finishedAt: createdAt }),
+            ),
+          );
+          yield* write(bound.turns.update(reactivated));
+          expect(yield* bound.turns.findActive(first.memberId, first.threadId)).toEqual(
+            Option.some(reactivated),
+          );
+        }),
+      ),
+    );
+
+    it.effect(
+      "marking a thread read settles the member's notifications from it in the same write",
+      () =>
+        fixture.withStorage((storage) =>
+          Effect.gen(function* () {
+            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            yield* initialized(bound);
+            const recordedAt = yield* DateTime.now;
+            const reader = Notification.ofMember(Member.Id.make("reader"), bob);
+            const threadId = ThreadId.Id.make("thread");
+            const note = (
+              id: string,
+              sequence: number,
+              recipient: Notification.Recipient = reader,
+              thread = threadId,
+            ): Notification.Notification => ({
+              id: Notification.Id.make(id),
+              workspaceId,
+              source: { logId: Entry.LogId.make(`${thread}-log`), entryId: Entry.Id.make(id) },
+              thread: { threadId: thread, groupId: Group.GeneralId, sequence },
+              recipient,
+              recordedAt,
+              state: Notification.State.cases.Pending.make({}),
+            });
+            yield* bound.store.transaction(
+              bound.notifications.insertMany([
+                note("first", 1),
+                note("second", 2),
+                note("later", 3),
+                note("other-thread", 1, reader, ThreadId.Id.make("other-thread")),
+                note("other-member", 1, Notification.ofMember(Member.Id.make("other"), charlie)),
+              ]),
+            );
+            const position = (readThrough: number) => ({
+              workspaceId,
+              memberId: reader.memberId,
+              threadId,
+              readThrough,
+            });
+            /** Each notification's state, Pending or when it was seen, in the order inserted. */
+            const states = Effect.forEach(
+              ["first", "second", "later", "other-thread", "other-member"],
+              (id) =>
+                Effect.map(bound.notifications.get(Notification.Id.make(id)), (found) => {
+                  const { state } = Option.getOrThrow(found);
+                  return Notification.State.isAnyOf(["Seen"])(state)
+                    ? DateTime.toEpochMillis(state.seenAt)
+                    : state._tag;
+                }),
+            );
+            const positions = Effect.map(
+              bound.readStates.getThreadPositions(reader.memberId, [threadId]),
+              (found) => found.map(({ readThrough }) => readThrough),
+            );
+
+            // A transaction that rolls back takes both parts with it.
+            expect(
+              yield* Effect.flip(
+                bound.store.transaction(
+                  Effect.andThen(
+                    bound.readStates.markThreadRead(position(2), recordedAt),
+                    Effect.fail("undo"),
+                  ),
+                ),
+              ),
+            ).toBe("undo");
+            expect(yield* states).toEqual(["Pending", "Pending", "Pending", "Pending", "Pending"]);
+            expect(yield* positions).toEqual([]);
+
+            // Only the member's pending notifications from the thread, up to the position, are seen.
+            const firstSeen = DateTime.toEpochMillis(recordedAt);
+            yield* bound.readStates.markThreadRead(position(2), recordedAt);
+            expect(yield* states).toEqual([firstSeen, firstSeen, "Pending", "Pending", "Pending"]);
+            expect(yield* positions).toEqual([2]);
+
+            // An earlier position is kept back, and a notification seen before keeps its time.
+            const later = DateTime.add(recordedAt, { minutes: 1 });
+            yield* bound.store.transaction(bound.readStates.markThreadRead(position(1), later));
+            expect(yield* positions).toEqual([2]);
+            yield* bound.readStates.markThreadRead(position(3), later);
+            expect(yield* states).toEqual([
+              firstSeen,
+              firstSeen,
+              DateTime.toEpochMillis(later),
+              "Pending",
+              "Pending",
+            ]);
+            expect(yield* positions).toEqual([3]);
           }),
         ),
     );

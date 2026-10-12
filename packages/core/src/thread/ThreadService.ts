@@ -42,8 +42,7 @@ import * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
 import * as ThreadMessage from "./ThreadMessage.ts";
 import * as ThreadFacts from "./ThreadFacts.ts";
 import * as ThreadTitleActivity from "./ThreadTitleActivity.ts";
-import * as ReadStateCommand from "../read-state/ReadStateCommand.ts";
-import type * as ReadState from "../read-state/ReadState.ts";
+import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as Request from "../request/Request.ts";
 import * as Task from "../task/Task.ts";
 import * as TaskCommand from "../task/TaskCommand.ts";
@@ -57,7 +56,6 @@ import {
   NotFound,
   ParticipantUnavailable,
 } from "./internal/thread-errors.ts";
-import * as Notification from "../notification/Notification.ts";
 export {
   /**
    * The thread's title is no longer the one the renamer expected: someone renamed it meanwhile.
@@ -120,7 +118,8 @@ export type Error =
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | GroupFollowStore.Failure
-  | ReadStateCommand.Error
+  | ReadStateStore.Failure
+  | ReadStateStore.Conflict
   | MemberStore.Failure
   | Schema.SchemaError
   | PlatformError.PlatformError
@@ -264,7 +263,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
   const groupCommand = yield* GroupCommand.GroupCommand;
   const threadQuery = yield* ThreadQuery.ThreadQuery;
   const threadStore = yield* ThreadStore.ThreadStore;
-  const readStateCommand = yield* ReadStateCommand.ReadStateCommand;
+  const readStateStore = yield* ReadStateStore.ReadStateStore;
   const threadMessageStore = yield* ThreadMessageStore.ThreadMessageStore;
   const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore;
   const taskCommand = yield* TaskCommand.TaskCommand;
@@ -346,7 +345,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
    * task at its second position when the start asks for one, so a task never lacks a description.
    */
   const createThread = Effect.fnUntraced(function* (
-    author: ReadState.Reader,
+    authorId: Member.Id,
     groupId: Group.Id,
     participants: ReadonlyArray<Member.Id>,
     opening: {
@@ -370,7 +369,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
         message: {
           messageId: ids.messageId,
-          author: { _tag: "Member", memberId: author.memberId },
+          author: { _tag: "Member", memberId: authorId },
           text: opening.text,
           mentions: opening.mentions,
           via: null,
@@ -379,7 +378,15 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       })
       .pipe(Effect.catchTag("ThreadCommand.Unavailable", unavailable));
     // Posting reads the thread through the author's own message.
-    yield* readStateCommand.markThreadRead(author, started.thread, started.activity.sequence);
+    yield* readStateStore.markThreadRead(
+      {
+        workspaceId,
+        memberId: authorId,
+        threadId: started.thread.id,
+        readThrough: started.activity.sequence,
+      },
+      occurredAt,
+    );
     const task =
       opening.task === undefined
         ? null
@@ -388,7 +395,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
               thread: started.thread,
               ...Task.initial(opening.task),
               createdBy: started.thread.createdBy,
-              by: { _tag: "Member", memberId: author.memberId },
+              by: { _tag: "Member", memberId: authorId },
               occurredAt,
             })
             .pipe(Effect.catchTag("ThreadCommand.Unavailable", unavailable))).task;
@@ -431,7 +438,6 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const author = Notification.ofMember(actor.memberId, actor.identity);
       const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
       if (memberIds.length < 2) return yield* new DirectMembersRequired({});
       const missing = request.mentions.find((id) => !memberIds.includes(id));
@@ -458,7 +464,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       // Creating the group gives its agents a place in all of its threads, as making an agent
       // follow a team group does, so it needs agent use on each; later starts name only mentions.
       yield* authorizeParticipants(memberIds, created ? memberIds : request.mentions, eligible);
-      return yield* createThread(author, group.id, memberIds, request, ids);
+      return yield* createThread(actor.memberId, group.id, memberIds, request, ids);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -486,7 +492,6 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const author = Notification.ofMember(actor.memberId, actor.identity);
       const ids = yield* deriveStartIds("thread.start", options.requestKey);
       const retried = yield* findRetriedStart(options.requestKey, ids);
       if (Option.isSome(retried)) return retried.value;
@@ -509,7 +514,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
             ),
           );
       if (request.task !== undefined) yield* authorizeTask(group.id, request.task);
-      return yield* createThread(author, request.groupId, starters, request, ids);
+      return yield* createThread(actor.memberId, request.groupId, starters, request, ids);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

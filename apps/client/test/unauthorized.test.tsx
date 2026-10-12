@@ -15,7 +15,7 @@ import {
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const rejected = () => json({ _tag: "Api.Unauthorized", message: "Unauthorized" }, 401);
+const rejected = () => json({ _tag: "Authentication.Unauthorized", message: "Unauthorized" }, 401);
 const session = (token: string) =>
   Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } });
 const listing = { memberships: [], invitations: [] };

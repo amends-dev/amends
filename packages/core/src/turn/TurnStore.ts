@@ -83,7 +83,10 @@ export class TurnStore extends Context.Service<
     readonly insert: (
       record: Turn.Turn,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
-    /** Replace a stored turn; a missing record conflicts. */
+    /**
+     * Replace a stored turn. A missing record conflicts, and so does a change that would give its
+     * agent a second active turn on the thread.
+     */
     readonly update: (
       record: Turn.Turn,
     ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
@@ -218,6 +221,14 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
           operation: "update",
           message: "Expected a stored turn",
         });
+      const records = yield* rows
+        .all(space.records.of("turns"))
+        .pipe(Effect.mapError(storeFailure(Failure, "update")));
+      if (secondActive(records, record))
+        return yield* new Conflict({
+          operation: "update",
+          message: "The agent already has an active turn on this thread",
+        });
       const row = yield* rows.encode(record).pipe(Effect.mapError(storeFailure(Failure, "update")));
       space.records.of("turns").set(record.id, row);
     }),
@@ -228,8 +239,9 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
 /**
  * Provide `TurnStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps what
  * the contract leaves to storage: a reused ID conflicts, and so does a second active turn of one
- * agent on one thread; an update of a missing turn conflicts. An agent's turns on a thread order by
- * creation time, then how far each accepted input, then ID. `make` checks every input first.
+ * agent on one thread, inserted or updated; an update of a missing turn conflicts. An agent's
+ * turns on a thread order by creation time, then how far each accepted input, then ID. `make`
+ * checks every input first.
  *
  * @category layers
  * @since 0.1.0

@@ -1,4 +1,4 @@
-import { Codec, Fact, Journal, Log, Publication, Subject } from "@amends-dev/core/journal";
+import { Codec, Entry, Fact, Journal, Publication, Subject } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
@@ -44,7 +44,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             Effect.provide(core(bound)),
           );
           const rows =
-            yield* (yield* SqlClient.SqlClient)`SELECT subject, fact_name, fact_version, payload FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${Log.Id.make("journal")} ORDER BY position, entry_index`;
+            yield* (yield* SqlClient.SqlClient)`SELECT subject, fact_name, fact_version, payload FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${Entry.LogId.make("journal")} ORDER BY position, entry_index`;
           expect(rows.map((row) => row.fact_name)).toEqual([
             Changed.name,
             Other.name,

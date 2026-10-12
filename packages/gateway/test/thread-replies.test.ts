@@ -24,7 +24,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -102,7 +102,7 @@ describe("thread replies", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const notifications = (bound: Bound, id: Member.Id) =>
     listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
       limit: 100,
@@ -781,7 +781,7 @@ describe("thread replies", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "JournalStore.Conflict" },
+                value: { _tag: "Store.Conflict" },
               });
           yield* Effect.scoped(
             runHost(
@@ -919,7 +919,7 @@ describe("thread replies", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(first.thread.id, [], " ")),
             ),
-          ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
         }),
       ),
     ),
@@ -1060,7 +1060,7 @@ describe("thread replies", () => {
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
                   _tag: expect.stringMatching(
-                    /^(JournalStore.Conflict|ThreadMessageService.ParticipantUnavailable)$/,
+                    /^(Store.Conflict|ThreadMessageService.ParticipantUnavailable)$/,
                   ),
                 },
               });

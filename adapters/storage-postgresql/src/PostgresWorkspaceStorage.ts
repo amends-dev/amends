@@ -61,8 +61,6 @@ export interface Options extends Binding.Options {
 /**
  * Provide every store core requires, and the signal hub, over the same workspace binding.
  * Adding a store adds a line here.
- *
- * @category layers
  */
 const layerStores = Layer.mergeAll(
   Journal.layer,

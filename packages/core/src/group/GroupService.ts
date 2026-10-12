@@ -82,30 +82,33 @@ export {
 
 /**
  * What changing a group can fail with, which `CreateError` and `RenameError` extend:
- * authorization, the member reads and journal writes a change depends on, and the member outcomes
- * in `GroupErrors`.
+ * authorization, and the journal writes a change depends on.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
   | Authorization.Error
-  | MemberStore.Failure
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.WriteError
-  | Projection.Error
-  | MemberNotFound
-  | InactiveMember;
+  | Projection.Error;
 
 /**
- * What creating a team group can fail with. A retried creation reads back the group its first
- * attempt created, so it can also fail as that read does.
+ * What creating a team group can fail with: a member to admit who is missing or not active, and
+ * the failures of reading them. A retried creation reads back the group its first attempt
+ * created, so it can also fail as that read does.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | GroupStore.Failure | NotFound;
+export type CreateError =
+  | Error
+  | MemberStore.Failure
+  | MemberNotFound
+  | InactiveMember
+  | GroupStore.Failure
+  | NotFound;
 
 /**
  * What renaming a team group can fail with: the outcomes above, and the failures of

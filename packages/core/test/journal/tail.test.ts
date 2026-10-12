@@ -6,7 +6,9 @@ import { Deferred, Effect, Fiber, Option, Ref, Schema, Stream } from "effect";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Codec from "../../src/journal/Codec.ts";
 import * as Fact from "../../src/journal/Fact.ts";
+import * as Event from "../../src/journal/Event.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Store from "../../src/journal/Store.ts";
@@ -16,7 +18,7 @@ import { Counter, make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("turn/one");
+const logId = Entry.LogId.make("turn/one");
 const open = Effect.map(Log.Log, (log) => log.open({ id: logId, schema: Schema.String }));
 const run = <A, E>(
   fixture: Fixture,
@@ -64,8 +66,8 @@ it.effect("a tail resumes after its cursor, drains history, and waits for a futu
           "third",
         ]);
         expect(batches.map((batch) => batch.position)).toEqual([
-          Log.Position.make(1),
-          Log.Position.make(2),
+          Entry.Position.make(1),
+          Entry.Position.make(2),
         ]);
       }),
     );
@@ -154,7 +156,7 @@ it.effect("short pages and a slow consumer preserve order without reading ahead"
                 ...values,
                 ...batch.entries.map((entry) => entry.payload),
               ]);
-              if (batch.position === Log.Position.make(0)) {
+              if (batch.position === Entry.Position.make(0)) {
                 yield* Deferred.succeed(ready, undefined);
                 yield* Deferred.await(release);
               }
@@ -184,7 +186,7 @@ const projection = Projection.make("counter", { version: 1 }).on(
     yield* (yield* Counter).add(event.payload);
   }),
 );
-const domain = Journal.make({ logId: Log.Id.make("domain"), projections: [projection] });
+const domain = Journal.make({ logId: Entry.LogId.make("domain"), projections: [projection] });
 it.effect(
   "journal tails expose complete batches only after projection and cross-log writes commit",
   () =>
@@ -265,12 +267,12 @@ it.effect("tails ignore rolled-back appends and observe commits with lost acknow
         ).toBe("rollback");
         yield* fixture.loseNextAcknowledgment;
         expect((yield* Effect.flip(journal.publish(Changed, 1)))._tag).toBe(
-          "JournalStore.CommitUncertain",
+          "Store.CommitUncertain",
         );
         const batches = yield* Fiber.join(tail);
         const entry = batches[0]?.entries[0];
         if (entry === undefined) throw new Error("Missing committed event");
-        expect((yield* Journal.decode(Changed, entry)).payload).toBe(1);
+        expect((yield* Event.decode(Changed, entry)).payload).toBe(1);
         expect(yield* fixture.counter.get).toBe(1);
       }),
     );
@@ -315,7 +317,7 @@ it.effect("consumers wait independently and interruption releases the host wait"
         yield* Fiber.interrupt(first);
         expect(active).toBe(1);
         const other = (yield* Log.Log).open({
-          id: Log.Id.make("unrelated"),
+          id: Entry.LogId.make("unrelated"),
           schema: Schema.String,
         });
         yield* other.append("ignore");

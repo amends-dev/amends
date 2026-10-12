@@ -1,10 +1,12 @@
 import { Identity } from "@amends-dev/core/identity";
 import {
   Codec,
+  Entry,
   Event,
   Fact,
   Journal,
   Log,
+  Occurrence,
   Publication,
   Store,
   Subject,
@@ -88,7 +90,7 @@ export const factMetadata = (fixture: Fixture) => {
                   ).toEqual([]);
                   expect((yield* journal.log.read({ limit: 1 }))[0]?.entries).toHaveLength(3);
                   const other = yield* Journal.make({
-                    logId: Log.Id.make("another"),
+                    logId: Entry.LogId.make("another"),
                     projections: [],
                   });
                   yield* other.publish(Changed, "other log");
@@ -98,7 +100,7 @@ export const factMetadata = (fixture: Fixture) => {
                     yield* foreign.store.readFacts(journalLog, { name: Changed.name, limit: 10 }),
                   ).toEqual([]);
                   const execution = (yield* Log.Log).open({
-                    id: Log.Id.make("execution"),
+                    id: Entry.LogId.make("execution"),
                     schema: Schema.String,
                   });
                   yield* execution.append("plain");
@@ -140,7 +142,7 @@ export const factMetadata = (fixture: Fixture) => {
               fact: { subject: testSubject(), name: Changed.name, version: 1, provenance },
               payload: yield* Codec.make(Changed).encode("same"),
             };
-            const key = Log.IdempotencyKey.make("native-fact");
+            const key = Occurrence.Key.make("native-fact");
             const append = (entry: Store.Content) =>
               bound.store.transaction(
                 Effect.flatMap(Store.Transaction, (storeTransaction) =>
@@ -165,7 +167,7 @@ export const factMetadata = (fixture: Fixture) => {
               },
             ]) {
               expect((yield* Effect.flip(append({ ...content, fact })))._tag).toBe(
-                "JournalStore.Conflict",
+                "Store.Conflict",
               );
             }
             const foreign = {
@@ -175,20 +177,16 @@ export const factMetadata = (fixture: Fixture) => {
                 provenance: Object.assign({}, provenance, { workspaceId: otherWorkspaceId }),
               },
             };
-            expect((yield* Effect.flip(append(foreign)))._tag).toBe("JournalStore.Conflict");
+            expect((yield* Effect.flip(append(foreign)))._tag).toBe("Store.Conflict");
             const missingAttribution = { ...content, fact: { ...content.fact } };
             Reflect.deleteProperty(missingAttribution.fact, "provenance");
-            expect((yield* Effect.flip(append(missingAttribution)))._tag).toBe(
-              "JournalStore.Conflict",
-            );
+            expect((yield* Effect.flip(append(missingAttribution)))._tag).toBe("Store.Conflict");
             const missingSubject = { ...content, fact: { ...content.fact } };
             Reflect.deleteProperty(missingSubject.fact, "subject");
-            expect((yield* Effect.flip(append(missingSubject)))._tag).toBe("JournalStore.Conflict");
+            expect((yield* Effect.flip(append(missingSubject)))._tag).toBe("Store.Conflict");
             const nullAttribution = { ...content, fact: { ...content.fact } };
             Reflect.set(nullAttribution.fact, "provenance", null);
-            expect((yield* Effect.flip(append(nullAttribution)))._tag).toBe(
-              "JournalStore.Conflict",
-            );
+            expect((yield* Effect.flip(append(nullAttribution)))._tag).toBe("Store.Conflict");
             expect(Option.isSome(yield* bound.store.getAppend(journalLog, key))).toBe(true);
             expect(
               yield* bound.store.readFacts(journalLog, { name: Changed.name, limit: 10 }),
@@ -265,7 +263,7 @@ export const factMetadata = (fixture: Fixture) => {
                   ).toEqual([]);
                   expect((yield* journal.log.read({ limit: 1 }))[0]?.entries).toHaveLength(3);
                   const other = yield* Journal.make({
-                    logId: Log.Id.make("other-subject-log"),
+                    logId: Entry.LogId.make("other-subject-log"),
                     projections: [],
                   });
                   yield* other.publish(Message, { threadId: "one", text: "other log" });

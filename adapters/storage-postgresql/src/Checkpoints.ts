@@ -115,7 +115,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
       yield* guard(replace, true).pipe(Effect.mapError(storeError(Store, "checkpoint.setLive")));
     }),
   };
-  return Checkpoint.make(workspaceId, driver);
+  return Checkpoint.make(driver);
 });
 
 /**

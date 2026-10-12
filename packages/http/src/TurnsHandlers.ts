@@ -8,9 +8,8 @@
  */
 import * as Api from "./Api.ts";
 import * as Authentication from "./Authentication.ts";
-import type { Actor } from "@amends-dev/core/identity";
+import { makeAsMember } from "./internal/as-member.ts";
 import { Turn, TurnService } from "@amends-dev/core/turn";
-import type { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
@@ -28,28 +27,21 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "turns",
   Effect.fn(function* (handlers) {
+    const asMember = yield* makeAsMember;
     const gateway = yield* Gateway.Gateway;
     const streams = yield* Streams.Streams;
     const unavailable = () => new Turn.LogUnavailable({});
-    /** Run a turn operation as the principal, a member of the workspace. */
-    const asMember = <A, E>(
-      workspaceId: Workspace.Id,
-      operation: (
-        turnService: TurnService.TurnService["Service"],
-      ) => Effect.Effect<A, E, Actor.Actor>,
-    ) =>
-      Effect.flatMap(Authentication.Principal, (principal) =>
-        gateway.asMember(
-          workspaceId,
-          principal,
-          Effect.flatMap(TurnService.TurnService, operation),
-        ),
-      );
     return handlers.handleAll({
       listActive: ({ params, query }) =>
-        asMember(params.workspaceId, (turnService) => turnService.listActive(query.limit)),
+        asMember(
+          params.workspaceId,
+          TurnService.TurnService.use((turnService) => turnService.listActive(query.limit)),
+        ),
       get: ({ params }) =>
-        asMember(params.workspaceId, (turnService) => turnService.get(params.turnId)),
+        asMember(
+          params.workspaceId,
+          TurnService.TurnService.use((turnService) => turnService.get(params.turnId)),
+        ),
       watchLog: ({ params }) =>
         Effect.flatMap(Authentication.Principal, (principal) =>
           streams.hold(params.workspaceId, principal).pipe(
@@ -67,9 +59,15 @@ export const layer = HttpApiBuilder.group(
           ),
         ).pipe(Streams.withHeartbeats),
       cancel: ({ params }) =>
-        asMember(params.workspaceId, (turnService) => turnService.cancel(params.turnId)),
+        asMember(
+          params.workspaceId,
+          TurnService.TurnService.use((turnService) => turnService.cancel(params.turnId)),
+        ),
       retry: ({ params }) =>
-        asMember(params.workspaceId, (turnService) => turnService.retry(params.turnId)),
+        asMember(
+          params.workspaceId,
+          TurnService.TurnService.use((turnService) => turnService.retry(params.turnId)),
+        ),
     });
   }),
 ).pipe(Layer.provide(Streams.layer));

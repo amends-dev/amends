@@ -1,6 +1,6 @@
 import { GroupService, GroupMembershipService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Log, Store } from "@amends-dev/core/journal";
+import { Entry, Store } from "@amends-dev/core/journal";
 import { Request } from "@amends-dev/core/request";
 import { ThreadService, ThreadMessageService } from "@amends-dev/core/thread";
 import { InvitationService, Member } from "@amends-dev/core/workspace";
@@ -28,7 +28,7 @@ const memberActor = (name: string) =>
   });
 const other = memberActor("other");
 const key = Request.Key.make("request-1");
-const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
+const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 });
 
 /** Request keys: a retry of a creating request returns what its first attempt created. */
 const { core, initialized, seed, gateway } = Support;

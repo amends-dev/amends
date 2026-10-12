@@ -240,11 +240,11 @@ describe("what an agent runs a turn on", () => {
       });
 
       expect(yield* Effect.flip(modelGone.select(agentMemberId, undefined))).toMatchObject({
-        _tag: "AgentService.Incomplete",
+        _tag: "AgentQuery.Incomplete",
         issues: [{ _tag: "Removed", part: "model" }],
       });
       expect(yield* Effect.flip(noHarness.select(agentMemberId, undefined))).toMatchObject({
-        _tag: "AgentService.Incomplete",
+        _tag: "AgentQuery.Incomplete",
         issues: [{ _tag: "NoHarness" }],
       });
     }),
@@ -317,11 +317,11 @@ describe("an agent ready to run", () => {
       expect(
         yield* Effect.flip(harnessGone.buildRunnable(agentMemberId, selection())),
       ).toMatchObject({
-        _tag: "AgentService.Incomplete",
+        _tag: "AgentQuery.Incomplete",
         issues: [{ _tag: "Removed", part: "harness" }],
       });
       expect(yield* Effect.flip(keyless.buildRunnable(agentMemberId, selection()))).toMatchObject({
-        _tag: "AgentService.Incomplete",
+        _tag: "AgentQuery.Incomplete",
         issues: [
           {
             _tag: "Invalid",
@@ -333,7 +333,7 @@ describe("an agent ready to run", () => {
       expect(
         yield* Effect.flip(keepsNoKeys.buildRunnable(agentMemberId, selection())),
       ).toMatchObject({
-        _tag: "AgentService.Incomplete",
+        _tag: "AgentQuery.Incomplete",
         issues: [{ _tag: "Invalid", part: "model", description: "No key protects credentials" }],
       });
     }),

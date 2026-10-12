@@ -418,7 +418,7 @@ projections again, which then rebuild the commits they missed.
 The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/Binding.ts) returns
 `Store.CommitUncertain` for every failed COMMIT effect, even when a particular
 database error could establish that nothing committed. This over-reports uncertainty.
-The gateway exposes `Gateway.Uncertain` with the commit ID; there is no public
+The gateway exposes `GatewayErrors.Uncertain` with the commit ID; there is no public
 HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction programs.
 Creating operations accept a request key, so their retries return the first result; other
 operations settle a repeat by their own rules, such as `AlreadyRemoved`, rather than repeating it.
@@ -451,7 +451,7 @@ An explicit isolation choice and coverage for changed defaults remain outstandin
 
 The [local server](../hosts/local/src/LocalServer.ts) refuses request bodies over one mebibyte with
 413, through Bun's own limit. Each process serves at most a thousand live-update streams per
-workspace and twenty per member of it, refusing more with 429 (`Api.TooManyStreams`). Message
+workspace and twenty per member of it, refusing more with 429 (`ApiErrors.TooManyStreams`). Message
 text has no length limit of its own beyond the body limit, and no server-side control paces
 clients that reconnect repeatedly.
 

@@ -8,10 +8,8 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
-import type { Actor } from "@amends-dev/core/identity";
-import type { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { HttpServerRequest } from "effect/http";
@@ -27,38 +25,47 @@ export const layerChannels = HttpApiBuilder.group(
   Api.Api,
   "channels",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
-    /** Run a channel operation as the principal, a member of the workspace. */
-    const asMember = <A, E>(
-      workspaceId: Workspace.Id,
-      operation: (
-        channelService: ChannelService.ChannelService["Service"],
-      ) => Effect.Effect<A, E, Actor.Actor>,
-    ) =>
-      Effect.flatMap(Authentication.Principal, (principal) =>
-        gateway.asMember(
-          workspaceId,
-          principal,
-          Effect.flatMap(ChannelService.ChannelService, operation),
-        ),
-      );
+    const asMember = yield* makeAsMember;
     return handlers.handleAll({
-      list: ({ params }) => asMember(params.workspaceId, (channelService) => channelService.list),
+      list: ({ params }) =>
+        asMember(
+          params.workspaceId,
+          ChannelService.ChannelService.use((channelService) => channelService.list),
+        ),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (channelService) =>
-          channelService.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(
+          params.workspaceId,
+          ChannelService.ChannelService.use((channelService) =>
+            channelService.create(payload, { requestKey: headers["idempotency-key"] }),
+          ),
         ),
       get: ({ params }) =>
-        asMember(params.workspaceId, (channelService) => channelService.get(params.channelId)),
+        asMember(
+          params.workspaceId,
+          ChannelService.ChannelService.use((channelService) =>
+            channelService.get(params.channelId),
+          ),
+        ),
       redirect: ({ params, payload }) =>
-        asMember(params.workspaceId, (channelService) =>
-          channelService.redirect({ channelId: params.channelId, groupId: payload.groupId }),
+        asMember(
+          params.workspaceId,
+          ChannelService.ChannelService.use((channelService) =>
+            channelService.redirect({ channelId: params.channelId, groupId: payload.groupId }),
+          ),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (channelService) => channelService.remove(params.channelId)),
+        asMember(
+          params.workspaceId,
+          ChannelService.ChannelService.use((channelService) =>
+            channelService.remove(params.channelId),
+          ),
+        ),
       binding: ({ params }) =>
-        asMember(params.workspaceId, (channelService) =>
-          channelService.getBinding(params.threadId),
+        asMember(
+          params.workspaceId,
+          ChannelService.ChannelService.use((channelService) =>
+            channelService.getBinding(params.threadId),
+          ),
         ),
     });
   }),

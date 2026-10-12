@@ -50,7 +50,7 @@ are issued; the `session` group asks the host's sign-in for one.
   non-empty, and trimmed; the returned `Workspace.Workspace` includes the workspace's.
   `GET /workspaces/:workspaceId/settings` returns metadata and action/role flags;
   `GET …/member-management` adds access and removal flags to readable members. `PUT …/name` accepts
-  `{ name, expectedName }` and returns the renamed workspace (409 `WorkspaceSettings.Changed` when
+  `{ name, expectedName }` and returns the renamed workspace (409 `WorkspaceSettingsService.Changed` when
   the previous name no longer matches). `GET /workspaces/:workspaceId/ownership` returns current
   ownership and eligible candidates. `POST` to that path accepts
   `{ memberId, expectedOwnerAssignmentId }` and transfers ownership atomically, returning the
@@ -72,7 +72,7 @@ are issued; the `session` group asks the host's sign-in for one.
   address to its account, creating one the first time, and the invitation records that account's
   human ID as `recipientId`.
   `POST …/:invitationId/accept` and `POST …/:invitationId/revoke` change state; accepting in a
-  workspace that was never created returns 404 with `Gateway.WorkspaceNotFound`. Acceptance takes
+  workspace that was never created returns 404 with `GatewayErrors.WorkspaceNotFound`. Acceptance takes
   `{ name }`, the new member's name.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
@@ -158,7 +158,7 @@ SSE comments keep idle connections open without producing application messages, 
 no SSE event IDs. Responses use `Cache-Control: no-store` and disable proxy buffering where
 supported. Missing/rejected credentials return 401; absent active membership returns 403; a caller
 at the server's limit of open streams for the workspace, or for itself within it, gets 429
-`Api.TooManyStreams` with the limit it met. Failures after streaming starts use Effect's SSE failure
+`ApiErrors.TooManyStreams` with the limit it met. Failures after streaming starts use Effect's SSE failure
 encoding with `ChangeFeed.Unavailable` and no other detail; reconnect with the last cursor to
 continue. A commit the server cannot read, such as a fact version a newer server wrote during a
 deployment, also ends the stream, and reconnecting then resets. See

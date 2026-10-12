@@ -112,7 +112,9 @@ it("signing out in another window leaves no way back to this page for the next p
 it("clears rejected credentials while preserving the intended route", async () => {
   const fixture = memoryStore(session("expired"));
   const history = mount("/workspaces/one", fixture.store, () =>
-    Promise.resolve(response({ _tag: "Api.Unauthorized", message: "Unauthorized" }, 401)),
+    Promise.resolve(
+      response({ _tag: "Authentication.Unauthorized", message: "Unauthorized" }, 401),
+    ),
   );
   await screen.findByRole("heading", { name: "Sign in to amends" });
   expect(fixture.store.read()).toBeUndefined();
@@ -765,7 +767,7 @@ it("leaves a workspace once a commit removes the member, without signing out", a
     liveWorkspace({ name: () => "Studio", status: () => status }),
     () =>
       status === "removed"
-        ? response({ _tag: "Gateway.NotMember", workspaceId: "one" }, 403)
+        ? response({ _tag: "GatewayErrors.NotMember", workspaceId: "one" }, 403)
         : undefined,
   );
   await screen.findByRole("heading", { name: "Inbox" });

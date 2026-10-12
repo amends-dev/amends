@@ -264,7 +264,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* rejectedClient.notifications
             .inbox({ params: { workspaceId: workspace.id }, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "Api.Unauthorized" });
+        ).toMatchObject({ _tag: "Authentication.Unauthorized" });
         const openapi = yield* (yield* http.get("/openapi.json")).json;
         expect(openapi).toMatchObject({
           paths: {

@@ -12,12 +12,7 @@ import {
   ThreadMessageService,
   ThreadParticipationService,
 } from "@amends-dev/core/thread";
-import {
-  AssignmentService,
-  Authorization,
-  Delegation,
-  PermissionCatalog,
-} from "@amends-dev/core/authorization";
+import { AssignmentService, Authorization, Delegation } from "@amends-dev/core/authorization";
 import { Commit } from "@amends-dev/core/journal";
 import { ChangeFeed } from "@amends-dev/core/change-feed";
 import { NotificationService } from "@amends-dev/core/notification";
@@ -44,7 +39,7 @@ import { Schema } from "effect";
  * @category errors
  * @since 0.1.0
  */
-export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
+export class NotMember extends Schema.TaggedError<NotMember>()("GatewayErrors.NotMember", {
   workspaceId: Workspace.Id,
 }) {}
 
@@ -55,7 +50,7 @@ export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMembe
  * @since 0.1.0
  */
 export class WorkspaceNotFound extends Schema.TaggedError<WorkspaceNotFound>()(
-  "Gateway.WorkspaceNotFound",
+  "GatewayErrors.WorkspaceNotFound",
   { workspaceId: Workspace.Id },
 ) {}
 
@@ -65,7 +60,7 @@ export class WorkspaceNotFound extends Schema.TaggedError<WorkspaceNotFound>()(
  * @category errors
  * @since 0.1.0
  */
-export class Conflict extends Schema.TaggedError<Conflict>()("Gateway.Conflict", {
+export class Conflict extends Schema.TaggedError<Conflict>()("GatewayErrors.Conflict", {
   workspaceId: Workspace.Id,
   operation: Schema.String,
   message: Schema.String,
@@ -77,7 +72,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()("Gateway.Conflict",
  * @category errors
  * @since 0.1.0
  */
-export class Uncertain extends Schema.TaggedError<Uncertain>()("Gateway.Uncertain", {
+export class Uncertain extends Schema.TaggedError<Uncertain>()("GatewayErrors.Uncertain", {
   workspaceId: Workspace.Id,
   commitId: Commit.Id,
 }) {}
@@ -89,7 +84,7 @@ export class Uncertain extends Schema.TaggedError<Uncertain>()("Gateway.Uncertai
  * @category errors
  * @since 0.1.0
  */
-export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.InvalidInput", {
+export class InvalidInput extends Schema.TaggedError<InvalidInput>()("GatewayErrors.InvalidInput", {
   message: Schema.String,
 }) {}
 
@@ -112,7 +107,6 @@ export const PublicError = Schema.Union([
   InvalidInput,
   Authorization.Denied,
   Authorization.InvalidActor,
-  PermissionCatalog.Unknown,
   Delegation.Denied,
   Delegation.OwnerProtected,
   Delegation.UnsupportedRole,
@@ -196,6 +190,7 @@ export const PublicError = Schema.Union([
   ChannelService.GroupNotFound,
   ChannelService.ConnectionUnavailable,
   ChannelService.NotBound,
+  ChannelIntake.NotFound,
   ChannelIntake.Rejected,
   ChannelIntake.Unavailable,
 ]);

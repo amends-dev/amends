@@ -229,12 +229,12 @@ describe("store validation", () => {
                 };
                 expect(
                   yield* Effect.flip(bound.checkpoints.set(key, { ...cursor, index: -1 })),
-                ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.set" });
+                ).toMatchObject({ _tag: "Store.Conflict", operation: "checkpoint.set" });
                 expect(
                   yield* Effect.flip(
                     bound.checkpoints.set({ ...key, version: Number.NaN }, cursor),
                   ),
-                ).toMatchObject({ _tag: "JournalStore.Conflict", operation: "checkpoint.set" });
+                ).toMatchObject({ _tag: "Store.Conflict", operation: "checkpoint.set" });
                 expect(yield* bound.checkpoints.get(key)).toEqual(Option.none());
                 yield* bound.checkpoints.set(key, cursor);
                 return { key, cursor };

@@ -22,7 +22,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
 import {
   Invitation,
   InvitationFacts,
@@ -56,7 +56,7 @@ import { withStorage } from "./fixture.ts";
 
 const { core, initialized, runGateway } = Support;
 describe("group memberships", () => {
-  const journalId = Log.Id.make("journal");
+  const journalId = Entry.LogId.make("journal");
   const managerId = Member.Id.make("manager");
   const humanId = Member.Id.make("new-human");
   const agentId = Member.Id.make("new-agent");
@@ -820,7 +820,7 @@ describe("group memberships", () => {
               _tag: "Some",
               value: {
                 _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyMember|JournalStore.Conflict)$/,
+                  /^(GroupMembershipService.AlreadyMember|Store.Conflict)$/,
                 ),
               },
             });
@@ -1591,7 +1591,7 @@ describe("group memberships", () => {
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               value: {
                 _tag: expect.stringMatching(
-                  /^(GroupMembershipService.AlreadyRemoved|JournalStore.Conflict)$/,
+                  /^(GroupMembershipService.AlreadyRemoved|Store.Conflict)$/,
                 ),
               },
             });
@@ -1668,7 +1668,7 @@ describe("group memberships", () => {
               expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                 value: {
                   _tag: expect.stringMatching(
-                    /^(GroupMembershipService.InactiveMember|JournalStore.Conflict)$/,
+                    /^(GroupMembershipService.InactiveMember|Store.Conflict)$/,
                   ),
                 },
               });
@@ -1921,7 +1921,7 @@ describe("group memberships", () => {
                       .publish(GroupMembershipFacts.Removed, { ...event.payload, reason: "left" })
                       .pipe(Effect.provideService(Publication.Publication, event.provenance)),
                   ),
-                ).toMatchObject({ _tag: "JournalStore.Conflict" });
+                ).toMatchObject({ _tag: "Store.Conflict" });
               }),
             );
             expect(yield* history(bound)).toEqual(before);

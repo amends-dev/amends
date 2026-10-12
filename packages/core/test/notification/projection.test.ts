@@ -19,6 +19,7 @@ import { DateTime, Effect, Option, Schema } from "effect";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Fact from "../../src/journal/Fact.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Store from "../../src/journal/Store.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
@@ -32,7 +33,7 @@ import { make, type Fixture } from "../memory.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("journal");
+const logId = Entry.LogId.make("journal");
 const Source = Fact.make("notification-test.source", {
   subject: testSubject,
   version: 1,

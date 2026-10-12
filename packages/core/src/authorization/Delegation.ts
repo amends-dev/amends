@@ -10,7 +10,7 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Predicate, Schema } from "effect";
 import * as Actor from "../identity/Actor.ts";
 import * as Member from "../workspace/Member.ts";
 import * as Workspace from "../workspace/Workspace.ts";
@@ -78,7 +78,6 @@ export type Error =
   | WorkspaceStore.Failure
   | AssignmentStore.Failure
   | RoleStore.Failure
-  | PermissionCatalog.Unknown
   | Schema.SchemaError
   | Denied
   | OwnerProtected
@@ -280,3 +279,33 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
  * @since 0.1.0
  */
 export const layer = Layer.effect(Delegation, make());
+
+/**
+ * What a check answers when it refuses the actor: authorization's or delegation's denial, or the
+ * owner's protection.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type Refusal = Authorization.Denied | Denied | OwnerProtected;
+
+const isRefusal = (error: unknown): error is Refusal =>
+  Predicate.isTagged(error, "Authorization.Denied") ||
+  Predicate.isTagged(error, "Delegation.Denied") ||
+  Predicate.isTagged(error, "Delegation.OwnerProtected");
+
+/**
+ * Whether a check of authorization and delegation allows the actor: `false` when it refuses them,
+ * for screens that show what the actor may do; any other failure fails the same.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const isAllowedBy = <A, E, R>(
+  check: Effect.Effect<A, E | Refusal, R>,
+): Effect.Effect<boolean, Exclude<E, Refusal>, R> =>
+  Effect.catchIf<boolean, E | Refusal, R, Refusal, boolean, never, never>(
+    Effect.as(check, true),
+    (error): error is Refusal => isRefusal(error),
+    () => Effect.succeed(false),
+  );

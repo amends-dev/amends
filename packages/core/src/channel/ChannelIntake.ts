@@ -31,7 +31,7 @@ import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import { NotFound, Rejected, Unavailable } from "./internal/channel-errors.ts";
+import { NotFound, Rejected, Unavailable } from "./internal/channel-intake-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import type * as ChannelStore from "./ChannelStore.ts";
@@ -40,7 +40,7 @@ import * as ContactStore from "./ContactStore.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
 export {
   /**
-   * The channel is missing or removed, or the actor may not read it; the three are not told apart.
+   * The channel is missing or removed, so the request reaches no channel.
    *
    * @category errors
    * @since 0.1.0
@@ -63,7 +63,7 @@ export {
    * @since 0.1.0
    */
   Unavailable,
-} from "./internal/channel-errors.ts";
+} from "./internal/channel-intake-errors.ts";
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or
@@ -464,9 +464,15 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         ),
       );
 
+  /** The channel a request is for, which must exist and not be removed. */
+  const requireChannel = (channelId: Channel.Id) =>
+    channelQuery
+      .requireActive(channelId)
+      .pipe(Effect.catchTag("ChannelQuery.NotFound", () => new NotFound({ channelId })));
+
   const receive: ChannelIntake["Service"]["receive"] = Effect.fn("ChannelIntake.receive")(
     function* (channelId, inbound) {
-      const channel = yield* channelQuery.requireActive(channelId);
+      const channel = yield* requireChannel(channelId);
       const transport = yield* transportOf(channel);
       const received = yield* transport
         .receive(inbound)
@@ -488,7 +494,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
 
   const intake: ChannelIntake["Service"]["intake"] = Effect.fn("ChannelIntake.intake")(
     function* (channelId, event) {
-      const channel = yield* channelQuery.requireActive(channelId);
+      const channel = yield* requireChannel(channelId);
       const transport = yield* transportOf(channel);
       return yield* intakeEvent(channel, transport.self, event);
     },

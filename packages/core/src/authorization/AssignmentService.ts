@@ -79,6 +79,15 @@ export type Error =
   | Changed;
 
 /**
+ * What reading a member's access can fail with: the delegation checks it shows, and a member who
+ * is missing or no longer active.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type ListError = Delegation.Error | MemberNotFound | InactiveMember;
+
+/**
  * What `permissions` can fail with: authorization's failures but never `Denied`, since reading
  * one's own permissions needs only active membership.
  *
@@ -107,12 +116,18 @@ export class AssignmentService extends Context.Service<
       Actor.Actor
     >;
     /** The three built-in roles, each with whether the actor may give it, under active membership. */
-    readonly roles: Effect.Effect<ReadonlyArray<Assignment.RoleChoice>, Error, Actor.Actor>;
+    readonly roles: Effect.Effect<
+      ReadonlyArray<Assignment.RoleChoice>,
+      Delegation.Error,
+      Actor.Actor
+    >;
     /**
      * A member's access, under `assignment.read` on them: their active assignments, the roles on
      * offer, and whether the actor may change them.
      */
-    readonly list: (memberId: Member.Id) => Effect.Effect<Assignment.Access, Error, Actor.Actor>;
+    readonly list: (
+      memberId: Member.Id,
+    ) => Effect.Effect<Assignment.Access, ListError, Actor.Actor>;
     /**
      * Give a member a built-in role across the workspace, under `assignment.manage` and the
      * delegation rules for the member and the role. A role they already hold is returned as it is,
@@ -206,14 +221,6 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     if (record.status !== "active") return yield* new InactiveMember({ memberId });
     yield* delegation.requireRecipient(memberId);
   });
-  const isAllowedBy = <A, R>(effect: Effect.Effect<A, Error, R>) =>
-    effect.pipe(
-      Effect.as(true),
-      Effect.catchTag(
-        ["Authorization.Denied", "Delegation.Denied", "Delegation.OwnerProtected"],
-        () => Effect.succeed(false),
-      ),
-    );
   const listRoleChoices = Effect.gen(function* () {
     yield* authorization.require([]);
     return yield* Effect.forEach(
@@ -221,7 +228,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       (id) =>
         Effect.gen(function* () {
           const role = yield* delegation.loadRole(id);
-          return { role, assignable: yield* isAllowedBy(delegation.requireGrant(id)) };
+          return { role, assignable: yield* Delegation.isAllowedBy(delegation.requireGrant(id)) };
         }),
     );
   });
@@ -233,10 +240,16 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     return Assignment.Access.make({
       assignments: yield* delegation.assignmentsFor(memberId),
       roles: yield* listRoleChoices,
-      canManage: record.status === "active" && (yield* isAllowedBy(authorizeRecipient(memberId))),
+      canManage:
+        record.status === "active" && (yield* Delegation.isAllowedBy(authorizeRecipient(memberId))),
     });
   });
-  const isWorkspaceRole = (record: Assignment.Assignment) =>
+  /** Is this a role held across the workspace? Its source then names the role. */
+  const isWorkspaceRole = (
+    record: Assignment.Assignment,
+  ): record is Assignment.Assignment & {
+    readonly source: Extract<Assignment.Source, { readonly _tag: "Role" }>;
+  } =>
     Assignment.Source.isAnyOf(["Role"])(record.source) &&
     Scope.Scope.isAnyOf(["Workspace"])(record.source.scope);
   const assign = Effect.fn("AssignmentService.assign")(
@@ -245,10 +258,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       yield* authorizeRecipient(request.memberId);
       yield* delegation.requireGrant(request.roleId);
       const existing = (yield* delegation.assignmentsFor(request.memberId)).find(
-        (record) =>
-          isWorkspaceRole(record) &&
-          Assignment.Source.isAnyOf(["Role"])(record.source) &&
-          record.source.roleId === request.roleId,
+        (record) => isWorkspaceRole(record) && record.source.roleId === request.roleId,
       );
       if (existing !== undefined) return existing;
       return yield* assignmentCommand.assignRole(request.memberId, request.roleId);
@@ -285,14 +295,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
         current.some(({ id }) => !request.expectedAssignmentIds.includes(id))
       )
         return yield* new Changed({ memberId: request.memberId });
-      for (const record of current) {
-        if (Assignment.Source.isAnyOf(["Role"])(record.source))
-          yield* delegation.requireGrant(record.source.roleId);
-      }
-      const same = current.find(
-        ({ source }) =>
-          Assignment.Source.isAnyOf(["Role"])(source) && source.roleId === request.roleId,
-      );
+      for (const record of current) yield* delegation.requireGrant(record.source.roleId);
+      const same = current.find(({ source }) => source.roleId === request.roleId);
       if (current.length === 1 && same !== undefined) return same;
       for (const record of current) yield* assignmentCommand.revokeAssignment(record);
       return yield* assignmentCommand.assignRole(request.memberId, request.roleId);

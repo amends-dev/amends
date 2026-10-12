@@ -75,10 +75,10 @@ describe("gateway", () => {
                 yield* Effect.all(requests, { concurrency: "unbounded" });
                 expect(
                   yield* Effect.flip(Operations.getMember(b.id, alice, b.ownerMemberId)),
-                ).toMatchObject({ _tag: "Gateway.NotMember" });
+                ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
                 expect(
                   yield* Effect.flip(Operations.getMember(a.id, bob, a.ownerMemberId)),
-                ).toMatchObject({ _tag: "Gateway.NotMember" });
+                ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
                 expect(
                   yield* Effect.flip(Operations.getMember(a.id, alice, b.ownerMemberId)),
                 ).toMatchObject({ _tag: "MemberService.NotFound" });
@@ -277,7 +277,7 @@ describe("gateway", () => {
             }),
           ),
         );
-        expect(outcome.crossed).toMatchObject({ _tag: "Gateway.NotMember" });
+        expect(outcome.crossed).toMatchObject({ _tag: "GatewayErrors.NotMember" });
         expect(outcome.listing.memberships.map((m) => m.workspace.id)).toEqual([outcome.b.id]);
         expect(outcome.listing.invitations).toEqual([
           {
@@ -361,7 +361,7 @@ describe("gateway", () => {
           expect((yield* other.checkpoints.listLive(Core.journalLog)).length).toBe(live.length - 1);
           // The write this host was about to make did not commit, and may simply be retried.
           expect(yield* Effect.flip(createGroup("During"))).toMatchObject({
-            _tag: "Gateway.Conflict",
+            _tag: "GatewayErrors.Conflict",
             operation: "commit",
           });
           const retried = yield* createGroup("During");
@@ -415,7 +415,7 @@ describe("gateway", () => {
           for (const name of ["", " \t\n"]) {
             expect(
               yield* Effect.flip(gateway.createWorkspace(alice.id, { name, memberName: "alice" })),
-            ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
           }
           expect(yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(alice)).toEqual({
             memberships: [],

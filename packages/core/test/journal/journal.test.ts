@@ -5,7 +5,9 @@ import { expect, it } from "@effect/vitest";
 import { Cause, Deferred, Effect, Exit, Fiber, Option, Result, Schema, Stream } from "effect";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Fact from "../../src/journal/Fact.ts";
+import * as Event from "../../src/journal/Event.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Store from "../../src/journal/Store.ts";
@@ -45,8 +47,11 @@ const run = <A, E>(
   );
 const setup = Effect.gen(function* () {
   const log = yield* Log.Log;
-  const journal = yield* Journal.make({ logId: Log.Id.make("domain"), projections: [projection] });
-  const turn = log.open({ id: Log.Id.make("turn/one"), schema: Harness });
+  const journal = yield* Journal.make({
+    logId: Entry.LogId.make("domain"),
+    projections: [projection],
+  });
+  const turn = log.open({ id: Entry.LogId.make("turn/one"), schema: Harness });
   return { logs: log, journal, turn };
 });
 it.effect(
@@ -65,8 +70,8 @@ it.effect(
           const output = yield* Stream.runCollect(turn.stream({ limit: 1 }));
           expect(domain).toHaveLength(1);
           expect(output.map((batch) => batch.position)).toEqual([
-            Log.Position.make(0),
-            Log.Position.make(1),
+            Entry.Position.make(0),
+            Entry.Position.make(1),
           ]);
           expect(
             output.flatMap((batch) => batch.entries.map((entry) => entry.payload._tag)),
@@ -80,7 +85,7 @@ it.effect(
           expect(new Set(output.map((batch) => batch.commit.id)).size).toBe(2);
           const raw = domain[0]?.entries[0];
           if (raw === undefined) throw new Error("Missing fact");
-          expect((yield* Journal.decode(Changed, raw)).payload.amount).toBe(2);
+          expect((yield* Event.decode(Changed, raw)).payload.amount).toBe(2);
         }),
       );
     }),
@@ -126,7 +131,7 @@ it.effect("a caught projection failure still rolls back all logs and projection 
         const { logs, turn } = yield* setup;
         const failing = projection.on(Changed, () => Effect.fail("Rejected"));
         const journal = yield* Journal.make({
-          logId: Log.Id.make("domain"),
+          logId: Entry.LogId.make("domain"),
           projections: [failing],
         });
         const failure = yield* Effect.flip(
@@ -137,7 +142,7 @@ it.effect("a caught projection failure still rolls back all logs and projection 
             }),
           ),
         );
-        expect(failure._tag).toBe("Commit.Aborted");
+        expect(failure._tag).toBe("Transaction.Aborted");
         expect((yield* fixture.snapshot).logs.size).toBe(0);
         expect(yield* (yield* Counter).get).toBe(0);
         yield* logs.commit(Effect.void);
@@ -237,14 +242,14 @@ it.effect("projections cannot recursively append execution or fact entries", () 
           turn.append({ _tag: "Finished" }).pipe(Effect.asVoid),
         );
         const journal = yield* Journal.make({
-          logId: Log.Id.make("domain"),
+          logId: Entry.LogId.make("domain"),
           projections: [invalid],
         });
         const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }));
         expect(failure).toMatchObject({
           _tag: "Projection.Failure",
           phase: "apply",
-          cause: { _tag: "Commit.WriteForbidden" },
+          cause: { _tag: "Transaction.WriteForbidden" },
         });
         expect((yield* fixture.snapshot).logs.size).toBe(0);
       }),
@@ -282,7 +287,7 @@ it.effect("escaped transaction contexts cannot append after completion", () =>
         const failure = yield* Effect.flip(
           turn.append({ _tag: "Finished" }).pipe(Effect.provideContext(captured)),
         );
-        expect(failure._tag).toBe("Commit.Closed");
+        expect(failure._tag).toBe("Transaction.Closed");
         expect(yield* fixture.attempts).toBe(1);
         expect((yield* fixture.snapshot).logs.size).toBe(0);
       }),
@@ -306,7 +311,7 @@ it.effect("expected positions and replay cursors are scoped to their log", () =>
         const conflict = yield* Effect.flip(
           turn.append({ _tag: "Finished" }, { expectedAfter: Option.none() }),
         );
-        expect(conflict._tag).toBe("JournalStore.Conflict");
+        expect(conflict._tag).toBe("Store.Conflict");
         const resumed = yield* Stream.runCollect(turn.stream({ after: first.position, limit: 1 }));
         expect(resumed).toHaveLength(1);
         expect(resumed[0]?.entries[0]?.payload._tag).toBe("Finished");
@@ -330,7 +335,7 @@ it.effect("readers reject batches from another log", () =>
       ...fixture,
       store: Store.Store.of({
         ...fixture.store,
-        read: (_id, options) => fixture.store.read(Log.Id.make("domain"), options),
+        read: (_id, options) => fixture.store.read(Entry.LogId.make("domain"), options),
       }),
     };
     yield* run(

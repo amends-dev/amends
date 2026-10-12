@@ -17,6 +17,7 @@ import { expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Publication from "../../src/journal/Publication.ts";
 import * as Store from "../../src/journal/Store.ts";
@@ -25,7 +26,7 @@ import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("journal");
+const logId = Entry.LogId.make("journal");
 const groupId = Group.Id.make("group");
 const threadId = Thread.Id.make("thread");
 const memberId = Member.Id.make("member");

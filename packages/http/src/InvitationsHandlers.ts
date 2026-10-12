@@ -12,6 +12,7 @@ import { Identity } from "@amends-dev/core/identity";
 import * as Api from "./Api.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { InvitationService } from "@amends-dev/core/workspace";
 import { Accounts, Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
@@ -28,34 +29,26 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "invitations",
   Effect.fn(function* (handlers) {
+    const asMember = yield* makeAsMember;
     const gateway = yield* Gateway.Gateway;
     const accounts = yield* Accounts.Accounts;
     return handlers.handleAll({
       list: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(
-              InvitationService.InvitationService,
-              (invitationService) => invitationService.list,
-            ),
-          ),
+        asMember(
+          params.workspaceId,
+          InvitationService.InvitationService.use((invitationService) => invitationService.list),
         ),
       issue: ({ params, headers, payload: { email, ...invitation } }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.gen(function* () {
-              const recipient = yield* accounts.findOrCreate(email);
-              const invitationService = yield* InvitationService.InvitationService;
-              return yield* invitationService.issue(
-                { ...invitation, recipientId: recipient.id },
-                { requestKey: headers["idempotency-key"] },
-              );
-            }),
-          ),
+        asMember(
+          params.workspaceId,
+          Effect.gen(function* () {
+            const recipient = yield* accounts.findOrCreate(email);
+            const invitationService = yield* InvitationService.InvitationService;
+            return yield* invitationService.issue(
+              { ...invitation, recipientId: recipient.id },
+              { requestKey: headers["idempotency-key"] },
+            );
+          }),
         ),
       accept: ({ params, payload }) =>
         Effect.gen(function* () {
@@ -70,13 +63,10 @@ export const layer = HttpApiBuilder.group(
           );
         }),
       revoke: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-              invitationService.revoke(params.invitationId),
-            ),
+        asMember(
+          params.workspaceId,
+          InvitationService.InvitationService.use((invitationService) =>
+            invitationService.revoke(params.invitationId),
           ),
         ),
     });

@@ -29,7 +29,7 @@ import * as SignalHub from "../../src/signal/SignalHub.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
-const logId = Log.Id.make("journal");
+const logId = Entry.LogId.make("journal");
 const alice = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice-member"),

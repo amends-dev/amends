@@ -10,8 +10,7 @@ import { Context, Crypto, type DateTime, Effect, Layer, Option } from "effect";
 import * as AssignmentCommand from "../authorization/AssignmentCommand.ts";
 import type * as Role from "../authorization/Role.ts";
 import * as Group from "../group/Group.ts";
-import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
-import * as GroupMembership from "../group/GroupMembership.ts";
+import * as GroupCommand from "../group/GroupCommand.ts";
 import * as GroupStore from "../group/GroupStore.ts";
 import type * as Identity from "../identity/Identity.ts";
 import * as Journal from "../journal/Journal.ts";
@@ -21,13 +20,13 @@ import * as MemberFacts from "./MemberFacts.ts";
 import * as Member from "./Member.ts";
 
 /**
- * What adding a member can fail with: the failures of assigning its role and of reading the
- * general group.
+ * What adding a member can fail with: the failures of assigning its role, of reading the general
+ * group, and of admitting the member to it.
  *
  * @category errors
  * @since 0.1.0
  */
-export type Error = AssignmentCommand.Error | GroupStore.Failure;
+export type Error = AssignmentCommand.Error | GroupStore.Failure | GroupCommand.AdmitError;
 
 /**
  * A member to add: who they are, what they are called, the role they start with, and when.
@@ -80,6 +79,7 @@ export class MemberCommand extends Context.Service<
  */
 export const make = Effect.fn("MemberCommand.make")(function* () {
   const assignmentCommand = yield* AssignmentCommand.AssignmentCommand;
+  const groupCommand = yield* GroupCommand.GroupCommand;
   const groupStore = yield* GroupStore.GroupStore;
   const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
@@ -102,14 +102,7 @@ export const make = Effect.fn("MemberCommand.make")(function* () {
     yield* assignmentCommand.assignRole(added.id, member.roleId);
     // A workspace created before general groups existed has none.
     if (Option.isSome(yield* groupStore.get(Group.GeneralId)))
-      yield* journal.publish(GroupMembershipFacts.Added, {
-        id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        groupId: Group.GeneralId,
-        memberId: added.id,
-        admittedAt: member.joinedAt,
-        status: "active",
-      });
+      yield* groupCommand.admitMember(Group.GeneralId, added.id, member.joinedAt);
     return added;
   });
 

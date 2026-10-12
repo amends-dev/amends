@@ -193,7 +193,8 @@ Groups share their internal reads and writes as `GroupQuery` and `GroupCommand`,
 `Operations`. `GroupQuery.requireAudience` checks current workspace and group membership, with no
 action permission and no management bypass; each service checks its own grant beside it, inside its
 commit for writes. `GroupCommand.admitMember` publishes an admission for team creation, direct
-groups, adding, and joining alike. `GroupCommand.removeMembership` records a departure as one fact,
+groups, adding, and joining alike, and for the general group a new workspace starts with and every
+new member joins. `GroupCommand.removeMembership` records a departure as one fact,
 and projections end the member's follow and every thread participation held through the admission
 together. Removing a workspace member uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).
@@ -303,9 +304,9 @@ Notifications never create turns, accept their input, or run work. See
 
 `@amends-dev/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
 `markGroupRead`, over the `ReadStateStore`, which is kept outside the journal.
-`ReadStateCommand.markThreadRead` marks the reader's notifications from the thread seen and advances
-their position; marking a thread read, starting one, and replying all use it, so an author has read
-what they posted. It is what makes ambient activity visible in the
+`ReadStateStore.markThreadRead` advances the reader's position and marks their notifications from
+the thread seen in one write; marking a thread read, starting one, and replying all use it, so an
+author has read what they posted. It is what makes ambient activity visible in the
 [attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient). The
 thread and group projections keep each thread's and group's latest message, and notifications from
 thread activity carry their thread and sequence, so reading a thread settles exactly its
@@ -367,7 +368,7 @@ harness it can run on. `buildRunnable` gives the agent ready to run on a selecti
 (`AgentQuery.Runnable`): its instructions, and the connections of the selection's harness, model,
 and sandbox, each with its key, beside the model as its integration's endpoint takes it. Whoever
 runs the agent builds its harness and sandbox from these with the host's integrations, so core runs
-nothing of an agent. Both fail with `Incomplete` when the agent cannot run.
+nothing of an agent. Both fail with `AgentQuery.Incomplete` when the agent cannot run.
 
 `agent.create` works on the workspace, and `agent.read` and `agent.configure` on the agent's
 membership. Members read agents; administrators and the owner create and configure them.
@@ -574,9 +575,11 @@ Nothing survives the process.
 
 Every store contract builds its store with `make(workspaceId, driver)`, over the driver an
 adapter implements: the store checks each input against its schema, and a record against the
-workspace, through `StoreInput`, before the driver sees it. A driver keeps only what storage
-keeps, such as reused IDs and conditional writes, and an adapter's module returns
-`XStore.make(workspaceId, driver)` from its constructor, as each `layerMemory` does.
+workspace, through `StoreInput`, before the driver sees it. The checkpoint and session log stores,
+whose inputs name no workspace, take the driver alone, and `Store.make` reads the workspace from
+its driver. A driver keeps only what storage keeps, such as reused IDs and conditional writes, and
+an adapter's module returns the contract's `make` over its driver from its constructor, as each
+`layerMemory` does.
 
 - `MemoryDatabase`, in the journal feature, is the storage every connected host shares. Each
   workspace has one `Space`: its commits, log batches, keyed append slices, projected records by
@@ -601,7 +604,7 @@ thread sequences. Lists order IDs by their UTF-8 bytes, as binary collation does
 
 A transaction copies its workspace's maps, runs against the copy, and on success makes the copy
 the committed state; a failure or interruption discards it. A workspace another connection is
-writing reports `JournalStore.Conflict` at once, as a lock wait that timed out immediately would;
+writing reports `Store.Conflict` at once, as a lock wait that timed out immediately would;
 the same connection's writers wait for each other. Each log has a lock shared by every host: a
 transaction takes it on its first append to the log, or lookup of one of its keys, refreshes its
 copy of that log from committed state, and keeps it until it ends; a standalone append takes only
@@ -638,10 +641,12 @@ src/workspace/
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
-The outcomes a caller can act on are schemas in an `internal/` errors module, apart from the
-services, so a protocol or a browser client carries them without loading an implementation; the
-service that reports them exports them under its name, which their tags carry, as
-`MemberService.NotFound`. Helpers no consumer imports go under `internal/` too.
+Every error belongs to the module that raises it, and its tag is its name there, as
+`MemberService.NotFound` or `Store.Conflict`. The outcomes a service reports to callers are schemas
+in an `internal/` errors module, apart from the services, so a protocol or a browser client carries
+them without loading an implementation, and the service exports them. A query defines what it
+raises beside itself, as `ThreadQuery.NotFound`, and a service that calls it maps that to its own
+outcome. Helpers no consumer imports go under `internal/` too.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

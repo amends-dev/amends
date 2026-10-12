@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Option, Semaphore } from "effect";
+import { Context, Effect, Option } from "effect";
+import * as Lanes from "./internal/lanes.ts";
 
 /**
  * The read cap of one pool, keyed by workspace.
@@ -24,11 +25,6 @@ export interface PostgresReads {
   ) => Effect.Effect<A, E, R>;
 }
 
-interface Lane {
-  readonly semaphore: Semaphore.Semaphore;
-  users: number;
-}
-
 /** Marks a fiber already holding a place for a key, so statements inside it do not wait again. */
 class Holding extends Context.Service<Holding, string>()(
   "@amends-dev/storage-postgresql/PostgresReads/Holding",
@@ -41,8 +37,7 @@ class Holding extends Context.Service<Holding, string>()(
  * @since 0.1.0
  */
 export const make = (): PostgresReads => {
-  // A lane lives while it has statements, so keys never accumulate.
-  const lanes = new Map<string, Lane>();
+  const lanes = Lanes.make();
   const run = <A, E, R>(
     key: string,
     permits: number,
@@ -51,19 +46,8 @@ export const make = (): PostgresReads => {
     Effect.flatMap(Effect.serviceOption(Holding), (holding) =>
       Option.contains(holding, key)
         ? effect
-        : Effect.acquireUseRelease(
-            Effect.sync(() => {
-              const lane = lanes.get(key) ?? { semaphore: Semaphore.makeUnsafe(permits), users: 0 };
-              lane.users += 1;
-              lanes.set(key, lane);
-              return lane;
-            }),
-            (lane) => lane.semaphore.withPermits(1)(Effect.provideService(effect, Holding, key)),
-            (lane) =>
-              Effect.sync(() => {
-                lane.users -= 1;
-                if (lane.users === 0 && lanes.get(key) === lane) lanes.delete(key);
-              }),
+        : lanes(key, permits, (semaphore) =>
+            semaphore.withPermits(1)(Effect.provideService(effect, Holding, key)),
           ),
     );
   return { run };

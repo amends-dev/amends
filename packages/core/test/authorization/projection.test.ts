@@ -16,6 +16,7 @@ import * as Target from "../../src/authorization/Target.ts";
 import * as Identity from "../../src/identity/Identity.ts";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Store from "../../src/journal/Store.ts";
 import * as Transaction from "../../src/journal/Transaction.ts";
@@ -28,7 +29,7 @@ import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
-const logId = Log.Id.make("workspace-one/journal");
+const logId = Entry.LogId.make("workspace-one/journal");
 const roleId = Role.Id.make("manager");
 const memberId = Member.Id.make("recipient");
 const roleAssignmentId = Assignment.Id.make("role-assignment");
@@ -333,7 +334,7 @@ it.effect(
               }),
             ),
           );
-          expect(failure._tag).toBe("Commit.Aborted");
+          expect(failure._tag).toBe("Transaction.Aborted");
           expect(yield* fixture.snapshot).toEqual(before);
         }),
       );
@@ -426,7 +427,7 @@ it.effect("a failed role replay batch restores its prior name, permissions, and 
           name: RoleProjection.definition.name,
           version: 1,
         });
-        expect(Option.map(cursor, (c) => c.position)).toEqual(Option.some(Log.Position.make(0)));
+        expect(Option.map(cursor, (c) => c.position)).toEqual(Option.some(Entry.Position.make(0)));
       }),
     );
   }),
@@ -474,7 +475,9 @@ it.effect(
             name: AssignmentProjection.definition.name,
             version: 1,
           });
-          expect(Option.map(cursor, (c) => c.position)).toEqual(Option.some(Log.Position.make(0)));
+          expect(Option.map(cursor, (c) => c.position)).toEqual(
+            Option.some(Entry.Position.make(0)),
+          );
         }),
       );
     }),

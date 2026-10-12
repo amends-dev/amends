@@ -1,5 +1,5 @@
 import { AssignmentFacts, BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization";
-import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication } from "@amends-dev/core/journal";
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
@@ -23,7 +23,7 @@ describe("invitation policy", () => {
             const b = yield* Operations.createWorkspace(charlie.id);
             const invitation = yield* Operations.invite(a.id, alice, request(yield* future));
             const bound = yield* boundTo(a.id);
-            const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+            const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
             expect(
               yield* Effect.flip(
                 Operations.acceptInvitation(a.id, charlie.id, invitation.details.id),
@@ -32,7 +32,9 @@ describe("invitation policy", () => {
             expect(
               yield* Effect.flip(Operations.acceptInvitation(b.id, bob.id, invitation.details.id)),
             ).toMatchObject({ _tag: "InvitationService.NotFound" });
-            expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
+            expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
+              before,
+            );
             yield* Operations.acceptInvitation(a.id, bob.id, invitation.details.id);
             expect(
               yield* Effect.flip(
@@ -197,12 +199,14 @@ describe("invitation policy", () => {
         Effect.gen(function* () {
           const workspace = yield* Operations.createWorkspace(alice.id);
           const bound = yield* boundTo(workspace.id);
-          const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
           for (const roleId of [Role.Id.make("unknown"), BuiltinRoles.OwnerId]) {
             yield* Effect.flip(
               Operations.invite(workspace.id, alice, request(yield* future, bob.id, roleId)),
             );
-            expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
+            expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
+              before,
+            );
           }
           expect(
             yield* Effect.flip(

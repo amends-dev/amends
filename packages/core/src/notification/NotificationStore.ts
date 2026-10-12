@@ -1,10 +1,10 @@
 /**
  * The storage contract for notifications, which every storage adapter implements and
  * `NotificationProjection` writes. `NotificationService` reads inboxes through it and marks what a
- * person saw; `ReadStateCommand` marks what reading a thread settles; `GroupService` counts what
- * waits in each group; and `TurnExecution` and `DeliveryExecution` list what an agent or a contact
- * was told in a thread. The store checks what it is given and authorizes nobody: operations do
- * that.
+ * person saw; `GroupService` counts what waits in each group; and `TurnExecution` and
+ * `DeliveryExecution` list what an agent or a contact was told in a thread. Reading a thread
+ * settles its notifications through `ReadStateStore`. The store checks what it is given and
+ * authorizes nobody: operations do that.
  *
  * @since 0.1.0
  */

@@ -38,7 +38,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 }),
               ),
             ),
-          ).toMatchObject({ _tag: "JournalStore.Failure", operation: "commit" });
+          ).toMatchObject({ _tag: "Store.Failure", operation: "commit" });
           expect(yield* bound.invitations.get(Invitation.Id.make("second"))).toEqual(Option.none());
         }),
       ),

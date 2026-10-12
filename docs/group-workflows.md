@@ -4,7 +4,7 @@ Team groups: creating them, reading them, finding and joining public ones, manag
 and following them.
 The operations are `GroupService`, `GroupMembershipService`, and `GroupFollowService`
 in a workspace context, such as `Gateway.asMember`. The gateway preserves the outcomes named below
-and maps malformed input to `Gateway.InvalidInput`. Direct groups (DMs and group DMs) start with
+and maps malformed input to `GatewayErrors.InvalidInput`. Direct groups (DMs and group DMs) start with
 their first thread; see [starting a direct group](thread-workflows.md#starting-a-direct-group).
 The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
 broader design, and the [HTTP contract](../packages/http/README.md#conversations) exposes these

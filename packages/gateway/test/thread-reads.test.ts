@@ -23,9 +23,9 @@ import { Actor, Identity } from "@amends-dev/core/identity";
 import { Notification } from "@amends-dev/core/notification";
 import {
   Checkpoint,
+  Entry,
   Fact,
   Journal,
-  Log,
   Publication,
   Store,
   Subject,
@@ -101,7 +101,7 @@ describe("thread reads", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const get = (id: Thread.Id) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) => threadService.get(id));
   /** Readable threads of a group as records in ID order; listing order has its own test. */
@@ -960,7 +960,7 @@ describe("thread reads", () => {
                   timeline(opened.thread.id, { limit: 0 }),
                 ),
               ),
-            ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
           }),
         ),
       ),

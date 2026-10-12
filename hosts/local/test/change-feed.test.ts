@@ -224,7 +224,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* bob.changeFeed
               .watch({ params: { workspaceId: workspace.id }, query: {} })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "Gateway.NotMember" });
+          ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
           yield* Effect.all([second.close, foreign.close, reconnected.close, resumed.close]);
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
       ),
@@ -369,12 +369,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const first = yield* listen(alice, workspace.id);
         yield* listen(alice, workspace.id);
         expect(yield* refused(alice)).toMatchObject({
-          _tag: "Api.TooManyStreams",
+          _tag: "ApiErrors.TooManyStreams",
           limit: "member",
         });
         yield* listen(bob, workspace.id);
         expect(yield* refused(carol)).toMatchObject({
-          _tag: "Api.TooManyStreams",
+          _tag: "ApiErrors.TooManyStreams",
           limit: "workspace",
         });
         // Closing a stream gives its place back, to its member and to the workspace.

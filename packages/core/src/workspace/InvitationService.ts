@@ -297,9 +297,11 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
 
   const revoke = Effect.fn("InvitationService.revoke")(
     function* (id: Invitation.Id) {
+      // Managing invitations is checked first, so a caller who may not learns nothing of this one.
       yield* authorization.require([manage]);
       const invitation = yield* requireInvitation(id);
-      const actor = yield* authorizeInvitation(invitation.details);
+      yield* delegation.requireGrant(invitation.details.roleId);
+      const actor = yield* Actor.Actor;
       if (Invitation.State.isAnyOf(["Revoked"])(invitation.state)) return invitation;
       if (Invitation.State.isAnyOf(["Accepted"])(invitation.state))
         return yield* new Unavailable({ invitationId: id, reason: "accepted" });

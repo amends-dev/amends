@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends-dev/core/authorization";
 import { Group, GroupService, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication } from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   Thread,
@@ -48,7 +48,7 @@ describe("thread starts", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 200 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 200 });
   const startDirect = (
     memberIds: ReadonlyArray<Member.Id>,
     mentions: ReadonlyArray<Member.Id> = [],

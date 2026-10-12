@@ -9,7 +9,7 @@ import * as Core from "@amends-dev/core";
 import { ReadStateStore } from "@amends-dev/core/read-state";
 import { AssignmentStore, RoleStore } from "@amends-dev/core/authorization";
 import { Identity, Performer } from "@amends-dev/core/identity";
-import { Event, Checkpoint, Log, Store } from "@amends-dev/core/journal";
+import { Checkpoint, Entry, Event, Store } from "@amends-dev/core/journal";
 import { NotificationStore } from "@amends-dev/core/notification";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
 import {
@@ -43,7 +43,7 @@ export const setup = () => {
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
 export const workspaceId = Workspace.Id.make("workspace-one");
-export const journalLog = Log.Id.make("journal");
+export const journalLog = Entry.LogId.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (

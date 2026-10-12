@@ -9,7 +9,7 @@ import {
   GroupMembershipService,
 } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication } from "@amends-dev/core/journal";
 import {
   Thread,
   ThreadService,
@@ -57,7 +57,7 @@ describe("read state", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 });
   const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id>) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, text: "Opening", mentions }),
@@ -327,16 +327,20 @@ describe("read state", () => {
           const threadId = started.thread.id;
           const position = (readThrough: number, changes: Partial<ReadState.ThreadPosition> = {}) =>
             Object.assign({ workspaceId, memberId: humanId, threadId, readThrough }, changes);
-          yield* bound.readStates.advanceThread(position(2));
-          yield* bound.store.transaction(bound.readStates.advanceThread(position(1)));
+          const seenAt = yield* DateTime.now;
+          yield* bound.readStates.markThreadRead(position(2), seenAt);
+          yield* bound.store.transaction(bound.readStates.markThreadRead(position(1), seenAt));
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([2]);
-          yield* bound.store.transaction(bound.readStates.advanceThread(position(5)));
+          yield* bound.store.transaction(bound.readStates.markThreadRead(position(5), seenAt));
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([5]);
           // A rolled-back transaction takes its write with it.
           expect(
             yield* Effect.flip(
               bound.store.transaction(
-                Effect.andThen(bound.readStates.advanceThread(position(9)), Effect.fail("undo")),
+                Effect.andThen(
+                  bound.readStates.markThreadRead(position(9), seenAt),
+                  Effect.fail("undo"),
+                ),
               ),
             ),
           ).toBe("undo");
@@ -347,14 +351,16 @@ describe("read state", () => {
           const open = yield* bound.store
             .transaction(
               Effect.gen(function* () {
-                yield* bound.readStates.advanceThread(position(6));
+                yield* bound.readStates.markThreadRead(position(6), seenAt);
                 yield* Deferred.succeed(staged, undefined);
                 yield* Deferred.await(release);
               }),
             )
             .pipe(Effect.forkChild);
           yield* Deferred.await(staged);
-          const outside = yield* bound.readStates.advanceThread(position(7)).pipe(Effect.forkChild);
+          const outside = yield* bound.readStates
+            .markThreadRead(position(7), seenAt)
+            .pipe(Effect.forkChild);
           // Let the outside write land first where storage allows; a database may make it wait
           // for the transaction instead. Either order must keep the later value.
           for (let turn = 0; turn < 5; turn++) yield* Effect.yieldNow;
@@ -364,7 +370,10 @@ describe("read state", () => {
           expect(yield* positionOf(bound, humanId, threadId)).toEqual([7]);
           expect(
             yield* Effect.flip(
-              bound.readStates.advanceThread(position(1, { workspaceId: otherWorkspaceId })),
+              bound.readStates.markThreadRead(
+                position(1, { workspaceId: otherWorkspaceId }),
+                seenAt,
+              ),
             ),
           ).toMatchObject({ _tag: "ReadStateStore.Conflict" });
           // Read state references no projection rows, so rebuilding threads from the journal keeps it.

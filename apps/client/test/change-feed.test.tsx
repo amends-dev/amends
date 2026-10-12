@@ -272,7 +272,7 @@ it("ends and refreshes the directory when the member loses the workspace", async
   let denied = false;
   const f = fixture({
     changes: () =>
-      denied ? json({ _tag: "Gateway.NotMember", workspaceId: "one" }, 403) : undefined,
+      denied ? json({ _tag: "GatewayErrors.NotMember", workspaceId: "one" }, 403) : undefined,
   });
   const first = await f.connected(0);
   first.send(ready("2", true));
@@ -297,7 +297,7 @@ it("ends and refreshes the directory when the member loses the workspace", async
 
 it("clears rejected credentials instead of reconnecting", async () => {
   const f = fixture({
-    changes: () => json({ _tag: "Api.Unauthorized", message: "Unauthorized" }, 401),
+    changes: () => json({ _tag: "Authentication.Unauthorized", message: "Unauthorized" }, 401),
   });
   await waitFor(() => expect(f.store.read()).toBeUndefined());
 });

@@ -20,6 +20,7 @@ import * as Actor from "../../../src/identity/Actor.ts";
 import * as Identity from "../../../src/identity/Identity.ts";
 import * as Checkpoint from "../../../src/journal/Checkpoint.ts";
 import * as Journal from "../../../src/journal/Journal.ts";
+import * as Entry from "../../../src/journal/Entry.ts";
 import * as Log from "../../../src/journal/Log.ts";
 import * as Store from "../../../src/journal/Store.ts";
 import * as InvitationStore from "../../../src/workspace/InvitationStore.ts";
@@ -88,7 +89,7 @@ const configured = (
     PermissionCatalog.layer([MemberPermissions.Read, MemberPermissions.Remove]),
   );
   const journal = Journal.layer({
-    logId: Log.Id.make("workspace-one/journal"),
+    logId: Entry.LogId.make("workspace-one/journal"),
     projections: [MemberProjection.definition, AssignmentProjection.definition],
   }).pipe(Layer.provide(Log.layer));
   const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));

@@ -27,39 +27,18 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
     HttpApiEndpoint.get("settings", "/:workspaceId/settings", {
       params: { workspaceId: Workspace.Id },
       success: WorkspaceSettings.View,
-      error: [
-        ...ApiErrors.member,
-        ...ApiErrors.assignment,
-        ApiErrors.MemberNotFound,
-        ApiErrors.OwnerProtected,
-        ApiErrors.AlreadyRemoved,
-        ApiErrors.WorkspaceChanged,
-      ],
+      error: [...ApiErrors.member, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.put("rename", "/:workspaceId/name", {
       params: { workspaceId: Workspace.Id },
       payload: WorkspaceSettings.RenameInput,
       success: Workspace.Workspace,
-      error: [
-        ...ApiErrors.member,
-        ...ApiErrors.assignment,
-        ApiErrors.MemberNotFound,
-        ApiErrors.OwnerProtected,
-        ApiErrors.AlreadyRemoved,
-        ApiErrors.WorkspaceChanged,
-      ],
+      error: [...ApiErrors.member, ApiErrors.WorkspaceChanged],
     }),
     HttpApiEndpoint.get("members", "/:workspaceId/member-management", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(WorkspaceSettings.MemberEntry),
-      error: [
-        ...ApiErrors.member,
-        ...ApiErrors.assignment,
-        ApiErrors.MemberNotFound,
-        ApiErrors.OwnerProtected,
-        ApiErrors.AlreadyRemoved,
-        ApiErrors.WorkspaceChanged,
-      ],
+      error: [...ApiErrors.member, ...ApiErrors.delegation, ApiErrors.MemberNotFound],
     }),
     HttpApiEndpoint.post("create", "/", {
       headers: ApiErrors.requestKey,

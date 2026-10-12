@@ -1,6 +1,6 @@
 import { AssignmentService } from "@amends-dev/core/authorization";
 import { ChangeFeedService } from "@amends-dev/core/change-feed";
-import { Log, Store } from "@amends-dev/core/journal";
+import { Entry, Store } from "@amends-dev/core/journal";
 import { Notification, NotificationService } from "@amends-dev/core/notification";
 import {
   InvitationService,
@@ -33,7 +33,7 @@ export const reads = (fixture: Fixture) => {
                 memberName: "alice",
               });
               const bound = yield* boundTo(workspace.id);
-              const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+              const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
               const writer = yield* forWorkspace(yield* storage.connect(), workspace.id);
               const entered = yield* Deferred.make<void>();
               const release = yield* Deferred.make<void>();
@@ -41,7 +41,7 @@ export const reads = (fixture: Fixture) => {
                 .transaction(
                   Effect.gen(function* () {
                     yield* (yield* Store.Transaction).append({
-                      logId: Log.Id.make("background"),
+                      logId: Entry.LogId.make("background"),
                       entries: [{ payload: new Uint8Array([1]) }],
                     });
                     yield* Deferred.succeed(entered, undefined);
@@ -100,10 +100,10 @@ export const reads = (fixture: Fixture) => {
                       ),
                     ),
                   ),
-                ).toMatchObject({ _tag: "Gateway.Conflict" });
+                ).toMatchObject({ _tag: "GatewayErrors.Conflict" });
               }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)));
               yield* Fiber.join(writing);
-              expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
+              expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
                 before,
               );
             }).pipe(Effect.provide(gateway(host)));

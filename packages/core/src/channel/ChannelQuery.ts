@@ -17,8 +17,17 @@ import * as Connection from "../connection/Connection.ts";
 import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import * as Channel from "./Channel.ts";
-import { NotFound } from "./internal/channel-errors.ts";
 import * as ChannelStore from "./ChannelStore.ts";
+
+/**
+ * The channel is missing or removed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class NotFound extends Schema.TaggedError<NotFound>()("ChannelQuery.NotFound", {
+  channelId: Channel.Id,
+}) {}
 
 /**
  * The channel's external system cannot be reached as the channel stands: its connection was
@@ -42,8 +51,6 @@ export type Error = ConnectionStore.Failure | ConnectionCredentialStore.Failure;
 
 /**
  * The shared reads of channels. Internal: not among `Core.Operations`.
- *
- * The shared reads.
  *
  * @category services
  * @since 0.1.0

@@ -63,7 +63,6 @@ import * as GroupMembershipProjection from "./group/GroupMembershipProjection.ts
 import * as GroupFollowService from "./group/GroupFollowService.ts";
 import * as GroupFollowProjection from "./group/GroupFollowProjection.ts";
 import * as ReadStateService from "./read-state/ReadStateService.ts";
-import * as ReadStateCommand from "./read-state/ReadStateCommand.ts";
 import * as GroupMembershipService from "./group/GroupMembershipService.ts";
 import * as GroupMembershipPermissions from "./group/GroupMembershipPermissions.ts";
 import * as GroupPermissions from "./group/GroupPermissions.ts";
@@ -77,6 +76,7 @@ import * as GrantResolver from "./authorization/GrantResolver.ts";
 import * as PermissionCatalog from "./authorization/PermissionCatalog.ts";
 import * as RoleProjection from "./authorization/RoleProjection.ts";
 import * as Journal from "./journal/Journal.ts";
+import * as Entry from "./journal/Entry.ts";
 import * as Log from "./journal/Log.ts";
 import * as NotificationService from "./notification/NotificationService.ts";
 import * as NotificationProjection from "./notification/NotificationProjection.ts";
@@ -184,7 +184,7 @@ const activityResolvers = [
  * @category constructors
  * @since 0.1.0
  */
-export const journalLog = Log.Id.make("journal");
+export const journalLog = Entry.LogId.make("journal");
 
 /**
  * The domain journal and its log, over host storage. A commit that publishes a fact that changes
@@ -215,8 +215,9 @@ const taskCommand = TaskCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
 );
 const channelQuery = ChannelQuery.layer;
-const readStateCommand = ReadStateCommand.layer;
-const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
+const memberCommand = MemberCommand.layer.pipe(
+  Layer.provide(Layer.mergeAll(AssignmentCommand.layer, groupCommand)),
+);
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
@@ -262,7 +263,6 @@ const operations = Layer.mergeAll(
       groupCommand,
       threadQuery,
       threadCommand,
-      readStateCommand,
       turnCommand,
       taskCommand,
       channelQuery,

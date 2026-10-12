@@ -22,7 +22,7 @@ import * as Store from "./Store.ts";
  * @category errors
  * @since 0.1.0
  */
-export class Aborted extends Schema.TaggedError<Aborted>()("Commit.Aborted", {
+export class Aborted extends Schema.TaggedError<Aborted>()("Transaction.Aborted", {
   cause: Schema.Defect(),
 }) {}
 
@@ -33,7 +33,7 @@ export class Aborted extends Schema.TaggedError<Aborted>()("Commit.Aborted", {
  * @category errors
  * @since 0.1.0
  */
-export class Closed extends Schema.TaggedError<Closed>()("Commit.Closed", {}) {}
+export class Closed extends Schema.TaggedError<Closed>()("Transaction.Closed", {}) {}
 
 /**
  * A write reached a commit it does not belong to: one another coordinator opened, a native
@@ -42,7 +42,7 @@ export class Closed extends Schema.TaggedError<Closed>()("Commit.Closed", {}) {}
  * @category errors
  * @since 0.1.0
  */
-export class Foreign extends Schema.TaggedError<Foreign>()("Commit.Foreign", {}) {}
+export class Foreign extends Schema.TaggedError<Foreign>()("Transaction.Foreign", {}) {}
 
 /**
  * A write was attempted where writes are forbidden, such as a projection appending to a log;
@@ -51,9 +51,12 @@ export class Foreign extends Schema.TaggedError<Foreign>()("Commit.Foreign", {})
  * @category errors
  * @since 0.1.0
  */
-export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()("Commit.WriteForbidden", {
-  reason: Schema.String,
-}) {}
+export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()(
+  "Transaction.WriteForbidden",
+  {
+    reason: Schema.String,
+  },
+) {}
 
 /**
  * A commit's storage work began a step while another fiber's step was running. A commit runs its
@@ -63,7 +66,7 @@ export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()("Commit
  * @category errors
  * @since 0.1.0
  */
-export class Concurrent extends Schema.TaggedError<Concurrent>()("Commit.Concurrent", {}) {}
+export class Concurrent extends Schema.TaggedError<Concurrent>()("Transaction.Concurrent", {}) {}
 
 /**
  * What running a commit can fail with: storage's failures, conflicts, and uncertain outcomes, and
@@ -178,7 +181,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
   const store = yield* Store.Store;
   const owner = Symbol("transaction coordinator");
 
-  const run = Effect.fn("Commit.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
+  const run = Effect.fn("Transaction.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
     const current = yield* Effect.serviceOption(Current);
     if (Option.isSome(current)) {
       const state = current.value;
@@ -249,7 +252,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     return result.value;
   });
 
-  const operation = Effect.fn("Commit.operation")(function* <A, E, R>(
+  const operation = Effect.fn("Transaction.operation")(function* <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ) {
     return yield* run(
@@ -275,7 +278,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     );
   });
 
-  const step = Effect.fn("Commit.step")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
+  const step = Effect.fn("Transaction.step")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
     const current = yield* Effect.serviceOption(Current);
     if (Option.isNone(current) || current.value.owner !== owner || !current.value.active)
       return yield* program;

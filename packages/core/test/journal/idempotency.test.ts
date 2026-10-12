@@ -5,6 +5,8 @@ import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Event from "../../src/journal/Event.ts";
 import * as Fact from "../../src/journal/Fact.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Occurrence from "../../src/journal/Occurrence.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Publication from "../../src/journal/Publication.ts";
@@ -16,8 +18,8 @@ import { testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("journal");
-const key = Log.IdempotencyKey.make("operation/one");
+const logId = Entry.LogId.make("journal");
+const key = Occurrence.Key.make("operation/one");
 const Changed = Fact.make("counter.changed", {
   subject: testSubject,
   version: 1,
@@ -149,7 +151,7 @@ it.effect(
         Effect.gen(function* () {
           const journal = yield* Journal.Journal;
           yield* journal.publish(Changed, 1, { idempotencyKey: key });
-          const second = Log.IdempotencyKey.make("operation/two");
+          const second = Occurrence.Key.make("operation/two");
           const error = yield* Effect.flip(
             journal.commit(
               Effect.gen(function* () {
@@ -158,7 +160,7 @@ it.effect(
               }),
             ),
           );
-          expect(error._tag).toBe("Commit.Aborted");
+          expect(error._tag).toBe("Transaction.Aborted");
           expect(yield* journal.log.getAppend(second)).toEqual(Option.none());
           expect(yield* fixture.counter.get).toBe(1);
           for (const fact of [
@@ -167,9 +169,9 @@ it.effect(
           ])
             expect(
               (yield* Effect.flip(journal.publish(fact, 1, { idempotencyKey: key })))._tag,
-            ).toBe("JournalStore.Conflict");
+            ).toBe("Store.Conflict");
           const failing = yield* Journal.make({
-            logId: Log.Id.make("failing"),
+            logId: Entry.LogId.make("failing"),
             projections: [
               Projection.make("failing", { version: 1 }).on(Changed, () => Effect.fail("reject")),
             ],
@@ -178,7 +180,10 @@ it.effect(
             (yield* Effect.flip(failing.publish(Changed, 1, { idempotencyKey: key })))._tag,
           ).toBe("Projection.Failure");
           expect(yield* failing.log.getAppend(key)).toEqual(Option.none());
-          const retry = yield* Journal.make({ logId: Log.Id.make("failing"), projections: [] });
+          const retry = yield* Journal.make({
+            logId: Entry.LogId.make("failing"),
+            projections: [],
+          });
           yield* retry.publish(Changed, 1, { idempotencyKey: key });
         }),
       );
@@ -194,7 +199,10 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const log = yield* Log.Log;
-          const executionLog = log.open({ id: Log.Id.make("execution"), schema: Schema.String });
+          const executionLog = log.open({
+            id: Entry.LogId.make("execution"),
+            schema: Schema.String,
+          });
           const first = yield* log.commit(
             Effect.gen(function* () {
               yield* executionLog.append("before");
@@ -217,24 +225,22 @@ it.effect(
           for (const input of [["one"], ["two", "one"], ["one", "changed"]])
             expect(
               (yield* Effect.flip(executionLog.appendAll(input, { idempotencyKey: key })))._tag,
-            ).toBe("JournalStore.Conflict");
+            ).toBe("Store.Conflict");
           expect(
             (yield* Effect.flip(
-              executionLog.appendAll([], { idempotencyKey: Log.IdempotencyKey.make("empty") }),
+              executionLog.appendAll([], { idempotencyKey: Occurrence.Key.make("empty") }),
             ))._tag,
           ).toBe("SchemaError");
           expect(
             (yield* Effect.flip(
               executionLog.append("new", {
-                idempotencyKey: Log.IdempotencyKey.make("new"),
+                idempotencyKey: Occurrence.Key.make("new"),
                 expectedAfter: Option.none(),
               }),
             ))._tag,
-          ).toBe("JournalStore.Conflict");
-          expect(yield* executionLog.getAppend(Log.IdempotencyKey.make("new"))).toEqual(
-            Option.none(),
-          );
-          const other = log.open({ id: Log.Id.make("other"), schema: Schema.String });
+          ).toBe("Store.Conflict");
+          expect(yield* executionLog.getAppend(Occurrence.Key.make("new"))).toEqual(Option.none());
+          const other = log.open({ id: Entry.LogId.make("other"), schema: Schema.String });
           yield* other.append("different", { idempotencyKey: key });
           const a = yield* executionLog.append("unkeyed");
           const b = yield* executionLog.append("unkeyed");
@@ -272,7 +278,7 @@ it.effect(
         broken,
         Effect.gen(function* () {
           const log = (yield* Log.Log).open({
-            id: Log.Id.make("guarded"),
+            id: Entry.LogId.make("guarded"),
             schema: Schema.String,
           });
           // The store resolves the key itself; the log trusts its returned entries.
@@ -281,7 +287,7 @@ it.effect(
           expect((yield* Effect.flip(log.getAppend(key)))._tag).toBe("SchemaError");
         }),
       );
-      expect((yield* fixture.snapshot).logs.get(Log.Id.make("guarded"))).toHaveLength(1);
+      expect((yield* fixture.snapshot).logs.get(Entry.LogId.make("guarded"))).toHaveLength(1);
       const failure = new Store.Failure({ operation: "getAppend", cause: "lookup unavailable" });
       const unavailable: Fixture = {
         ...fixture,
@@ -291,13 +297,13 @@ it.effect(
         unavailable,
         Effect.gen(function* () {
           const log = (yield* Log.Log).open({
-            id: Log.Id.make("guarded"),
+            id: Entry.LogId.make("guarded"),
             schema: Schema.String,
           });
           expect(yield* Effect.flip(log.getAppend(key))).toBe(failure);
           expect((yield* log.append("value", { idempotencyKey: key })).payload).toBe("value");
         }),
       );
-      expect((yield* fixture.snapshot).logs.get(Log.Id.make("guarded"))).toHaveLength(1);
+      expect((yield* fixture.snapshot).logs.get(Entry.LogId.make("guarded"))).toHaveLength(1);
     }),
 );

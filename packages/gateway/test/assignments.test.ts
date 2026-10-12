@@ -2,7 +2,7 @@ import { AssignmentService, BuiltinRoles, Role } from "@amends-dev/core/authoriz
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Log, Store } from "@amends-dev/core/journal";
+import { Entry, Store } from "@amends-dev/core/journal";
 
 import type { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
@@ -43,8 +43,10 @@ describe("assignments", () => {
           const { workspace, viewer, admin, bound } = yield* setup;
           const other = yield* Operations.createWorkspace(alice.id);
           const otherBound = yield* boundTo(other.id);
-          const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
-          const otherBefore = yield* otherBound.store.read(Log.Id.make("journal"), { limit: 20 });
+          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
+          const otherBefore = yield* otherBound.store.read(Entry.LogId.make("journal"), {
+            limit: 20,
+          });
           const first = (yield* bound.assignments.listActiveByMember(viewer.id))[0];
           if (first === undefined) throw new Error("Missing Viewer assignment");
           expect(
@@ -56,15 +58,17 @@ describe("assignments", () => {
             ),
           ).toMatchObject({ _tag: "AssignmentService.MemberNotFound" });
           expect(yield* Effect.flip(Operations.access(other.id, bob, viewer.id))).toMatchObject({
-            _tag: "Gateway.NotMember",
+            _tag: "GatewayErrors.NotMember",
           });
           expect(
             yield* Effect.flip(
               Operations.revokeAssignment(workspace.id, alice, admin.id, first.id),
             ),
           ).toMatchObject({ _tag: "AssignmentService.NotFound" });
-          expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
-          expect(yield* otherBound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
+          expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
+            before,
+          );
+          expect(yield* otherBound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
             otherBefore,
           );
         }),
@@ -103,7 +107,7 @@ describe("assignments", () => {
                 id: Identity.HumanId.make("stranger"),
               }),
             ),
-          ).toMatchObject({ _tag: "Gateway.NotMember" });
+          ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
         }),
       ),
     ),
@@ -117,12 +121,14 @@ describe("assignments", () => {
           storage,
           Effect.gen(function* () {
             const { workspace, viewer, bound } = yield* setup;
-            const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+            const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
             const duplicate = yield* Operations.assign(workspace.id, alice, {
               memberId: viewer.id,
               roleId: BuiltinRoles.MemberId,
             });
-            expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
+            expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
+              before,
+            );
             const admin = yield* Operations.assign(workspace.id, alice, {
               memberId: viewer.id,
               roleId: BuiltinRoles.AdministratorId,
@@ -146,7 +152,7 @@ describe("assignments", () => {
               value: { status: "revoked" },
             });
             expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual([changed]);
-            const batches = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+            const batches = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
             expect(batches.at(-1)?.entries).toHaveLength(2);
             expect(
               yield* Effect.flip(
@@ -227,10 +233,10 @@ describe("assignments", () => {
                 roleId: Role.Id.make("invented"),
               }),
             ];
-            const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 30 });
+            const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 30 });
             for (const attempt of attempts) {
               yield* Effect.flip(attempt);
-              expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 30 })).toEqual(
+              expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 30 })).toEqual(
                 before,
               );
             }
@@ -272,7 +278,7 @@ describe("assignments", () => {
                 expect(results.filter(Result.isSuccess)).toHaveLength(1);
                 const rejected = results.find((result) => Result.isFailure(result));
                 // A writer that waited sees the winner's change; one that gave up reports contention.
-                expect(["AssignmentService.Changed", "Gateway.Conflict"]).toContain(
+                expect(["AssignmentService.Changed", "GatewayErrors.Conflict"]).toContain(
                   rejected !== undefined && Result.isFailure(rejected)
                     ? rejected.failure._tag
                     : undefined,
@@ -311,7 +317,7 @@ describe("assignments", () => {
         Effect.gen(function* () {
           const { workspace, viewer, bound } = yield* setup;
           const active = yield* bound.assignments.listActiveByMember(viewer.id);
-          const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+          const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
           const failure = new Store.Failure({
             operation: "commit",
             cause: "injected late failure",
@@ -336,7 +342,9 @@ describe("assignments", () => {
           );
           expect(rejected).toBe(failure);
           expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual(active);
-          expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
+          expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
+            before,
+          );
         }),
       ),
     ),

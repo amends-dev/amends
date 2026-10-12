@@ -9,7 +9,7 @@ import {
 } from "@amends-dev/core/authorization";
 import { GroupService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication } from "@amends-dev/core/journal";
 import { Notification } from "@amends-dev/core/notification";
 import { Request } from "@amends-dev/core/request";
 import { Task, TaskPermissions, TaskService } from "@amends-dev/core/task";
@@ -59,7 +59,7 @@ describe("tasks", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   /** A recipient's notifications oldest first: the position each is about, and whether it asks work. */
   /** What a recipient was told, by thread sequence: one change tells everyone at one instant. */
   const toldOf = (bound: Bound, recipient: Notification.Recipient) =>

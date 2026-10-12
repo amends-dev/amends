@@ -20,7 +20,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -122,7 +122,7 @@ describe("threads", () => {
     Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name, memberIds: members }),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const seed = (bound: Bound) =>
     publish(
       bound,
@@ -799,7 +799,7 @@ describe("threads", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, owner, startOnly(group.id, [], " ")),
               ),
-            ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
           }),
         ),
       ),
@@ -927,7 +927,7 @@ describe("threads", () => {
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
                   _tag: expect.stringMatching(
-                    /^(JournalStore.Conflict|ThreadService.ParticipantUnavailable)$/,
+                    /^(Store.Conflict|ThreadService.ParticipantUnavailable)$/,
                   ),
                 },
               });
@@ -983,7 +983,7 @@ describe("threads", () => {
             expect(
               yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
             ).toMatchObject({
-              _tag: "JournalStore.Failure",
+              _tag: "Store.Failure",
             });
             expect(yield* history(bound)).toEqual(before);
             expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);

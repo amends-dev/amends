@@ -241,7 +241,7 @@ rule (`Delegation.recipientDenial`) that role changes and removals enforce.
 
 `PUT …/name` accepts `{ name, expectedName }`, requires `workspace.rename`, and
 records `workspace.renamed` with the old and new name. A different current name
-returns 409 `WorkspaceSettings.Changed`; retrying an already-applied name succeeds
+returns 409 `WorkspaceSettingsService.Changed`; retrying an already-applied name succeeds
 without another fact. This compares names, not a version: a rename away and back
 is not detected. Creation attribution and ownership remain unchanged. The built-in
 Owner bundle includes rename permission. The directory reads the updated

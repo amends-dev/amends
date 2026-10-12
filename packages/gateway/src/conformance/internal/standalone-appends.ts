@@ -1,10 +1,10 @@
-import { Log, Store } from "@amends-dev/core/journal";
+import { Entry, Occurrence, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option } from "effect";
 import type { Fixture } from "../Fixture.ts";
 import { type Bound, forWorkspace, workspaceId } from "../Support.ts";
 
-const execution = Log.Id.make("execution");
+const execution = Entry.LogId.make("execution");
 const byValue = (left: number | undefined, right: number | undefined) => (left ?? 0) - (right ?? 0);
 const entry = (byte: number): Store.Content => ({ payload: new Uint8Array([byte]) });
 const alone = (bound: Bound, byte: number, options: Store.AppendOptions = {}) =>
@@ -14,7 +14,7 @@ const alone = (bound: Bound, byte: number, options: Store.AppendOptions = {}) =>
  * Hold a transaction open on the bound workspace until released, after it appends to the given
  * logs; the fiber ends with its commit or rollback.
  */
-const holding = (bound: Bound, logs: ReadonlyArray<Log.Id>, outcome: "commit" | "rollback") =>
+const holding = (bound: Bound, logs: ReadonlyArray<Entry.LogId>, outcome: "commit" | "rollback") =>
   Effect.gen(function* () {
     const entered = yield* Deferred.make<void>();
     const release = yield* Deferred.make<void>();
@@ -46,12 +46,12 @@ export const standaloneAppends = (fixture: Fixture) => {
               yield* storage.connect({ failFast: true }),
               workspaceId,
             );
-            const held = yield* holding(writer, [Log.Id.make("background")], "commit");
+            const held = yield* holding(writer, [Entry.LogId.make("background")], "commit");
             const [appended] = yield* alone(other, 1);
             expect(appended).toMatchObject({ logId: execution, position: 0, index: 0 });
             // The workspace itself is still busy for a transaction.
             expect(yield* Effect.flip(other.store.transaction(Effect.void))).toMatchObject({
-              _tag: "JournalStore.Conflict",
+              _tag: "Store.Conflict",
             });
             yield* held.release;
             expect((yield* held.done)._tag).toBe("Success");
@@ -104,7 +104,10 @@ export const standaloneAppends = (fixture: Fixture) => {
               const held = yield* holding(writer, [execution], outcome);
               const waiting = yield* Effect.forkChild(alone(other, 9));
               // Another log is not held, so its append goes ahead meanwhile.
-              yield* other.store.append({ logId: Log.Id.make("unrelated"), entries: [entry(1)] });
+              yield* other.store.append({
+                logId: Entry.LogId.make("unrelated"),
+                entries: [entry(1)],
+              });
               yield* Effect.sleep("200 millis");
               expect(waiting.pollUnsafe()).toBeUndefined();
               yield* held.release;
@@ -128,7 +131,7 @@ export const standaloneAppends = (fixture: Fixture) => {
           Effect.gen(function* () {
             const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const other = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const key = Store.IdempotencyKey.make("output");
+            const key = Occurrence.Key.make("output");
             const looked = yield* Deferred.make<void>();
             const release = yield* Deferred.make<void>();
             const transaction = yield* writer.store
@@ -164,15 +167,15 @@ export const standaloneAppends = (fixture: Fixture) => {
         Effect.gen(function* () {
           const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const other = yield* forWorkspace(yield* storage.connect(), workspaceId);
-          const key = Store.IdempotencyKey.make("output-1");
+          const key = Occurrence.Key.make("output-1");
           const original = yield* alone(other, 1, { idempotencyKey: key });
           expect(yield* alone(writer, 1, { idempotencyKey: key })).toEqual(original);
           expect(yield* Effect.flip(alone(writer, 2, { idempotencyKey: key }))).toMatchObject({
-            _tag: "JournalStore.Conflict",
+            _tag: "Store.Conflict",
           });
           expect(
             yield* Effect.flip(alone(writer, 2, { expectedAfter: Option.none() })),
-          ).toMatchObject({ _tag: "JournalStore.Conflict" });
+          ).toMatchObject({ _tag: "Store.Conflict" });
           // A transaction already open when another host appends still sees that append.
           const entered = yield* Deferred.make<void>();
           const appended = yield* Deferred.make<void>();
@@ -185,12 +188,12 @@ export const standaloneAppends = (fixture: Fixture) => {
                 const retried = yield* storeTransaction.append({
                   logId: execution,
                   entries: [entry(3)],
-                  idempotencyKey: Store.IdempotencyKey.make("output-2"),
+                  idempotencyKey: Occurrence.Key.make("output-2"),
                 });
                 const next = yield* storeTransaction.append({
                   logId: execution,
                   entries: [entry(4)],
-                  expectedAfter: Option.some(Log.Position.make(1)),
+                  expectedAfter: Option.some(Entry.Position.make(1)),
                 });
                 return [retried, next] as const;
               }),
@@ -198,8 +201,8 @@ export const standaloneAppends = (fixture: Fixture) => {
             .pipe(Effect.forkChild);
           yield* Deferred.await(entered);
           const [second] = yield* alone(other, 3, {
-            idempotencyKey: Store.IdempotencyKey.make("output-2"),
-            expectedAfter: Option.some(Log.Position.make(0)),
+            idempotencyKey: Occurrence.Key.make("output-2"),
+            expectedAfter: Option.some(Entry.Position.make(0)),
           });
           yield* Deferred.succeed(appended, undefined);
           const [retried, next] = yield* Fiber.join(transaction);
@@ -211,7 +214,7 @@ export const standaloneAppends = (fixture: Fixture) => {
                 Effect.suspend(() => writer.store.append({ logId: execution, entries: [] })),
               ),
             ),
-          ).toMatchObject({ _tag: "JournalStore.Failure" });
+          ).toMatchObject({ _tag: "Store.Failure" });
           expect((yield* writer.store.read(execution, { limit: 10 })).length).toBe(3);
         }),
       ),

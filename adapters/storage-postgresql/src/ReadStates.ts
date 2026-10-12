@@ -3,9 +3,11 @@
  * `group_read_times`: private read state, outside the journal, referencing no projection rows, so
  * rebuilds keep it. `ReadStateStore.make` checks every input before the driver sees it, so the
  * driver keeps only what storage keeps: each advance is one upsert that keeps the later of the
- * stored and requested value with `greatest`. Every statement is scoped to the binding's workspace
- * and runs under its `guard`; a write joins the caller's transaction when there is one and
- * otherwise commits on its own, without the workspace's lock.
+ * stored and requested value with `greatest`. Marking a thread read is one statement that also
+ * marks the member's pending notifications from it seen, as `Notifications` does, so it is atomic
+ * without a transaction. Every statement is scoped to the binding's workspace and runs under its
+ * `guard`; a write joins the caller's transaction when there is one and otherwise commits on its
+ * own, without the workspace's lock.
  *
  * @since 0.1.0
  */
@@ -15,7 +17,7 @@ import { DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";
 import { storeError, storeFailure } from "./internal/errors.ts";
 import { inIds } from "./internal/id-list.ts";
-import { groupReadTimes, threadReadPositions } from "./internal/schema.ts";
+import { groupReadTimes, notificationSeen, threadReadPositions } from "./internal/schema.ts";
 
 const decodePositions = Schema.decodeUnknownEffect(Schema.Array(ReadState.ThreadPosition));
 const decodeGroups = Schema.decodeUnknownEffect(
@@ -54,22 +56,31 @@ export const make = Effect.fn("ReadStates.make")(function* () {
       },
       Effect.mapError(storeFailure(ReadStateStore, "getThreadPositions")),
     ),
-    advanceThread: Effect.fn("ReadStates.advanceThread")(function* (position) {
+    markThreadRead: Effect.fn("ReadStates.markThreadRead")(function* (position, seenAt) {
+      const { memberId, threadId, readThrough } = position;
+      const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt);
+      // The member's pending notifications from the thread up to the position become Seen, and
+      // notification_seen keeps the first time through rebuilds, as Notifications.markSeen does;
+      // the position keeps the later value. Every part of one statement commits together.
       yield* guard(
-        db
-          .insert(threadReadPositions)
-          .values(position)
-          .onConflictDoUpdate({
-            target: [
-              threadReadPositions.workspaceId,
-              threadReadPositions.memberId,
-              threadReadPositions.threadId,
-            ],
-            set: {
-              readThrough: sql`greatest(${threadReadPositions.readThrough}, excluded.read_through)`,
-            },
-          }),
-      ).pipe(Effect.mapError(storeError(ReadStateStore, "advanceThread")));
+        db.execute(sql`
+          WITH seen AS (
+            UPDATE notifications SET state = 'Seen', seen_at = ${seen}::timestamptz
+            WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human'
+              AND coalesce(recipient_member_id, recipient_id, '') = ${memberId}
+              AND thread_id = ${threadId} AND thread_sequence <= ${readThrough}
+              AND state = 'Pending'
+            RETURNING id, seen_at
+          ), recorded AS (
+            INSERT INTO notification_seen (workspace_id, notification_id, seen_at)
+            SELECT ${workspaceId}::text, id, seen_at FROM seen
+            ON CONFLICT DO NOTHING
+          )
+          INSERT INTO thread_read_positions (workspace_id, member_id, thread_id, read_through)
+          VALUES (${workspaceId}, ${memberId}, ${threadId}, ${readThrough})
+          ON CONFLICT (workspace_id, member_id, thread_id) DO UPDATE
+            SET read_through = greatest(thread_read_positions.read_through, excluded.read_through)`),
+      ).pipe(Effect.mapError(storeError(ReadStateStore, "markThreadRead")));
     }),
     getGroupReads: Effect.fn("ReadStates.getGroupReads")(
       function* (memberId, groupIds) {

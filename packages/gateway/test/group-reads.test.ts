@@ -20,7 +20,7 @@ import {
   GroupStore,
 } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Checkpoint, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Checkpoint, Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 import { ThreadService } from "@amends-dev/core/thread";
 import { Gateway } from "@amends-dev/gateway";
@@ -107,7 +107,7 @@ describe("group reads", () => {
         membershipId: membership.id,
       }),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const seed = (bound: Bound) =>
     publish(
       bound,

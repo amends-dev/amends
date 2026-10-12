@@ -170,7 +170,7 @@ describe("invitation replay", () => {
             expect(
               yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
             ).toMatchObject({
-              _tag: "Gateway.NotMember",
+              _tag: "GatewayErrors.NotMember",
             });
             expect((yield* Operations.getMember(other.id, bob, other.ownerMemberId)).status).toBe(
               "active",
@@ -187,7 +187,7 @@ describe("invitation replay", () => {
             expect(
               yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
             ).toMatchObject({
-              _tag: "Gateway.NotMember",
+              _tag: "GatewayErrors.NotMember",
             });
             expect(yield* bound.store.read(journalLog, { limit: 20 })).toEqual(after);
             for (const record of pending)

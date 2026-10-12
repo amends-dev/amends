@@ -342,7 +342,7 @@ describe("connections", () => {
           );
           // A key for a connection that authenticates with none is not a request at all.
           expect(yield* refused(changed(tools, { apiKey: Redacted.make(goodKey) }))).toMatchObject({
-            _tag: "Gateway.InvalidInput",
+            _tag: "GatewayErrors.InvalidInput",
           });
 
           const created = yield* as(workspace.id, alice, (connectionService) =>

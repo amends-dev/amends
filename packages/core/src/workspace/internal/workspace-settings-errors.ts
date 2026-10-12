@@ -10,6 +10,6 @@ import * as Workspace from "../Workspace.ts";
  * The workspace's name is no longer the one the renamer expected: someone renamed it meanwhile,
  * and nothing was recorded.
  */
-export class Changed extends Schema.TaggedError<Changed>()("WorkspaceSettings.Changed", {
+export class Changed extends Schema.TaggedError<Changed>()("WorkspaceSettingsService.Changed", {
   workspaceId: Workspace.Id,
 }) {}

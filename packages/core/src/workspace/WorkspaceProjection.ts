@@ -26,7 +26,7 @@ export const definition = Projection.make("workspace.metadata", { version: 1 })
   )
   .on(
     WorkspaceFacts.Initialized,
-    Effect.fn("WorkspaceInitialization.project")(function* ({ payload }) {
+    Effect.fn("WorkspaceProjection.initialized")(function* ({ payload }) {
       yield* (yield* WorkspaceStore.WorkspaceStore).insert(payload);
     }),
   )

@@ -29,7 +29,7 @@ import { alice, type Bound, forWorkspace, testProvenance, workspaceId } from "./
 const roleIds = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
 const current = BuiltinRoles.make(workspaceId, Core.permissions);
 /** The next revision's declarations: member removal becomes a viewer's, agent use nobody's. */
-const next: BuiltinRoleUpgrade.Target = {
+const next: BuiltinRoleUpgrade.Options = {
   revision: BuiltinRoles.revision + 1,
   definitions: Core.permissions.flatMap((permission): ReadonlyArray<Permission.Definition> => {
     if (permission.name === AgentPermissions.Use.name) return [];
@@ -41,7 +41,7 @@ const next: BuiltinRoleUpgrade.Target = {
   }),
 };
 /** A later revision that gives every role a permission this host does not declare yet. */
-const later: BuiltinRoleUpgrade.Target = {
+const later: BuiltinRoleUpgrade.Options = {
   revision: BuiltinRoles.revision + 1,
   definitions: [
     ...Core.permissions,
@@ -57,8 +57,8 @@ const ownerMemberId = Member.Id.make("owner");
 /** Built-in role bundles: recorded at creation, and upgraded through facts to later revisions. */
 const { core, initialized, gateway } = Support;
 const roles = (bound: Bound) => Effect.forEach(roleIds, (id) => bound.roles.get(id));
-const upgrade = (bound: Bound, target?: BuiltinRoleUpgrade.Target) =>
-  BuiltinRoleUpgrade.upgrade(target).pipe(Effect.provide(core(bound)));
+const upgrade = (bound: Bound, options?: BuiltinRoleUpgrade.Options) =>
+  BuiltinRoleUpgrade.upgrade(options).pipe(Effect.provide(core(bound)));
 const history = (bound: Bound) =>
   Effect.flatMap(Journal.Journal, (journal) => journal.log.read({ limit: 100 })).pipe(
     Effect.provide(core(bound)),
@@ -283,7 +283,7 @@ describe("built-in roles", () => {
           if (Exit.isFailure(exit))
             expect(Exit.findErrorOption(exit)).toMatchObject({
               _tag: "Some",
-              value: { _tag: "JournalStore.Conflict" },
+              value: { _tag: "Store.Conflict" },
             });
         const revised = (yield* history(bound))
           .flatMap((batch) => batch.entries)

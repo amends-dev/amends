@@ -1,7 +1,7 @@
 /**
- * The outcomes `TurnService` and `TurnExecution` report that a caller can act on. They are
- * schemas, so protocols carry them to clients; each service's error types add the failures of what
- * it depends on.
+ * The outcomes `TurnService` reports that a caller can act on. They are schemas, so protocols
+ * carry them to clients; the service's error types add the failures of what it depends on.
+ * `TurnService` re-exports them.
  */
 import { Schema } from "effect";
 import * as Turn from "../Turn.ts";

@@ -54,7 +54,7 @@ transaction services stay exposed so execution-log writes can join journal commi
 
 ```ts
 const JournalLive = Journal.layer({
-  logId: Log.Id.make("domain"),
+  logId: Entry.LogId.make("domain"),
   projections: [AgentsProjection],
 }).pipe(Layer.provideMerge(Log.layer), Layer.provide(HostServices));
 ```
@@ -168,9 +168,9 @@ for the same record ID. Schema versions are excluded: publishing another version
 of an existing occurrence conflicts rather than creating a second occurrence.
 
 The key identifies one occurrence within a workspace and log. Another workspace
-or log has an independent key space. `Occurrence.Key`, `Store.IdempotencyKey`, and
-`Log.IdempotencyKey` refer to the same branded schema. Treat the fact name, identity
-components, and key encoding as persistence contracts. Definitions registered for
+or log has an independent key space. `Occurrence.Key` is that key, and every append's
+`idempotencyKey` takes it, whether a fact derives it or a caller gives it. Treat the
+fact name, identity components, and key encoding as persistence contracts. Definitions registered for
 the same fact name and version must share the payload schema, subject function, and occurrence
 function. Publication checks that same contract against registered definitions.
 
@@ -187,7 +187,7 @@ key fails with `Store.Conflict`; callers cannot override the declared identity.
 Use an explicit key for request-level retries of a repeatable fact:
 
 ```ts
-const options = { idempotencyKey: Log.IdempotencyKey.make(operationId) };
+const options = { idempotencyKey: Occurrence.Key.make(operationId) };
 const rename = Effect.gen(function* () {
   return yield* journal.publish(RoleFacts.Renamed, { workspaceId, roleId, name }, options);
 });
@@ -385,7 +385,7 @@ outer commit succeeds.
 A commit runs its storage work one step at a time: await each publication, append, and log read
 before starting the next. A step nested in the running one on the same fiber, such as a
 publication's own append and projection updates, runs within it. Starting a step while another
-fiber's is running is a defect, `Commit.Concurrent`, that aborts the commit. Waiting instead could
+fiber's is running is a defect, `Transaction.Concurrent`, that aborts the commit. Waiting instead could
 deadlock a forked fiber on its parent's step, and let a read interleave with writes the store has
 staged. Work outside storage can still run concurrently inside a commit's program.
 
@@ -431,7 +431,7 @@ Expected projection decoder and handler failures become `Projection.Failure`, wi
 the projection key, source entry cursor, `decode` or `apply` phase, and the original
 error in `cause`. This keeps the journal's error contract independent of registered
 handlers. Defects and interruption keep their Effect causes. A caught failure is
-still reported at the outer commit boundary as `Commit.Aborted`.
+still reported at the outer commit boundary as `Transaction.Aborted`.
 
 Adapters report unconfirmed commit outcomes with `Store.CommitUncertain`, including
 the commit ID for lookup and reconciliation. The core does not automatically retry

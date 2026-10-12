@@ -6,8 +6,10 @@ import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Event from "../../src/journal/Event.ts";
 import * as Fact from "../../src/journal/Fact.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Publication from "../../src/journal/Publication.ts";
+import * as Occurrence from "../../src/journal/Occurrence.ts";
 import * as Store from "../../src/journal/Store.ts";
 import * as Transaction from "../../src/journal/Transaction.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
@@ -16,7 +18,7 @@ import { testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("journal");
+const logId = Entry.LogId.make("journal");
 const Changed = Fact.make("example.changed", {
   subject: testSubject,
   version: 1,
@@ -133,7 +135,7 @@ it.effect(
         [...original].reverse(),
         [first, first],
         [...original, first],
-        [{ ...first, logId: Log.Id.make("other") }],
+        [{ ...first, logId: Entry.LogId.make("other") }],
         [{ ...first, fact: { ...first.fact, name: Other.name } }],
         [{ ...first, fact: { ...first.fact, subject: Subject.make("test", "other") } }],
         [withoutFact],
@@ -196,7 +198,7 @@ it.effect("publication retries and replay decoding reject changed subject intent
       fixture,
       Effect.gen(function* () {
         const journal = yield* Journal.make({ logId, projections: [] });
-        const key = Store.IdempotencyKey.make("subject-retry");
+        const key = Occurrence.Key.make("subject-retry");
         const first = yield* journal.publish(Changed, 1, { idempotencyKey: key });
         expect(yield* journal.publish(Changed, 1, { idempotencyKey: key })).toEqual(first);
         const changed = Fact.make(Changed.name, {
@@ -206,7 +208,7 @@ it.effect("publication retries and replay decoding reject changed subject intent
         });
         expect(
           (yield* Effect.flip(journal.publish(changed, 1, { idempotencyKey: key })))._tag,
-        ).toBe("JournalStore.Conflict");
+        ).toBe("Store.Conflict");
         const page = yield* journal.read({ subject: testSubject(), limit: 10 });
         const entry = page[0];
         if (entry === undefined) return yield* Effect.die("Missing event");
@@ -217,7 +219,7 @@ it.effect("publication retries and replay decoding reject changed subject intent
               payload: Object.assign({}, entry.payload, { subject: Subject.make("test", "wrong") }),
             }),
           ))._tag,
-        ).toBe("Journal.FactMismatch");
+        ).toBe("Event.FactMismatch");
         expect(page).toHaveLength(1);
       }),
     );
@@ -233,8 +235,8 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const log = yield* Log.Log;
-          const plain = log.open({ id: Log.Id.make("plain"), schema: Schema.String });
-          const other = log.open({ id: Log.Id.make("other"), schema: Schema.String });
+          const plain = log.open({ id: Entry.LogId.make("plain"), schema: Schema.String });
+          const other = log.open({ id: Entry.LogId.make("other"), schema: Schema.String });
           const written = yield* plain.append("value");
           const before = yield* fixture.snapshot;
           const attempts = yield* fixture.attempts;

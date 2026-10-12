@@ -1,16 +1,17 @@
 /**
- * The identity of one occurrence of a fact, which makes publishing it idempotent. A fact's
- * `occurrence` rule names an occurrence with stable parts, such as a record's ID; the journal turns
- * the fact's name and those parts into a key, scoped to the workspace and log, and a retry under
- * the same key returns the original event. The key's encoding is a persistence contract.
+ * The identity of one occurrence of an append, which makes it idempotent: a retry under the same
+ * key, scoped to the workspace and log, returns the original entries. A fact's `occurrence` rule
+ * names an occurrence with stable parts, such as a record's ID, and the journal turns the fact's
+ * name and those parts into a key, so a retry returns the original event. The key's encoding is a
+ * persistence contract.
  *
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
 
 /**
- * Stable identity for one append within a workspace and log. `Store.IdempotencyKey` and
- * `Log.IdempotencyKey` are this schema.
+ * Stable identity for one append within a workspace and log, which `Store` and `Log` take as an
+ * append's `idempotencyKey`.
  *
  * @category schemas
  * @since 0.1.0

@@ -21,7 +21,7 @@ import { testCrypto, testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("journal");
+const logId = Entry.LogId.make("journal");
 const Changed = Fact.make("example.changed", {
   subject: testSubject,
   version: 1,
@@ -198,7 +198,7 @@ it.effect("foreign workspaces, dangling causes and changed correlations reject w
             }),
           ),
         );
-        expect(failure._tag).toBe("Commit.Aborted");
+        expect(failure._tag).toBe("Transaction.Aborted");
         expect(
           (yield* journal.log.read({ limit: 10 })).flatMap((batch) => batch.entries),
         ).toHaveLength(1);

@@ -6,14 +6,13 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as Authentication from "./Authentication.ts";
+import { makeAsMember } from "./internal/as-member.ts";
 import { MemberService } from "@amends-dev/core/workspace";
-import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register member handlers, capturing the gateway and reading the principal per request.
+ * Register member handlers, each entering the workspace as the request's principal.
  *
  * @category layers
  * @since 0.1.0
@@ -22,45 +21,27 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "members",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
+    const asMember = yield* makeAsMember;
     return handlers.handleAll({
       list: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(MemberService.MemberService, (memberService) => memberService.list),
-          ),
+        asMember(
+          params.workspaceId,
+          MemberService.MemberService.use((memberService) => memberService.list),
         ),
       get: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(MemberService.MemberService, (memberService) =>
-              memberService.get(params.memberId),
-            ),
-          ),
+        asMember(
+          params.workspaceId,
+          MemberService.MemberService.use((memberService) => memberService.get(params.memberId)),
         ),
       rename: ({ params, payload }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(MemberService.MemberService, (memberService) =>
-              memberService.rename(payload.name),
-            ),
-          ),
+        asMember(
+          params.workspaceId,
+          MemberService.MemberService.use((memberService) => memberService.rename(payload.name)),
         ),
       remove: ({ params }) =>
-        Effect.flatMap(Authentication.Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(MemberService.MemberService, (memberService) =>
-              memberService.remove(params.memberId),
-            ),
-          ),
+        asMember(
+          params.workspaceId,
+          MemberService.MemberService.use((memberService) => memberService.remove(params.memberId)),
         ),
     });
   }),
