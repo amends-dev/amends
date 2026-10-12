@@ -236,7 +236,12 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       canManage: record.status === "active" && (yield* isAllowedBy(authorizeRecipient(memberId))),
     });
   });
-  const isWorkspaceRole = (record: Assignment.Assignment) =>
+  /** Is this a role held across the workspace? Its source then names the role. */
+  const isWorkspaceRole = (
+    record: Assignment.Assignment,
+  ): record is Assignment.Assignment & {
+    readonly source: Extract<Assignment.Source, { readonly _tag: "Role" }>;
+  } =>
     Assignment.Source.isAnyOf(["Role"])(record.source) &&
     Scope.Scope.isAnyOf(["Workspace"])(record.source.scope);
   const assign = Effect.fn("AssignmentService.assign")(
@@ -245,10 +250,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       yield* authorizeRecipient(request.memberId);
       yield* delegation.requireGrant(request.roleId);
       const existing = (yield* delegation.assignmentsFor(request.memberId)).find(
-        (record) =>
-          isWorkspaceRole(record) &&
-          Assignment.Source.isAnyOf(["Role"])(record.source) &&
-          record.source.roleId === request.roleId,
+        (record) => isWorkspaceRole(record) && record.source.roleId === request.roleId,
       );
       if (existing !== undefined) return existing;
       return yield* assignmentCommand.assignRole(request.memberId, request.roleId);
@@ -285,14 +287,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
         current.some(({ id }) => !request.expectedAssignmentIds.includes(id))
       )
         return yield* new Changed({ memberId: request.memberId });
-      for (const record of current) {
-        if (Assignment.Source.isAnyOf(["Role"])(record.source))
-          yield* delegation.requireGrant(record.source.roleId);
-      }
-      const same = current.find(
-        ({ source }) =>
-          Assignment.Source.isAnyOf(["Role"])(source) && source.roleId === request.roleId,
-      );
+      for (const record of current) yield* delegation.requireGrant(record.source.roleId);
+      const same = current.find(({ source }) => source.roleId === request.roleId);
       if (current.length === 1 && same !== undefined) return same;
       for (const record of current) yield* assignmentCommand.revokeAssignment(record);
       return yield* assignmentCommand.assignRole(request.memberId, request.roleId);
