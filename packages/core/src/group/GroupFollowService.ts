@@ -26,16 +26,9 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollow from "./GroupFollow.ts";
 import * as GroupFollowFacts from "./GroupFollowFacts.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
-import { AgentRequired, MemberUnavailable, NotFollowable } from "./internal/group-follow-errors.ts";
+import { MemberUnavailable, NotFollowable } from "./internal/group-follow-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
-  /**
-   * Only an agent can be made to follow by another member; people follow for themselves.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  AgentRequired,
   /**
    * The named member is missing, inactive, or not a current member of the group.
    *
@@ -72,7 +65,7 @@ export type Error =
   | CoreError.NotFound
   | NotFollowable
   | MemberUnavailable
-  | AgentRequired;
+  | CoreError.Denied;
 
 /**
  * The follow operations, one of `Core.Operations`.
@@ -148,7 +141,9 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     if (member.status !== "active")
       return yield* new MemberUnavailable({ memberId: request.memberId });
     if (!Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
-      return yield* new AgentRequired({ memberId: request.memberId });
+      return yield* new CoreError.Denied({
+        reason: new CoreError.AgentRequired({ memberId: request.memberId }),
+      });
     // Directing an agent's attention is using it, in either direction.
     yield* authorization.require([
       Requirement.make(AgentPermissions.Use, {

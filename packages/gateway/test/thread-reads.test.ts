@@ -356,14 +356,12 @@ describe("thread reads", () => {
             const { bound, reader, agent, group, first, second } = yield* prepare();
             expect(yield* run(bound, reader, list(group.id))).toEqual([]);
             expect(yield* Effect.flip(run(bound, reader, get(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: "thread.read" } },
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted", requirement: { permission: { name: "thread.read" } } },
             });
             yield* grant(bound, readerId, GroupPermissions.Read);
             expect(yield* Effect.flip(run(bound, reader, timeline(first.thread.id)))).toMatchObject(
-              {
-                _tag: "Authorization.Denied",
-              },
+              { _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } },
             );
             const assignment = yield* grant(
               bound,
@@ -376,7 +374,8 @@ describe("thread reads", () => {
             expect(yield* run(bound, agent, timeline(first.thread.id))).toHaveLength(1);
             expect(yield* run(bound, agent, participants(first.thread.id))).toHaveLength(2);
             expect(yield* Effect.flip(run(bound, reader, get(second.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             yield* publish(
               bound,
@@ -431,7 +430,8 @@ describe("thread reads", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, get(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -618,7 +618,8 @@ describe("thread reads", () => {
                 ];
                 for (const call of calls)
                   expect(yield* Effect.flip(call)).toMatchObject({
-                    _tag: "Authorization.InvalidActor",
+                    _tag: "CoreError.Denied",
+                    reason: { _tag: "InvalidActor" },
                   });
               }),
             );
@@ -706,7 +707,8 @@ describe("thread reads", () => {
                   ),
                 );
                 expect(yield* Effect.flip(threadService.get(first.thread.id))).toMatchObject({
-                  _tag: "Authorization.Denied",
+                  _tag: "CoreError.Denied",
+                  reason: { _tag: "NotGranted" },
                 });
                 expect(yield* threadService.listInGroup(group.id, { limit: 100 })).toEqual([]);
               }),
@@ -773,7 +775,7 @@ describe("thread reads", () => {
                   expect(yield* asActor(list(group.id), reader)).toEqual([]);
                   expect(
                     yield* Effect.flip(asActor(timeline(first.thread.id), reader)),
-                  ).toMatchObject({ _tag: "Authorization.Denied" });
+                  ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
                   yield* journal.publish(GroupMembershipFacts.Removed, {
                     workspaceId,
                     groupId: group.id,
@@ -876,15 +878,15 @@ describe("thread reads", () => {
             ).toBe(false);
             expect(
               yield* Effect.flip(run(bound, actorFor(agentId), get(first.thread.id))),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             const impostor = Actor.Actor.of({
               workspaceId,
               memberId: owner.memberId,
               identity: readerIdentity,
             });
             expect(yield* Effect.flip(run(bound, impostor, get(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
-              reason: "identity-mismatch",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor", reason: "identity-mismatch" },
             });
             expect(
               yield* Effect.flip(
@@ -938,7 +940,7 @@ describe("thread reads", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, readerIdentity, get(opened.thread.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* grant(bound, readerId, ThreadPermissions.Read);
             expect(
               yield* gateway.asMember(workspace.id, readerIdentity, get(opened.thread.id)),

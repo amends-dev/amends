@@ -62,7 +62,7 @@ export class Gateway extends Context.Service<
       workspaceId: Workspace.Id,
       identity: Identity.MemberReference,
       program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
+    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.Denied, Scope.Scope>;
     /**
      * Run a program in a workspace without an actor, keeping the workspace prepared for the
      * caller's scope: invitation acceptance, where the recipient is not yet a member, and a host's
@@ -260,7 +260,8 @@ export const make = Effect.fn("Gateway.make")(function* (
     const membership = Option.isSome(admittedMember)
       ? admittedMember
       : yield* Effect.orDie((yield* MemberStore.MemberStore).findActive(identity));
-    if (Option.isNone(membership)) return yield* new GatewayErrors.NotMember({ workspaceId });
+    if (Option.isNone(membership))
+      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) });
     const actor = Actor.Actor.of({ workspaceId, memberId: membership.value.id, identity });
     return yield* toPublicErrors(
       workspaceId,
@@ -337,7 +338,7 @@ export const make = Effect.fn("Gateway.make")(function* (
     const operation: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope> = program;
     const admission = yield* checkAdmission(workspaceId, identity);
     if (Admission.$is("Refused")(admission))
-      return yield* new GatewayErrors.NotMember({ workspaceId });
+      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) });
     const admittedMember = Admission.$is("Member")(admission)
       ? Option.some(admission.member)
       : Option.none<Member.Member>();

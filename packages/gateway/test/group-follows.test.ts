@@ -202,11 +202,14 @@ describe("group follows", () => {
             const plain = actorFor(plainId);
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, owner, follow(team.id, humanId)))).toEqual(
-              new GroupFollowService.AgentRequired({ memberId: humanId }),
+              new CoreError.Denied({ reason: new CoreError.AgentRequired({ memberId: humanId }) }),
             );
             expect(yield* Effect.flip(run(bound, plain, follow(team.id, agentId)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: AgentPermissions.Use.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: AgentPermissions.Use.name } },
+              },
             });
             expect(yield* Effect.flip(run(bound, owner, follow(team.id, outsiderId)))).toEqual(
               new GroupFollowService.MemberUnavailable({ memberId: outsiderId }),
@@ -218,12 +221,11 @@ describe("group follows", () => {
             expect(yield* participantsOf(bound, reached)).toEqual([agentId, plainId].sort());
             expect(yield* inbox(bound, agentId)).toHaveLength(1);
             expect(yield* Effect.flip(run(bound, plain, post(team.id, [agentId])))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             expect(yield* Effect.flip(run(bound, plain, unfollow(team.id, agentId)))).toMatchObject(
-              {
-                _tag: "Authorization.Denied",
-              },
+              { _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } },
             );
             yield* run(bound, owner, unfollow(team.id, agentId));
             expect(yield* participantsOf(bound, yield* run(bound, plain, post(team.id)))).toEqual([
@@ -246,8 +248,11 @@ describe("group follows", () => {
             expect(
               yield* Effect.flip(run(bound, actorFor(plainId), follow(team.id, plainId))),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: GroupPermissions.Follow.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: GroupPermissions.Follow.name } },
+              },
             });
             expect(
               yield* Effect.flip(run(bound, actorFor(outsiderId), follow(team.id, outsiderId))),

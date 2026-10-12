@@ -37,7 +37,7 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(Invitation.Invitation),
-      error: [...ApiErrors.member, ...ApiErrors.invitation],
+      error: [...ApiErrors.workspace, ...ApiErrors.invitation],
     }),
     HttpApiEndpoint.post("issue", "/", {
       params: { workspaceId: Workspace.Id },
@@ -46,19 +46,19 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
       success: Invitation.Invitation.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "IssuedWorkspaceInvitation",
       }),
-      error: [...ApiErrors.member, ...ApiErrors.invitation],
+      error: [...ApiErrors.workspace, ...ApiErrors.invitation],
     }),
     HttpApiEndpoint.post("accept", "/:invitationId/accept", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
       // What the recipient wants people in the workspace to call them.
       payload: Schema.Struct({ name: Member.NewName }),
       success: Member.Member,
-      error: [ApiErrors.HumanRequired, ...ApiErrors.workspace, ...ApiErrors.invitation],
+      error: [...ApiErrors.workspace, ...ApiErrors.invitation],
     }),
     HttpApiEndpoint.post("revoke", "/:invitationId/revoke", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
       success: Invitation.Invitation,
-      error: [...ApiErrors.member, ...ApiErrors.invitation],
+      error: [...ApiErrors.workspace, ...ApiErrors.invitation],
     }),
   )
   .middleware(Authentication)

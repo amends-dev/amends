@@ -48,15 +48,10 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // What the reader expected changed since they read it.
   "CoreError.Changed": "changed",
   "GatewayErrors.Conflict": "changed",
-  "Authorization.Denied": "denied",
-  "Authorization.InvalidActor": "denied",
-  "Delegation.Denied": "denied",
+  // The reader may not do this, for the reason it gives.
+  "CoreError.Denied": "denied",
   "Delegation.OwnerProtected": "denied",
-  "GatewayErrors.NotMember": "denied",
   "MemberService.OwnerProtected": "denied",
-  "OwnershipService.NotOwner": "denied",
-  "InvitationService.NotRecipient": "denied",
-  "ApiErrors.HumanRequired": "denied",
   // Anything the reader named that is missing or out of their reach.
   "CoreError.NotFound": "gone",
   "AssignmentService.InactiveMember": "gone",
@@ -89,11 +84,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ApiErrors.TooManyStreams": "failed",
   // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
   "ConnectionService.CredentialsUnavailable": "failed",
-  "GroupFollowService.AgentRequired": "denied",
-  "ReadStateService.HumanRequired": "denied",
-  "ThreadService.HumanAuthorRequired": "denied",
-  "ThreadMessageService.HumanAuthorRequired": "denied",
-  "NotificationService.HumanRecipientRequired": "denied",
   "GroupService.NotRenamable": "invalid",
   "GroupService.InactiveMember": "gone",
   "GroupMembershipService.InactiveMember": "gone",
@@ -101,7 +91,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "GroupFollowService.MemberUnavailable": "gone",
   "ThreadService.ParticipantUnavailable": "gone",
   "ThreadMessageService.ParticipantUnavailable": "gone",
-  "ThreadMessageService.NotAuthor": "denied",
   "ThreadMessageService.Deleted": "gone",
   "TaskService.ParticipantUnavailable": "gone",
   "TaskService.AlreadyTask": "changed",

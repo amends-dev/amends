@@ -112,13 +112,17 @@ const gone = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
     (reason) =>
       Cause.isFailReason(reason) &&
-      (Schema.is(ApiErrors.NotFound)(reason.error) || Schema.is(ApiErrors.NotMember)(reason.error)),
+      (Schema.is(ApiErrors.NotFound)(reason.error) ||
+        (Schema.is(ApiErrors.Denied)(reason.error) && reason.error.reason._tag === "NotMember")),
   );
 
 /** The reader is in the turn's thread's group, but may no longer read the thread. */
 const denied = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
-    (reason) => Cause.isFailReason(reason) && Schema.is(ApiErrors.Denied)(reason.error),
+    (reason) =>
+      Cause.isFailReason(reason) &&
+      Schema.is(ApiErrors.Denied)(reason.error) &&
+      reason.error.reason._tag === "NotGranted",
   );
 
 /** The items with each change put in its place. */

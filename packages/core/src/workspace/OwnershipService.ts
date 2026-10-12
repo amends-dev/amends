@@ -32,7 +32,7 @@ import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
-import { InvalidRecipient, NotOwner } from "./internal/ownership-errors.ts";
+import { InvalidRecipient } from "./internal/ownership-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
   /**
@@ -43,14 +43,6 @@ export {
    * @since 0.1.0
    */
   InvalidRecipient,
-  /**
-   * The actor is not the current owner, or is not a person; only the owner transfers, whatever
-   * their grants.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotOwner,
 } from "./internal/ownership-errors.ts";
 
 /**
@@ -67,7 +59,7 @@ export type Error =
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError
-  | NotOwner
+  | CoreError.Denied
   | CoreError.NotFound
   | InvalidRecipient
   | CoreError.Changed;
@@ -89,11 +81,11 @@ export class OwnershipService extends Context.Service<
     readonly get: Effect.Effect<Ownership.View, Error, Actor.Actor>;
     /**
      * Make another active human member the owner, under `workspace.transfer-ownership`, as the
-     * current owner (otherwise `NotOwner`), and against the Owner assignment the caller reviewed
-     * (otherwise `CoreError.Changed`). One commit revokes both members' built-in workspace roles,
-     * makes the recipient Owner and the former owner Administrator, and moves `ownerMemberId`;
-     * direct grants, scoped assignments, the name, and `createdBy` stay. Returns the workspace as
-     * it now stands.
+     * current owner (otherwise `CoreError.Denied`, `OwnerRequired`), and against the Owner
+     * assignment the caller reviewed (otherwise `CoreError.Changed`). One commit revokes both
+     * members' built-in workspace roles, makes the recipient Owner and the former owner
+     * Administrator, and moves `ownerMemberId`; direct grants, scoped assignments, the name, and
+     * `createdBy` stay. Returns the workspace as it now stands.
      */
     readonly transfer: (
       input: Ownership.TransferInput,
@@ -159,7 +151,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       Identity.MemberReference.isAnyOf(["Human"])(actor.identity) &&
       (yield* authorization.require([requirement]).pipe(
         Effect.as(true),
-        Effect.catchTag("Authorization.Denied", () => Effect.succeed(false)),
+        Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false)),
       ));
     const candidates = canTransfer
       ? (yield* memberStore.list).filter(
@@ -188,7 +180,9 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
         actor.memberId !== state.owner.id ||
         !Identity.MemberReference.isAnyOf(["Human"])(actor.identity)
       )
-        return yield* new NotOwner({ workspaceId });
+        return yield* new CoreError.Denied({
+          reason: new CoreError.OwnerRequired({ reason: "ownership-transfer" }),
+        });
       if (request.expectedOwnerAssignmentId !== state.assignment.id)
         return yield* new CoreError.Changed({ resource: "Workspace", id: workspaceId });
       if (request.memberId === state.owner.id)

@@ -1315,8 +1315,8 @@ describe("turns", () => {
           yield* revokeRoles(workspace.id, reader.id);
           for (const read of reads)
             expect(yield* Effect.flip(asBob(read))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: "thread.read" } },
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted", requirement: { permission: { name: "thread.read" } } },
             });
           expect(yield* asBob((turns) => turns.listActive(10))).toEqual([]);
         }),

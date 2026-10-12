@@ -10,7 +10,7 @@ const constructorOf = (ast: SchemaAST.AST): unknown => ast.annotations?.["~const
 const transport = new Set(
   [
     Authentication.Unauthorized,
-    ApiErrors.HumanRequired,
+    ApiErrors.Denied,
     ApiErrors.TooManyStreams,
     SignIn.Rejected,
     SignIn.Limited,
@@ -38,6 +38,7 @@ it("every error a route declares reaches its client as declared, never as a defe
         }
     },
   });
-  expect(exposed.size).toBeGreaterThan(50);
+  // Each public error has its own constructor, so the comparison above is never vacuous.
+  expect(exposed.size).toBe(GatewayErrors.PublicError.members.length);
   expect(unreachable).toEqual([]);
 });

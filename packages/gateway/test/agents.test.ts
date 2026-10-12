@@ -266,7 +266,8 @@ describe("agents", () => {
             ];
             for (const denied of operations)
               expect(yield* Effect.flip(as(workspace.id, bob, denied))).toMatchObject({
-                _tag: "Authorization.Denied",
+                _tag: "CoreError.Denied",
+                reason: { _tag: "NotGranted" },
               });
             // An agent starts with a role its creator may grant, which the owner's never is.
             expect(
@@ -425,7 +426,10 @@ describe("agents", () => {
               Grant.make(ConnectionPermissions.Read, onConnection(connections.models.id)),
               Grant.make(ConnectionPermissions.Use, onConnection(connections.sandboxes.id)),
             ]);
-            expect(yield* Effect.flip(create)).toMatchObject({ _tag: "Authorization.Denied" });
+            expect(yield* Effect.flip(create)).toMatchObject({
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
+            });
             yield* grant(bound, bobMemberId, [Grant.make(AgentPermissions.Create, inWorkspace)]);
             expect(yield* Effect.flip(create)).toEqual(
               new AgentService.ConnectionUnavailable({

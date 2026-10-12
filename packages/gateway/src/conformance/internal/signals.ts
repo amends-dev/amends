@@ -239,7 +239,10 @@ export const signals = (fixture: Fixture) => {
           expect(yield* typing(outsider)).toEqual(notFound(threadId));
           const missing = Thread.Id.make("missing");
           expect(yield* typing(reader, missing)).toEqual(notFound(missing));
-          expect(yield* typing(unpermitted)).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(yield* typing(unpermitted)).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
         }).pipe(Effect.scoped),
       ),
     );

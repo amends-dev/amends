@@ -68,7 +68,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         }),
       },
       success: Schema.Array(Thread.ListItem.annotate({ identifier: "ThreadListItem" })),
-      error: [...ApiErrors.member, ...ApiErrors.thread],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.get("openings", "/groups/:groupId/openings", {
       params: inGroup,
@@ -80,26 +80,26 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         }),
       },
       success: Schema.Array(Thread.Opening.annotate({ identifier: "ThreadOpening" })),
-      error: [...ApiErrors.member, ...ApiErrors.thread],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.post("start", "/groups/:groupId/threads", {
       params: inGroup,
       headers: ApiErrors.requestKey,
       payload: opening,
       success: started,
-      error: [...ApiErrors.member, ...ApiErrors.thread],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.post("startDirect", "/threads", {
       params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
       payload: Thread.StartDirectInput,
       success: started,
-      error: [...ApiErrors.member, ...ApiErrors.thread],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.get("get", "/threads/:threadId", {
       params: thread,
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.thread],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.post("rename", "/threads/:threadId/rename", {
       params: thread,
@@ -108,7 +108,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         expectedTitle: Thread.RenameInput.fields.expectedTitle,
       }),
       success: record,
-      error: [...ApiErrors.member, ...ApiErrors.thread, ApiErrors.Changed],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread, ApiErrors.Changed],
     }),
     HttpApiEndpoint.get("timeline", "/threads/:threadId/timeline", {
       params: thread,
@@ -119,7 +119,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         from: reading.from,
       },
       success: Schema.Array(ThreadTimeline.Item.annotate({ identifier: "TimelineItem" })),
-      error: [...ApiErrors.member, ...ApiErrors.thread],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.get("participants", "/threads/:threadId/participants", {
       params: thread,
@@ -130,14 +130,14 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         }),
       },
       success: Schema.Array(participant),
-      error: [...ApiErrors.member, ...ApiErrors.thread],
+      error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.post("publish", "/threads/:threadId/messages", {
       params: thread,
       headers: ApiErrors.requestKey,
       payload: reply,
       success: messageRecord.pipe(HttpApiSchema.status(201)),
-      error: [...ApiErrors.member, ...ApiErrors.message],
+      error: [...ApiErrors.workspace, ...ApiErrors.message],
     }),
     HttpApiEndpoint.put("edit", "/messages/:messageId", {
       params: message,
@@ -147,22 +147,22 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         expectedRevision: ThreadMessage.EditInput.fields.expectedRevision,
       }),
       success: messageRecord,
-      error: [...ApiErrors.member, ...ApiErrors.messageEdit],
+      error: [...ApiErrors.workspace, ...ApiErrors.messageEdit],
     }),
     HttpApiEndpoint.delete("delete", "/messages/:messageId", {
       params: message,
       success: messageRecord,
-      error: [...ApiErrors.member, ...ApiErrors.messageDelete],
+      error: [...ApiErrors.workspace, ...ApiErrors.messageDelete],
     }),
     HttpApiEndpoint.post("typing", "/threads/:threadId/typing", {
       params: thread,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ...ApiErrors.typing],
+      error: [...ApiErrors.workspace, ...ApiErrors.typing],
     }),
     HttpApiEndpoint.post("follow", "/threads/:threadId/follow", {
       params: thread,
       success: participant,
-      error: [...ApiErrors.member, ...ApiErrors.participation],
+      error: [...ApiErrors.workspace, ...ApiErrors.participation],
     }),
     HttpApiEndpoint.post("unfollow", "/threads/:threadId/unfollow", {
       params: thread,
@@ -170,7 +170,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         participationId: ThreadParticipation.UnfollowInput.fields.participationId,
       }),
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ...ApiErrors.participation],
+      error: [...ApiErrors.workspace, ...ApiErrors.participation],
     }),
     HttpApiEndpoint.post("markRead", "/threads/:threadId/read", {
       params: thread,
@@ -178,7 +178,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         throughSequence: ReadState.MarkThreadReadInput.fields.throughSequence,
       }),
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ...ApiErrors.readState],
+      error: [...ApiErrors.workspace, ...ApiErrors.readState],
     }),
   )
   .middleware(Authentication)

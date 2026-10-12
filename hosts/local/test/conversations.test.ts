@@ -340,7 +340,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asAlice.groups
             .follow({ params: { workspaceId, groupId }, payload: { memberId: bobId } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupFollowService.AgentRequired" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "AgentRequired" } });
 
         // Leaving the group ends Bob's access to it and its threads.
         const admission = roster.find((entry) => entry.memberId === bobId)!;
@@ -533,7 +533,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* outsider.groups
             .list({ params: { workspaceId }, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
 
         const http = yield* HttpClient.HttpClient;
         const authorization = { authorization: "Bearer alice" };

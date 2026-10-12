@@ -280,7 +280,7 @@ describe("notification sources", () => {
               yield* Effect.flip(
                 run(protectedBound, { ...human, identity: owner.identity }, entryOf(note.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             yield* run(
               bound,
               owner,
@@ -289,7 +289,8 @@ describe("notification sources", () => {
               ),
             );
             expect(yield* Effect.flip(run(protectedBound, human, entryOf(note.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor" },
             });
           }),
         ),

@@ -551,7 +551,7 @@ describe("channels", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             const team = yield* as(
               workspace.id,
               alice,
@@ -573,7 +573,7 @@ describe("channels", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             const models = yield* as(
               workspace.id,
               alice,

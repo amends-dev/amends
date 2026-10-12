@@ -216,7 +216,8 @@ describe("connections", () => {
             ];
             for (const denied of operations)
               expect(yield* Effect.flip(as(workspace.id, bob, denied))).toMatchObject({
-                _tag: "Authorization.Denied",
+                _tag: "CoreError.Denied",
+                reason: { _tag: "NotGranted" },
               });
 
             // The key is stored apart, and never reaches the journal its settings reach.

@@ -4,7 +4,6 @@
  */
 import { Schema } from "effect";
 import * as ThreadId from "../../thread/ThreadId.ts";
-import * as MemberId from "../../workspace/MemberId.ts";
 
 /**
  * The requested position is past the thread's latest recorded activity.
@@ -12,13 +11,4 @@ import * as MemberId from "../../workspace/MemberId.ts";
 export class BeyondTimeline extends Schema.TaggedError<BeyondTimeline>()(
   "ReadStateService.BeyondTimeline",
   { threadId: ThreadId.Id, throughSequence: Schema.Int, latestSequence: Schema.Int },
-) {}
-
-/**
- * The acting member is an agent: only people keep read state, and agents' turns track their input
- * progress.
- */
-export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
-  "ReadStateService.HumanRequired",
-  { memberId: MemberId.Id },
 ) {}

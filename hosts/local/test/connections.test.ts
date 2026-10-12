@@ -119,9 +119,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* asBob.connections
               .replaceKey({ params, payload: { apiKey: Redacted.make("sk-bob") } })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "Authorization.Denied" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           expect(yield* asBob.connections.check({ params }).pipe(Effect.flip)).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
 
           // What the host has not installed, or does not take, is refused before anything is stored.

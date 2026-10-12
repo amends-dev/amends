@@ -48,11 +48,7 @@ import * as Task from "../task/Task.ts";
 import * as TaskCommand from "../task/TaskCommand.ts";
 import * as TaskPermissions from "../task/TaskPermissions.ts";
 import * as TaskStore from "../task/TaskStore.ts";
-import {
-  DirectMembersRequired,
-  HumanAuthorRequired,
-  ParticipantUnavailable,
-} from "./internal/thread-errors.ts";
+import { DirectMembersRequired, ParticipantUnavailable } from "./internal/thread-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
   /**
@@ -62,14 +58,6 @@ export {
    * @since 0.1.0
    */
   DirectMembersRequired,
-  /**
-   * An agent asked to start a thread; only people start them, and agents' messages come from
-   * their turns.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanAuthorRequired,
   /**
    * A member who was to take part cannot: they are missing, inactive, or not in the group.
    *
@@ -103,7 +91,7 @@ export type Error =
   | Projection.Error
   | CoreError.NotFound
   | ParticipantUnavailable
-  | HumanAuthorRequired
+  | CoreError.Denied
   | DirectMembersRequired
   | ThreadStore.Failure
   | ThreadMessageStore.Failure
@@ -411,7 +399,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       yield* authorization.require([]);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
       const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
       if (memberIds.length < 2) return yield* new DirectMembersRequired({});
       const missing = request.mentions.find((id) => !memberIds.includes(id));
@@ -458,7 +446,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       ]);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
       const ids = yield* deriveStartIds("thread.start", options.requestKey);
       const retried = yield* findRetriedStart(options.requestKey, ids);
       if (Option.isSome(retried)) return retried.value;

@@ -25,7 +25,7 @@ import {
   OwnershipPermissions,
   Workspace,
 } from "@amends-dev/core/workspace";
-import { Gateway, GatewayErrors, WorkspaceDirectory } from "@amends-dev/gateway";
+import { Gateway, WorkspaceDirectory } from "@amends-dev/gateway";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Layer, Option } from "effect";
 import { withStorage } from "./fixture.ts";
@@ -76,10 +76,10 @@ describe("gateway", () => {
                 yield* Effect.all(requests, { concurrency: "unbounded" });
                 expect(
                   yield* Effect.flip(Operations.getMember(b.id, alice, b.ownerMemberId)),
-                ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
                 expect(
                   yield* Effect.flip(Operations.getMember(a.id, bob, a.ownerMemberId)),
-                ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
                 expect(
                   yield* Effect.flip(Operations.getMember(a.id, alice, b.ownerMemberId)),
                 ).toMatchObject({ _tag: "CoreError.NotFound" });
@@ -278,7 +278,10 @@ describe("gateway", () => {
             }),
           ),
         );
-        expect(outcome.crossed).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+        expect(outcome.crossed).toMatchObject({
+          _tag: "CoreError.Denied",
+          reason: { _tag: "NotMember" },
+        });
         expect(outcome.listing.memberships.map((m) => m.workspace.id)).toEqual([outcome.b.id]);
         expect(outcome.listing.invitations).toEqual([
           {
@@ -452,7 +455,11 @@ describe("gateway", () => {
                 const unknown = Workspace.Id.make("never-created");
                 expect(
                   yield* Effect.flip(Operations.getMember(unknown, bob, workspace.ownerMemberId)),
-                ).toEqual(new GatewayErrors.NotMember({ workspaceId: unknown }));
+                ).toEqual(
+                  new CoreError.Denied({
+                    reason: new CoreError.NotMember({ workspaceId: unknown }),
+                  }),
+                );
                 expect(
                   yield* Effect.flip(
                     Operations.acceptInvitation(
@@ -466,7 +473,11 @@ describe("gateway", () => {
                   yield* Effect.flip(
                     Operations.getMember(workspace.id, bob, workspace.ownerMemberId),
                   ),
-                ).toEqual(new GatewayErrors.NotMember({ workspaceId: workspace.id }));
+                ).toEqual(
+                  new CoreError.Denied({
+                    reason: new CoreError.NotMember({ workspaceId: workspace.id }),
+                  }),
+                );
               }),
             ),
           );

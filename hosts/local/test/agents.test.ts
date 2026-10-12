@@ -162,7 +162,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.agents
             .create({ params: { workspaceId }, headers: {}, payload })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "Authorization.Denied" });
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
 
         // A setup that could not run, or names a connection that gives nothing, is refused.
         const inOpencode = {

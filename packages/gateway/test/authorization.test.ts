@@ -64,7 +64,7 @@ describe("authorization", () => {
               yield* (yield* MemberService.MemberService)
                 .get(workspace.ownerMemberId)
                 .pipe(Effect.provideService(Actor.Actor, actor), Effect.flip),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             expect(yield* bound.roles.get(roleId)).toMatchObject({
               _tag: "Some",
               value: { name: "Renamed", permissions: ["member.read"] },

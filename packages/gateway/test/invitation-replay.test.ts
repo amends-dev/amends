@@ -169,9 +169,7 @@ describe("invitation replay", () => {
             expect(yield* bound.assignments.listActiveByMember(member.id)).toEqual(grants);
             expect(
               yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
-            ).toMatchObject({
-              _tag: "GatewayErrors.NotMember",
-            });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
             expect((yield* Operations.getMember(other.id, bob, other.ownerMemberId)).status).toBe(
               "active",
             );
@@ -186,9 +184,7 @@ describe("invitation replay", () => {
             });
             expect(
               yield* Effect.flip(Operations.getMember(workspace.id, bob, member.id)),
-            ).toMatchObject({
-              _tag: "GatewayErrors.NotMember",
-            });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
             expect(yield* bound.store.read(journalLog, { limit: 20 })).toEqual(after);
             for (const record of pending)
               expect(

@@ -1103,7 +1103,7 @@ it.effect("a removed member cannot subscribe", () =>
     Effect.gen(function* () {
       yield* fixture.store.transaction(fixture.members.markRemoved(actor.memberId));
       const error = yield* Effect.flip((yield* ChangeFeedService.ChangeFeedService).watch());
-      expect(error).toMatchObject({ _tag: "Authorization.InvalidActor" });
+      expect(error).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
     }),
   ),
 );

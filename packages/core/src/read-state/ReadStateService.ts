@@ -22,7 +22,7 @@ import * as ReadState from "./ReadState.ts";
 import * as ReadStateStore from "./ReadStateStore.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import { BeyondTimeline, HumanRequired } from "./internal/read-state-errors.ts";
+import { BeyondTimeline } from "./internal/read-state-errors.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
@@ -33,14 +33,6 @@ export {
    * @since 0.1.0
    */
   BeyondTimeline,
-  /**
-   * The acting member is an agent: only people keep read state, and agents' turns track their input
-   * progress.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanRequired,
 } from "./internal/read-state-errors.ts";
 
 /**
@@ -58,7 +50,7 @@ export type Error =
   | ReadStateStore.Failure
   | ReadStateStore.Conflict
   | Schema.SchemaError
-  | HumanRequired
+  | CoreError.Denied
   | CoreError.NotFound
   | BeyondTimeline;
 
@@ -107,7 +99,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
   const requireHuman = Effect.fnUntraced(function* () {
     const actor = yield* Actor.Actor;
     if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-      return yield* new HumanRequired({ memberId: actor.memberId });
+      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
     return actor.memberId;
   });
   const markThreadRead = Effect.fn("ReadStateService.markThreadRead")(function* (

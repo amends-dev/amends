@@ -90,7 +90,7 @@ export type Error =
  */
 export type AcceptError =
   | Error
-  | Exclude<ThreadQuery.AccessError, CoreError.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
   | NotificationStore.Failure
   | MemberStore.Failure
   | SessionLogStore.Failure;
@@ -104,7 +104,7 @@ export type AcceptError =
  */
 export type StartError =
   | Error
-  | Exclude<ThreadQuery.TimelineError, CoreError.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.TimelineError, CoreError.NotFound>
   | NotificationStore.Failure
   | MemberStore.Failure
   | ContactStore.Failure
@@ -136,7 +136,7 @@ export type JoinedConversationError =
  */
 export type CloseError =
   | Error
-  | Exclude<ThreadQuery.AccessError, CoreError.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
   | ThreadQuery.ParticipantsError
   | ThreadCommand.Error;
 
@@ -541,10 +541,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
     const thread = yield* threadQuery.requireAccess(threadId).pipe(
       Effect.asSome,
-      Effect.catchTags({
-        "CoreError.NotFound": () => Effect.succeedNone,
-        "Authorization.Denied": () => Effect.succeedNone,
-      }),
+      Effect.catchTag("CoreError.NotFound", () => Effect.succeedNone),
+      Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeedNone),
     );
     if (Option.isNone(thread)) return undefined;
     const notificationIds = accepted.map(({ id }) => id);
@@ -703,6 +701,14 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             const runnable = yield* agentQuery.buildRunnable(turn.memberId, selection);
             return yield* readyTurn(turn, selection, runnable);
           }).pipe(
+            // The agent's membership ended, or the thread is gone or closed to the agent: the turn
+            // fails rather than tells nothing.
+            Effect.catchReason("CoreError.Denied", "NotGranted", () =>
+              endAsIdle(turn, {
+                outcome: "failed",
+                reason: "The agent can no longer read the thread.",
+              }),
+            ),
             // The agent cannot run on what is selected for it: the turn fails, saying why.
             Effect.catchTags({
               "AgentQuery.Incomplete": ({ issues }) =>
@@ -710,8 +716,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
                   outcome: "failed",
                   reason: issues.map(describeIssue).join(" "),
                 }),
-              // The agent's membership ended, or the thread is gone or closed to the agent: the turn
-              // fails rather than tells nothing.
               "CoreError.NotFound": ({ resource }) =>
                 endAsIdle(turn, {
                   outcome: "failed",
@@ -719,11 +723,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
                     resource === "Agent"
                       ? "The agent can no longer run."
                       : "The agent can no longer read the thread.",
-                }),
-              "Authorization.Denied": () =>
-                endAsIdle(turn, {
-                  outcome: "failed",
-                  reason: "The agent can no longer read the thread.",
                 }),
             }),
           );
@@ -767,10 +766,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const readReplyParticipants = Effect.fnUntraced(function* (turn: Turn.Turn) {
     const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
       Effect.asSome,
-      Effect.catchTags({
-        "CoreError.NotFound": () => Effect.succeedNone,
-        "Authorization.Denied": () => Effect.succeedNone,
-      }),
+      Effect.catchTag("CoreError.NotFound", () => Effect.succeedNone),
+      Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeedNone),
     );
     if (Option.isNone(thread)) return Result.fail("The agent can no longer open this thread.");
     const [mayPublish] = yield* authorization.permitted([

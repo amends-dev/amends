@@ -529,11 +529,14 @@ const refusals = {
   denied: () =>
     json(
       {
-        _tag: "Authorization.Denied",
-        memberId: "owner",
-        requirement: {
-          permission: { name: "thread.read", targetKind: "Thread" },
-          target: { _tag: "Thread", workspaceId: "one", threadId: "thread" },
+        _tag: "CoreError.Denied",
+        reason: {
+          _tag: "NotGranted",
+          memberId: "owner",
+          requirement: {
+            permission: { name: "thread.read", targetKind: "Thread" },
+            target: { _tag: "Thread", workspaceId: "one", threadId: "thread" },
+          },
         },
       },
       403,

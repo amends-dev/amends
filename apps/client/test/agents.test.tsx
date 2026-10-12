@@ -481,10 +481,21 @@ it("says which connection the host refused and why a setup couldn't run, keeping
       issues: [{ kind: "sandbox-required" }],
     }),
   );
-  f.server.answers.push(json({ _tag: "Delegation.Denied", reason: "administrator-role" }, 403));
+  f.server.answers.push(
+    json(
+      { _tag: "CoreError.Denied", reason: { _tag: "OwnerRequired", reason: "administrator-role" } },
+      403,
+    ),
+  );
   f.view.create.save();
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "role-denied" }));
-  expect(f.view.stale()).toBe(false);
+  // A role the workspace does not record is refused the same; anything else missing is gone.
+  f.server.answers.push(json({ _tag: "CoreError.NotFound", resource: "Role", id: "member" }, 404));
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "role-denied" }));
+  f.server.answers.push(json({ _tag: "CoreError.NotFound", resource: "Agent", id: "scout" }, 404));
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "gone" }));
   expect(f.view.create.name()).toBe("Scout");
 });
 

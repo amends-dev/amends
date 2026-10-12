@@ -30,7 +30,7 @@ of `make` keeps that scope open for the gateway's lifetime. The gateway's operat
   gives. The caller has authenticated the creator and checked that they may create one.
 - `asMember(workspaceId, identity, program)` resolves the identity's active membership into
   `Actor.Actor`, binds the workspace, and runs the program. A non-member, or a workspace that does
-  not exist, gets `NotMember` without the workspace being loaded. Programs may require only core's
+  not exist, gets `CoreError.Denied` (`NotMember`) without the workspace being loaded. Programs may require only core's
   `Operations`, the actor, and `Scope`: stores, the journal, and authorization are out of reach, so
   protocol code cannot bypass the checks inside each operation.
 - `inWorkspace(workspaceId, program)` is the same without an actor, for accepting an invitation,
@@ -211,7 +211,7 @@ Programs fail only with outcomes a caller can act on. Core's domain errors pass 
 among them `CoreError.NotFound`, which `inWorkspace` also returns for a workspace that was never
 created. The gateway adds:
 
-- `NotMember` when the identity has no active membership;
+- `CoreError.Denied` (`NotMember`) when the identity has no active membership;
 - `Conflict` for storage contention worth retrying;
 - `Uncertain` when a commit's outcome is unknown, with its commit ID;
 - `InvalidInput` when core rejects values the caller supplied, such as invitation grants.

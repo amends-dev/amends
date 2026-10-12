@@ -773,16 +773,12 @@ describe("notifications", () => {
             }
             expect(
               yield* Effect.flip(gateway.asMember(workspaceId, anotherIdentity, list)),
-            ).toMatchObject({
-              _tag: "GatewayErrors.NotMember",
-            });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
             expect(yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before);
             yield* a.store.transaction(a.members.markRemoved(workspace.ownerMemberId));
             expect(
               yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, list)),
-            ).toMatchObject({
-              _tag: "GatewayErrors.NotMember",
-            });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
             expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual(
               inboxOf(foreign),
             );

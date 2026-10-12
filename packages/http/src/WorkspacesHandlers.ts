@@ -1,6 +1,6 @@
 /**
  * Implements `WorkspacesGroup`. Creating a workspace refuses an agent with
- * `ApiErrors.HumanRequired` and calls the gateway's `createWorkspace` for the person, with no
+ * `HumanRequired` and calls the gateway's `createWorkspace` for the person, with no
  * membership to enter. The other handlers enter the workspace as the principal's membership through
  * `Gateway.asMember` and call `WorkspaceSettingsService` or `OwnershipService`; transferring
  * ownership refuses an agent first.
@@ -9,13 +9,13 @@
  */
 import { Identity } from "@amends-dev/core/identity";
 import * as Api from "./Api.ts";
-import * as ApiErrors from "./ApiErrors.ts";
 import * as Authentication from "./Authentication.ts";
 import { makeAsMember } from "./internal/as-member.ts";
 import { Gateway } from "@amends-dev/gateway";
 import { OwnershipService, WorkspaceSettingsService } from "@amends-dev/core/workspace";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
+import { CoreError } from "@amends-dev/core/error";
 
 /**
  * Register the workspace handlers: creation, settings and renaming, member management, and
@@ -61,7 +61,7 @@ export const layer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const principal = yield* Authentication.Principal;
           if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
-            return yield* new ApiErrors.HumanRequired();
+            return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
           return yield* gateway.asMember(
             params.workspaceId,
             principal,
@@ -74,7 +74,7 @@ export const layer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const principal = yield* Authentication.Principal;
           if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
-            return yield* new ApiErrors.HumanRequired();
+            return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
           return yield* gateway.createWorkspace(principal.id, payload, {
             requestKey: headers["idempotency-key"],
           });

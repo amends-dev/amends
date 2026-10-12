@@ -134,7 +134,7 @@ describe("workspace settings", () => {
             });
             expect(
               yield* Effect.flip(rename(workspace.id, bob, "No", workspace.name)),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* Operations.assign(workspace.id, alice, {
               memberId: member.id,
               roleId: BuiltinRoles.AdministratorId,

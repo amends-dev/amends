@@ -39,7 +39,7 @@ export function workspaceRejection(
   for (const reason of cause.reasons) {
     if (!Cause.isFailReason(reason)) continue;
     if (Schema.is(ApiErrors.InvalidInput)(reason.error)) return "invalid-name";
-    if (Schema.is(ApiErrors.HumanRequired)(reason.error)) return "denied";
+    if (Schema.is(ApiErrors.Denied)(reason.error)) return "denied";
   }
   return "request-failed";
 }

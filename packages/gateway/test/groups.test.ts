@@ -165,8 +165,11 @@ describe("groups", () => {
             asActor(create([memberId]), who).pipe(Effect.provide(core(bound)));
           const before = yield* history(bound);
           expect(yield* Effect.flip(call(actor))).toMatchObject({
-            _tag: "Authorization.Denied",
-            requirement: { permission: { name: GroupPermissions.Create.name } },
+            _tag: "CoreError.Denied",
+            reason: {
+              _tag: "NotGranted",
+              requirement: { permission: { name: GroupPermissions.Create.name } },
+            },
           });
           expect(yield* history(bound)).toEqual(before);
           const roleId = Role.Id.make("contributor");
@@ -204,7 +207,8 @@ describe("groups", () => {
             ),
           );
           expect(yield* Effect.flip(call(actor))).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
           yield* publish(
             bound,
@@ -235,7 +239,8 @@ describe("groups", () => {
             ),
           );
           expect(yield* Effect.flip(call(owner))).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
         }),
       ),
@@ -393,7 +398,10 @@ describe("groups", () => {
             }),
             owner,
           ).pipe(Effect.provide(core(bound)));
-          expect(yield* Effect.flip(revoked)).toMatchObject({ _tag: "Authorization.Denied" });
+          expect(yield* Effect.flip(revoked)).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
+          });
           expect(yield* history(bound)).toEqual(before);
         }),
       ),
@@ -655,7 +663,8 @@ describe("groups", () => {
           const before = yield* history(bound);
           // Only a member granted group.rename may rename; belonging to the group is not enough.
           expect(yield* Effect.flip(rename(actor, group.id, "Platform"))).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
           const renamed = yield* rename(owner, group.id, "Platform");
           expect(renamed).toEqual({ ...group, name: "Platform" });

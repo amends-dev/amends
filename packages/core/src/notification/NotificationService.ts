@@ -22,7 +22,7 @@ import * as NotificationInbox from "./NotificationInbox.ts";
 import type * as Thread from "../thread/Thread.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import { AlreadyHandled, HumanRecipientRequired } from "./internal/notification-errors.ts";
+import { AlreadyHandled } from "./internal/notification-errors.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
@@ -34,13 +34,6 @@ export {
    * @since 0.1.0
    */
   AlreadyHandled,
-  /**
-   * The acting member is not a person: only people mark their notifications seen.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanRecipientRequired,
 } from "./internal/notification-errors.ts";
 
 /**
@@ -58,9 +51,7 @@ export type Error = Authorization.Error | NotificationStore.Failure | Schema.Sch
  * @category errors
  * @since 0.1.0
  */
-export type SourceError =
-  | Exclude<ThreadQuery.TimelineError, CoreError.NotFound | Authorization.Denied>
-  | Log.ReadError;
+export type SourceError = Exclude<ThreadQuery.TimelineError, CoreError.NotFound> | Log.ReadError;
 
 /**
  * What reading the inbox can fail with: reading notifications, and reading their sources.
@@ -81,7 +72,7 @@ export type MarkSeenError =
   | Error
   | NotificationStore.Conflict
   | CoreError.NotFound
-  | HumanRecipientRequired
+  | CoreError.Denied
   | AlreadyHandled;
 
 /**
@@ -212,10 +203,8 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     const event = yield* Effect.orDie(Event.decode(ThreadActivityFacts.Recorded, entry));
     return yield* threadQuery.readTimelineItem(event.payload.activity.id).pipe(
       Effect.asSome,
-      Effect.catchTags({
-        "CoreError.NotFound": () => Effect.succeedNone,
-        "Authorization.Denied": () => Effect.succeedNone,
-      }),
+      Effect.catchTag("CoreError.NotFound", () => Effect.succeedNone),
+      Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeedNone),
     );
   });
   const inbox = Effect.fn("NotificationService.inbox")(function* (
@@ -242,7 +231,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
   ) {
     const notification = yield* requireOwn(notificationId);
     if (!Notification.Recipient.isAnyOf(["Human"])(notification.recipient))
-      return yield* new HumanRecipientRequired({});
+      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
     if (Notification.State.isAnyOf(["Seen"])(notification.state)) return notification;
     if (!Notification.State.isAnyOf(["Pending"])(notification.state))
       return yield* new AlreadyHandled({ notificationId: notification.id });
@@ -272,7 +261,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
   ) {
     const target = yield* requireRecipient();
     if (!Notification.Recipient.isAnyOf(["Human"])(target))
-      return yield* new HumanRecipientRequired({});
+      return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
     const through = yield* decodeCursor(input);
     const memberId = (yield* Actor.Actor).memberId;
     /** One page marked: what it listed and how many of them were due. */

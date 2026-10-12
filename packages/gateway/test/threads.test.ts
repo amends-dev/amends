@@ -308,8 +308,11 @@ describe("threads", () => {
             const { bound, owner, human, agent, group, hidden } = yield* prepare();
             const before = yield* history(bound);
             expect(yield* Effect.flip(run(bound, human, start(group.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: ThreadPermissions.Start.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: ThreadPermissions.Start.name } },
+              },
             });
             expect(yield* Effect.flip(run(bound, owner, start(hidden.id)))).toEqual(
               new CoreError.NotFound({ resource: "Group", id: hidden.id }),
@@ -339,10 +342,13 @@ describe("threads", () => {
             yield* run(bound, human, start(group.id));
             expect(yield* Effect.flip(run(bound, human, start(group.id, [agentId])))).toMatchObject(
               {
-                _tag: "Authorization.Denied",
-                requirement: {
-                  permission: { name: AgentPermissions.Use.name },
-                  target: { memberId: agentId },
+                _tag: "CoreError.Denied",
+                reason: {
+                  _tag: "NotGranted",
+                  requirement: {
+                    permission: { name: AgentPermissions.Use.name },
+                    target: { memberId: agentId },
+                  },
                 },
               },
             );
@@ -384,7 +390,8 @@ describe("threads", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, agent, start(group.id)))).toMatchObject({
-              _tag: "ThreadService.HumanAuthorRequired",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "HumanRequired" },
             });
             yield* publish(
               bound,
@@ -397,7 +404,8 @@ describe("threads", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, start(group.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -438,10 +446,13 @@ describe("threads", () => {
               ),
             );
             const denied = {
-              _tag: "Authorization.Denied",
-              requirement: {
-                permission: { name: AgentPermissions.Use.name },
-                target: { memberId: agentId },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: {
+                  permission: { name: AgentPermissions.Use.name },
+                  target: { memberId: agentId },
+                },
               },
             };
             // Creating a direct group with an agent gives it a place in every thread.
@@ -643,7 +654,7 @@ describe("threads", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "Authorization.Denied" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           const admission = Option.getOrThrow(
             yield* bound.groupMemberships.findActive(group.id, humanId),
           );
@@ -1189,7 +1200,7 @@ describe("threads", () => {
           const before = yield* history(bound);
           // Only a member granted thread.rename may rename; belonging to the group is not enough.
           expect(yield* Effect.flip(rename(human, started.thread.id, "Launch plan"))).toMatchObject(
-            { _tag: "Authorization.Denied" },
+            { _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } },
           );
           // To anyone outside the group, the thread is missing.
           expect(yield* Effect.flip(rename(other, started.thread.id, "Launch plan"))).toEqual(

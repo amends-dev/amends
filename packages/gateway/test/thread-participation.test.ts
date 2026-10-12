@@ -517,7 +517,8 @@ describe("thread participation", () => {
             yield* grant(bound, humanId, ThreadPermissions.Read);
             yield* grant(bound, humanId, ThreadMessagePermissions.Publish);
             expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const assignment = yield* grant(
               bound,
@@ -531,7 +532,7 @@ describe("thread participation", () => {
             const participant = yield* asActor(service.follow(first.thread.id), human);
             expect(
               yield* Effect.flip(asActor(service.follow(second.thread.id), human)),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* facts(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -544,7 +545,7 @@ describe("thread participation", () => {
             );
             expect(
               yield* Effect.flip(asActor(service.follow(first.thread.id), human)),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* asActor(
               service.unfollow({ threadId: first.thread.id, participationId: participant.id }),
               human,
@@ -576,7 +577,8 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, human, follow(second.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const hidden = yield* run(bound, owner, create([otherId]));
             yield* grant(bound, otherId, ThreadPermissions.Start);
@@ -635,7 +637,7 @@ describe("thread participation", () => {
               yield* Effect.flip(
                 run(bound, { ...human, identity: owner.identity }, follow(first.thread.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             const record = Option.getOrThrow(yield* bound.participations.get(own.id));
             yield* run(
               bound,
@@ -663,7 +665,8 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor" },
             });
           }),
         ),
@@ -771,7 +774,8 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, revoked))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
           }),

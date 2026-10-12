@@ -4,12 +4,12 @@
  * declares no transport concerns, so the status lives here, on the contract's view of each error,
  * and the serialized tag stays the one core or the gateway declares. A name that would be ambiguous
  * in the shared namespace says its source, such as `InvitationUnavailable` or `TurnNotActive`.
- * `HumanRequired` and `TooManyStreams` are the contract's own, and `requestKey` is the
- * `Idempotency-Key` header a creating endpoint accepts.
+ * `TooManyStreams` is the contract's own, and `requestKey` is the `Idempotency-Key` header a
+ * creating endpoint accepts.
  *
  * @since 0.1.0
  */
-import { AssignmentService, Authorization, Delegation } from "@amends-dev/core/authorization";
+import { AssignmentService, Delegation } from "@amends-dev/core/authorization";
 import { InvitationService, MemberService, OwnershipService } from "@amends-dev/core/workspace";
 import * as GatewayErrors from "@amends-dev/gateway/GatewayErrors";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
@@ -29,18 +29,6 @@ import { Request } from "@amends-dev/core/request";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/http-api";
 import { CoreError } from "@amends-dev/core/error";
-
-/**
- * The principal is an agent where only a human may act; 403.
- *
- * @category errors
- * @since 0.1.0
- */
-export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
-  "ApiErrors.HumanRequired",
-  {},
-  { httpApiStatus: 403 },
-) {}
 
 /**
  * The caller cannot open another live-update stream on this server now: the workspace, or the
@@ -72,13 +60,13 @@ export const NotFound = CoreError.NotFound.pipe(HttpApiSchema.status(404));
  */
 export const Changed = CoreError.Changed.pipe(HttpApiSchema.status(409));
 /**
- * The principal holds no active membership of the workspace, or no workspace has this ID: 403.
- * The gateway answers it before loading the workspace.
+ * The caller may not do what they asked, for the `reason` given, such as a grant they lack, a
+ * workspace they are not a member of, or an action only a person or the owner takes: 403.
  *
  * @category errors
  * @since 0.1.0
  */
-export const NotMember = GatewayErrors.NotMember.pipe(HttpApiSchema.status(403));
+export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403));
 /**
  * The request key a creating endpoint accepts: send a new one for each logical request and the
  * same one on every retry of it, and the retry returns the first attempt's result.
@@ -112,29 +100,6 @@ export const Uncertain = GatewayErrors.Uncertain.pipe(HttpApiSchema.status(500))
  */
 export const InvalidInput = GatewayErrors.InvalidInput.pipe(HttpApiSchema.status(400));
 /**
- * No current grant of the caller's membership covers what the operation requires; 403.
- *
- * @category errors
- * @since 0.1.0
- */
-export const Denied = Authorization.Denied.pipe(HttpApiSchema.status(403));
-/**
- * The acting membership is missing or removed, or its identity is not the principal's; 403.
- *
- * @category errors
- * @since 0.1.0
- */
-export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status(403));
-/**
- * Only a person marks a notification seen; an agent's are handled by its work. 403.
- *
- * @category errors
- * @since 0.1.0
- */
-export const NotificationHumanRecipientRequired = NotificationService.HumanRecipientRequired.pipe(
-  HttpApiSchema.status(403),
-);
-/**
  * The notification was already settled otherwise, so it is not marked seen; 409.
  *
  * @category errors
@@ -157,13 +122,6 @@ export const OwnerProtected = MemberService.OwnerProtected.pipe(HttpApiSchema.st
  * @since 0.1.0
  */
 export const AlreadyRemoved = MemberService.AlreadyRemoved.pipe(HttpApiSchema.status(409));
-/**
- * The principal is not the person the invitation was issued to; 403.
- *
- * @category errors
- * @since 0.1.0
- */
-export const NotRecipient = InvitationService.NotRecipient.pipe(HttpApiSchema.status(403));
 /**
  * The invitation's recipient is an active member already; 409.
  *
@@ -188,23 +146,15 @@ export const InvitationInvalidExpiry = InvitationService.InvalidExpiry.pipe(
   HttpApiSchema.status(400),
 );
 /**
- * The caller may not delegate this: only the owner gives Administrator, and only the owner changes
- * a member who holds a direct grant or a role other than Member; 403.
- *
- * @category errors
- * @since 0.1.0
- */
-export const DelegationDenied = Delegation.Denied.pipe(HttpApiSchema.status(403));
-/**
  * The delegation rules' outcomes, which giving, changing, and taking away a role share:
- * `DelegationDenied` (403), the owner out of reach (409), a role other than the three built-in
- * ones (400), and a built-in role this workspace does not record (404).
+ * `Denied` where only the owner may (403), the owner out of reach (409), a role other than the
+ * three built-in ones (400), and a built-in role this workspace does not record (404).
  *
  * @category errors
  * @since 0.1.0
  */
 export const delegation = [
-  DelegationDenied,
+  Denied,
   Delegation.OwnerProtected.pipe(HttpApiSchema.status(409)),
   Delegation.UnsupportedRole.pipe(HttpApiSchema.status(400)),
   NotFound,
@@ -217,7 +167,7 @@ export const delegation = [
  */
 export const invitation = [
   ...delegation,
-  NotRecipient,
+  Denied,
   AlreadyMember,
   InvitationUnavailable,
   InvitationInvalidExpiry,
@@ -251,7 +201,7 @@ export const assignment = [...assignmentRead, Changed] as const;
  * @since 0.1.0
  */
 export const ownership = [
-  OwnershipService.NotOwner.pipe(HttpApiSchema.status(403)),
+  Denied,
   NotFound,
   OwnershipService.InvalidRecipient.pipe(HttpApiSchema.status(409)),
   Changed,
@@ -302,7 +252,7 @@ export const groupMembership = [
  */
 export const groupFollow = [
   NotFound,
-  GroupFollowService.AgentRequired.pipe(HttpApiSchema.status(403)),
+  Denied,
   GroupFollowService.MemberUnavailable.pipe(HttpApiSchema.status(409)),
   GroupFollowService.NotFollowable.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -317,7 +267,7 @@ export const groupFollow = [
  */
 export const thread = [
   NotFound,
-  ThreadService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  Denied,
   ThreadService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
   ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
 ] as const;
@@ -330,7 +280,7 @@ export const thread = [
  */
 export const message = [
   NotFound,
-  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  Denied,
   ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
 /**
@@ -342,8 +292,7 @@ export const message = [
  */
 export const messageEdit = [
   NotFound,
-  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
-  ThreadMessageService.NotAuthor.pipe(HttpApiSchema.status(403)),
+  Denied,
   ThreadMessageService.Deleted.pipe(HttpApiSchema.status(409)),
   Changed,
   ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
@@ -354,10 +303,7 @@ export const messageEdit = [
  * @category errors
  * @since 0.1.0
  */
-export const messageDelete = [
-  NotFound,
-  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
-] as const;
+export const messageDelete = [NotFound, Denied] as const;
 /**
  * Saying one is typing: a thread missing or outside the caller's groups is 404.
  *
@@ -419,7 +365,7 @@ export const taskUpdate = [
  * @since 0.1.0
  */
 export const readState = [
-  ReadStateService.HumanRequired.pipe(HttpApiSchema.status(403)),
+  Denied,
   NotFound,
   ReadStateService.BeyondTimeline.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -497,15 +443,7 @@ export const TurnNotRetryable = TurnService.NotRetryable.pipe(HttpApiSchema.stat
  * @category errors
  * @since 0.1.0
  */
-export const workspace = [Denied, InvalidActor, InvalidInput, Conflict, Uncertain] as const;
-
-/**
- * Outcomes every member operation shares: the workspace set plus membership.
- *
- * @category errors
- * @since 0.1.0
- */
-export const member = [NotMember, ...workspace] as const;
+export const workspace = [Denied, InvalidInput, Conflict, Uncertain] as const;
 
 /**
  * Channel outcomes. A channel the caller may not read, or removed, is 404, as is a group the caller

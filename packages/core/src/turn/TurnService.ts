@@ -76,7 +76,7 @@ export {
  */
 export type ReadError =
   | ThreadQuery.AccessError
-  | Exclude<Authorization.Error, Authorization.Denied>
+  | Authorization.Error
   | TurnStore.Failure
   | ThreadParticipationStore.Failure
   | Schema.SchemaError
@@ -303,10 +303,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
       if (opened.has(turn.threadId)) continue;
       const may = yield* threadQuery.requireAccess(turn.threadId).pipe(
         Effect.as(true),
-        Effect.catchTags({
-          "CoreError.NotFound": () => Effect.succeed(false),
-          "Authorization.Denied": () => Effect.succeed(false),
-        }),
+        Effect.catchTag("CoreError.NotFound", () => Effect.succeed(false)),
+        Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false)),
       );
       opened.set(turn.threadId, may);
     }

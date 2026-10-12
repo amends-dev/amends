@@ -5,7 +5,7 @@ import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { expect, it } from "@effect/vitest";
 import { Api, Authentication, Routes } from "../src/index.ts";
 import type * as Core from "@amends-dev/core";
-import { Authorization, Requirement, Target } from "@amends-dev/core/authorization";
+import { Requirement, Target } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { Entry } from "@amends-dev/core/journal";
 import { Notification, NotificationService } from "@amends-dev/core/notification";
@@ -74,12 +74,14 @@ const record =
     calls.push({ operation, arguments: args });
     return respond(...args);
   };
-const denied = new Authorization.Denied({
-  memberId,
-  requirement: Requirement.make(
-    MemberPermissions.Read,
-    Target.Reference.cases.Member.make({ workspaceId, memberId }),
-  ),
+const denied = new CoreError.Denied({
+  reason: new CoreError.NotGranted({
+    memberId,
+    requirement: Requirement.make(
+      MemberPermissions.Read,
+      Target.Reference.cases.Member.make({ workspaceId, memberId }),
+    ),
+  }),
 });
 const actor = Actor.Actor.of({ workspaceId, memberId, identity: alice });
 const pending = ({
@@ -199,7 +201,7 @@ const conversations = Layer.mergeAll(
     ThreadMessageService.ThreadMessageService,
     ThreadMessageService.ThreadMessageService.of({
       publish: record("thread.publish", () =>
-        Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
+        Effect.fail(new CoreError.Denied({ reason: new CoreError.HumanRequired() })),
       ),
       edit: record("thread.edit", (input) =>
         Effect.fail(new CoreError.Changed({ resource: "ThreadMessage", id: input.messageId })),
@@ -342,11 +344,13 @@ const gateway = Layer.succeed(
     ) => {
       calls.push({ operation: "asMember", arguments: [id, identity] });
       if (identity.id !== alice.id)
-        return Effect.fail(new GatewayErrors.NotMember({ workspaceId: id }));
+        return Effect.fail(
+          new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId: id }) }),
+        );
       return Effect.provide(
         Effect.provideService(program, Actor.Actor, actor),
         operations,
-      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
+      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.Denied, Scope.Scope>;
     },
   }),
 );
@@ -536,15 +540,18 @@ it.effect("domain outcomes keep their tags and statuses", () =>
     const notMember = yield* run("bob", (client) =>
       client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
     );
-    expect(notMember).toMatchObject({ _tag: "GatewayErrors.NotMember", workspaceId });
+    expect(notMember).toMatchObject({
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotMember", workspaceId },
+    });
     const forbidden = yield* run("alice", (client) =>
       client.members
         .remove({ params: { workspaceId, memberId }, responseMode: "decoded-and-response" })
         .pipe(Effect.flip),
     );
     expect(forbidden).toMatchObject({
-      _tag: "Authorization.Denied",
-      requirement: { permission: { name: "member.read" } },
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", requirement: { permission: { name: "member.read" } } },
     });
     const statuses = yield* run("alice", (client) =>
       Effect.all([
@@ -592,7 +599,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
         .create({ headers: {}, payload: { name: "Test workspace", memberName: member.name } })
         .pipe(Effect.flip),
     );
-    expect(refused).toMatchObject({ _tag: "ApiErrors.HumanRequired" });
+    expect(refused).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
     const accepted = yield* run("alice", (client) =>
       client.invitations.accept({
         params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
@@ -704,7 +711,7 @@ it.effect("a person reads their account, and signs out with the credential they 
       email: "alice@example.com",
     });
     const agent = yield* run("agent", (client) => Effect.flip(client.me.account()));
-    expect(agent).toMatchObject({ _tag: "ApiErrors.HumanRequired" });
+    expect(agent).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
     // A session no account holds is not honored.
     const unknown = yield* run("carol", (client) =>
       client.me.account({ responseMode: "response-only" }),

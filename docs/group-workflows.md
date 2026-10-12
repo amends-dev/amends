@@ -128,7 +128,7 @@ and admission times, for active admissions whose workspace member is still activ
 
 Missing, foreign, and outside-audience groups are `CoreError.NotFound` for `get` and roster
 reads alike. A current member without the
-action grant receives `Authorization.Denied`. No read reaches a group from outside it. Storage and
+action grant receives `CoreError.Denied` (`NotGranted`). No read reaches a group from outside it. Storage and
 consistency failures are not hidden as empty lists or
 missing groups. Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
 
@@ -203,7 +203,7 @@ value, and repeating either records nothing.
 The actor must be a current member of the group; otherwise, as for a missing group, the result is
 `CoreError.NotFound`. Members follow for themselves under `group.follow`, and
 unfollowing oneself needs no grant. Another member can be made to follow or unfollow only when it
-is an agent in the group and the actor holds `agent.use` for it: a person returns `AgentRequired`,
+is an agent in the group and the actor holds `agent.use` for it: a person returns `CoreError.Denied` (`AgentRequired`),
 and a member outside the group or inactive returns `MemberUnavailable`. Posting in the group then
 reaches the agent without the poster's `agent.use`, as the [attention
 model](core-model.md#agreed-attention-is-directed-followed-or-ambient) agrees. Direct groups return

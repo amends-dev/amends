@@ -767,7 +767,10 @@ it("leaves a workspace once a commit removes the member, without signing out", a
     liveWorkspace({ name: () => "Studio", status: () => status }),
     () =>
       status === "removed"
-        ? response({ _tag: "GatewayErrors.NotMember", workspaceId: "one" }, 403)
+        ? response(
+            { _tag: "CoreError.Denied", reason: { _tag: "NotMember", workspaceId: "one" } },
+            403,
+          )
         : undefined,
   );
   await screen.findByRole("heading", { name: "Inbox" });

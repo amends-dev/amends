@@ -35,18 +35,18 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
       params: { workspaceId: Workspace.Id },
       query: { limit },
       success: Schema.Array(view),
-      error: ApiErrors.member,
+      error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.get("get", "/turns/:turnId", {
       params: turn,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.NotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.get("watchLog", "/turns/:turnId/log/events", {
       params: turn,
       success: HttpApiSchema.StreamSse({ data: Turn.LogMessage, error: Turn.LogUnavailable }),
       error: [
-        ...ApiErrors.member,
+        ...ApiErrors.workspace,
         ApiErrors.NotFound,
         Turn.LogUnavailable.pipe(HttpApiSchema.status(503)),
         ApiErrors.TooManyStreams,
@@ -55,12 +55,12 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
     HttpApiEndpoint.post("cancel", "/turns/:turnId/cancel", {
       params: turn,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.TurnNotActive],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.TurnNotActive],
     }),
     HttpApiEndpoint.post("retry", "/turns/:turnId/retry", {
       params: turn,
       success: Turn.View.pipe(HttpApiSchema.status(201)).annotate({ identifier: "RetriedTurn" }),
-      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.TurnNotRetryable],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.TurnNotRetryable],
     }),
   )
   .middleware(Authentication)

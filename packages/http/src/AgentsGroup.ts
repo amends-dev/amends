@@ -32,7 +32,7 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(view),
-      error: ApiErrors.member,
+      error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.post("create", "/", {
       params: { workspaceId: Workspace.Id },
@@ -41,18 +41,18 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
       success: Agent.View.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedAgent",
       }),
-      error: [...ApiErrors.member, ...setup, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...setup, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.get("get", "/:agentId", {
       params: agent,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.NotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.put("configure", "/:agentId/configuration", {
       params: agent,
       payload: Agent.Configuration,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.NotFound, ...setup],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ...setup],
     }),
     HttpApiEndpoint.post("rename", "/:agentId/rename", {
       params: agent,
@@ -61,7 +61,7 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
         expectedName: Agent.RenameInput.fields.expectedName,
       }),
       success: view,
-      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.Changed],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Changed],
     }),
   )
   .middleware(Authentication)

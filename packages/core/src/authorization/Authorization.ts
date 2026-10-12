@@ -1,11 +1,11 @@
 /**
  * The check every operation runs for the acting member: that the actor is a current, active member
  * of this workspace, and that one of their grants covers each permission the operation requires on
- * its target. `require` fails with `Denied` at the first uncovered requirement; `permitted` answers
- * each one, for lists that keep only what the actor may see. The actor comes from `Actor.Actor` in
- * context, their grants from `GrantResolver`, and permissions from `PermissionCatalog`. Whether a
- * target exists, group membership, and business rules stay with the operation, which runs the
- * check inside its commit when it writes.
+ * its target. `require` fails with `CoreError.Denied`, `NotGranted`, at the first uncovered
+ * requirement; `permitted` answers each one, for lists that keep only what the actor may see. The
+ * actor comes from `Actor.Actor` in context, their grants from `GrantResolver`, and permissions
+ * from `PermissionCatalog`. Whether a target exists, group membership, and business rules stay with
+ * the operation, which runs the check inside its commit when it writes.
  *
  * @since 0.1.0
  */
@@ -21,25 +21,8 @@ import * as GrantResolver from "./GrantResolver.ts";
 import * as PermissionCatalog from "./PermissionCatalog.ts";
 import * as Requirement from "./Requirement.ts";
 
-import { Denied, InvalidActor } from "./internal/authorization-errors.ts";
 import * as Store from "../journal/Store.ts";
-export {
-  /**
-   * No current grant of the member covers the requirement.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Denied,
-  /**
-   * The actor is not an active member of the workspace: the membership is missing or removed, or
-   * its identity is not the actor's.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidActor,
-} from "./internal/authorization-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * The actor, or a requirement's target, belongs to another workspace than the one this core is
@@ -64,8 +47,7 @@ export type Error =
   | MemberStore.Failure
   | GrantResolver.Error
   | WorkspaceMismatch
-  | InvalidActor
-  | Denied;
+  | CoreError.Denied;
 
 /**
  * The authorization check, bound to one workspace. Every operation calls `require` with its
@@ -94,7 +76,7 @@ export class Authorization extends Context.Service<
      */
     readonly permitted: (
       requirements: ReadonlyArray<Requirement.Requirement>,
-    ) => Effect.Effect<ReadonlyArray<boolean>, Exclude<Error, Denied>, Actor.Actor>;
+    ) => Effect.Effect<ReadonlyArray<boolean>, Error, Actor.Actor>;
   }
 >()("@amends-dev/core/authorization/Authorization") {}
 
@@ -135,14 +117,29 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     yield* requireWorkspace(workspaceId, actor.workspaceId);
     const found = yield* memberStore.get(actor.memberId);
     if (Option.isNone(found)) {
-      return yield* new InvalidActor({ memberId: actor.memberId, reason: "membership-missing" });
+      return yield* new CoreError.Denied({
+        reason: new CoreError.InvalidActor({
+          memberId: actor.memberId,
+          reason: "membership-missing",
+        }),
+      });
     }
     const member = found.value;
     if (member.status !== "active") {
-      return yield* new InvalidActor({ memberId: actor.memberId, reason: "membership-removed" });
+      return yield* new CoreError.Denied({
+        reason: new CoreError.InvalidActor({
+          memberId: actor.memberId,
+          reason: "membership-removed",
+        }),
+      });
     }
     if (!sameIdentity(member.identity, actor.identity)) {
-      return yield* new InvalidActor({ memberId: actor.memberId, reason: "identity-mismatch" });
+      return yield* new CoreError.Denied({
+        reason: new CoreError.InvalidActor({
+          memberId: actor.memberId,
+          reason: "identity-mismatch",
+        }),
+      });
     }
 
     for (const requirement of requirements) {
@@ -172,7 +169,9 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     const grants = yield* grantResolver.resolve(actor.memberId);
     for (const requirement of checked)
       if (!Grant.anyCovers(grants, requirement))
-        return yield* new Denied({ memberId: actor.memberId, requirement });
+        return yield* new CoreError.Denied({
+          reason: new CoreError.NotGranted({ memberId: actor.memberId, requirement }),
+        });
   });
   const permitted = Effect.fn("Authorization.permitted")(function* (
     requirements: ReadonlyArray<Requirement.Requirement>,

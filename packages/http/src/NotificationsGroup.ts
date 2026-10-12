@@ -39,28 +39,23 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
         pendingOnly: Schema.optionalKey(Schema.Boolean),
       },
       success: Schema.Array(NotificationInbox.Item.annotate({ identifier: "InboxItem" })),
-      error: ApiErrors.member,
+      error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.get("count", "/count", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Struct({ pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
-      error: ApiErrors.member,
+      error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.post("markSeenThrough", "/seen", {
       params: { workspaceId: Workspace.Id },
       payload: Schema.Struct({ through: NotificationStore.Cursor }),
       success: Schema.Struct({ marked: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
-      error: [...ApiErrors.member, ApiErrors.NotificationHumanRecipientRequired],
+      error: [...ApiErrors.workspace],
     }),
     HttpApiEndpoint.post("markSeen", "/:notificationId/seen", {
       params,
       success: record,
-      error: [
-        ...ApiErrors.member,
-        ApiErrors.NotFound,
-        ApiErrors.NotificationHumanRecipientRequired,
-        ApiErrors.NotificationAlreadyHandled,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.NotificationAlreadyHandled],
     }),
   )
   .middleware(Authentication)

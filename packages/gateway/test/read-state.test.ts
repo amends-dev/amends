@@ -268,13 +268,13 @@ describe("read state", () => {
             // Only people with current read access keep read state.
             expect(
               yield* Effect.flip(run(bound, actorFor(agentId), markRead(threadId, 1))),
-            ).toEqual(new ReadStateService.HumanRequired({ memberId: agentId }));
+            ).toEqual(new CoreError.Denied({ reason: new CoreError.HumanRequired() }));
             expect(
               yield* Effect.flip(run(bound, actorFor(outsiderId), markRead(threadId, 1))),
             ).toEqual(new CoreError.NotFound({ resource: "Thread", id: threadId }));
             expect(
               yield* Effect.flip(run(bound, actorFor(plainId), markRead(threadId, 1))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             expect(yield* positionOf(bound, plainId, threadId)).toEqual([]);
           }),
         ),
@@ -308,7 +308,7 @@ describe("read state", () => {
           });
           expect(yield* readTimes).toEqual([second]);
           expect(yield* Effect.flip(run(bound, actorFor(agentId), markGroupRead(team.id)))).toEqual(
-            new ReadStateService.HumanRequired({ memberId: agentId }),
+            new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
           );
           expect(
             yield* Effect.flip(run(bound, actorFor(outsiderId), markGroupRead(team.id))),

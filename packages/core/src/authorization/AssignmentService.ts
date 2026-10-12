@@ -66,15 +66,6 @@ export type Error =
 export type ListError = Delegation.Error | CoreError.NotFound | InactiveMember;
 
 /**
- * What `permissions` can fail with: authorization's failures but never `Denied`, since reading
- * one's own permissions needs only active membership.
- *
- * @category errors
- * @since 0.1.0
- */
-export type PermissionsError = Exclude<Authorization.Error, Authorization.Denied>;
-
-/**
  * The assignment operations, one of `Core.Operations`.
  *
  * @category services
@@ -90,7 +81,7 @@ export class AssignmentService extends Context.Service<
      */
     readonly permissions: Effect.Effect<
       ReadonlyArray<Permission.Name>,
-      PermissionsError,
+      Authorization.Error,
       Actor.Actor
     >;
     /** The three built-in roles, each with whether the actor may give it, under active membership. */

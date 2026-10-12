@@ -29,12 +29,7 @@ import * as InvitationStore from "./InvitationStore.ts";
 import * as Member from "./Member.ts";
 import * as MemberCommand from "./MemberCommand.ts";
 import * as MemberStore from "./MemberStore.ts";
-import {
-  AlreadyMember,
-  InvalidExpiry,
-  NotRecipient,
-  Unavailable,
-} from "./internal/invitation-errors.ts";
+import { AlreadyMember, InvalidExpiry, Unavailable } from "./internal/invitation-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
 export {
   /**
@@ -51,13 +46,6 @@ export {
    * @since 0.1.0
    */
   InvalidExpiry,
-  /**
-   * The authenticated person is not whom the invitation names; only the named recipient may accept.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotRecipient,
   /**
    * The invitation cannot be accepted or revoked now: it has expired, was revoked, or was accepted
    * already, as `reason` says.
@@ -85,7 +73,7 @@ export type Error =
   | MemberStore.Failure
   | MemberCommand.Error
   | CoreError.NotFound
-  | NotRecipient
+  | CoreError.Denied
   | AlreadyMember
   | Unavailable
   | InvalidExpiry;
@@ -235,7 +223,10 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     const name = yield* Schema.decodeEffect(Member.NewName)(chosenName);
     const invitation = yield* requireInvitation(id);
     const { details, state } = invitation;
-    if (details.recipientId !== recipient) return yield* new NotRecipient({ invitationId: id });
+    if (details.recipientId !== recipient)
+      return yield* new CoreError.Denied({
+        reason: new CoreError.NotRecipient({ invitationId: id }),
+      });
     // Repeated acceptance returns the original receipt, without restoring grants
     // or reactivating a membership that has since been removed.
     if (Invitation.State.isAnyOf(["Accepted"])(state)) {
@@ -252,9 +243,11 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     yield* requireUnjoined(recipient);
     const inviter = yield* memberStore.get(details.inviterMemberId);
     if (Option.isNone(inviter))
-      return yield* new Authorization.InvalidActor({
-        memberId: details.inviterMemberId,
-        reason: "membership-missing",
+      return yield* new CoreError.Denied({
+        reason: new CoreError.InvalidActor({
+          memberId: details.inviterMemberId,
+          reason: "membership-missing",
+        }),
       });
     // Only this authority check uses the recorded inviter, never recipient input.
     yield* authorizeInvitation(details).pipe(

@@ -2,18 +2,18 @@
  * Implements `MeGroup` over the host's services alone, entering no workspace: `Accounts.findByIds`
  * for the principal's account, `WorkspaceDirectory.list` for its memberships and pending
  * invitations, and `SessionTokens.revoke` for the request's `Credential` on signing out. An agent
- * asking for its account gets `ApiErrors.HumanRequired`, and a session no account holds
+ * asking for its account is denied as `HumanRequired`, and a session no account holds
  * `Unauthorized`.
  *
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import * as ApiErrors from "./ApiErrors.ts";
 import * as Authentication from "./Authentication.ts";
 import { Identity } from "@amends-dev/core/identity";
 import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway";
 import { Array, Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
+import { CoreError } from "@amends-dev/core/error";
 
 /**
  * Register the principal's own handlers over the host's accounts, directory, and session tokens,
@@ -34,7 +34,7 @@ export const layer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const principal = yield* Authentication.Principal;
           if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
-            return yield* new ApiErrors.HumanRequired();
+            return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
           const found = Array.head(yield* accounts.findByIds([principal.id]));
           if (found._tag === "None")
             return yield* new Authentication.Unauthorized({

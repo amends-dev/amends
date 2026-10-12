@@ -275,7 +275,9 @@ export const signalKeys = (workspaceId: string, signal: Signal.Signal): Array<st
 const failures = (cause: Cause.Cause<unknown>) =>
   cause.reasons.flatMap((reason) => (Cause.isFailReason(reason) ? [reason.error] : []));
 const unavailable = (cause: Cause.Cause<unknown>) =>
-  failures(cause).some((error) => Schema.is(ApiErrors.NotMember)(error));
+  failures(cause).some(
+    (error) => Schema.is(ApiErrors.Denied)(error) && error.reason._tag === "NotMember",
+  );
 /** How long a connection must stay live before its failure counts as the first in a row. */
 const healthy = 10_000;
 /**

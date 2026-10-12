@@ -28,7 +28,7 @@ describe("invitation policy", () => {
               yield* Effect.flip(
                 Operations.acceptInvitation(a.id, charlie.id, invitation.details.id),
               ),
-            ).toMatchObject({ _tag: "InvitationService.NotRecipient" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotRecipient" } });
             expect(
               yield* Effect.flip(Operations.acceptInvitation(b.id, bob.id, invitation.details.id)),
             ).toMatchObject({ _tag: "CoreError.NotFound" });
@@ -40,7 +40,7 @@ describe("invitation policy", () => {
               yield* Effect.flip(
                 Operations.acceptInvitation(a.id, charlie.id, invitation.details.id),
               ),
-            ).toMatchObject({ _tag: "InvitationService.NotRecipient" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotRecipient" } });
             expect(yield* (yield* boundTo(b.id)).members.findActive(bob)).toEqual(Option.none());
           }),
         ),
@@ -101,7 +101,7 @@ describe("invitation policy", () => {
                 request(yield* future, charlie.id, BuiltinRoles.AdministratorId),
               ),
             ),
-          ).toMatchObject({ _tag: "Delegation.Denied" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "OwnerRequired" } });
           yield* Operations.invite(workspace.id, bob, request(yield* future, charlie.id));
           expect(
             yield* Effect.flip(
@@ -176,10 +176,10 @@ describe("invitation policy", () => {
             );
             expect(failure._tag).toBe(
               change === "permission"
-                ? "Authorization.Denied"
+                ? "CoreError.Denied"
                 : change === "membership"
-                  ? "Authorization.InvalidActor"
-                  : "Delegation.Denied",
+                  ? "CoreError.Denied"
+                  : "CoreError.Denied",
             );
             expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
             expect(yield* bound.invitations.get(invitation.details.id)).toMatchObject({

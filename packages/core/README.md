@@ -126,7 +126,12 @@ whichever operation raises it, carrying in its fields what it is about and in it
 happened. `CoreError.NotFound` names the `resource` and the `id` the caller asked for; a missing
 resource and one out of the caller's reach answer alike. `CoreError.Changed` names one that changed
 since the caller read it: a name, title, revision, or set of roles they expected is no longer so,
-and nothing was recorded. Operations pass it through unchanged, so a
+and nothing was recorded. `CoreError.Denied` refuses the actor, and its `reason` says why: a grant
+they lack (`NotGranted`), a membership they do not hold (`NotMember`, `InvalidActor`), or an action
+only the owner (`OwnerRequired`), the author (`NotAuthor`), the invitation's recipient
+(`NotRecipient`), a person (`HumanRequired`), or an agent (`AgentRequired`) takes. A caller recovers
+from one reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`, as lists do to
+leave out what the actor may not read. Operations pass it through unchanged, so a
 protocol answers it with one status and a client handles it once, and an operation that reaches a
 resource through another reports the one the caller named: a message whose thread they cannot read
 is the message not found, not the thread.
@@ -450,7 +455,7 @@ reasoning or tool calls.
 `TurnService` lets a reader who may read a thread `get` its turns as `Turn.View`s, with whether the
 reader may stop (`stoppable`) or retry (`retryable`) them now, and `listActive` the workspace's
 active turns in threads the reader may read. A turn in a thread outside the reader's audience is
-`NotFound`, and one in a thread they may not read is `Authorization.Denied`. A reader who may direct
+`NotFound`, and one in a thread they may not read is `CoreError.Denied` (`NotGranted`). A reader who may direct
 its agent may `cancel` an active turn, a queued one at once and a running one once its job confirms
 it, and `retry` a failed or stopped turn as a new queued turn for the same agent, participation, and
 accepted work, prompted again with who asked. Only the agent's latest turn on the thread can be
@@ -654,9 +659,10 @@ src/workspace/
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
 An outcome every feature reports is one kind in `CoreError`, whichever operation raises it:
-anything missing, or out of the caller's reach, is `CoreError.NotFound`, and anything that changed
-since the caller read it is `CoreError.Changed`; each names the resource and its ID and passes
-through every operation unchanged. Any other error belongs to the module that
+anything missing, or out of the caller's reach, is `CoreError.NotFound`; anything that changed
+since the caller read it is `CoreError.Changed`; and a refusal of the actor is `CoreError.Denied`,
+with its reason. Each says what it is about in its fields and passes through every operation
+unchanged. Any other error belongs to the module that
 raises it, and its tag is its name there, as `MemberService.OwnerProtected` or `Store.Conflict`. The
 outcomes a service reports to callers are schemas in an `internal/` errors module, apart from the
 services, so a protocol or a browser client carries them without loading an implementation, and the

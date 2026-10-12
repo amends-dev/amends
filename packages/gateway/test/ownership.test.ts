@@ -140,7 +140,7 @@ describe("ownership", () => {
                   roleId: BuiltinRoles.MemberId,
                 }),
               ),
-            ).toMatchObject({ _tag: "Delegation.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "OwnerRequired" } });
             expect(
               (yield* bound.store.read(journalLog, { limit: 30 })).at(-1)?.entries,
             ).toHaveLength(6);
@@ -197,7 +197,7 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             // Having the action permission alone does not confer ownership.
             yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
@@ -222,7 +222,10 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "OwnershipService.NotOwner" });
+            ).toMatchObject({
+              _tag: "CoreError.Denied",
+              reason: { _tag: "OwnerRequired", reason: "ownership-transfer" },
+            });
             yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(RoleFacts.PermissionsChanged, {
@@ -240,7 +243,7 @@ describe("ownership", () => {
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           }),
         ),
       ),

@@ -14,11 +14,3 @@ export class AlreadyHandled extends Schema.TaggedError<AlreadyHandled>()(
   "NotificationService.AlreadyHandled",
   { notificationId: Notification.Id },
 ) {}
-
-/**
- * The acting member is not a person: only people mark their notifications seen.
- */
-export class HumanRecipientRequired extends Schema.TaggedError<HumanRecipientRequired>()(
-  "NotificationService.HumanRecipientRequired",
-  {},
-) {}

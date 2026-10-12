@@ -14,15 +14,6 @@ export class DirectMembersRequired extends Schema.TaggedError<DirectMembersRequi
 ) {}
 
 /**
- * An agent asked to start a thread; only people start them, and agents' messages come from
- * their turns.
- */
-export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>()(
-  "ThreadService.HumanAuthorRequired",
-  { memberId: Member.Id },
-) {}
-
-/**
  * A member who was to take part cannot: they are missing, inactive, or not in the group.
  */
 export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()(

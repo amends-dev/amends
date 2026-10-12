@@ -289,7 +289,7 @@ describe("marking notifications seen", () => {
             // Agents accept work rather than seeing it, and everyone counts only their own.
             expect(
               yield* Effect.flip(service(agent)((s) => s.markSeenThrough(through))),
-            ).toMatchObject({ _tag: "NotificationService.HumanRecipientRequired" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
             expect(yield* service(p.owner)((s) => s.countPending)).toBe(2);
             expect(
               yield* p.bound.notifications.countPendingByRecipient(
@@ -315,12 +315,8 @@ describe("marking notifications seen", () => {
               [agent, p.humanNote.id, "CoreError.NotFound"],
               [human, p.agentNote.id, "CoreError.NotFound"],
               [human, Notification.Id.make("missing"), "CoreError.NotFound"],
-              [agent, p.agentNote.id, "NotificationService.HumanRecipientRequired"],
-              [
-                changed(human, { identity: p.owner.identity }),
-                p.humanNote.id,
-                "Authorization.InvalidActor",
-              ],
+              [agent, p.agentNote.id, "CoreError.Denied"],
+              [changed(human, { identity: p.owner.identity }), p.humanNote.id, "CoreError.Denied"],
             ] as const)
               expect(yield* Effect.flip(run(p.bound, actor, markSeen(id)))).toMatchObject({
                 _tag: tag,
@@ -341,9 +337,7 @@ describe("marking notifications seen", () => {
                 );
                 expect(
                   yield* Effect.flip(notificationService.markSeen(p.humanNote.id)),
-                ).toMatchObject({
-                  _tag: "Authorization.InvalidActor",
-                });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
               }),
             );
             // Removal from the workspace ended their access, which settled what was pending.
@@ -667,7 +661,8 @@ describe("marking notifications seen", () => {
             ),
           );
           expect(yield* Effect.flip(operation)).toMatchObject({
-            _tag: "Authorization.InvalidActor",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "InvalidActor" },
           });
           expect(yield* snapshot(p)).toEqual(before);
         }),
@@ -938,7 +933,7 @@ describe("marking notifications seen", () => {
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, agent.identity, markSeen(p.agentNote.id)),
                 ),
-              ).toMatchObject({ _tag: "NotificationService.HumanRecipientRequired" });
+              ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
               const invalid = { id: p.humanNote.id };
               Reflect.set(invalid, "id", "");
               expect(

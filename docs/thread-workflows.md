@@ -48,7 +48,7 @@ their mention link.
 Authorization and validation run in the same commit as the start:
 
 - The caller must be a human with active workspace and group membership and `thread.start` on
-  the group. An agent caller receives `ThreadService.HumanAuthorRequired`.
+  the group. An agent caller receives `CoreError.Denied` (`HumanRequired`).
 - Each mentioned agent requires `agent.use` on it. Agents that are not mentioned need no
   authority, including the agents of a direct group. Missing authority rejects the whole
   operation; recipients are never silently dropped.
@@ -265,16 +265,16 @@ through `ThreadMessageService` today, so agents' messages will come from their t
 
 Missing, foreign, and outside-audience threads share `CoreError.NotFound`.
 Ineligible mentions return `ThreadMessageService.ParticipantUnavailable`, and agent callers get
-`ThreadMessageService.HumanAuthorRequired`. Admission, the message, its timeline activity, and
+`CoreError.Denied` (`HumanRequired`). Admission, the message, its timeline activity, and
 its notifications commit together; the timeline never has gaps or duplicate positions.
 
 ## Editing and deleting a message
 
 `ThreadMessageService.edit({ messageId, text, mentions, expectedRevision })` replaces what a
 message says. Only its author edits it, with `thread.publish` on the thread and membership of the
-group; anyone else gets `ThreadMessageService.NotAuthor`, and to someone outside the group the
+group; anyone else gets `CoreError.Denied` (`NotAuthor`), and to someone outside the group the
 message is `CoreError.NotFound`, as a missing one is. Agents edit their own replies through their
-turns, so an agent caller gets `HumanAuthorRequired`. The text and mentions follow a reply's
+turns, so an agent caller gets `CoreError.Denied` (`HumanRequired`). The text and mentions follow a reply's
 rules. The same text and mentions again record nothing; otherwise `expectedRevision`, the revision
 the editor last saw, must still be the message's: one edited meanwhile is `CoreError.Changed`, and nothing is
 recorded. A deleted message is `Deleted`.
@@ -367,7 +367,7 @@ can read earlier history without retroactive notifications.
 
 Missing, foreign, and outside-audience threads share `CoreError.NotFound`, and an
 inaccessible group's list returns it for the group. A member of the audience without
-the grant receives `Authorization.Denied` for a single thread; lists omit unreadable threads.
+the grant receives `CoreError.Denied` (`NotGranted`) for a single thread; lists omit unreadable threads.
 Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
 
 ### Timeline pages
@@ -424,7 +424,7 @@ pending. It marks them in batches of 100, each written as `markSeen` writes one 
 the person's other sessions as one `NotificationsSeen` signal, and returns how many it marked;
 nothing left to mark returns zero. Batches are not one transaction: a failure keeps what earlier
 batches marked, and a retry continues. A batch that a departure settles part of meanwhile is read
-again without those, up to twice. Agents receive `HumanRecipientRequired`.
+again without those, up to twice. Agents receive `CoreError.Denied` (`HumanRequired`).
 
 ## Notification sources
 
@@ -451,7 +451,7 @@ The state becomes `{ _tag: "Seen", seenAt }`. The notification stays in inbox hi
 pending results and counts. Repeating it returns the first time stored, including when two devices
 mark it at once. Missing and other
 recipients' IDs return `CoreError.NotFound`; an agent's notification returns
-`HumanRecipientRequired`, and a discarded one `AlreadyHandled`, including one that leaving its
+`CoreError.Denied` (`HumanRequired`), and a discarded one `AlreadyHandled`, including one that leaving its
 group settles while it is being marked.
 
 `Seen` is private state, like read positions: it is kept outside the journal, takes no place in the
@@ -465,7 +465,7 @@ delivery, is recorded by those workflows as `Accepted`, not by marking it seen.
 `ReadStateService.markThreadRead({ threadId, throughSequence })` records that the acting
 person has read a thread through a timeline position. It requires a human actor, current group
 access, and `thread.read`: missing and inaccessible threads return
-`CoreError.NotFound`, an agent returns `HumanRequired`, and a position past the
+`CoreError.NotFound`, an agent returns `CoreError.Denied` (`HumanRequired`), and a position past the
 latest activity returns `BeyondTimeline`. The position only moves forward. The reader's pending
 notifications from the thread up to that position become `Seen` in the same write. Reading a timeline does not mark
 it read; clients call this for what they have shown.

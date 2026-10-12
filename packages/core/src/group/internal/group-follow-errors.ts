@@ -8,14 +8,6 @@ import * as Member from "../../workspace/Member.ts";
 import * as Group from "../Group.ts";
 
 /**
- * Only an agent can be made to follow by another member; people follow for themselves.
- */
-export class AgentRequired extends Schema.TaggedError<AgentRequired>()(
-  "GroupFollowService.AgentRequired",
-  { memberId: Member.Id },
-) {}
-
-/**
  * The named member is missing, inactive, or not a current member of the group.
  */
 export class MemberUnavailable extends Schema.TaggedError<MemberUnavailable>()(

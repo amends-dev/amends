@@ -146,7 +146,7 @@ describe("invitations", () => {
                   yield* Effect.flip(
                     Operations.invite(workspace.id, bob, request(yield* future, charlie.id)),
                   ),
-                ).toMatchObject({ _tag: "Authorization.Denied" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
                 const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
                 expect(before).toHaveLength(3);
                 // The member, their role, their admission to general, and the acceptance.
@@ -164,7 +164,7 @@ describe("invitations", () => {
                   yield* Effect.flip(
                     Operations.getMember(workspace.id, bob, workspace.ownerMemberId),
                   ),
-                ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
                 const freshInvite = yield* Operations.invite(workspace.id, alice, {
                   recipientId: bob.id,
                   expiresAt: yield* future,
@@ -181,7 +181,7 @@ describe("invitations", () => {
                   yield* Effect.flip(
                     Operations.removeMember(workspace.id, bob, workspace.ownerMemberId),
                   ),
-                ).toMatchObject({ _tag: "Authorization.Denied" });
+                ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
               }),
             ),
           );

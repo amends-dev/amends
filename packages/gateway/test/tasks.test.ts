@@ -307,8 +307,11 @@ describe("tasks", () => {
             expect(
               yield* Effect.flip(run(bound, human, start({ groupId: group.id, task: {} }))),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: TaskPermissions.Create.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: TaskPermissions.Create.name } },
+              },
             });
             yield* grant(bound, humanId, TaskPermissions.Create, groupTarget);
             const hidden = yield* run(bound, owner, create([owner.memberId]));
@@ -319,8 +322,11 @@ describe("tasks", () => {
                 run(bound, human, start({ groupId: group.id, task: { assignee: agentId } })),
               ),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: AgentPermissions.Use.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: AgentPermissions.Use.name } },
+              },
             });
             expect(
               yield* Effect.flip(
@@ -377,8 +383,11 @@ describe("tasks", () => {
               new CoreError.NotFound({ resource: "Thread", id: threadId }),
             );
             expect(yield* Effect.flip(run(bound, human, createTask({ threadId })))).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: TaskPermissions.Create.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: TaskPermissions.Create.name } },
+              },
             });
             expect(yield* participants(bound, threadId)).toEqual([
               [`Member:${owner.memberId}`, 1],
@@ -524,8 +533,11 @@ describe("tasks", () => {
                 run(bound, agent, update(threadId, { _tag: "Status", from: "done", to: "doing" })),
               ),
             ).toMatchObject({
-              _tag: "Authorization.Denied",
-              requirement: { permission: { name: TaskPermissions.Update.name } },
+              _tag: "CoreError.Denied",
+              reason: {
+                _tag: "NotGranted",
+                requirement: { permission: { name: TaskPermissions.Update.name } },
+              },
             });
             yield* grant(bound, agentId, TaskPermissions.Update, {
               _tag: "Thread",

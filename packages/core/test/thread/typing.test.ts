@@ -78,7 +78,12 @@ const run = <A, E>(
           requirements.push(...needed);
           return options.deny === true && needed.length > 0
             ? Effect.fail(
-                new Authorization.Denied({ memberId: actor.memberId, requirement: needed[0]! }),
+                new CoreError.Denied({
+                  reason: new CoreError.NotGranted({
+                    memberId: actor.memberId,
+                    requirement: needed[0]!,
+                  }),
+                }),
               )
             : Effect.void;
         }),
@@ -175,7 +180,8 @@ it.effect("inaccessible threads and missing permission publish nothing", () =>
       (published) =>
         Effect.gen(function* () {
           expect(yield* Effect.flip(typing("open"))).toMatchObject({
-            _tag: "Authorization.Denied",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotGranted" },
           });
           expect(published).toEqual([]);
         }),

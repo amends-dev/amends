@@ -245,10 +245,13 @@ it.effect(
       };
       for (const id of [agent.memberId, missingId]) {
         expect(yield* run(fixture, get(id).pipe(Effect.flip), alice, overrides)).toMatchObject({
-          _tag: "Authorization.Denied",
-          requirement: {
-            permission: { name: MemberPermissions.Read.name },
-            target: { memberId: id },
+          _tag: "CoreError.Denied",
+          reason: {
+            _tag: "NotGranted",
+            requirement: {
+              permission: { name: MemberPermissions.Read.name },
+              target: { memberId: id },
+            },
           },
         });
       }
@@ -274,13 +277,13 @@ it.effect("a shared member application uses each call's actor and current member
     const read = application.get(bob.id);
     expect(yield* read.pipe(Effect.provideService(Actor.Actor, alice))).toEqual(bob);
     expect(yield* read.pipe(Effect.provideService(Actor.Actor, agent), Effect.flip)).toMatchObject({
-      _tag: "Authorization.Denied",
-      memberId: agent.memberId,
+      _tag: "CoreError.Denied",
+      reason: { _tag: "NotGranted", memberId: agent.memberId },
     });
     yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
     expect(yield* read.pipe(Effect.provideService(Actor.Actor, alice), Effect.flip)).toMatchObject({
-      _tag: "Authorization.InvalidActor",
-      reason: "membership-removed",
+      _tag: "CoreError.Denied",
+      reason: { _tag: "InvalidActor", reason: "membership-removed" },
     });
   }),
 );
@@ -353,9 +356,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
         );
       }).pipe(Effect.flip),
     );
-    expect(failure).toMatchObject({
-      _tag: "Authorization.Denied",
-    });
+    expect(failure).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
     expect(yield* fixture.snapshot).toEqual(before);
     expect(yield* run(fixture, get(bob.id))).toEqual(bob);
   }),
@@ -400,10 +401,12 @@ it.effect(
       yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
       const application = yield* run(fixture, MemberService.MemberService);
       expect(yield* run(fixture, get(bob.id).pipe(Effect.flip))).toMatchObject({
-        _tag: "Authorization.Denied",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "NotGranted" },
       });
       expect(yield* run(fixture, remove(agent.memberId).pipe(Effect.flip))).toMatchObject({
-        _tag: "Authorization.Denied",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "NotGranted" },
       });
       const removed = yield* run(fixture, remove(bob.id));
       expect(removed).toEqual({
@@ -424,8 +427,8 @@ it.effect(
           .get(bob.id)
           .pipe(Effect.provideService(Actor.Actor, staleActor), Effect.flip),
       ).toMatchObject({
-        _tag: "Authorization.InvalidActor",
-        reason: "membership-removed",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "InvalidActor", reason: "membership-removed" },
       });
       const beforeRepeat = yield* fixture.snapshot;
       expect(yield* run(fixture, remove(bob.id).pipe(Effect.flip))).toMatchObject({
@@ -445,7 +448,8 @@ it.effect(
       // Ownership and read permission each confer no removal authority.
       for (const id of [bob.id, missingId, alice.memberId]) {
         expect(yield* run(fixture, remove(id).pipe(Effect.flip))).toMatchObject({
-          _tag: "Authorization.Denied",
+          _tag: "CoreError.Denied",
+          reason: { _tag: "NotGranted" },
         });
       }
       expect(yield* fixture.snapshot).toEqual(before);
@@ -587,8 +591,8 @@ it.effect(
       // A removed actor cannot list at all.
       yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
       expect(yield* run(fixture, Effect.flip(list))).toMatchObject({
-        _tag: "Authorization.InvalidActor",
-        reason: "membership-removed",
+        _tag: "CoreError.Denied",
+        reason: { _tag: "InvalidActor", reason: "membership-removed" },
       });
     }),
 );

@@ -224,7 +224,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* bob.changeFeed
               .watch({ params: { workspaceId: workspace.id }, query: {} })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
           yield* Effect.all([second.close, foreign.close, reconnected.close, resumed.close]);
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
       ),

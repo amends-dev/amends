@@ -25,12 +25,7 @@ import * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as Request from "../request/Request.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
-import {
-  Deleted,
-  HumanAuthorRequired,
-  NotAuthor,
-  ParticipantUnavailable,
-} from "./internal/thread-message-errors.ts";
+import { Deleted, ParticipantUnavailable } from "./internal/thread-message-errors.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
@@ -43,21 +38,6 @@ export {
    * @since 0.1.0
    */
   Deleted,
-  /**
-   * An agent asked to publish; only people publish through the service, and agents' messages come
-   * from their turns.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  HumanAuthorRequired,
-  /**
-   * Someone other than the message's author asked to edit it; only the author edits a message.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotAuthor,
   /**
    * A mentioned member cannot take part: they are missing, inactive, or not in the group.
    *
@@ -82,7 +62,7 @@ export type Error =
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | CoreError.NotFound
   | ParticipantUnavailable
-  | HumanAuthorRequired
+  | CoreError.Denied
   | ThreadMessageStore.Failure;
 
 /**
@@ -96,8 +76,7 @@ export type EditError =
   | ThreadQuery.AccessError
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | CoreError.NotFound
-  | HumanAuthorRequired
-  | NotAuthor
+  | CoreError.Denied
   | Deleted
   | CoreError.Changed
   | ParticipantUnavailable
@@ -114,7 +93,7 @@ export type DeleteError =
   | ThreadQuery.AccessError
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | CoreError.NotFound
-  | HumanAuthorRequired
+  | CoreError.Denied
   | ThreadMessageStore.Failure;
 
 /**
@@ -276,7 +255,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const thread = yield* requirePublishable(request.threadId);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
       const messageId = yield* deriveReplyId(options.requestKey);
       const retried = yield* findRetriedReply(options.requestKey, messageId);
       if (Option.isSome(retried)) return retried.value;
@@ -356,8 +335,11 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const { message, thread } = yield* requireMessage(request.messageId);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      if (!wroteBy(message, actor)) return yield* new NotAuthor({ messageId: message.id });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
+      if (!wroteBy(message, actor))
+        return yield* new CoreError.Denied({
+          reason: new CoreError.NotAuthor({ messageId: message.id }),
+        });
       yield* authorization.require([
         Requirement.make(ThreadMessagePermissions.Publish, {
           _tag: "Thread",
@@ -419,7 +401,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const { message, thread } = yield* requireMessage(id);
       const actor = yield* Actor.Actor;
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
-        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+        return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
       // The author deletes their own message as they published it; anyone else moderates the group.
       yield* authorization.require([
         wroteBy(message, actor)

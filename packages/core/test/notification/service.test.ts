@@ -279,7 +279,7 @@ it.effect(
               expect(error._tag).toBe(
                 actor.workspaceId === otherWorkspaceId
                   ? "Authorization.WorkspaceMismatch"
-                  : "Authorization.InvalidActor",
+                  : "CoreError.Denied",
               );
             }
           }),
@@ -317,8 +317,8 @@ it.effect("inbox reads join an outer commit and observe staged membership remova
           ),
         );
         expect(error).toMatchObject({
-          _tag: "Authorization.InvalidActor",
-          reason: "membership-removed",
+          _tag: "CoreError.Denied",
+          reason: { _tag: "InvalidActor", reason: "membership-removed" },
         });
         expect(yield* notificationService.countPending).toBe(1);
         expect(yield* journal.log.read({ limit: 10 })).toEqual([]);

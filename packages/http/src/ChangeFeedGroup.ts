@@ -35,7 +35,7 @@ export class ChangeFeedGroup extends HttpApiGroup.make("changeFeed")
       },
       success: HttpApiSchema.StreamSse({ data: ChangeFeed.Message, error: ChangeFeed.Unavailable }),
       error: [
-        ...ApiErrors.member,
+        ...ApiErrors.workspace,
         ChangeFeed.Unavailable.pipe(HttpApiSchema.status(503)),
         ApiErrors.TooManyStreams,
       ],

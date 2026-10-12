@@ -7,7 +7,7 @@ describe("workspaceFailure", () => {
     const failure = (_tag: string) => workspaceFailure(Cause.fail({ _tag }));
     expect(failure("CoreError.Changed")).toBe("changed");
     expect(failure("GatewayErrors.Conflict")).toBe("changed");
-    expect(failure("Authorization.Denied")).toBe("denied");
+    expect(failure("CoreError.Denied")).toBe("denied");
     expect(failure("MemberService.AlreadyRemoved")).toBe("gone");
     expect(failure("GatewayErrors.InvalidInput")).toBe("invalid");
     expect(workspaceFailure(Cause.fail(new InvalidCommand({ message: "Expected a string" })))).toBe(
@@ -50,7 +50,7 @@ describe("workspaceFailure", () => {
     expect(workspaceFailure(Cause.fail(error))).toBe("changed");
   });
   it("uses the first recognized failure in a combined cause", () => {
-    const denied = Cause.fail({ _tag: "Authorization.Denied" });
+    const denied = Cause.fail({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
     const changed = Cause.fail({ _tag: "GatewayErrors.Conflict" });
     const transport = Cause.fail({ _tag: "HttpClientError" });
     expect(workspaceFailure(Cause.combine(denied, changed))).toBe("denied");
@@ -60,7 +60,10 @@ describe("workspaceFailure", () => {
   it("skips unrecognized failures, defects, and interruptions before a recognized failure", () => {
     const ignored = Cause.combine(
       Cause.fail({ _tag: "Something.New" }),
-      Cause.combine(Cause.die({ _tag: "Authorization.Denied" }), Cause.interrupt()),
+      Cause.combine(
+        Cause.die({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } }),
+        Cause.interrupt(),
+      ),
     );
     expect(workspaceFailure(ignored)).toBe("failed");
     expect(

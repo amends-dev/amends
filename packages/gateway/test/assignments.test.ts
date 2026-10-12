@@ -58,7 +58,8 @@ describe("assignments", () => {
             ),
           ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(yield* Effect.flip(Operations.access(other.id, bob, viewer.id))).toMatchObject({
-            _tag: "GatewayErrors.NotMember",
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotMember" },
           });
           expect(
             yield* Effect.flip(
@@ -107,7 +108,7 @@ describe("assignments", () => {
                 id: Identity.HumanId.make("stranger"),
               }),
             ),
-          ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
         }),
       ),
     ),
@@ -161,7 +162,7 @@ describe("assignments", () => {
                   roleId: BuiltinRoles.AdministratorId,
                 }),
               ),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           }),
         ),
       ),
@@ -373,7 +374,7 @@ describe("assignments", () => {
             yield* Effect.flip(
               Operations.acceptInvitation(workspace.id, recipient, invitation.details.id),
             ),
-          ).toMatchObject({ _tag: "Authorization.Denied" });
+          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
           expect(yield* bound.members.findActive({ _tag: "Human", id: recipient })).toEqual(
             Option.none(),
           );

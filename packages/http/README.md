@@ -27,7 +27,7 @@ and the gateway declare, imported from those packages.
 `Authentication` is bearer middleware that provides `Principal`, the authenticated human or agent
 identity, and `Credential`, the token the request presented. A server implements it by verifying the
 credential, and a client by attaching one with `HttpApiMiddleware.layerClient`. Endpoints only a
-person may call fail with `HumanRequired` when the principal is an agent, and a request without a
+person may call fail with `CoreError.Denied` (`HumanRequired`) when the principal is an agent, and a request without a
 credential the host accepts fails with `Unauthorized`. The contract does not define how credentials
 are issued; the `session` group asks the host's sign-in for one.
 
@@ -38,7 +38,7 @@ are issued; the `session` group asks the host's sign-in for one.
   one-time code for an address and `POST /session/code` exchanges it for a `SignIn.Session`, a token
   and the account it signs in as. None needs a credential.
 - `me`: `GET /me` returns the principal's `Accounts.Account`, its human ID and address; an agent
-  gets 403 `HumanRequired`, and a session no account holds 401. `GET /me/workspaces` lists the
+  gets 403 `CoreError.Denied` (`HumanRequired`), and a session no account holds 401. `GET /me/workspaces` lists the
   principal's memberships and pending invitations. `DELETE /me/session` signs out: the host stops
   honoring the presented token.
 - `accounts`: `GET /workspaces/:workspaceId/accounts` returns the accounts of the workspace's human
@@ -172,35 +172,35 @@ group or thread the caller cannot read answers 404 exactly as a missing one does
 [group](../../docs/group-workflows.md) and [thread](../../docs/thread-workflows.md) workflows
 describe the rules behind each operation.
 
-| Endpoint                                             | Operation                                                                                                                                                      |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following.                                                                 |
-| `POST …/groups`                                      | Create a team from `{ name, memberIds, visibility? }`, private unless `Public`; 201 with the group.                                                            |
-| `GET …/groups/public?limit&after`                    | Public groups the caller may join, in group-ID order, each with `members` and `joined`.                                                                        |
-| `POST …/groups/:groupId/join`                        | Join a public group as the caller; returns the admission. Private, direct, and missing groups are 404.                                                         |
-| `GET …/groups/:groupId`                              | One group.                                                                                                                                                     |
-| `POST …/groups/:groupId/rename`                      | Give a team group `{ name, expectedName }` under `group.rename`; returns it. A direct group, or a name no longer `expectedName` (`CoreError.Changed`), is 409. |
-| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                                                                                      |
-| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                                                                                  |
-| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                    |
-| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                    |
-| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                            |
-| `POST …/groups/:groupId/read`                        | Record that the caller read the group now; 204.                                                                                                                |
-| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, each with its task or null, the caller's position, and unread.                                            |
-| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, each with its task or null, opening message, and reply count.                                         |
-| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions, title?, origin?, task? }`; 201 with the thread, its opening message, and its task or null. See [tasks](#tasks).         |
-| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions, title? }`, reusing their direct group; 201 with `task` null.                                          |
-| `GET …/threads/:threadId`                            | One thread.                                                                                                                                                    |
-| `POST …/threads/:threadId/rename`                    | Give a thread `{ title, expectedTitle }` under `thread.rename`; returns it. A title no longer `expectedTitle` (`CoreError.Changed`) is 409.                    |
-| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                           |
-| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                |
-| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                         |
-| `PUT …/messages/:messageId`                          | Edit one's own message from `{ text, mentions, expectedRevision }`; returns it. Another's is 403 `NotAuthor`; a deleted one or a stale revision is 409.        |
-| `DELETE …/messages/:messageId`                       | Delete one's own message, or any under `thread.moderate` on the group; returns it with its content deleted.                                                    |
-| `POST …/threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                    |
-| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                   |
-| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                   |
-| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                              |
+| Endpoint                                             | Operation                                                                                                                                                                    |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following.                                                                               |
+| `POST …/groups`                                      | Create a team from `{ name, memberIds, visibility? }`, private unless `Public`; 201 with the group.                                                                          |
+| `GET …/groups/public?limit&after`                    | Public groups the caller may join, in group-ID order, each with `members` and `joined`.                                                                                      |
+| `POST …/groups/:groupId/join`                        | Join a public group as the caller; returns the admission. Private, direct, and missing groups are 404.                                                                       |
+| `GET …/groups/:groupId`                              | One group.                                                                                                                                                                   |
+| `POST …/groups/:groupId/rename`                      | Give a team group `{ name, expectedName }` under `group.rename`; returns it. A direct group, or a name no longer `expectedName` (`CoreError.Changed`), is 409.               |
+| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                                                                                                    |
+| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                                                                                                |
+| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                                  |
+| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                                  |
+| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                                          |
+| `POST …/groups/:groupId/read`                        | Record that the caller read the group now; 204.                                                                                                                              |
+| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, each with its task or null, the caller's position, and unread.                                                          |
+| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, each with its task or null, opening message, and reply count.                                                       |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions, title?, origin?, task? }`; 201 with the thread, its opening message, and its task or null. See [tasks](#tasks).                       |
+| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions, title? }`, reusing their direct group; 201 with `task` null.                                                        |
+| `GET …/threads/:threadId`                            | One thread.                                                                                                                                                                  |
+| `POST …/threads/:threadId/rename`                    | Give a thread `{ title, expectedTitle }` under `thread.rename`; returns it. A title no longer `expectedTitle` (`CoreError.Changed`) is 409.                                  |
+| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                                         |
+| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                              |
+| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                                       |
+| `PUT …/messages/:messageId`                          | Edit one's own message from `{ text, mentions, expectedRevision }`; returns it. Another's is 403 `CoreError.Denied` (`NotAuthor`); a deleted one or a stale revision is 409. |
+| `DELETE …/messages/:messageId`                       | Delete one's own message, or any under `thread.moderate` on the group; returns it with its content deleted.                                                                  |
+| `POST …/threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                                  |
+| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                                 |
+| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                                 |
+| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                            |
 
 Every page takes an integer `limit` from 1 to 100 and an exclusive boundary from the last item of
 the previous page; an empty page ends the traversal. Groups, rosters, and participants pass that

@@ -383,7 +383,7 @@ describe("thread replies", () => {
             const before = yield* snapshot(bound, first.thread.id);
             expect(
               yield* Effect.flip(run(bound, human, reply(first.thread.id, [agentId]))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
             // Replying where the agent already takes part reaches it without that authority.
             yield* run(bound, human, reply(first.thread.id));
@@ -409,7 +409,8 @@ describe("thread replies", () => {
             yield* grant(bound, humanId, ThreadPermissions.Read);
             const own = yield* run(bound, human, start(group.id, [humanId]));
             expect(yield* Effect.flip(run(bound, human, reply(own.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const assignment = yield* grant(
               bound,
@@ -419,7 +420,8 @@ describe("thread replies", () => {
             );
             yield* run(bound, human, reply(first.thread.id, [humanId]));
             expect(yield* Effect.flip(run(bound, human, reply(own.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             const revoke = Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Revoked, {
@@ -431,7 +433,7 @@ describe("thread replies", () => {
             yield* facts(bound, revoke);
             expect(
               yield* Effect.flip(run(bound, human, reply(first.thread.id, [humanId]))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* facts(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -460,7 +462,7 @@ describe("thread replies", () => {
             );
             expect(
               yield* Effect.flip(run(bound, human, reply(first.thread.id, [humanId]))),
-            ).toMatchObject({ _tag: "Authorization.Denied" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
             yield* facts(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -472,7 +474,8 @@ describe("thread replies", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, owner, reply(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
           }),
         ),
@@ -501,13 +504,13 @@ describe("thread replies", () => {
                 _tag: "SchemaError",
               });
             expect(yield* Effect.flip(run(bound, agent, reply(first.thread.id)))).toEqual(
-              new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
             );
             expect(
               yield* Effect.flip(
                 run(bound, { ...human, identity: owner.identity }, reply(first.thread.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.InvalidActor" });
+            ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "InvalidActor" } });
             const hidden = yield* run(bound, owner, create([otherId]));
             yield* grant(bound, otherId, ThreadPermissions.Start);
             const secret = yield* run(bound, actorFor(otherId), start(hidden.id));
@@ -540,7 +543,8 @@ describe("thread replies", () => {
               yield* Effect.flip(run(bound, owner, reply(first.thread.id, [humanId]))),
             ).toEqual(new ThreadMessageService.ParticipantUnavailable({ memberId: humanId }));
             expect(yield* Effect.flip(run(bound, human, reply(first.thread.id)))).toMatchObject({
-              _tag: "Authorization.InvalidActor",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "InvalidActor" },
             });
             expect(yield* bound.activities.listByThread(first.thread.id)).toEqual([first.activity]);
             expect(
@@ -1269,10 +1273,10 @@ describe("thread replies", () => {
             // Only the author edits a message; agents edit through their turns; to anyone
             // outside the group, and for a message that does not exist, there is no message.
             expect(yield* Effect.flip(edit(owner, messageId, "Final", []))).toEqual(
-              new ThreadMessageService.NotAuthor({ messageId }),
+              new CoreError.Denied({ reason: new CoreError.NotAuthor({ messageId }) }),
             );
             expect(yield* Effect.flip(edit(agent, messageId, "Final", []))).toEqual(
-              new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
             );
             expect(yield* Effect.flip(edit(other, messageId, "Final", []))).toEqual(
               new CoreError.NotFound({ resource: "ThreadMessage", id: messageId }),
@@ -1370,10 +1374,11 @@ describe("thread replies", () => {
             expect(yield* history(bound)).toHaveLength(before.length + 2);
             // Only the author or a moderator of the group deletes; the owner moderates.
             expect(yield* Effect.flip(remove(other, messageId))).toMatchObject({
-              _tag: "Authorization.Denied",
+              _tag: "CoreError.Denied",
+              reason: { _tag: "NotGranted" },
             });
             expect(yield* Effect.flip(remove(agent, messageId))).toEqual(
-              new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
             );
             yield* TestClock.adjust("1 second");
             const deletedAt = yield* DateTime.now;

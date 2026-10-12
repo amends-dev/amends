@@ -402,7 +402,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           program: Effect.Effect<A, E>,
         ): Effect.Effect<
           A,
-          GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember | CoreError.NotFound,
+          GatewayErrors.PublicErrorOf<E> | CoreError.Denied | CoreError.NotFound,
           Scope.Scope
         > =>
           entry === "inWorkspace"
@@ -551,7 +551,10 @@ it.effect("one gateway resolves each caller's current membership and stops after
               }),
             ),
           );
-          expect(rejected).toMatchObject({ _tag: "GatewayErrors.NotMember", workspaceId });
+          expect(rejected).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotMember", workspaceId },
+          });
           expect(called).toBe(false);
           expect(seen).toEqual([alice, agent, alice]);
         }),
@@ -673,7 +676,7 @@ it.effect("a workspace that was never created is refused without being prepared"
       findActive: () => Effect.succeedNone,
     });
     expect(yield* Effect.flip(gateway.asMember(workspaceId, alice, Effect.void))).toEqual(
-      new GatewayErrors.NotMember({ workspaceId }),
+      new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) }),
     );
     expect(yield* Effect.flip(gateway.inWorkspace(workspaceId, Effect.void))).toEqual(
       new CoreError.NotFound({ resource: "Workspace", id: workspaceId }),
@@ -699,7 +702,9 @@ it.effect("a non-member of a created workspace is refused without preparing it",
         }),
       ),
     );
-    expect(refused).toEqual(new GatewayErrors.NotMember({ workspaceId }));
+    expect(refused).toEqual(
+      new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) }),
+    );
     expect(called).toBe(false);
     expect(boots.reads).toBe(0);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
@@ -763,7 +768,7 @@ it.effect("read models awaiting a rebuild are prepared first, then resolve membe
     expect(boots.reads).toBe(1);
     // The rebuilt read models still refuse someone who is not a member.
     expect(yield* Effect.flip(gateway.asMember(workspaceId, agent, Effect.void))).toEqual(
-      new GatewayErrors.NotMember({ workspaceId }),
+      new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) }),
     );
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );
