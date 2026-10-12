@@ -99,10 +99,12 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   that gives one it can run on. Agents have no toolkits, skills, memory, or schedules, and no
   profile photos. A removed agent's membership cannot be reactivated, as a person's cannot.
 - Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish: a turn
-  job for each agent in each thread. The local host runs them, and prunes handled job requests on an Effect Cluster runner. Several host processes over one
-  database share that work; one that stops answering keeps its workspaces for the takeover time,
-  35 seconds by default. Cluster's socket transport, which delivers job requests between processes
-  at once, is not authenticated and belongs on a private network.
+  job for each agent in each thread. The local host runs them on Effect Cluster and prunes handled
+  job requests. A host process serves the API, runs jobs, or both; several over one database
+  share the jobs, and one that stops answering keeps its workspaces for the takeover time, 35
+  seconds by default. A commit wakes the process that runs each job it requests through a
+  PostgreSQL notice; a notice lost leaves the request to that process's next read, within two
+  seconds. Cluster's socket transport is not authenticated and belongs on a private network.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping
@@ -411,7 +413,10 @@ newer projections, which newer hosts must rebuild from the last commit each one 
 whose commit fails because another host changed the live set prepares the workspace again for
 its next request, replaying it; the request that failed returns a conflict to retry. While hosts
 with different sets keep writing one workspace, each such write retires the other set's
-projections again, which then rebuild the commits they missed.
+projections again, which then rebuild the commits they missed. Processes that serve the API and
+processes that run jobs write the same workspaces, so this holds between them too, and a job
+request one stores is decoded by whichever runs the job: deploy every process over one database
+together. Nothing checks this.
 
 ## Commit outcomes and PostgreSQL contention
 

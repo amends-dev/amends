@@ -50,7 +50,7 @@ export class PostgresDatabase extends Context.Service<
     readonly db: DrizzleClient;
     /** The Effect client every statement runs through, and the transactions they share. */
     readonly sql: SqlClient.SqlClient;
-    /** Append wakeups and relayed signals, from one listener for this pool. */
+    /** Append and job request wakeups and relayed signals, from one listener for this pool. */
     readonly notices: PostgresNotices.PostgresNotices;
     /** Turns among this process's writers to one workspace or log, before they take a connection. */
     readonly turns: PostgresTurns.PostgresTurns;

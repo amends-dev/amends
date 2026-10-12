@@ -1,9 +1,11 @@
 /**
  * The local host's entry point, which `bun run start` runs: it loads the configuration with
- * `LocalConfig.load`, builds `LocalHost.layer` and the authentication `AMENDS_SIGN_IN` names, and
- * serves them with `LocalServer.layer` until the process stops, through `BunRuntime.runMain`. It
- * reads settings from the environment keeping empty strings, so a blank setting fails validation
- * rather than taking its default. Importing any other module of the host starts nothing.
+ * `LocalConfig.load` and builds `LocalHost.layer` for the role `AMENDS_ROLE` names. A process that
+ * serves the API adds the authentication `AMENDS_SIGN_IN` names and serves them with
+ * `LocalServer.layer`; one that only runs jobs runs the host alone. Either way it runs until the
+ * process stops, through `BunRuntime.runMain`. It reads settings from the environment keeping empty
+ * strings, so a blank setting fails validation rather than taking its default. Importing any other
+ * module of the host starts nothing.
  *
  * @since 0.1.0
  */
@@ -17,10 +19,11 @@ import * as LocalServer from "./LocalServer.ts";
 
 /**
  * Serve the application on the loopback interface over the AMENDS_DATABASE_URL database, signing
- * people in as AMENDS_SIGN_IN says.
+ * people in as AMENDS_SIGN_IN says, or run its jobs alone, as AMENDS_ROLE says.
  */
 const program = Effect.gen(function* () {
   const {
+    role,
     port,
     databaseUrl,
     poolSize,
@@ -31,24 +34,28 @@ const program = Effect.gen(function* () {
     sandboxDirectory,
     signIn,
   } = yield* LocalConfig.load();
+  const host = LocalHost.layer(databaseUrl, {
+    runJobs: role !== "api",
+    poolSize,
+    runnerAddress,
+    runnerTransport,
+    runnerTakeover,
+    credentialKey,
+    sandboxDirectory,
+  });
+  if (role === "jobs")
+    return yield* Layer.launch(
+      host.pipe(
+        Layer.tap(() =>
+          Effect.logInfo(`Running jobs at ${runnerAddress.host}:${runnerAddress.port}`),
+        ),
+      ),
+    );
   const authentication =
     signIn === "development"
       ? DevelopmentAuthentication.layer()
       : EmailAuthentication.layer(credentialKey);
-  return yield* Layer.launch(
-    LocalServer.layer(
-      LocalHost.layer(databaseUrl, {
-        poolSize,
-        runnerAddress,
-        runnerTransport,
-        runnerTakeover,
-        credentialKey,
-        sandboxDirectory,
-      }),
-      authentication,
-      port,
-    ),
-  );
+  return yield* Layer.launch(LocalServer.layer(host, authentication, port));
 });
 
 BunRuntime.runMain(

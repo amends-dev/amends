@@ -1,9 +1,11 @@
 /**
  * The local host's composition: the gateway, the workspace directory, accounts, and sign-in's
  * storage over one PostgreSQL database through the storage adapter, with turn and delivery jobs on
- * Effect Cluster over the same connection pool, and the integrations workspaces connect to. The
- * host implements no storage itself. `LocalServer` serves the HTTP API over `layer`, and the entry
- * point builds it from `LocalConfig`.
+ * Effect Cluster over the same connection pool, and the integrations workspaces connect to. A
+ * process runs jobs unless told not to, as one that only serves the API is; either way its commits
+ * store the job requests they make, and wake whichever process runs each job. The host implements
+ * no storage itself. `LocalServer` serves the HTTP API over `layer`, and the entry point builds it
+ * from `LocalConfig`.
  *
  * @since 0.1.0
  */
@@ -67,6 +69,12 @@ export type HostLayer = Layer.Layer<
  * @since 0.1.0
  */
 export interface Options {
+  /**
+   * Whether this process runs jobs, true by default. One that does not stores the job requests
+   * its commits make for the processes that do, and takes no runner address; the runner settings
+   * below apply only to a process that runs jobs.
+   */
+  readonly runJobs?: boolean | undefined;
   /** The most connections to open to the database, twenty by default. */
   readonly poolSize?: number | undefined;
   /**
@@ -141,15 +149,37 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
 
 /**
  * The database, and the cluster that runs jobs over the same pool: one SQL client, so a job a
- * commit requests is stored in that commit's transaction. The process first claims its
- * runner address, so it fails to start while another process runs at it. Cluster keeps its own
+ * commit requests is stored in that commit's transaction. A process that runs jobs first claims
+ * its runner address, so it fails to start while another process runs at it. Cluster keeps its own
  * tables beside the adapter's and holds one of the pool's connections for its shard locks, and the
- * claim another.
+ * claim another. A process that runs no jobs is the cluster's client alone: it stores requests,
+ * claims no address, and holds neither.
  *
  * @category layers
  * @since 0.1.0
  */
-export const layerDatabase = (url: Redacted.Redacted<string>, options: Options = {}) => {
+export const layerDatabase = (url: Redacted.Redacted<string>, options: Options = {}) =>
+  layerCluster(options).pipe(
+    Layer.provideMerge(PostgresDatabase.layer({ url, maxConnections: options.poolSize ?? 20 })),
+  );
+
+/**
+ * The cluster over the database's client, started one process at a time: a runner at this
+ * process's address, or a client.
+ */
+const layerCluster = (
+  options: Options,
+): Layer.Layer<
+  Sharding.Sharding | Runners.Runners | MessageStorage.MessageStorage,
+  unknown,
+  SqlClient.SqlClient | PostgresDatabase.PostgresDatabase
+> => {
+  if (options.runJobs === false)
+    return PostgresClusterStorage.layerOneAtATime(
+      SingleRunner.layer({ shardingConfig: { runnerAddress: Option.none() } }).pipe(
+        Layer.provide(BunCrypto.layer),
+      ),
+    );
   const host = options.runnerAddress?.host ?? "localhost";
   const port = options.runnerAddress?.port ?? 34431;
   const shardingConfig = {
@@ -165,18 +195,20 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
     options.runnerTransport === "socket"
       ? BunClusterSocket.layer({ storage: "sql", shardingConfig })
       : SingleRunner.layer({ shardingConfig }).pipe(Layer.provide(BunCrypto.layer));
-  return cluster.pipe(
-    Layer.provide(Layer.effectDiscard(PostgresClusterStorage.claimAddress(`${host}:${port}`))),
-    Layer.provideMerge(PostgresDatabase.layer({ url, maxConnections: options.poolSize ?? 20 })),
+  return PostgresClusterStorage.layerOneAtATime(
+    cluster.pipe(
+      Layer.provide(Layer.effectDiscard(PostgresClusterStorage.claimAddress(`${host}:${port}`))),
+    ),
   );
 };
 
 /**
  * The gateway, the workspace directory, the accounts, and sign-in's storage over one PostgreSQL
- * database, through the storage adapter, with the turn jobs that run agents' turns and the delivery
- * jobs that carry messages to channels, both on the integrations the host installs, and handled job
- * requests pruned after seven days. The HTTP server resolves bearer tokens before entering the
- * gateway.
+ * database, through the storage adapter, whose commits store job requests and wake the runners for
+ * them. A process that runs jobs also runs the turn jobs that run agents' turns and the delivery
+ * jobs that carry messages to channels, both on the integrations the host installs, listens for
+ * requests other processes store, and prunes handled job requests after seven days. The HTTP
+ * server resolves bearer tokens before entering the gateway.
  *
  * @category layers
  * @since 0.1.0
@@ -186,10 +218,14 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
   const jobs = Effect.map(
     makeIntegrations(sandboxDirectory, options.credentialKey),
     (integrations) => {
+      const requests = Layer.merge(TurnJob.layerRequests, DeliveryJob.layerRequests).pipe(
+        Layer.provide(PostgresClusterStorage.layerWakeup),
+      );
       const gateway = Gateway.layer({ integrations }).pipe(
         Layer.provideMerge(PostgresStorage.layer({ credentialKey: options.credentialKey })),
-        Layer.provide(Layer.merge(TurnJob.layerRequests, DeliveryJob.layerRequests)),
+        Layer.provide(requests),
       );
+      if (options.runJobs === false) return gateway;
       const installed = Layer.effect(Integrations.Integrations, Integrations.make(integrations));
       return Layer.mergeAll(
         Layer.merge(TurnJob.layerWorker, DeliveryJob.layerWorker).pipe(Layer.provide(installed)),
@@ -197,6 +233,7 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
           prune: PostgresClusterStorage.prune,
           entityTypes: [TurnJob.entity.type, DeliveryJob.entity.type],
         }),
+        PostgresClusterStorage.layerWakeupListener,
       ).pipe(Layer.provideMerge(gateway));
     },
   );

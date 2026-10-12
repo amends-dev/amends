@@ -179,6 +179,7 @@ const deliveryJobsFor = (
   transport: ReturnType<typeof makeTransport>,
 ) =>
   DeliveryJob.layer.pipe(
+    Layer.provide(JobRequests.layerWakeLocal),
     Layer.provideMerge(cluster),
     Layer.provide(
       Layer.merge(Layer.succeed(Gateway.Gateway, workspace.gateway), transport.integrations),

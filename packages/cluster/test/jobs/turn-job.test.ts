@@ -45,6 +45,7 @@ const turnJobsFor = (
 ) => {
   const workspace = makeFakeWorkspace(options);
   const layer = TurnJob.layer.pipe(
+    Layer.provide(JobRequests.layerWakeLocal),
     Layer.provideMerge(cluster),
     Layer.provide(
       Layer.merge(

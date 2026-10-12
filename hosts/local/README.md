@@ -3,7 +3,8 @@
 The Bun host that runs amends over a PostgreSQL database: it serves the
 [HTTP API](../../packages/http/README.md), runs [jobs](../../packages/cluster/README.md) such as
 agents' turns, installs the integrations workspaces connect to, and signs people in with emailed codes.
-One process serves any number of workspaces, and several processes can share one database. It
+One process serves any number of workspaces, and several processes can share one database, each
+serving the API, running jobs, or both. It
 composes the [gateway](../../packages/gateway/README.md), the
 [PostgreSQL adapter](../../adapters/storage-postgresql/README.md), and the
 [HTTP server](../../packages/http/README.md#serving-the-contract), and implements no storage itself.
@@ -28,6 +29,7 @@ app's development server proxies `/api` here, and the desktop app connects to it
 
 | Setting                     | Default           | Accepted value                                                                  |
 | --------------------------- | ----------------- | ------------------------------------------------------------------------------- |
+| `AMENDS_ROLE`               | `all`             | `all`, `api` to serve the API alone, or `jobs` to run jobs alone.               |
 | `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port.                      |
 | `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                                         |
 | `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                                                |
@@ -38,8 +40,8 @@ app's development server proxies `/api` here, and the desktop app connects to it
 | `AMENDS_SANDBOX_DIRECTORY`  | Temporary         | A directory; `amends-sandboxes` in the system's temporary directory by default. |
 | `AMENDS_SIGN_IN`            | `email`           | `email`, or `development` for tests and scripts.                                |
 
-The database must exist; startup applies the schema to it before serving, one process at a time when
-several start together. A missing or invalid URL fails startup before any connection, an explicitly
+The database must exist; startup applies the schema to it before serving, and Effect Cluster creates
+its tables, each one process at a time when several start together. A missing or invalid URL fails startup before any connection, an explicitly
 blank setting fails validation, and database URLs stay redacted in configuration errors.
 
 `AMENDS_CREDENTIAL_KEY` seals connections' credentials at rest. Without it the host stores none, and
@@ -48,9 +50,11 @@ key cannot open credentials sealed with the old one, and nothing rotates them. E
 key derives from it too, so a code one process sent works on every process over the database;
 without it, a code works only on the process that sent it.
 
-The pool size is the most connections the host opens. Three stay held: the runner-address claim, the
-cluster's shard locks, and the change feed's listener once a stream opens. The minimum of five
-leaves two for requests, so one long commit does not stall every read. A busy workspace's writers
+The pool size is the most connections the host opens. A process that runs jobs holds three: its
+runner-address claim, the cluster's shard locks, and the notice listener, which wakes it to job
+requests and serves the change feed's streams too. One that only serves the API holds just the
+listener, once a stream opens. The minimum of five leaves two for requests, so one long commit does
+not stall every read. A busy workspace's writers
 wait for each other in memory rather than each holding a connection, and its reads use at most three
 at once; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
 
@@ -83,31 +87,48 @@ process's own, which only a single process can use.
 
 ## Jobs
 
-The host runs jobs in its own process, on an Effect Cluster runner over the same database pool as
-its storage, so a job request a commit makes is stored in that commit's transaction. Cluster keeps
-its own tables beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
-`cluster_migrations`), creating them at startup, reads for due requests every two seconds, and holds
-one of the pool's connections for its shard locks. Every hour, one runner prunes job requests
-handled more than seven days ago.
+The host runs jobs on Effect Cluster over the same database pool as its storage, so a job request a
+commit makes is stored in that commit's transaction. Cluster keeps its own tables beside the
+adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`, `cluster_migrations`), creating
+them at startup. Every hour, one runner prunes job requests handled more than seven days ago.
 
 The host runs [turn jobs](../../packages/core/README.md#jobs) as cluster's `TurnJob`, and delivery
 jobs as its `DeliveryJob`, entering workspaces through its gateway, and builds each turn's harness,
 model, and sandbox, and each delivery's channel transport, from the integrations it installs.
 
-Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they share
-out the jobs, and when one stops answering, the others take its workspaces after
-`AMENDS_RUNNER_TAKEOVER`, which every process over the database sets alike. A process claims its
-address as it starts, holding one more pooled connection, and refuses to start while another process
-holds it: two processes at one address would share Cluster's machine ID, and the first to stop would
-remove the other's registration. The claim ends with its process, so a host restarted after a crash
-takes its address back at once, and its unfinished jobs run again. Restart a host by stopping the
-old process before starting the new one; requests sent meanwhile wait in the database.
+Once a commit that requests jobs is done, it wakes the process that runs each job: its own runner at
+once, and every other through a PostgreSQL notice sent with the commit's others, which each runner's
+listener answers by reading Cluster's storage. A runner also reads it every two seconds, which is
+all a request waits for when its notice is lost, or behind a transaction-pooling proxy, where
+`LISTEN` is unavailable.
 
-With `AMENDS_RUNNER_TRANSPORT=storage`, the default, processes coordinate through the database
-alone, so a request for a job another process runs arrives at that process's next read, within two
-seconds. With `socket`, each process also listens at its runner address and tells the process that
-runs a job about its request at once. Cluster's socket messages are not authenticated: use `socket`
+### Processes
+
+By default a process serves the API and runs jobs. `AMENDS_ROLE` splits the two: `api` serves the
+API alone, as Cluster's client, so its commits store job requests for other processes to run,
+while it claims no runner address and holds no shard; `jobs` runs jobs alone, with no HTTP server,
+and logs `Running jobs at` its runner address once it runs. A database served by `api` processes
+needs at least one process that runs jobs, or what they request waits until one starts.
+
+Several processes that run jobs can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`:
+they share out the jobs, and when one stops answering, the others take its workspaces after
+`AMENDS_RUNNER_TAKEOVER`, which every such process sets alike. A process claims its address as it
+starts, holding one more pooled connection, and refuses to start while another process holds it:
+two processes at one address would share Cluster's machine ID, and the first to stop would remove
+the other's registration. The claim ends with its process, so a host restarted after a crash takes
+its address back at once, and its unfinished jobs run again. Restart a host by stopping the old
+process before starting the new one; requests sent meanwhile wait in the database. The runner
+settings mean nothing to an `api` process.
+
+With `AMENDS_RUNNER_TRANSPORT=storage`, the default, processes that run jobs coordinate through the
+database alone. With `socket`, each also listens at its runner address, where the others reach it
+directly and check that it answers. Cluster's socket messages are not authenticated: use `socket`
 only on a private network.
+
+Every process over one database runs the same version: processes that serve the API and processes
+that run jobs commit to the same workspaces, so they must register the same
+[projections](../../docs/current-status.md#projection-sets-across-hosts), and a job's request one
+process stores is read by whichever process runs the job. Deploy them together.
 
 ## Browser and desktop access
 
@@ -171,18 +192,18 @@ and core's outcomes keep their tags, such as `CoreError.NotFound` with 404.
 Follow the [host conventions](../README.md). Importing any module but the entry point reads no
 configuration and starts nothing.
 
-| Module                         | Responsibility                                                                                                                                                           |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DevelopmentSignIn.ts`         | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                         |
-| `DevelopmentSessionTokens.ts`  | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                      |
-| `DevelopmentAuthentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                    |
-| `EmailAuthentication.ts`       | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                 |
-| `LocalConfig.ts`               | `LocalConfig.load()`, validating every setting before any resource is acquired, and `deriveSecret`.                                                                      |
-| `HarnessIntegrations.ts`       | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                    |
-| `SandboxIntegrations.ts`       | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                      |
-| `LocalHost.ts`                 | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, and sign-in storage over PostgreSQL, with jobs and pruning; `layerDatabase`; and `makeIntegrations`. |
-| `LocalServer.ts`               | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                             |
-| `index.ts`                     | Loads configuration, builds the host layer and the authentication `AMENDS_SIGN_IN` names, and launches through `BunRuntime.runMain`.                                     |
+| Module                         | Responsibility                                                                                                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DevelopmentSignIn.ts`         | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending codes per acquisition, signing in to the host's accounts.                                                                   |
+| `DevelopmentSessionTokens.ts`  | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs; revoking does nothing.                                                                                                |
+| `DevelopmentAuthentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                              |
+| `EmailAuthentication.ts`       | `EmailAuthentication.layer(credentialKey)`: the gateway's email sign-in with emails logged by `logEmails`, its code key derived from the credential key.                                           |
+| `LocalConfig.ts`               | `LocalConfig.load()`, validating every setting before any resource is acquired, and `deriveSecret`.                                                                                                |
+| `HarnessIntegrations.ts`       | `HarnessIntegrations`: the amends agent and opencode as integrations.                                                                                                                              |
+| `SandboxIntegrations.ts`       | `SandboxIntegrations`: local and Daytona sandboxes as integrations.                                                                                                                                |
+| `LocalHost.ts`                 | `LocalHost.layer(url, options?)`: the gateway, directory, accounts, and sign-in storage over PostgreSQL, with jobs and pruning unless `runJobs` is false; `layerDatabase`; and `makeIntegrations`. |
+| `LocalServer.ts`               | `LocalServer.layerRoutes` for routes and documentation; `layer(host, authentication, port)` adds the authentication and the Bun HTTP server.                                                       |
+| `index.ts`                     | Loads configuration, builds the host layer for `AMENDS_ROLE`, serves it with the authentication `AMENDS_SIGN_IN` names unless the role is `jobs`, and launches through `BunRuntime.runMain`.       |
 
 Development sign-in requires `Crypto.Crypto` and the host's `Accounts.Accounts`, and email sign-in
 also its `SignInStorage.SignInStorage`; development session tokens are built synchronously. None
@@ -204,8 +225,10 @@ bun run test --project postgresql hosts/local
 
 They cover authentication and configuration, the HTTP routes over PostgreSQL for workspaces,
 conversations, notifications, connections, agents, and the change feed, the installed integrations,
-jobs stored with the commits that request them and reaching another process over sockets, the
-runner-address claim, and agents' turns over HTTP with a model provider of the test's own.
+jobs stored with the commits that request them and run at once by whichever process runs them,
+whether that process serves the API too or not, over the database or over sockets, the
+runner-address claim, and agents' turns over HTTP with a model provider of the test's own, in one
+process and with the API and its jobs apart, through the real entry point too.
 Subprocess tests start the real entry point with their own database and port, disable
 environment-file loading, drain both output streams, and bound startup and termination.
 
@@ -213,5 +236,7 @@ environment-file loading, drain both output streams, and bound startup and termi
 
 After changing the host's runtime composition, also start it by hand: create a temporary database,
 run `AMENDS_PORT=0 bun run start` with `AMENDS_DATABASE_URL` naming it, confirm the `Listening on`
-line, stop the process, and drop the database. The subprocess fixture in `test/server.ts` automates
-the same boundary.
+line, stop the process, and drop the database. When the change touches roles, also start an
+`AMENDS_ROLE=api` process and an `AMENDS_ROLE=jobs` process together over a new database, and
+confirm the `Running jobs at` line. The subprocess fixture in `test/server.ts` automates the same
+boundary.

@@ -95,6 +95,7 @@
       "name": "@amends-dev/storage-postgresql",
       "version": "0.0.0",
       "dependencies": {
+        "@amends-dev/cluster": "workspace:*",
         "@amends-dev/connection": "workspace:*",
         "@amends-dev/core": "workspace:*",
         "@amends-dev/gateway": "workspace:*",

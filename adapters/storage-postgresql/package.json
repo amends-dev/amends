@@ -12,6 +12,7 @@
     "test": "bun run --bun vitest run --root ../.. --config vitest.config.ts adapters/storage-postgresql/test"
   },
   "dependencies": {
+    "@amends-dev/cluster": "workspace:*",
     "@amends-dev/connection": "workspace:*",
     "@amends-dev/core": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
