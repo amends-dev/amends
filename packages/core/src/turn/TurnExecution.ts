@@ -254,22 +254,6 @@ export class TurnExecution extends Context.Service<
 /** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
 
-/** Why the agent cannot run, as the turn that failed for it says. */
-const describeIssue = (issue: Agent.Issue): string => {
-  switch (issue._tag) {
-    case "Removed":
-      return `The connection for the agent's ${issue.part} was removed.`;
-    case "Uninstalled":
-      return `The integration of the agent's ${issue.part} connection is not installed here.`;
-    case "Invalid":
-      return issue.description;
-    case "SandboxRequired":
-      return "The agent's harness works only in a sandbox, and the agent has none.";
-    case "NoHarness":
-      return "No connection gives a harness the agent can run on.";
-  }
-};
-
 /**
  * The execution over the workspace's stores, the turn and thread commands, `AgentQuery`, the
  * journal, and the signal hub.
@@ -701,11 +685,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             ),
             // The agent cannot run on what is selected for it: the turn fails, saying why.
             Effect.catchTags({
-              "AgentQuery.Incomplete": ({ issues }) =>
-                endAsIdle(turn, {
-                  outcome: "failed",
-                  reason: issues.map(describeIssue).join(" "),
-                }),
+              "CoreError.Invalid": ({ reason }) =>
+                endAsIdle(turn, { outcome: "failed", reason: reason.message }),
               "CoreError.NotFound": ({ resource }) =>
                 endAsIdle(turn, {
                   outcome: "failed",

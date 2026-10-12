@@ -17,7 +17,7 @@ import * as ApiErrors from "./ApiErrors.ts";
 const agent = { workspaceId: Workspace.Id, agentId: Agent.Id };
 const view = Agent.View.annotate({ identifier: "Agent" });
 /** Outcomes of a setup: a connection the caller cannot give the agent, or one that cannot run. */
-const setup = [ApiErrors.AgentConnectionUnavailable, ApiErrors.AgentIncomplete] as const;
+const setup = [ApiErrors.Invalid, ApiErrors.Invalid] as const;
 
 /**
  * The workspace's agents, each a member working on the harness, model, and sandbox its

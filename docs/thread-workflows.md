@@ -4,10 +4,10 @@ Conversations in groups: starting them, as tasks or not, renaming them, replying
 deleting messages, following, reading, tracking tasks, and the notifications and read state around
 them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadParticipationService`,
 `TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
-`Gateway.asMember`. The gateway preserves the
-outcomes named below and maps malformed input to `GatewayErrors.InvalidInput`. Storage and consistency
-failures remain failures. The [HTTP contract](../packages/http/README.md#conversations) exposes
-each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
+`Gateway.asMember`. The gateway preserves the outcomes named below and maps malformed input to
+`CoreError.Invalid` (`Malformed`). Storage and consistency failures remain failures. The [HTTP
+contract](../packages/http/README.md#conversations) exposes each operation under
+`/workspaces/:workspaceId`, with the status each outcome returns.
 
 ## Starting a conversation
 
@@ -69,10 +69,10 @@ membership, a human identity, and `thread.start` on the direct group. The start 
 group also needs `agent.use` for each agent member, since the group gives its agents a place in
 every thread, as making an agent follow a team group does; later starts, through either operation,
 need it only for mentioned agents. Every member takes part in the thread, and mentions, which must
-name members, only narrow notification. Fewer than two distinct members returns
-`ThreadService.DirectMembersRequired`; a missing or inactive member, or a mention outside the group,
-returns `CoreError.Conflict` (`ParticipantUnavailable`). Later threads in the same direct group can
-also start with `startInGroup`.
+name members, only narrow notification. Fewer than two distinct members returns `CoreError.Invalid`
+(`DirectMembersRequired`); a missing or inactive member, or a mention outside the group, returns
+`CoreError.Conflict` (`ParticipantUnavailable`). Later threads in the same direct group can also
+start with `startInGroup`.
 
 ## Renaming a thread
 
@@ -132,30 +132,31 @@ whoever made it is told nothing:
 | Status to `held`, `done`, or `dismissed` | Nobody           | Every participant                                              |
 | Priority                                 | Nobody           | Every participant                                              |
 
-An agent taken off a task, by reassignment or by a status that asks no work, has its active turn
-in the thread asked to stop in the same commit, as a person's stop request does; the turn ends
-with the reason `task-changed`. A task's title and description are its requirements: renaming the
-thread or editing its opening message tells every participant and asks the assignee agent anew
-while the task is being worked. `done` does not close the thread; messages continue, and a later
-status reopens the work. `TaskService.listInGroup(groupId, { status?, before?, limit })` pages a
-group's tasks newest created first, each as a `Thread.ListItem` under the rules of
-`ThreadService.listInGroup`. To anyone outside a thread's group, the thread is `CoreError.NotFound`,
-and for a thread without a task, the task is. Triage is a participant and recipient only: nothing yet
-evaluates a policy or records a decision.
+An agent taken off a task, by reassignment or by a status that asks no work, has its active turn in
+the thread asked to stop in the same commit, as a person's stop request does; the turn ends with the
+reason `task-changed`. A task's title and description are its requirements: renaming the thread or
+editing its opening message tells every participant and asks the assignee agent anew while the task
+is being worked. `done` does not close the thread; messages continue, and a later status reopens the
+work. `TaskService.listInGroup(groupId, { status?, before?, limit })` pages a group's tasks newest
+created first, each as a `Thread.ListItem` under the rules of `ThreadService.listInGroup`. To anyone
+outside a thread's group, the thread is `CoreError.NotFound`, and for a thread without a task, the
+task is. Triage is a participant and recipient only: nothing yet evaluates a policy or records a
+decision.
 
 ## Channels
 
 A channel is a connection's external conversations, which become threads in one group: a support
 inbox or a chat room, whatever the connection's integration gives as a `ChannelTransport`
-([channel](../packages/channel/README.md)). `ChannelService.create({ connectionId,
-groupId, name, opensTasks })` makes one under `channel.create`, over a connection the actor may read
-and use whose integration gives channels (`ConnectionUnavailable` otherwise), into a group the actor
-belongs to and may start threads in (`CoreError.NotFound` otherwise), since every member of that group
-reads the channel's conversations. `list` and `get` read channels under `channel.read`;
-`redirect({ channelId, groupId })` sends new conversations to another group, and `remove` stops the
-channel's use, both under `channel.manage`. A removed channel's record and its threads' bindings
-remain, and it receives nothing more. `getBinding(threadId)` is the external conversation a thread
-came from, under `thread.read`; a thread that came through no channel has no binding, `CoreError.NotFound`.
+([channel](../packages/channel/README.md)). `ChannelService.create({ connectionId, groupId, name,
+opensTasks })` makes one under `channel.create`, over a connection the actor may read and use whose
+integration gives channels (`CoreError.Invalid` with `ConnectionUnusable` otherwise), into a group
+the actor belongs to and may start threads in (`CoreError.NotFound` otherwise), since every member
+of that group reads the channel's conversations. `list` and `get` read channels under
+`channel.read`; `redirect({ channelId, groupId })` sends new conversations to another group, and
+`remove` stops the channel's use, both under `channel.manage`. A removed channel's record and its
+threads' bindings remain, and it receives nothing more. `getBinding(threadId)` is the external
+conversation a thread came from, under `thread.read`; a thread that came through no channel has no
+binding, `CoreError.NotFound`.
 
 What the external system sends the host reaches `ChannelIntake.receive(channelId, { headers, body })`
 as no member: the channel's transport verifies the request, makes `events` of it, and says what to
@@ -270,14 +271,14 @@ its notifications commit together; the timeline never has gaps or duplicate posi
 
 ## Editing and deleting a message
 
-`ThreadMessageService.edit({ messageId, text, mentions, expectedRevision })` replaces what a
-message says. Only its author edits it, with `thread.publish` on the thread and membership of the
-group; anyone else gets `CoreError.Denied` (`NotAuthor`), and to someone outside the group the
-message is `CoreError.NotFound`, as a missing one is. Agents edit their own replies through their
-turns, so an agent caller gets `CoreError.Denied` (`HumanRequired`). The text and mentions follow a reply's
+`ThreadMessageService.edit({ messageId, text, mentions, expectedRevision })` replaces what a message
+says. Only its author edits it, with `thread.publish` on the thread and membership of the group;
+anyone else gets `CoreError.Denied` (`NotAuthor`), and to someone outside the group the message is
+`CoreError.NotFound`, as a missing one is. Agents edit their own replies through their turns, so an
+agent caller gets `CoreError.Denied` (`HumanRequired`). The text and mentions follow a reply's
 rules. The same text and mentions again record nothing; otherwise `expectedRevision`, the revision
-the editor last saw, must still be the message's: one edited meanwhile is `CoreError.Changed`, and nothing is
-recorded. A deleted message is `CoreError.Conflict` (`Deleted`).
+the editor last saw, must still be the message's: one edited meanwhile is `CoreError.Changed`, and
+nothing is recorded. A deleted message is `CoreError.Conflict` (`Deleted`).
 
 An edit records `thread.message.edited` with the next revision, the new text and mentions, and the
 time, and a quiet `message.edited` activity whose occurrence is the message and revision, in one
@@ -327,7 +328,7 @@ can unfollow after losing the follow permission. Other members' IDs, another thr
 missing participations share `CoreError.NotFound`; one's own ended participation returns
 `CoreError.Conflict` (`AlreadyEnded`). An inaccessible or missing thread returns
 `CoreError.NotFound` for the thread. Everyone in a direct conversation takes part in all of its
-threads, so unfollowing one returns `ThreadParticipationService.FixedParticipation` and records
+threads, so unfollowing one returns `CoreError.Invalid` (`FixedParticipation`) and records
 nothing.
 
 Unfollowing records a `participation.ended` activity with reason `unfollowed` and keeps the
@@ -365,10 +366,10 @@ A nonparticipant with group access and the grant can read the whole earlier conv
 creates no participation, acknowledges nothing, and requests no agent work. Later group members
 can read earlier history without retroactive notifications.
 
-Missing, foreign, and outside-audience threads share `CoreError.NotFound`, and an
-inaccessible group's list returns it for the group. A member of the audience without
-the grant receives `CoreError.Denied` (`NotGranted`) for a single thread; lists omit unreadable threads.
-Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
+Missing, foreign, and outside-audience threads share `CoreError.NotFound`, and an inaccessible
+group's list returns it for the group. A member of the audience without the grant receives
+`CoreError.Denied` (`NotGranted`) for a single thread; lists omit unreadable threads. Reads follow
+core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
 
 ### Timeline pages
 
@@ -469,8 +470,8 @@ read a thread through a timeline position. It requires a human actor, current gr
 notifications from the thread up to that position become `Seen` in the same write. Reading a
 timeline does not mark it read; clients call this for what they have shown.
 
-`markGroupRead({ groupId })` records that the acting person read a group now. It needs current
-group membership and `group.read`, and returns `CoreError.NotFound` otherwise; the read time also only
+`markGroupRead({ groupId })` records that the acting person read a group now. It needs current group
+membership and `group.read`, and returns `CoreError.NotFound` otherwise; the read time also only
 moves forward.
 
 Positions and read times are private state, like `Seen`: outside the journal, never waiting

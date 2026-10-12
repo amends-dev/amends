@@ -49,7 +49,7 @@ export class Gateway extends Context.Service<
       options?: Request.Options,
     ) => Effect.Effect<
       Workspace.Workspace,
-      CoreError.Unavailable | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
+      CoreError.Unavailable | GatewayErrors.Uncertain | CoreError.Invalid
     >;
     /**
      * Run core operations as the identity's active membership, keeping the workspace prepared for
@@ -119,14 +119,18 @@ const toPublicErrors = <A, E, R>(
     if (isUncertain(error))
       return Effect.fail(new GatewayErrors.Uncertain({ workspaceId, commitId: error.commitId }));
     if (Schema.isSchemaError(error))
-      return Effect.fail(new GatewayErrors.InvalidInput({ message: error.message }));
+      return Effect.fail(
+        new CoreError.Invalid({ reason: new CoreError.Malformed({ description: error.message }) }),
+      );
     // The runtime is prepared again for the next request, so this one may simply be retried.
     if (isBehind(error) || isUnregistered(error))
       return Effect.fail(new CoreError.Unavailable({ reason: new CoreError.Reloading() }));
     if (isMismatch(error))
       return Effect.fail(
-        new GatewayErrors.InvalidInput({
-          message: `Values must belong to workspace ${error.expectedWorkspaceId}`,
+        new CoreError.Invalid({
+          reason: new CoreError.Malformed({
+            description: `Values must belong to workspace ${error.expectedWorkspaceId}`,
+          }),
         }),
       );
     if (isPublic(error)) return Effect.fail(error as Extract<E, GatewayErrors.PublicError>);

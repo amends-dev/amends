@@ -198,8 +198,10 @@ describe("group memberships", () => {
             const own = Option.getOrThrow(
               yield* bound.groupMemberships.findActive(Group.GeneralId, owner.memberId),
             );
-            const refused = new GroupMembershipService.GeneralMembership({
-              groupId: Group.GeneralId,
+            const refused = new CoreError.Invalid({
+              reason: new CoreError.GeneralMembership({
+                groupId: Group.GeneralId,
+              }),
             });
             // Nobody, person or agent, leaves it or is removed, however broad the authority.
             expect(yield* Effect.flip(run(bound, owner, leave(own)))).toEqual(refused);

@@ -419,7 +419,7 @@ describe("gateway", () => {
           for (const name of ["", " \t\n"]) {
             expect(
               yield* Effect.flip(gateway.createWorkspace(alice.id, { name, memberName: "alice" })),
-            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+            ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
           }
           expect(yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(alice)).toEqual({
             memberships: [],

@@ -49,12 +49,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       success: Connection.View.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedConnection",
       }),
-      error: [
-        ...ApiErrors.workspace,
-        ApiErrors.NotFound,
-        ApiErrors.UnknownIntegration,
-        ApiErrors.InvalidConnection,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.get("get", "/:connectionId", {
       params: connection,
@@ -64,7 +59,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
     HttpApiEndpoint.get("models", "/:connectionId/models", {
       params: connection,
       success: Connection.Models.annotate({ identifier: "ConnectionModels" }),
-      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.UnknownIntegration],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.post("rename", "/:connectionId/rename", {
       params: connection,
@@ -79,28 +74,18 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       params: connection,
       payload: Schema.Struct({ settings: Connection.ConfigureInput.fields.settings }),
       success: view,
-      error: [
-        ...ApiErrors.workspace,
-        ApiErrors.NotFound,
-        ApiErrors.UnknownIntegration,
-        ApiErrors.InvalidConnection,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.put("replaceKey", "/:connectionId/key", {
       params: connection,
       payload: Schema.Struct({ apiKey: Connection.ReplaceKeyInput.fields.apiKey }),
       success: view,
-      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Keyless],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.post("check", "/:connectionId/check", {
       params: connection,
       success: ConnectionContract.Health.annotate({ identifier: "ConnectionHealth" }),
-      error: [
-        ...ApiErrors.workspace,
-        ApiErrors.NotFound,
-        ApiErrors.UnknownIntegration,
-        ApiErrors.InvalidConnection,
-      ],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Invalid, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.delete("remove", "/:connectionId", {
       params: connection,

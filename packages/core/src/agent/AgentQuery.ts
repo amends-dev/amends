@@ -30,23 +30,14 @@ import * as CoreError from "../error/CoreError.ts";
 export type ReadError = CoreError.NotFound | MemberStore.Failure | AgentStore.Failure;
 
 /**
- * The agent cannot run on what it is set up with, for the issues its readiness reports.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Incomplete extends Schema.TaggedError<Incomplete>()("AgentQuery.Incomplete", {
-  issues: Schema.NonEmptyArray(Agent.Issue),
-}) {}
-
-/**
  * What selecting can fail with: what reading the agent and the workspace's connections meets, and
- * `Incomplete`, when the agent cannot run for the issues its readiness reports.
+ * `CoreError.Invalid` (`Incomplete`), when the agent cannot run for the issues its readiness
+ * reports.
  *
  * @category errors
  * @since 0.1.0
  */
-export type SelectError = ReadError | ConnectionStore.Failure | Incomplete;
+export type SelectError = ReadError | ConnectionStore.Failure | CoreError.Invalid;
 
 /**
  * What building can fail with: what selecting meets, and a connection whose key cannot be read.
@@ -99,9 +90,9 @@ export class AgentQuery extends Context.Service<
 
     /**
      * The agent of `memberId` ready to run on `selection`: its instructions, and each connection of
-     * the selection with the key it holds. Fails with `Incomplete` when a connection of the selection
-     * can no longer give its part, as when it was removed since the selection was made, or it has no
-     * key.
+     * the selection with the key it holds. Fails with `CoreError.Invalid` (`Incomplete`) when a
+     * connection of the selection can no longer give its part, as when it was removed since the
+     * selection was made, or it has no key.
      */
     readonly buildRunnable: (
       memberId: MemberId.Id,
@@ -119,7 +110,9 @@ const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
 
 /** A connection's failure to give `part`, as the issue it is to the agent. */
 const invalid = (part: Agent.Part, description: string) =>
-  new Incomplete({ issues: [{ _tag: "Invalid", part, description }] });
+  new CoreError.Invalid({
+    reason: new CoreError.Incomplete({ issues: [{ _tag: "Invalid", part, description }] }),
+  });
 
 /**
  * Capture the stores and the host's integrations; each read finds the agent by its membership.
@@ -154,7 +147,8 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     connections: AgentReadiness.Connections,
   ) {
     const issues = yield* AgentReadiness.issuesOf(setup, connections, integrations);
-    if (Array.isReadonlyArrayNonEmpty(issues)) return yield* new Incomplete({ issues });
+    if (Array.isReadonlyArrayNonEmpty(issues))
+      return yield* new CoreError.Invalid({ reason: new CoreError.Incomplete({ issues }) });
   });
 
   /**
@@ -169,7 +163,10 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     if (record.harness._tag === "Connection") return record.harness.connectionId;
     const choices = yield* AgentReadiness.harnessesToChoose(record, connections, integrations);
     const chosen = AgentReadiness.chooseHarness(choices, previous?.harness.connectionId);
-    if (chosen === undefined) return yield* new Incomplete({ issues: [{ _tag: "NoHarness" }] });
+    if (chosen === undefined)
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.Incomplete({ issues: [{ _tag: "NoHarness" }] }),
+      });
     return chosen;
   });
 
@@ -189,7 +186,9 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
       integrations,
     );
     if (resolved._tag !== "Installed")
-      return yield* new Incomplete({ issues: [{ _tag: resolved._tag, part }] });
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.Incomplete({ issues: [{ _tag: resolved._tag, part }] }),
+      });
     const { connection } = resolved;
     if (connection.auth === "none")
       return { connection, credential: null } satisfies Connection.Access;

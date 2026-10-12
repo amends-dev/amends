@@ -71,12 +71,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
         expectedName: Group.RenameInput.fields.expectedName,
       }),
       success: Group.Group,
-      error: [
-        ...ApiErrors.workspace,
-        ...ApiErrors.group,
-        ApiErrors.NotRenamable,
-        ApiErrors.Changed,
-      ],
+      error: [...ApiErrors.workspace, ...ApiErrors.group, ApiErrors.Invalid, ApiErrors.Changed],
     }),
     HttpApiEndpoint.get("get", "/:groupId", {
       params: group,

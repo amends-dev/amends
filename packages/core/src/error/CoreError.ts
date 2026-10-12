@@ -4,15 +4,19 @@
  * however many operations report it, and a new operation adds no mapping: `NotFound`, for anything
  * the caller named that is missing or out of their reach; `Changed`, for what changed since the
  * caller read it; `Denied`, for who may not do what they asked; `Conflict`, for a request the
- * state of what it acts on refuses; and `Unavailable`, for what an operation needs that cannot be
- * reached or used now. The last three say why in their `reason`, as `NotGranted` or
- * `AlreadyMember`, so a caller recovers from one reason with
+ * state of what it acts on refuses; `Invalid`, for a request that cannot be done as asked whatever
+ * the state; and `Unavailable`, for what an operation needs that cannot be reached or used now.
+ * The last four say why in their `reason`, as `NotGranted` or `AlreadyMember`, so a caller
+ * recovers from one reason with
  * `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`.
  *
  * @since 0.1.0
  */
 import { Schema } from "effect";
+import * as Agent from "../agent/Agent.ts";
 import * as Requirement from "../authorization/Requirement.ts";
+import * as Role from "../authorization/Role.ts";
+import * as Connection from "../connection/Connection.ts";
 import * as GroupId from "../group/GroupId.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as Notification from "../notification/Notification.ts";
@@ -635,6 +639,298 @@ export type ConflictReason = typeof ConflictReason.Type;
  */
 export class Conflict extends Schema.TaggedError<Conflict>()("CoreError.Conflict", {
   reason: ConflictReason,
+}) {
+  override get message(): string {
+    return this.reason.message;
+  }
+}
+
+/**
+ * Values the caller gave do not hold: they fail what core accepts, or name another workspace's
+ * records. The description says which.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class Malformed extends Schema.TaggedClass<Malformed>()("Malformed", {
+  description: Schema.String,
+}) {
+  get message(): string {
+    return this.description;
+  }
+}
+
+/**
+ * The role is not one of the three built-in ones; no other role is delegated.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class UnsupportedRole extends Schema.TaggedClass<UnsupportedRole>()("UnsupportedRole", {
+  roleId: Role.Id,
+}) {
+  get message(): string {
+    return `Role ${this.roleId} is not a built-in role`;
+  }
+}
+
+/**
+ * The expiry given is not after now.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class PastExpiry extends Schema.TaggedClass<PastExpiry>()("PastExpiry", {}) {
+  get message(): string {
+    return "The expiry is not after now";
+  }
+}
+
+/**
+ * A direct group needs the author and at least one other member.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class DirectMembersRequired extends Schema.TaggedClass<DirectMembersRequired>()(
+  "DirectMembersRequired",
+  {},
+) {
+  get message(): string {
+    return "A direct group needs the author and at least one other member";
+  }
+}
+
+/**
+ * A direct group is named by its members, so it takes no name.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class NotRenamable extends Schema.TaggedClass<NotRenamable>()("NotRenamable", {
+  groupId: GroupId.Id,
+}) {
+  get message(): string {
+    return `Group ${this.groupId} is named by its members`;
+  }
+}
+
+/**
+ * A direct group's members are fixed: nobody is added to it, removed from it, or leaves it.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class FixedMembership extends Schema.TaggedClass<FixedMembership>()("FixedMembership", {
+  groupId: GroupId.Id,
+}) {
+  get message(): string {
+    return `Group ${this.groupId} has fixed members`;
+  }
+}
+
+/**
+ * Everyone in the workspace belongs to its general group: nobody leaves it or is removed from it.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class GeneralMembership extends Schema.TaggedClass<GeneralMembership>()(
+  "GeneralMembership",
+  {
+    groupId: GroupId.Id,
+  },
+) {
+  get message(): string {
+    return `Everyone belongs to the general group ${this.groupId}`;
+  }
+}
+
+/**
+ * Everyone in a direct group takes part in its threads, so it has nothing to follow.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class NotFollowable extends Schema.TaggedClass<NotFollowable>()("NotFollowable", {
+  groupId: GroupId.Id,
+}) {
+  get message(): string {
+    return `Group ${this.groupId} has nothing to follow`;
+  }
+}
+
+/**
+ * Everyone in a direct conversation takes part in it, so nobody follows or unfollows it.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class FixedParticipation extends Schema.TaggedClass<FixedParticipation>()(
+  "FixedParticipation",
+  {
+    threadId: ThreadId.Id,
+  },
+) {
+  get message(): string {
+    return `Everyone takes part in thread ${this.threadId}`;
+  }
+}
+
+/**
+ * This host does not install the integration, or no longer installs the one a connection names.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class UnknownIntegration extends Schema.TaggedClass<UnknownIntegration>()(
+  "UnknownIntegration",
+  {
+    integration: Schema.String,
+  },
+) {
+  get message(): string {
+    return `This host does not install ${this.integration}`;
+  }
+}
+
+/**
+ * The integration does not take the connection: its settings, how it authenticates, or, when
+ * checking one that authenticates with a key, a missing key. The description is the integration's,
+ * for the person who gave them.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class IntegrationRefused extends Schema.TaggedClass<IntegrationRefused>()(
+  "IntegrationRefused",
+  {
+    description: Schema.String,
+  },
+) {
+  get message(): string {
+    return this.description;
+  }
+}
+
+/**
+ * The connection authenticates with nothing, so it takes no key.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class Keyless extends Schema.TaggedClass<Keyless>()("Keyless", {
+  connectionId: Connection.Id,
+}) {
+  get message(): string {
+    return `Connection ${this.connectionId} takes no key`;
+  }
+}
+
+const describeIssue = (issue: Agent.Issue): string => {
+  switch (issue._tag) {
+    case "Removed":
+      return `The connection for the agent's ${issue.part} was removed.`;
+    case "Uninstalled":
+      return `The integration of the agent's ${issue.part} connection is not installed here.`;
+    case "Invalid":
+      return issue.description;
+    case "SandboxRequired":
+      return "The agent's harness works only in a sandbox, and the agent has none.";
+    case "NoHarness":
+      return "No connection gives a harness the agent can run on.";
+  }
+};
+
+/**
+ * The agent cannot run as it would be set up, for the issues its readiness reports.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class Incomplete extends Schema.TaggedClass<Incomplete>()("Incomplete", {
+  issues: Schema.NonEmptyArray(Agent.Issue),
+}) {
+  get message(): string {
+    return this.issues.map(describeIssue).join(" ");
+  }
+}
+
+/**
+ * A connection the request names is missing or removed, the actor may not read and use it, or it
+ * gives nothing for its use, which they cannot tell apart. `part` names the part of an agent's
+ * setup that names it.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class ConnectionUnusable extends Schema.TaggedClass<ConnectionUnusable>()(
+  "ConnectionUnusable",
+  {
+    connectionId: Connection.Id,
+    part: Schema.optional(Agent.Part),
+  },
+) {
+  get message(): string {
+    return `Connection ${this.connectionId} cannot be used here`;
+  }
+}
+
+/**
+ * The channel's transport rejected what the host received: it is not the external system's, or
+ * its signature does not hold. Nothing was taken in.
+ *
+ * @category reasons
+ * @since 0.1.0
+ */
+export class Unverified extends Schema.TaggedClass<Unverified>()("Unverified", {
+  description: Schema.String,
+}) {
+  get message(): string {
+    return this.description;
+  }
+}
+
+/**
+ * Why a request cannot be done as asked: one of the reasons above.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const InvalidReason = Schema.Union([
+  Malformed,
+  UnsupportedRole,
+  PastExpiry,
+  DirectMembersRequired,
+  NotRenamable,
+  FixedMembership,
+  GeneralMembership,
+  NotFollowable,
+  FixedParticipation,
+  UnknownIntegration,
+  IntegrationRefused,
+  Keyless,
+  Incomplete,
+  ConnectionUnusable,
+  Unverified,
+]);
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type InvalidReason = typeof InvalidReason.Type;
+
+/**
+ * The request cannot be done as asked, whatever the state, for the `reason` given, such as values
+ * that do not hold, a role or integration this workspace does not have, a fixed roster, or a setup
+ * that cannot run; asking again unchanged fails the same. Nothing was recorded.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class Invalid extends Schema.TaggedError<Invalid>()("CoreError.Invalid", {
+  reason: InvalidReason,
 }) {
   override get message(): string {
     return this.reason.message;

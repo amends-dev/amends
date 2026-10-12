@@ -302,7 +302,9 @@ describe("connections", () => {
                 }),
               ),
             ),
-          ).toEqual(new ConnectionService.Keyless({ connectionId: keyless.id }));
+          ).toEqual(
+            new CoreError.Invalid({ reason: new CoreError.Keyless({ connectionId: keyless.id }) }),
+          );
           expect(yield* journalText(bound)).not.toContain("sk-bad");
         }),
       ),
@@ -320,7 +322,9 @@ describe("connections", () => {
               as(workspace.id, alice, (connectionService) => connectionService.create(input)),
             );
           expect(yield* refused(changed(models, { integration: "not-installed" }))).toEqual(
-            new ConnectionService.UnknownIntegration({ integration: "not-installed" }),
+            new CoreError.Invalid({
+              reason: new CoreError.UnknownIntegration({ integration: "not-installed" }),
+            }),
           );
           const unaccepted: ReadonlyArray<Connection.CreateInput["settings"]> = [
             {},
@@ -328,23 +332,29 @@ describe("connections", () => {
           ];
           for (const settings of unaccepted) {
             const invalid = yield* refused(changed(models, { settings }));
-            expect(invalid).toBeInstanceOf(ConnectionService.InvalidConnection);
+            expect(invalid).toBeInstanceOf(CoreError.Invalid);
             expect(invalid).toMatchObject({
-              description: expect.stringContaining(
-                "The settings of Models do not match what Test models takes",
-              ),
+              reason: {
+                _tag: "IntegrationRefused",
+                description: expect.stringContaining(
+                  "The settings of Models do not match what Test models takes",
+                ),
+              },
             });
           }
           expect(
             yield* refused(changed(tools, { auth: "apiKey", apiKey: Redacted.make(goodKey) })),
           ).toEqual(
-            new ConnectionService.InvalidConnection({
-              description: "Test tools takes no authentication by apiKey",
+            new CoreError.Invalid({
+              reason: new CoreError.IntegrationRefused({
+                description: "Test tools takes no authentication by apiKey",
+              }),
             }),
           );
           // A key for a connection that authenticates with none is not a request at all.
           expect(yield* refused(changed(tools, { apiKey: Redacted.make(goodKey) }))).toMatchObject({
-            _tag: "GatewayErrors.InvalidInput",
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "Malformed" },
           });
 
           const created = yield* as(workspace.id, alice, (connectionService) =>
@@ -358,7 +368,7 @@ describe("connections", () => {
               }),
             ),
           );
-          expect(reconfigured).toBeInstanceOf(ConnectionService.InvalidConnection);
+          expect(reconfigured).toBeInstanceOf(CoreError.Invalid);
           expect(
             yield* as(workspace.id, alice, (connectionService) => connectionService.list),
           ).toEqual([created]);
@@ -551,12 +561,16 @@ describe("connections", () => {
               yield* Effect.flip(
                 as(workspace.id, alice, (connectionService) => connectionService.check(keyless.id)),
               ),
-            ).toEqual(new ConnectionService.UnknownIntegration({ integration: "test-tools" }));
+            ).toEqual(
+              new CoreError.Invalid({
+                reason: new CoreError.UnknownIntegration({ integration: "test-tools" }),
+              }),
+            );
             expect(
               yield* Effect.flip(
                 as(workspace.id, alice, (connectionService) => connectionService.check(keyed.id)),
               ),
-            ).toBeInstanceOf(ConnectionService.InvalidConnection);
+            ).toBeInstanceOf(CoreError.Invalid);
             // The models of a connection are its integration's, whatever its settings.
             expect(
               yield* as(workspace.id, alice, (connectionService) =>
@@ -569,7 +583,11 @@ describe("connections", () => {
                   connectionService.models(keyless.id),
                 ),
               ),
-            ).toEqual(new ConnectionService.UnknownIntegration({ integration: "test-tools" }));
+            ).toEqual(
+              new CoreError.Invalid({
+                reason: new CoreError.UnknownIntegration({ integration: "test-tools" }),
+              }),
+            );
           }).pipe(Effect.provide(gateway(host, { ...installed, integrations: [changedModels] })));
         }),
       ),

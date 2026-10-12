@@ -144,7 +144,11 @@ const conversations = Layer.mergeAll(
         Effect.fail(new CoreError.NotFound({ resource: "Group", id: groupId })),
       ),
       remove: record("group.remove", (input) =>
-        Effect.fail(new GroupMembershipService.FixedMembership({ groupId: input.groupId })),
+        Effect.fail(
+          new CoreError.Invalid({
+            reason: new CoreError.FixedMembership({ groupId: input.groupId }),
+          }),
+        ),
       ),
       leave: record("group.leave", (input) =>
         Effect.fail(
@@ -164,7 +168,11 @@ const conversations = Layer.mergeAll(
     GroupFollowService.GroupFollowService.of({
       follow: record("group.follow", () => Effect.void),
       unfollow: record("group.unfollow", (input) =>
-        Effect.fail(new GroupFollowService.NotFollowable({ groupId: input.groupId })),
+        Effect.fail(
+          new CoreError.Invalid({
+            reason: new CoreError.NotFollowable({ groupId: input.groupId }),
+          }),
+        ),
       ),
     }),
   ),
@@ -177,7 +185,7 @@ const conversations = Layer.mergeAll(
         ),
       ),
       startDirect: record("thread.startDirect", () =>
-        Effect.fail(new ThreadService.DirectMembersRequired()),
+        Effect.fail(new CoreError.Invalid({ reason: new CoreError.DirectMembersRequired() })),
       ),
       get: record("thread.get", (id) =>
         Effect.fail(new CoreError.NotFound({ resource: "Thread", id })),
@@ -268,7 +276,11 @@ const channels = Layer.mergeAll(
         return Effect.succeed([]);
       }),
       create: record("channel.create", (input) =>
-        Effect.fail(new ChannelService.ConnectionUnavailable({ connectionId: input.connectionId })),
+        Effect.fail(
+          new CoreError.Invalid({
+            reason: new CoreError.ConnectionUnusable({ connectionId: input.connectionId }),
+          }),
+        ),
       ),
       get: record("channel.get", (id) =>
         Effect.fail(new CoreError.NotFound({ resource: "Channel", id })),
@@ -923,7 +935,7 @@ it.effect(
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
       );
       expect(statuses).toEqual([
-        201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 409,
+        201, 200, 200, 404, 200, 409, 422, 409, 404, 204, 422, 204, 200, 200, 409, 422, 404, 409,
         200, 200, 403, 409, 404, 404, 409, 409, 200, 404, 409, 409, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([

@@ -48,17 +48,7 @@ import * as Task from "../task/Task.ts";
 import * as TaskCommand from "../task/TaskCommand.ts";
 import * as TaskPermissions from "../task/TaskPermissions.ts";
 import * as TaskStore from "../task/TaskStore.ts";
-import { DirectMembersRequired } from "./internal/thread-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * A direct group needs the author and at least one other member.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  DirectMembersRequired,
-} from "./internal/thread-errors.ts";
 
 /**
  * What starting a thread can fail with: the outcomes above, and the failures of what
@@ -85,7 +75,7 @@ export type Error =
   | CoreError.NotFound
   | CoreError.Conflict
   | CoreError.Denied
-  | DirectMembersRequired
+  | CoreError.Invalid
   | ThreadStore.Failure
   | ThreadMessageStore.Failure
   | ThreadActivityStore.Failure
@@ -394,7 +384,8 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
       const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
-      if (memberIds.length < 2) return yield* new DirectMembersRequired({});
+      if (memberIds.length < 2)
+        return yield* new CoreError.Invalid({ reason: new CoreError.DirectMembersRequired() });
       const missing = request.mentions.find((id) => !memberIds.includes(id));
       if (missing !== undefined)
         return yield* new CoreError.Conflict({

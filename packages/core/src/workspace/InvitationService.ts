@@ -29,17 +29,7 @@ import * as InvitationStore from "./InvitationStore.ts";
 import * as Member from "./Member.ts";
 import * as MemberCommand from "./MemberCommand.ts";
 import * as MemberStore from "./MemberStore.ts";
-import { InvalidExpiry } from "./internal/invitation-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The expiry given is not after now.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidExpiry,
-} from "./internal/invitation-errors.ts";
 
 /**
  * What the invitation operations can fail with: the outcomes above, and the
@@ -60,7 +50,7 @@ export type Error =
   | CoreError.NotFound
   | CoreError.Denied
   | CoreError.Conflict
-  | InvalidExpiry;
+  | CoreError.Invalid;
 
 /**
  * The invitation operations, one of `Core.Operations`.
@@ -179,7 +169,8 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       )
         return yield* requireInvitation(invitationId);
       const issuedAt = yield* DateTime.now;
-      if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
+      if (!DateTime.isGreaterThan(request.expiresAt, issuedAt))
+        return yield* new CoreError.Invalid({ reason: new CoreError.PastExpiry() });
       yield* requireUnjoined(request.recipientId);
       const details: Invitation.Issuance = {
         id: invitationId,

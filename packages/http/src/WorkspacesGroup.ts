@@ -46,7 +46,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       success: Workspace.Workspace.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedWorkspace",
       }),
-      error: [ApiErrors.Denied, ApiErrors.Unavailable, ApiErrors.Uncertain, ApiErrors.InvalidInput],
+      error: [ApiErrors.Denied, ApiErrors.Unavailable, ApiErrors.Uncertain, ApiErrors.Invalid],
     }),
     HttpApiEndpoint.get("ownership", "/:workspaceId/ownership", {
       params: { workspaceId: Workspace.Id },

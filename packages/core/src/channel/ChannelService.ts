@@ -31,22 +31,11 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import { ConnectionUnavailable } from "./internal/channel-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelPermissions from "./ChannelPermissions.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import * as ChannelStore from "./ChannelStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The connection is missing or removed, the actor may not read and use it, or its integration
-   * gives no channels; the actor cannot tell these apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ConnectionUnavailable,
-} from "./internal/channel-errors.ts";
 
 /**
  * What reading channels can fail with.
@@ -83,11 +72,7 @@ export type DestinationError = GroupMembershipStore.Failure | CoreError.NotFound
  * @category errors
  * @since 0.1.0
  */
-export type CreateError =
-  | Error
-  | DestinationError
-  | ConnectionStore.Failure
-  | ConnectionUnavailable;
+export type CreateError = Error | DestinationError | ConnectionStore.Failure | CoreError.Invalid;
 
 /**
  * What redirecting a channel can fail with.
@@ -211,7 +196,8 @@ export const make = Effect.fn("ChannelService.make")(function* () {
    * actor, and of an integration that gives channels. Anything else is unavailable alike.
    */
   const requireUsableConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
-    const unavailable = () => new ConnectionUnavailable({ connectionId });
+    const unavailable = () =>
+      new CoreError.Invalid({ reason: new CoreError.ConnectionUnusable({ connectionId }) });
     const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found) || found.value.status !== "active") return yield* unavailable();
     const target = { _tag: "Connection", workspaceId, connectionId } as const;

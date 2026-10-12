@@ -2,21 +2,12 @@
  * The contract's error namespace: each gateway and core outcome an endpoint can answer with, given
  * its HTTP status, and the lists of them that groups spread into an endpoint's `error`. Core
  * declares no transport concerns, so the status lives here, on the contract's view of each error,
- * and the serialized tag stays the one core or the gateway declares. A name that would be ambiguous
- * in the shared namespace says its source, such as `InvitationInvalidExpiry` or `AgentIncomplete`.
- * `TooManyStreams` is the contract's own, and `requestKey` is the `Idempotency-Key` header a
- * creating endpoint accepts.
+ * and the serialized tag stays the one core or the gateway declares. `TooManyStreams` is the
+ * contract's own, and `requestKey` is the `Idempotency-Key` header a creating endpoint accepts.
  *
  * @since 0.1.0
  */
-import { Delegation } from "@amends-dev/core/authorization";
-import { InvitationService } from "@amends-dev/core/workspace";
 import * as GatewayErrors from "@amends-dev/gateway/GatewayErrors";
-import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
-import { AgentService } from "@amends-dev/core/agent";
-import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
-import { ConnectionService } from "@amends-dev/core/connection";
-import { ThreadService, ThreadParticipationService } from "@amends-dev/core/thread";
 import { Request } from "@amends-dev/core/request";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/http-api";
@@ -68,6 +59,14 @@ export const Denied = CoreError.Denied.pipe(HttpApiSchema.status(403));
  */
 export const Conflict = CoreError.Conflict.pipe(HttpApiSchema.status(409));
 /**
+ * The request cannot be done as asked, whatever the state, for the `reason` given, such as values
+ * that do not hold, a fixed roster, or an agent setup that cannot run: 422.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const Invalid = CoreError.Invalid.pipe(HttpApiSchema.status(422));
+/**
  * What the operation needs cannot be reached or used now, for the `reason` given, such as storage
  * another writer held or a host that keeps no keys: 503.
  *
@@ -94,58 +93,24 @@ export const requestKey = {
  */
 export const Uncertain = GatewayErrors.Uncertain.pipe(HttpApiSchema.status(500));
 /**
- * Core rejected the operation's input; 400.
+ * The delegation rules' outcomes, which giving, changing, and taking away a role share, as do
+ * issuing and answering an invitation and reading a member's access: `Denied` where only the owner
+ * may (403); a missing member, invitation, or built-in role this workspace does not record (404);
+ * the owner out of reach, a member no longer active or already one, or an invitation no longer open
+ * (409); and a role other than the three built-in ones, or an expiry not after now (422).
  *
  * @category errors
  * @since 0.1.0
  */
-export const InvalidInput = GatewayErrors.InvalidInput.pipe(HttpApiSchema.status(400));
+export const delegation = [Denied, Conflict, Invalid, NotFound] as const;
 /**
- * The invitation would expire no later than it is issued; 400.
+ * Assignment outcomes: the delegation rules', and access that changed since the caller read it,
+ * 409.
  *
  * @category errors
  * @since 0.1.0
  */
-export const InvitationInvalidExpiry = InvitationService.InvalidExpiry.pipe(
-  HttpApiSchema.status(400),
-);
-/**
- * The delegation rules' outcomes, which giving, changing, and taking away a role share:
- * `Denied` where only the owner may (403), the owner out of reach (409), a role other than the
- * three built-in ones (400), and a built-in role this workspace does not record (404).
- *
- * @category errors
- * @since 0.1.0
- */
-export const delegation = [
-  Denied,
-  Conflict,
-  Delegation.UnsupportedRole.pipe(HttpApiSchema.status(400)),
-  NotFound,
-] as const;
-/**
- * Invitation outcomes, with the delegation rules issuing one checks.
- *
- * @category errors
- * @since 0.1.0
- */
-export const invitation = [...delegation, Conflict, InvitationInvalidExpiry] as const;
-/**
- * Reading a member's access, with the delegation rules it shows: a missing member is 404, and one
- * no longer active 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const assignmentRead = [...delegation, Conflict] as const;
-/**
- * Assignment outcomes: those of reading a member's access, and a missing assignment, 404, or
- * access that changed since the caller read it, 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const assignment = [...assignmentRead, Changed] as const;
+export const assignment = [...delegation, Changed] as const;
 
 /**
  * Ownership outcomes: a caller who is not the owner is 403, a missing recipient 404, and a
@@ -167,55 +132,33 @@ export const ownership = [Denied, NotFound, Conflict, Changed] as const;
  */
 export const group = [NotFound, Conflict] as const;
 /**
- * A direct group is named by its members and refuses a name with 409.
- *
- * @category errors
- * @since 0.1.0
- */
-export const NotRenamable = GroupService.NotRenamable.pipe(HttpApiSchema.status(409));
-/**
  * Admission outcomes: a missing group, member, or admission is 404; a member no longer active, one
- * admitted already, an admission ended already, and the fixed roster of a direct or the general
- * group are 409.
+ * admitted already, and an admission ended already are 409; the fixed roster of a direct or the
+ * general group is 422.
  *
  * @category errors
  * @since 0.1.0
  */
-export const groupMembership = [
-  NotFound,
-  Conflict,
-  GroupMembershipService.FixedMembership.pipe(HttpApiSchema.status(409)),
-  GroupMembershipService.GeneralMembership.pipe(HttpApiSchema.status(409)),
-] as const;
+export const groupMembership = [NotFound, Conflict, Invalid] as const;
 /**
  * Following outcomes: a missing group, or one the caller does not belong to, is 404; making someone
- * other than an agent follow is 403; and a member missing, inactive, or outside the group, or a
- * direct group, whose members already take part in every thread, is 409.
+ * other than an agent follow is 403; a member missing, inactive, or outside the group is 409;
+ * and a direct group, whose members already take part in every thread, is 422.
  *
  * @category errors
  * @since 0.1.0
  */
-export const groupFollow = [
-  NotFound,
-  Denied,
-  Conflict,
-  GroupFollowService.NotFollowable.pipe(HttpApiSchema.status(409)),
-] as const;
+export const groupFollow = [NotFound, Denied, Conflict, Invalid] as const;
 
 /**
  * Thread outcomes. Missing threads and threads outside the caller's groups share a 404; an agent
  * principal writing where only people may is a 403; a named member who cannot take part is a 409;
- * and a direct thread without another member is a 400.
+ * and a direct thread without another member is a 422.
  *
  * @category errors
  * @since 0.1.0
  */
-export const thread = [
-  NotFound,
-  Denied,
-  Conflict,
-  ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
-] as const;
+export const thread = [NotFound, Denied, Conflict, Invalid] as const;
 /**
  * Replying outcomes: a thread missing or outside the caller's groups is 404, an agent principal
  * 403, and a mentioned member who cannot take part 409.
@@ -248,16 +191,12 @@ export const messageDelete = [NotFound, Denied] as const;
 export const typing = [NotFound] as const;
 /**
  * Following a thread: a missing thread, or a participation missing or not the caller's, is 404; a
- * participation ended already, and a direct conversation, where everyone takes part, are 409.
+ * participation ended already is 409; and a direct conversation, where everyone takes part, 422.
  *
  * @category errors
  * @since 0.1.0
  */
-export const participation = [
-  NotFound,
-  Conflict,
-  ThreadParticipationService.FixedParticipation.pipe(HttpApiSchema.status(409)),
-] as const;
+export const participation = [NotFound, Conflict, Invalid] as const;
 
 /**
  * Task outcomes. A thread the caller cannot read, or without a task, is 404, as is a group the
@@ -294,55 +233,12 @@ export const taskUpdate = [NotFound, Changed, Conflict] as const;
 export const readState = [Denied, NotFound, Conflict] as const;
 
 /**
- * The integration is not installed on this host.
- *
- * @category errors
- * @since 0.1.0
- */
-export const UnknownIntegration = ConnectionService.UnknownIntegration.pipe(
-  HttpApiSchema.status(422),
-);
-/**
- * The integration does not take the connection's settings or auth method, as it describes.
- *
- * @category errors
- * @since 0.1.0
- */
-export const InvalidConnection = ConnectionService.InvalidConnection.pipe(
-  HttpApiSchema.status(422),
-);
-/**
- * The connection authenticates with nothing, so it takes no key.
- *
- * @category errors
- * @since 0.1.0
- */
-export const Keyless = ConnectionService.Keyless.pipe(HttpApiSchema.status(422));
-
-/**
- * A connection the setup names is missing or removed, or the caller may not read and use it.
- *
- * @category errors
- * @since 0.1.0
- */
-export const AgentConnectionUnavailable = AgentService.ConnectionUnavailable.pipe(
-  HttpApiSchema.status(422),
-);
-/**
- * The agent could not run as it would be set up, for the issues given.
- *
- * @category errors
- * @since 0.1.0
- */
-export const AgentIncomplete = AgentService.Incomplete.pipe(HttpApiSchema.status(422));
-
-/**
  * Outcomes every operation in a workspace shares: authorization, input, and storage.
  *
  * @category errors
  * @since 0.1.0
  */
-export const workspace = [Denied, InvalidInput, Unavailable, Uncertain] as const;
+export const workspace = [Denied, Invalid, Unavailable, Uncertain] as const;
 
 /**
  * Channel outcomes. A channel the caller may not read, or removed, is 404, as is a group the caller
@@ -360,17 +256,7 @@ export const channelRead = [NotFound] as const;
  * @category errors
  * @since 0.1.0
  */
-export const channelCreate = [
-  ...channelRead,
-  ChannelService.ConnectionUnavailable.pipe(HttpApiSchema.status(422)),
-] as const;
-/**
- * Redirecting a channel: a channel or destination group the caller cannot reach is 404.
- *
- * @category errors
- * @since 0.1.0
- */
-export const channelRedirect = [...channelRead] as const;
+export const channelCreate = [...channelRead, Invalid] as const;
 /**
  * Where a thread came from: a thread missing, unreadable, or that came through no channel is 404.
  *
@@ -380,13 +266,9 @@ export const channelRedirect = [...channelRead] as const;
 export const channelBinding = [NotFound] as const;
 /**
  * What an external system's request to a channel can be answered with: a channel missing or removed
- * is 404, a request its transport rejects 400, and a system that cannot be reached 503.
+ * is 404, a request its transport rejects 422, and a system that cannot be reached 503.
  *
  * @category errors
  * @since 0.1.0
  */
-export const channelEvents = [
-  NotFound,
-  ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
-  Unavailable,
-] as const;
+export const channelEvents = [NotFound, Invalid, Unavailable] as const;

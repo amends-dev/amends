@@ -42,7 +42,7 @@ export class AssignmentsGroup extends HttpApiGroup.make("assignments")
     HttpApiEndpoint.get("list", "/members/:memberId/assignments", {
       params: member,
       success: Assignment.Access,
-      error: [...ApiErrors.workspace, ...ApiErrors.assignmentRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.post("assign", "/assignments", {
       params,

@@ -25,18 +25,8 @@ import * as Requirement from "./Requirement.ts";
 import * as BuiltinRoles from "./BuiltinRoles.ts";
 import * as Role from "./Role.ts";
 import * as RoleStore from "./RoleStore.ts";
-import { UnsupportedRole } from "./internal/delegation-errors.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The role is not one of the three built-in ones; no other role is delegated.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  UnsupportedRole,
-} from "./internal/delegation-errors.ts";
 
 /**
  * What a delegation check can fail with: the outcomes above, authorization's, and
@@ -53,7 +43,7 @@ export type Error =
   | Schema.SchemaError
   | CoreError.Denied
   | CoreError.Conflict
-  | UnsupportedRole
+  | CoreError.Invalid
   | CoreError.NotFound;
 
 /**
@@ -69,7 +59,7 @@ export class Delegation extends Context.Service<
     /**
      * A built-in role as recorded, with each of its permissions this host declares checked to fit
      * a workspace-wide grant; one it does not declare is kept and grants nothing. Any other role
-     * is `UnsupportedRole`.
+     * is `CoreError.Invalid` (`UnsupportedRole`).
      */
     readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Role, Error>;
     /** The member's active assignments, by role and direct grant alike. */
@@ -174,7 +164,9 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   const loadRole = Effect.fn("Delegation.loadRole")(function* (roleId: Role.Id) {
     const id = yield* Schema.decodeEffect(Role.Id)(roleId);
     if (![BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
-      return yield* new UnsupportedRole({ roleId: id });
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.UnsupportedRole({ roleId: id }),
+      });
     const found = yield* roleStore.get(id);
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Role", id });
     const role = found.value;

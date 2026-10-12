@@ -472,7 +472,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { participationId: own.id },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadParticipationService.FixedParticipation" });
+        ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "FixedParticipation" } });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({
           group: { id: groupId, kind: "Direct", memberIds: [aliceId, bobId].sort() },
@@ -533,7 +533,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             responseMode: "response-only",
           }),
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status)));
-        expect(fixed).toEqual([409, 409, 409]);
+        expect(fixed).toEqual([422, 422, 422]);
         const outsider = yield* client("carol");
         expect(
           yield* outsider.groups
@@ -557,10 +557,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(response.status).toBe(400);
         }
         const timeline = `/workspaces/${workspaceId}/threads/${direct.thread.id}/timeline`;
-        for (const query of ["limit=10&from=middle", "limit=10&afterSequence=5&beforeSequence=5"])
-          expect((yield* http.get(`${timeline}?${query}`, { headers: authorization })).status).toBe(
-            400,
+        // A query the contract cannot read is 400; an empty range it reads but core refuses is 422.
+        const timelineStatus = (query: string) =>
+          Effect.map(
+            http.get(`${timeline}?${query}`, { headers: authorization }),
+            (response) => response.status,
           );
+        expect(yield* timelineStatus("limit=10&from=middle")).toBe(400);
+        expect(yield* timelineStatus("limit=10&afterSequence=5&beforeSequence=5")).toBe(422);
         const blank = yield* http.post(
           `/workspaces/${workspaceId}/threads/${direct.thread.id}/messages`,
           {

@@ -31,7 +31,6 @@ import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Channel from "./Channel.ts";
 import type * as ChannelBinding from "./ChannelBinding.ts";
 import * as ChannelBindingStore from "./ChannelBindingStore.ts";
-import { Rejected } from "./internal/channel-intake-errors.ts";
 import * as ChannelFacts from "./ChannelFacts.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import type * as ChannelStore from "./ChannelStore.ts";
@@ -39,16 +38,6 @@ import * as Contact from "./Contact.ts";
 import * as ContactStore from "./ContactStore.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The channel's transport rejected what the host received: it is not the external system's, or
-   * its signature does not hold. Nothing was taken in.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Rejected,
-} from "./internal/channel-intake-errors.ts";
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or
@@ -116,7 +105,7 @@ export type IntakeError =
  * @category errors
  * @since 0.1.0
  */
-export type ReceiveError = IntakeError | Rejected;
+export type ReceiveError = IntakeError | CoreError.Invalid;
 
 /**
  * Intake, one of `Core.JobServices`: a host calls it for what its channels receive, as no actor.
@@ -132,7 +121,8 @@ export class ChannelIntake extends Context.Service<
     /**
      * Take in a request the external system sent the host for the channel: the channel's transport
      * makes events of it, each taken in as `intake` does, in a commit of its own. A request the
-     * transport rejects is `Rejected`, and a channel whose system cannot be reached `Unavailable`;
+     * transport rejects is `CoreError.Invalid` (`Unverified`), and a channel whose system cannot be
+     * reached `CoreError.Unavailable`;
      * a channel missing or removed is `CoreError.NotFound`.
      */
     readonly receive: (
@@ -448,7 +438,9 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         Effect.catchTag("TransportError", (error) =>
           Effect.fail(
             error.reason === "rejected"
-              ? new Rejected({ description: error.description })
+              ? new CoreError.Invalid({
+                  reason: new CoreError.Unverified({ description: error.description }),
+                })
               : new CoreError.Unavailable({
                   reason: new CoreError.ChannelUnreachable({ description: error.description }),
                 }),

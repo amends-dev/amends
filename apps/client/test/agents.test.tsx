@@ -462,7 +462,10 @@ it("says which connection the host refused and why a setup couldn't run, keeping
   f.view.create.fields().onModelChange("claude-opus-5-5");
   f.server.answers.push(
     json(
-      { _tag: "AgentService.ConnectionUnavailable", part: "model", connectionId: "openrouter" },
+      {
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "ConnectionUnusable", part: "model", connectionId: "openrouter" },
+      },
       422,
     ),
   );
@@ -471,7 +474,13 @@ it("says which connection the host refused and why a setup couldn't run, keeping
     expect(f.view.failure()).toEqual({ action: "create", error: "unavailable", part: "model" }),
   );
   f.server.answers.push(
-    json({ _tag: "AgentService.Incomplete", issues: [{ _tag: "SandboxRequired" }] }, 422),
+    json(
+      {
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "SandboxRequired" }] },
+      },
+      422,
+    ),
   );
   f.view.create.save();
   await waitFor(() =>
@@ -516,7 +525,9 @@ it("stops showing what the host refused as the fields that may resolve it change
     { _tag: "SandboxRequired" },
     { _tag: "Invalid", part: "model", description: "OpenRouter offers no model sonnet." },
   ];
-  f.server.answers.push(json({ _tag: "AgentService.Incomplete", issues: refused }, 422));
+  f.server.answers.push(
+    json({ _tag: "CoreError.Invalid", reason: { _tag: "Incomplete", issues: refused } }, 422),
+  );
   f.view.create.save();
   await waitFor(() => expect(f.view.failure()?.issues).toHaveLength(2));
 
@@ -535,7 +546,10 @@ it("stops showing what the host refused as the fields that may resolve it change
   // A connection the host refused stops showing once another is chosen, until the next save.
   f.server.answers.push(
     json(
-      { _tag: "AgentService.ConnectionUnavailable", part: "model", connectionId: "openrouter" },
+      {
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "ConnectionUnusable", part: "model", connectionId: "openrouter" },
+      },
       422,
     ),
   );

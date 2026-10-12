@@ -598,8 +598,8 @@ describe("groups", () => {
           );
           expect(team.kind).toBe("Team");
           const fixed = {
-            _tag: "GroupMembershipService.FixedMembership",
-            groupId: direct.id,
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "FixedMembership", groupId: direct.id },
           };
           const memberships = (
             program: (
@@ -722,7 +722,8 @@ describe("groups", () => {
             ]),
           );
           expect(yield* Effect.flip(rename(owner, direct.id, "Pair"))).toMatchObject({
-            _tag: "GroupService.NotRenamable",
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "NotRenamable" },
           });
           expect(
             yield* Effect.flip(

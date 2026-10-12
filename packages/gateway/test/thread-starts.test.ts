@@ -245,9 +245,7 @@ describe("thread starts", () => {
           const before = yield* history(bound);
           expect(
             yield* Effect.flip(run(bound, owner, startDirect([owner.memberId]))),
-          ).toMatchObject({
-            _tag: "ThreadService.DirectMembersRequired",
-          });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "DirectMembersRequired" } });
           expect(
             yield* Effect.flip(run(bound, owner, startDirect([Member.Id.make("missing")]))),
           ).toMatchObject({

@@ -57,7 +57,7 @@ describe("invitation policy", () => {
           const expiresAt = DateTime.add(now, { seconds: 30 });
           expect(
             yield* at(now, Effect.flip(Operations.invite(workspace.id, alice, request(now)))),
-          ).toMatchObject({ _tag: "InvitationService.InvalidExpiry" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "PastExpiry" } });
           const invitation = yield* at(
             now,
             Operations.invite(workspace.id, alice, request(expiresAt)),

@@ -27,12 +27,12 @@ of `make` keeps that scope open for the gateway's lifetime. The gateway's operat
 - `createWorkspace(creator, input, options?)` creates a workspace with a required name and runs
   core's initialization for the creator. With `options.requestKey`, the workspace's ID derives from
   the creator and the key, so a retry returns what its first attempt created, whatever name it
-  gives. The caller has authenticated the creator and checked that they may create one.
-- `asMember(workspaceId, identity, program)` resolves the identity's active membership into
+  gives. The caller has authenticated the creator and checked that they may create one. -
+  `asMember(workspaceId, identity, program)` resolves the identity's active membership into
   `Actor.Actor`, binds the workspace, and runs the program. A non-member, or a workspace that does
-  not exist, gets `CoreError.Denied` (`NotMember`) without the workspace being loaded. Programs may require only core's
-  `Operations`, the actor, and `Scope`: stores, the journal, and authorization are out of reach, so
-  protocol code cannot bypass the checks inside each operation.
+  not exist, gets `CoreError.Denied` (`NotMember`) without the workspace being loaded. Programs may
+  require only core's `Operations`, the actor, and `Scope`: stores, the journal, and authorization
+  are out of reach, so protocol code cannot bypass the checks inside each operation.
 - `inWorkspace(workspaceId, program)` is the same without an actor, for accepting an invitation,
   whose recipient is not yet a member, and for a host's [jobs](../core/README.md#jobs). Programs may
   require `Operations`, core's `JobServices`, and `Scope`. A workspace that was never created gets
@@ -77,8 +77,8 @@ Commits persist events and projection records together. `Projection.Behind` refu
 registered projection is not live, and `Projection.Unregistered` while one this host does not run
 is, as when a host with a different projection set booted. Either stops sharing the prepared
 runtime: the next request prepares the workspace again, and the failed request, which committed
-nothing, gets `CoreError.Unavailable` (`Reloading`) to retry. Boot is not an online migration: the directory reads
-projection tables directly.
+nothing, gets `CoreError.Unavailable` (`Reloading`) to retry. Boot is not an online migration: the
+directory reads projection tables directly.
 
 ## Host contracts
 
@@ -214,7 +214,8 @@ gateway adds:
 
 - `CoreError.Denied` (`NotMember`) when the identity has no active membership;
 - `Uncertain` when a commit's outcome is unknown, with its commit ID;
-- `InvalidInput` when core rejects values the caller supplied, such as invitation grants.
+- `CoreError.Invalid` (`Malformed`) when core rejects values the caller supplied, such as invitation
+  grants, or values that name another workspace's records.
 
 Every other failure, and any failure while binding storage or building core, becomes a defect that
 keeps its cause for the host's logs; HTTP answers it with 500. Jobs get the same outcomes and run

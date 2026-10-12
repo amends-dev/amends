@@ -33,18 +33,8 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
-import { NotRenamable } from "./internal/group-errors.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * A direct group is named by its members, so it has no name to change.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotRenamable,
-} from "./internal/group-errors.ts";
 
 /**
  * What changing a group can fail with, which `CreateError` and `RenameError` extend:
@@ -87,7 +77,7 @@ export type RenameError =
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | CoreError.NotFound
-  | NotRenamable
+  | CoreError.Invalid
   | CoreError.Changed;
 
 /**
@@ -130,8 +120,8 @@ export class GroupService extends Context.Service<
      * Require group.rename on the group and membership of it, then give a team group a new name. No
      * workspace role reaches a group from outside it: to a non-member, a group is
      * `CoreError.NotFound`, as a missing or foreign one is. A direct group, named by its members,
-     * is NotRenamable. The same name again records nothing; otherwise a name other than
-     * `expectedName` is `CoreError.Changed`, and nothing is recorded.
+     * is `CoreError.Invalid` (`NotRenamable`). The same name again records nothing; otherwise a
+     * name other than `expectedName` is `CoreError.Changed`, and nothing is recorded.
      */
     readonly rename: (
       input: Group.RenameInput,
@@ -262,7 +252,10 @@ export const make = Effect.fn("GroupService.make")(function* () {
       // Only its members may rename a group; to anyone else it is missing.
       yield* groupQuery.requireAudience(request.groupId);
       const group = yield* requireGroup(request.groupId);
-      if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
+      if (group.kind !== "Team")
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.NotRenamable({ groupId: group.id }),
+        });
       if (group.name === request.name) return group;
       if (group.name !== request.expectedName)
         return yield* new CoreError.Changed({ resource: "Group", id: group.id });

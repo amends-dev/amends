@@ -1,14 +1,13 @@
 # Group workflows
 
 Team groups: creating them, reading them, finding and joining public ones, managing their members,
-and following them.
-The operations are `GroupService`, `GroupMembershipService`, and `GroupFollowService`
-in a workspace context, such as `Gateway.asMember`. The gateway preserves the outcomes named below
-and maps malformed input to `GatewayErrors.InvalidInput`. Direct groups (DMs and group DMs) start with
-their first thread; see [starting a direct group](thread-workflows.md#starting-a-direct-group).
-The [core model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the
-broader design, and the [HTTP contract](../packages/http/README.md#conversations) exposes these
-operations.
+and following them. The operations are `GroupService`, `GroupMembershipService`, and
+`GroupFollowService` in a workspace context, such as `Gateway.asMember`. The gateway preserves the
+outcomes named below and maps malformed input to `CoreError.Invalid` (`Malformed`). Direct groups
+(DMs and group DMs) start with their first thread; see [starting a direct
+group](thread-workflows.md#starting-a-direct-group). The [core
+model](core-model.md#agreed-groups-provide-a-shared-home-for-threads) describes the broader design,
+and the [HTTP contract](../packages/http/README.md#conversations) exposes these operations.
 
 ## Who may do what
 
@@ -39,7 +38,7 @@ workspace under the fixed ID `general` (`Group.GeneralId`), holding the creator.
 person or agent, joins it as they join the workspace, in the same commit: today that is each person
 who accepts an invitation, since agents join through no workflow yet, and the workflow that adds
 them must admit them too. Nobody leaves it or is removed from it: leaving it, or removing anyone
-from it, is `GroupMembershipService.GeneralMembership`, whatever the actor's authority. Leaving
+from it, is `CoreError.Invalid` (`GeneralMembership`), whatever the actor's authority. Leaving
 the workspace ends the admission, as it ends any other. It can be renamed, like any team group,
 and groups are never deleted. A workspace created before general groups existed has none, and its
 new members join nothing.
@@ -61,17 +60,16 @@ creator, and offer creation to members whose workspace permissions, read through
 
 ## Renaming a group
 
-`GroupService.rename({ groupId, name, expectedName })` requires `group.rename` on the group,
-which every built-in role holds, and membership of the group. To anyone outside it, the group is
-`CoreError.NotFound`, as a missing or foreign one is, and a direct group, named by its
-members, is `GroupService.NotRenamable`. The name follows creation's rule, while `expectedName` may be any recorded name. Renaming
-records `group.renamed` with the new name and returns the group; the same name again records
-nothing. Otherwise `expectedName`, the name the renamer last saw, must still be the group's name:
-one renamed meanwhile is `CoreError.Changed`, so a rename is never silently replaced, and
-nothing is recorded. Members read
-the new name through their groups list, and the change feed delivers the fact to the group's
-readers. Each listed group says whether the reader may rename it (`renamable`), from the same grant
-resolution as reading it.
+`GroupService.rename({ groupId, name, expectedName })` requires `group.rename` on the group, which
+every built-in role holds, and membership of the group. To anyone outside it, the group is
+`CoreError.NotFound`, as a missing or foreign one is, and a direct group, named by its members, is
+`CoreError.Invalid` (`NotRenamable`). The name follows creation's rule, while `expectedName` may be
+any recorded name. Renaming records `group.renamed` with the new name and returns the group; the
+same name again records nothing. Otherwise `expectedName`, the name the renamer last saw, must still
+be the group's name: one renamed meanwhile is `CoreError.Changed`, so a rename is never silently
+replaced, and nothing is recorded. Members read the new name through their groups list, and the
+change feed delivers the fact to the group's readers. Each listed group says whether the reader may
+rename it (`renamable`), from the same grant resolution as reading it.
 
 ## Public groups
 
@@ -126,17 +124,17 @@ A roster returns `GroupMembership.GroupMembership` values: admission IDs, worksp
 and admission times, for active admissions whose workspace member is still active. It needs no
 `member.read` grant and returns no member profiles, identities, or ended admissions.
 
-Missing, foreign, and outside-audience groups are `CoreError.NotFound` for `get` and roster
-reads alike. A current member without the
-action grant receives `CoreError.Denied` (`NotGranted`). No read reaches a group from outside it. Storage and
-consistency failures are not hidden as empty lists or
-missing groups. Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
+Missing, foreign, and outside-audience groups are `CoreError.NotFound` for `get` and roster reads
+alike. A current member without the action grant receives `CoreError.Denied` (`NotGranted`). No read
+reaches a group from outside it. Storage and consistency failures are not hidden as empty lists or
+missing groups. Reads follow core's [read
+boundaries](../packages/core/README.md#read-and-write-boundaries).
 
 ## Adding a member
 
-`GroupMembershipService.add({ groupId, memberId })` requires `group.membership.manage` on the
-group, which every built-in role holds, and membership of the group: to anyone outside it, the
-group is `CoreError.NotFound`. An exact Group scope authorizes that group only; a workspace scope covers
+`GroupMembershipService.add({ groupId, memberId })` requires `group.membership.manage` on the group,
+which every built-in role holds, and membership of the group: to anyone outside it, the group is
+`CoreError.NotFound`. An exact Group scope authorizes that group only; a workspace scope covers
 every group the caller belongs to. No member-read grant is needed, and group creation authority or
 creator attribution grants no management authority.
 
@@ -152,9 +150,9 @@ create competing active admissions: the later one sees `AlreadyMember` or storag
 
 ## Removing a member or leaving
 
-`GroupMembershipService.remove({ groupId, membershipId })` requires `group.membership.manage`
-on the group and membership of it; to anyone outside it, the group is `CoreError.NotFound`. Any member
-may remove others from a private group. Removing someone else from a public group also requires
+`GroupMembershipService.remove({ groupId, membershipId })` requires `group.membership.manage` on the
+group and membership of it; to anyone outside it, the group is `CoreError.NotFound`. Any member may
+remove others from a private group. Removing someone else from a public group also requires
 `group.moderate`, which administrators and the owner hold; removing oneself needs no more than
 leaving does. `group.create`, creator attribution, and role names do not authorize removal.
 
@@ -174,9 +172,9 @@ admission, which no earlier removal or leave request can end. Leaving grants no 
 oneself back.
 
 Direct groups have fixed membership: adding to, removing from, or leaving one returns
-`GroupMembershipService.FixedMembership`. Including someone else needs another direct group.
+`CoreError.Invalid` (`FixedMembership`). Including someone else needs another direct group.
 Everyone stays in the [general group](#the-general-group): leaving it, or removing anyone from
-it, returns `GroupMembershipService.GeneralMembership`.
+it, returns `CoreError.Invalid` (`GeneralMembership`).
 
 A departure records its reason, `removed`, `left`, or `workspace-removed`, as one fact however much
 the member took part. It ends their follow of the group and their participation in all of its
@@ -207,7 +205,7 @@ group and the actor holds `agent.use` for it: a person returns `CoreError.Denied
 and a member outside the group or inactive returns `CoreError.Conflict` (`ParticipantUnavailable`).
 Posting in the group then reaches the agent without the poster's `agent.use`, as the [attention
 model](core-model.md#agreed-attention-is-directed-followed-or-ambient) agrees. Direct groups return
-`NotFollowable`: all their members already take part in every thread.
+`CoreError.Invalid` (`NotFollowable`): all their members already take part in every thread.
 
 A follow belongs to the member's admission: leaving the group or the workspace ends it, so
 rejoining starts with no follow.

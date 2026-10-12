@@ -24,36 +24,10 @@ import * as Store from "../journal/Store.ts";
 import * as Request from "../request/Request.ts";
 import * as Connection from "./Connection.ts";
 import * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts";
-import { InvalidConnection, Keyless, UnknownIntegration } from "./internal/connection-errors.ts";
 import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The integration does not take the connection: its settings, how it authenticates, or, when
-   * checking one that authenticates with a key, a missing key. The description is the integration's,
-   * for the person who gave them.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  InvalidConnection,
-  /**
-   * The connection authenticates with nothing, so it takes no key.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Keyless,
-  /**
-   * This host does not install the integration, or no longer installs the one a connection names.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  UnknownIntegration,
-} from "./internal/connection-errors.ts";
 
 /**
  * What reading connections can fail with.
@@ -84,7 +58,7 @@ type KeyError = ConnectionCredentialStore.Failure | CoreError.Unavailable;
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | UnknownIntegration | InvalidConnection | KeyError;
+export type CreateError = Error | CoreError.Invalid | KeyError;
 
 /**
  * What configuring a connection can fail with: an integration the host no longer installs, or one
@@ -93,7 +67,7 @@ export type CreateError = Error | UnknownIntegration | InvalidConnection | KeyEr
  * @category errors
  * @since 0.1.0
  */
-export type ConfigureError = Error | UnknownIntegration | InvalidConnection;
+export type ConfigureError = Error | CoreError.Invalid;
 
 /**
  * What replacing a connection's key can fail with: a connection that takes no key, and storing the
@@ -102,7 +76,7 @@ export type ConfigureError = Error | UnknownIntegration | InvalidConnection;
  * @category errors
  * @since 0.1.0
  */
-export type ReplaceKeyError = Error | Keyless | KeyError;
+export type ReplaceKeyError = Error | CoreError.Invalid | KeyError;
 
 /**
  * What removing a connection can fail with: a change's failures, and deleting its key.
@@ -119,7 +93,7 @@ export type RemoveError = Error | ConnectionCredentialStore.Failure;
  * @category errors
  * @since 0.1.0
  */
-export type CheckError = ReadError | UnknownIntegration | InvalidConnection | KeyError;
+export type CheckError = ReadError | CoreError.Invalid | KeyError;
 
 /**
  * What reading the models a connection offers can fail with: reading it, and an integration the
@@ -128,7 +102,7 @@ export type CheckError = ReadError | UnknownIntegration | InvalidConnection | Ke
  * @category errors
  * @since 0.1.0
  */
-export type ModelsError = ReadError | UnknownIntegration;
+export type ModelsError = ReadError | CoreError.Invalid;
 
 /**
  * The connection operations, one of `Core.Operations`.
@@ -160,7 +134,7 @@ export class ConnectionService extends Context.Service<
     /**
      * The models the connection offers an agent, to set an agent up with one: those its integration
      * lists, and whether it also offers others by any id. A connection whose integration this host
-     * no longer installs offers nothing, and fails with `UnknownIntegration`.
+     * no longer installs offers nothing, and fails with `CoreError.Invalid` (`UnknownIntegration`).
      */
     readonly models: (
       connectionId: Connection.Id,
@@ -189,7 +163,8 @@ export class ConnectionService extends Context.Service<
     ) => Effect.Effect<Connection.View, ConfigureError, Actor.Actor>;
     /**
      * Store a new key for a connection that authenticates with one, in place of its key, under
-     * `connection.manage`; a connection that authenticates with none is `Keyless`.
+     * `connection.manage`; a connection that authenticates with none is `CoreError.Invalid`
+     * (`Keyless`).
      */
     readonly replaceKey: (
       input: Connection.ReplaceKeyInput,
@@ -226,13 +201,18 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const connectionTarget = (connectionId: Connection.Id) =>
     Target.Reference.cases.Connection.make({ workspaceId, connectionId });
 
-  /** The integration this host installs as `integration`, or UnknownIntegration. */
+  /** The integration this host installs as `integration`, or `UnknownIntegration`. */
   const requireIntegration = (integration: string) =>
-    Effect.mapError(integrations.find(integration), () => new UnknownIntegration({ integration }));
+    Effect.mapError(
+      integrations.find(integration),
+      () => new CoreError.Invalid({ reason: new CoreError.UnknownIntegration({ integration }) }),
+    );
 
   /** Fails, as the integration describes it, for a connection the integration does not take. */
   const toInvalidConnection = (error: ConnectionContract.ConnectionError) =>
-    new InvalidConnection({ description: error.reason.description });
+    new CoreError.Invalid({
+      reason: new CoreError.IntegrationRefused({ description: error.reason.description }),
+    });
 
   /** Fails unless the integration this host installs takes `record`, as it describes it. */
   const requireValid = Effect.fnUntraced(function* (record: Connection.Connection) {
@@ -433,7 +413,10 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         request.connectionId,
         ConnectionPermissions.Manage,
       );
-      if (record.auth !== "apiKey") return yield* new Keyless({ connectionId: record.id });
+      if (record.auth !== "apiKey")
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.Keyless({ connectionId: record.id }),
+        });
       yield* setKey(record.id, request.apiKey);
       yield* journal.publish(ConnectionFacts.KeyReplaced, {
         workspaceId,

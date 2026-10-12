@@ -935,7 +935,7 @@ describe("thread replies", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(first.thread.id, [], " ")),
             ),
-          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
         }),
       ),
     ),

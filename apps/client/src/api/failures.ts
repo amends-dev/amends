@@ -57,33 +57,16 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "CoreError.Denied": "denied",
   // Anything the reader named that is missing or out of their reach.
   "CoreError.NotFound": "gone",
-  // Connections: naming an integration this host no longer has; `connectionsFailure` tells the
-  // integration's refusals apart.
-  "ConnectionService.UnknownIntegration": "changed",
-  "ConnectionService.InvalidConnection": "invalid",
-  "ConnectionService.Keyless": "invalid",
-  // Agents: a connection no longer usable, or a setup that cannot run, is refused with the draft
-  // kept, and `agentsFailure` tells them apart.
-  "AgentService.ConnectionUnavailable": "invalid",
-  "AgentService.Incomplete": "invalid",
-  // Channels: a connection that gives no channels, or the reader may not use, is refused with the
-  // draft kept.
-  "ChannelService.ConnectionUnavailable": "invalid",
+  // The request cannot be done as asked, and the draft is kept, such as a name that does not hold,
+  // a connection the reader can't use, or a setup that cannot run; `connectionsFailure` and
+  // `agentsFailure` tell the reasons they show apart.
+  "CoreError.Invalid": "invalid",
   // What the request needs cannot be reached now, such as storage another writer held or a turn's
   // log that stopped short, or too many streams are open: asking again may work. A host that keeps
   // no keys is one too; `connectionsFailure` tells it apart.
   "CoreError.Unavailable": "failed",
   "ApiErrors.TooManyStreams": "failed",
-  "GroupService.NotRenamable": "invalid",
   "Client.InvalidCommand": "invalid",
-  "GroupMembershipService.FixedMembership": "invalid",
-  "GroupMembershipService.GeneralMembership": "invalid",
-  "ThreadParticipationService.FixedParticipation": "invalid",
-  "GroupFollowService.NotFollowable": "invalid",
-  "ThreadService.DirectMembersRequired": "invalid",
-  "GatewayErrors.InvalidInput": "invalid",
-  "InvitationService.InvalidExpiry": "invalid",
-  "Delegation.UnsupportedRole": "invalid",
   // Rejected credentials sign out in the HTTP layer; the rest are transport or host failures.
   "Authentication.Unauthorized": "failed",
   "GatewayErrors.Uncertain": "failed",

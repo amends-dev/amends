@@ -27,7 +27,7 @@ export class AccountsGroup extends HttpApiGroup.make("accounts")
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(Accounts.Account),
-      error: [...ApiErrors.workspace, ...ApiErrors.invitation],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
   )
   .middleware(Authentication)

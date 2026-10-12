@@ -276,7 +276,7 @@ export interface Configured extends Schema.Schema.Type<typeof Configured> {}
 
 /**
  * The part of an agent's setup that a connection gives, which an issue and
- * `ConnectionUnavailable` name.
+ * `CoreError.ConnectionUnusable` name.
  *
  * @category schemas
  * @since 0.1.0

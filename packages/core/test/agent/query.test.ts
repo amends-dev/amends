@@ -245,12 +245,12 @@ describe("what an agent runs a turn on", () => {
       });
 
       expect(yield* Effect.flip(modelGone.select(agentMemberId, undefined))).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "Removed", part: "model" }],
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "Removed", part: "model" }] },
       });
       expect(yield* Effect.flip(noHarness.select(agentMemberId, undefined))).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "NoHarness" }],
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "NoHarness" }] },
       });
     }),
   );
@@ -322,24 +322,30 @@ describe("an agent ready to run", () => {
       expect(
         yield* Effect.flip(harnessGone.buildRunnable(agentMemberId, selection())),
       ).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "Removed", part: "harness" }],
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Incomplete", issues: [{ _tag: "Removed", part: "harness" }] },
       });
       expect(yield* Effect.flip(keyless.buildRunnable(agentMemberId, selection()))).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [
-          {
-            _tag: "Invalid",
-            part: "model",
-            description: "The connection conn-models has no API key",
-          },
-        ],
+        _tag: "CoreError.Invalid",
+        reason: {
+          _tag: "Incomplete",
+          issues: [
+            {
+              _tag: "Invalid",
+              part: "model",
+              description: "The connection conn-models has no API key",
+            },
+          ],
+        },
       });
       expect(
         yield* Effect.flip(keepsNoKeys.buildRunnable(agentMemberId, selection())),
       ).toMatchObject({
-        _tag: "AgentQuery.Incomplete",
-        issues: [{ _tag: "Invalid", part: "model", description: "No key protects credentials" }],
+        _tag: "CoreError.Invalid",
+        reason: {
+          _tag: "Incomplete",
+          issues: [{ _tag: "Invalid", part: "model", description: "No key protects credentials" }],
+        },
       });
     }),
   );

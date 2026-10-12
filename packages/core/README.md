@@ -138,13 +138,20 @@ something done already (`AlreadyMember`, `AlreadyJoined`, `AlreadyEnded`, `Alrea
 `AlreadyTask`), a message deleted (`Deleted`), a turn finished or not retryable (`TurnNotActive`,
 `NotRetryable`), a read position past the timeline (`BeyondTimeline`), a recipient who cannot own
 the workspace (`InvalidRecipient`), or an invitation no longer open (`InvitationClosed`).
-`CoreError.Unavailable` says what an operation needs cannot be reached or used now: storage another
-writer held (`Contention`) or read models another host is rebuilding (`Reloading`), a change feed or
-turn log that stopped (`ChangeFeedInterrupted`, `LogInterrupted`), a channel's system out of reach
-(`ChannelUnreachable`), or a host that keeps no keys (`CredentialsUnavailable`). Operations pass it
-through unchanged, so a protocol answers it with one status and a client handles it once, and an
-operation that reaches a resource through another reports the one the caller named: a message whose
-thread they cannot read is the message not found, not the thread.
+`CoreError.Invalid` says the request cannot be done as asked, whatever the state, and its `reason`
+says why: values that do not hold (`Malformed`, `PastExpiry`, `DirectMembersRequired`), a role or
+integration this workspace does not have (`UnsupportedRole`, `UnknownIntegration`), a roster fixed
+by the kind of group (`NotRenamable`, `FixedMembership`, `GeneralMembership`, `NotFollowable`,
+`FixedParticipation`), a connection that refuses or cannot be used (`IntegrationRefused`, `Keyless`,
+`ConnectionUnusable`), an agent setup that cannot run (`Incomplete`), or a channel request its
+transport rejects (`Unverified`). `CoreError.Unavailable` says what an operation needs cannot be
+reached or used now: storage another writer held (`Contention`) or read models another host is
+rebuilding (`Reloading`), a change feed or turn log that stopped (`ChangeFeedInterrupted`,
+`LogInterrupted`), a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no
+keys (`CredentialsUnavailable`). Operations pass it through unchanged, so a protocol answers it with
+one status and a client handles it once, and an operation that reaches a resource through another
+reports the one the caller named: a message whose thread they cannot read is the message not found,
+not the thread.
 
 ## Workspace and access
 
@@ -353,12 +360,13 @@ removes them. A view is the record without its key, `manageable`, and its readin
 the host no longer installs it.
 
 Creating takes the key with the connection, when it authenticates with one and only then, and the
-integration validates its settings and auth method first (`UnknownIntegration`,
-`InvalidConnection`). The key goes to `ConnectionCredentialStore`, one credential per connection, in
-the commit that records the connection; replacing it overwrites it, and removal deletes it and keeps
-the record, so a retried create finds the connection and answers `NotFound`. No fact, change-feed
-event, or view carries a key. `check` reads the key and asks the integration to check the connection
-with its system, returning `Health`, and holds no commit open while the system answers.
+integration validates its settings and auth method first (`CoreError.Invalid` with
+`UnknownIntegration` or `IntegrationRefused`). The key goes to `ConnectionCredentialStore`, one
+credential per connection, in the commit that records the connection; replacing it overwrites it,
+and removal deletes it and keeps the record, so a retried create finds the connection and answers
+`NotFound`. No fact, change-feed event, or view carries a key. `check` reads the key and asks the
+integration to check the connection with its system, returning `Health`, and holds no commit open
+while the system answers.
 
 `connection.create` works on the workspace, and `connection.read`, `connection.manage`, and
 `connection.use` on each connection. Members read and use connections; administrators and the owner
@@ -380,11 +388,11 @@ membership, and `Configured` replaces its setup as a whole.
 configures, and renames them. Creating adds the agent's membership with `MemberCommand.add`, with a
 role the actor must be able to grant; its role changes, and it is removed, as any member's is.
 Creating and configuring refuse a connection the actor may not read and use, or that is not active
-(`ConnectionUnavailable`, naming the part), and a setup that cannot run (`Incomplete`), except that
-an agent on `Auto` may wait for a connection that gives a harness. A view carries the agent's
-readiness, as `AgentReadiness` finds it against the workspace's connections and the host's
-integrations: `Ready`; or `Incomplete` with issues naming a part whose connection was `Removed`,
-whose integration is `Uninstalled`, or that does not give the part as the agent takes it
+(`CoreError.Invalid` with `ConnectionUnusable`, naming the part), and a setup that cannot run
+(`Incomplete`), except that an agent on `Auto` may wait for a connection that gives a harness. A
+view carries the agent's readiness, as `AgentReadiness` finds it against the workspace's connections
+and the host's integrations: `Ready`; or `Incomplete` with issues naming a part whose connection was
+`Removed`, whose integration is `Uninstalled`, or that does not give the part as the agent takes it
 (`Invalid`), `SandboxRequired` when its harness's agent works only in a sandbox and it has none, and
 `NoHarness` when, on `Auto`, no connection gives a harness it can run on.
 
@@ -395,7 +403,7 @@ harness it can run on. `buildRunnable` gives the agent ready to run on a selecti
 (`AgentQuery.Runnable`): its instructions, and the connections of the selection's harness, model,
 and sandbox, each with its key, beside the model as its integration's endpoint takes it. Whoever
 runs the agent builds its harness and sandbox from these with the host's integrations, so core runs
-nothing of an agent. Both fail with `AgentQuery.Incomplete` when the agent cannot run.
+nothing of an agent. Both fail with `CoreError.Invalid` (`Incomplete`) when the agent cannot run.
 
 `agent.create` works on the workspace, and `agent.read` and `agent.configure` on the agent's
 membership. Members read agents; administrators and the owner create and configure them.
@@ -465,13 +473,14 @@ reasoning or tool calls.
 `TurnService` lets a reader who may read a thread `get` its turns as `Turn.View`s, with whether the
 reader may stop (`stoppable`) or retry (`retryable`) them now, and `listActive` the workspace's
 active turns in threads the reader may read. A turn in a thread outside the reader's audience is
-`NotFound`, and one in a thread they may not read is `CoreError.Denied` (`NotGranted`). A reader who may direct
-its agent may `cancel` an active turn, a queued one at once and a running one once its job confirms
-it, and `retry` a failed or stopped turn as a new queued turn for the same agent, participation, and
-accepted work, prompted again with who asked. Only the agent's latest turn on the thread can be
-retried, while no other is active and the agent still takes part there; otherwise it is
-`CoreError.Conflict` (`NotRetryable`) with the reason (`active`, `completed`, `superseded`, or `departed`). A retry takes
-its ID from the turn it retries, so repeating it returns the turn it created.
+`NotFound`, and one in a thread they may not read is `CoreError.Denied` (`NotGranted`). A reader who
+may direct its agent may `cancel` an active turn, a queued one at once and a running one once its
+job confirms it, and `retry` a failed or stopped turn as a new queued turn for the same agent,
+participation, and accepted work, prompted again with who asked. Only the agent's latest turn on the
+thread can be retried, while no other is active and the agent still takes part there; otherwise it
+is `CoreError.Conflict` (`NotRetryable`) with the reason (`active`, `completed`, `superseded`, or
+`departed`). A retry takes its ID from the turn it retries, so repeating it returns the turn it
+created.
 
 `TurnService.watchLog` follows a turn's session log for a reader who may read its thread, as a
 stream of `Turn.LogMessage`s: `Opened` with the items as they stand, `Changed` with the items each
@@ -481,7 +490,8 @@ following mid-step sees the step from the next draft that starts at its part's b
 the step is logged. Its subscriptions register before the turn and log are read, so nothing in
 between is missed. Each append checks that the reader may still read the thread, as does each commit
 that changes the reader's groups, grants, or role; following ends once the commit that took the
-reader's access is delivered. A stream that cannot go on fails with `CoreError.Unavailable` (`LogInterrupted`).
+reader's access is delivered. A stream that cannot go on fails with `CoreError.Unavailable`
+(`LogInterrupted`).
 
 A turn's changes also show in its thread's timeline as `TurnActivity` kinds, recorded in the commits
 that make them: `turn.created` where the agent took on the work, or where a retry asked again,
@@ -656,14 +666,12 @@ and flat in the feature directory, as the Effect repository lays its modules out
 src/workspace/
   Member.ts             domain schemas, value types, and pure functions
   MemberId.ts           the ID alone, where references would otherwise make a cycle
-  MemberService.ts      the operations actors call, authorized, and the outcomes they report
+  MemberService.ts      the operations actors call, authorized, failing with CoreError's kinds
   MemberCommand.ts      the internal writes other operations share
   MemberStore.ts        the persistence contract adapters implement
   MemberFacts.ts        versioned declarations of recorded changes
   MemberProjection.ts   replays the facts into the store, exported as `definition`
   MemberPermissions.ts  the permissions the feature owns
-  internal/member-errors.ts
-                        those outcomes, as schemas only
 ```
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
@@ -671,13 +679,13 @@ the query; a query never writes; and a step with one caller stays a private func
 An outcome every feature reports is one kind in `CoreError`, whichever operation raises it: anything
 missing, or out of the caller's reach, is `CoreError.NotFound`; anything that changed since the
 caller read it is `CoreError.Changed`; a refusal of the actor is `CoreError.Denied`; a request the
-state refuses is `CoreError.Conflict`; and what cannot be reached now is `CoreError.Unavailable`,
-the last three with their reason. Each says what it is about in its fields, and a query or command
-raises the kind itself, so it passes through every operation unchanged. Any other error belongs to
-the module that raises it, and its tag is its name there, as `GroupService.NotRenamable` or
-`Store.Conflict`. The outcomes a service reports to callers are schemas in an `internal/` errors
-module, apart from the services, so a protocol or a browser client carries them without loading an
-implementation, and the service exports them. Helpers no consumer imports go under `internal/` too.
+state refuses is `CoreError.Conflict`; a request that cannot be done as asked is
+`CoreError.Invalid`; and what cannot be reached now is `CoreError.Unavailable`, the last four with
+their reason. Each says what it is about in its fields, and a query or command raises the kind
+itself, so it passes through every operation unchanged and a protocol or a browser client carries it
+without loading an implementation. Any other error is a failure of the module that raises it, and
+its tag is its name there, as `Store.Conflict`; the gateway turns those into defects. Helpers no
+consumer imports go under `internal/`.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

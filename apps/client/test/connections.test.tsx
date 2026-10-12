@@ -386,8 +386,8 @@ it("says what the integration refused, and tells a host without key storage apar
   f.server.answers.push(
     json(
       {
-        _tag: "ConnectionService.InvalidConnection",
-        description: "Search server takes no retries.",
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "IntegrationRefused", description: "Search server takes no retries." },
       },
       422,
     ),
@@ -449,7 +449,10 @@ it("keeps why a check could not run with the connection it checked", async () =>
   const f = fixture();
   await waitFor(() => expect(f.view.connection("docs")).toBeDefined());
   f.server.answers.push(
-    json({ _tag: "ConnectionService.InvalidConnection", description: "No URL." }, 422),
+    json(
+      { _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused", description: "No URL." } },
+      422,
+    ),
   );
   f.view.check.run("docs");
   expect(f.view.pending()).toBe("check");

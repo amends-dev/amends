@@ -1,21 +1,14 @@
 /**
- * The outcomes a program run through the gateway may fail with: core's outcomes by kind, such as
- * `CoreError.NotFound`, and the domain errors its services still declare, which pass through
- * unchanged, and the gateway's own, such as `Uncertain`. Every other failure becomes a defect.
- * `PublicError` lists them all, so a service error core adds reaches callers only once it is
- * listed here. The HTTP contract imports this module from `@amends-dev/gateway/GatewayErrors`,
- * which does not load the gateway itself.
+ * The outcomes a program run through the gateway may fail with: core's outcomes by kind, from
+ * `CoreError.NotFound` to `CoreError.Unavailable`, which pass through unchanged, and the gateway's
+ * own `Uncertain`. Every other failure becomes a defect. `PublicError` lists them all, so a kind
+ * core adds reaches callers only once it is listed here. The HTTP contract imports this module
+ * from `@amends-dev/gateway/GatewayErrors`, which does not load the gateway itself.
  *
  * @since 0.1.0
  */
-import { ThreadService, ThreadParticipationService } from "@amends-dev/core/thread";
-import { Delegation } from "@amends-dev/core/authorization";
 import { Commit } from "@amends-dev/core/journal";
-import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
-import { InvitationService, Workspace } from "@amends-dev/core/workspace";
-import { ConnectionService } from "@amends-dev/core/connection";
-import { AgentService } from "@amends-dev/core/agent";
-import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { CoreError } from "@amends-dev/core/error";
 
@@ -31,17 +24,6 @@ export class Uncertain extends Schema.TaggedError<Uncertain>()("GatewayErrors.Un
 }) {}
 
 /**
- * Core rejected the operation's input, such as invitation grants for the wrong workspace or target
- * kind.
- *
- * @category errors
- * @since 0.1.0
- */
-export class InvalidInput extends Schema.TaggedError<InvalidInput>()("GatewayErrors.InvalidInput", {
-  message: Schema.String,
-}) {}
-
-/**
  * Domain outcomes a caller can act on. Storage, transaction, projection, and
  * consistency failures reveal nothing actionable and become defects that keep
  * their original cause for host logging.
@@ -54,24 +36,9 @@ export const PublicError = Schema.Union([
   CoreError.Changed,
   CoreError.Denied,
   CoreError.Conflict,
+  CoreError.Invalid,
   CoreError.Unavailable,
   Uncertain,
-  InvalidInput,
-  Delegation.UnsupportedRole,
-  ThreadService.DirectMembersRequired,
-  ThreadParticipationService.FixedParticipation,
-  GroupService.NotRenamable,
-  GroupMembershipService.FixedMembership,
-  GroupMembershipService.GeneralMembership,
-  GroupFollowService.NotFollowable,
-  InvitationService.InvalidExpiry,
-  ConnectionService.UnknownIntegration,
-  ConnectionService.InvalidConnection,
-  ConnectionService.Keyless,
-  AgentService.ConnectionUnavailable,
-  AgentService.Incomplete,
-  ChannelService.ConnectionUnavailable,
-  ChannelIntake.Rejected,
 ]);
 /**
  * @category schemas
@@ -90,4 +57,4 @@ export type PublicErrorOf<E> =
   | Extract<E, PublicError>
   | CoreError.Unavailable
   | Uncertain
-  | InvalidInput;
+  | CoreError.Invalid;

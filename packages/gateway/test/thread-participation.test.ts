@@ -1035,7 +1035,7 @@ describe("thread participation", () => {
           ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(
             yield* Effect.flip(gateway.asMember(workspace.id, owner, follow("" as Thread.Id))),
-          ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
           expect(
             yield* Effect.flip(
               gateway.asMember(
@@ -1484,8 +1484,8 @@ describe("thread participation", () => {
           expect(
             yield* Effect.flip(run(bound, owner, unfollow(started.thread.id, own.id))),
           ).toMatchObject({
-            _tag: "ThreadParticipationService.FixedParticipation",
-            threadId: started.thread.id,
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "FixedParticipation", threadId: started.thread.id },
           });
           expect(yield* snapshot(bound, started.thread.id)).toEqual(before);
         }),

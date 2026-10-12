@@ -963,7 +963,7 @@ describe("thread reads", () => {
                   timeline(opened.thread.id, { limit: 0 }),
                 ),
               ),
-            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+            ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
           }),
         ),
       ),

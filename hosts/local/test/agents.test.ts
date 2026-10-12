@@ -174,8 +174,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
             .create({ params: { workspaceId }, headers: {}, payload: inOpencode })
             .pipe(Effect.flip),
         ).toMatchObject({
-          _tag: "AgentService.Incomplete",
-          issues: [{ _tag: "SandboxRequired" }],
+          _tag: "CoreError.Invalid",
+          reason: { _tag: "Incomplete", issues: [{ _tag: "SandboxRequired" }] },
         });
         expect(
           yield* asAlice.agents
@@ -186,8 +186,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
             })
             .pipe(Effect.flip),
         ).toMatchObject({
-          _tag: "AgentService.Incomplete",
-          issues: [{ _tag: "Invalid", part: "model", description: "This machine gives no models" }],
+          _tag: "CoreError.Invalid",
+          reason: {
+            _tag: "Incomplete",
+            issues: [
+              { _tag: "Invalid", part: "model", description: "This machine gives no models" },
+            ],
+          },
         });
 
         // In a sandbox, opencode can run it.

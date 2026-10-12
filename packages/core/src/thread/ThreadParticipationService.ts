@@ -21,17 +21,7 @@ import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";
 import * as GroupStore from "../group/GroupStore.ts";
-import { FixedParticipation } from "./internal/thread-participation-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * Everyone in a direct conversation takes part in all of its threads, so none is unfollowed.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  FixedParticipation,
-} from "./internal/thread-participation-errors.ts";
 
 /**
  * What following and unfollowing can fail with: the outcomes above, and
@@ -47,7 +37,7 @@ export type Error =
   | GroupStore.Failure
   | CoreError.NotFound
   | CoreError.Conflict
-  | FixedParticipation;
+  | CoreError.Invalid;
 
 /**
  * The participation operations, one of `Core.Operations`.
@@ -136,7 +126,9 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
       const group = yield* groupStore.get(thread.groupId);
       if (Option.isNone(group)) return yield* Effect.die("A thread's group is missing");
       if (group.value.kind === "Direct")
-        return yield* new FixedParticipation({ threadId: thread.id });
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.FixedParticipation({ threadId: thread.id }),
+        });
       const actor = yield* Actor.Actor;
       const found = yield* threadParticipationStore.get(request.participationId);
       if (Option.isNone(found))

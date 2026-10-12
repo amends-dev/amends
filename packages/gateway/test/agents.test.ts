@@ -327,7 +327,9 @@ describe("agents", () => {
                 changed(input, { model: { connectionId: missing, id: "test-model" } }),
               ),
             ).toEqual(
-              new AgentService.ConnectionUnavailable({ part: "model", connectionId: missing }),
+              new CoreError.Invalid({
+                reason: new CoreError.ConnectionUnusable({ part: "model", connectionId: missing }),
+              }),
             );
             expect(
               yield* refused(
@@ -336,13 +338,17 @@ describe("agents", () => {
                 }),
               ),
             ).toEqual(
-              new AgentService.ConnectionUnavailable({
-                part: "harness",
-                connectionId: connections.inProcess.id,
+              new CoreError.Invalid({
+                reason: new CoreError.ConnectionUnusable({
+                  part: "harness",
+                  connectionId: connections.inProcess.id,
+                }),
               }),
             );
             expect(yield* refused(changed(input, { sandbox: null }))).toEqual(
-              new AgentService.Incomplete({ issues: [{ _tag: "SandboxRequired" }] }),
+              new CoreError.Invalid({
+                reason: new CoreError.Incomplete({ issues: [{ _tag: "SandboxRequired" }] }),
+              }),
             );
             expect(
               yield* refused(
@@ -353,20 +359,22 @@ describe("agents", () => {
                 }),
               ),
             ).toEqual(
-              new AgentService.Incomplete({
-                issues: [
-                  {
-                    _tag: "Invalid",
-                    part: "harness",
-                    description: "Test models gives no harnesses",
-                  },
-                  { _tag: "Invalid", part: "model", description: "Test tools gives no models" },
-                  {
-                    _tag: "Invalid",
-                    part: "sandbox",
-                    description: "Test harness gives no sandboxes",
-                  },
-                ],
+              new CoreError.Invalid({
+                reason: new CoreError.Incomplete({
+                  issues: [
+                    {
+                      _tag: "Invalid",
+                      part: "harness",
+                      description: "Test models gives no harnesses",
+                    },
+                    { _tag: "Invalid", part: "model", description: "Test tools gives no models" },
+                    {
+                      _tag: "Invalid",
+                      part: "sandbox",
+                      description: "Test harness gives no sandboxes",
+                    },
+                  ],
+                }),
               }),
             );
             expect(
@@ -376,20 +384,22 @@ describe("agents", () => {
                 }),
               ),
             ).toEqual(
-              new AgentService.Incomplete({
-                issues: [
-                  {
-                    _tag: "Invalid",
-                    part: "model",
-                    description: "Test model takes no effort max",
-                  },
-                ],
+              new CoreError.Invalid({
+                reason: new CoreError.Incomplete({
+                  issues: [
+                    {
+                      _tag: "Invalid",
+                      part: "model",
+                      description: "Test model takes no effort max",
+                    },
+                  ],
+                }),
               }),
             );
             // Instructions with surrounding space are not a request at all.
             expect(
               yield* refused(changed(input, { instructions: " Review each change. " })),
-            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+            ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
 
             expect(yield* bound.store.read(journalLog, { limit: 200 })).toEqual(before);
             expect(yield* bound.agents.list).toEqual([]);
@@ -432,18 +442,22 @@ describe("agents", () => {
             });
             yield* grant(bound, bobMemberId, [Grant.make(AgentPermissions.Create, inWorkspace)]);
             expect(yield* Effect.flip(create)).toEqual(
-              new AgentService.ConnectionUnavailable({
-                part: "model",
-                connectionId: connections.models.id,
+              new CoreError.Invalid({
+                reason: new CoreError.ConnectionUnusable({
+                  part: "model",
+                  connectionId: connections.models.id,
+                }),
               }),
             );
             yield* grant(bound, bobMemberId, [
               Grant.make(ConnectionPermissions.Use, onConnection(connections.models.id)),
             ]);
             expect(yield* Effect.flip(create)).toEqual(
-              new AgentService.ConnectionUnavailable({
-                part: "sandbox",
-                connectionId: connections.sandboxes.id,
+              new CoreError.Invalid({
+                reason: new CoreError.ConnectionUnusable({
+                  part: "sandbox",
+                  connectionId: connections.sandboxes.id,
+                }),
               }),
             );
             expect(yield* bound.agents.list).toEqual([]);
@@ -551,7 +565,11 @@ describe("agents", () => {
                 }),
               ),
             ),
-          ).toEqual(new AgentService.Incomplete({ issues: [{ _tag: "SandboxRequired" }] }));
+          ).toEqual(
+            new CoreError.Invalid({
+              reason: new CoreError.Incomplete({ issues: [{ _tag: "SandboxRequired" }] }),
+            }),
+          );
           expect(yield* bound.store.read(journalLog, { limit: 200 })).toEqual(before);
 
           const rename = (name: string, expectedName: string) =>
@@ -730,8 +748,10 @@ describe("agents", () => {
                 ),
               ),
             ).toEqual(
-              new AgentService.Incomplete({
-                issues: [{ _tag: "Uninstalled", part: "harness" }],
+              new CoreError.Invalid({
+                reason: new CoreError.Incomplete({
+                  issues: [{ _tag: "Uninstalled", part: "harness" }],
+                }),
               }),
             );
           }).pipe(

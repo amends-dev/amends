@@ -272,7 +272,11 @@ describe("group follows", () => {
             );
             expect(
               yield* Effect.flip(run(bound, owner, follow(direct.thread.groupId, owner.memberId))),
-            ).toEqual(new GroupFollowService.NotFollowable({ groupId: direct.thread.groupId }));
+            ).toEqual(
+              new CoreError.Invalid({
+                reason: new CoreError.NotFollowable({ groupId: direct.thread.groupId }),
+              }),
+            );
             // Leaving the group ends the follow; joining again does not restore it.
             yield* run(bound, human, follow(team.id, humanId));
             const admission = Option.getOrThrow(

@@ -31,29 +31,11 @@ import * as MemberFacts from "../workspace/MemberFacts.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
-import { ConnectionUnavailable, Incomplete } from "./internal/agent-errors.ts";
 import * as AgentFacts from "./AgentFacts.ts";
 import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * The connection named for a part of the agent's setup is missing or removed, or the actor may
-   * not read and use it, which they cannot tell apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ConnectionUnavailable,
-  /**
-   * The agent cannot run as it would be set up, for the issues its readiness would report.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  Incomplete,
-} from "./internal/agent-errors.ts";
 
 /**
  * What listing agents can fail with.
@@ -84,21 +66,13 @@ export type ReadError = ListError | Schema.SchemaError | CoreError.NotFound;
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 
 /**
- * A setup naming a connection the actor may not give an agent, or one that cannot run.
- *
- * @category errors
- * @since 0.1.0
- */
-export type SetupError = ConnectionUnavailable | Incomplete;
-
-/**
  * What creating can fail with. Creating also adds a membership, with a role the actor must be
  * able to grant.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | SetupError | Delegation.Error | MemberCommand.Error;
+export type CreateError = Error | CoreError.Invalid | Delegation.Error | MemberCommand.Error;
 
 /**
  * What configuring can fail with.
@@ -106,7 +80,7 @@ export type CreateError = Error | SetupError | Delegation.Error | MemberCommand.
  * @category errors
  * @since 0.1.0
  */
-export type ConfigureError = Error | SetupError;
+export type ConfigureError = Error | CoreError.Invalid;
 
 /**
  * What renaming can fail with: a rename made meanwhile, besides what every change meets.
@@ -240,12 +214,15 @@ export const make = Effect.fn("AgentService.make")(function* () {
       const [readable = false, usable = false] = permitted.slice(index * 2, index * 2 + 2);
       const active = connections.some((connection) => connection.id === connectionId);
       if (!readable || !usable || !active)
-        return yield* new ConnectionUnavailable({ part, connectionId });
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.ConnectionUnusable({ part, connectionId }),
+        });
     }
     const issues = (yield* AgentReadiness.issuesOf(setup, connections, integrations)).filter(
       (issue) => issue._tag !== "NoHarness",
     );
-    if (Array.isReadonlyArrayNonEmpty(issues)) return yield* new Incomplete({ issues });
+    if (Array.isReadonlyArrayNonEmpty(issues))
+      return yield* new CoreError.Invalid({ reason: new CoreError.Incomplete({ issues }) });
   });
 
   /** The agents whose membership lasts, each with its name, in no particular order. */

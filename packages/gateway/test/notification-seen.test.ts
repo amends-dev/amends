@@ -942,7 +942,7 @@ describe("marking notifications seen", () => {
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, human.identity, markSeen(invalid.id)),
                 ),
-              ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+              ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
             }),
           );
         }),

@@ -433,7 +433,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           commitId: "commit",
         });
         const invalid = yield* Effect.flip(enter(Schema.decodeEffect(Schema.NonEmptyString)("")));
-        expect(invalid).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+        expect(invalid).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
         const mismatch = yield* Effect.flip(
           enter(
             Effect.fail(
@@ -445,8 +445,8 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           ),
         );
         expect(mismatch).toMatchObject({
-          _tag: "GatewayErrors.InvalidInput",
-          message: "Values must belong to workspace workspace",
+          _tag: "CoreError.Invalid",
+          reason: { _tag: "Malformed", description: "Values must belong to workspace workspace" },
         });
         const missing = new CoreError.NotFound({ resource: "Member", id: memberId });
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing);

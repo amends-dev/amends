@@ -135,8 +135,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
               })
               .pipe(Effect.flip),
           ).toMatchObject({
-            _tag: "ConnectionService.UnknownIntegration",
-            integration: "missing",
+            _tag: "CoreError.Invalid",
+            reason: { _tag: "UnknownIntegration", integration: "missing" },
           });
           expect(
             yield* asAlice.connections
@@ -146,7 +146,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 payload: { integration: "mcp", name: "Other", settings: {}, auth: "none" },
               })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "ConnectionService.InvalidConnection" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused" } });
 
           // The key is stored, and no read of the connection carries it.
           const read = (path: string) =>
@@ -185,7 +185,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* asAlice.connections
               .configure({ params, payload: { settings: { url: nowhere, region: "eu" } } })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "ConnectionService.InvalidConnection" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused" } });
           expect(
             (yield* asAlice.connections.replaceKey({
               params,
@@ -212,7 +212,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 payload: { apiKey: Redacted.make(secret) },
               })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "ConnectionService.Keyless" });
+          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Keyless" } });
 
           yield* asAlice.connections.remove({ params });
           expect(yield* asBob.connections.get({ params }).pipe(Effect.flip)).toMatchObject({

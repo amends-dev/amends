@@ -292,7 +292,7 @@ describe("channels", () => {
                   channelIntake.receive(channel.id, { headers: {}, body: "not json" }),
                 ),
               ),
-            ).toMatchObject({ _tag: "ChannelIntake.Rejected" });
+            ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Unverified" } });
             expect(
               yield* Effect.flip(
                 intake(workspace.id, (channelIntake) =>
@@ -601,7 +601,11 @@ describe("channels", () => {
                   ),
                 ),
               ),
-            ).toEqual(new ChannelService.ConnectionUnavailable({ connectionId: models.id }));
+            ).toEqual(
+              new CoreError.Invalid({
+                reason: new CoreError.ConnectionUnusable({ connectionId: models.id }),
+              }),
+            );
             const redirected = yield* as(
               workspace.id,
               alice,

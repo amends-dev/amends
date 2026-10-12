@@ -29,26 +29,7 @@ import * as GroupStore from "./GroupStore.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
-import { FixedMembership, GeneralMembership } from "./internal/group-membership-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
-
-export {
-  /**
-   * A direct group's members never change; including someone else needs another direct group.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  FixedMembership,
-  /**
-   * Everyone in the workspace belongs to its general group: nobody leaves it or is removed from it.
-   * Leaving the workspace ends the admission.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GeneralMembership,
-} from "./internal/group-membership-errors.ts";
 
 /**
  * What changing membership can fail with: the outcomes above, and the
@@ -69,8 +50,7 @@ export type Error =
   | Projection.Error
   | CoreError.NotFound
   | CoreError.Conflict
-  | FixedMembership
-  | GeneralMembership;
+  | CoreError.Invalid;
 
 /**
  * What listing admissions can fail with.
@@ -181,7 +161,8 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
   /** The group, when it is a team: a direct group keeps the members it started with. */
   const requireTeamGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const group = yield* requireGroup(groupId);
-    if (group.kind === "Direct") return yield* new FixedMembership({ groupId });
+    if (group.kind === "Direct")
+      return yield* new CoreError.Invalid({ reason: new CoreError.FixedMembership({ groupId }) });
     return group;
   });
 
@@ -274,7 +255,10 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
       yield* requireManagement(checked.groupId);
       const group = yield* requireTeamGroup(checked.groupId);
       const membership = yield* requireMembership(checked);
-      if (Group.isGeneral(group)) return yield* new GeneralMembership({ groupId: group.id });
+      if (Group.isGeneral(group))
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.GeneralMembership({ groupId: group.id }),
+        });
       // Removing someone from a public group is moderation; a private one is its members' to tidy.
       const actor = yield* Actor.Actor;
       if (group.visibility === "Public" && membership.memberId !== actor.memberId)
@@ -304,7 +288,10 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
           id: checked.membershipId,
         });
       const group = yield* requireTeamGroup(checked.groupId);
-      if (Group.isGeneral(group)) return yield* new GeneralMembership({ groupId: group.id });
+      if (Group.isGeneral(group))
+        return yield* new CoreError.Invalid({
+          reason: new CoreError.GeneralMembership({ groupId: group.id }),
+        });
       return yield* endMembership(membership, "left");
     },
     Publication.withActor,

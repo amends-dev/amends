@@ -819,7 +819,7 @@ describe("threads", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, owner, startOnly(group.id, [], " ")),
               ),
-            ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
+            ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
           }),
         ),
       ),

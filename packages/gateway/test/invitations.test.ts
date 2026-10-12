@@ -74,10 +74,10 @@ describe("invitations", () => {
                   "Bob\u200B",
                 ])
                   expect(
-                    (yield* Effect.flip(
+                    yield* Effect.flip(
                       Operations.renameMember(workspace.id, bob, name as Member.Name),
-                    ))._tag,
-                  ).toMatch(/SchemaError|InvalidInput/);
+                    ),
+                  ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
                 return { workspaceId: workspace.id, members: yield* bound.members.list };
               }),
             ),

@@ -126,8 +126,7 @@ export const reloadConnections = (reads: ConnectionsReads) =>
     discard: true,
   });
 
-const unknownIntegration = Schema.is(ApiErrors.UnknownIntegration);
-const invalidConnection = Schema.is(ApiErrors.InvalidConnection);
+const invalid = Schema.is(ApiErrors.Invalid);
 const credentialsUnavailable = (error: unknown) =>
   Schema.is(ApiErrors.Unavailable)(error) && error.reason._tag === "CredentialsUnavailable";
 
@@ -141,9 +140,10 @@ export function connectionsFailure(
 ): Omit<ConnectionsFailure, "action"> {
   for (const reason of cause.reasons) {
     if (!Cause.isFailReason(reason)) continue;
-    if (unknownIntegration(reason.error)) return { error: "uninstalled" };
-    if (invalidConnection(reason.error))
-      return { error: "refused", description: reason.error.description };
+    const refused = invalid(reason.error) ? reason.error.reason : undefined;
+    if (refused?._tag === "UnknownIntegration") return { error: "uninstalled" };
+    if (refused?._tag === "IntegrationRefused")
+      return { error: "refused", description: refused.description };
     if (credentialsUnavailable(reason.error)) return { error: "storage-unavailable" };
   }
   return { error: workspaceFailure(cause) };

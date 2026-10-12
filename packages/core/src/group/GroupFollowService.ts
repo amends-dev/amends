@@ -26,17 +26,7 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollow from "./GroupFollow.ts";
 import * as GroupFollowFacts from "./GroupFollowFacts.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
-import { NotFollowable } from "./internal/group-follow-errors.ts";
 import * as CoreError from "../error/CoreError.ts";
-export {
-  /**
-   * A direct group's members already take part in all of its threads.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFollowable,
-} from "./internal/group-follow-errors.ts";
 
 /**
  * What following and unfollowing can fail with: the outcomes above, and the
@@ -56,7 +46,7 @@ export type Error =
   | Log.WriteError
   | Projection.Error
   | CoreError.NotFound
-  | NotFollowable
+  | CoreError.Invalid
   | CoreError.Conflict
   | CoreError.Denied;
 
@@ -112,7 +102,10 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     const foundGroup = yield* groupStore.get(request.groupId);
     if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
     const group = foundGroup.value;
-    if (group.kind === "Direct") return yield* new NotFollowable({ groupId: group.id });
+    if (group.kind === "Direct")
+      return yield* new CoreError.Invalid({
+        reason: new CoreError.NotFollowable({ groupId: group.id }),
+      });
     const actor = yield* Actor.Actor;
     if (request.memberId === actor.memberId) {
       // People follow for themselves under group.follow; unfollowing needs no grant.

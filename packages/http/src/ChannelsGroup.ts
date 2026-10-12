@@ -57,7 +57,7 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
       params: channel,
       payload: Schema.Struct({ groupId: Group.Id }),
       success: record,
-      error: [...ApiErrors.workspace, ...ApiErrors.channelRedirect],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
     }),
     HttpApiEndpoint.delete("remove", "/channels/:channelId", {
       params: channel,
