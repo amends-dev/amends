@@ -175,7 +175,7 @@ describe("ownership", () => {
               [workspace.ownerMemberId, "OwnershipService.InvalidRecipient"],
               [other.id, "OwnershipService.InvalidRecipient"],
               [agentId, "OwnershipService.InvalidRecipient"],
-              [elsewhere.ownerMemberId, "OwnershipService.MemberNotFound"],
+              [elsewhere.ownerMemberId, "CoreError.NotFound"],
             ] as const) {
               expect(
                 yield* Effect.flip(

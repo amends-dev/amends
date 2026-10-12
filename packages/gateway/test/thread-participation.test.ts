@@ -70,6 +70,7 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Following and unfollowing threads: quiet activity, stale departures, settlement, and replay. */
 
@@ -581,7 +582,7 @@ describe("thread participation", () => {
             yield* grant(bound, otherId, ThreadPermissions.Start);
             const secret = yield* run(bound, actorFor(otherId), start(hidden.id));
             expect(yield* Effect.flip(run(bound, owner, follow(secret.thread.id)))).toEqual(
-              new ThreadParticipationService.ThreadNotFound({ threadId: secret.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: secret.thread.id }),
             );
           }),
         ),
@@ -604,10 +605,7 @@ describe("thread participation", () => {
               expect(
                 yield* Effect.flip(run(bound, actor, unfollow(first.thread.id, agentPart.id))),
               ).toEqual(
-                new ThreadParticipationService.NotFound({
-                  threadId: first.thread.id,
-                  participationId: agentPart.id,
-                }),
+                new CoreError.NotFound({ resource: "ThreadParticipation", id: agentPart.id }),
               );
             yield* grant(bound, humanId, ThreadParticipationPermissions.Follow);
             const own = yield* run(bound, human, follow(first.thread.id));
@@ -621,7 +619,7 @@ describe("thread participation", () => {
               [first.thread.id, ThreadParticipation.Id.make("missing")],
             ] as const)
               expect(yield* Effect.flip(run(bound, human, unfollow(threadId, id)))).toEqual(
-                new ThreadParticipationService.NotFound({ threadId, participationId: id }),
+                new CoreError.NotFound({ resource: "ThreadParticipation", id }),
               );
             const foreign = yield* boundTo(otherWorkspaceId);
             const workspace = yield* initialized(foreign);
@@ -631,7 +629,7 @@ describe("thread participation", () => {
               identity: { _tag: "Human", id: workspace.createdBy },
             });
             expect(yield* Effect.flip(run(foreign, actor, follow(first.thread.id)))).toMatchObject({
-              _tag: "ThreadParticipationService.ThreadNotFound",
+              _tag: "CoreError.NotFound",
             });
             expect(
               yield* Effect.flip(
@@ -652,11 +650,11 @@ describe("thread participation", () => {
               ),
             );
             expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
-              _tag: "ThreadParticipationService.ThreadNotFound",
+              _tag: "CoreError.NotFound",
             });
             expect(
               yield* Effect.flip(run(bound, human, unfollow(first.thread.id, own.id))),
-            ).toMatchObject({ _tag: "ThreadParticipationService.ThreadNotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             yield* run(
               bound,
               owner,
@@ -1025,7 +1023,7 @@ describe("thread participation", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, owner, follow(Thread.Id.make("missing"))),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationService.ThreadNotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(
             yield* Effect.flip(gateway.asMember(workspace.id, owner, follow("" as Thread.Id))),
           ).toMatchObject({ _tag: "GatewayErrors.InvalidInput" });
@@ -1037,7 +1035,7 @@ describe("thread participation", () => {
                 unfollow(first.thread.id, ThreadParticipation.Id.make("missing")),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadParticipationService.NotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
         }),
       ),
     ),

@@ -41,18 +41,18 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
       success: Agent.View.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedAgent",
       }),
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound, ...setup, ...ApiErrors.delegation],
+      error: [...ApiErrors.member, ...setup, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.get("get", "/:agentId", {
       params: agent,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound],
+      error: [...ApiErrors.member, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.put("configure", "/:agentId/configuration", {
       params: agent,
       payload: Agent.Configuration,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound, ...setup],
+      error: [...ApiErrors.member, ApiErrors.NotFound, ...setup],
     }),
     HttpApiEndpoint.post("rename", "/:agentId/rename", {
       params: agent,
@@ -61,7 +61,7 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
         expectedName: Agent.RenameInput.fields.expectedName,
       }),
       success: view,
-      error: [...ApiErrors.member, ApiErrors.AgentNotFound, ApiErrors.AgentChanged],
+      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.AgentChanged],
     }),
   )
   .middleware(Authentication)

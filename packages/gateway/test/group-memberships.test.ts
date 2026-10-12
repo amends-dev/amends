@@ -51,6 +51,7 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Group admission and departure: authority, workspace removal, concurrency, and replay. */
 
@@ -397,10 +398,10 @@ describe("group memberships", () => {
             const membership = yield* run(bound, owner, add(group.id, humanId));
             const before = yield* history(bound);
             for (const [groupId, memberId, tag] of [
-              [Group.Id.make("missing"), humanId, "GroupMembershipService.GroupNotFound"],
-              [foreignGroup.id, humanId, "GroupMembershipService.GroupNotFound"],
-              [group.id, Member.Id.make("missing"), "GroupMembershipService.MemberNotFound"],
-              [group.id, otherWorkspace.ownerMemberId, "GroupMembershipService.MemberNotFound"],
+              [Group.Id.make("missing"), humanId, "CoreError.NotFound"],
+              [foreignGroup.id, humanId, "CoreError.NotFound"],
+              [group.id, Member.Id.make("missing"), "CoreError.NotFound"],
+              [group.id, otherWorkspace.ownerMemberId, "CoreError.NotFound"],
               [group.id, agentId, "GroupMembershipService.InactiveMember"],
               [group.id, humanId, "GroupMembershipService.AlreadyMember"],
             ] as const)
@@ -476,7 +477,7 @@ describe("group memberships", () => {
             });
             // The owner moderates, but only from inside the group, which they join first.
             expect(yield* Effect.flip(run(bound, owner, remove(agentThere)))).toMatchObject({
-              _tag: "GroupMembershipService.GroupNotFound",
+              _tag: "CoreError.NotFound",
             });
             yield* run(
               bound,
@@ -604,8 +605,9 @@ describe("group memberships", () => {
             yield* bound.store.transaction(bound.groups.insert(direct));
             for (const id of [group.id, direct.id, Group.Id.make("missing")])
               expect(yield* Effect.flip(run(bound, human, join(id)))).toMatchObject({
-                _tag: "GroupMembershipService.GroupNotFound",
-                groupId: id,
+                _tag: "CoreError.NotFound",
+                resource: "Group",
+                id: id,
               });
             // Someone without group.join neither finds public groups nor joins one.
             const agent = memberActor(agentId);
@@ -893,9 +895,7 @@ describe("group memberships", () => {
               }),
             );
             expect(yield* Effect.flip(call(Member.Id.make("missing")))).toEqual(
-              new GroupMembershipService.MemberNotFound({
-                memberId: Member.Id.make("missing"),
-              }),
+              new CoreError.NotFound({ resource: "Member", id: Member.Id.make("missing") }),
             );
             yield* publish(
               bound,
@@ -914,7 +914,7 @@ describe("group memberships", () => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, ownerIdentity, add(missing, humanId)),
               ),
-            ).toEqual(new GroupMembershipService.GroupNotFound({ groupId: missing }));
+            ).toEqual(new CoreError.NotFound({ resource: "Group", id: missing }));
             yield* publish(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -1031,7 +1031,7 @@ describe("group memberships", () => {
               )) {
                 expect(yield* Effect.flip(run(bound, actor, leave(other.admission)))).toMatchObject(
                   {
-                    _tag: "GroupMembershipService.NotFound",
+                    _tag: "CoreError.NotFound",
                   },
                 );
               }
@@ -1206,7 +1206,7 @@ describe("group memberships", () => {
                       ),
                     ),
                   ),
-                ).toMatchObject({ _tag: "GroupMembershipService.NotFound" });
+                ).toMatchObject({ _tag: "CoreError.NotFound" });
               }
             }
             expect(yield* history(bound)).toEqual(before);
@@ -1817,9 +1817,9 @@ describe("group memberships", () => {
                 ),
               ),
             ).toEqual(
-              new GroupMembershipService.NotFound({
-                groupId: group.id,
-                membershipId: GroupMembership.Id.make("missing"),
+              new CoreError.NotFound({
+                resource: "GroupMembership",
+                id: GroupMembership.Id.make("missing"),
               }),
             );
             expect(
@@ -1879,7 +1879,7 @@ describe("group memberships", () => {
             expect(fresh.id).not.toBe(admission.id);
             expect(
               yield* Effect.flip(run(bound, { ...actor, memberId: newMemberId }, leave(admission))),
-            ).toMatchObject({ _tag: "GroupMembershipService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* bound.groupMemberships.findActive(group.id, newMemberId)).toEqual(
               Option.some(fresh),
             );

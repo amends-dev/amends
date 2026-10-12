@@ -276,7 +276,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               params: { workspaceId: workspace.id, threadId: Thread.Id.make("missing") },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadMessageService.NotFound", threadId: "missing" });
+        ).toMatchObject({ _tag: "CoreError.NotFound", resource: "Thread", id: "missing" });
         const http = yield* HttpClient.HttpClient;
         const path = `/workspaces/${workspace.id}/threads/${threadId}/typing`;
         expect((yield* http.post(path)).status).toBe(401);

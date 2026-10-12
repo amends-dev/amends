@@ -22,15 +22,10 @@ import { AssignmentStore, Authorization, RoleStore } from "@amends-dev/core/auth
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
 import { Checkpoint, Commit, Entry, Store } from "@amends-dev/core/journal";
-import {
-  Notification,
-  NotificationService,
-  NotificationStore,
-} from "@amends-dev/core/notification";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   InvitationStore,
   Member,
-  MemberService,
   MemberStore,
   Workspace,
   WorkspaceStore,
@@ -55,6 +50,7 @@ import * as GatewayErrors from "../src/GatewayErrors.ts";
 import * as Gateway from "../src/Gateway.ts";
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -406,9 +402,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           program: Effect.Effect<A, E>,
         ): Effect.Effect<
           A,
-          | GatewayErrors.PublicErrorOf<E>
-          | GatewayErrors.NotMember
-          | GatewayErrors.WorkspaceNotFound,
+          GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember | CoreError.NotFound,
           Scope.Scope
         > =>
           entry === "inWorkspace"
@@ -456,11 +450,11 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           _tag: "GatewayErrors.InvalidInput",
           message: "Values must belong to workspace workspace",
         });
-        const missing = new MemberService.NotFound({ workspaceId, memberId });
+        const missing = new CoreError.NotFound({ resource: "Member", id: memberId });
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing);
-        const missingNotification = new NotificationService.NotFound({
-          workspaceId,
-          notificationId: Notification.Id.make("missing"),
+        const missingNotification = new CoreError.NotFound({
+          resource: "Notification",
+          id: Notification.Id.make("missing"),
         });
         expect(yield* Effect.flip(enter(Effect.fail(missingNotification)))).toBe(
           missingNotification,
@@ -481,7 +475,7 @@ it.effect(
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
         ).toBe(failure);
-        const malformed = { _tag: "MemberService.NotFound", workspaceId, memberId: 42 };
+        const malformed = { _tag: "CoreError.NotFound", resource: "Member", id: 42 };
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(malformed)))),
         ).toBe(malformed);
@@ -682,7 +676,7 @@ it.effect("a workspace that was never created is refused without being prepared"
       new GatewayErrors.NotMember({ workspaceId }),
     );
     expect(yield* Effect.flip(gateway.inWorkspace(workspaceId, Effect.void))).toEqual(
-      new GatewayErrors.WorkspaceNotFound({ workspaceId }),
+      new CoreError.NotFound({ resource: "Workspace", id: workspaceId }),
     );
     // Nothing was booted, and nothing was written: setLive would have failed the request.
     expect(boots.reads).toBe(0);

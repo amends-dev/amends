@@ -22,6 +22,7 @@ import {
   request,
   testModel,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,
@@ -248,13 +249,13 @@ describe("connections", () => {
           expect(yield* modelsOf(offeringNone.id)).toEqual({ listed: [], unlisted: false });
           const missing = Connection.Id.make("missing");
           expect(yield* Effect.flip(modelsOf(missing))).toEqual(
-            new ConnectionService.NotFound({ connectionId: missing }),
+            new CoreError.NotFound({ resource: "Connection", id: missing }),
           );
           yield* as(workspace.id, alice, (connectionService) =>
             connectionService.remove(offering.id),
           );
           expect(yield* Effect.flip(modelsOf(offering.id))).toEqual(
-            new ConnectionService.NotFound({ connectionId: offering.id }),
+            new CoreError.NotFound({ resource: "Connection", id: offering.id }),
           );
         }),
       ),
@@ -413,7 +414,7 @@ describe("connections", () => {
           yield* as(workspace.id, alice, (connectionService) =>
             connectionService.remove(created.id),
           );
-          const gone = new ConnectionService.NotFound({ connectionId: created.id });
+          const gone = new CoreError.NotFound({ resource: "Connection", id: created.id });
           expect(
             yield* as(workspace.id, alice, (connectionService) => connectionService.list),
           ).toEqual([]);
@@ -493,7 +494,7 @@ describe("connections", () => {
               connectionService.remove(first.id),
             );
             expect(yield* Effect.flip(create(models))).toEqual(
-              new ConnectionService.NotFound({ connectionId: first.id }),
+              new CoreError.NotFound({ resource: "Connection", id: first.id }),
             );
           }),
         ),

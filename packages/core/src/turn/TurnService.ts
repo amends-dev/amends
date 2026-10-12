@@ -2,9 +2,9 @@
  * The operations on turns an actor calls: reading a thread's turns as `Turn.View`s and the
  * workspace's active ones, following a turn's session log as it grows, asking an active turn to
  * stop, and retrying a failed or stopped one. A turn in a thread outside the reader's audience is
- * `NotFound`; reading needs `thread.read` on the thread, and stopping or retrying needs directing
- * the turn's agent. Running turns is `TurnExecution`'s, for each agent's turn job; this service
- * only asks, through the commits it makes.
+ * `CoreError.NotFound`; reading needs `thread.read` on the thread, and stopping or retrying needs
+ * directing the turn's agent. Running turns is `TurnExecution`'s, for each agent's turn job; this
+ * service only asks, through the commits it makes.
  *
  * @since 0.1.0
  */
@@ -40,7 +40,7 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import type * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts";
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts";
-import { NotActive, NotFound, NotRetryable } from "./internal/turn-errors.ts";
+import { NotActive, NotRetryable } from "./internal/turn-errors.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnCommand from "./TurnCommand.ts";
 import * as TurnFacts from "./TurnFacts.ts";
@@ -48,6 +48,7 @@ import * as SessionLog from "./SessionLog.ts";
 import * as SessionLogStore from "./SessionLogStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The turn has already finished, or is not in the state the operation needs.
@@ -56,13 +57,6 @@ export {
    * @since 0.1.0
    */
   NotActive,
-  /**
-   * Missing turns, and turns in threads the reader cannot open, share this outcome.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
   /**
    * The turn cannot be retried now, for `reason`: it is still active, it completed, a later turn of
    * its agent superseded it, or its agent no longer takes part in the thread.
@@ -74,28 +68,28 @@ export {
 } from "./internal/turn-errors.ts";
 
 /**
- * What reading a turn can fail with: `NotFound`, a denied `thread.read`, and the failures of what
- * a read depends on.
+ * What reading a turn can fail with: `CoreError.NotFound`, a denied `thread.read`, and the failures
+ * of what a read depends on.
  *
  * @category errors
  * @since 0.1.0
  */
 export type ReadError =
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadQuery.AccessError
   | Exclude<Authorization.Error, Authorization.Denied>
   | TurnStore.Failure
   | ThreadParticipationStore.Failure
   | Schema.SchemaError
-  | NotFound;
+  | CoreError.NotFound;
 
 /**
- * What listing active turns can fail with: `ReadError` but `NotFound`, since turns the reader may
- * not read are left out.
+ * What listing active turns can fail with: `ReadError` but `CoreError.NotFound`, since turns the
+ * reader may not read are left out.
  *
  * @category errors
  * @since 0.1.0
  */
-export type ActiveError = Exclude<ReadError, NotFound>;
+export type ActiveError = Exclude<ReadError, CoreError.NotFound>;
 
 /**
  * What opening a turn's log can fail with: `ReadError`, the session log store's failures, and
@@ -147,7 +141,8 @@ export class TurnService extends Context.Service<
   {
     /**
      * A turn in a thread the reader may read: in its group's audience, with `thread.read` on it, as
-     * its timeline requires. Outside the audience it is NotFound; without the permission, Denied.
+     * its timeline requires. Outside the audience it is `CoreError.NotFound`; without the
+     * permission, Denied.
      */
     readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Actor>;
     /**
@@ -243,10 +238,13 @@ export const make = Effect.fn("TurnService.make")(function* () {
   /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
   const requireReadableTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turnStore.get(turnId);
-    if (Option.isNone(found)) return yield* new NotFound({ turnId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Turn", id: turnId });
     const turn = found.value;
     yield* requireReadableThread(turn.threadId).pipe(
-      Effect.catchTag("ThreadQuery.NotFound", () => Effect.fail(new NotFound({ turnId }))),
+      Effect.catchTag("CoreError.NotFound", () =>
+        Effect.fail(new CoreError.NotFound({ resource: "Turn", id: turnId })),
+      ),
     );
     return turn;
   });
@@ -306,7 +304,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       const may = yield* threadQuery.requireAccess(turn.threadId).pipe(
         Effect.as(true),
         Effect.catchTags({
-          "ThreadQuery.NotFound": () => Effect.succeed(false),
+          "CoreError.NotFound": () => Effect.succeed(false),
           "Authorization.Denied": () => Effect.succeed(false),
         }),
       );

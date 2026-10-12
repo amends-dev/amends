@@ -32,12 +32,8 @@ import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
-import {
-  Changed,
-  InvalidRecipient,
-  MemberNotFound,
-  NotOwner,
-} from "./internal/ownership-errors.ts";
+import { Changed, InvalidRecipient, NotOwner } from "./internal/ownership-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The Owner assignment is no longer the one the caller reviewed: ownership moved meanwhile, and
@@ -55,13 +51,6 @@ export {
    * @since 0.1.0
    */
   InvalidRecipient,
-  /**
-   * No membership has the ID given as the recipient.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberNotFound,
   /**
    * The actor is not the current owner, or is not a person; only the owner transfers, whatever
    * their grants.
@@ -87,7 +76,7 @@ export type Error =
   | Log.WriteError
   | PlatformError.PlatformError
   | NotOwner
-  | MemberNotFound
+  | CoreError.NotFound
   | InvalidRecipient
   | Changed;
 
@@ -155,7 +144,8 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     memberId: Member.Id,
   ) {
     const found = yield* memberStore.get(memberId);
-    if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Member", id: memberId });
     return found.value;
   });
   const readCurrentOwnership = Effect.gen(function* () {

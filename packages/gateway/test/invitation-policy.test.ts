@@ -31,7 +31,7 @@ describe("invitation policy", () => {
             ).toMatchObject({ _tag: "InvitationService.NotRecipient" });
             expect(
               yield* Effect.flip(Operations.acceptInvitation(b.id, bob.id, invitation.details.id)),
-            ).toMatchObject({ _tag: "InvitationService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
               before,
             );

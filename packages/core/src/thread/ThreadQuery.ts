@@ -29,17 +29,7 @@ import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 import * as ThreadActivity from "./ThreadActivity.ts";
 import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
 import * as ThreadActivityStore from "./ThreadActivityStore.ts";
-
-/**
- * The thread is missing, or outside the actor's group audience; the two are not told apart, so
- * nothing discloses whether a thread exists. Operations map it to their own outcome.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("ThreadQuery.NotFound", {
-  threadId: Thread.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * A member who may take part in a group's threads: a current admission and active membership.
@@ -63,7 +53,7 @@ export type AccessError =
   | GroupMembershipStore.Failure
   | ThreadStore.Failure
   | Schema.SchemaError
-  | NotFound;
+  | CoreError.NotFound;
 
 /**
  * What reading participants can fail with.
@@ -102,7 +92,7 @@ export type TimelineError =
  * @since 0.1.0
  */
 export type ListError =
-  | GroupQuery.NotMember
+  | CoreError.NotFound
   | Authorization.Error
   | GroupMembershipStore.Failure
   | ThreadStore.Failure
@@ -239,11 +229,16 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     const id = yield* Schema.decodeEffect(Thread.Id)(threadId);
     yield* authorization.require([]);
     const found = yield* threadStore.get(id);
-    if (Option.isNone(found)) return yield* new NotFound({ threadId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Thread", id });
     const thread = found.value;
     yield* groupQuery
       .requireAudience(thread.groupId)
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new NotFound({ threadId: id })));
+      .pipe(
+        Effect.catchTag(
+          "CoreError.NotFound",
+          () => new CoreError.NotFound({ resource: "Thread", id }),
+        ),
+      );
     return thread;
   });
 

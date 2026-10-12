@@ -4,7 +4,6 @@
  * on.
  */
 import { Schema } from "effect";
-import * as WorkspaceId from "../../workspace/WorkspaceId.ts";
 import * as Notification from "../Notification.ts";
 
 /**
@@ -23,12 +22,3 @@ export class HumanRecipientRequired extends Schema.TaggedError<HumanRecipientReq
   "NotificationService.HumanRecipientRequired",
   {},
 ) {}
-
-/**
- * The notification is missing, or is another recipient's; the two are deliberately not told
- * apart.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("NotificationService.NotFound", {
-  workspaceId: WorkspaceId.Id,
-  notificationId: Notification.Id,
-}) {}

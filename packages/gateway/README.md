@@ -36,7 +36,7 @@ of `make` keeps that scope open for the gateway's lifetime. The gateway's operat
 - `inWorkspace(workspaceId, program)` is the same without an actor, for accepting an invitation,
   whose recipient is not yet a member, and for a host's [jobs](../core/README.md#jobs). Programs may
   require `Operations`, core's `JobServices`, and `Scope`. A workspace that was never created gets
-  `WorkspaceNotFound`.
+  `CoreError.NotFound` for it.
 
 Both keep the workspace prepared for the caller's scope: an HTTP response's, which a stream holds
 until the client disconnects, or one the caller closes. Identities must come from a trusted ingress,
@@ -208,10 +208,10 @@ email sign-in over the memory storage, and the [conformance suites](#conformance
 ## Public outcomes
 
 Programs fail only with outcomes a caller can act on. Core's domain errors pass through unchanged,
-and the gateway adds:
+among them `CoreError.NotFound`, which `inWorkspace` also returns for a workspace that was never
+created. The gateway adds:
 
 - `NotMember` when the identity has no active membership;
-- `WorkspaceNotFound` when `inWorkspace` names a workspace that was never created;
 - `Conflict` for storage contention worth retrying;
 - `Uncertain` when a commit's outcome is unknown, with its commit ID;
 - `InvalidInput` when core rejects values the caller supplied, such as invitation grants.

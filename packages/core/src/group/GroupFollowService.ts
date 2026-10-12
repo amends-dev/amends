@@ -26,12 +26,8 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollow from "./GroupFollow.ts";
 import * as GroupFollowFacts from "./GroupFollowFacts.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
-import {
-  AgentRequired,
-  GroupNotFound,
-  MemberUnavailable,
-  NotFollowable,
-} from "./internal/group-follow-errors.ts";
+import { AgentRequired, MemberUnavailable, NotFollowable } from "./internal/group-follow-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * Only an agent can be made to follow by another member; people follow for themselves.
@@ -40,13 +36,6 @@ export {
    * @since 0.1.0
    */
   AgentRequired,
-  /**
-   * Missing, foreign, and groups the actor does not belong to share this outcome.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GroupNotFound,
   /**
    * The named member is missing, inactive, or not a current member of the group.
    *
@@ -80,7 +69,7 @@ export type Error =
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error
-  | GroupNotFound
+  | CoreError.NotFound
   | NotFollowable
   | MemberUnavailable
   | AgentRequired;
@@ -133,14 +122,7 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     following: boolean,
   ) {
     const request = yield* Schema.decodeEffect(GroupFollow.Input)(input);
-    const own = yield* groupQuery
-      .requireAudience(request.groupId)
-      .pipe(
-        Effect.catchTag(
-          "GroupQuery.NotMember",
-          () => new GroupNotFound({ groupId: request.groupId }),
-        ),
-      );
+    const own = yield* groupQuery.requireAudience(request.groupId);
     const foundGroup = yield* groupStore.get(request.groupId);
     if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
     const group = foundGroup.value;

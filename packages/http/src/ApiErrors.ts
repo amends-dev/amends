@@ -3,7 +3,7 @@
  * its HTTP status, and the lists of them that groups spread into an endpoint's `error`. Core
  * declares no transport concerns, so the status lives here, on the contract's view of each error,
  * and the serialized tag stays the one core or the gateway declares. A name that would be ambiguous
- * in the shared namespace says its source, such as `InvitationNotFound` or `ConnectionChanged`.
+ * in the shared namespace says its source, such as `InvitationUnavailable` or `ConnectionChanged`.
  * `HumanRequired` and `TooManyStreams` are the contract's own, and `requestKey` is the
  * `Idempotency-Key` header a creating endpoint accepts.
  *
@@ -33,6 +33,7 @@ import {
 import { Request } from "@amends-dev/core/request";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/http-api";
+import { CoreError } from "@amends-dev/core/error";
 
 /**
  * The principal is an agent where only a human may act; 403.
@@ -60,6 +61,14 @@ export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
 ) {}
 
 /**
+ * Something the caller named is missing, or out of their reach, which answer alike: 404, with the
+ * resource and the ID.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const NotFound = CoreError.NotFound.pipe(HttpApiSchema.status(404));
+/**
  * The principal holds no active membership of the workspace, or no workspace has this ID: 403.
  * The gateway answers it before loading the workspace.
  *
@@ -75,15 +84,6 @@ export const NotMember = GatewayErrors.NotMember.pipe(HttpApiSchema.status(403))
  * @since 0.1.0
  */
 export const WorkspaceChanged = WorkspaceSettingsService.Changed.pipe(HttpApiSchema.status(409));
-/**
- * No workspace was ever created under this ID: 404. Only the endpoints that enter a workspace
- * without a member, accepting an invitation and a channel's events, answer it; the others answer
- * `NotMember`.
- *
- * @category errors
- * @since 0.1.0
- */
-export const WorkspaceNotFound = GatewayErrors.WorkspaceNotFound.pipe(HttpApiSchema.status(404));
 /**
  * The request key a creating endpoint accepts: send a new one for each logical request and the
  * same one on every retry of it, and the retry returns the first attempt's result.
@@ -131,21 +131,6 @@ export const Denied = Authorization.Denied.pipe(HttpApiSchema.status(403));
  */
 export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status(403));
 /**
- * No membership has this ID in the workspace; 404. Only a caller authorized on that member learns
- * it.
- *
- * @category errors
- * @since 0.1.0
- */
-export const MemberNotFound = MemberService.NotFound.pipe(HttpApiSchema.status(404));
-/**
- * The notification is missing or another recipient's; the two answer alike, with 404.
- *
- * @category errors
- * @since 0.1.0
- */
-export const NotificationNotFound = NotificationService.NotFound.pipe(HttpApiSchema.status(404));
-/**
  * Only a person marks a notification seen; an agent's are handled by its work. 403.
  *
  * @category errors
@@ -177,13 +162,6 @@ export const OwnerProtected = MemberService.OwnerProtected.pipe(HttpApiSchema.st
  * @since 0.1.0
  */
 export const AlreadyRemoved = MemberService.AlreadyRemoved.pipe(HttpApiSchema.status(409));
-/**
- * No invitation has this ID in the workspace; 404.
- *
- * @category errors
- * @since 0.1.0
- */
-export const InvitationNotFound = InvitationService.NotFound.pipe(HttpApiSchema.status(404));
 /**
  * The principal is not the person the invitation was issued to; 403.
  *
@@ -234,7 +212,7 @@ export const delegation = [
   DelegationDenied,
   Delegation.OwnerProtected.pipe(HttpApiSchema.status(409)),
   Delegation.UnsupportedRole.pipe(HttpApiSchema.status(400)),
-  Delegation.RoleNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
 ] as const;
 /**
  * Invitation outcomes, with the delegation rules issuing one checks.
@@ -244,7 +222,6 @@ export const delegation = [
  */
 export const invitation = [
   ...delegation,
-  InvitationNotFound,
   NotRecipient,
   AlreadyMember,
   InvitationUnavailable,
@@ -259,7 +236,6 @@ export const invitation = [
  */
 export const assignmentRead = [
   ...delegation,
-  AssignmentService.MemberNotFound.pipe(HttpApiSchema.status(404)),
   AssignmentService.InactiveMember.pipe(HttpApiSchema.status(409)),
 ] as const;
 /**
@@ -271,7 +247,6 @@ export const assignmentRead = [
  */
 export const assignment = [
   ...assignmentRead,
-  AssignmentService.NotFound.pipe(HttpApiSchema.status(404)),
   AssignmentService.Changed.pipe(HttpApiSchema.status(409)),
 ] as const;
 
@@ -285,7 +260,7 @@ export const assignment = [
  */
 export const ownership = [
   OwnershipService.NotOwner.pipe(HttpApiSchema.status(403)),
-  OwnershipService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   OwnershipService.InvalidRecipient.pipe(HttpApiSchema.status(409)),
   OwnershipService.Changed.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -299,8 +274,7 @@ export const ownership = [
  * @since 0.1.0
  */
 export const group = [
-  GroupService.NotFound.pipe(HttpApiSchema.status(404)),
-  GroupService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   GroupService.InactiveMember.pipe(HttpApiSchema.status(409)),
 ] as const;
 /**
@@ -326,9 +300,7 @@ export const GroupChanged = GroupService.Changed.pipe(HttpApiSchema.status(409))
  * @since 0.1.0
  */
 export const groupMembership = [
-  GroupMembershipService.GroupNotFound.pipe(HttpApiSchema.status(404)),
-  GroupMembershipService.MemberNotFound.pipe(HttpApiSchema.status(404)),
-  GroupMembershipService.NotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   GroupMembershipService.InactiveMember.pipe(HttpApiSchema.status(409)),
   GroupMembershipService.AlreadyMember.pipe(HttpApiSchema.status(409)),
   GroupMembershipService.AlreadyRemoved.pipe(HttpApiSchema.status(409)),
@@ -344,7 +316,7 @@ export const groupMembership = [
  * @since 0.1.0
  */
 export const groupFollow = [
-  GroupFollowService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   GroupFollowService.AgentRequired.pipe(HttpApiSchema.status(403)),
   GroupFollowService.MemberUnavailable.pipe(HttpApiSchema.status(409)),
   GroupFollowService.NotFollowable.pipe(HttpApiSchema.status(409)),
@@ -359,8 +331,7 @@ export const groupFollow = [
  * @since 0.1.0
  */
 export const thread = [
-  ThreadService.NotFound.pipe(HttpApiSchema.status(404)),
-  ThreadService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   ThreadService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
   ThreadService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
   ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
@@ -380,7 +351,7 @@ export const ThreadChanged = ThreadService.Changed.pipe(HttpApiSchema.status(409
  * @since 0.1.0
  */
 export const message = [
-  ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -392,7 +363,7 @@ export const message = [
  * @since 0.1.0
  */
 export const messageEdit = [
-  ThreadMessageService.MessageNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.NotAuthor.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.Deleted.pipe(HttpApiSchema.status(409)),
@@ -406,7 +377,7 @@ export const messageEdit = [
  * @since 0.1.0
  */
 export const messageDelete = [
-  ThreadMessageService.MessageNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
 ] as const;
 /**
@@ -415,7 +386,7 @@ export const messageDelete = [
  * @category errors
  * @since 0.1.0
  */
-export const typing = [ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404))] as const;
+export const typing = [NotFound] as const;
 /**
  * Following a thread: a missing thread, or a participation missing or not the caller's, is 404; a
  * participation ended already, and a direct conversation, where everyone takes part, are 409.
@@ -424,8 +395,7 @@ export const typing = [ThreadMessageService.NotFound.pipe(HttpApiSchema.status(4
  * @since 0.1.0
  */
 export const participation = [
-  ThreadParticipationService.ThreadNotFound.pipe(HttpApiSchema.status(404)),
-  ThreadParticipationService.NotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   ThreadParticipationService.AlreadyEnded.pipe(HttpApiSchema.status(409)),
   ThreadParticipationService.FixedParticipation.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -438,10 +408,7 @@ export const participation = [
  * @category errors
  * @since 0.1.0
  */
-export const taskRead = [
-  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
-  TaskService.GroupNotFound.pipe(HttpApiSchema.status(404)),
-] as const;
+export const taskRead = [NotFound] as const;
 /**
  * Making a conversation a task: a missing or unreadable thread is 404; a thread that is a task
  * already, and an assignee who cannot take part, are 409.
@@ -450,7 +417,7 @@ export const taskRead = [
  * @since 0.1.0
  */
 export const taskCreate = [
-  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   TaskService.AlreadyTask.pipe(HttpApiSchema.status(409)),
   TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -462,7 +429,7 @@ export const taskCreate = [
  * @since 0.1.0
  */
 export const taskUpdate = [
-  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   TaskService.Changed.pipe(HttpApiSchema.status(409)),
   TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
@@ -475,18 +442,10 @@ export const taskUpdate = [
  */
 export const readState = [
   ReadStateService.HumanRequired.pipe(HttpApiSchema.status(403)),
-  ReadStateService.ThreadNotFound.pipe(HttpApiSchema.status(404)),
-  ReadStateService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   ReadStateService.BeyondTimeline.pipe(HttpApiSchema.status(409)),
 ] as const;
 
-/**
- * A connection the caller may not read answers as missing, as does one removed since a create.
- *
- * @category errors
- * @since 0.1.0
- */
-export const ConnectionNotFound = ConnectionService.NotFound.pipe(HttpApiSchema.status(404));
 /**
  * A connection renamed since the caller last saw its name refuses another name with 409.
  *
@@ -530,13 +489,6 @@ export const ConnectionCredentialsUnavailable = ConnectionService.CredentialsUna
 );
 
 /**
- * An agent the caller may not read, or whose membership ended, answers as missing.
- *
- * @category errors
- * @since 0.1.0
- */
-export const AgentNotFound = AgentService.NotFound.pipe(HttpApiSchema.status(404));
-/**
  * An agent renamed since the caller last saw its name refuses another name with 409.
  *
  * @category errors
@@ -560,13 +512,6 @@ export const AgentConnectionUnavailable = AgentService.ConnectionUnavailable.pip
  */
 export const AgentIncomplete = AgentService.Incomplete.pipe(HttpApiSchema.status(422));
 
-/**
- * A turn the caller may not read, because its thread is closed to them, answers as missing.
- *
- * @category errors
- * @since 0.1.0
- */
-export const TurnNotFound = TurnService.NotFound.pipe(HttpApiSchema.status(404));
 /**
  * The turn has already finished, so there is nothing to stop.
  *
@@ -606,7 +551,7 @@ export const member = [NotMember, ...workspace] as const;
  * @category errors
  * @since 0.1.0
  */
-export const channelRead = [ChannelService.NotFound.pipe(HttpApiSchema.status(404))] as const;
+export const channelRead = [NotFound] as const;
 /**
  * Creating a channel: a group the caller does not belong to is 404, and a connection that gives no
  * channels, or that the caller may not use, is 422.
@@ -616,7 +561,6 @@ export const channelRead = [ChannelService.NotFound.pipe(HttpApiSchema.status(40
  */
 export const channelCreate = [
   ...channelRead,
-  ChannelService.GroupNotFound.pipe(HttpApiSchema.status(404)),
   ChannelService.ConnectionUnavailable.pipe(HttpApiSchema.status(422)),
 ] as const;
 /**
@@ -625,17 +569,14 @@ export const channelCreate = [
  * @category errors
  * @since 0.1.0
  */
-export const channelRedirect = [
-  ...channelRead,
-  ChannelService.GroupNotFound.pipe(HttpApiSchema.status(404)),
-] as const;
+export const channelRedirect = [...channelRead] as const;
 /**
  * Where a thread came from: a thread missing, unreadable, or that came through no channel is 404.
  *
  * @category errors
  * @since 0.1.0
  */
-export const channelBinding = [ChannelService.NotBound.pipe(HttpApiSchema.status(404))] as const;
+export const channelBinding = [NotFound] as const;
 /**
  * What an external system's request to a channel can be answered with: a channel missing or removed
  * is 404, a request its transport rejects 400, and a system that cannot be reached 503.
@@ -644,7 +585,7 @@ export const channelBinding = [ChannelService.NotBound.pipe(HttpApiSchema.status
  * @since 0.1.0
  */
 export const channelEvents = [
-  ChannelIntake.NotFound.pipe(HttpApiSchema.status(404)),
+  NotFound,
   ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
   ChannelIntake.Unavailable.pipe(HttpApiSchema.status(503)),
 ] as const;

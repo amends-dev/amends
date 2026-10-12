@@ -26,6 +26,7 @@ import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
 import * as TestSignalHub from "../signal-hub.ts";
 import * as SignalHub from "../../src/signal/SignalHub.ts";
+import * as CoreError from "../../src/error/CoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
@@ -241,10 +242,7 @@ it.effect(
           const notificationService = yield* NotificationService.NotificationService;
           for (const id of [theirs.id, agents.id, Notification.Id.make("absent")]) {
             expect(yield* Effect.flip(notificationService.markSeen(id))).toEqual(
-              new NotificationService.NotFound({
-                workspaceId,
-                notificationId: id,
-              }),
+              new CoreError.NotFound({ resource: "Notification", id }),
             );
           }
         }),

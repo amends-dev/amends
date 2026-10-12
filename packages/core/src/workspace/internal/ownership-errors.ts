@@ -27,14 +27,6 @@ export class InvalidRecipient extends Schema.TaggedError<InvalidRecipient>()(
 ) {}
 
 /**
- * No membership has the ID given as the recipient.
- */
-export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
-  "OwnershipService.MemberNotFound",
-  { memberId: Member.Id },
-) {}
-
-/**
  * The actor is not the current owner, or is not a person; only the owner transfers, whatever
  * their grants.
  */

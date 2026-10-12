@@ -86,6 +86,6 @@ export class ChannelEventsGroup extends HttpApiGroup.make("channelEvents").add(
     params: channel,
     payload: text,
     success: text,
-    error: [ApiErrors.WorkspaceNotFound, ...ApiErrors.workspace, ...ApiErrors.channelEvents],
+    error: [...ApiErrors.workspace, ...ApiErrors.channelEvents],
   }),
 ) {}

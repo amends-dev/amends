@@ -27,13 +27,6 @@ export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()(
 ) {}
 
 /**
- * The built-in role is not recorded in this workspace.
- */
-export class RoleNotFound extends Schema.TaggedError<RoleNotFound>()("Delegation.RoleNotFound", {
-  roleId: Role.Id,
-}) {}
-
-/**
  * The role is not one of the three built-in ones; no other role is delegated.
  */
 export class UnsupportedRole extends Schema.TaggedError<UnsupportedRole>()(

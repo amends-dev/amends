@@ -16,27 +16,9 @@ export class AlreadyEnded extends Schema.TaggedError<AlreadyEnded>()(
 ) {}
 
 /**
- * The participation is missing, in another thread, or another member's; the three are not told
- * apart.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()(
-  "ThreadParticipationService.NotFound",
-  ThreadParticipation.UnfollowInput.fields,
-) {}
-
-/**
  * Everyone in a direct conversation takes part in all of its threads, so none is unfollowed.
  */
 export class FixedParticipation extends Schema.TaggedError<FixedParticipation>()(
   "ThreadParticipationService.FixedParticipation",
-  { threadId: Thread.Id },
-) {}
-
-/**
- * The thread is missing, in another workspace, or outside the actor's groups; the three are not
- * told apart.
- */
-export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
-  "ThreadParticipationService.ThreadNotFound",
   { threadId: Thread.Id },
 ) {}

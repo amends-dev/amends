@@ -182,7 +182,7 @@ it("refuses a blank name before any request, and reports a refused invitation", 
   const accept = await f.at(1);
   expect(await accept.request.json()).toEqual({ name: "Ada" });
   accept.resolve(
-    json({ _tag: "InvitationService.NotFound", invitationId: "invitation-quiet" }, 404),
+    json({ _tag: "CoreError.NotFound", resource: "Invitation", id: "invitation-quiet" }, 404),
   );
   await waitFor(() =>
     expect(f.picker.accepting()).toMatchObject({ error: "gone", joined: false, pending: false }),

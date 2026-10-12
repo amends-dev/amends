@@ -19,6 +19,7 @@ import * as Thread from "../../src/thread/Thread.ts";
 import * as Member from "../../src/workspace/Member.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make } from "../memory.ts";
+import * as CoreError from "../../src/error/CoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const groupId = Group.Id.make("group");
@@ -60,7 +61,7 @@ const run = <A, E>(
       requireAccess: (threadId) =>
         readable.has(threadId)
           ? Effect.succeed(thread(threadId))
-          : Effect.fail(new ThreadQuery.NotFound({ threadId })),
+          : Effect.fail(new CoreError.NotFound({ resource: "Thread", id: threadId })),
       requireReadable: unexpected,
       eligibleMembers: unexpected,
       followers: unexpected,
@@ -165,7 +166,7 @@ it.effect("inaccessible threads and missing permission publish nothing", () =>
     yield* run((published) =>
       Effect.gen(function* () {
         expect(yield* Effect.flip(typing("hidden"))).toEqual(
-          new ThreadMessageService.NotFound({ threadId: Thread.Id.make("hidden") }),
+          new CoreError.NotFound({ resource: "Thread", id: Thread.Id.make("hidden") }),
         );
         expect(published).toEqual([]);
       }),

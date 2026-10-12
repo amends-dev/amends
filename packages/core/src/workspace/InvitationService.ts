@@ -32,10 +32,10 @@ import * as MemberStore from "./MemberStore.ts";
 import {
   AlreadyMember,
   InvalidExpiry,
-  NotFound,
   NotRecipient,
   Unavailable,
 } from "./internal/invitation-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The person has an active membership already, so they can neither be invited nor accept.
@@ -51,13 +51,6 @@ export {
    * @since 0.1.0
    */
   InvalidExpiry,
-  /**
-   * No invitation has this ID in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
   /**
    * The authenticated person is not whom the invitation names; only the named recipient may accept.
    *
@@ -91,7 +84,7 @@ export type Error =
   | InvitationStore.Failure
   | MemberStore.Failure
   | MemberCommand.Error
-  | NotFound
+  | CoreError.NotFound
   | NotRecipient
   | AlreadyMember
   | Unavailable
@@ -186,7 +179,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   const requireInvitation = Effect.fnUntraced(function* (id: Invitation.Id) {
     const validId = yield* Schema.decodeEffect(Invitation.Id)(id);
     const found = yield* invitationStore.get(validId);
-    if (Option.isNone(found)) return yield* new NotFound({ invitationId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Invitation", id });
     return found.value;
   });
   const requireUnjoined = Effect.fnUntraced(function* (recipientId: Identity.HumanId) {

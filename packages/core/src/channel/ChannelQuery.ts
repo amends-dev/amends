@@ -18,16 +18,7 @@ import * as ConnectionCredentialStore from "../connection/ConnectionCredentialSt
 import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import * as Channel from "./Channel.ts";
 import * as ChannelStore from "./ChannelStore.ts";
-
-/**
- * The channel is missing or removed.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("ChannelQuery.NotFound", {
-  channelId: Channel.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * The channel's external system cannot be reached as the channel stands: its connection was
@@ -58,10 +49,10 @@ export type Error = ConnectionStore.Failure | ConnectionCredentialStore.Failure;
 export class ChannelQuery extends Context.Service<
   ChannelQuery,
   {
-    /** The channel, which must exist and not be removed; otherwise it is `NotFound`. */
+    /** The channel, which must exist and not be removed; otherwise it is `CoreError.NotFound`. */
     readonly requireActive: (
       channelId: Channel.Id,
-    ) => Effect.Effect<Channel.Channel, ChannelStore.Failure | NotFound>;
+    ) => Effect.Effect<Channel.Channel, ChannelStore.Failure | CoreError.NotFound>;
     /** The integration of a connection, which must be installed and give channels. */
     readonly integrationOf: (
       connection: Connection.Connection,
@@ -95,7 +86,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
   const requireActive = Effect.fn("ChannelQuery.requireActive")(function* (channelId: Channel.Id) {
     const found = yield* channelStore.get(channelId);
     if (Option.isNone(found) || found.value.status !== "active")
-      return yield* new NotFound({ channelId });
+      return yield* new CoreError.NotFound({ resource: "Channel", id: channelId });
     return found.value;
   });
 

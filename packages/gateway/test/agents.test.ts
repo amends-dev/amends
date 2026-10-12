@@ -31,6 +31,7 @@ import {
   testProvenance,
   type Bound,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,
@@ -294,7 +295,7 @@ describe("agents", () => {
             ];
             for (const missing of hidden)
               expect(yield* Effect.flip(as(workspace.id, bob, missing))).toEqual(
-                new AgentService.NotFound({ agentId: created.id }),
+                new CoreError.NotFound({ resource: "Agent", id: created.id }),
               );
           }),
         ),
@@ -587,7 +588,7 @@ describe("agents", () => {
           ];
           for (const missing of operations)
             expect(yield* Effect.flip(as(workspace.id, alice, missing))).toEqual(
-              new AgentService.NotFound({ agentId: unknown }),
+              new CoreError.NotFound({ resource: "Agent", id: unknown }),
             );
         }),
       ),
@@ -615,7 +616,7 @@ describe("agents", () => {
             ]);
 
             yield* Operations.removeMember(workspace.id, alice, first.memberId);
-            const gone = new AgentService.NotFound({ agentId: first.id });
+            const gone = new CoreError.NotFound({ resource: "Agent", id: first.id });
             expect(yield* as(workspace.id, alice, (agentService) => agentService.list)).toEqual([]);
             const operations: ReadonlyArray<Operation> = [
               (agentService) => agentService.get(first.id),

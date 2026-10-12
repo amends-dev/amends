@@ -57,7 +57,7 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
       success: record,
       error: [
         ...ApiErrors.member,
-        ApiErrors.NotificationNotFound,
+        ApiErrors.NotFound,
         ApiErrors.NotificationHumanRecipientRequired,
         ApiErrors.NotificationAlreadyHandled,
       ],

@@ -35,6 +35,7 @@ import {
   testProvenance,
   workspaceId,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Tasks: creation with a thread or in one, changes and whom they reach, and the task store. */
 
@@ -330,13 +331,13 @@ describe("tasks", () => {
               yield* Effect.flip(
                 run(bound, human, start({ groupId: group.id, origin: secret.thread.id })),
               ),
-            ).toEqual(new ThreadService.NotFound({ threadId: secret.thread.id }));
+            ).toEqual(new CoreError.NotFound({ resource: "Thread", id: secret.thread.id }));
             expect(yield* history(bound)).toEqual(before);
             expect(yield* Effect.flip(run(bound, human, taskOf(secret.thread.id)))).toEqual(
-              new TaskService.NotFound({ threadId: secret.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: secret.thread.id }),
             );
             expect(yield* Effect.flip(run(bound, owner, taskOf(secret.thread.id)))).toEqual(
-              new TaskService.NotFound({ threadId: secret.thread.id }),
+              new CoreError.NotFound({ resource: "Task", id: secret.thread.id }),
             );
           }),
         ),
@@ -373,7 +374,7 @@ describe("tasks", () => {
               new TaskService.AlreadyTask({ threadId }),
             );
             expect(yield* Effect.flip(run(bound, other, createTask({ threadId })))).toEqual(
-              new TaskService.NotFound({ threadId }),
+              new CoreError.NotFound({ resource: "Thread", id: threadId }),
             );
             expect(yield* Effect.flip(run(bound, human, createTask({ threadId })))).toMatchObject({
               _tag: "Authorization.Denied",
@@ -549,7 +550,7 @@ describe("tasks", () => {
                   update(threadId, { _tag: "Priority", from: "urgent", to: "low" }),
                 ),
               ),
-            ).toEqual(new TaskService.NotFound({ threadId }));
+            ).toEqual(new CoreError.NotFound({ resource: "Thread", id: threadId }));
             expect(
               yield* Effect.flip(
                 run(

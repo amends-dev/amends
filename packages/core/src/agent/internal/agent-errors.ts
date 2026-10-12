@@ -8,13 +8,6 @@ import * as Connection from "../../connection/Connection.ts";
 import * as Agent from "../Agent.ts";
 
 /**
- * Missing agents, agents whose membership ended, and agents the actor may not read share this.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("AgentService.NotFound", {
-  agentId: Agent.Id,
-}) {}
-
-/**
  * The agent's name is no longer the one expected: someone renamed it meanwhile.
  */
 export class Changed extends Schema.TaggedError<Changed>()("AgentService.Changed", {

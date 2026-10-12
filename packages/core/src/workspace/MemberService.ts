@@ -31,7 +31,8 @@ import * as MemberStore from "./MemberStore.ts";
 import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
 
-import { AlreadyRemoved, NotFound, OwnerProtected } from "./internal/member-errors.ts";
+import { AlreadyRemoved, OwnerProtected } from "./internal/member-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The member to remove was removed already; nothing more is recorded.
@@ -40,13 +41,6 @@ export {
    * @since 0.1.0
    */
   AlreadyRemoved,
-  /**
-   * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
   /**
    * The member is the current owner, who cannot be removed; ownership must be transferred first.
    *
@@ -63,7 +57,11 @@ export {
  * @category errors
  * @since 0.1.0
  */
-export type Error = Authorization.Error | MemberStore.Failure | Schema.SchemaError | NotFound;
+export type Error =
+  | Authorization.Error
+  | MemberStore.Failure
+  | Schema.SchemaError
+  | CoreError.NotFound;
 
 /**
  * What renaming oneself can fail with: what a read can, and the failures of the commit.
@@ -105,7 +103,7 @@ export class MemberService extends Context.Service<
     /**
      * Read an active or removed membership after requiring `member.read` on it. Authorization and
      * lookup read current state without opening a transaction, and use an existing commit when
-     * there is one. Only authorized callers can receive `NotFound`.
+     * there is one. Only authorized callers can receive `CoreError.NotFound`.
      */
     readonly get: (memberId: Member.Id) => Effect.Effect<Member.Member, Error, Actor.Actor>;
     /**
@@ -168,7 +166,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
 
   const requireMember = Effect.fnUntraced(function* (id: Member.Id) {
     const found = yield* memberStore.get(id);
-    if (Option.isNone(found)) return yield* new NotFound({ workspaceId, memberId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id });
     return found.value;
   });
 

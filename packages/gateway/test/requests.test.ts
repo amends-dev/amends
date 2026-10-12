@@ -19,6 +19,7 @@ import {
   request,
   workspaceId,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const memberActor = (name: string) =>
   Actor.Actor.of({
@@ -146,7 +147,7 @@ describe("request keys", () => {
           ),
         );
         expect(yield* Effect.flip(as(other, start("Hello")))).toEqual(
-          new ThreadService.GroupNotFound({ groupId: group.id }),
+          new CoreError.NotFound({ resource: "Group", id: group.id }),
         );
       }),
     ),

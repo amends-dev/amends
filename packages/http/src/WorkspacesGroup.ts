@@ -38,7 +38,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
     HttpApiEndpoint.get("members", "/:workspaceId/member-management", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(WorkspaceSettings.MemberEntry),
-      error: [...ApiErrors.member, ...ApiErrors.delegation, ApiErrors.MemberNotFound],
+      error: [...ApiErrors.member, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.post("create", "/", {
       headers: ApiErrors.requestKey,

@@ -69,6 +69,7 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Replies: admission, recipients, concurrent sequencing, rollback, and replay. */
 
@@ -512,7 +513,7 @@ describe("thread replies", () => {
             const secret = yield* run(bound, actorFor(otherId), start(hidden.id));
             for (const id of [secret.thread.id, Thread.Id.make("missing")])
               expect(yield* Effect.flip(run(bound, owner, reply(id)))).toEqual(
-                new ThreadMessageService.NotFound({ threadId: id }),
+                new CoreError.NotFound({ resource: "Thread", id }),
               );
             const foreign = yield* boundTo(otherWorkspaceId);
             const foreignWorkspace = yield* initialized(foreign);
@@ -522,7 +523,7 @@ describe("thread replies", () => {
               identity: { _tag: "Human", id: foreignWorkspace.createdBy },
             });
             expect(yield* Effect.flip(run(foreign, foreignOwner, reply(first.thread.id)))).toEqual(
-              new ThreadMessageService.NotFound({ threadId: first.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: first.thread.id }),
             );
             expect(yield* messages(bound, first.thread.id)).toEqual(before.messages);
             expect(yield* bound.participations.listByThread(first.thread.id)).toEqual(
@@ -914,7 +915,7 @@ describe("thread replies", () => {
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(Thread.Id.make("missing"))),
             ),
-          ).toMatchObject({ _tag: "ThreadMessageService.NotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(
             yield* Effect.flip(
               gateway.asMember(workspace.id, identity, answer(first.thread.id, [], " ")),
@@ -983,7 +984,7 @@ describe("thread replies", () => {
               ),
             );
             expect(yield* Effect.flip(asActor(ownReply, human))).toEqual(
-              new ThreadMessageService.NotFound({ threadId: first.thread.id }),
+              new CoreError.NotFound({ resource: "Thread", id: first.thread.id }),
             );
             yield* run(
               bound,
@@ -1274,11 +1275,11 @@ describe("thread replies", () => {
               new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
             );
             expect(yield* Effect.flip(edit(other, messageId, "Final", []))).toEqual(
-              new ThreadMessageService.MessageNotFound({ messageId }),
+              new CoreError.NotFound({ resource: "ThreadMessage", id: messageId }),
             );
             const missing = ThreadMessage.Id.make("missing");
             expect(yield* Effect.flip(edit(human, missing, "Final", []))).toEqual(
-              new ThreadMessageService.MessageNotFound({ messageId: missing }),
+              new CoreError.NotFound({ resource: "ThreadMessage", id: missing }),
             );
             expect(yield* history(bound)).toEqual(before);
             // The edit newly mentions a group member who did not take part: they join and are told.

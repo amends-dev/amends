@@ -3,7 +3,6 @@
  * carry them to clients; the service's `Error` type adds the failures of what it depends on.
  */
 import { Schema } from "effect";
-import * as Group from "../../group/Group.ts";
 import * as Member from "../../workspace/Member.ts";
 import * as Thread from "../Thread.ts";
 
@@ -23,14 +22,6 @@ export class DirectMembersRequired extends Schema.TaggedError<DirectMembersRequi
 ) {}
 
 /**
- * The group is missing, or the actor is not a member of it; the two are not told apart.
- */
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "ThreadService.GroupNotFound",
-  { groupId: Group.Id },
-) {}
-
-/**
  * An agent asked to start a thread; only people start them, and agents' messages come from
  * their turns.
  */
@@ -38,14 +29,6 @@ export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>
   "ThreadService.HumanAuthorRequired",
   { memberId: Member.Id },
 ) {}
-
-/**
- * The thread is missing, in another workspace, or outside the actor's groups; the three are not
- * told apart.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("ThreadService.NotFound", {
-  threadId: Thread.Id,
-}) {}
 
 /**
  * A member who was to take part cannot: they are missing, inactive, or not in the group.

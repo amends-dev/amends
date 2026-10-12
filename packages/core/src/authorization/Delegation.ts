@@ -25,13 +25,9 @@ import * as Requirement from "./Requirement.ts";
 import * as BuiltinRoles from "./BuiltinRoles.ts";
 import * as Role from "./Role.ts";
 import * as RoleStore from "./RoleStore.ts";
-import {
-  Denied,
-  OwnerProtected,
-  RoleNotFound,
-  UnsupportedRole,
-} from "./internal/delegation-errors.ts";
+import { Denied, OwnerProtected, UnsupportedRole } from "./internal/delegation-errors.ts";
 import * as Store from "../journal/Store.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The actor may not delegate this: only the owner gives Administrator (`administrator-role`), and
@@ -50,13 +46,6 @@ export {
    * @since 0.1.0
    */
   OwnerProtected,
-  /**
-   * The built-in role is not recorded in this workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  RoleNotFound,
   /**
    * The role is not one of the three built-in ones; no other role is delegated.
    *
@@ -82,7 +71,7 @@ export type Error =
   | Denied
   | OwnerProtected
   | UnsupportedRole
-  | RoleNotFound;
+  | CoreError.NotFound;
 
 /**
  * The delegation rules, bound to one workspace. Read screens check current policy to show what the
@@ -204,7 +193,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     if (![BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
       return yield* new UnsupportedRole({ roleId: id });
     const found = yield* roleStore.get(id);
-    if (Option.isNone(found)) return yield* new RoleNotFound({ roleId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Role", id });
     const role = found.value;
     // A permission this host does not declare, retired or added by a newer host's bundles, grants
     // nothing here, as in GrantResolver; the role still loads, with every permission it records.

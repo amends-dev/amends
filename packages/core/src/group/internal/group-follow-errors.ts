@@ -16,14 +16,6 @@ export class AgentRequired extends Schema.TaggedError<AgentRequired>()(
 ) {}
 
 /**
- * Missing, foreign, and groups the actor does not belong to share this outcome.
- */
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "GroupFollowService.GroupNotFound",
-  { groupId: Group.Id },
-) {}
-
-/**
  * The named member is missing, inactive, or not a current member of the group.
  */
 export class MemberUnavailable extends Schema.TaggedError<MemberUnavailable>()(

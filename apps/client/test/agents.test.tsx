@@ -258,7 +258,7 @@ function fixture() {
     }
     const id = path.split("/")[4];
     const stored = server.agents.find((agent) => agent.id === id);
-    if (!stored) return json({ _tag: "AgentService.NotFound", agentId: id }, 404);
+    if (!stored) return json({ _tag: "CoreError.NotFound", resource: "Agent", id }, 404);
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/configuration")) Object.assign(stored, body);
     return json(viewOf(stored));

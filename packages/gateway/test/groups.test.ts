@@ -259,8 +259,8 @@ describe("groups", () => {
           const before = yield* history(bound);
           const footprint = yield* storage.footprint;
           for (const [ids, tag] of [
-            [[memberId, Member.Id.make("absent")], "GroupService.MemberNotFound"],
-            [[memberId, other.ownerMemberId], "GroupService.MemberNotFound"],
+            [[memberId, Member.Id.make("absent")], "CoreError.NotFound"],
+            [[memberId, other.ownerMemberId], "CoreError.NotFound"],
             [[memberId, agentId], "GroupService.InactiveMember"],
             [[memberId, memberId], "SchemaError"],
           ] as const) {
@@ -688,7 +688,7 @@ describe("groups", () => {
             expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe("SchemaError");
           expect(
             yield* Effect.flip(rename(owner, Group.Id.make("missing"), "Platform")),
-          ).toMatchObject({ _tag: "GroupService.NotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           // A direct group is named by its members.
           const direct = {
             id: Group.Id.make("direct-group"),

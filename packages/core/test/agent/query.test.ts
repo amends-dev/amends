@@ -17,6 +17,7 @@ import * as Identity from "../../src/identity/Identity.ts";
 import * as Member from "../../src/workspace/Member.ts";
 import * as MemberStore from "../../src/workspace/MemberStore.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
+import * as CoreError from "../../src/error/CoreError.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 
@@ -265,7 +266,7 @@ describe("what an agent runs a turn on", () => {
 
       for (const memberId of [person.id, agentMemberId]) {
         expect(yield* Effect.flip(agentQuery.select(memberId, undefined))).toEqual(
-          new AgentQuery.NotFound({ memberId }),
+          new CoreError.NotFound({ resource: "Agent", id: memberId }),
         );
       }
     }),

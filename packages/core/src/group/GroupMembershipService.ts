@@ -34,11 +34,9 @@ import {
   AlreadyRemoved,
   FixedMembership,
   GeneralMembership,
-  GroupNotFound,
   InactiveMember,
-  MemberNotFound,
-  NotFound,
 } from "./internal/group-membership-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 
 export {
   /**
@@ -71,36 +69,12 @@ export {
    */
   GeneralMembership,
   /**
-   * The group is missing, or the actor is not in it; for joining, also one that cannot be joined, a
-   * private or direct group. None are told apart, so nothing discloses a group to someone outside
-   * it.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GroupNotFound,
-  /**
    * The member to add is no longer active in the workspace.
    *
    * @category errors
    * @since 0.1.0
    */
   InactiveMember,
-  /**
-   * The member to add is not in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberNotFound,
-  /**
-   * The admission is missing, is in another group than the one named, or, when leaving, is another
-   * member's; none are told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
 } from "./internal/group-membership-errors.ts";
 
 /**
@@ -120,11 +94,9 @@ export type Error =
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error
-  | GroupNotFound
-  | MemberNotFound
+  | CoreError.NotFound
   | InactiveMember
   | AlreadyMember
-  | NotFound
   | AlreadyRemoved
   | FixedMembership
   | GeneralMembership;
@@ -141,7 +113,7 @@ export type ReadError =
   | GroupMembershipStore.Failure
   | MemberStore.Failure
   | Schema.SchemaError
-  | GroupNotFound;
+  | CoreError.NotFound;
 
 /**
  * The membership operations, one of `Core.Operations`.
@@ -156,8 +128,8 @@ export class GroupMembershipService extends Context.Service<
      * Require group.membership.manage on this group and membership of it, validate its active
      * workspace member, and publish a fresh admission in one commit. An active admission is
      * rejected without another fact. No workspace role reaches a group from outside it: to a
-     * non-member, a group is GroupNotFound, as a missing one is. Adding, removing, and leaving
-     * apply to team groups; direct groups reject them as fixed.
+     * non-member, a group is `CoreError.NotFound`, as a missing one is. Adding, removing, and
+     * leaving apply to team groups; direct groups reject them as fixed.
      */
     readonly add: (
       input: GroupMembership.AddInput,
@@ -172,8 +144,8 @@ export class GroupMembershipService extends Context.Service<
     ) => Effect.Effect<GroupMembership.GroupMembership, Error, Actor.Actor>;
     /**
      * Join a public team group as the actor, under group.join on it. Private and direct groups are
-     * GroupNotFound like missing ones, so joining discloses nothing about them. Joining again
-     * returns the actor's current admission and records nothing.
+     * `CoreError.NotFound` like missing ones, so joining discloses nothing about them. Joining
+     * again returns the actor's current admission and records nothing.
      */
     readonly join: (
       groupId: Group.Id,
@@ -224,15 +196,14 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
         Target.Reference.cases.Group.make({ workspaceId, groupId }),
       ),
     ]);
-    yield* groupQuery
-      .requireAudience(groupId)
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
+    yield* groupQuery.requireAudience(groupId);
   });
 
-  /** The group, or GroupNotFound when it is not stored. */
+  /** The group, or `CoreError.NotFound` when it is not stored. */
   const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const foundGroup = yield* groupStore.get(groupId);
-    if (Option.isNone(foundGroup)) return yield* new GroupNotFound({ groupId });
+    if (Option.isNone(foundGroup))
+      return yield* new CoreError.NotFound({ resource: "Group", id: groupId });
     return foundGroup.value;
   });
 
@@ -256,7 +227,8 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
       yield* requireTeamGroup(groupId);
 
       const member = yield* memberStore.get(memberId);
-      if (Option.isNone(member)) return yield* new MemberNotFound({ memberId });
+      if (Option.isNone(member))
+        return yield* new CoreError.NotFound({ resource: "Member", id: memberId });
       if (member.value.status !== "active") return yield* new InactiveMember({ memberId });
       if (Option.isSome(yield* groupMembershipStore.findActive(groupId, memberId)))
         return yield* new AlreadyMember({ groupId, memberId });
@@ -279,7 +251,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
       const actor = yield* Actor.Actor;
       const group = yield* requireGroup(groupId);
       if (group.kind !== "Team" || group.visibility !== "Public")
-        return yield* new GroupNotFound({ groupId });
+        return yield* new CoreError.NotFound({ resource: "Group", id: groupId });
       const current = yield* groupMembershipStore.findActive(groupId, actor.memberId);
       if (Option.isSome(current)) return current.value;
       return yield* admitMember(groupId, actor.memberId);
@@ -289,11 +261,11 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     journal.commit,
   );
 
-  /** The admission the input names in its group, or NotFound. */
+  /** The admission the input names in its group, or `CoreError.NotFound`. */
   const requireMembership = Effect.fnUntraced(function* (input: GroupMembership.RemoveInput) {
     const found = yield* groupMembershipStore.get(input.membershipId);
     if (Option.isNone(found) || found.value.groupId !== input.groupId)
-      return yield* new NotFound(input);
+      return yield* new CoreError.NotFound({ resource: "GroupMembership", id: input.membershipId });
     return found.value;
   });
 
@@ -351,7 +323,11 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
       const actor = yield* Actor.Actor;
       const membership = yield* requireMembership(checked);
       // Do not disclose another member's admission or departure state through self-service.
-      if (membership.memberId !== actor.memberId) return yield* new NotFound(checked);
+      if (membership.memberId !== actor.memberId)
+        return yield* new CoreError.NotFound({
+          resource: "GroupMembership",
+          id: checked.membershipId,
+        });
       const group = yield* requireTeamGroup(checked.groupId);
       if (Group.isGeneral(group)) return yield* new GeneralMembership({ groupId: group.id });
       return yield* endMembership(membership, "left");
@@ -399,9 +375,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     options: GroupMembership.ListOptions,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    yield* groupQuery
-      .requireAudience(id)
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId: id })));
+    yield* groupQuery.requireAudience(id);
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);

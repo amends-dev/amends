@@ -7,13 +7,6 @@ import { Schema } from "effect";
 import * as Connection from "../Connection.ts";
 
 /**
- * The connection is missing, removed, or not readable by the actor; the three are not told apart.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("ConnectionService.NotFound", {
-  connectionId: Connection.Id,
-}) {}
-
-/**
  * The connection's name is no longer the one expected: someone renamed it meanwhile.
  */
 export class Changed extends Schema.TaggedError<Changed>()("ConnectionService.Changed", {

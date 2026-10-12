@@ -4,14 +4,6 @@
  * what it depends on. `ChannelIntake` re-exports them.
  */
 import { Schema } from "effect";
-import * as ChannelId from "../ChannelId.ts";
-
-/**
- * The channel is missing or removed, so the request reaches no channel.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("ChannelIntake.NotFound", {
-  channelId: ChannelId.Id,
-}) {}
 
 /**
  * The channel's transport rejected what the host received: it is not the external system's, or

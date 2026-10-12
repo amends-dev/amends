@@ -26,6 +26,7 @@ import { type Scope } from "effect";
 import * as GatewayErrors from "./GatewayErrors.ts";
 import * as WorkspaceStorage from "./WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "./internal/workspace-runtime.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /**
  * The gateway a host builds once, with `make` or `layer`: it creates workspaces and runs programs
@@ -67,16 +68,12 @@ export class Gateway extends Context.Service<
      * caller's scope: invitation acceptance, where the recipient is not yet a member, and a host's
      * jobs, which call the services core gives them. Programs may require only core's operations
      * and those services, never the journal or the stores commits write. A workspace that was never
-     * created returns WorkspaceNotFound without being prepared.
+     * created returns `CoreError.NotFound` for the workspace without being prepared.
      */
     readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
       workspaceId: Workspace.Id,
       program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<
-      A,
-      GatewayErrors.PublicErrorOf<E> | GatewayErrors.WorkspaceNotFound,
-      Scope.Scope
-    >;
+    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.NotFound, Scope.Scope>;
   }
 >()("@amends-dev/gateway/Gateway") {}
 
@@ -250,7 +247,7 @@ export const make = Effect.fn("Gateway.make")(function* (
   /** A workspace that was never created has no history, and is refused before it is prepared. */
   const requireCreated = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
     if (!(yield* runtimes.isPrepared(workspaceId)) && !(yield* hasHistory(workspaceId)))
-      return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+      return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId });
   });
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(

@@ -68,6 +68,7 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Thread discovery, metadata, timeline pages, and participant summaries. */
 
@@ -413,11 +414,11 @@ describe("thread reads", () => {
                 > = [get(id), timeline(id), participants(id)];
                 for (const call of calls)
                   expect(yield* Effect.flip(run(bound, actor, call))).toEqual(
-                    new ThreadService.NotFound({ threadId: id }),
+                    new CoreError.NotFound({ resource: "Thread", id }),
                   );
               }
             expect(yield* Effect.flip(run(bound, owner, list(hidden.id)))).toEqual(
-              new ThreadService.GroupNotFound({ groupId: hidden.id }),
+              new CoreError.NotFound({ resource: "Group", id: hidden.id }),
             );
             yield* publish(
               bound,
@@ -578,12 +579,12 @@ describe("thread reads", () => {
                     }),
                 );
                 expect(yield* Effect.flip(threadService.get(first.thread.id))).toEqual(
-                  new ThreadService.NotFound({ threadId: first.thread.id }),
+                  new CoreError.NotFound({ resource: "Thread", id: first.thread.id }),
                 );
                 expect(
                   yield* Effect.flip(threadService.listInGroup(group.id, { limit: 100 })),
                 ).toMatchObject({
-                  _tag: "ThreadService.GroupNotFound",
+                  _tag: "CoreError.NotFound",
                 });
                 yield* asActor(
                   Effect.flatMap(
@@ -781,7 +782,7 @@ describe("thread reads", () => {
                     reason: "removed",
                   });
                   expect(yield* Effect.flip(asActor(get(first.thread.id), reader))).toMatchObject({
-                    _tag: "ThreadService.NotFound",
+                    _tag: "CoreError.NotFound",
                   });
                   return yield* Effect.fail("rollback");
                 }).pipe(Publication.withActor),
@@ -823,7 +824,7 @@ describe("thread reads", () => {
             yield* grant(bound, memberId, ThreadPermissions.Read);
             const visitor = Actor.Actor.of({ workspaceId, memberId, identity });
             expect(yield* Effect.flip(run(bound, visitor, get(first.thread.id)))).toMatchObject({
-              _tag: "ThreadService.NotFound",
+              _tag: "CoreError.NotFound",
             });
             yield* run(
               bound,
@@ -951,7 +952,7 @@ describe("thread reads", () => {
             for (const id of [foreignThread.thread.id, Thread.Id.make("missing")])
               expect(
                 yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, get(id))),
-              ).toEqual(new ThreadService.NotFound({ threadId: id }));
+              ).toEqual(new CoreError.NotFound({ resource: "Thread", id }));
             expect(
               yield* Effect.flip(
                 gateway.asMember(

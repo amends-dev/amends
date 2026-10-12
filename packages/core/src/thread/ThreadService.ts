@@ -51,11 +51,10 @@ import * as TaskStore from "../task/TaskStore.ts";
 import {
   Changed,
   DirectMembersRequired,
-  GroupNotFound,
   HumanAuthorRequired,
-  NotFound,
   ParticipantUnavailable,
 } from "./internal/thread-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The thread's title is no longer the one the renamer expected: someone renamed it meanwhile.
@@ -72,13 +71,6 @@ export {
    */
   DirectMembersRequired,
   /**
-   * The group is missing, or the actor is not a member of it; the two are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GroupNotFound,
-  /**
    * An agent asked to start a thread; only people start them, and agents' messages come from
    * their turns.
    *
@@ -86,14 +78,6 @@ export {
    * @since 0.1.0
    */
   HumanAuthorRequired,
-  /**
-   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
-   * told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
   /**
    * A member who was to take part cannot: they are missing, inactive, or not in the group.
    *
@@ -125,11 +109,10 @@ export type Error =
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error
-  | GroupNotFound
+  | CoreError.NotFound
   | ParticipantUnavailable
   | HumanAuthorRequired
   | DirectMembersRequired
-  | NotFound
   | ThreadStore.Failure
   | ThreadMessageStore.Failure
   | ThreadActivityStore.Failure
@@ -147,7 +130,7 @@ export type RenameError =
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | GroupMembershipStore.Failure
   | TaskStore.Failure
-  | NotFound
+  | CoreError.NotFound
   | Changed;
 
 /**
@@ -157,14 +140,13 @@ export type RenameError =
  * @since 0.1.0
  */
 export type ReadError =
-  | Exclude<ThreadQuery.ListError, GroupQuery.NotMember>
+  | ThreadQuery.ListError
   | MemberStore.Failure
   | ThreadMessageStore.Failure
   | ThreadActivityStore.Failure
   | ThreadActivityResolvers.Failure
   | ThreadParticipationStore.Failure
-  | GroupNotFound
-  | NotFound;
+  | CoreError.NotFound;
 
 /**
  * The thread operations, one of `Core.Operations`.
@@ -474,14 +456,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
   const startInGroup = Effect.fn("ThreadService.startInGroup")(
     function* (input: Thread.StartInGroupInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input);
-      yield* groupQuery
-        .requireAudience(request.groupId)
-        .pipe(
-          Effect.catchTag(
-            "GroupQuery.NotMember",
-            () => new GroupNotFound({ groupId: request.groupId }),
-          ),
-        );
+      yield* groupQuery.requireAudience(request.groupId);
       yield* authorization.require([
         Requirement.make(ThreadPermissions.Start, {
           _tag: "Group",
@@ -504,15 +479,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
           : yield* teamStarters(group.id, actor.memberId, request.mentions);
       yield* authorizeParticipants(starters, request.mentions, eligible);
       // Work is split out of a thread its author can read; to anyone else the origin is missing.
-      if (request.origin !== undefined)
-        yield* threadQuery
-          .requireReadable(request.origin)
-          .pipe(
-            Effect.catchTag(
-              "ThreadQuery.NotFound",
-              (error) => new NotFound({ threadId: error.threadId }),
-            ),
-          );
+      if (request.origin !== undefined) yield* threadQuery.requireReadable(request.origin);
       if (request.task !== undefined) yield* authorizeTask(group.id, request.task);
       return yield* createThread(actor.memberId, request.groupId, starters, request, ids);
     },
@@ -525,14 +492,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     function* (input: Thread.RenameInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Thread.RenameInput))(input);
       // Only its group's members may rename a thread; to anyone else it is missing.
-      const thread = yield* threadQuery
-        .requireAccess(request.threadId)
-        .pipe(
-          Effect.catchTag(
-            "ThreadQuery.NotFound",
-            (error) => new NotFound({ threadId: error.threadId }),
-          ),
-        );
+      const thread = yield* threadQuery.requireAccess(request.threadId);
       yield* authorization.require([
         Requirement.make(ThreadPermissions.Rename, {
           _tag: "Thread",
@@ -590,36 +550,18 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     journal.commit,
   );
 
-  /** The thread the actor may read, which every read of its conversation checks first. */
-  const requireReadable = (threadId: Thread.Id) =>
-    threadQuery
-      .requireReadable(threadId)
-      .pipe(
-        Effect.catchTag(
-          "ThreadQuery.NotFound",
-          (error) => new NotFound({ threadId: error.threadId }),
-        ),
-      );
-
   // Reads are deliberately outside journal.commit; an enclosing caller transaction remains
   // authoritative when present.
-  const get = Effect.fn("ThreadService.get")(requireReadable);
-
-  /** A page of the group's readable threads, which the actor must belong to. */
-  const listReadable = <R, Cursor, E>(
-    groupId: Group.Id,
-    options: ThreadQuery.ListOptions<R, Cursor, E>,
-  ) =>
-    threadQuery
-      .listReadable(groupId, options)
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
+  const get = Effect.fn("ThreadService.get")((threadId: Thread.Id) =>
+    threadQuery.requireReadable(threadId),
+  );
 
   const listInGroup = Effect.fn("ThreadService.listInGroup")(function* (
     groupId: Group.Id,
     input: Thread.ListOptions,
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
-    return yield* listReadable(groupId, {
+    return yield* threadQuery.listReadable(groupId, {
       limit: options.limit,
       first: options.before,
       list: (before) =>
@@ -640,7 +582,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     input: Thread.OpeningOptions,
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input);
-    const items = yield* listReadable(groupId, {
+    const items = yield* threadQuery.listReadable(groupId, {
       limit: options.limit,
       first: options.before,
       list: (before) =>
@@ -689,21 +631,14 @@ export const make = Effect.fn("ThreadService.make")(function* () {
 
   const readTimeline = Effect.fn("ThreadService.readTimeline")(
     (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) =>
-      threadQuery
-        .readTimeline(threadId, options)
-        .pipe(
-          Effect.catchTag(
-            "ThreadQuery.NotFound",
-            (error) => new NotFound({ threadId: error.threadId }),
-          ),
-        ),
+      threadQuery.readTimeline(threadId, options),
   );
 
   const listParticipants = Effect.fn("ThreadService.listParticipants")(function* (
     threadId: Thread.Id,
     options: ThreadParticipation.ListOptions,
   ) {
-    const thread = yield* requireReadable(threadId);
+    const thread = yield* threadQuery.requireReadable(threadId);
     const participants = yield* threadQuery.pageParticipants(thread, options);
     return participants.map(ThreadParticipation.toSummary);
   });

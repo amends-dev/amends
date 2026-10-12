@@ -259,9 +259,9 @@ it.effect(
         ),
       );
       expect(yield* run(fixture, get(missingId).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberService.NotFound",
-        workspaceId,
-        memberId: missingId,
+        _tag: "CoreError.NotFound",
+        resource: "Member",
+        id: missingId,
       });
     }),
 );
@@ -465,7 +465,7 @@ it.effect(
       );
       const authorized = yield* fixture.snapshot;
       expect(yield* run(fixture, remove(missingId).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberService.NotFound",
+        _tag: "CoreError.NotFound",
       });
       for (const actor of [alice, agent]) {
         expect(yield* run(fixture, remove(alice.memberId).pipe(Effect.flip), actor)).toMatchObject({

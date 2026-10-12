@@ -46,6 +46,7 @@ import { DateTime, Effect, Layer, Redacted } from "effect";
 import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
+import { CoreError } from "@amends-dev/core/error";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const bob = Identity.HumanId.make("bob");
@@ -124,7 +125,9 @@ const conversations = Layer.mergeAll(
     GroupService.GroupService.of({
       createTeam: record("group.create", () => Effect.succeed(team)),
       rename: record("group.rename", () => Effect.succeed(team)),
-      get: record("group.get", (id) => Effect.fail(new GroupService.NotFound({ groupId: id }))),
+      get: record("group.get", (id) =>
+        Effect.fail(new CoreError.NotFound({ resource: "Group", id })),
+      ),
       listMine: record("group.listMine", () => Effect.succeed([])),
       listPublic: record("group.listPublic", () => Effect.succeed([])),
     }),
@@ -136,7 +139,7 @@ const conversations = Layer.mergeAll(
         Effect.fail(new GroupMembershipService.AlreadyMember(input)),
       ),
       join: record("group.join", (groupId) =>
-        Effect.fail(new GroupMembershipService.GroupNotFound({ groupId })),
+        Effect.fail(new CoreError.NotFound({ resource: "Group", id: groupId })),
       ),
       remove: record("group.remove", (input) =>
         Effect.fail(new GroupMembershipService.FixedMembership({ groupId: input.groupId })),
@@ -165,7 +168,9 @@ const conversations = Layer.mergeAll(
       startDirect: record("thread.startDirect", () =>
         Effect.fail(new ThreadService.DirectMembersRequired()),
       ),
-      get: record("thread.get", (id) => Effect.fail(new ThreadService.NotFound({ threadId: id }))),
+      get: record("thread.get", (id) =>
+        Effect.fail(new CoreError.NotFound({ resource: "Thread", id })),
+      ),
       rename: record("thread.rename", (input) =>
         Effect.fail(new ThreadService.Changed({ threadId: input.threadId })),
       ),
@@ -184,7 +189,9 @@ const conversations = Layer.mergeAll(
       update: record("task.update", (input) =>
         Effect.fail(new TaskService.Changed({ threadId: input.threadId })),
       ),
-      get: record("task.get", (id) => Effect.fail(new TaskService.NotFound({ threadId: id }))),
+      get: record("task.get", (id) =>
+        Effect.fail(new CoreError.NotFound({ resource: "Task", id })),
+      ),
       listInGroup: record("task.list", () => Effect.succeed([])),
     }),
   ),
@@ -198,7 +205,7 @@ const conversations = Layer.mergeAll(
         Effect.fail(new ThreadMessageService.Changed({ messageId: input.messageId })),
       ),
       delete: record("thread.delete", (id) =>
-        Effect.fail(new ThreadMessageService.MessageNotFound({ messageId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "ThreadMessage", id })),
       ),
       typing: record("thread.typing", () => Effect.void),
     }),
@@ -207,7 +214,7 @@ const conversations = Layer.mergeAll(
     ThreadParticipationService.ThreadParticipationService,
     ThreadParticipationService.ThreadParticipationService.of({
       follow: record("thread.follow", (id) =>
-        Effect.fail(new ThreadParticipationService.ThreadNotFound({ threadId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "Thread", id })),
       ),
       unfollow: record("thread.unfollow", (input) =>
         Effect.fail(new ThreadParticipationService.AlreadyEnded(input)),
@@ -240,14 +247,14 @@ const channels = Layer.mergeAll(
         Effect.fail(new ChannelService.ConnectionUnavailable({ connectionId: input.connectionId })),
       ),
       get: record("channel.get", (id) =>
-        Effect.fail(new ChannelService.NotFound({ channelId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "Channel", id })),
       ),
       redirect: record("channel.redirect", (input) =>
-        Effect.fail(new ChannelService.GroupNotFound({ groupId: input.groupId })),
+        Effect.fail(new CoreError.NotFound({ resource: "Group", id: input.groupId })),
       ),
       remove: record("channel.remove", () => Effect.void),
       getBinding: record("channel.binding", (id) =>
-        Effect.fail(new ChannelService.NotBound({ threadId: id })),
+        Effect.fail(new CoreError.NotFound({ resource: "ChannelBinding", id })),
       ),
     }),
   ),
@@ -268,7 +275,7 @@ const operations = Layer.mergeAll(
       markSeen: record("notification.markSeen", (notificationId) =>
         notificationId === notification.id
           ? Effect.fail(new NotificationService.AlreadyHandled({ notificationId }))
-          : Effect.fail(new NotificationService.NotFound({ workspaceId, notificationId })),
+          : Effect.fail(new CoreError.NotFound({ resource: "Notification", id: notificationId })),
       ),
       inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),
       markSeenThrough: record("notification.markSeenThrough", () => Effect.succeed(2)),
@@ -281,7 +288,7 @@ const operations = Layer.mergeAll(
       get: record("get", (target) =>
         target === memberId
           ? Effect.succeed(member)
-          : Effect.fail(new MemberService.NotFound({ workspaceId, memberId: target })),
+          : Effect.fail(new CoreError.NotFound({ resource: "Member", id: target })),
       ),
       remove: record("remove", () => Effect.fail(denied)),
       rename: record("rename", (name) =>
@@ -493,9 +500,9 @@ it.effect("marking a missing notification seen exposes a typed 404", () =>
         .pipe(Effect.flip),
     );
     expect(missing).toMatchObject({
-      _tag: "NotificationService.NotFound",
-      workspaceId,
-      notificationId: "missing",
+      _tag: "CoreError.NotFound",
+      resource: "Notification",
+      id: "missing",
     });
   }),
 );
@@ -521,7 +528,11 @@ it.effect("domain outcomes keep their tags and statuses", () =>
         .get({ params: { workspaceId, memberId: Member.Id.make("missing") } })
         .pipe(Effect.flip),
     );
-    expect(missing).toMatchObject({ _tag: "MemberService.NotFound", memberId: "missing" });
+    expect(missing).toMatchObject({
+      _tag: "CoreError.NotFound",
+      resource: "Member",
+      id: "missing",
+    });
     const notMember = yield* run("bob", (client) =>
       client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
     );

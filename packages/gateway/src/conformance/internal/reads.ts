@@ -82,7 +82,7 @@ export const reads = (fixture: Fixture) => {
                       yield* Effect.flip(
                         notificationService.markSeen(Notification.Id.make("missing")),
                       ),
-                    ).toMatchObject({ _tag: "NotificationService.NotFound" });
+                    ).toMatchObject({ _tag: "CoreError.NotFound" });
                     const stream = yield* (yield* ChangeFeedService.ChangeFeedService).watch();
                     expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
                       { _tag: "Ready", workspaceId: workspace.id, reset: true },

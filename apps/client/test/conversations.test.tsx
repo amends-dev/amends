@@ -683,8 +683,11 @@ it("lists public groups and joins one, refreshing the list; a group gone says so
     }
     if (path === "/workspaces/one/groups/g2/join")
       return new Response(
-        JSON.stringify({ _tag: "GroupMembershipService.GroupNotFound", groupId: "g2" }),
-        { status: 404, headers: { "content-type": "application/json" } },
+        JSON.stringify({ _tag: "CoreError.NotFound", resource: "Group", id: "g2" }),
+        {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        },
       );
     return json([]);
   });

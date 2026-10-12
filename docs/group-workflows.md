@@ -63,7 +63,7 @@ creator, and offer creation to members whose workspace permissions, read through
 
 `GroupService.rename({ groupId, name, expectedName })` requires `group.rename` on the group,
 which every built-in role holds, and membership of the group. To anyone outside it, the group is
-`GroupService.NotFound`, as a missing or foreign one is, and a direct group, named by its
+`CoreError.NotFound`, as a missing or foreign one is, and a direct group, named by its
 members, is `GroupService.NotRenamable`. The name follows creation's rule, while `expectedName` may be any recorded name. Renaming
 records `group.renamed` with the new name and returns the group; the same name again records
 nothing. Otherwise `expectedName`, the name the renamer last saw, must still be the group's name:
@@ -88,7 +88,7 @@ grants skip groups. Private and direct groups are never listed.
 
 `GroupMembershipService.join(groupId)` requires `group.join` on the group, then admits the
 caller, recording `group.membership.added` attributed to them, like an addition. Private, direct,
-and missing groups are `GroupMembershipService.GroupNotFound`, so joining discloses nothing
+and missing groups are `CoreError.NotFound`, so joining discloses nothing
 about them. Joining a group the caller already belongs to returns their admission and records
 nothing. Leaving, removal, following, and renaming work as for any team group.
 
@@ -126,8 +126,8 @@ A roster returns `GroupMembership.GroupMembership` values: admission IDs, worksp
 and admission times, for active admissions whose workspace member is still active. It needs no
 `member.read` grant and returns no member profiles, identities, or ended admissions.
 
-Missing, foreign, and outside-audience groups share `GroupService.NotFound` for `get`;
-ordinary roster reads use `GroupMembershipService.GroupNotFound`. A current member without the
+Missing, foreign, and outside-audience groups are `CoreError.NotFound` for `get` and roster
+reads alike. A current member without the
 action grant receives `Authorization.Denied`. No read reaches a group from outside it. Storage and
 consistency failures are not hidden as empty lists or
 missing groups. Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
@@ -136,14 +136,14 @@ missing groups. Reads follow core's [read boundaries](../packages/core/README.md
 
 `GroupMembershipService.add({ groupId, memberId })` requires `group.membership.manage` on the
 group, which every built-in role holds, and membership of the group: to anyone outside it, the
-group is `GroupNotFound`. An exact Group scope authorizes that group only; a workspace scope covers
+group is `CoreError.NotFound`. An exact Group scope authorizes that group only; a workspace scope covers
 every group the caller belongs to. No member-read grant is needed, and group creation authority or
 creator attribution grants no management authority.
 
 The group must exist in the workspace, and `memberId` must name an active human or agent
 membership there; missing and foreign references share the not-found outcomes. An existing active
 admission returns `GroupMembershipService.AlreadyMember` without recording anything. The other
-outcomes are `GroupNotFound`, `MemberNotFound`, and `InactiveMember`.
+outcomes are `CoreError.NotFound`, for the group or the member, and `InactiveMember`.
 
 A successful addition returns a fresh `GroupMembership.GroupMembership` with its own admission time. It
 neither invokes an agent nor enrolls anyone in an existing thread. Concurrent additions cannot
@@ -153,7 +153,7 @@ without an automatic retry.
 ## Removing a member or leaving
 
 `GroupMembershipService.remove({ groupId, membershipId })` requires `group.membership.manage`
-on the group and membership of it; to anyone outside it, the group is `GroupNotFound`. Any member
+on the group and membership of it; to anyone outside it, the group is `CoreError.NotFound`. Any member
 may remove others from a private group. Removing someone else from a public group also requires
 `group.moderate`, which administrators and the owner hold; removing oneself needs no more than
 leaving does. `group.create`, creator attribution, and role names do not authorize removal.
@@ -167,9 +167,9 @@ waits on the group's notifications: their pending ones from it are settled as `a
 
 Both address a specific admission and return it with `status: "removed"`, keeping its group,
 member, and admission time. Missing, foreign, and wrong-group admission IDs return
-`GroupMembershipService.NotFound`; leaving also returns `NotFound` for another member's
-admission. Managed removal returns `GroupNotFound` for a missing group, or one the caller is not
-in, after authorization.
+`CoreError.NotFound` for the admission, as leaving does for another member's admission. Managed
+removal returns it for the group when the group is missing, or the caller is not in it, after
+authorization.
 Repeating a departure returns `AlreadyRemoved`. Adding the member again creates a fresh admission,
 which no earlier removal or leave request can end. Leaving grants no authority to add oneself back.
 
@@ -201,7 +201,7 @@ stops joining future threads and leaves current thread participation unchanged. 
 value, and repeating either records nothing.
 
 The actor must be a current member of the group; otherwise, as for a missing group, the result is
-`GroupFollowService.GroupNotFound`. Members follow for themselves under `group.follow`, and
+`CoreError.NotFound`. Members follow for themselves under `group.follow`, and
 unfollowing oneself needs no grant. Another member can be made to follow or unfollow only when it
 is an agent in the group and the actor holds `agent.use` for it: a person returns `AgentRequired`,
 and a member outside the group or inactive returns `MemberUnavailable`. Posting in the group then

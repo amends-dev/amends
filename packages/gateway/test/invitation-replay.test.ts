@@ -131,7 +131,7 @@ describe("invitation replay", () => {
             // A member ID from another workspace cannot be addressed through this context.
             expect(
               yield* Effect.flip(Operations.removeMember(workspace.id, alice, other.ownerMemberId)),
-            ).toMatchObject({ _tag: "MemberService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             const results = yield* Effect.forEach(
               [1, 2],
               () => Operations.removeMember(workspace.id, alice, member.id).pipe(Effect.result),

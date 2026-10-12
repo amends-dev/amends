@@ -33,14 +33,9 @@ import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
-import {
-  Changed,
-  InactiveMember,
-  MemberNotFound,
-  NotFound,
-  NotRenamable,
-} from "./internal/group-errors.ts";
+import { Changed, InactiveMember, NotRenamable } from "./internal/group-errors.ts";
 import * as Notification from "../notification/Notification.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The group's name is no longer the one the renamer expected: someone renamed it meanwhile.
@@ -56,21 +51,6 @@ export {
    * @since 0.1.0
    */
   InactiveMember,
-  /**
-   * A member listed for a new team group is not in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberNotFound,
-  /**
-   * Missing groups and groups outside the caller's audience share this outcome, so nothing discloses
-   * a group to someone outside it.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
   /**
    * A direct group is named by its members, so it has no name to change.
    *
@@ -105,10 +85,9 @@ export type Error =
 export type CreateError =
   | Error
   | MemberStore.Failure
-  | MemberNotFound
+  | CoreError.NotFound
   | InactiveMember
-  | GroupStore.Failure
-  | NotFound;
+  | GroupStore.Failure;
 
 /**
  * What renaming a team group can fail with: the outcomes above, and the failures of
@@ -121,7 +100,7 @@ export type RenameError =
   | Error
   | GroupStore.Failure
   | GroupMembershipStore.Failure
-  | NotFound
+  | CoreError.NotFound
   | NotRenamable
   | Changed;
 
@@ -139,7 +118,7 @@ export type ReadError =
   | ReadStateStore.Failure
   | NotificationStore.Failure
   | Schema.SchemaError
-  | NotFound;
+  | CoreError.NotFound;
 
 /**
  * The group operations, one of `Core.Operations`.
@@ -162,11 +141,11 @@ export class GroupService extends Context.Service<
       options?: Request.Options,
     ) => Effect.Effect<Group.Group, CreateError, Actor.Actor>;
     /**
-     * Require group.rename on the group and membership of it, then give a team group a new name.
-     * No workspace role reaches a group from outside it: to a non-member, a group is NotFound, as a
-     * missing or foreign one is. A direct group, named by its members, is NotRenamable. The same
-     * name again records nothing; otherwise a name other than `expectedName` is Changed, and
-     * nothing is recorded.
+     * Require group.rename on the group and membership of it, then give a team group a new name. No
+     * workspace role reaches a group from outside it: to a non-member, a group is
+     * `CoreError.NotFound`, as a missing or foreign one is. A direct group, named by its members,
+     * is NotRenamable. The same name again records nothing; otherwise a name other than
+     * `expectedName` is Changed, and nothing is recorded.
      */
     readonly rename: (
       input: Group.RenameInput,
@@ -218,10 +197,11 @@ export const make = Effect.fn("GroupService.make")(function* () {
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
 
-  /** The group, or NotFound when it is not stored. */
+  /** The group, or `CoreError.NotFound` when it is not stored. */
   const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const found = yield* groupStore.get(groupId);
-    if (Option.isNone(found)) return yield* new NotFound({ groupId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Group", id: groupId });
     return found.value;
   });
 
@@ -243,7 +223,8 @@ export const make = Effect.fn("GroupService.make")(function* () {
       );
       for (const memberId of request.memberIds) {
         const member = found.get(memberId);
-        if (member === undefined) return yield* new MemberNotFound({ memberId });
+        if (member === undefined)
+          return yield* new CoreError.NotFound({ resource: "Member", id: memberId });
         if (member.status !== "active") return yield* new InactiveMember({ memberId });
       }
       const createdAt = yield* DateTime.now;
@@ -272,9 +253,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
 
   const get = Effect.fn("GroupService.get")(function* (groupId: Group.Id) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    yield* groupQuery
-      .requireAudience(id)
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new NotFound({ groupId: id })));
+    yield* groupQuery.requireAudience(id);
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);
@@ -292,11 +271,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
         }),
       ]);
       // Only its members may rename a group; to anyone else it is missing.
-      yield* groupQuery
-        .requireAudience(request.groupId)
-        .pipe(
-          Effect.catchTag("GroupQuery.NotMember", () => new NotFound({ groupId: request.groupId })),
-        );
+      yield* groupQuery.requireAudience(request.groupId);
       const group = yield* requireGroup(request.groupId);
       if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
       if (group.name === request.name) return group;

@@ -215,7 +215,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
 
           yield* asAlice.connections.remove({ params });
           expect(yield* asBob.connections.get({ params }).pipe(Effect.flip)).toMatchObject({
-            _tag: "ConnectionService.NotFound",
+            _tag: "CoreError.NotFound",
           });
           expect(yield* asBob.connections.list({ params: { workspaceId } })).toMatchObject([
             { id: agent.id },

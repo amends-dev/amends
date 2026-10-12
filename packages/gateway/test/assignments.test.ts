@@ -56,7 +56,7 @@ describe("assignments", () => {
                 roleId: BuiltinRoles.MemberId,
               }),
             ),
-          ).toMatchObject({ _tag: "AssignmentService.MemberNotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(yield* Effect.flip(Operations.access(other.id, bob, viewer.id))).toMatchObject({
             _tag: "GatewayErrors.NotMember",
           });
@@ -64,7 +64,7 @@ describe("assignments", () => {
             yield* Effect.flip(
               Operations.revokeAssignment(workspace.id, alice, admin.id, first.id),
             ),
-          ).toMatchObject({ _tag: "AssignmentService.NotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
           expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
             before,
           );

@@ -31,6 +31,7 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Following groups: joining later threads, ending with the admission, and storage constraints. */
 
@@ -250,7 +251,7 @@ describe("group follows", () => {
             });
             expect(
               yield* Effect.flip(run(bound, actorFor(outsiderId), follow(team.id, outsiderId))),
-            ).toEqual(new GroupFollowService.GroupNotFound({ groupId: team.id }));
+            ).toEqual(new CoreError.NotFound({ resource: "Group", id: team.id }));
             const direct = yield* run(
               bound,
               owner,

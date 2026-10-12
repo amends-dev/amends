@@ -13,10 +13,11 @@ import {
   type TurnJobs,
 } from "@amends-dev/core/turn";
 import { Member, Workspace } from "@amends-dev/core/workspace";
-import { Gateway, GatewayErrors } from "@amends-dev/gateway";
+import { Gateway } from "@amends-dev/gateway";
 import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends-dev/harness";
 import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
+import { CoreError } from "@amends-dev/core/error";
 
 export const workspaceId = Workspace.Id.make("workspace-1");
 export const job: TurnJobs.Job = {
@@ -179,7 +180,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
         Effect.gen(function* () {
           entered += 1;
           if (options.created === false)
-            return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+            return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId });
           return yield* program;
         }),
         services,

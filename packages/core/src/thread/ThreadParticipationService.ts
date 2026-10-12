@@ -21,12 +21,8 @@ import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";
 import * as GroupStore from "../group/GroupStore.ts";
-import {
-  AlreadyEnded,
-  FixedParticipation,
-  NotFound,
-  ThreadNotFound,
-} from "./internal/thread-participation-errors.ts";
+import { AlreadyEnded, FixedParticipation } from "./internal/thread-participation-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The actor's participation had already ended.
@@ -42,22 +38,6 @@ export {
    * @since 0.1.0
    */
   FixedParticipation,
-  /**
-   * The participation is missing, in another thread, or another member's; the three are not told
-   * apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
-   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
-   * told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  ThreadNotFound,
 } from "./internal/thread-participation-errors.ts";
 
 /**
@@ -69,11 +49,10 @@ export {
  */
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadQuery.AccessError
   | ThreadCommand.Error
   | GroupStore.Failure
-  | ThreadNotFound
-  | NotFound
+  | CoreError.NotFound
   | AlreadyEnded
   | FixedParticipation;
 
@@ -117,19 +96,9 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
   const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Store;
-  /** The thread, under its audience; one outside it is missing to the actor. */
-  const requireAccess = (threadId: Thread.Id) =>
-    threadQuery
-      .requireAccess(threadId)
-      .pipe(
-        Effect.catchTag(
-          "ThreadQuery.NotFound",
-          (error) => new ThreadNotFound({ threadId: error.threadId }),
-        ),
-      );
   const follow = Effect.fn("ThreadParticipationService.follow")(
     function* (threadId: Thread.Id) {
-      const thread = yield* requireAccess(threadId);
+      const thread = yield* threadQuery.requireAccess(threadId);
       yield* authorization.require([
         Requirement.make(ThreadParticipationPermissions.Follow, {
           _tag: "Thread",
@@ -170,14 +139,18 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
   const unfollow = Effect.fn("ThreadParticipationService.unfollow")(
     function* (input: ThreadParticipation.UnfollowInput) {
       const request = yield* Schema.decodeEffect(ThreadParticipation.UnfollowInput)(input);
-      const thread = yield* requireAccess(request.threadId);
+      const thread = yield* threadQuery.requireAccess(request.threadId);
       const group = yield* groupStore.get(thread.groupId);
       if (Option.isNone(group)) return yield* Effect.die("A thread's group is missing");
       if (group.value.kind === "Direct")
         return yield* new FixedParticipation({ threadId: thread.id });
       const actor = yield* Actor.Actor;
       const found = yield* threadParticipationStore.get(request.participationId);
-      if (Option.isNone(found)) return yield* new NotFound(request);
+      if (Option.isNone(found))
+        return yield* new CoreError.NotFound({
+          resource: "ThreadParticipation",
+          id: request.participationId,
+        });
       const participant = found.value;
       const own = participant.participant;
       if (
@@ -185,7 +158,10 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
         !ThreadParticipation.Participant.isAnyOf(["Member"])(own) ||
         own.memberId !== actor.memberId
       )
-        return yield* new NotFound(request);
+        return yield* new CoreError.NotFound({
+          resource: "ThreadParticipation",
+          id: request.participationId,
+        });
       if (participant.status === "ended") return yield* new AlreadyEnded(request);
       // Unfollowing ends the participation quietly in the timeline. Leaving or being removed from
       // the group ends participations with the departure instead, all together and without

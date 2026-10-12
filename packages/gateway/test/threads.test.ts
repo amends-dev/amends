@@ -63,6 +63,7 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Thread starts in private groups: records, participation, activity, rollback, and replay. */
 
@@ -311,11 +312,11 @@ describe("threads", () => {
               requirement: { permission: { name: ThreadPermissions.Start.name } },
             });
             expect(yield* Effect.flip(run(bound, owner, start(hidden.id)))).toEqual(
-              new ThreadService.GroupNotFound({ groupId: hidden.id }),
+              new CoreError.NotFound({ resource: "Group", id: hidden.id }),
             );
             expect(
               yield* Effect.flip(run(bound, owner, start(Group.Id.make("missing")))),
-            ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* history(bound)).toEqual(before);
             yield* publish(
               bound,
@@ -1192,7 +1193,7 @@ describe("threads", () => {
           );
           // To anyone outside the group, the thread is missing.
           expect(yield* Effect.flip(rename(other, started.thread.id, "Launch plan"))).toEqual(
-            new ThreadService.NotFound({ threadId: started.thread.id }),
+            new CoreError.NotFound({ resource: "Thread", id: started.thread.id }),
           );
           expect(yield* history(bound)).toEqual(before);
           const renamed = yield* rename(owner, started.thread.id, "Launch plan");
@@ -1261,7 +1262,7 @@ describe("threads", () => {
             ).toBe("SchemaError");
           expect(
             yield* Effect.flip(rename(owner, Thread.Id.make("missing"), "Launch plan")),
-          ).toEqual(new ThreadService.NotFound({ threadId: Thread.Id.make("missing") }));
+          ).toEqual(new CoreError.NotFound({ resource: "Thread", id: Thread.Id.make("missing") }));
           // A start may title the thread; the title is the thread's own, apart from its message.
           const titled = yield* run(
             bound,

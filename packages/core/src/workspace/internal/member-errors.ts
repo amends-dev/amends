@@ -15,14 +15,6 @@ export class AlreadyRemoved extends Schema.TaggedError<AlreadyRemoved>()(
 ) {}
 
 /**
- * No membership has this ID in the workspace. Only a caller authorized on that member learns it.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("MemberService.NotFound", {
-  workspaceId: Workspace.Id,
-  memberId: Member.Id,
-}) {}
-
-/**
  * The member is the current owner, who cannot be removed; ownership must be transferred first.
  */
 export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()(

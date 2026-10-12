@@ -769,11 +769,7 @@ describe("notifications", () => {
               );
               expect(
                 yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, markSeen)),
-              ).toMatchObject({
-                _tag: "NotificationService.NotFound",
-                workspaceId,
-                notificationId: id,
-              });
+              ).toMatchObject({ _tag: "CoreError.NotFound", resource: "Notification", id });
             }
             expect(
               yield* Effect.flip(gateway.asMember(workspaceId, anotherIdentity, list)),
@@ -830,7 +826,7 @@ describe("notifications", () => {
             ).toBe("rollback");
             expect(yield* notificationService.inbox(page)).toEqual([]);
             expect(yield* Effect.flip(notificationService.markSeen(value.id))).toMatchObject({
-              _tag: "NotificationService.NotFound",
+              _tag: "CoreError.NotFound",
             });
             yield* journal.commit(bound.notifications.insert(value));
             expect(yield* notificationService.inbox(page)).toEqual(inboxOf(value));

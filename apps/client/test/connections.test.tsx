@@ -150,7 +150,7 @@ function fixture() {
     }
     const id = path.split("/")[4];
     const stored = server.connections.find((connection) => connection.id === id);
-    if (!stored) return json({ _tag: "ConnectionService.NotFound", connectionId: id }, 404);
+    if (!stored) return json({ _tag: "CoreError.NotFound", resource: "Connection", id }, 404);
     if (path.endsWith("/check")) return json({ status: "healthy" });
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/settings"))

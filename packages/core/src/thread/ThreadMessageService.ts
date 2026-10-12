@@ -29,14 +29,13 @@ import {
   Changed,
   Deleted,
   HumanAuthorRequired,
-  MessageNotFound,
   NotAuthor,
-  NotFound,
   ParticipantUnavailable,
 } from "./internal/thread-message-errors.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The message's revision is no longer the one the editor expected: someone edited it meanwhile.
@@ -61,28 +60,12 @@ export {
    */
   HumanAuthorRequired,
   /**
-   * The message is missing, in another workspace, or in a thread outside the actor's groups; the
-   * three are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MessageNotFound,
-  /**
    * Someone other than the message's author asked to edit it; only the author edits a message.
    *
    * @category errors
    * @since 0.1.0
    */
   NotAuthor,
-  /**
-   * The thread is missing, in another workspace, or outside the actor's groups; the three are not
-   * told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
   /**
    * A mentioned member cannot take part: they are missing, inactive, or not in the group.
    *
@@ -103,9 +86,9 @@ export type Error =
   | ReadStateStore.Failure
   | ReadStateStore.Conflict
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadQuery.AccessError
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | NotFound
+  | CoreError.NotFound
   | ParticipantUnavailable
   | HumanAuthorRequired
   | ThreadMessageStore.Failure;
@@ -118,9 +101,9 @@ export type Error =
  */
 export type EditError =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadQuery.AccessError
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | MessageNotFound
+  | CoreError.NotFound
   | HumanAuthorRequired
   | NotAuthor
   | Deleted
@@ -136,9 +119,9 @@ export type EditError =
  */
 export type DeleteError =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadQuery.AccessError
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | MessageNotFound
+  | CoreError.NotFound
   | HumanAuthorRequired
   | ThreadMessageStore.Failure;
 
@@ -148,10 +131,7 @@ export type DeleteError =
  * @category errors
  * @since 0.1.0
  */
-export type TypingError =
-  | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | NotFound;
+export type TypingError = Authorization.Error | ThreadQuery.AccessError | CoreError.NotFound;
 
 /**
  * The message operations, one of `Core.Operations`.
@@ -256,14 +236,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
 
   /** The thread, once the actor may read it and publish there. */
   const requirePublishable = Effect.fnUntraced(function* (threadId: Thread.Id) {
-    const thread = yield* threadQuery
-      .requireAccess(threadId)
-      .pipe(
-        Effect.catchTag(
-          "ThreadQuery.NotFound",
-          (error) => new NotFound({ threadId: error.threadId }),
-        ),
-      );
+    const thread = yield* threadQuery.requireAccess(threadId);
     yield* authorization.require([
       Requirement.make(ThreadMessagePermissions.Publish, {
         _tag: "Thread",
@@ -284,10 +257,16 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
    */
   const requireMessage = Effect.fnUntraced(function* (messageId: ThreadMessage.Id) {
     const found = yield* threadMessageStore.get(messageId);
-    if (Option.isNone(found)) return yield* new MessageNotFound({ messageId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "ThreadMessage", id: messageId });
     const thread = yield* threadQuery
       .requireAccess(found.value.threadId)
-      .pipe(Effect.catchTag("ThreadQuery.NotFound", () => new MessageNotFound({ messageId })));
+      .pipe(
+        Effect.catchTag(
+          "CoreError.NotFound",
+          () => new CoreError.NotFound({ resource: "ThreadMessage", id: messageId }),
+        ),
+      );
     return { message: found.value, thread };
   });
 

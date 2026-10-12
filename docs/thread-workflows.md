@@ -57,7 +57,7 @@ Authorization and validation run in the same commit as the start:
   `ThreadService.ParticipantUnavailable`.
 
 Starting needs no `group.read`, `group.create`, or membership-management grant. Missing and
-inaccessible groups share `ThreadService.GroupNotFound`.
+inaccessible groups share `CoreError.NotFound`.
 
 ## Starting a direct group
 
@@ -78,7 +78,7 @@ can also start with `startInGroup`.
 
 `ThreadService.rename({ threadId, title, expectedTitle })` requires `thread.rename` on the thread,
 which every built-in role holds, and membership of its group. To anyone outside the group, the
-thread is `ThreadService.NotFound`, as a missing or foreign one is. The title follows the start's
+thread is `CoreError.NotFound`, as a missing or foreign one is. The title follows the start's
 rule, while `expectedTitle` is the title the renamer last saw, or null for a thread that had none.
 Renaming records `thread.renamed` with the new title and, in the same commit, a quiet
 `thread.renamed` activity whose details carry the new and previous titles; it returns the renamed
@@ -139,8 +139,8 @@ thread or editing its opening message tells every participant and asks the assig
 while the task is being worked. `done` does not close the thread; messages continue, and a later
 status reopens the work. `TaskService.listInGroup(groupId, { status?, before?, limit })` pages a
 group's tasks newest created first, each as a `Thread.ListItem` under the rules of
-`ThreadService.listInGroup`. To anyone outside a thread's group, and for a thread without a task,
-the task is `TaskService.NotFound`. Triage is a participant and recipient only: nothing yet
+`ThreadService.listInGroup`. To anyone outside a thread's group, the thread is `CoreError.NotFound`,
+and for a thread without a task, the task is. Triage is a participant and recipient only: nothing yet
 evaluates a policy or records a decision.
 
 ## Channels
@@ -150,12 +150,12 @@ inbox or a chat room, whatever the connection's integration gives as a `ChannelT
 ([channel](../packages/channel/README.md)). `ChannelService.create({ connectionId,
 groupId, name, opensTasks })` makes one under `channel.create`, over a connection the actor may read
 and use whose integration gives channels (`ConnectionUnavailable` otherwise), into a group the actor
-belongs to and may start threads in (`GroupNotFound` otherwise), since every member of that group
+belongs to and may start threads in (`CoreError.NotFound` otherwise), since every member of that group
 reads the channel's conversations. `list` and `get` read channels under `channel.read`;
 `redirect({ channelId, groupId })` sends new conversations to another group, and `remove` stops the
 channel's use, both under `channel.manage`. A removed channel's record and its threads' bindings
 remain, and it receives nothing more. `getBinding(threadId)` is the external conversation a thread
-came from, under `thread.read`; a thread that came through no channel is `NotBound`.
+came from, under `thread.read`; a thread that came through no channel has no binding, `CoreError.NotFound`.
 
 What the external system sends the host reaches `ChannelIntake.receive(channelId, { headers, body })`
 as no member: the channel's transport verifies the request, makes `events` of it, and says what to
@@ -263,7 +263,7 @@ notifications are created settled as `Informational`, never pending. People are 
 asked; their notifications are pending until they see them, whoever wrote. Only people can reply
 through `ThreadMessageService` today, so agents' messages will come from their turns.
 
-Missing, foreign, and outside-audience threads share `ThreadMessageService.NotFound`.
+Missing, foreign, and outside-audience threads share `CoreError.NotFound`.
 Ineligible mentions return `ThreadMessageService.ParticipantUnavailable`, and agent callers get
 `ThreadMessageService.HumanAuthorRequired`. Admission, the message, its timeline activity, and
 its notifications commit together; the timeline never has gaps or duplicate positions.
@@ -273,7 +273,7 @@ its notifications commit together; the timeline never has gaps or duplicate posi
 `ThreadMessageService.edit({ messageId, text, mentions, expectedRevision })` replaces what a
 message says. Only its author edits it, with `thread.publish` on the thread and membership of the
 group; anyone else gets `ThreadMessageService.NotAuthor`, and to someone outside the group the
-message is `MessageNotFound`, as a missing one is. Agents edit their own replies through their
+message is `CoreError.NotFound`, as a missing one is. Agents edit their own replies through their
 turns, so an agent caller gets `HumanAuthorRequired`. The text and mentions follow a reply's
 rules. The same text and mentions again record nothing; otherwise `expectedRevision`, the revision
 the editor last saw, must still be the message's: one edited meanwhile is `Changed`, and nothing is
@@ -310,7 +310,7 @@ A keyed start derives its thread's and opening message's IDs from the operation,
 the key (`Request.derivedId`), and a keyed reply derives its message's ID the same way, so a retry
 finds what its first attempt created by those IDs and records no receipt. A retry passes the same
 checks as the first attempt before it looks: for a start, group membership, `thread.start`, and a
-human author, so an author who has since left the group receives `GroupNotFound`; for a reply,
+human author, so an author who has since left the group receives `CoreError.NotFound`; for a reply,
 access to the thread, `thread.publish`, and a human author.
 
 ## Following and unfollowing
@@ -324,9 +324,9 @@ participating returns the existing summary and records nothing.
 `unfollow({ threadId, participationId })` returns no value and ends only the actor's addressed
 participation. It requires current workspace and group membership but no action grant, so a member
 can unfollow after losing the follow permission. Other members' IDs, another thread's IDs, and
-missing participations share `ThreadParticipationService.NotFound`; one's own ended
+missing participations share `CoreError.NotFound`; one's own ended
 participation returns `AlreadyEnded`. An inaccessible or missing thread returns
-`ThreadParticipationService.ThreadNotFound`. Everyone in a direct conversation takes part in
+`CoreError.NotFound` for the thread. Everyone in a direct conversation takes part in
 all of its threads, so unfollowing one returns `ThreadParticipationService.FixedParticipation`
 and records nothing.
 
@@ -365,8 +365,8 @@ A nonparticipant with group access and the grant can read the whole earlier conv
 creates no participation, acknowledges nothing, and requests no agent work. Later group members
 can read earlier history without retroactive notifications.
 
-Missing, foreign, and outside-audience threads share `ThreadService.NotFound`, and an
-inaccessible group list returns `ThreadService.GroupNotFound`. A member of the audience without
+Missing, foreign, and outside-audience threads share `CoreError.NotFound`, and an
+inaccessible group's list returns it for the group. A member of the audience without
 the grant receives `Authorization.Denied` for a single thread; lists omit unreadable threads.
 Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
 
@@ -450,7 +450,7 @@ rejoin participation, or mark the conversation read.
 The state becomes `{ _tag: "Seen", seenAt }`. The notification stays in inbox history and leaves
 pending results and counts. Repeating it returns the first time stored, including when two devices
 mark it at once. Missing and other
-recipients' IDs return `NotificationService.NotFound`; an agent's notification returns
+recipients' IDs return `CoreError.NotFound`; an agent's notification returns
 `HumanRecipientRequired`, and a discarded one `AlreadyHandled`, including one that leaving its
 group settles while it is being marked.
 
@@ -465,13 +465,13 @@ delivery, is recorded by those workflows as `Accepted`, not by marking it seen.
 `ReadStateService.markThreadRead({ threadId, throughSequence })` records that the acting
 person has read a thread through a timeline position. It requires a human actor, current group
 access, and `thread.read`: missing and inaccessible threads return
-`ReadStateService.ThreadNotFound`, an agent returns `HumanRequired`, and a position past the
+`CoreError.NotFound`, an agent returns `HumanRequired`, and a position past the
 latest activity returns `BeyondTimeline`. The position only moves forward. The reader's pending
 notifications from the thread up to that position become `Seen` in the same write. Reading a timeline does not mark
 it read; clients call this for what they have shown.
 
 `markGroupRead({ groupId })` records that the acting person read a group now. It needs current
-group membership and `group.read`, and returns `GroupNotFound` otherwise; the read time also only
+group membership and `group.read`, and returns `CoreError.NotFound` otherwise; the read time also only
 moves forward.
 
 Positions and read times are private state, like `Seen`: outside the journal, never waiting
@@ -486,7 +486,7 @@ messages count as new activity, not quiet participation changes.
 
 `ThreadMessageService.typing(threadId)`, and `POST /workspaces/:workspaceId/threads/:threadId/typing`
 over HTTP, tells the thread's readers that the acting member is composing there. It needs the same
-current group access and `thread.publish` as publishing, and returns `ThreadMessageService.NotFound`
+current group access and `thread.publish` as publishing, and returns `CoreError.NotFound`
 for missing and inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals) reaches the group's
 members with `thread.read` for the thread, on every host, and lasts six seconds unless repeated;
 repeats within two seconds are dropped. It is never stored.

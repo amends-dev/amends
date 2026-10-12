@@ -5,7 +5,6 @@
  */
 import { Schema } from "effect";
 import * as Member from "../../workspace/Member.ts";
-import * as ThreadId from "../ThreadId.ts";
 import * as ThreadMessageId from "../ThreadMessageId.ts";
 
 /**
@@ -34,27 +33,10 @@ export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>
 ) {}
 
 /**
- * The message is missing, in another workspace, or in a thread outside the actor's groups; the
- * three are not told apart.
- */
-export class MessageNotFound extends Schema.TaggedError<MessageNotFound>()(
-  "ThreadMessageService.MessageNotFound",
-  { messageId: ThreadMessageId.Id },
-) {}
-
-/**
  * Someone other than the message's author asked to edit it; only the author edits a message.
  */
 export class NotAuthor extends Schema.TaggedError<NotAuthor>()("ThreadMessageService.NotAuthor", {
   messageId: ThreadMessageId.Id,
-}) {}
-
-/**
- * The thread is missing, in another workspace, or outside the actor's groups; the three are not
- * told apart.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("ThreadMessageService.NotFound", {
-  threadId: ThreadId.Id,
 }) {}
 
 /**

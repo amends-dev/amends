@@ -31,6 +31,7 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Thread and group lists with unread state, forward-only read state, and settling on reading. */
 
@@ -270,7 +271,7 @@ describe("read state", () => {
             ).toEqual(new ReadStateService.HumanRequired({ memberId: agentId }));
             expect(
               yield* Effect.flip(run(bound, actorFor(outsiderId), markRead(threadId, 1))),
-            ).toEqual(new ReadStateService.ThreadNotFound({ threadId }));
+            ).toEqual(new CoreError.NotFound({ resource: "Thread", id: threadId }));
             expect(
               yield* Effect.flip(run(bound, actorFor(plainId), markRead(threadId, 1))),
             ).toMatchObject({ _tag: "Authorization.Denied" });
@@ -311,7 +312,7 @@ describe("read state", () => {
           );
           expect(
             yield* Effect.flip(run(bound, actorFor(outsiderId), markGroupRead(team.id))),
-          ).toEqual(new ReadStateService.GroupNotFound({ groupId: team.id }));
+          ).toEqual(new CoreError.NotFound({ resource: "Group", id: team.id }));
         }),
       ),
     ),
@@ -490,7 +491,7 @@ describe("read state", () => {
                 ),
               ),
             ),
-          ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+          ).toMatchObject({ _tag: "CoreError.NotFound" });
         }),
       ),
     ),
@@ -580,7 +581,7 @@ describe("read state", () => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
           }),
         ),
       ),

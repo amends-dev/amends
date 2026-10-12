@@ -112,9 +112,7 @@ const gone = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
     (reason) =>
       Cause.isFailReason(reason) &&
-      (Schema.is(ApiErrors.TurnNotFound)(reason.error) ||
-        Schema.is(ApiErrors.NotMember)(reason.error) ||
-        Schema.is(ApiErrors.WorkspaceNotFound)(reason.error)),
+      (Schema.is(ApiErrors.NotFound)(reason.error) || Schema.is(ApiErrors.NotMember)(reason.error)),
   );
 
 /** The reader is in the turn's thread's group, but may no longer read the thread. */

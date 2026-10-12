@@ -40,6 +40,7 @@ import {
   journalLog,
   testProvenance,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 /** Workspace creation, isolation, boot, and the directory through the gateway. */
 const { core, runGateway, gateway: gatewayOn } = Support;
@@ -81,7 +82,7 @@ describe("gateway", () => {
                 ).toMatchObject({ _tag: "GatewayErrors.NotMember" });
                 expect(
                   yield* Effect.flip(Operations.getMember(a.id, alice, b.ownerMemberId)),
-                ).toMatchObject({ _tag: "MemberService.NotFound" });
+                ).toMatchObject({ _tag: "CoreError.NotFound" });
                 return [a, b];
               }),
             ),
@@ -395,7 +396,7 @@ describe("gateway", () => {
             const missing = Workspace.Id.make("never-created");
             expect(
               yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, acceptWork))),
-            ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: missing }));
+            ).toEqual(new CoreError.NotFound({ resource: "Workspace", id: missing }));
             expect(yield* (yield* WorkspaceDirectory.WorkspaceDirectory).list(alice)).toMatchObject(
               {
                 memberships: [{ workspace }],
@@ -460,7 +461,7 @@ describe("gateway", () => {
                       Invitation.Id.make("never-issued"),
                     ),
                   ),
-                ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: unknown }));
+                ).toEqual(new CoreError.NotFound({ resource: "Workspace", id: unknown }));
                 expect(
                   yield* Effect.flip(
                     Operations.getMember(workspace.id, bob, workspace.ownerMemberId),

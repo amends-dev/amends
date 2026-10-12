@@ -42,36 +42,9 @@ export class GeneralMembership extends Schema.TaggedError<GeneralMembership>()(
 ) {}
 
 /**
- * The group is missing, or the actor is not in it; for joining, also one that cannot be joined, a
- * private or direct group. None are told apart, so nothing discloses a group to someone outside
- * it.
- */
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "GroupMembershipService.GroupNotFound",
-  { groupId: Group.Id },
-) {}
-
-/**
  * The member to add is no longer active in the workspace.
  */
 export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
   "GroupMembershipService.InactiveMember",
   { memberId: Member.Id },
-) {}
-
-/**
- * The member to add is not in the workspace.
- */
-export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
-  "GroupMembershipService.MemberNotFound",
-  { memberId: Member.Id },
-) {}
-
-/**
- * The admission is missing, is in another group than the one named, or, when leaving, is another
- * member's; none are told apart.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()(
-  "GroupMembershipService.NotFound",
-  GroupMembership.RemoveInput.fields,
 ) {}

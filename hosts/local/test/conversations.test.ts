@@ -85,23 +85,23 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         const outside = { workspaceId, groupId: mine.id };
         expect(yield* asAlice.groups.get({ params: outside }).pipe(Effect.flip)).toMatchObject({
-          _tag: "GroupService.NotFound",
+          _tag: "CoreError.NotFound",
         });
         expect(
           yield* asAlice.groups
             .addMember({ params: outside, payload: { memberId: aliceId } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         expect(
           yield* asAlice.groups
             .rename({ params: outside, payload: { name: "Ours", expectedName: "Mine" } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupService.NotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         expect(
           yield* asAlice.groups
             .members({ params: outside, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         // Bob leaves his group again; the rest of the conversation happens in Design.
         const [kept] = yield* asBob.groups.members({ params: outside, query: { limit: 10 } });
         yield* asBob.groups.leave({ params: { ...outside, membershipId: kept!.id } });
@@ -408,7 +408,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.threads
             .list({ params: { workspaceId, groupId }, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
         // Joining admits him, once; he then reads its threads like any member.
         const joined = yield* asBob.groups.join({ params: { workspaceId, groupId } });
         expect(joined).toMatchObject({ groupId, memberId: bobId, status: "active" });
@@ -427,7 +427,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.groups
             .join({ params: { workspaceId, groupId: secret.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
       }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),
   );

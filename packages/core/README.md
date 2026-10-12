@@ -33,7 +33,7 @@ The package root composes one workspace's core:
 Each domain is a subpath export with the records, facts, stores, projections, and operations it
 implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journal`, `/group`,
 `/thread`, `/task`, `/channel`, `/connection`, `/agent`, `/turn`, `/notification`, `/read-state`,
-`/change-feed`, `/signal`, and `/request`.
+`/change-feed`, `/signal`, `/request`, and `/error`.
 
 ## Domains
 
@@ -118,6 +118,16 @@ it creates that way, so a retry runs the operation's checks, finds the record by
 it instead of creating another. The key alone names the request: a retry gets what the key created,
 whatever it asks for. A turn retry derives its turn's ID from the turn it retries. See
 [retrying safely](../../docs/thread-workflows.md#retrying-safely).
+
+### Errors by kind
+
+`@amends-dev/core/error` holds `CoreError`, the outcomes every feature reports, each one class
+whichever operation raises it, carrying in its fields what it is about and in its `message` what
+happened. `CoreError.NotFound` names the `resource` and the `id` the caller asked for; a missing
+resource and one out of the caller's reach answer alike. Operations pass it through unchanged, so a
+protocol answers it with one status and a client handles it once, and an operation that reaches a
+resource through another reports the one the caller named: a message whose thread they cannot read
+is the message not found, not the thread.
 
 ## Workspace and access
 
@@ -641,12 +651,14 @@ src/workspace/
 
 The internal reads other operations share go in one `<Feature>Query.ts`. A command may read through
 the query; a query never writes; and a step with one caller stays a private function of that caller.
-Every error belongs to the module that raises it, and its tag is its name there, as
-`MemberService.NotFound` or `Store.Conflict`. The outcomes a service reports to callers are schemas
-in an `internal/` errors module, apart from the services, so a protocol or a browser client carries
-them without loading an implementation, and the service exports them. A query defines what it
-raises beside itself, as `ThreadQuery.NotFound`, and a service that calls it maps that to its own
-outcome. Helpers no consumer imports go under `internal/` too.
+An outcome every feature reports is one kind in `CoreError`, whichever operation raises it:
+anything missing, or out of the caller's reach, is `CoreError.NotFound`, which names the resource
+and its ID and passes through every operation unchanged. Any other error belongs to the module that
+raises it, and its tag is its name there, as `MemberService.OwnerProtected` or `Store.Conflict`. The
+outcomes a service reports to callers are schemas in an `internal/` errors module, apart from the
+services, so a protocol or a browser client carries them without loading an implementation, and the
+service exports them. A query or command defines what else it raises beside itself, as
+`ThreadCommand.Unavailable`, and a service that calls it maps that to its own outcome. Helpers no consumer imports go under `internal/` too.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

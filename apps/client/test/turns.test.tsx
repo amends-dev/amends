@@ -525,7 +525,7 @@ it("follows a turn's log again after it drops, opening with the items as they st
 });
 
 const refusals = {
-  gone: () => json({ _tag: "TurnService.NotFound", turnId: "atlas-1" }, 404),
+  gone: () => json({ _tag: "CoreError.NotFound", resource: "Turn", id: "atlas-1" }, 404),
   denied: () =>
     json(
       {

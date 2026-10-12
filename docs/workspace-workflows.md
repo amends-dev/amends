@@ -51,7 +51,7 @@ Removal also, in the same commit and without further grants:
 
 A failure rolls all of it back. Repeating a removal returns `MemberService.AlreadyRemoved`
 without recording anything; the caller must still be active and authorized. Missing members
-return `MemberService.NotFound`, only after authorization.
+return `CoreError.NotFound`, only after authorization.
 
 The removed membership and its assignments remain historical records that authorized readers can
 inspect. Active-membership checks deny its later operations, including calls with an actor resolved

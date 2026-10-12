@@ -24,13 +24,6 @@ export class InvalidExpiry extends Schema.TaggedError<InvalidExpiry>()(
 ) {}
 
 /**
- * No invitation has this ID in the workspace.
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("InvitationService.NotFound", {
-  invitationId: Invitation.Id,
-}) {}
-
-/**
  * The authenticated person is not whom the invitation names; only the named recipient may accept.
  */
 export class NotRecipient extends Schema.TaggedError<NotRecipient>()(

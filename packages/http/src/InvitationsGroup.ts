@@ -4,7 +4,7 @@
  * active membership and `invitation.manage`, and the role an invitation gives follows the
  * delegation rules; issuing resolves the address to its account first, creating one the first time.
  * Accepting is for the recipient, a person not yet a member, so it enters the workspace without an
- * actor and answers `ApiErrors.WorkspaceNotFound` for a workspace never created.
+ * actor and answers `ApiErrors.NotFound` for a workspace never created.
  * `InvitationsHandlers` implements it.
  *
  * @since 0.1.0
@@ -53,12 +53,7 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
       // What the recipient wants people in the workspace to call them.
       payload: Schema.Struct({ name: Member.NewName }),
       success: Member.Member,
-      error: [
-        ApiErrors.HumanRequired,
-        ApiErrors.WorkspaceNotFound,
-        ...ApiErrors.workspace,
-        ...ApiErrors.invitation,
-      ],
+      error: [ApiErrors.HumanRequired, ...ApiErrors.workspace, ...ApiErrors.invitation],
     }),
     HttpApiEndpoint.post("revoke", "/:invitationId/revoke", {
       params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },

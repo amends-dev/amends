@@ -51,16 +51,7 @@ import * as SessionLogStore from "./SessionLogStore.ts";
 import * as SessionStateStore from "./SessionStateStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
-
-/**
- * The workspace has no turn with this ID.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("TurnExecution.NotFound", {
-  turnId: Turn.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * The turn is not in the state the step needs: it has finished, or is not running yet.
@@ -86,7 +77,7 @@ export type Error =
   | PlatformError.PlatformError
   | Projection.Error
   | SessionStateStore.Failure
-  | NotFound
+  | CoreError.NotFound
   | NotActive
   | TurnCommand.EndError;
 
@@ -99,7 +90,7 @@ export type Error =
  */
 export type AcceptError =
   | Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.AccessError, CoreError.NotFound | Authorization.Denied>
   | NotificationStore.Failure
   | MemberStore.Failure
   | SessionLogStore.Failure;
@@ -113,7 +104,7 @@ export type AcceptError =
  */
 export type StartError =
   | Error
-  | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.TimelineError, CoreError.NotFound | Authorization.Denied>
   | NotificationStore.Failure
   | MemberStore.Failure
   | ContactStore.Failure
@@ -145,7 +136,7 @@ export type JoinedConversationError =
  */
 export type CloseError =
   | Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.AccessError, CoreError.NotFound | Authorization.Denied>
   | ThreadQuery.ParticipantsError
   | ThreadCommand.Error;
 
@@ -320,7 +311,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const requireTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turnStore.get(turnId);
-    if (Option.isNone(found)) return yield* new NotFound({ turnId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Turn", id: turnId });
     return found.value;
   });
 
@@ -550,7 +542,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const thread = yield* threadQuery.requireAccess(threadId).pipe(
       Effect.asSome,
       Effect.catchTags({
-        "ThreadQuery.NotFound": () => Effect.succeedNone,
+        "CoreError.NotFound": () => Effect.succeedNone,
         "Authorization.Denied": () => Effect.succeedNone,
       }),
     );
@@ -718,13 +710,15 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
                   outcome: "failed",
                   reason: issues.map(describeIssue).join(" "),
                 }),
-              "AgentQuery.NotFound": () =>
-                endAsIdle(turn, { outcome: "failed", reason: "The agent can no longer run." }),
-              // The thread is gone or closed to the agent: the turn fails rather than tells nothing.
-              "ThreadQuery.NotFound": () =>
+              // The agent's membership ended, or the thread is gone or closed to the agent: the turn
+              // fails rather than tells nothing.
+              "CoreError.NotFound": ({ resource }) =>
                 endAsIdle(turn, {
                   outcome: "failed",
-                  reason: "The agent can no longer read the thread.",
+                  reason:
+                    resource === "Agent"
+                      ? "The agent can no longer run."
+                      : "The agent can no longer read the thread.",
                 }),
               "Authorization.Denied": () =>
                 endAsIdle(turn, {
@@ -774,7 +768,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
       Effect.asSome,
       Effect.catchTags({
-        "ThreadQuery.NotFound": () => Effect.succeedNone,
+        "CoreError.NotFound": () => Effect.succeedNone,
         "Authorization.Denied": () => Effect.succeedNone,
       }),
     );

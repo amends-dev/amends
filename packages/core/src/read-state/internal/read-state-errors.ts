@@ -3,7 +3,6 @@
  * carry them to clients; the service's `Error` type adds the failures of what it depends on.
  */
 import { Schema } from "effect";
-import * as GroupId from "../../group/GroupId.ts";
 import * as ThreadId from "../../thread/ThreadId.ts";
 import * as MemberId from "../../workspace/MemberId.ts";
 
@@ -16,27 +15,10 @@ export class BeyondTimeline extends Schema.TaggedError<BeyondTimeline>()(
 ) {}
 
 /**
- * The group is missing, or the actor is not a member of it; the two are not told apart.
- */
-export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
-  "ReadStateService.GroupNotFound",
-  { groupId: GroupId.Id },
-) {}
-
-/**
  * The acting member is an agent: only people keep read state, and agents' turns track their input
  * progress.
  */
 export class HumanRequired extends Schema.TaggedError<HumanRequired>()(
   "ReadStateService.HumanRequired",
   { memberId: MemberId.Id },
-) {}
-
-/**
- * The thread is missing, in another workspace, or outside the actor's groups; the three are not
- * told apart.
- */
-export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
-  "ReadStateService.ThreadNotFound",
-  { threadId: ThreadId.Id },
 ) {}

@@ -31,11 +31,12 @@ import * as MemberFacts from "../workspace/MemberFacts.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
-import { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./internal/agent-errors.ts";
+import { Changed, ConnectionUnavailable, Incomplete } from "./internal/agent-errors.ts";
 import * as AgentFacts from "./AgentFacts.ts";
 import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The agent's name is no longer the one expected: someone renamed it meanwhile.
@@ -59,13 +60,6 @@ export {
    * @since 0.1.0
    */
   Incomplete,
-  /**
-   * Missing agents, agents whose membership ended, and agents the actor may not read share this.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
 } from "./internal/agent-errors.ts";
 
 /**
@@ -86,7 +80,7 @@ export type ListError =
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = ListError | Schema.SchemaError | NotFound;
+export type ReadError = ListError | Schema.SchemaError | CoreError.NotFound;
 
 /**
  * What every change can fail with: what reading meets, and what writing its commit meets.
@@ -194,13 +188,17 @@ export const make = Effect.fn("AgentService.make")(function* () {
       AgentReadiness.readinessOf,
     );
 
-  /** The agent by ID with its name while its membership lasts, and NotFound once it ended. */
+  /**
+   * The agent by ID with its name while its membership lasts, and `CoreError.NotFound` once it
+   * ended.
+   */
   const requireActiveAgent = Effect.fnUntraced(function* (agentId: Agent.Id) {
     const found = yield* agentStore.get(agentId);
-    if (Option.isNone(found)) return yield* new NotFound({ agentId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Agent", id: agentId });
     const member = yield* memberStore.get(found.value.memberId);
     if (Option.isNone(member) || member.value.status !== "active")
-      return yield* new NotFound({ agentId });
+      return yield* new CoreError.NotFound({ resource: "Agent", id: agentId });
     return { record: found.value, name: member.value.name };
   });
 
@@ -215,7 +213,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
       authorization,
       Requirement.make(AgentPermissions.Read, target),
       Requirement.make(permission, target),
-      () => new NotFound({ agentId }),
+      () => new CoreError.NotFound({ resource: "Agent", id: agentId }),
     );
     return agent;
   });

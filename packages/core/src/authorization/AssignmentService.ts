@@ -27,7 +27,8 @@ import * as Assignment from "./Assignment.ts";
 import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
-import { Changed, InactiveMember, MemberNotFound, NotFound } from "./internal/assignment-errors.ts";
+import { Changed, InactiveMember } from "./internal/assignment-errors.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The member's workspace role assignments are no longer the ones the caller expected: someone
@@ -44,20 +45,6 @@ export {
    * @since 0.1.0
    */
   InactiveMember,
-  /**
-   * No member with this ID is recorded in the workspace.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  MemberNotFound,
-  /**
-   * No assignment with this ID is recorded for the member.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
 } from "./internal/assignment-errors.ts";
 
 /**
@@ -73,9 +60,8 @@ export type Error =
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError
-  | MemberNotFound
+  | CoreError.NotFound
   | InactiveMember
-  | NotFound
   | Changed;
 
 /**
@@ -85,7 +71,7 @@ export type Error =
  * @category errors
  * @since 0.1.0
  */
-export type ListError = Delegation.Error | MemberNotFound | InactiveMember;
+export type ListError = Delegation.Error | CoreError.NotFound | InactiveMember;
 
 /**
  * What `permissions` can fail with: authorization's failures but never `Denied`, since reading
@@ -138,8 +124,8 @@ export class AssignmentService extends Context.Service<
     ) => Effect.Effect<Assignment.Assignment, Error, Actor.Actor>;
     /**
      * End one of a member's assignments, under `assignment.manage` and the delegation rules for the
-     * member and, for a role assignment, its role. Another member's assignment is `NotFound`; one
-     * already revoked is returned as it is.
+     * member and, for a role assignment, its role. Another member's assignment is
+     * `CoreError.NotFound`; one already revoked is returned as it is.
      */
     readonly revoke: (
       memberId: Member.Id,
@@ -210,7 +196,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   ) {
     const id = yield* Schema.decodeEffect(Member.Id)(memberId);
     const found = yield* memberStore.get(id);
-    if (Option.isNone(found)) return yield* new MemberNotFound({ memberId: id });
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id });
     return found.value;
   });
   const authorizeRecipient = Effect.fn("AssignmentService.authorizeRecipient")(function* (
@@ -272,9 +258,11 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       yield* authorizeRecipient(memberId);
       const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
       const found = yield* assignmentStore.get(id);
-      if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
+      if (Option.isNone(found))
+        return yield* new CoreError.NotFound({ resource: "Assignment", id });
       const record = found.value;
-      if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
+      if (record.memberId !== memberId)
+        return yield* new CoreError.NotFound({ resource: "Assignment", id });
       if (Assignment.Source.isAnyOf(["Role"])(record.source))
         yield* delegation.requireGrant(record.source.roleId);
       if (record.status === "revoked") return record;

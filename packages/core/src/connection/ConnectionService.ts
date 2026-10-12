@@ -29,12 +29,12 @@ import {
   CredentialsUnavailable,
   InvalidConnection,
   Keyless,
-  NotFound,
   UnknownIntegration,
 } from "./internal/connection-errors.ts";
 import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The connection's name is no longer the one expected: someone renamed it meanwhile.
@@ -67,13 +67,6 @@ export {
    */
   Keyless,
   /**
-   * The connection is missing, removed, or not readable by the actor; the three are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
    * This host does not install the integration, or no longer installs the one a connection names.
    *
    * @category errors
@@ -92,7 +85,7 @@ export type ReadError =
   | Authorization.Error
   | ConnectionStore.Failure
   | Schema.SchemaError
-  | NotFound;
+  | CoreError.NotFound;
 
 /**
  * What every change can fail with: reading's failures, and recording the change in the journal.
@@ -179,7 +172,7 @@ export class ConnectionService extends Context.Service<
     readonly list: Effect.Effect<ReadonlyArray<Connection.View>, ReadError, Actor.Actor>;
     /**
      * The connection, under `connection.read`; a missing, removed, or unreadable one is
-     * `NotFound`.
+     * `CoreError.NotFound`.
      */
     readonly get: (
       connectionId: Connection.Id,
@@ -196,7 +189,8 @@ export class ConnectionService extends Context.Service<
      * Connect the workspace to an installed integration, with settings and a way of authenticating
      * the integration takes, and its key when it authenticates with one, stored in the same commit.
      * Needs `connection.create` on the workspace. A retry with the same request key returns the
-     * connection its first attempt created, or `NotFound` once that connection is removed.
+     * connection its first attempt created, or `CoreError.NotFound` once that connection is
+     * removed.
      */
     readonly create: (
       input: Connection.CreateInput,
@@ -295,11 +289,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     return yield* viewOf(record, manageable);
   });
 
-  /** The active connection by ID, or NotFound. */
+  /** The active connection by ID, or `CoreError.NotFound`. */
   const requireActiveConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found) || found.value.status !== "active")
-      return yield* new NotFound({ connectionId });
+      return yield* new CoreError.NotFound({ resource: "Connection", id: connectionId });
     return found.value;
   });
 
@@ -313,7 +307,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       authorization,
       Requirement.make(ConnectionPermissions.Read, connectionTarget(connectionId)),
       Requirement.make(permission, connectionTarget(connectionId)),
-      () => new NotFound({ connectionId }),
+      () => new CoreError.NotFound({ resource: "Connection", id: connectionId }),
     );
     return record;
   });

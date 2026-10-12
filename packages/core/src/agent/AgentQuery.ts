@@ -19,16 +19,7 @@ import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Agent from "./Agent.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
-
-/**
- * The member is not one of the workspace's agents: it is a person, or its membership ended.
- *
- * @category errors
- * @since 0.1.0
- */
-export class NotFound extends Schema.TaggedError<NotFound>()("AgentQuery.NotFound", {
-  memberId: MemberId.Id,
-}) {}
+import * as CoreError from "../error/CoreError.ts";
 
 /**
  * What reading the agent of a member can fail with.
@@ -36,7 +27,7 @@ export class NotFound extends Schema.TaggedError<NotFound>()("AgentQuery.NotFoun
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = NotFound | MemberStore.Failure | AgentStore.Failure;
+export type ReadError = CoreError.NotFound | MemberStore.Failure | AgentStore.Failure;
 
 /**
  * The agent cannot run on what it is set up with, for the issues its readiness reports.
@@ -147,12 +138,13 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
   const requireAgent = Effect.fnUntraced(function* (memberId: MemberId.Id) {
     const member = yield* memberStore.get(memberId);
     if (Option.isNone(member) || member.value.status !== "active")
-      return yield* new NotFound({ memberId });
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
     const { identity } = member.value;
     if (!Identity.MemberReference.isAnyOf(["Agent"])(identity))
-      return yield* new NotFound({ memberId });
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
     const found = yield* agentStore.get(identity.id);
-    if (Option.isNone(found)) return yield* new NotFound({ memberId });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
     return found.value;
   });
 

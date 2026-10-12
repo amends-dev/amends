@@ -40,7 +40,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
     HttpApiEndpoint.get("list", "/", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(view),
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound],
+      error: [...ApiErrors.member, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.post("create", "/", {
       params: { workspaceId: Workspace.Id },
@@ -51,7 +51,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       }),
       error: [
         ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
+        ApiErrors.NotFound,
         ApiErrors.UnknownIntegration,
         ApiErrors.InvalidConnection,
         ApiErrors.ConnectionCredentialsUnavailable,
@@ -60,12 +60,12 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
     HttpApiEndpoint.get("get", "/:connectionId", {
       params: connection,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound],
+      error: [...ApiErrors.member, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.get("models", "/:connectionId/models", {
       params: connection,
       success: Connection.Models.annotate({ identifier: "ConnectionModels" }),
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound, ApiErrors.UnknownIntegration],
+      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.UnknownIntegration],
     }),
     HttpApiEndpoint.post("rename", "/:connectionId/rename", {
       params: connection,
@@ -74,7 +74,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
         expectedName: Connection.RenameInput.fields.expectedName,
       }),
       success: view,
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound, ApiErrors.ConnectionChanged],
+      error: [...ApiErrors.member, ApiErrors.NotFound, ApiErrors.ConnectionChanged],
     }),
     HttpApiEndpoint.put("configure", "/:connectionId/settings", {
       params: connection,
@@ -82,7 +82,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       success: view,
       error: [
         ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
+        ApiErrors.NotFound,
         ApiErrors.UnknownIntegration,
         ApiErrors.InvalidConnection,
       ],
@@ -93,7 +93,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       success: view,
       error: [
         ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
+        ApiErrors.NotFound,
         ApiErrors.Keyless,
         ApiErrors.ConnectionCredentialsUnavailable,
       ],
@@ -103,7 +103,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       success: ConnectionContract.Health.annotate({ identifier: "ConnectionHealth" }),
       error: [
         ...ApiErrors.member,
-        ApiErrors.ConnectionNotFound,
+        ApiErrors.NotFound,
         ApiErrors.UnknownIntegration,
         ApiErrors.InvalidConnection,
         ApiErrors.ConnectionCredentialsUnavailable,
@@ -112,7 +112,7 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
     HttpApiEndpoint.delete("remove", "/:connectionId", {
       params: connection,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound],
+      error: [...ApiErrors.member, ApiErrors.NotFound],
     }),
   )
   .middleware(Authentication)

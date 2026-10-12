@@ -22,12 +22,9 @@ import * as NotificationInbox from "./NotificationInbox.ts";
 import type * as Thread from "../thread/Thread.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
-import {
-  AlreadyHandled,
-  HumanRecipientRequired,
-  NotFound,
-} from "./internal/notification-errors.ts";
+import { AlreadyHandled, HumanRecipientRequired } from "./internal/notification-errors.ts";
 import * as Store from "../journal/Store.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The notification no longer waits for its recipient: it was discarded, or settled some other way,
@@ -44,14 +41,6 @@ export {
    * @since 0.1.0
    */
   HumanRecipientRequired,
-  /**
-   * The notification is missing, or is another recipient's; the two are deliberately not told
-   * apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
 } from "./internal/notification-errors.ts";
 
 /**
@@ -70,7 +59,7 @@ export type Error = Authorization.Error | NotificationStore.Failure | Schema.Sch
  * @since 0.1.0
  */
 export type SourceError =
-  | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.TimelineError, CoreError.NotFound | Authorization.Denied>
   | Log.ReadError;
 
 /**
@@ -91,7 +80,7 @@ export type InboxError = Error | SourceError;
 export type MarkSeenError =
   | Error
   | NotificationStore.Conflict
-  | NotFound
+  | CoreError.NotFound
   | HumanRecipientRequired
   | AlreadyHandled;
 
@@ -128,7 +117,11 @@ export class NotificationService extends Context.Service<
      */
     readonly markSeenThrough: (
       through: NotificationStore.Cursor,
-    ) => Effect.Effect<number, Exclude<MarkSeenError, NotFound | AlreadyHandled>, Actor.Actor>;
+    ) => Effect.Effect<
+      number,
+      Exclude<MarkSeenError, CoreError.NotFound | AlreadyHandled>,
+      Actor.Actor
+    >;
     /** How many notifications are still pending for the acting member, from anywhere. */
     readonly countPending: Effect.Effect<number, Error, Actor.Actor>;
   }
@@ -191,7 +184,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     const id = yield* Schema.decodeEffect(Notification.Id)(notificationId);
     const found = yield* notificationStore.get(id);
     if (Option.isNone(found) || !isSameRecipient(found.value.recipient, target))
-      return yield* new NotFound({ workspaceId, notificationId: id });
+      return yield* new CoreError.NotFound({ resource: "Notification", id });
     return found.value;
   });
 
@@ -220,7 +213,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     return yield* threadQuery.readTimelineItem(event.payload.activity.id).pipe(
       Effect.asSome,
       Effect.catchTags({
-        "ThreadQuery.NotFound": () => Effect.succeedNone,
+        "CoreError.NotFound": () => Effect.succeedNone,
         "Authorization.Denied": () => Effect.succeedNone,
       }),
     );

@@ -11,7 +11,6 @@ import * as AgentPermissions from "../agent/AgentPermissions.ts";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import type * as Group from "../group/Group.ts";
-import type * as GroupQuery from "../group/GroupQuery.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as Journal from "../journal/Journal.ts";
@@ -24,15 +23,10 @@ import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Member from "../workspace/Member.ts";
 import * as Task from "./Task.ts";
 import * as TaskCommand from "./TaskCommand.ts";
-import {
-  AlreadyTask,
-  Changed,
-  GroupNotFound,
-  NotFound,
-  ParticipantUnavailable,
-} from "./internal/task-errors.ts";
+import { AlreadyTask, Changed, ParticipantUnavailable } from "./internal/task-errors.ts";
 import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
+import * as CoreError from "../error/CoreError.ts";
 export {
   /**
    * The thread is a task already; a thread has one.
@@ -50,20 +44,6 @@ export {
    */
   Changed,
   /**
-   * The group is missing, or the actor is not a member of it; the two are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  GroupNotFound,
-  /**
-   * The thread is missing, outside the actor's groups, or has no task; the three are not told apart.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  NotFound,
-  /**
    * The assignee cannot take part in the thread: missing, inactive, or outside its group.
    *
    * @category errors
@@ -80,10 +60,10 @@ export {
  */
 export type CreateError =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadQuery.AccessError
   | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
   | TaskStore.Failure
-  | NotFound
+  | CoreError.NotFound
   | AlreadyTask
   | ParticipantUnavailable;
 
@@ -95,10 +75,10 @@ export type CreateError =
  */
 export type UpdateError =
   | Authorization.Error
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadQuery.AccessError
   | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
   | TaskStore.Failure
-  | NotFound
+  | CoreError.NotFound
   | Changed
   | ParticipantUnavailable;
 
@@ -109,11 +89,10 @@ export type UpdateError =
  * @since 0.1.0
  */
 export type ReadError =
-  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | Exclude<ThreadQuery.ListError, GroupQuery.NotMember>
+  | ThreadQuery.AccessError
+  | ThreadQuery.ListError
   | TaskStore.Failure
-  | NotFound
-  | GroupNotFound;
+  | CoreError.NotFound;
 
 /**
  * The task operations, one of `Core.Operations`.
@@ -144,7 +123,10 @@ export class TaskService extends Context.Service<
     readonly update: (
       input: Task.UpdateInput,
     ) => Effect.Effect<Task.Task, UpdateError, Actor.Actor>;
-    /** The thread's task, under current group audience and `thread.read`; a thread without one is `NotFound`. */
+    /**
+     * The thread's task, under current group audience and `thread.read`; a thread without one is
+     * `CoreError.NotFound`.
+     */
     readonly get: (threadId: Thread.Id) => Effect.Effect<Task.Task, ReadError, Actor.Actor>;
     /**
      * One page of a group's tasks the actor can read, newest created first, of one status when the
@@ -174,21 +156,11 @@ export const make = Effect.fn("TaskService.make")(function* () {
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Store;
 
-  /** The thread, which only its group's members may act on; to anyone else it is missing. */
-  const requireThread = (threadId: Thread.Id) =>
-    threadQuery
-      .requireAccess(threadId)
-      .pipe(
-        Effect.catchTag(
-          "ThreadQuery.NotFound",
-          (error) => new NotFound({ threadId: error.threadId }),
-        ),
-      );
-
   /** The thread's task, which it must have. */
   const requireTask = Effect.fnUntraced(function* (thread: Thread.Thread) {
     const found = yield* taskStore.get(thread.id);
-    if (Option.isNone(found)) return yield* new NotFound({ threadId: thread.id });
+    if (Option.isNone(found))
+      return yield* new CoreError.NotFound({ resource: "Task", id: thread.id });
     return found.value;
   });
 
@@ -218,7 +190,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
   const create = Effect.fn("TaskService.create")(
     function* (input: Task.CreateInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Task.CreateInput))(input);
-      const thread = yield* requireThread(request.threadId);
+      const thread = yield* threadQuery.requireAccess(request.threadId);
       yield* authorization.require([
         Requirement.make(TaskPermissions.Create, {
           _tag: "Group",
@@ -249,7 +221,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
   const update = Effect.fn("TaskService.update")(
     function* (input: Task.UpdateInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Task.UpdateInput))(input);
-      const thread = yield* requireThread(request.threadId);
+      const thread = yield* threadQuery.requireAccess(request.threadId);
       const task = yield* requireTask(thread);
       yield* authorization.require([
         Requirement.make(TaskPermissions.Update, {
@@ -281,14 +253,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
 
   // Reads are outside journal.commit; an enclosing caller transaction remains authoritative.
   const get = Effect.fn("TaskService.get")(function* (threadId: Thread.Id) {
-    const thread = yield* threadQuery
-      .requireReadable(threadId)
-      .pipe(
-        Effect.catchTag(
-          "ThreadQuery.NotFound",
-          (error) => new NotFound({ threadId: error.threadId }),
-        ),
-      );
+    const thread = yield* threadQuery.requireReadable(threadId);
     return yield* requireTask(thread);
   });
 
@@ -321,18 +286,16 @@ export const make = Effect.fn("TaskService.make")(function* () {
           : Effect.succeed({ task, thread });
       });
     });
-    return yield* threadQuery
-      .listReadable(groupId, {
-        limit: options.limit,
-        first: options.before,
-        list: page,
-        threadOf: ({ thread }) => thread,
-        cursorOf: ({ task }): Task.ListCursor => ({
-          createdAt: task.createdAt,
-          threadId: task.threadId,
-        }),
-      })
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
+    return yield* threadQuery.listReadable(groupId, {
+      limit: options.limit,
+      first: options.before,
+      list: page,
+      threadOf: ({ thread }) => thread,
+      cursorOf: ({ task }): Task.ListCursor => ({
+        createdAt: task.createdAt,
+        threadId: task.threadId,
+      }),
+    });
   });
 
   return TaskService.of({ create, update, get, listInGroup });

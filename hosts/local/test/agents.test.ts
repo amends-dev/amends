@@ -99,7 +99,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.connections
             .models({ params: { workspaceId, connectionId: anthropic.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ConnectionService.NotFound" });
+        ).toMatchObject({ _tag: "CoreError.NotFound" });
       }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),
   );
@@ -231,7 +231,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         // An agent leaves as any member does.
         yield* asAlice.members.remove({ params: { workspaceId, memberId: created.memberId } });
         expect(yield* asBob.agents.get({ params }).pipe(Effect.flip)).toMatchObject({
-          _tag: "AgentService.NotFound",
+          _tag: "CoreError.NotFound",
         });
         expect(yield* asAlice.agents.list({ params: { workspaceId } })).toEqual([]);
       }).pipe(Effect.scoped, Effect.provide(server(url))),

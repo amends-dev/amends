@@ -311,10 +311,10 @@ describe("marking notifications seen", () => {
             const p = yield* prepare();
             const before = yield* snapshot(p);
             for (const [actor, id, tag] of [
-              [p.owner, p.humanNote.id, "NotificationService.NotFound"],
-              [agent, p.humanNote.id, "NotificationService.NotFound"],
-              [human, p.agentNote.id, "NotificationService.NotFound"],
-              [human, Notification.Id.make("missing"), "NotificationService.NotFound"],
+              [p.owner, p.humanNote.id, "CoreError.NotFound"],
+              [agent, p.humanNote.id, "CoreError.NotFound"],
+              [human, p.agentNote.id, "CoreError.NotFound"],
+              [human, Notification.Id.make("missing"), "CoreError.NotFound"],
               [agent, p.agentNote.id, "NotificationService.HumanRecipientRequired"],
               [
                 changed(human, { identity: p.owner.identity }),
@@ -903,7 +903,7 @@ describe("marking notifications seen", () => {
             });
             expect(
               yield* Effect.flip(run({ ...p.bound, context }, human, markSeen(p.humanNote.id))),
-            ).toMatchObject({ _tag: "NotificationService.NotFound" });
+            ).toMatchObject({ _tag: "CoreError.NotFound" });
             expect(yield* snapshot(p)).toEqual(before);
           }),
         ),
@@ -933,7 +933,7 @@ describe("marking notifications seen", () => {
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, p.owner.identity, markSeen(p.humanNote.id)),
                 ),
-              ).toMatchObject({ _tag: "NotificationService.NotFound" });
+              ).toMatchObject({ _tag: "CoreError.NotFound" });
               expect(
                 yield* Effect.flip(
                   gateway.asMember(workspaceId, agent.identity, markSeen(p.agentNote.id)),

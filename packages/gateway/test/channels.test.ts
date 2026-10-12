@@ -34,6 +34,7 @@ import {
   takeTurnJobs,
   testTransport,
 } from "./support.ts";
+import { CoreError } from "@amends-dev/core/error";
 
 const as = <A, E, R extends Core.Operations | Actor.Actor>(
   id: Workspace.Id,
@@ -301,7 +302,9 @@ describe("channels", () => {
                   }),
                 ),
               ),
-            ).toEqual(new ChannelIntake.NotFound({ channelId: Channel.Id.make("missing") }));
+            ).toEqual(
+              new CoreError.NotFound({ resource: "Channel", id: Channel.Id.make("missing") }),
+            );
           }),
         ),
       ),
@@ -642,7 +645,7 @@ describe("channels", () => {
                   ),
                 ),
               ),
-            ).toEqual(new ChannelService.NotBound({ threadId: plain.thread.id }));
+            ).toEqual(new CoreError.NotFound({ resource: "ChannelBinding", id: plain.thread.id }));
             // Removed, the channel is listed no more and receives nothing; its threads stay.
             yield* as(
               workspace.id,
@@ -658,7 +661,7 @@ describe("channels", () => {
                   channelIntake.receive(channel.id, { headers: {}, body: body([]) }),
                 ),
               ),
-            ).toEqual(new ChannelIntake.NotFound({ channelId: channel.id }));
+            ).toEqual(new CoreError.NotFound({ resource: "Channel", id: channel.id }));
             expect(yield* bound.channelBindings.get(threadId)).toMatchObject(
               Option.some({ channelId: channel.id }),
             );
