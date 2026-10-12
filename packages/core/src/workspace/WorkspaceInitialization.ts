@@ -16,8 +16,7 @@ import * as RoleFacts from "../authorization/RoleFacts.ts";
 
 import * as GroupFacts from "../group/GroupFacts.ts";
 import * as Group from "../group/Group.ts";
-import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
-import * as GroupMembership from "../group/GroupMembership.ts";
+import * as GroupCommand from "../group/GroupCommand.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
@@ -65,8 +64,9 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   const journal = yield* Journal.Journal;
   const crypto = yield* Crypto.Crypto;
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog;
-  // Creation runs before the workspace's operations exist, so it builds the command it shares.
+  // Creation runs before the workspace's operations exist, so it builds the commands it shares.
   const assignmentCommand = yield* AssignmentCommand.make();
+  const groupCommand = yield* GroupCommand.make();
   const provenance = yield* Publication.make(workspaceId, {
     _tag: "Identity",
     identity: Identity.Reference.cases.Human.make({ id: createdBy }),
@@ -114,16 +114,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
           createdAt,
         })
         .pipe(Publication.withOccurredAt(createdAt));
-      yield* journal
-        .publish(GroupMembershipFacts.Added, {
-          id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
-          workspaceId: record.id,
-          groupId: Group.GeneralId,
-          memberId: ownerMemberId,
-          admittedAt: createdAt,
-          status: "active",
-        })
-        .pipe(Publication.withOccurredAt(createdAt));
+      yield* groupCommand.admitMember(Group.GeneralId, ownerMemberId, createdAt);
       return record;
     }).pipe(Effect.provideService(Publication.Publication, provenance)),
   );

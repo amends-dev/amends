@@ -193,7 +193,8 @@ Groups share their internal reads and writes as `GroupQuery` and `GroupCommand`,
 `Operations`. `GroupQuery.requireAudience` checks current workspace and group membership, with no
 action permission and no management bypass; each service checks its own grant beside it, inside its
 commit for writes. `GroupCommand.admitMember` publishes an admission for team creation, direct
-groups, adding, and joining alike. `GroupCommand.removeMembership` records a departure as one fact,
+groups, adding, and joining alike, and for the general group a new workspace starts with and every
+new member joins. `GroupCommand.removeMembership` records a departure as one fact,
 and projections end the member's follow and every thread participation held through the admission
 together. Removing a workspace member uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).

@@ -215,7 +215,9 @@ const taskCommand = TaskCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
 );
 const channelQuery = ChannelQuery.layer;
-const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
+const memberCommand = MemberCommand.layer.pipe(
+  Layer.provide(Layer.mergeAll(AssignmentCommand.layer, groupCommand)),
+);
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
