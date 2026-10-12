@@ -10,7 +10,6 @@
  * @since 0.1.0
  */
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
-import type { PlatformError } from "effect";
 import { Prompt } from "effect/ai";
 import type * as Agent from "../agent/Agent.ts";
 import * as AgentQuery from "../agent/AgentQuery.ts";
@@ -21,7 +20,6 @@ import * as Actor from "../identity/Actor.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as Performer from "../identity/Performer.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as Notification from "../notification/Notification.ts";
@@ -52,71 +50,76 @@ import * as SessionStateStore from "./SessionStateStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What every execution operation can fail with: a turn missing or not in the state the step needs
- * (`CoreError.Conflict` with `TurnNotActive`), and the failures of the stores and commit each one
- * writes through.
+ * (`CoreError.Conflict` with `TurnNotActive`), and what its commit meets.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | PlatformError.PlatformError
-  | Projection.Error
   | CoreError.NotFound
   | CoreError.Conflict
-  | TurnCommand.EndError;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What `accept` can fail with: `Error`, and the failures of reading the agent's notifications,
- * its membership, the thread's access, and the session log's head.
+ * What `accept` can fail with: `Error`, and the thread's access.
  *
  * @category errors
  * @since 0.1.0
  */
 export type AcceptError =
-  | Error
-  | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
-  | StoreError.StoreError;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What `start` can fail with: `Error`, and the failures of reading what the agent is told and of
- * building what it runs on.
+ * What `start` can fail with: `Error`, and what the agent runs on.
  *
  * @category errors
  * @since 0.1.0
  */
 export type StartError =
-  | Error
-  | Exclude<ThreadQuery.TimelineError, CoreError.NotFound>
-  | StoreError.StoreError
-  | AgentQuery.BuildError;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What `joinedConversation` can fail with: `Error`, and the failures of reading the thread's
- * messages and what their authors are called.
+ * What `joinedConversation` can fail with: `Error`.
  *
  * @category errors
  * @since 0.1.0
  */
-export type JoinedConversationError = Error | StoreError.StoreError;
+export type JoinedConversationError =
+  | CoreError.NotFound
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What `close` can fail with: `Error`, and the failures of checking the agent's access and
- * posting its reply.
+ * What `close` can fail with: `Error`, and the agent's access to post its reply.
  *
  * @category errors
  * @since 0.1.0
  */
 export type CloseError =
-  | Error
-  | Exclude<ThreadQuery.AccessError, CoreError.NotFound>
-  | StoreError.StoreError
-  | ThreadCommand.Error;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What a turn's job runs: nothing, since the turn ended as it stood or is not active; or the turn,
@@ -227,7 +230,7 @@ export class TurnExecution extends Context.Service<
     readonly fail: (
       turnId: Turn.Id,
       failure: { readonly reason: string; readonly resume?: SessionStateStore.Resume | undefined },
-    ) => Effect.Effect<void, Error | StoreError.StoreError>;
+    ) => Effect.Effect<void, Error>;
     /**
      * End a turn its job stopped, or that it was not running, keeping a session it started: one
      * asked to stop, or whose participation ended. Any other turn is left as it is.
@@ -235,7 +238,7 @@ export class TurnExecution extends Context.Service<
     readonly confirmStopped: (
       turnId: Turn.Id,
       stopped: { readonly resume?: SessionStateStore.Resume | undefined },
-    ) => Effect.Effect<void, Error | StoreError.StoreError>;
+    ) => Effect.Effect<void, Error>;
   }
 >()("@amends-dev/core/turn/TurnExecution") {}
 
@@ -561,23 +564,24 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const accept: TurnExecution["Service"]["accept"] = Effect.fn("TurnExecution.accept")(
-    function* (memberId, threadId) {
-      const member = yield* memberStore.get(memberId);
-      if (Option.isNone(member) || member.value.status !== "active") return Option.none();
-      const { identity } = member.value;
-      if (!Identity.MemberReference.isAnyOf(["Agent"])(identity)) return Option.none();
-      return yield* asAgent(
-        memberId,
-        identity,
-        Effect.gen(function* () {
-          const active = yield* turnStore.findActive(memberId, threadId);
-          if (Option.isSome(active)) return active;
-          return Option.fromUndefinedOr(yield* acceptWork(memberId, identity, threadId));
-        }),
-      );
-    },
-  );
+  const accept: TurnExecution["Service"]["accept"] = Effect.fn("TurnExecution.accept")(function* (
+    memberId,
+    threadId,
+  ) {
+    const member = yield* memberStore.get(memberId);
+    if (Option.isNone(member) || member.value.status !== "active") return Option.none();
+    const { identity } = member.value;
+    if (!Identity.MemberReference.isAnyOf(["Agent"])(identity)) return Option.none();
+    return yield* asAgent(
+      memberId,
+      identity,
+      Effect.gen(function* () {
+        const active = yield* turnStore.findActive(memberId, threadId);
+        if (Option.isSome(active)) return active;
+        return Option.fromUndefinedOr(yield* acceptWork(memberId, identity, threadId));
+      }),
+    );
+  }, Operation.report);
 
   /**
    * Ready `turn` to run on `selection`, in the caller's commit, with what the agent is told now,
@@ -642,53 +646,53 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     });
   });
 
-  const start: TurnExecution["Service"]["start"] = Effect.fn("TurnExecution.start")(
-    function* (turnId) {
-      return yield* asTurnAgent(
-        turnId,
-        Effect.fnUntraced(function* (turn) {
-          if (!Turn.active(turn.status)) return Start.cases.Idle.make({});
-          if (turn.status === "cancelling")
-            return yield* endAsIdle(turn, {
-              outcome: "cancelled",
-              cancelReason: reasonAskedToStop(turn),
-            });
-          if (yield* hasDeparted(turn))
-            return yield* endAsIdle(turn, {
-              outcome: "cancelled",
-              cancelReason: "participation-ended",
-            });
-          return yield* Effect.gen(function* () {
-            const selection = yield* selectionOf(turn);
-            const runnable = yield* agentQuery.buildRunnable(turn.memberId, selection);
-            return yield* readyTurn(turn, selection, runnable);
-          }).pipe(
-            // The agent's membership ended, or the thread is gone or closed to the agent: the turn
-            // fails rather than tells nothing.
-            Effect.catchReason("CoreError.Denied", "NotGranted", () =>
+  const start: TurnExecution["Service"]["start"] = Effect.fn("TurnExecution.start")(function* (
+    turnId,
+  ) {
+    return yield* asTurnAgent(
+      turnId,
+      Effect.fnUntraced(function* (turn) {
+        if (!Turn.active(turn.status)) return Start.cases.Idle.make({});
+        if (turn.status === "cancelling")
+          return yield* endAsIdle(turn, {
+            outcome: "cancelled",
+            cancelReason: reasonAskedToStop(turn),
+          });
+        if (yield* hasDeparted(turn))
+          return yield* endAsIdle(turn, {
+            outcome: "cancelled",
+            cancelReason: "participation-ended",
+          });
+        return yield* Effect.gen(function* () {
+          const selection = yield* selectionOf(turn);
+          const runnable = yield* agentQuery.buildRunnable(turn.memberId, selection);
+          return yield* readyTurn(turn, selection, runnable);
+        }).pipe(
+          // The agent's membership ended, or the thread is gone or closed to the agent: the turn
+          // fails rather than tells nothing.
+          Effect.catchReason("CoreError.Denied", "NotGranted", () =>
+            endAsIdle(turn, {
+              outcome: "failed",
+              reason: "The agent can no longer read the thread.",
+            }),
+          ),
+          // The agent cannot run on what is selected for it: the turn fails, saying why.
+          Effect.catchTags({
+            "CoreError.Invalid": ({ reason }) =>
+              endAsIdle(turn, { outcome: "failed", reason: reason.message }),
+            "CoreError.NotFound": ({ resource }) =>
               endAsIdle(turn, {
                 outcome: "failed",
-                reason: "The agent can no longer read the thread.",
+                reason:
+                  resource === "Agent"
+                    ? "The agent can no longer run."
+                    : "The agent can no longer read the thread.",
               }),
-            ),
-            // The agent cannot run on what is selected for it: the turn fails, saying why.
-            Effect.catchTags({
-              "CoreError.Invalid": ({ reason }) =>
-                endAsIdle(turn, { outcome: "failed", reason: reason.message }),
-              "CoreError.NotFound": ({ resource }) =>
-                endAsIdle(turn, {
-                  outcome: "failed",
-                  reason:
-                    resource === "Agent"
-                      ? "The agent can no longer run."
-                      : "The agent can no longer read the thread.",
-                }),
-            }),
-          );
-        }),
-      );
-    },
-  );
+          }),
+        );
+      }),
+    );
+  }, Operation.report);
 
   const joinedConversation: TurnExecution["Service"]["joinedConversation"] = Effect.fn(
     "TurnExecution.joinedConversation",
@@ -701,7 +705,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         through: participation.joinedAtSequence - 1,
       }),
     );
-  });
+  }, Operation.report);
 
   const showDraft: TurnExecution["Service"]["showDraft"] = Effect.fn("TurnExecution.showDraft")(
     function* (turnId, draft) {
@@ -716,6 +720,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         draft,
       });
     },
+    Operation.report,
   );
 
   /**
@@ -796,24 +801,25 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         return Closing.cases.Closed.make({ messageIds });
       }),
     );
-  });
+  }, Operation.report);
 
-  const fail: TurnExecution["Service"]["fail"] = Effect.fn("TurnExecution.fail")(
-    function* (turnId, failure) {
-      const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(failure.reason);
-      yield* asTurnAgent(
-        turnId,
-        Effect.fnUntraced(function* (turn) {
-          if (!Turn.active(turn.status))
-            return yield* new CoreError.Conflict({
-              reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
-            });
-          if (failure.resume !== undefined) yield* saveSession(turn, failure.resume);
-          yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
-        }),
-      );
-    },
-  );
+  const fail: TurnExecution["Service"]["fail"] = Effect.fn("TurnExecution.fail")(function* (
+    turnId,
+    failure,
+  ) {
+    const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(failure.reason);
+    yield* asTurnAgent(
+      turnId,
+      Effect.fnUntraced(function* (turn) {
+        if (!Turn.active(turn.status))
+          return yield* new CoreError.Conflict({
+            reason: new CoreError.TurnNotActive({ turnId: turn.id, status: turn.status }),
+          });
+        if (failure.resume !== undefined) yield* saveSession(turn, failure.resume);
+        yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
+      }),
+    );
+  }, Operation.report);
 
   const confirmStopped: TurnExecution["Service"]["confirmStopped"] = Effect.fn(
     "TurnExecution.confirmStopped",
@@ -827,7 +833,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         if (yield* hasDeparted(turn)) return yield* endStopped(turn, "participation-ended", resume);
       }),
     );
-  });
+  }, Operation.report);
 
   return TurnExecution.of({
     accept,

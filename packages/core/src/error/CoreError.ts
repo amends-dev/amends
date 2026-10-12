@@ -5,10 +5,10 @@
  * the caller named that is missing or out of their reach; `Changed`, for what changed since the
  * caller read it; `Denied`, for who may not do what they asked; `Conflict`, for a request the
  * state of what it acts on refuses; `Invalid`, for a request that cannot be done as asked whatever
- * the state; and `Unavailable`, for what an operation needs that cannot be reached or used now.
- * The last four say why in their `reason`, as `NotGranted` or `AlreadyMember`, so a caller
- * recovers from one reason with
- * `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`.
+ * the state; `Unavailable`, for what an operation needs that cannot be reached or used now; and
+ * `Uncertain`, for a commit storage could not confirm. Denied, Conflict, Invalid, and Unavailable
+ * say why in their `reason`, as `NotGranted` or `AlreadyMember`, so a caller recovers from one
+ * reason with `Effect.catchReason("CoreError.Denied", "NotGranted", ...)`. `CoreError` is all seven.
  *
  * @since 0.1.0
  */
@@ -19,6 +19,7 @@ import * as Role from "../authorization/Role.ts";
 import * as Connection from "../connection/Connection.ts";
 import * as GroupId from "../group/GroupId.ts";
 import * as Identity from "../identity/Identity.ts";
+import * as Commit from "../journal/Commit.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
@@ -936,3 +937,40 @@ export class Invalid extends Schema.TaggedError<Invalid>()("CoreError.Invalid", 
     return this.reason.message;
   }
 }
+
+/**
+ * Storage could not confirm whether the operation's commit took effect: it may have. `commitId`
+ * names it, to reconcile stored state before asking again; asking again with the same request key
+ * returns what a first attempt that committed recorded.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class Uncertain extends Schema.TaggedError<Uncertain>()("CoreError.Uncertain", {
+  commitId: Commit.Id,
+}) {
+  override get message(): string {
+    return `Commit ${this.commitId} may or may not have taken effect`;
+  }
+}
+
+/**
+ * Every outcome core reports, by kind.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const CoreError = Schema.Union([
+  NotFound,
+  Changed,
+  Denied,
+  Conflict,
+  Invalid,
+  Unavailable,
+  Uncertain,
+]);
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type CoreError = typeof CoreError.Type;

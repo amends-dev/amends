@@ -278,9 +278,7 @@ it.effect(
             for (const operation of operations) {
               const error = yield* Effect.flip(operation);
               expect(error._tag).toBe(
-                actor.workspaceId === otherWorkspaceId
-                  ? "Authorization.WorkspaceMismatch"
-                  : "CoreError.Denied",
+                actor.workspaceId === otherWorkspaceId ? "CoreError.Invalid" : "CoreError.Denied",
               );
             }
           }),
@@ -393,10 +391,12 @@ it.effect("invalid notification IDs and paging are rejected before store reads",
       Effect.gen(function* () {
         const notificationService = yield* NotificationService.NotificationService;
         expect((yield* Effect.flip(notificationService.markSeen(invalid.id)))._tag).toBe(
-          "SchemaError",
+          "CoreError.Invalid",
         );
         for (const options of [{ limit: 0 }, { limit: -1 }, { limit: 1.5 }, { limit: 1, before }])
-          expect((yield* Effect.flip(notificationService.inbox(options)))._tag).toBe("SchemaError");
+          expect((yield* Effect.flip(notificationService.inbox(options)))._tag).toBe(
+            "CoreError.Invalid",
+          );
       }),
       alice,
       {
@@ -408,7 +408,7 @@ it.effect("invalid notification IDs and paging are rejected before store reads",
   }),
 );
 
-it.effect("notification storage failures retain their cause", () =>
+it.effect("notification storage failures are defects that keep the failure", () =>
   Effect.gen(function* () {
     const fixture = yield* make(workspaceId);
     yield* seed(fixture);
@@ -418,9 +418,11 @@ it.effect("notification storage failures retain their cause", () =>
       fixture,
       Effect.gen(function* () {
         const notificationService = yield* NotificationService.NotificationService;
-        expect(yield* Effect.flip(notificationService.markSeen(mine.id))).toBe(failure);
-        expect(yield* Effect.flip(notificationService.inbox(page))).toBe(failure);
-        expect(yield* Effect.flip(notificationService.countPending)).toBe(failure);
+        const defectOf = <A, E, R>(operation: Effect.Effect<A, E, R>) =>
+          Effect.catchDefect(operation, Effect.succeed);
+        expect(yield* defectOf(notificationService.markSeen(mine.id))).toBe(failure);
+        expect(yield* defectOf(notificationService.inbox(page))).toBe(failure);
+        expect(yield* defectOf(notificationService.countPending)).toBe(failure);
       }),
       alice,
       { get: fail, listLatestByRecipient: fail, countPendingByRecipient: fail },

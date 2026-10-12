@@ -10,7 +10,6 @@ import * as Identity from "../identity/Identity.ts";
 import * as Assignment from "../authorization/Assignment.ts";
 import * as Scope from "../authorization/Scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 
 import * as AssignmentStore from "../authorization/AssignmentStore.ts";
 import * as Authorization from "../authorization/Authorization.ts";
@@ -22,8 +21,6 @@ import * as BuiltinRoles from "../authorization/BuiltinRoles.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Store from "../journal/Store.ts";
 import * as WorkspaceFacts from "./WorkspaceFacts.ts";
 import * as Member from "./Member.ts";
@@ -33,25 +30,22 @@ import * as Workspace from "./Workspace.ts";
 import * as Ownership from "./Ownership.ts";
 import * as OwnershipPermissions from "./OwnershipPermissions.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What the ownership operations can fail with: the outcomes above, and the failures
- * of what they depend on.
+ * What the ownership operations can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Delegation.Error
-  | StoreError.StoreError
-  | Projection.Error
-  | Log.WriteError
-  | PlatformError.PlatformError
-  | CoreError.Denied
   | CoreError.NotFound
+  | CoreError.Changed
+  | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Changed;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The ownership operations, one of `Core.Operations`.
@@ -157,7 +151,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       canTransfer,
       candidates,
     });
-  }).pipe(Effect.withSpan("OwnershipService.get"));
+  }).pipe(Effect.withSpan("OwnershipService.get"), Operation.report);
   const builtins = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
   const transfer = Effect.fn("OwnershipService.transfer")(
     function* (input: Ownership.TransferInput) {
@@ -220,6 +214,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
   return OwnershipService.of({ get, transfer });
 });

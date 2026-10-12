@@ -24,24 +24,20 @@ import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What marking a thread or a group read can fail with: the outcomes above, and the
- * failures of what marking depends on.
+ * What marking a thread or a group read can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Authorization.Error
-  | ThreadQuery.AccessError
-  | GroupQuery.AudienceError
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.Denied
   | CoreError.NotFound
-  | CoreError.Conflict;
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The read-state operations, one of `Core.Operations`.
@@ -132,7 +128,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
         readThrough: position.readThrough,
       }),
     );
-  });
+  }, Operation.report);
 
   const markGroupRead = Effect.fn("ReadStateService.markGroupRead")(function* (
     input: ReadState.MarkGroupReadInput,
@@ -162,7 +158,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
         readAt,
       }),
     );
-  });
+  }, Operation.report);
 
   return ReadStateService.of({ markThreadRead, markGroupRead });
 });

@@ -1,13 +1,12 @@
 /**
- * The contract's error namespace: each gateway and core outcome an endpoint can answer with, given
- * its HTTP status, and the lists of them that groups spread into an endpoint's `error`. Core
- * declares no transport concerns, so the status lives here, on the contract's view of each error,
- * and the serialized tag stays the one core or the gateway declares. `TooManyStreams` is the
+ * The contract's error namespace: each core outcome an endpoint can answer with, given its HTTP
+ * status, and the lists of them that groups spread into an endpoint's `error`. Core declares no
+ * transport concerns, so the status lives here, on the contract's view of each error, and the
+ * serialized tag stays the one core declares. `TooManyStreams` is the
  * contract's own, and `requestKey` is the `Idempotency-Key` header a creating endpoint accepts.
  *
  * @since 0.1.0
  */
-import * as GatewayErrors from "@amends-dev/gateway/GatewayErrors";
 import { Request } from "@amends-dev/core/request";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/http-api";
@@ -91,7 +90,7 @@ export const requestKey = {
  * @category errors
  * @since 0.1.0
  */
-export const Uncertain = GatewayErrors.Uncertain.pipe(HttpApiSchema.status(500));
+export const Uncertain = CoreError.Uncertain.pipe(HttpApiSchema.status(500));
 /**
  * The delegation rules' outcomes, which giving, changing, and taking away a role share, as do
  * issuing and answering an invitation and reading a member's access: `Denied` where only the owner

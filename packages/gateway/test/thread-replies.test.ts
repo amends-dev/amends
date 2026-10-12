@@ -506,7 +506,7 @@ describe("thread replies", () => {
               reply(first.thread.id, [humanId, humanId]),
             ])
               expect(yield* Effect.flip(run(bound, owner, operation))).toMatchObject({
-                _tag: "SchemaError",
+                _tag: "CoreError.Invalid",
               });
             expect(yield* Effect.flip(run(bound, agent, reply(first.thread.id)))).toEqual(
               new CoreError.Denied({ reason: new CoreError.HumanRequired() }),
@@ -788,7 +788,7 @@ describe("thread replies", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
+                value: { _tag: "CoreError.Unavailable", reason: { _tag: "Contention" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -948,7 +948,10 @@ describe("thread replies", () => {
               Effect.fail(StoreError.failed("ThreadActivityStore", "latest")("injected")),
           });
           expect(
-            yield* Effect.flip(run({ ...bound, context }, owner, reply(first.thread.id))),
+            yield* Effect.catchDefect(
+              run({ ...bound, context }, owner, reply(first.thread.id)),
+              Effect.succeed,
+            ),
           ).toMatchObject({
             _tag: "StoreError",
             store: "ThreadActivityStore",
@@ -1071,7 +1074,7 @@ describe("thread replies", () => {
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(/^(StoreError|CoreError.Conflict)$/),
+                  _tag: expect.stringMatching(/^(CoreError.Unavailable|CoreError.Conflict)$/),
                 },
               });
           yield* Effect.scoped(

@@ -3,7 +3,7 @@ import type * as Core from "@amends-dev/core";
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { Member, Workspace } from "@amends-dev/core/workspace";
-import { SessionTokens, Gateway, type GatewayErrors } from "@amends-dev/gateway";
+import { SessionTokens, Gateway } from "@amends-dev/gateway";
 import { expect, it } from "@effect/vitest";
 import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect";
 import type { Scope } from "effect";
@@ -44,7 +44,7 @@ const gateway = Layer.succeed(
     ) =>
       Effect.provide(Effect.provideService(program, Actor.Actor, actor), failing) as Effect.Effect<
         A,
-        GatewayErrors.PublicErrorOf<E> | CoreError.Denied,
+        E | CoreError.Denied,
         Scope.Scope
       >,
   }),

@@ -26,26 +26,17 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
   /** Run `program` in the workspace, holding it only while `program` runs. */
   const enter = <A, E>(program: Effect.Effect<A, E, Core.JobServices | Scope.Scope>) =>
     Effect.scoped(gateway.inWorkspace(workspaceId, program));
-  /**
-   * Ask `call` of the workspace's turn execution, as `TurnExecution.use` does; the gateway reports
-   * its public errors as they are, and the rest as defects.
-   */
+  /** Ask `call` of the workspace's turn execution, as `TurnExecution.use` does. */
   const useTurnExecution = <A, E>(
     call: (turnExecution: TurnExecution.TurnExecution["Service"]) => Effect.Effect<A, E>,
   ) => enter(TurnExecution.TurnExecution.use(call));
   /**
-   * Ask `call` of the workspace's session log store. The log takes part in no commit and its
-   * errors are the writer's to handle, so they leave the workspace as they are, where the gateway
-   * would report them as defects.
+   * Ask `call` of the workspace's session log store. The log takes part in no commit, and its
+   * errors are the writer's to handle.
    */
   const useSessionLogStore = <A, E>(
     call: (sessionLogStore: SessionLogStore.SessionLogStore["Service"]) => Effect.Effect<A, E>,
-  ) =>
-    enter(
-      SessionLogStore.SessionLogStore.use((sessionLogStore) =>
-        Effect.result(call(sessionLogStore)),
-      ),
-    ).pipe(Effect.flatMap(Effect.fromResult));
+  ) => enter(SessionLogStore.SessionLogStore.use(call));
   return {
     /** The agent's active turn in the thread, or a new one that accepts the work that waits. */
     accept: (job: TurnJobs.Job) =>

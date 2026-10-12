@@ -361,9 +361,9 @@ stale expectation, and `CoreError.Conflict`, a request the state of what it acts
 its reason, are 409; `CoreError.Invalid`, a request that cannot be done as asked whatever the
 state, such as values core refuses, a fixed roster, or a setup that cannot run, is 422; and
 `CoreError.Unavailable`, what cannot be reached now, such as storage another writer held, is 503. A
-request the contract itself cannot read is 400, too many streams 429, and an uncertain commit 500
-with its commit ID. The gateway's public outcomes are listed in
-[gateway](../gateway/README.md#public-outcomes); `ApiErrors` is this contract's error namespace.
+request the contract itself cannot read is 400, too many streams 429, and `CoreError.Uncertain`, a
+commit storage could not confirm, 500 with its commit ID. Core's kinds are described in
+[errors by kind](../core/README.md#errors-by-kind); `ApiErrors` is this contract's error namespace.
 
 ## Serving the contract
 

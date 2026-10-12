@@ -7,14 +7,11 @@
  */
 import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as AgentPermissions from "../agent/AgentPermissions.ts";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 
@@ -27,26 +24,21 @@ import * as GroupFollow from "./GroupFollow.ts";
 import * as GroupFollowFacts from "./GroupFollowFacts.ts";
 import * as GroupFollowStore from "./GroupFollowStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What following and unfollowing can fail with: the outcomes above, and the
- * failures of what they depend on.
+ * What following and unfollowing can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | PlatformError.PlatformError
-  | Log.WriteError
-  | Projection.Error
   | CoreError.NotFound
-  | CoreError.Invalid
+  | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Denied;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The follow operations, one of `Core.Operations`.
@@ -164,6 +156,7 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const unfollow = Effect.fn("GroupFollowService.unfollow")(
@@ -182,6 +175,7 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
   return GroupFollowService.of({ follow, unfollow });
 });

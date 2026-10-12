@@ -205,30 +205,22 @@ The decisions are pure functions, `decideSend`, `decideRedeem`, `withdrawUnsent`
 which `modifyCode` and `resolve` apply. The gateway's `test/sign-in.test.ts` runs
 email sign-in over the memory storage, and the [conformance suites](#conformance) its storage.
 
-## Public outcomes
+## Outcomes
 
-Programs fail only with outcomes a caller can act on. Core's domain errors pass through unchanged,
-among them `CoreError.NotFound`, which `inWorkspace` also returns for a workspace that was never
-created, and `CoreError.Unavailable` (`Contention`) for storage contention worth retrying. The
-gateway adds:
+A program fails with what the operations it calls report, by kind, as core's
+[errors by kind](../core/README.md#errors-by-kind) describes; the gateway passes each through as it
+is. It adds `CoreError.Denied` (`NotMember`) when `asMember`'s identity has no active membership,
+and `CoreError.NotFound` when `inWorkspace` names a workspace that was never created.
+`createWorkspace` reports initialization's failures the same way. A job's own stores, such as the
+session log a turn's job writes, fail as those stores do. Any failure while binding storage or
+building core is a defect that keeps its cause for the host's logs; HTTP answers it with 500, and
+jobs run again after any failure. When an operation reports `CoreError.Unavailable` (`Reloading`),
+another host changed which projection versions are live, and the gateway prepares the workspace
+again for the next request.
 
-- `CoreError.Denied` (`NotMember`) when the identity has no active membership;
-- `Uncertain` when a commit's outcome is unknown, with its commit ID;
-- `CoreError.Invalid` (`Malformed`) when core rejects values the caller supplied, such as invitation
-  grants, or values that name another workspace's records.
-
-Every other failure, and any failure while binding storage or building core, becomes a defect that
-keeps its cause for the host's logs; HTTP answers it with 500. Jobs get the same outcomes and run
-again after any failure. `GatewayErrors.PublicError` is the schema of these outcomes, and
-`GatewayErrors.PublicErrorOf<E>` computes a program's public error type. A domain error core adds
-reaches callers only once it is listed there: a type test checks that every error a core operation
-can fail with is public or one of the internal failures it names, and an HTTP test that every
-error an HTTP route declares is public, so a new outcome fails the build until it is classified.
-
-The storage adapters map every failed `COMMIT` to `Uncertain`, including some definite failures; see
-[known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention). Import
-`GatewayErrors` from `@amends-dev/gateway/GatewayErrors` in contracts, to avoid loading the gateway
-itself.
+The storage adapters map every failed `COMMIT` to `CoreError.Uncertain`, including some definite
+failures; see
+[known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
 
 ## Development
 
@@ -236,11 +228,10 @@ itself.
 bun run test packages/gateway
 ```
 
-`test/gateway.test.ts` covers error mapping, defects and interruption, shared boot, retry after a
+`test/gateway.test.ts` covers failures passing through, interruption, shared boot, retry after a
 failed boot, release after the idle time-to-live, leases, isolation between calls, shutdown, and
 actor resolution, over host stubs whose journals are empty and that refuse unexpected writes.
-`test/contracts.test.ts` checks the sign-in and directory encodings, and
-`test/public-errors.test.ts` the classification of core's errors. The rest of `test/` runs core's
+`test/contracts.test.ts` checks the sign-in and directory encodings. The rest of `test/` runs core's
 operations as a host runs them, through the gateway over the [memory storage](#memory) that
 `test/fixture.ts` opens: workspaces and access, groups, threads, tasks, notifications,
 connections, agents, turns, channels, and email sign-in, with hosts over the same storage where

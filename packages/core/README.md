@@ -33,7 +33,7 @@ The package root composes one workspace's core:
 Each domain is a subpath export with the records, facts, stores, projections, and operations it
 implements: `@amends-dev/core/workspace`, `/authorization`, `/identity`, `/journal`, `/group`,
 `/thread`, `/task`, `/channel`, `/connection`, `/agent`, `/turn`, `/notification`, `/read-state`,
-`/change-feed`, `/signal`, `/request`, and `/error`.
+`/change-feed`, `/signal`, `/request`, `/operation`, and `/error`.
 
 ## Domains
 
@@ -148,10 +148,21 @@ transport rejects (`Unverified`). `CoreError.Unavailable` says what an operation
 reached or used now: storage another writer held (`Contention`) or read models another host is
 rebuilding (`Reloading`), a change feed or turn log that stopped (`ChangeFeedInterrupted`,
 `LogInterrupted`), a channel's system out of reach (`ChannelUnreachable`), or a host that keeps no
-keys (`CredentialsUnavailable`). Operations pass it through unchanged, so a protocol answers it with
-one status and a client handles it once, and an operation that reaches a resource through another
-reports the one the caller named: a message whose thread they cannot read is the message not found,
-not the thread.
+keys (`CredentialsUnavailable`). `CoreError.Uncertain` says storage could not confirm whether a
+commit took effect, and names it by `commitId`. Operations pass each kind through unchanged, so a
+protocol answers it with one status and a client handles it once, and an operation that reaches a
+resource through another reports the one the caller named: a message whose thread they cannot read
+is the message not found, not the thread. `CoreError.CoreError` is all seven.
+
+An operation's signature lists only these kinds. Each operation passes `Operation.report`, from
+`@amends-dev/core/operation`, to the `Effect.fn` that defines it, which reports what core's internals
+fail with by kind: storage another writer held, and read models another host is rebuilding, as
+`CoreError.Unavailable` (`Contention`, `Reloading`); a commit storage could not confirm as
+`CoreError.Uncertain`; and a value that does not decode, which during an operation is one a caller
+supplied, as `CoreError.Invalid` (`Malformed`). The rest of `Operation.Internal`, such as storage
+that failed otherwise, is a defect that keeps the failure for the host's logs. A failure that is
+neither a kind nor internal stays in the operation's type, which its signature then refuses, so a
+new outcome fails the build until it is a kind or internal.
 
 ## Workspace and access
 
@@ -680,12 +691,14 @@ An outcome every feature reports is one kind in `CoreError`, whichever operation
 missing, or out of the caller's reach, is `CoreError.NotFound`; anything that changed since the
 caller read it is `CoreError.Changed`; a refusal of the actor is `CoreError.Denied`; a request the
 state refuses is `CoreError.Conflict`; a request that cannot be done as asked is
-`CoreError.Invalid`; and what cannot be reached now is `CoreError.Unavailable`, the last four with
-their reason. Each says what it is about in its fields, and a query or command raises the kind
-itself, so it passes through every operation unchanged and a protocol or a browser client carries it
-without loading an implementation. Every store fails with one `StoreError`, naming the store and the
-operation, whose reason says whether storage `Failed`, `Rejected` a write, or was `Contended`; the
-gateway answers contention with `CoreError.Unavailable` and turns the rest into defects. Any other
+`CoreError.Invalid`; what cannot be reached now is `CoreError.Unavailable`, the last four with
+their reason; and a commit storage could not confirm is `CoreError.Uncertain`. Each says what it is
+about in its fields, and a query or command raises the kind itself, so it passes through every
+operation unchanged and a protocol or a browser client carries it without loading an
+implementation. Each operation passes `Operation.report` to its `Effect.fn`, so its signature lists
+only kinds; see [errors by kind](#errors-by-kind). Every store fails with one `StoreError`, naming the store and the
+operation, whose reason says whether storage `Failed`, `Rejected` a write, or was `Contended`; an
+operation reports contention as `CoreError.Unavailable` and the rest as defects. Any other
 error belongs to the module that raises it, and its tag is its name there, as
 `SessionLogStore.Overtaken`. Helpers no consumer imports go under `internal/`.
 

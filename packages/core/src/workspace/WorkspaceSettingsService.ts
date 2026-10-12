@@ -8,7 +8,6 @@
  * @since 0.1.0
  */
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Assignment from "../authorization/Assignment.ts";
 import * as AssignmentService from "../authorization/AssignmentService.ts";
 import * as AssignmentPermissions from "../authorization/AssignmentPermissions.ts";
@@ -18,8 +17,6 @@ import * as Requirement from "../authorization/Requirement.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Store from "../journal/Store.ts";
 import * as MemberService from "./MemberService.ts";
 import * as MemberPermissions from "./MemberPermissions.ts";
@@ -30,32 +27,33 @@ import * as Workspace from "./Workspace.ts";
 import * as WorkspaceSettings from "./WorkspaceSettings.ts";
 import * as WorkspaceSettingsPermissions from "./WorkspaceSettingsPermissions.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What reading the member-management view can fail with: the delegation checks it shows, and
- * reading the members.
+ * What reading the member-management view can fail with: the delegation checks it shows.
  *
  * @category errors
  * @since 0.1.0
  */
-export type MembersError = Delegation.Error | MemberService.Error;
+export type MembersError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
- * What renaming can fail with: authorization, `CoreError.Changed`, and the failures of reading the
- * workspace and of the commit.
+ * What renaming can fail with: authorization, `CoreError.Changed`, and what its commit meets.
  *
  * @category errors
  * @since 0.1.0
  */
 export type RenameError =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
   | CoreError.Changed
-  | Projection.Error
-  | Log.WriteError
-  | PlatformError.PlatformError;
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The settings operations, one of `Core.Operations`.
@@ -70,7 +68,15 @@ export class WorkspaceSettingsService extends Context.Service<
      * The workspace, whether the actor may rename it, read invitations, and invite, and the
      * built-in roles with whether the actor may assign each. Requires active membership alone.
      */
-    readonly get: Effect.Effect<WorkspaceSettings.View, Delegation.Error, Actor.Actor>;
+    readonly get: Effect.Effect<
+      WorkspaceSettings.View,
+      | CoreError.NotFound
+      | CoreError.Denied
+      | CoreError.Conflict
+      | CoreError.Invalid
+      | CoreError.Unavailable,
+      Actor.Actor
+    >;
     /**
      * The members the actor may read, each with their access when the actor may read it and whether
      * the actor may remove them. One resolution of the actor's grants decides every member, by the
@@ -131,7 +137,7 @@ export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
       canInvite: canReadInvitations && roles.some((role) => role.assignable),
       roles,
     };
-  });
+  }).pipe(Operation.report);
   const members = Effect.gen(function* () {
     const visible = yield* memberService.list;
     const workspace = yield* readWorkspace;
@@ -182,7 +188,7 @@ export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
         };
       }),
     );
-  });
+  }).pipe(Operation.report);
   const rename = Effect.fn("WorkspaceSettingsService.rename")(
     function* (input: WorkspaceSettings.RenameInput) {
       const request = yield* Schema.decodeEffect(WorkspaceSettings.RenameInput)(input);
@@ -201,6 +207,7 @@ export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
   return WorkspaceSettingsService.of({ get, members, rename });
 });

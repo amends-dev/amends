@@ -61,7 +61,7 @@ export type AccessError =
  * @category errors
  * @since 0.1.0
  */
-export type TimelineError = AccessError | StoreError.StoreError | ThreadActivityResolvers.Failure;
+export type TimelineError = AccessError | StoreError.StoreError;
 
 /**
  * What listing a group's readable threads can fail with, beyond the listing's own failures.

@@ -320,7 +320,7 @@ describe("ownership", () => {
                 memberId: workspace.ownerMemberId,
                 identity: alice,
               }),
-              Effect.flip,
+              Effect.catchDefect(Effect.succeed),
             ),
           ).toBe(failure);
           expect(yield* bound.workspace.get).toEqual(Option.some(workspace));

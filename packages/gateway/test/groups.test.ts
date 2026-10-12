@@ -268,7 +268,7 @@ describe("groups", () => {
             [[memberId, Member.Id.make("absent")], "CoreError.NotFound"],
             [[memberId, other.ownerMemberId], "CoreError.NotFound"],
             [[memberId, agentId], "CoreError.Conflict"],
-            [[memberId, memberId], "SchemaError"],
+            [[memberId, memberId], "CoreError.Invalid"],
           ] as const) {
             expect(
               yield* Effect.flip(asActor(create(ids), owner).pipe(Effect.provide(core(bound)))),
@@ -279,7 +279,7 @@ describe("groups", () => {
               yield* Effect.flip(
                 asActor(create([memberId], name), owner).pipe(Effect.provide(core(bound))),
               ),
-            ).toMatchObject({ _tag: "SchemaError" });
+            ).toMatchObject({ _tag: "CoreError.Invalid" });
           expect(yield* history(bound)).toEqual(before);
           expect(yield* storage.footprint).toBe(footprint);
           const empty = yield* asActor(create([]), owner).pipe(Effect.provide(core(bound)));
@@ -332,8 +332,9 @@ describe("groups", () => {
                 }),
             );
             expect(
-              yield* Effect.flip(
+              yield* Effect.catchDefect(
                 asActor(create([memberId, agentId]), owner).pipe(Effect.provide(core(broken))),
+                Effect.succeed,
               ),
             ).toMatchObject({ _tag: "Projection.Failure", cause: failure });
             const group = yield* Ref.get(observed);
@@ -714,7 +715,9 @@ describe("groups", () => {
           yield* rename(owner, group.id, "Platform");
           // A name must have text without surrounding space, and the group must exist.
           for (const name of ["", " Platform"])
-            expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe("SchemaError");
+            expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe(
+              "CoreError.Invalid",
+            );
           expect(
             yield* Effect.flip(rename(owner, Group.Id.make("missing"), "Platform")),
           ).toMatchObject({ _tag: "CoreError.NotFound" });

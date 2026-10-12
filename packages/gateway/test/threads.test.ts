@@ -289,11 +289,11 @@ describe("threads", () => {
               );
             expect(
               yield* Effect.flip(run(bound, owner, start(group.id, [humanId, humanId]))),
-            ).toMatchObject({ _tag: "SchemaError" });
+            ).toMatchObject({ _tag: "CoreError.Invalid" });
             expect(
               yield* Effect.flip(run(bound, owner, start(group.id, [], " \n "))),
             ).toMatchObject({
-              _tag: "SchemaError",
+              _tag: "CoreError.Invalid",
             });
             expect(yield* history(bound)).toEqual(before);
           }),
@@ -514,7 +514,10 @@ describe("threads", () => {
             }),
           };
           expect(
-            yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
+            yield* Effect.catchDefect(
+              run(broken, owner, start(group.id, everyone(owner.memberId))),
+              Effect.succeed,
+            ),
           ).toMatchObject({
             _tag: "Projection.Failure",
           });
@@ -964,7 +967,7 @@ describe("threads", () => {
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(/^(StoreError|CoreError.Conflict)$/),
+                  _tag: expect.stringMatching(/^(CoreError.Unavailable|CoreError.Conflict)$/),
                 },
               });
           yield* Effect.scoped(
@@ -1014,7 +1017,10 @@ describe("threads", () => {
             const live = yield* bound.checkpoints.listLive(journalLog);
             const broken = failingLate(bound, StoreError.failed("Store", "commit")("injected"));
             expect(
-              yield* Effect.flip(run(broken, owner, start(group.id, everyone(owner.memberId)))),
+              yield* Effect.catchDefect(
+                run(broken, owner, start(group.id, everyone(owner.memberId))),
+                Effect.succeed,
+              ),
             ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
             expect(yield* history(bound)).toEqual(before);
             expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
@@ -1036,7 +1042,7 @@ describe("threads", () => {
               }),
             };
             expect(
-              yield* Effect.flip(
+              yield* Effect.catchDefect(
                 run(
                   failing,
                   agent,
@@ -1049,6 +1055,7 @@ describe("threads", () => {
                       }),
                   ),
                 ),
+                Effect.succeed,
               ),
             ).toMatchObject({ _tag: "Projection.Failure" });
             expect(yield* bound.participations.get(participation.id)).toEqual(
@@ -1300,7 +1307,7 @@ describe("threads", () => {
           for (const title of ["", " Launch", "x".repeat(201), "Launch\u0000 plan"])
             expect(
               (yield* Effect.flip(rename(owner, started.thread.id, title, "Launch review")))._tag,
-            ).toBe("SchemaError");
+            ).toBe("CoreError.Invalid");
           expect(
             yield* Effect.flip(rename(owner, Thread.Id.make("missing"), "Launch plan")),
           ).toEqual(new CoreError.NotFound({ resource: "Thread", id: Thread.Id.make("missing") }));

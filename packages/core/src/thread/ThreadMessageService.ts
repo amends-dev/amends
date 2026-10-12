@@ -29,23 +29,21 @@ import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import type * as Thread from "./Thread.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What publishing can fail with: the outcomes above, and the failures of what
- * publishing depends on.
+ * What publishing can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | StoreError.StoreError
-  | Authorization.Error
-  | ThreadQuery.AccessError
-  | ThreadCommand.Error
   | CoreError.NotFound
+  | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Denied;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What editing a message can fail with.
@@ -54,14 +52,13 @@ export type Error =
  * @since 0.1.0
  */
 export type EditError =
-  | Authorization.Error
-  | ThreadQuery.AccessError
-  | ThreadCommand.Error
   | CoreError.NotFound
+  | CoreError.Changed
   | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Changed
-  | StoreError.StoreError;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What deleting a message can fail with.
@@ -70,12 +67,11 @@ export type EditError =
  * @since 0.1.0
  */
 export type DeleteError =
-  | Authorization.Error
-  | ThreadQuery.AccessError
-  | Exclude<ThreadCommand.Error, CoreError.Conflict>
   | CoreError.NotFound
   | CoreError.Denied
-  | StoreError.StoreError;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What saying one is typing can fail with.
@@ -83,7 +79,11 @@ export type DeleteError =
  * @category errors
  * @since 0.1.0
  */
-export type TypingError = Authorization.Error | ThreadQuery.AccessError | CoreError.NotFound;
+export type TypingError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The message operations, one of `Core.Operations`.
@@ -303,6 +303,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const edit = Effect.fn("ThreadMessageService.edit")(
@@ -367,6 +368,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const deleteMessage = Effect.fn("ThreadMessageService.delete")(
@@ -403,6 +405,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   /** When each member last said they were typing in each thread, in this process. */
@@ -429,7 +432,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
         until: DateTime.add(now, { milliseconds: Duration.toMillis(typingFor) }),
       }),
     );
-  });
+  }, Operation.report);
   return ThreadMessageService.of({ publish, edit, delete: deleteMessage, typing });
 });
 

@@ -18,6 +18,7 @@
     "./agent": "./src/agent/index.ts",
     "./read-state": "./src/read-state/index.ts",
     "./request": "./src/request/index.ts",
+    "./operation": "./src/operation/index.ts",
     "./signal": "./src/signal/index.ts",
     "./connection": "./src/connection/index.ts",
     "./turn": "./src/turn/index.ts",

@@ -34,14 +34,7 @@ import {
   MemberPermissions,
   Workspace,
 } from "@amends-dev/core/workspace";
-import {
-  Accounts,
-  SessionTokens,
-  Gateway,
-  GatewayErrors,
-  SignIn,
-  WorkspaceDirectory,
-} from "@amends-dev/gateway";
+import { Accounts, SessionTokens, Gateway, SignIn, WorkspaceDirectory } from "@amends-dev/gateway";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/http";
@@ -365,11 +358,7 @@ const gateway = Layer.succeed(
     inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, unknown>) => {
       calls.push({ operation: "inWorkspace", arguments: [id] });
       return Effect.provide(
-        program as Effect.Effect<
-          A,
-          GatewayErrors.PublicErrorOf<E>,
-          Layer.Success<typeof operations>
-        >,
+        program as Effect.Effect<A, E, Layer.Success<typeof operations>>,
         operations,
       );
     },
@@ -386,7 +375,7 @@ const gateway = Layer.succeed(
       return Effect.provide(
         Effect.provideService(program, Actor.Actor, actor),
         operations,
-      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.Denied, Scope.Scope>;
+      ) as Effect.Effect<A, E | CoreError.Denied, Scope.Scope>;
     },
   }),
 );

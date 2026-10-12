@@ -10,12 +10,9 @@
  */
 import { ChannelTransport } from "@amends-dev/channel";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Connection from "../connection/Connection.ts";
 import * as Performer from "../identity/Performer.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import type * as Notification from "../notification/Notification.ts";
@@ -39,7 +36,8 @@ import * as ChannelStore from "./ChannelStore.ts";
 import * as Delivery from "./Delivery.ts";
 import * as DeliveryFacts from "./DeliveryFacts.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as CoreError from "../error/CoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What a delivery's job posts: nothing, since the delivery is no longer requested or was failed as
@@ -89,20 +87,13 @@ export interface FailedInput {
   readonly attempts: number;
 }
 
-/** What publishing in a commit can fail with. */
-type CommitError =
-  | Schema.SchemaError
-  | PlatformError.PlatformError
-  | Log.WriteError
-  | Projection.Error;
-
 /**
  * What accepting can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
-export type AcceptError = CommitError | StoreError.StoreError;
+export type AcceptError = CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain;
 
 /**
  * What readying a delivery can fail with.
@@ -110,7 +101,7 @@ export type AcceptError = CommitError | StoreError.StoreError;
  * @category errors
  * @since 0.1.0
  */
-export type StartError = CommitError | StoreError.StoreError;
+export type StartError = CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain;
 
 /**
  * What recording a delivery's end can fail with.
@@ -118,7 +109,7 @@ export type StartError = CommitError | StoreError.StoreError;
  * @category errors
  * @since 0.1.0
  */
-export type RecordError = CommitError | StoreError.StoreError;
+export type RecordError = CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain;
 
 /**
  * What the job asks of the workspace, one of `Core.JobServices`.
@@ -302,6 +293,7 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
       yield* asDelivery(acceptPending(thread.value, binding.value, channel.value));
       return yield* deliveryStore.listRequestedByThread(threadId);
     },
+    Operation.report,
   );
 
   /** What a message's author is called, as the post names them. */
@@ -370,6 +362,7 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
         }),
       );
     },
+    Operation.report,
   );
 
   const recordSent: DeliveryExecution["Service"]["recordSent"] = Effect.fn(
@@ -390,7 +383,7 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
         });
       }),
     );
-  });
+  }, Operation.report);
 
   const recordFailed: DeliveryExecution["Service"]["recordFailed"] = Effect.fn(
     "DeliveryExecution.recordFailed",
@@ -402,7 +395,7 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
         yield* publishFailed(found.value, failed.reason, failed.attempts);
       }),
     );
-  });
+  }, Operation.report);
 
   return DeliveryExecution.of({ accept, start, recordSent, recordFailed });
 });

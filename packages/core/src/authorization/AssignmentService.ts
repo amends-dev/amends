@@ -8,12 +8,9 @@
  */
 import * as Scope from "./Scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Store from "../journal/Store.ts";
 import * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
@@ -28,24 +25,22 @@ import * as AssignmentCommand from "./AssignmentCommand.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
 import * as AssignmentStore from "./AssignmentStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What the assignment operations can fail with: the outcomes above, delegation's,
- * and the failures of what they depend on.
+ * What the assignment operations can fail with: the outcomes above, and delegation's.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Delegation.Error
-  | StoreError.StoreError
-  | Projection.Error
-  | Log.WriteError
-  | PlatformError.PlatformError
   | CoreError.NotFound
+  | CoreError.Changed
+  | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Changed;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What reading a member's access can fail with: the delegation checks it shows, and a member who
@@ -54,7 +49,12 @@ export type Error =
  * @category errors
  * @since 0.1.0
  */
-export type ListError = Delegation.Error | CoreError.NotFound | CoreError.Conflict;
+export type ListError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The assignment operations, one of `Core.Operations`.
@@ -72,13 +72,17 @@ export class AssignmentService extends Context.Service<
      */
     readonly permissions: Effect.Effect<
       ReadonlyArray<Permission.Name>,
-      Authorization.Error,
+      CoreError.Denied | CoreError.Invalid | CoreError.Unavailable,
       Actor.Actor
     >;
     /** The three built-in roles, each with whether the actor may give it, under active membership. */
     readonly roles: Effect.Effect<
       ReadonlyArray<Assignment.RoleChoice>,
-      Delegation.Error,
+      | CoreError.NotFound
+      | CoreError.Denied
+      | CoreError.Conflict
+      | CoreError.Invalid
+      | CoreError.Unavailable,
       Actor.Actor
     >;
     /**
@@ -165,7 +169,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     return workspaceWide
       .filter((_, index) => covered[index] === true)
       .map((permission) => permission.name);
-  }).pipe(Effect.withSpan("AssignmentService.permissions"));
+  }).pipe(Effect.withSpan("AssignmentService.permissions"), Operation.report);
   const requireMember = Effect.fn("AssignmentService.requireMember")(function* (
     memberId: Member.Id,
   ) {
@@ -193,7 +197,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
           return { role, assignable: yield* Delegation.isAllowedBy(delegation.requireGrant(id)) };
         }),
     );
-  });
+  }).pipe(Operation.report);
   const list = Effect.fn("AssignmentService.list")(function* (memberId: Member.Id) {
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId }),
@@ -205,7 +209,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       canManage:
         record.status === "active" && (yield* Delegation.isAllowedBy(authorizeRecipient(memberId))),
     });
-  });
+  }, Operation.report);
   /** Is this a role held across the workspace? Its source then names the role. */
   const isWorkspaceRole = (
     record: Assignment.Assignment,
@@ -228,6 +232,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
   const revoke = Effect.fn("AssignmentService.revoke")(
     function* (memberId: Member.Id, assignmentId: Assignment.Id) {
@@ -247,6 +252,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
   const change = Effect.fn("AssignmentService.change")(
     function* (input: Assignment.ChangeInput) {
@@ -268,6 +274,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
   return AssignmentService.of({
     permissions,

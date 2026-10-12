@@ -22,7 +22,7 @@ import {
   Stream,
   Struct,
 } from "effect";
-import type { PlatformError, Scope } from "effect";
+import type { Scope } from "effect";
 import * as AgentPermissions from "../agent/AgentPermissions.ts";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
@@ -30,7 +30,6 @@ import * as ChangeFeedSource from "../change-feed/ChangeFeedSource.ts";
 import * as Actor from "../identity/Actor.ts";
 import type * as Source from "../change-feed/ChangeFeedSource.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as Request from "../request/Request.ts";
@@ -48,21 +47,19 @@ import * as SessionLogStore from "./SessionLogStore.ts";
 import * as TurnStore from "./TurnStore.ts";
 import * as Turn from "./Turn.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What reading a turn can fail with: `CoreError.NotFound`, a denied `thread.read`, and the failures
- * of what a read depends on.
+ * What reading a turn can fail with: `CoreError.NotFound`, and a denied `thread.read`.
  *
  * @category errors
  * @since 0.1.0
  */
 export type ReadError =
-  | ThreadQuery.AccessError
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * What listing active turns can fail with: `ReadError` but `CoreError.NotFound`, since turns the
@@ -71,30 +68,34 @@ export type ReadError =
  * @category errors
  * @since 0.1.0
  */
-export type ActiveError = Exclude<ReadError, CoreError.NotFound>;
+export type ActiveError = CoreError.Denied | CoreError.Invalid | CoreError.Unavailable;
 
 /**
- * What opening a turn's log can fail with: `ReadError`, the session log store's failures, and
- * `CoreError.Unavailable`.
+ * What opening a turn's log can fail with: `ReadError`, and `CoreError.Unavailable`.
  *
  * @category errors
  * @since 0.1.0
  */
-export type WatchError = ReadError | StoreError.StoreError | CoreError.Unavailable;
+export type WatchError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
- * What stopping or retrying a turn can fail with beyond its own outcome: `ReadError`, and the
- * failures of the commit that records the change.
+ * What stopping or retrying a turn can fail with beyond its own outcome: `ReadError`, and what the
+ * commit that records the change meets.
  *
  * @category errors
  * @since 0.1.0
  */
 export type ChangeError =
-  | ReadError
-  | PlatformError.PlatformError
-  | StoreError.StoreError
-  | Projection.Error
-  | TurnCommand.EndError;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What `cancel` can fail with: `ChangeError`, or `CoreError.Conflict` (`TurnNotActive`) for a turn
@@ -103,7 +104,13 @@ export type ChangeError =
  * @category errors
  * @since 0.1.0
  */
-export type CancelError = ChangeError | CoreError.Conflict;
+export type CancelError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What `retry` can fail with: `ChangeError`, or `CoreError.Conflict` (`NotRetryable`) with the
@@ -112,7 +119,13 @@ export type CancelError = ChangeError | CoreError.Conflict;
  * @category errors
  * @since 0.1.0
  */
-export type RetryError = ChangeError | CoreError.Conflict;
+export type RetryError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The turn operations, one of `Core.Operations`.
@@ -272,7 +285,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
   const get = Effect.fn("TurnService.get")(function* (turnId: Turn.Id) {
     const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
     return yield* toView(turn);
-  });
+  }, Operation.report);
 
   const decodeLimit = Schema.decodeEffect(
     Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
@@ -296,7 +309,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     const permitted = yield* authorization.permitted(threads.map(readThreadRequirement));
     const readable = new Set(threads.filter((_, index) => permitted[index] === true));
     return yield* toViews(active.filter((turn) => readable.has(turn.threadId)));
-  });
+  }, Operation.report);
 
   const logInterrupted = () =>
     new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() });
@@ -437,7 +450,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
         ),
       ),
     );
-  });
+  }, Operation.report);
 
   const cancel = Effect.fn("TurnService.cancel")(
     function* (turnId: Turn.Id) {
@@ -453,6 +466,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const retry = Effect.fn("TurnService.retry")(
@@ -501,6 +515,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   return TurnService.of({ get, listActive, watchLog, cancel, retry });

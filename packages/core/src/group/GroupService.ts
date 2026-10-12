@@ -9,14 +9,11 @@
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Order, Schema } from "effect";
 import * as Request from "../request/Request.ts";
-import type { PlatformError } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as Target from "../authorization/Target.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
@@ -35,45 +32,50 @@ import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as NotificationStore from "../notification/NotificationStore.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What changing a group can fail with, which `CreateError` and `RenameError` extend:
- * authorization, and the journal writes a change depends on.
+ * What changing a group can fail with, which `CreateError` and `RenameError` extend: authorization,
+ * and what its commit meets.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Authorization.Error
-  | Schema.SchemaError
-  | PlatformError.PlatformError
-  | Log.WriteError
-  | Projection.Error;
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What creating a team group can fail with: a member to admit who is missing or not active, and
- * the failures of reading them. A retried creation reads back the group its first attempt
- * created, so it can also fail as that read does.
+ * What creating a team group can fail with: a member to admit who is missing or not active. A
+ * retried creation reads back the group its first attempt created, so it can also fail as that read
+ * does.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | StoreError.StoreError | CoreError.NotFound | CoreError.Conflict;
+export type CreateError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What renaming a team group can fail with: the outcomes above, and the failures of
- * what a rename depends on.
+ * What renaming a team group can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type RenameError =
-  | Error
-  | StoreError.StoreError
   | CoreError.NotFound
+  | CoreError.Changed
+  | CoreError.Denied
   | CoreError.Invalid
-  | CoreError.Changed;
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What reading groups can fail with.
@@ -82,10 +84,10 @@ export type RenameError =
  * @since 0.1.0
  */
 export type ReadError =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The group operations, one of `Core.Operations`.
@@ -219,6 +221,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const get = Effect.fn("GroupService.get")(function* (groupId: Group.Id) {
@@ -228,7 +231,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);
     return yield* requireGroup(id);
-  });
+  }, Operation.report);
 
   const rename = Effect.fn("GroupService.rename")(
     function* (input: Group.RenameInput) {
@@ -260,6 +263,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   /**
@@ -359,7 +363,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
       if (admissions.size < options.limit) break;
     }
     return items;
-  });
+  }, Operation.report);
 
   const listPublic = Effect.fn("GroupService.listPublic")(function* (input: Group.ListOptions) {
     const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
@@ -398,7 +402,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
       if (page.length < options.limit) break;
     }
     return items;
-  });
+  }, Operation.report);
 
   return GroupService.of({
     createTeam,

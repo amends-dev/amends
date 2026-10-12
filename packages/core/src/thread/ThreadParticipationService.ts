@@ -22,23 +22,21 @@ import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as ThreadParticipationPermissions from "./ThreadParticipationPermissions.ts";
 import * as GroupStore from "../group/GroupStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What following and unfollowing can fail with: the outcomes above, and
- * the failures of what they depend on.
+ * What following and unfollowing can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Authorization.Error
-  | ThreadQuery.AccessError
-  | ThreadCommand.Error
-  | StoreError.StoreError
   | CoreError.NotFound
+  | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Invalid;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The participation operations, one of `Core.Operations`.
@@ -118,6 +116,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const unfollow = Effect.fn("ThreadParticipationService.unfollow")(
@@ -188,6 +187,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
   return ThreadParticipationService.of({ follow, unfollow });
 });

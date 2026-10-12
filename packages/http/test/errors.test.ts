@@ -1,12 +1,13 @@
 import { Api, ApiErrors, Authentication } from "../src/index.ts";
-import { GatewayErrors, SignIn } from "@amends-dev/gateway";
+import { CoreError } from "@amends-dev/core/error";
+import { SignIn } from "@amends-dev/gateway";
 import { expect, it } from "@effect/vitest";
 import type { SchemaAST } from "effect";
 import { HttpApi } from "effect/http-api";
 
 /** The constructor an error schema declares, which every schema of that error shares. */
 const constructorOf = (ast: SchemaAST.AST): unknown => ast.annotations?.["~constructor"];
-/** Errors the HTTP layer raises itself, beside the gateway: authentication, sign-in, and limits. */
+/** Errors the HTTP layer raises itself, beside core: authentication, sign-in, and limits. */
 const transport = new Set(
   [
     Authentication.Unauthorized,
@@ -19,11 +20,9 @@ const transport = new Set(
 );
 
 it("every error a route declares reaches its client as declared, never as a defect", () => {
-  // The gateway turns any error outside its public set into a defect, which a route answers with
-  // 500, so an error a route declares must be public, or raised by the HTTP layer itself.
-  const exposed = new Set(
-    GatewayErrors.PublicError.members.map((member) => constructorOf(member.ast)),
-  );
+  // Core reports only its kinds and turns anything else into a defect, which a route answers with
+  // 500, so an error a route declares must be a kind, or raised by the HTTP layer itself.
+  const exposed = new Set(CoreError.CoreError.members.map((member) => constructorOf(member.ast)));
   const unreachable: Array<string> = [];
   HttpApi.reflect(Api.Api, {
     onGroup: () => {},
@@ -38,7 +37,7 @@ it("every error a route declares reaches its client as declared, never as a defe
         }
     },
   });
-  // Each public error has its own constructor, so the comparison above is never vacuous.
-  expect(exposed.size).toBe(GatewayErrors.PublicError.members.length);
+  // Each kind has its own constructor, so the comparison above is never vacuous.
+  expect(exposed.size).toBe(CoreError.CoreError.members.length);
   expect(unreachable).toEqual([]);
 });

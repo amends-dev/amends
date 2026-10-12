@@ -8,7 +8,6 @@
  * @since 0.1.0
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import type * as Permission from "../authorization/Permission.ts";
 import * as Requirement from "../authorization/Requirement.ts";
@@ -19,8 +18,6 @@ import type * as Group from "../group/Group.ts";
 import * as GroupQuery from "../group/GroupQuery.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as Request from "../request/Request.ts";
@@ -35,7 +32,7 @@ import * as ChannelPermissions from "./ChannelPermissions.ts";
 import * as ChannelQuery from "./ChannelQuery.ts";
 import * as ChannelStore from "./ChannelStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What reading channels can fail with.
@@ -44,10 +41,10 @@ import * as StoreError from "../journal/StoreError.ts";
  * @since 0.1.0
  */
 export type ReadError =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * What every change can fail with besides reading.
@@ -55,7 +52,12 @@ export type ReadError =
  * @category errors
  * @since 0.1.0
  */
-export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
+export type Error =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What choosing a destination can fail with: the actor must belong to the group and be able to
@@ -64,7 +66,7 @@ export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | P
  * @category errors
  * @since 0.1.0
  */
-export type DestinationError = StoreError.StoreError | CoreError.NotFound;
+export type DestinationError = CoreError.NotFound | CoreError.Unavailable;
 
 /**
  * What creating a channel can fail with.
@@ -72,7 +74,12 @@ export type DestinationError = StoreError.StoreError | CoreError.NotFound;
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | DestinationError | StoreError.StoreError | CoreError.Invalid;
+export type CreateError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What redirecting a channel can fail with.
@@ -80,7 +87,12 @@ export type CreateError = Error | DestinationError | StoreError.StoreError | Cor
  * @category errors
  * @since 0.1.0
  */
-export type RedirectError = Error | DestinationError;
+export type RedirectError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What reading a thread's binding can fail with.
@@ -88,7 +100,11 @@ export type RedirectError = Error | DestinationError;
  * @category errors
  * @since 0.1.0
  */
-export type BindingError = ThreadQuery.AccessError | StoreError.StoreError | CoreError.NotFound;
+export type BindingError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The channel operations, one of `Core.Operations`.
@@ -241,6 +257,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const list = Effect.gen(function* () {
@@ -250,12 +267,12 @@ export const make = Effect.fn("ChannelService.make")(function* () {
       active.map((record) => Requirement.make(ChannelPermissions.Read, channelTarget(record.id))),
     );
     return active.filter((_, index) => permitted[index] === true).toSorted(byName);
-  });
+  }).pipe(Operation.report);
 
   const get = Effect.fn("ChannelService.get")(function* (channelId: Channel.Id) {
     const id = yield* Schema.decodeEffect(Channel.Id)(channelId);
     return yield* requirePermitted(id, ChannelPermissions.Read);
-  });
+  }, Operation.report);
 
   const redirect = Effect.fn("ChannelService.redirect")(
     function* (input: Channel.RedirectInput) {
@@ -273,6 +290,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const remove = Effect.fn("ChannelService.remove")(
@@ -284,6 +302,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   // Reads are outside journal.commit; an enclosing caller transaction remains authoritative.
@@ -293,7 +312,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     if (Option.isNone(binding))
       return yield* new CoreError.NotFound({ resource: "ChannelBinding", id: thread.id });
     return binding.value;
-  });
+  }, Operation.report);
 
   return ChannelService.of({ create, list, get, redirect, remove, getBinding });
 });

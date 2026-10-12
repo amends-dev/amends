@@ -373,18 +373,18 @@ it.effect("member reads refuse an actor from another workspace", () =>
       identity: alice.identity,
     });
     expect(yield* run(fixture, get(bob.id).pipe(Effect.flip), foreignActor)).toMatchObject({
-      _tag: "Authorization.WorkspaceMismatch",
+      _tag: "CoreError.Invalid",
     });
   }),
 );
 
-it.effect("member reads pass storage failures through", () =>
+it.effect("a storage failure ends a member read as a defect that keeps it", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
     const storageFailure = StoreError.failed("MemberStore", "get")("unavailable");
     expect(
-      yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
+      yield* run(fixture, get(bob.id).pipe(Effect.catchDefect(Effect.succeed)), alice, {
         get: (id) => (id === bob.id ? Effect.fail(storageFailure) : fixture.members.get(id)),
       }),
     ).toBe(storageFailure);
@@ -488,7 +488,7 @@ it.effect(
     }),
 );
 
-it.effect("removal passes a failure reading ownership through and writes nothing", () =>
+it.effect("a failure reading ownership ends a removal as a defect and writes nothing", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
@@ -497,7 +497,7 @@ it.effect("removal passes a failure reading ownership through and writes nothing
     expect(
       yield* run(
         fixture,
-        remove(bob.id).pipe(Effect.flip),
+        remove(bob.id).pipe(Effect.catchDefect(Effect.succeed)),
         alice,
         {},
         { get: Effect.fail(failure) },

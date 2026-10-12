@@ -417,16 +417,15 @@ projections again, which then rebuild the commits they missed.
 
 The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/Binding.ts) returns
 `Store.CommitUncertain` for every failed COMMIT effect, even when a particular database error could
-establish that nothing committed. This over-reports uncertainty. The gateway exposes
-`GatewayErrors.Uncertain` with the commit ID; there is no public HTTP commit-reconciliation
-endpoint. Core and adapters do not retry transaction programs. Creating operations accept a request
+establish that nothing committed. This over-reports uncertainty. Operations report it as
+`CoreError.Uncertain` with the commit ID; there is no public HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction programs. Creating operations accept a request
 key, so their retries return the first result; other operations settle a repeat by their own rules,
 such as `CoreError.Conflict` (`AlreadyEnded`), rather than repeating it.
 
 PostgreSQL's [error mapping](../adapters/storage-postgresql/src/internal/errors.ts) treats lock
 timeouts, serialization failures, and deadlocks, and a log or checkpoint row another writer stored
-first, as contention, `StoreError` (`Contended`), which the gateway reports as retryable; during
-COMMIT they fall under the broad uncertain-outcome mapping above.
+first, as contention, `StoreError` (`Contended`), which operations report as retryable
+`CoreError.Unavailable`; during COMMIT they fall under the broad uncertain-outcome mapping above.
 
 A process's writers to one workspace wait for each other in memory, so they hold at most one
 pooled connection while PostgreSQL makes them wait, and every wait is bounded. Its reads for one

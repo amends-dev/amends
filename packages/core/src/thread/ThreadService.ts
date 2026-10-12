@@ -9,7 +9,6 @@
  */
 import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as AgentPermissions from "../agent/AgentPermissions.ts";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
@@ -18,8 +17,6 @@ import * as Group from "../group/Group.ts";
 import * as GroupQuery from "../group/GroupQuery.ts";
 import * as Member from "../workspace/Member.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as Thread from "./Thread.ts";
@@ -31,7 +28,6 @@ import * as ThreadQuery from "./ThreadQuery.ts";
 import * as ThreadPermissions from "./ThreadPermissions.ts";
 import * as ThreadMessageStore from "./ThreadMessageStore.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
-import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
 import * as ThreadActivityStore from "./ThreadActivityStore.ts";
 import * as ThreadActivityKind from "./ThreadActivityKind.ts";
 import * as ThreadMessageActivity from "./ThreadMessageActivity.ts";
@@ -45,43 +41,35 @@ import * as TaskCommand from "../task/TaskCommand.ts";
 import * as TaskPermissions from "../task/TaskPermissions.ts";
 import * as TaskStore from "../task/TaskStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What starting a thread can fail with: the outcomes above, and the failures of what
- * a start depends on.
+ * What starting a thread can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Authorization.Error
-  | ThreadCommand.Error
-  | TaskCommand.Error
-  | GroupCommand.EstablishError
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | PlatformError.PlatformError
-  | Log.WriteError
-  | Projection.Error
   | CoreError.NotFound
-  | CoreError.Conflict
   | CoreError.Denied
-  | CoreError.Invalid;
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What renaming a thread can fail with: the outcomes above, and the failures of what
- * a rename depends on.
+ * What renaming a thread can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type RenameError =
-  | Authorization.Error
-  | Exclude<ThreadCommand.Error, CoreError.Conflict>
-  | StoreError.StoreError
   | CoreError.NotFound
-  | CoreError.Changed;
+  | CoreError.Changed
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What reading threads can fail with.
@@ -90,10 +78,10 @@ export type RenameError =
  * @since 0.1.0
  */
 export type ReadError =
-  | ThreadQuery.ListError
-  | StoreError.StoreError
-  | ThreadActivityResolvers.Failure
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The thread operations, one of `Core.Operations`.
@@ -399,6 +387,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const startInGroup = Effect.fn("ThreadService.startInGroup")(
@@ -434,6 +423,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const rename = Effect.fn("ThreadService.rename")(
@@ -494,12 +484,14 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   // Reads are deliberately outside journal.commit; an enclosing caller transaction remains
   // authoritative when present.
-  const get = Effect.fn("ThreadService.get")((threadId: Thread.Id) =>
-    threadQuery.requireReadable(threadId),
+  const get = Effect.fn("ThreadService.get")(
+    (threadId: Thread.Id) => threadQuery.requireReadable(threadId),
+    Operation.report,
   );
 
   const listInGroup = Effect.fn("ThreadService.listInGroup")(function* (
@@ -521,7 +513,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         threadId: thread.id,
       }),
     });
-  });
+  }, Operation.report);
 
   const listOpenings = Effect.fn("ThreadService.listOpenings")(function* (
     groupId: Group.Id,
@@ -573,11 +565,12 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       result.push(Thread.opening(item, message, remaining - opening));
     }
     return result;
-  });
+  }, Operation.report);
 
   const readTimeline = Effect.fn("ThreadService.readTimeline")(
     (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) =>
       threadQuery.readTimeline(threadId, options),
+    Operation.report,
   );
 
   const listParticipants = Effect.fn("ThreadService.listParticipants")(function* (
@@ -587,7 +580,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     const thread = yield* threadQuery.requireReadable(threadId);
     const participants = yield* threadQuery.pageParticipants(thread, options);
     return participants.map(ThreadParticipation.toSummary);
-  });
+  }, Operation.report);
   return ThreadService.of({
     startInGroup,
     startDirect,

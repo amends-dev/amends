@@ -8,14 +8,11 @@
  * @since 0.1.0
  */
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as Target from "../authorization/Target.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 
@@ -30,26 +27,21 @@ import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What changing membership can fail with: the outcomes above, and the
- * failures of what a change depends on.
+ * What changing membership can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | GroupCommand.RemoveError
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | PlatformError.PlatformError
-  | Log.WriteError
-  | Projection.Error
   | CoreError.NotFound
+  | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Invalid;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What listing admissions can fail with.
@@ -58,10 +50,10 @@ export type Error =
  * @since 0.1.0
  */
 export type ReadError =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The membership operations, one of `Core.Operations`.
@@ -191,6 +183,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const join = Effect.fn("GroupMembershipService.join")(
@@ -213,6 +206,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   /** The admission the input names in its group, or `CoreError.NotFound`. */
@@ -270,6 +264,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const leave = Effect.fn("GroupMembershipService.leave")(
@@ -294,6 +289,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   /**
@@ -339,7 +335,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);
     return yield* pageCurrentMemberships(id, options);
-  });
+  }, Operation.report);
   return GroupMembershipService.of({
     add,
     join,

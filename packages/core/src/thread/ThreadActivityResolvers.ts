@@ -10,16 +10,7 @@ import { Context, Effect, Layer, Schema } from "effect";
 import type * as Thread from "./Thread.ts";
 import type * as ThreadActivity from "./ThreadActivity.ts";
 import type * as ThreadActivityKind from "./ThreadActivityKind.ts";
-
-/**
- * Storage failed while loading what activity references.
- *
- * @category errors
- * @since 0.1.0
- */
-export class Failure extends Schema.TaggedError<Failure>()("ThreadActivityResolvers.Failure", {
-  cause: Schema.Defect(),
-}) {}
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * No resolver is registered for a recorded kind, as when a newer host recorded it. A defect, not a
@@ -33,14 +24,6 @@ export class Unknown extends Schema.TaggedError<Unknown>()("ThreadActivityResolv
 }) {}
 
 /**
- * What resolving can fail with.
- *
- * @category errors
- * @since 0.1.0
- */
-export type Error = Failure;
-
-/**
  * How a domain shows its kinds of activity in a timeline. Given activities of those kinds in one
  * thread, it loads what they reference in one batch and returns their items in the same order.
  *
@@ -52,7 +35,7 @@ export interface Resolver {
   readonly resolve: (
     thread: Thread.Thread,
     activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
-  ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Failure>;
+  ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, StoreError.StoreError>;
 }
 
 /**
@@ -70,7 +53,7 @@ export class ThreadActivityResolvers extends Context.Service<
     readonly resolve: (
       thread: Thread.Thread,
       activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Error>;
+    ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, StoreError.StoreError>;
   }
 >()("@amends-dev/core/thread/ThreadActivityResolvers") {}
 
