@@ -424,7 +424,8 @@ key, so their retries return the first result; other operations settle a repeat 
 such as `CoreError.Conflict` (`AlreadyEnded`), rather than repeating it.
 
 PostgreSQL's [error mapping](../adapters/storage-postgresql/src/internal/errors.ts) treats lock
-timeouts, serialization failures, and deadlocks as contention, a retryable conflict; during
+timeouts, serialization failures, and deadlocks, and a log or checkpoint row another writer stored
+first, as contention, `StoreError` (`Contended`), which the gateway reports as retryable; during
 COMMIT they fall under the broad uncertain-outcome mapping above.
 
 A process's writers to one workspace wait for each other in memory, so they hold at most one
