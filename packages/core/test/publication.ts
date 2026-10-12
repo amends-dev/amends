@@ -1,7 +1,7 @@
 import { Crypto, DateTime, Effect } from "effect";
-import { Performer } from "../src/identity/performer.ts";
-import { Event } from "../src/journal/event.ts";
-import { WorkspaceId } from "../src/workspace/id.ts";
+import * as Performer from "../src/identity/Performer.ts";
+import * as Event from "../src/journal/Event.ts";
+import * as WorkspaceId from "../src/workspace/WorkspaceId.ts";
 
 /** Explicit attribution for low-level fixture publications that bypass application operations. */
 export const testProvenance = (

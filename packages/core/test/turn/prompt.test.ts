@@ -1,16 +1,16 @@
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
 import type { Prompt } from "effect/ai";
-import { Identity } from "../../src/identity/identity.ts";
-import { Group } from "../../src/group/group.ts";
-import type { Task } from "../../src/task/Task.ts";
-import { Thread } from "../../src/thread/Thread.ts";
-import { ThreadActivity } from "../../src/thread/ThreadActivity.ts";
-import { ThreadMessage } from "../../src/thread/ThreadMessage.ts";
-import { ThreadParticipation } from "../../src/thread/ThreadParticipation.ts";
-import { TurnPrompt } from "../../src/turn/prompt.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Identity from "../../src/identity/Identity.ts";
+import * as Group from "../../src/group/Group.ts";
+import type * as Task from "../../src/task/Task.ts";
+import * as Thread from "../../src/thread/Thread.ts";
+import * as ThreadActivity from "../../src/thread/ThreadActivity.ts";
+import * as ThreadMessage from "../../src/thread/ThreadMessage.ts";
+import * as ThreadParticipation from "../../src/thread/ThreadParticipation.ts";
+import * as TurnPrompt from "../../src/turn/TurnPrompt.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const threadId = Thread.Id.make("thread");
@@ -53,7 +53,7 @@ const message = (
   id: string,
   author: ThreadMessage.Author,
   content: ThreadMessage.Content,
-): ThreadMessage.Record => ({
+): ThreadMessage.ThreadMessage => ({
   id: ThreadMessage.Id.make(id),
   workspaceId,
   threadId,
@@ -97,7 +97,7 @@ const turnCreated = (): Thread.TimelineItem =>
   ({
     activity: activity("turn.created", { turnId: "t", memberId: reviewer, retryOf: null }),
   }) as never;
-const task = (fields: Partial<Task.Record> = {}): Task.Record => ({
+const task = (fields: Partial<Task.Task> = {}): Task.Task => ({
   threadId,
   workspaceId,
   groupId: Group.GeneralId,

@@ -3,6 +3,8 @@
  * MCP server, an HTTP API, whatever the source reaches. The fixture serves three tools of it, which
  * every source is tested with, and makes the source for one test over a system in the condition the
  * suite asks for.
+ *
+ * @since 0.1.0
  */
 import type { Effect, Scope, Schema } from "effect";
 import type { ToolSource } from "../ToolSource.ts";
@@ -10,10 +12,18 @@ import type { ToolSource } from "../ToolSource.ts";
 /**
  * How the system the source reaches is for a test: it works, it refuses the credentials the source
  * has, it answers that it is down, or it cannot be reached.
+ *
+ * @category testing
+ * @since 0.1.0
  */
 export type Condition = "working" | "unauthorized" | "unavailable" | "unreachable";
 
-/** The source under test, for one test, with what the suites need of the system behind it. */
+/**
+ * The source under test, for one test, with what the suites need of the system behind it.
+ *
+ * @category testing
+ * @since 0.1.0
+ */
 export interface Subject {
   readonly source: ToolSource;
 
@@ -27,13 +37,27 @@ export interface Subject {
   readonly secrets: ReadonlyArray<string>;
 }
 
-/** A tool of the fixture, and the input that calls it. */
+/**
+ * A tool of the fixture, and the input that calls it.
+ *
+ * @category testing
+ * @since 0.1.0
+ */
 export interface ToolCase {
   /** The name the source discovers the tool under, short enough to stay as it is in an assembly. */
   readonly tool: string;
+
+  /** An input that the tool's parameters allow. */
   readonly input: Schema.JsonObject;
 }
 
+/**
+ * What a source's tests give `run`: how to make the source over a system in each condition, and
+ * the three tools of that system the suites call, `echo`, `failing`, and `blocking`.
+ *
+ * @category testing
+ * @since 0.1.0
+ */
 export interface Fixture {
   /**
    * Makes the source for one test, over a system in `condition`. What it starts ends with the
@@ -41,10 +65,13 @@ export interface Fixture {
    */
   readonly make: (condition: Condition) => Effect.Effect<Subject, unknown, Scope.Scope>;
 
+  /** The system's tools that the suites call, each by the name the source discovers it under. */
   readonly tools: {
     /** Answers with the text it is given, which is somewhere in what the source returns. */
     readonly echo: {
       readonly tool: string;
+
+      /** The input that asks the tool to answer with `text`. */
       readonly input: (text: string) => Schema.JsonObject;
 
       /** An input that the tool's parameters do not allow. */

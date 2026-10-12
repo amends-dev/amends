@@ -1,5 +1,5 @@
 /**
- * Writes `src/snapshot.ts`, the model catalog this package ships, from models.dev's current data.
+ * Writes `src/internal/snapshot.ts`, the model catalog this package ships, from models.dev's current data.
  * Reading the data fails, and writes nothing, when a part the catalog keeps has changed shape, so
  * that the change is made here rather than found by a host.
  *
@@ -37,7 +37,7 @@ if (json.includes("`") || json.includes("${")) {
 }
 
 await Bun.write(
-  new URL("../src/snapshot.ts", import.meta.url),
+  new URL("../src/internal/snapshot.ts", import.meta.url),
   [
     "// Written by `bun run update-models` from models.dev. Do not edit.",
     "",
@@ -48,4 +48,6 @@ await Bun.write(
 );
 
 const models = catalog.providers.reduce((sum, provider) => sum + provider.models.length, 0);
-console.log(`Wrote ${catalog.providers.length} providers and ${models} models to src/snapshot.ts`);
+console.log(
+  `Wrote ${catalog.providers.length} providers and ${models} models to src/internal/snapshot.ts`,
+);

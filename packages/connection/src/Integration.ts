@@ -13,6 +13,8 @@
  *
  * An integration describes its settings as a form a person fills in, `SettingsForm`, which is how
  * MCP asks a person for input, so that settings can be asked for without code for each integration.
+ *
+ * @since 0.1.0
  */
 import type { Agent, Harness, ModelEndpoint } from "@amends-dev/harness";
 import type { SandboxProvider } from "@amends-dev/sandbox";
@@ -32,7 +34,12 @@ import {
 } from "./Connection.ts";
 import type * as ModelCatalog from "./ModelCatalog.ts";
 
-/** What a connection gives amends. */
+/**
+ * What a connection gives amends, as `Integration.provides` lists it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Capability = Schema.Literals([
   "harnesses",
   "models",
@@ -41,28 +48,51 @@ export const Capability = Schema.Literals([
   "channels",
 ]);
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Capability = typeof Capability.Type;
 
 /**
  * The settings a connection gives, as a form a person fills in: an object of text, number,
  * yes-or-no, and choice fields, each with a title and a description, which is how MCP asks a person
  * for input.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const SettingsForm = McpSchema.ElicitRequestFormParams.fields.requestedSchema;
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type SettingsForm = typeof SettingsForm.Type;
 
 /** The settings of an integration that takes none: an object with no keys. */
 const noSettings = Schema.Record(Schema.String, Schema.Never);
 
+/**
+ * The settings of an integration that takes none, an object with no keys, as `make` decodes a
+ * connection's settings when `Options.settings` is left out.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type NoSettings = typeof noSettings.Type;
 
 /**
  * A connection as an integration's code is given it: with its settings decoded, and its key, which
  * the code of an integration that a connection authenticates with only by a key is always given.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Access<Settings, Auth extends AuthMethod = AuthMethod> {
   readonly connection: Connection;
+
+  /** The connection's settings, decoded by the integration's `settings` schema. */
   readonly settings: Settings;
 
   /** The connection's API key, when it authenticates with one. */
@@ -71,15 +101,31 @@ export interface Access<Settings, Auth extends AuthMethod = AuthMethod> {
     : Redacted.Redacted<string>;
 }
 
-/** The model an agent is to run on through a connection, and how it is to run. */
+/**
+ * The model an agent is to run on through a connection, and how it is to run.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface EndpointOptions {
   /** The model's id, as its provider names it. */
   readonly model: string;
 
+  /** How hard the model works, which a listed model must take. */
   readonly effort?: ModelEndpoint.Effort;
+
+  /** The most tokens the model may write in a response, which a listed model must allow. */
   readonly maxOutputTokens?: number;
 }
 
+/**
+ * What `make` declares an integration from: its id and name, the settings and ways to
+ * authenticate a connection gives, what a connection gives of each capability, and how a connection
+ * is checked. A capability left out is one the integration does not give.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
   /** Names the integration, as connections name it, such as `anthropic` or `mcp`. */
   readonly id: string;
@@ -162,10 +208,26 @@ export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
   readonly check: (access: Access<Settings, Auth>) => Effect.Effect<Health>;
 }
 
+/**
+ * An integration as `make` declares it: what it is, what a connection to it gives, and the
+ * operations that take a connection and its credential as they are stored. Each fails with
+ * `ConnectionError`: `InvalidConnectionError` for a connection the integration does not take, and
+ * `UnsupportedError` for what it does not give.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Integration {
+  /** Names the integration, as connections name it, such as `anthropic` or `mcp`. */
   readonly id: string;
+
+  /** What people call the system, such as `Anthropic`. */
   readonly name: string;
+
+  /** Where the system's documentation is, when the integration says. */
   readonly docs: string | undefined;
+
+  /** The ways a connection can authenticate, in the order to offer them. */
   readonly auth: Array.NonEmptyReadonlyArray<AuthMethod>;
 
   /** The settings a connection gives, as the form a person fills in to give them. */
@@ -206,7 +268,10 @@ export interface Integration {
     options: EndpointOptions,
   ) => Effect.Effect<void, ConnectionError>;
 
-  /** The harness of `connection`, running its agent on the models `options` gives. */
+  /**
+   * The harness of `connection`, running its agent on the models `options` gives. It dies when the
+   * harness says otherwise than the integration of whether its agent needs a sandbox.
+   */
   readonly harness: (
     connection: Connection,
     credential: Credential | undefined,
@@ -238,7 +303,10 @@ export interface Integration {
     credential: Credential | undefined,
   ) => Effect.Effect<ChannelTransport.ChannelTransport, ConnectionError>;
 
-  /** Checks `connection`. */
+  /**
+   * Checks `connection` by the integration's own `check`, failing only for a connection the
+   * integration does not take: what the check finds, as a refused key, is the `Health`.
+   */
   readonly check: (
     connection: Connection,
     credential: Credential | undefined,
@@ -248,6 +316,9 @@ export interface Integration {
 /**
  * The integration that `options` declares. It throws for settings that do not make a form, which
  * the integration's code must change.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const make = <Settings = NoSettings, Auth extends AuthMethod = AuthMethod>(
   options: Options<Settings, Auth>,

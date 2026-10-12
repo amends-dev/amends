@@ -19,5 +19,3 @@ export const Id = Schema.NonEmptyString.pipe(Schema.brand("ChannelId"));
  * @since 0.1.0
  */
 export type Id = typeof Id.Type;
-
-export * as ChannelId from "./ChannelId.ts";

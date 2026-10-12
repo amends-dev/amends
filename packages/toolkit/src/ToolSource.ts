@@ -11,6 +11,8 @@
  *
  * A call that fails is a result the model reads, so the turn goes on and the model can try something
  * else. Only interrupting the call ends it in any other way.
+ *
+ * @since 0.1.0
  */
 import {
   Cause,
@@ -31,6 +33,13 @@ import {
   type ToolSourceError as ToolSourceErrorType,
 } from "./ToolSourceError.ts";
 
+/**
+ * What every kind of tool source implements: its name, the tools it has now, and how to run one.
+ * `Mcp.http` and `Http.make` make one, and `toolkit` builds from one the toolkit a model calls.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface ToolSource {
   /**
    * Names the source, such as `github`. Its failures carry the name, and the toolkit of a set of
@@ -53,21 +62,38 @@ export interface ToolSource {
 
 /**
  * What a model reads of a call that failed: the failure's reason, what the model is told of it, and
- * whether trying again may help.
+ * whether trying again may help. `Presentation`, `ToolSearch`, and `CodeMode` give their own
+ * failures in this shape too.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Failure = Schema.Struct({
   /** The reason of the failure, such as `AuthenticationError`. */
   code: Schema.String,
+
+  /** What the model is told of the failure, such as a reason's `modelMessage`. */
   message: Schema.String,
+
+  /** Whether trying the call again may succeed. */
   retryable: Schema.Boolean,
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Failure extends Schema.Schema.Type<typeof Failure> {}
 
 /**
  * Builds the toolkit for exactly these `definitions`, which must have distinct names, as a catalog
  * keyed by them has. Its tools are named as the definitions name them. A tool that `needsApproval`
  * names is one the session asks about before it runs the tool.
+ *
+ * Building contacts nothing: the source is reached only when the model calls a tool.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const toolkit = Effect.fn("ToolSource.toolkit")(function* (
   source: ToolSource,

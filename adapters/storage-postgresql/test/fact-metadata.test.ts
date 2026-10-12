@@ -1,12 +1,25 @@
-import { Codec, Journal, Log, Publication, Subject } from "@amends-dev/core/journal";
-import { Changed, Changed2, Other, Suites } from "@amends-dev/storage-conformance";
+import { Codec, Fact, Journal, Log, Publication, Subject } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
-import { harness } from "./harness.ts";
 import { boundTo, core, inDatabase, setup, testProvenance, workspaceId } from "./support.ts";
 
-Suites.factMetadata(harness);
+const testSubject = () => Subject.make("test", "entity");
+const Changed = Fact.make("storage.changed", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
+const Changed2 = Fact.make(Changed.name, {
+  subject: testSubject,
+  version: 2,
+  payload: Schema.String,
+});
+const Other = Fact.make("storage.other", {
+  subject: testSubject,
+  version: 1,
+  payload: Schema.String,
+});
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
@@ -17,7 +30,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId);
           yield* Effect.gen(function* () {
-            const journal = yield* Journal.Service;
+            const journal = yield* Journal.Journal;
             yield* journal.commit(
               Effect.gen(function* () {
                 yield* journal.publish(Changed, "first");
@@ -27,7 +40,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
             yield* journal.publish(Changed, "third");
           }).pipe(
-            Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+            Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
             Effect.provide(core(bound)),
           );
           const rows =

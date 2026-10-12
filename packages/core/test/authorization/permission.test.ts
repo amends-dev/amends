@@ -1,13 +1,13 @@
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Schema } from "effect";
-import { Grant } from "../../src/authorization/grant.ts";
-import { Permission } from "../../src/authorization/permission.ts";
-import { Requirement } from "../../src/authorization/requirement.ts";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Grant from "../../src/authorization/Grant.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as Requirement from "../../src/authorization/Requirement.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 it("permission groups preserve existing member definitions and their specific target kind", () => {
   expect(MemberPermissions.Read).toEqual(
@@ -51,8 +51,8 @@ it("an action can target its workspace while other actions in the group keep the
     Requirement.make(created, target);
   }).toThrow("Schema validation failed");
 
-  const exactWorkspace = Scope.Value.cases.Target.make({ target: workspace });
-  const exactMember = Scope.Value.cases.Target.make({ target });
+  const exactWorkspace = Scope.Scope.cases.Target.make({ target: workspace });
+  const exactMember = Scope.Scope.cases.Target.make({ target });
   expect(Grant.make(created, exactWorkspace)).toEqual({
     permission: created.name,
     scope: exactWorkspace,

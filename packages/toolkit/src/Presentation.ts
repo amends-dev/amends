@@ -1,26 +1,46 @@
 /**
- * What the ways to present a toolkit to a model share, such as Search and Code mode: each takes the
- * toolkit a host assembled, which is the model's to use, and gives another, whose tools the model
- * calls to reach the first. A tool of the presented toolkit runs as it does when a model calls it
- * directly, so what it checks, what it fails with, and whether it needs approval stay as they are.
+ * What the ways to present a toolkit to a model share, such as `ToolSearch` and `CodeMode`: each
+ * takes the toolkit a host assembled, which is the model's to use, and gives another, whose tools
+ * the model calls to reach the first. A tool of the presented toolkit runs as it does when a model
+ * calls it directly, so what it checks, what it fails with, and whether it needs approval stay as
+ * they are.
+ *
+ * @since 0.1.0
  */
 import { Effect, Option, Schema, Stream } from "effect";
 import { AiError, Tool, type Toolkit } from "effect/ai";
 import { Failure } from "./ToolSource.ts";
 
-/** Whether `presented` has a tool named `name`, with the name as the type of one. */
+/**
+ * Whether `presented` has a tool named `name`, with the name as the type of one.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const hasTool = <Tools extends Record<string, Tool.Any>>(
   presented: Toolkit.WithHandler<Tools>,
   name: string,
 ): name is Extract<keyof Tools, string> => Object.hasOwn(presented.tools, name);
 
-/** The tool's parameters, as a JSON Schema with an object root, as a model is shown them. */
+/**
+ * The tool's parameters, as a JSON Schema with an object root, as a model is shown them. A tool
+ * whose parameters are not an object is shown an object with no properties.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
 export const inputSchemaOf = (tool: Tool.Any): Schema.JsonObject =>
   Option.getOrElse(Schema.decodeUnknownOption(Schema.JsonObject)(Tool.getJsonSchema(tool)), () => ({
     type: "object",
   }));
 
-/** What the model reads of a failure that no tool gave. */
+/**
+ * What the model reads of a failure that no tool gave, such as a name that is no tool's. It is not
+ * worth trying again.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const failure = (code: string, message: string): Failure => ({
   code,
   message,
@@ -30,6 +50,9 @@ export const failure = (code: string, message: string): Failure => ({
 /**
  * Runs the tool of `presented` named `name` with `input`, and returns its result as JSON. What the
  * tool fails with, as its handler or its parameters, fails as a `Failure`, a result the model reads.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const call = <Tools extends Record<string, Tool.Any>>(
   presented: Toolkit.WithHandler<Tools>,
@@ -79,7 +102,12 @@ const notFound = (name: string, available: ReadonlyArray<string>) =>
     reason: new AiError.ToolNotFoundError({ toolName: name, availableTools: [...available] }),
   });
 
-/** A toolkit of the tools of `presented` that `names` names, which run as they do in `presented`. */
+/**
+ * A toolkit of the tools of `presented` that `names` names, which run as they do in `presented`.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const restrict = <Tools extends Record<string, Tool.Any>>(
   presented: Toolkit.WithHandler<Tools>,
   names: ReadonlySet<string>,
@@ -97,7 +125,13 @@ export const restrict = <Tools extends Record<string, Tool.Any>>(
       : Effect.fail(notFound(name, [...names])),
 });
 
-/** A toolkit of the tools of both, whose names are the tools' own. A name that both have is `first`'s. */
+/**
+ * A toolkit of the tools of both, whose names are the tools' own, which run as they do in the
+ * toolkit they come from. A name that both have is `first`'s.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const merge = <
   First extends Record<string, Tool.Any>,
   Second extends Record<string, Tool.Any>,

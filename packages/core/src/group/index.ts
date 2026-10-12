@@ -1,37 +1,112 @@
-export { Group } from "./group.ts";
+/**
+ * Groups: lasting spaces for threads within a workspace, team or direct, with the admissions that
+ * make each one's audience and the follows that enroll members in its new threads. `Group`,
+ * `GroupMembership`, and `GroupFollow` are the records; `GroupService`, `GroupMembershipService`,
+ * and `GroupFollowService` the operations an actor calls; `GroupQuery` and `GroupCommand` the read
+ * and writes other domains share; `GroupId` the ID alone; and the stores the contracts every
+ * storage adapter implements.
+ *
+ * @since 0.1.0
+ */
 
-export { GroupService } from "./service.ts";
+// @barrel: Auto-generated exports. Do not edit manually.
 
-export { GroupCommand } from "./command.ts";
+/**
+ * @since 0.1.0
+ */
+export * as Group from "./Group.ts";
 
-export { GroupQuery } from "./query.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupCommand from "./GroupCommand.ts";
 
-export { GroupFacts } from "./facts.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupFacts from "./GroupFacts.ts";
 
-export { GroupPermissions } from "./permissions.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupFollow from "./GroupFollow.ts";
 
-export { GroupProjection } from "./projection.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupFollowFacts from "./GroupFollowFacts.ts";
 
-export { GroupStore } from "./store.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupFollowProjection from "./GroupFollowProjection.ts";
 
-export { GroupMembership } from "./membership/membership.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupFollowService from "./GroupFollowService.ts";
 
-export { GroupMembershipService } from "./membership/service.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupFollowStore from "./GroupFollowStore.ts";
 
-export { GroupMembershipPermissions } from "./membership/permissions.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupId from "./GroupId.ts";
 
-export { GroupMembershipFacts } from "./membership/facts.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupMembership from "./GroupMembership.ts";
 
-export { GroupMembershipProjection } from "./membership/projection.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupMembershipFacts from "./GroupMembershipFacts.ts";
 
-export { GroupMembershipStore } from "./membership/store.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts";
 
-export { GroupFollow } from "./follow/follow.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupMembershipProjection from "./GroupMembershipProjection.ts";
 
-export { GroupFollowService } from "./follow/service.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupMembershipService from "./GroupMembershipService.ts";
 
-export { GroupFollowFacts } from "./follow/facts.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupMembershipStore from "./GroupMembershipStore.ts";
 
-export { GroupFollowProjection } from "./follow/projection.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupPermissions from "./GroupPermissions.ts";
 
-export { GroupFollowStore } from "./follow/store.ts";
+/**
+ * @since 0.1.0
+ */
+export * as GroupProjection from "./GroupProjection.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as GroupQuery from "./GroupQuery.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as GroupService from "./GroupService.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as GroupStore from "./GroupStore.ts";

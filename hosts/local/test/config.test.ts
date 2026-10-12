@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { ConfigProvider, Duration, Effect, Redacted } from "effect";
-import { LocalConfig } from "../src/config.ts";
+import * as LocalConfig from "../src/LocalConfig.ts";
 
 const load = (values: Record<string, unknown>) =>
   LocalConfig.load().pipe(
@@ -142,4 +142,19 @@ it.effect.each(["", " ", "not-a-url", "https://user:secret@localhost/database"])
       expect(error.message).toContain("AMENDS_DATABASE_URL");
       expect(error.message).not.toContain("secret");
     }),
+);
+
+it.effect("people sign in with emailed codes unless development sign-in is asked for", () =>
+  Effect.gen(function* () {
+    expect((yield* load({ AMENDS_DATABASE_URL: databaseUrl })).signIn).toBe("email");
+    const options = yield* load({
+      AMENDS_DATABASE_URL: databaseUrl,
+      AMENDS_SIGN_IN: "development",
+    });
+    expect(options.signIn).toBe("development");
+    const error = yield* load({ AMENDS_DATABASE_URL: databaseUrl, AMENDS_SIGN_IN: "open" }).pipe(
+      Effect.flip,
+    );
+    expect(error.message).toContain("AMENDS_SIGN_IN");
+  }),
 );

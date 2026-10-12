@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Option, Schema } from "effect";
-import { Actor, Identity, Performer } from "@amends-dev/core/identity";
+import { Identity, Performer } from "@amends-dev/core/identity";
 import { Notification } from "@amends-dev/core/notification";
 import { Member } from "@amends-dev/core/workspace";
 
@@ -20,17 +20,13 @@ it("contact authorship does not make a contact a member, authenticated actor, or
   });
   expect(Schema.decodeSync(Notification.Recipient)(contact)).toEqual(contact);
   for (const decoded of [
+    // An actor's identity is a member reference.
     Schema.decodeUnknownOption(Identity.MemberReference)(contact),
-    Schema.decodeUnknownOption(Member.Record)({
+    Schema.decodeUnknownOption(Member.Member)({
       id: "member",
       workspaceId: "workspace",
       identity: contact,
       status: "active",
-    }),
-    Schema.decodeUnknownOption(Actor.Value)({
-      memberId: "member",
-      workspaceId: "workspace",
-      identity: contact,
     }),
     Schema.decodeUnknownOption(Performer.Reference)({
       _tag: "Member",

@@ -7,7 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./conformance": "./src/conformance/index.ts",
-    "./*": "./src/*.ts"
+    "./conformance/internal/*": null,
+    "./*": "./src/*.ts",
+    "./internal/*": null
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

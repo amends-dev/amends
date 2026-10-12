@@ -46,20 +46,21 @@ Import from the installed packages, never from `repos/`.
 
 | Command                  | What it does                                                                     |
 | ------------------------ | -------------------------------------------------------------------------------- |
-| `bun run check`          | Dependency boundaries, generated icons, types, lint, and formatting              |
+| `bun run check`          | Dependency boundaries, generated barrels and icons, types, lint, and formatting  |
 | `bun run test`           | Every test suite: backend, PostgreSQL, and the frontend workspaces               |
 | `bun run test <path>`    | The tests under one path, such as `bun run test packages/harness`                |
 | `bun run format`         | Format files with Oxfmt                                                          |
 | `bun run lint:fix`       | Apply Oxlint's safe fixes                                                        |
 | `bun run typecheck`      | TypeScript 7 with Effect's diagnostics, across every workspace                   |
 | `bun run check:packages` | Which package may depend on which                                                |
+| `bun run barrels`        | Write every barrel, each `index.ts` marked `// @barrel`, from its folder         |
 | `bun run dist`           | Build, check, or publish a package for npm; see [publishing](docs/publishing.md) |
 
 Run `bun run check` after every change and the tests after any change in behavior.
 [Testing](docs/testing.md) covers the test APIs, fixtures, and how CI splits the suites.
 
-Before each commit, [Lefthook](https://lefthook.dev) runs the dependency, generated-icon, type,
-lint, and formatting checks in parallel over the working tree. They change and stage nothing; a
+Before each commit, [Lefthook](https://lefthook.dev) runs the dependency, generated-barrel,
+generated-icon, type, lint, and formatting checks in parallel over the working tree. They change and stage nothing; a
 failing check blocks the commit. Run them by hand, even with nothing staged, with:
 
 ```sh

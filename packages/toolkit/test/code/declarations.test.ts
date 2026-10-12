@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Schema } from "effect";
-import { declare } from "../../src/code/Declarations.ts";
+import { declare } from "../../src/internal/declarations.ts";
 
 /** The declaration of one tool named `tool`, without the lines that wrap every declaration. */
 const declared = (inputSchema: Schema.JsonObject, description?: string) =>

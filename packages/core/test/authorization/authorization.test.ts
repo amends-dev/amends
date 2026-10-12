@@ -1,75 +1,75 @@
-import { Publication } from "../../src/journal/publication.ts";
+import * as Publication from "../../src/journal/Publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Exit, Layer, Option } from "effect";
-import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
-import { AssignmentProjection } from "../../src/authorization/assignment/projection.ts";
-import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
-import { Assignment } from "../../src/authorization/assignment/assignment.ts";
-import { Authorization } from "../../src/authorization/authorization.ts";
-import { BuiltinRoles } from "../../src/authorization/role/builtin.ts";
-import { GrantResolver } from "../../src/authorization/grant-resolver.ts";
-import { Grant } from "../../src/authorization/grant.ts";
-import { PermissionCatalog } from "../../src/authorization/permission-catalog.ts";
-import { Permission } from "../../src/authorization/permission.ts";
-import { Requirement } from "../../src/authorization/requirement.ts";
-import { RoleFacts } from "../../src/authorization/role/facts.ts";
-import { RoleProjection } from "../../src/authorization/role/projection.ts";
-import { RoleStore } from "../../src/authorization/role/store.ts";
-import { Role } from "../../src/authorization/role/role.ts";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { Actor } from "../../src/identity/actor.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Store } from "../../src/journal/store.ts";
-import { MemberFacts } from "../../src/workspace/member/facts.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
-import { MemberProjection } from "../../src/workspace/member/projection.ts";
-import { MemberStore } from "../../src/workspace/member/store.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import * as AssignmentFacts from "../../src/authorization/AssignmentFacts.ts";
+import * as AssignmentProjection from "../../src/authorization/AssignmentProjection.ts";
+import * as AssignmentStore from "../../src/authorization/AssignmentStore.ts";
+import * as Assignment from "../../src/authorization/Assignment.ts";
+import * as Authorization from "../../src/authorization/Authorization.ts";
+import * as BuiltinRoles from "../../src/authorization/BuiltinRoles.ts";
+import * as GrantResolver from "../../src/authorization/GrantResolver.ts";
+import * as Grant from "../../src/authorization/Grant.ts";
+import * as PermissionCatalog from "../../src/authorization/PermissionCatalog.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as Requirement from "../../src/authorization/Requirement.ts";
+import * as RoleFacts from "../../src/authorization/RoleFacts.ts";
+import * as RoleProjection from "../../src/authorization/RoleProjection.ts";
+import * as RoleStore from "../../src/authorization/RoleStore.ts";
+import * as Role from "../../src/authorization/Role.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Actor from "../../src/identity/Actor.ts";
+import * as Identity from "../../src/identity/Identity.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as MemberFacts from "../../src/workspace/MemberFacts.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as MemberProjection from "../../src/workspace/MemberProjection.ts";
+import * as MemberStore from "../../src/workspace/MemberStore.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
+import { make, type Fixture } from "../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
-const alice = Actor.Value.make({
+const alice = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") }),
 });
-const bob = Actor.Value.make({
+const bob = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("bob"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
 });
-const charlie = Actor.Value.make({
+const charlie = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("charlie"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("charlie") }),
 });
-const agent = Actor.Value.make({
+const agent = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("agent"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") }),
 });
-const membership = (actor: Actor.Value) =>
-  Member.Record.make({
+const membership = (actor: Actor.Actor["Service"]) =>
+  Member.Member.make({
     id: actor.memberId,
     workspaceId: actor.workspaceId,
     identity: actor.identity,
     name: Member.Name.make(actor.identity.id),
     status: "active",
   });
-const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
+const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId });
 const bobTarget = Target.Reference.cases.Member.make({ workspaceId, memberId: bob.memberId });
 const charlieTarget = Target.Reference.cases.Member.make({
   workspaceId,
   memberId: charlie.memberId,
 });
-const bobScope = Scope.Value.cases.Target.make({ target: bobTarget });
+const bobScope = Scope.Scope.cases.Target.make({ target: bobTarget });
 const readBob = Requirement.make(MemberPermissions.Read, bobTarget);
 const removeBob = Requirement.make(MemberPermissions.Remove, bobTarget);
 const readCharlie = Requirement.make(MemberPermissions.Read, charlieTarget);
@@ -84,9 +84,9 @@ const direct = (
   id: string,
   recipient: Member.Id,
   permission: Permission.Definition,
-  scope: Scope.Value = workspaceScope,
+  scope: Scope.Scope = workspaceScope,
 ) =>
-  Assignment.Record.make({
+  Assignment.Assignment.make({
     id: Assignment.Id.make(id),
     workspaceId,
     memberId: recipient,
@@ -94,21 +94,21 @@ const direct = (
     status: "active",
   });
 interface Overrides {
-  readonly members?: Partial<MemberStore.Interface>;
-  readonly roles?: Partial<RoleStore.Interface>;
+  readonly members?: Partial<MemberStore.MemberStore["Service"]>;
+  readonly roles?: Partial<RoleStore.RoleStore["Service"]>;
 }
 const dependencies = (fixture: Fixture, overrides: Overrides = {}) =>
   Layer.mergeAll(
     Layer.succeed(
-      MemberStore.Service,
-      MemberStore.Service.of({ ...fixture.members(workspaceId), ...overrides.members }),
+      MemberStore.MemberStore,
+      MemberStore.MemberStore.of({ ...fixture.members, ...overrides.members }),
     ),
     Layer.succeed(
-      RoleStore.Service,
-      RoleStore.Service.of({ ...fixture.roles(workspaceId), ...overrides.roles }),
+      RoleStore.RoleStore,
+      RoleStore.RoleStore.of({ ...fixture.roles, ...overrides.roles }),
     ),
-    Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
-    Layer.succeed(Store.Service, fixture.store),
+    Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
+    Layer.succeed(Store.Store, fixture.store),
     PermissionCatalog.layer([MemberPermissions.Read, MemberPermissions.Remove, Create]),
   );
 const configured = (fixture: Fixture, overrides: Overrides = {}) =>
@@ -117,48 +117,50 @@ const configured = (fixture: Fixture, overrides: Overrides = {}) =>
     Layer.provide(dependencies(fixture, overrides)),
   );
 const check = Effect.fn("AuthorizationTest.check")(function* (
-  requirements: ReadonlyArray<Requirement.Value>,
+  requirements: ReadonlyArray<Requirement.Requirement>,
 ) {
-  yield* (yield* Authorization.Service).require(requirements);
+  yield* (yield* Authorization.Authorization).require(requirements);
 });
 const run = <A, E>(
   fixture: Fixture,
-  program: Effect.Effect<A, E, Authorization.Service | Actor.Service>,
-  actor: Actor.Value = alice,
+  program: Effect.Effect<A, E, Authorization.Authorization | Actor.Actor>,
+  actor: Actor.Actor["Service"] = alice,
   overrides: Overrides = {},
 ) =>
   program.pipe(
     Effect.provide(configured(fixture, overrides)),
-    Effect.provideService(Actor.Service, actor),
+    Effect.provideService(Actor.Actor, actor),
   );
 const seed = (
   fixture: Fixture,
-  actors: ReadonlyArray<Actor.Value>,
-  assignments: ReadonlyArray<Assignment.Record> = [],
-  roles: ReadonlyArray<Role.Record> = [],
+  actors: ReadonlyArray<Actor.Actor["Service"]>,
+  assignments: ReadonlyArray<Assignment.Assignment> = [],
+  roles: ReadonlyArray<Role.Role> = [],
 ) =>
   fixture.store.transaction(
     Effect.gen(function* () {
-      for (const actor of actors) yield* fixture.members(workspaceId).insert(membership(actor));
-      for (const role of roles) yield* fixture.roles(workspaceId).insert(role);
-      for (const assignment of assignments)
-        yield* fixture.assignments(workspaceId).insert(assignment);
+      for (const actor of actors) yield* fixture.members.insert(membership(actor));
+      for (const role of roles) yield* fixture.roles.insert(role);
+      for (const assignment of assignments) yield* fixture.assignments.insert(assignment);
     }),
   );
 it.effect("authorization reads each caller's actor and uses an agent's own grants", () =>
   Effect.gen(function* () {
     expectTypeOf<Layer.Services<typeof Authorization.layer>>().toEqualTypeOf<
-      MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service | Store.Service
+      | MemberStore.MemberStore
+      | GrantResolver.GrantResolver
+      | PermissionCatalog.PermissionCatalog
+      | Store.Store
     >();
     expectTypeOf<Layer.Error<typeof Authorization.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
-      Effect.Services<ReturnType<Authorization.Interface["require"]>>
-    >().toEqualTypeOf<Actor.Service>();
+      Effect.Services<ReturnType<Authorization.Authorization["Service"]["require"]>>
+    >().toEqualTypeOf<Actor.Actor>();
+    expectTypeOf<Effect.Success<ReturnType<typeof Authorization.make>>>().toEqualTypeOf<
+      Authorization.Authorization["Service"]
+    >();
     expectTypeOf<
-      Effect.Success<ReturnType<typeof Authorization.make>>
-    >().toEqualTypeOf<Authorization.Interface>();
-    expectTypeOf<
-      Effect.Error<ReturnType<Authorization.Interface["require"]>>
+      Effect.Error<ReturnType<Authorization.Authorization["Service"]["require"]>>
     >().toEqualTypeOf<Authorization.Error>();
     const fixture = yield* make();
     yield* seed(
@@ -169,16 +171,16 @@ it.effect("authorization reads each caller's actor and uses an agent's own grant
         direct("agent-read", agent.memberId, MemberPermissions.Read),
       ],
     );
-    const authorization = yield* Authorization.Service.pipe(
+    const authorization = yield* Authorization.Authorization.pipe(
       Effect.provide(configured(fixture)),
-      Effect.provideService(Actor.Service, alice),
+      Effect.provideService(Actor.Actor, alice),
     );
     yield* fixture.store
       .transaction(authorization.require([removeBob]))
-      .pipe(Effect.provideService(Actor.Service, alice));
+      .pipe(Effect.provideService(Actor.Actor, alice));
     const agentDenied = yield* fixture.store
       .transaction(authorization.require([removeBob]).pipe(Effect.flip))
-      .pipe(Effect.provideService(Actor.Service, agent));
+      .pipe(Effect.provideService(Actor.Actor, agent));
     expect(agentDenied).toMatchObject({
       _tag: "Authorization.Denied",
       memberId: agent.memberId,
@@ -186,10 +188,10 @@ it.effect("authorization reads each caller's actor and uses an agent's own grant
     });
     yield* fixture.store
       .transaction(authorization.require([readBob]))
-      .pipe(Effect.provideService(Actor.Service, agent));
+      .pipe(Effect.provideService(Actor.Actor, agent));
     const humanDenied = yield* fixture.store
       .transaction(authorization.require([readBob]).pipe(Effect.flip))
-      .pipe(Effect.provideService(Actor.Service, alice));
+      .pipe(Effect.provideService(Actor.Actor, alice));
     expect(humanDenied).toMatchObject({ _tag: "Authorization.Denied", memberId: alice.memberId });
   }),
 );
@@ -225,7 +227,7 @@ it.effect("authorization requires a matching permission and scope for the actual
           "create",
           alice.memberId,
           Create,
-          Scope.Value.cases.Target.make({ target: workspaceTarget }),
+          Scope.Scope.cases.Target.make({ target: workspaceTarget }),
         ),
       ],
     );
@@ -244,7 +246,7 @@ it.effect("every requirement must be satisfied across role and direct assignment
       fixture,
       [alice],
       [
-        Assignment.Record.make({
+        Assignment.Assignment.make({
           id: Assignment.Id.make("role"),
           workspaceId,
           memberId: alice.memberId,
@@ -283,8 +285,8 @@ it.effect("permitted reports each requirement in order without failing on denial
         direct("remove-bob", alice.memberId, MemberPermissions.Remove, bobScope),
       ],
     );
-    const permitted = (requirements: ReadonlyArray<Requirement.Value>) =>
-      Effect.flatMap(Authorization.Service, (authorization) =>
+    const permitted = (requirements: ReadonlyArray<Requirement.Requirement>) =>
+      Effect.flatMap(Authorization.Authorization, (authorization) =>
         authorization.permitted(requirements),
       );
     expect(
@@ -357,7 +359,7 @@ it.effect(
       yield* seed(fixture, [alice]);
       yield* run(fixture, check([removeBob]));
       yield* run(fixture, check([]));
-      yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(alice.memberId));
+      yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
       for (const requirements of [[], [removeBob]]) {
         expect(yield* run(fixture, Effect.flip(check(requirements)))).toMatchObject({
           _tag: "Authorization.InvalidActor",
@@ -377,7 +379,7 @@ it.effect("acting identity must match both the membership's identity kind and ID
       agent.identity,
     ];
     for (const identity of wrongIdentities) {
-      const mismatched = Actor.Value.make({ workspaceId, memberId: alice.memberId, identity });
+      const mismatched = Actor.Actor.of({ workspaceId, memberId: alice.memberId, identity });
       expect(yield* run(fixture, Effect.flip(check([removeBob])), mismatched)).toMatchObject({
         _tag: "Authorization.InvalidActor",
         reason: "identity-mismatch",
@@ -395,7 +397,7 @@ it.effect("an actor or a target from another workspace is refused", () =>
       expectedWorkspaceId: workspaceId,
       actualWorkspaceId: foreignWorkspaceId,
     };
-    const foreignActor = Actor.Value.make({
+    const foreignActor = Actor.Actor.of({
       workspaceId: foreignWorkspaceId,
       memberId: alice.memberId,
       identity: alice.identity,
@@ -431,7 +433,7 @@ it.effect("requirements are validated against canonical permission definitions",
       builtinTier: "administrator",
     });
     const wrongKind = Requirement.make(wrongDefinition, workspaceTarget);
-    const malformed: Requirement.Value = {
+    const malformed: Requirement.Requirement = {
       permission: MemberPermissions.Remove,
       target: workspaceTarget,
     };
@@ -452,7 +454,7 @@ it.effect(
         fixture,
         [alice, bob, charlie],
         [
-          Assignment.Record.make({
+          Assignment.Assignment.make({
             id: assignmentId,
             workspaceId,
             memberId: alice.memberId,
@@ -470,7 +472,7 @@ it.effect(
         ],
       );
       yield* Effect.gen(function* () {
-        const authorization = yield* Authorization.Service;
+        const authorization = yield* Authorization.Authorization;
         const journal = yield* Journal.make({
           logId: Log.Id.make("workspace-one/journal"),
           projections: [
@@ -484,14 +486,11 @@ it.effect(
             yield* authorization.require([removeBob]);
             yield* journal
               .publish(MemberFacts.Removed, { workspaceId, memberId: bob.memberId })
-              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+              .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
           }),
         );
         expect(
-          Option.map(
-            yield* fixture.members(workspaceId).get(bob.memberId),
-            (member) => member.status,
-          ),
+          Option.map(yield* fixture.members.get(bob.memberId), (member) => member.status),
         ).toEqual(Option.some("removed"));
         const before = yield* fixture.snapshot;
         const denied = yield* Effect.flip(
@@ -503,14 +502,14 @@ it.effect(
                   workspaceId,
                   permissions: [],
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
               yield* authorization.require([removeCharlie]);
               yield* journal
                 .publish(MemberFacts.Removed, {
                   workspaceId,
                   memberId: charlie.memberId,
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
             }),
           ),
         );
@@ -522,7 +521,7 @@ it.effect(
             workspaceId,
             permissions: [],
           })
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         expect(
           yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
         ).toMatchObject({ _tag: "Authorization.Denied" });
@@ -532,10 +531,10 @@ it.effect(
             workspaceId,
             permissions: [MemberPermissions.Remove.name],
           })
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         yield* journal
           .publish(AssignmentFacts.Revoked, { assignmentId, workspaceId, memberId: alice.memberId })
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         expect(
           yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
         ).toMatchObject({ _tag: "Authorization.Denied" });
@@ -546,7 +545,7 @@ it.effect(
             memberId: alice.memberId,
             source,
           })
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         yield* journal.commit(authorization.require([removeCharlie]));
         const beforeRemoval = yield* fixture.snapshot;
         const inactive = yield* Effect.flip(
@@ -554,7 +553,7 @@ it.effect(
             Effect.gen(function* () {
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
               yield* authorization.require([removeCharlie]);
             }),
           ),
@@ -566,18 +565,18 @@ it.effect(
         expect(yield* fixture.snapshot).toEqual(beforeRemoval);
         yield* journal
           .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         expect(
           yield* Effect.flip(journal.commit(authorization.require([removeCharlie]))),
         ).toMatchObject({ _tag: "Authorization.InvalidActor", reason: "membership-removed" });
       }).pipe(
         Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
-        Effect.provideService(Store.Service, fixture.store),
-        Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-        Effect.provideService(MemberStore.Service, fixture.members(workspaceId)),
-        Effect.provideService(RoleStore.Service, fixture.roles(workspaceId)),
-        Effect.provideService(AssignmentStore.Service, fixture.assignments(workspaceId)),
-        Effect.provideService(Actor.Service, alice),
+        Effect.provideService(Store.Store, fixture.store),
+        Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
+        Effect.provideService(MemberStore.MemberStore, fixture.members),
+        Effect.provideService(RoleStore.RoleStore, fixture.roles),
+        Effect.provideService(AssignmentStore.AssignmentStore, fixture.assignments),
+        Effect.provideService(Actor.Actor, alice),
       );
     }),
 );
@@ -605,7 +604,7 @@ it.effect(
         [alice],
         [
           direct("read", alice.memberId, MemberPermissions.Read),
-          Assignment.Record.make({
+          Assignment.Assignment.make({
             id: Assignment.Id.make("by-role"),
             workspaceId,
             memberId: alice.memberId,

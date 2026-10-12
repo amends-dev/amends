@@ -5,10 +5,10 @@
  *
  * @since 0.1.0
  */
-import { Fact } from "../journal/fact.ts";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { Task } from "./Task.ts";
+import * as Fact from "../journal/Fact.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as Group from "../group/Group.ts";
+import * as Task from "./Task.ts";
 
 /**
  * A task was created, as its record says: once per thread.
@@ -21,7 +21,7 @@ export const Created = Fact.make("task.created", {
   subject: (payload) => Subject.make("task", payload.threadId),
   occurrence: (payload) => [payload.threadId],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: Task.Record,
+  payload: Task.Task,
 });
 
 /**
@@ -37,5 +37,3 @@ export const Updated = Fact.make("task.updated", {
   audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Task.Updated,
 });
-
-export * as TaskFacts from "./TaskFacts.ts";

@@ -103,6 +103,7 @@ import signInMeta, {
   Code,
   CodeError,
   Email,
+  EmailLimited,
   Resend,
   SignInFlow,
   WithProviders,
@@ -487,6 +488,9 @@ describe("sign in", () => {
   });
   it("announces a new code and clears the field", async () => {
     await stories.story(Resend).run();
+  });
+  it("says when too many codes were requested", async () => {
+    await stories.story(EmailLimited).run();
   });
 });
 

@@ -7,13 +7,13 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadParticipationId } from "./ThreadParticipationId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { GroupMembership } from "../group/membership/membership.ts";
-import { Identity } from "../identity/identity.ts";
-import { Notification } from "../notification/notification.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadParticipationId from "./ThreadParticipationId.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import * as GroupMembership from "../group/GroupMembership.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Notification from "../notification/Notification.ts";
 
 /**
  * Names a participation; `ThreadParticipationId.Id`, where models that only refer to
@@ -88,7 +88,7 @@ export const keyOf = (participant: Participant | Reference): string =>
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const ThreadParticipation = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
@@ -109,7 +109,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface ThreadParticipation extends Schema.Schema.Type<typeof ThreadParticipation> {}
 
 /**
  * A participation as it begins: active and not ended. What `ThreadParticipationFacts.Added`
@@ -119,7 +119,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * @since 0.1.0
  */
 export const Admission = Schema.Struct({
-  ...Record.fields,
+  ...ThreadParticipation.fields,
   status: Schema.Literal("active"),
   endedAt: Schema.Null,
 });
@@ -195,8 +195,8 @@ export const Summary = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
   participant: Reference,
-  joinedAt: Record.fields.joinedAt,
-  joinedAtSequence: Record.fields.joinedAtSequence,
+  joinedAt: ThreadParticipation.fields.joinedAt,
+  joinedAtSequence: ThreadParticipation.fields.joinedAtSequence,
 });
 
 /**
@@ -211,7 +211,7 @@ export interface Summary extends Schema.Schema.Type<typeof Summary> {}
  * @category utils
  * @since 0.1.0
  */
-export const toSummary = (record: Record): Summary => ({
+export const toSummary = (record: ThreadParticipation): Summary => ({
   id: record.id,
   workspaceId: record.workspaceId,
   threadId: record.threadId,
@@ -271,5 +271,3 @@ export const EndReason = Schema.Literals([
  * @since 0.1.0
  */
 export type EndReason = typeof EndReason.Type;
-
-export * as ThreadParticipation from "./ThreadParticipation.ts";

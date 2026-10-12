@@ -8,15 +8,15 @@
  * @since 0.1.0
  */
 import { Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadMessageId } from "./ThreadMessageId.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { Identity } from "../identity/identity.ts";
-import { Text as Characters } from "../text/text.ts";
-import { ChannelId } from "../channel/ChannelId.ts";
-import { TurnId } from "../turn/id.ts";
+import * as GroupId from "../group/GroupId.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadMessageId from "./ThreadMessageId.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import * as Identity from "../identity/Identity.ts";
+import * as Characters from "../text/Text.ts";
+import * as ChannelId from "../channel/ChannelId.ts";
+import * as TurnId from "../turn/TurnId.ts";
 
 /**
  * Names a message; `ThreadMessageId.Id`, where models that only refer to messages import it from.
@@ -170,7 +170,7 @@ export type Content = typeof Content.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const ThreadMessage = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
@@ -185,7 +185,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface ThreadMessage extends Schema.Schema.Type<typeof ThreadMessage> {}
 
 /**
  * The content a message is published with: its text and mentions at revision 1.
@@ -283,5 +283,3 @@ export const Deleted = Schema.Struct({
  * @since 0.1.0
  */
 export interface Deleted extends Schema.Schema.Type<typeof Deleted> {}
-
-export * as ThreadMessage from "./ThreadMessage.ts";

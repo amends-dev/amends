@@ -6,25 +6,23 @@ so a Bun host, a browser, or another runtime can use them. Implementations over 
 live in [adapters](../adapters/README.md), runtime composition in [hosts](../hosts/README.md), and
 the user interface in [apps](../apps/README.md).
 
-| Package                                                | What it is                                                                           |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| [`core`](core/README.md)                               | One workspace's domain: its journal, authorization, and operations.                  |
-| [`gateway`](gateway/README.md)                         | How a host enters core, and what a host implements: storage, sign-in, the directory. |
-| [`api-http`](api-http/README.md)                       | The HTTP API's contract, shared by the server and clients.                           |
-| [`server-http`](server-http/README.md)                 | The HTTP API's server, over the gateway, with its authentication.                    |
-| [`storage-conformance`](storage-conformance/README.md) | The test suites every storage adapter runs against itself.                           |
-| [`cluster`](cluster/README.md)                         | Jobs, the work outside requests, on Effect Cluster: agents' turns and deliveries.    |
-| [`connection`](connection/README.md)                   | The integrations a host installs, a workspace's connections, and the model catalog.  |
-| [`toolkit`](toolkit/README.md)                         | Tool sources, such as MCP servers and HTTP APIs, in one shape.                       |
-| [`harness`](harness/README.md)                         | Runs an agent and streams its turns in one format. Published to npm.                 |
-| [`sandbox`](sandbox/README.md)                         | The contract every sandbox provider implements. Published to npm.                    |
-| [`channel`](channel/README.md)                         | The contract every channel transport implements. Published to npm.                   |
+| Package                              | What it is                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| [`core`](core/README.md)             | One workspace's domain: its journal, authorization, and operations.                  |
+| [`gateway`](gateway/README.md)       | How a host enters core, and what a host implements: storage, sign-in, the directory. |
+| [`http`](http/README.md)             | The HTTP API: the contract clients call and its server, over the gateway.            |
+| [`cluster`](cluster/README.md)       | Jobs, the work outside requests, on Effect Cluster: agents' turns and deliveries.    |
+| [`connection`](connection/README.md) | The integrations a host installs, a workspace's connections, and the model catalog.  |
+| [`toolkit`](toolkit/README.md)       | Tool sources, such as MCP servers and HTTP APIs, in one shape.                       |
+| [`harness`](harness/README.md)       | Runs an agent and streams its turns in one format. Published to npm.                 |
+| [`sandbox`](sandbox/README.md)       | The contract every sandbox provider implements. Published to npm.                    |
+| [`channel`](channel/README.md)       | The contract every channel transport implements. Published to npm.                   |
 
 ## Dependencies
 
 A shared package depends on `effect` and on other packages here, through `workspace:*`, and on
 nothing else: no host, adapter, or app, and no other external package, except `@effect/vitest` for
-a package that ships test suites, such as `storage-conformance`. Effect's version comes from the
+a package that ships test suites, such as the gateway's conformance suites. Effect's version comes from the
 root catalog, as `catalog:`. The rule covers every dependency section, so development tools live at
 the repository root. `bun run check:packages` enforces it.
 
@@ -45,8 +43,8 @@ A feature owns one concept, its rules, and its lifecycle. It starts as one modul
 directory when its models, operations, facts, projections, or contracts need modules of their own.
 A core feature keeps the operations actors call in `service.ts`, the writes other operations
 share in `command.ts`, and its reads in `query.ts`, as far as it has each, as
-[AGENTS.md](../AGENTS.md) describes. An HTTP contract module and its handler share a filename, so
-`api-http/src/invitations.ts` leads to `server-http/src/invitations.ts`.
+[AGENTS.md](../AGENTS.md) describes. An HTTP group's module and its handler share a name, so
+`http/src/InvitationsGroup.ts` leads to `http/src/InvitationsHandlers.ts`.
 
 Each namespace module gives its concept one name, such as `ThreadErrors` or `ThreadActivityStore`.
 A package's index re-exports that name, and modules inside the package import the owning module

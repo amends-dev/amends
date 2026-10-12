@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { ThreadMessage } from "../../src/thread/ThreadMessage.ts";
+import * as ThreadMessage from "../../src/thread/ThreadMessage.ts";
 
 it("writes a mention as a link to the member, labelled with their name", () => {
   expect(ThreadMessage.mentionText("m-1", "Ada Lovelace")).toBe("[@Ada Lovelace](member:m-1)");

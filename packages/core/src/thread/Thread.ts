@@ -7,14 +7,14 @@
  * @since 0.1.0
  */
 import { DateTime, Schema } from "effect";
-import { GroupId } from "../group/id.ts";
-import { Text } from "../text/text.ts";
-import { WorkspaceId } from "../workspace/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { ThreadId } from "./ThreadId.ts";
-import { ThreadMessage } from "./ThreadMessage.ts";
-import type { ThreadActivityKind } from "./ThreadActivityKind.ts";
-import { Task } from "../task/Task.ts";
+import * as GroupId from "../group/GroupId.ts";
+import * as Text from "../text/Text.ts";
+import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import * as ThreadId from "./ThreadId.ts";
+import * as ThreadMessage from "./ThreadMessage.ts";
+import type * as ThreadActivityKind from "./ThreadActivityKind.ts";
+import * as Task from "../task/Task.ts";
 
 /**
  * Names a thread; `ThreadId.Id`, where models that only refer to threads import it from.
@@ -56,7 +56,7 @@ export type Title = typeof Title.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Record = Schema.Struct({
+export const Thread = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   groupId: GroupId.Id,
@@ -76,7 +76,7 @@ export const Record = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export interface Record extends Schema.Schema.Type<typeof Record> {}
+export interface Thread extends Schema.Schema.Type<typeof Thread> {}
 
 /**
  * A thread's latest content activity: the timeline position and time of its latest message.
@@ -142,9 +142,9 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  * @since 0.1.0
  */
 export const ListItem = Schema.Struct({
-  thread: Record,
+  thread: Thread,
   /** The task the thread tracks, or null. */
-  task: Schema.NullOr(Task.Record),
+  task: Schema.NullOr(Task.Task),
   latest: Latest,
   readThrough: Schema.NullOr(Latest.fields.sequence),
   unread: Schema.Boolean,
@@ -180,8 +180,8 @@ export const isUnread = (
  * @since 0.1.0
  */
 export const listItem = (
-  thread: Record,
-  task: Task.Record | null,
+  thread: Thread,
+  task: Task.Task | null,
   latest: Latest,
   readThrough: number | null,
   admittedAt: DateTime.Utc,
@@ -201,7 +201,7 @@ export const listItem = (
  * @since 0.1.0
  */
 export const OpeningCursor = Schema.Struct({
-  createdAt: Record.fields.createdAt,
+  createdAt: Thread.fields.createdAt,
   threadId: ThreadId.Id,
 });
 
@@ -238,9 +238,9 @@ export interface OpeningOptions extends Schema.Schema.Type<typeof OpeningOptions
  * @since 0.1.0
  */
 export const Opening = Schema.Struct({
-  thread: Record,
+  thread: Thread,
   task: ListItem.fields.task,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
   replies: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   latest: Latest,
   readThrough: ListItem.fields.readThrough,
@@ -261,7 +261,7 @@ export interface Opening extends Schema.Schema.Type<typeof Opening> {}
  */
 export const opening = (
   item: ListItem,
-  message: ThreadMessage.Record,
+  message: ThreadMessage.ThreadMessage,
   replies: number,
 ): Opening => ({
   thread: item.thread,
@@ -362,9 +362,9 @@ export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectI
  * @since 0.1.0
  */
 export const Started = Schema.Struct({
-  thread: Record,
-  message: ThreadMessage.Record,
-  task: Schema.NullOr(Task.Record),
+  thread: Thread,
+  message: ThreadMessage.ThreadMessage,
+  task: Schema.NullOr(Task.Task),
 });
 
 /**
@@ -382,5 +382,3 @@ export interface Started extends Schema.Schema.Type<typeof Started> {}
  * @since 0.1.0
  */
 export type TimelineItem = ThreadActivityKind.Item;
-
-export * as Thread from "./Thread.ts";

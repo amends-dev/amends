@@ -14,7 +14,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   with fixed membership.
 - Member, task, and [channel](thread-workflows.md#channels) workflows exist; managing other
   participants and muting are not implemented. No installed integration gives channels yet, so the
-  local host can create no channel until one does; the conformance suites run channels on a test
+  local host can create no channel until one does; the gateway's tests run channels on a test
   transport. Contacts are told of messages alone, which the delivery job carries to their
   conversation; a sent message's edits and deletions are not carried, and a channel's readiness is
   not shown. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision
@@ -92,7 +92,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   is not stored. Keys are sealed with one host key, which nothing
   rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier keys.
 - [Agents](../packages/core/README.md#agents) are created, configured, renamed, and removed
-  over connections, in core, [over HTTP](../packages/api-http/README.md#agents), and on the
+  over connections, in core, [over HTTP](../packages/http/README.md#agents), and on the
   [Agents page](agents.md); roles are changed in workspace Members. A turn starts on what the
   agent's setup selects, kept for the agent's later turns in the thread: on `Auto`, the harness its
   previous turn there ran on while a connection still gives it, and otherwise the oldest connection
@@ -121,15 +121,20 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 ## Sign-in and accounts
 
 Each email address has one [account](sign-in-design.md#accounts), with an opaque human ID the host
-issues, created on the address's first sign-in or invitation. Only the local host's development
-sign-in exists: it logs codes instead of emailing them, nothing proves control of an address, and
-its tokens are the human ID itself, which it trusts from any caller and cannot revoke. Production
-sign-in and identity providers are [designed](sign-in-design.md#production-sign-in) but not built;
-`GET /session/methods` lists no providers, and the apps offer email codes without reading it. An
-account's address never changes, and accounts are never deleted. Invitations send no email.
-Issuing an invitation creates the address's account before the workspace checks that the issuer
-may invite, so a member without that permission can still create accounts for addresses, though
-nothing about the workspace is revealed or sent.
+issues, created on the address's first sign-in or invitation. [Email sign-in](sign-in-design.md#email-sign-in)
+is implemented, but no email provider is: the local host logs each email it sends, code included,
+where it runs, so whoever reads its log can sign in as anyone, and the apps' hint says to find the
+code in the host's terminal. Development sign-in remains behind `AMENDS_SIGN_IN=development`, for
+tests and scripts. The limit on codes per client counts within one process, by the address a request
+comes from; behind a proxy every client would share the proxy's address, and the host does not read
+forwarded addresses. Expired codes, and expired sessions nobody presents again, stay in the
+database; nothing prunes them. A person cannot list their sessions or end the others. Identity
+providers are [designed](sign-in-design.md#identity-providers) but not built; `GET /session/methods`
+lists no providers, and the apps offer email codes without reading it. An account's address never
+changes, and accounts are never deleted. Invitations send no email. Issuing an invitation creates
+the address's account before the workspace checks that the issuer may invite, so a member without
+that permission can still create accounts for addresses, though nothing about the workspace is
+revealed or sent.
 
 ## HTTP coverage
 
@@ -410,7 +415,7 @@ projections again, which then rebuild the commits they missed.
 
 ## Commit outcomes and PostgreSQL contention
 
-The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/binding.ts) returns
+The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/Binding.ts) returns
 `Store.CommitUncertain` for every failed COMMIT effect, even when a particular
 database error could establish that nothing committed. This over-reports uncertainty.
 The gateway exposes `Gateway.Uncertain` with the commit ID; there is no public
@@ -418,7 +423,7 @@ HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction 
 Creating operations accept a request key, so their retries return the first result; other
 operations settle a repeat by their own rules, such as `AlreadyRemoved`, rather than repeating it.
 
-PostgreSQL's [error mapping](../adapters/storage-postgresql/src/errors.ts) treats lock
+PostgreSQL's [error mapping](../adapters/storage-postgresql/src/internal/errors.ts) treats lock
 timeouts, serialization failures, and deadlocks as contention, a retryable conflict; during
 COMMIT they fall under the broad uncertain-outcome mapping above.
 
@@ -430,7 +435,7 @@ outside a transaction have no statement timeout.
 
 ## PostgreSQL isolation
 
-The [binding](../adapters/storage-postgresql/src/binding.ts) uses plain `BEGIN`,
+The [binding](../adapters/storage-postgresql/src/Binding.ts) uses plain `BEGIN`,
 then takes a transaction-scoped advisory lock for the workspace, and one for each log a
 commit touches; a standalone append takes only its log's. It does not pin the isolation
 level. The locks serialize cooperating writers, but the connection's isolation default still
@@ -444,7 +449,7 @@ An explicit isolation choice and coverage for changed defaults remain outstandin
 
 ## Edge resource controls
 
-The [local server](../hosts/local/src/server.ts) refuses request bodies over one mebibyte with
+The [local server](../hosts/local/src/LocalServer.ts) refuses request bodies over one mebibyte with
 413, through Bun's own limit. Each process serves at most a thousand live-update streams per
 workspace and twenty per member of it, refusing more with 429 (`Api.TooManyStreams`). Message
 text has no length limit of its own beyond the body limit, and no server-side control paces
@@ -452,7 +457,7 @@ clients that reconnect repeatedly.
 
 ## Payload-format compatibility
 
-[Codec.makeForSchema](../packages/core/src/journal/codec.ts) persists payloads through
+[Codec.makeForSchema](../packages/core/src/journal/Codec.ts) persists payloads through
 `SchemaBinary.toCodec` and copies output buffers. The [codec tests](../packages/core/test/journal/codec.test.ts)
 freeze representative workspace and message bytes captured with Effect 4.0.0-rc.115, and a turn
 step's bytes captured with 4.0.0, checking both decoding and identical encoding on 4.0.0. They cover dates,

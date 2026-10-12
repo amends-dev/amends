@@ -7,9 +7,9 @@
  * @since 0.1.0
  */
 import { Context, Effect, Layer, Schema } from "effect";
-import type { Thread } from "./Thread.ts";
-import type { ThreadActivity } from "./ThreadActivity.ts";
-import type { ThreadActivityKind } from "./ThreadActivityKind.ts";
+import type * as Thread from "./Thread.ts";
+import type * as ThreadActivity from "./ThreadActivity.ts";
+import type * as ThreadActivityKind from "./ThreadActivityKind.ts";
 
 /**
  * Storage failed while loading what activity references.
@@ -50,34 +50,29 @@ export type Error = Failure;
 export interface Resolver {
   readonly kinds: ReadonlyArray<ThreadActivityKind.Definition>;
   readonly resolve: (
-    thread: Thread.Record,
-    activities: ReadonlyArray<ThreadActivity.Record>,
+    thread: Thread.Thread,
+    activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Failure>;
-}
-
-/**
- * The registered resolvers as one.
- *
- * @category services
- * @since 0.1.0
- */
-export interface Interface {
-  /** Resolve a thread's activities of any registered kinds, in their order. */
-  readonly resolve: (
-    thread: Thread.Record,
-    activities: ReadonlyArray<ThreadActivity.Record>,
-  ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Error>;
 }
 
 /**
  * The resolvers of every registered kind, which `ThreadQuery` reads timelines through.
  *
+ * The registered resolvers as one.
+ *
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()(
-  "@amends-dev/core/thread/ThreadActivityResolvers",
-) {}
+export class ThreadActivityResolvers extends Context.Service<
+  ThreadActivityResolvers,
+  {
+    /** Resolve a thread's activities of any registered kinds, in their order. */
+    readonly resolve: (
+      thread: Thread.Thread,
+      activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
+    ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Error>;
+  }
+>()("@amends-dev/core/thread/ThreadActivityResolvers") {}
 
 /**
  * Route each kind to the one resolver that registers it; two resolvers for one kind is a defect.
@@ -95,10 +90,10 @@ export const make = Effect.fn("ThreadActivityResolvers.make")(function* (
       byKind.set(kind.name, resolver);
     }
   const resolve = Effect.fn("ThreadActivityResolvers.resolve")(function* (
-    thread: Thread.Record,
-    activities: ReadonlyArray<ThreadActivity.Record>,
+    thread: Thread.Thread,
+    activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
-    const batches = new Map<Resolver, Array<ThreadActivity.Record>>();
+    const batches = new Map<Resolver, Array<ThreadActivity.ThreadActivity>>();
     for (const activity of activities) {
       const resolver = byKind.get(activity.kind);
       if (resolver === undefined) return yield* Effect.die(new Unknown({ kind: activity.kind }));
@@ -114,7 +109,7 @@ export const make = Effect.fn("ThreadActivityResolvers.make")(function* (
       return item === undefined ? [] : [item];
     });
   });
-  return Service.of({ resolve });
+  return ThreadActivityResolvers.of({ resolve });
 });
 
 /**
@@ -125,9 +120,13 @@ export const make = Effect.fn("ThreadActivityResolvers.make")(function* (
  */
 export const layer = <const Resolvers extends ReadonlyArray<Effect.Effect<Resolver, any, any>>>(
   resolvers: Resolvers,
-): Layer.Layer<Service, Effect.Error<Resolvers[number]>, Effect.Services<Resolvers[number]>> =>
+): Layer.Layer<
+  ThreadActivityResolvers,
+  Effect.Error<Resolvers[number]>,
+  Effect.Services<Resolvers[number]>
+> =>
   Layer.effect(
-    Service,
+    ThreadActivityResolvers,
     Effect.flatMap(
       Effect.all(
         resolvers as ReadonlyArray<
@@ -141,5 +140,3 @@ export const layer = <const Resolvers extends ReadonlyArray<Effect.Effect<Resolv
       make,
     ),
   );
-
-export * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";

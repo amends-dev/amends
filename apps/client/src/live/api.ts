@@ -1,4 +1,7 @@
-import { ApiErrors, Workspace, Signal, ChangeFeed } from "@amends-dev/api-http";
+import * as ApiErrors from "@amends-dev/http/ApiErrors";
+import { ChangeFeed } from "@amends-dev/core/change-feed";
+import { Signal } from "@amends-dev/core/signal";
+import { Workspace } from "@amends-dev/core/workspace";
 import {
   Cause,
   Clock,
@@ -251,8 +254,8 @@ export const affectedKeys = (
  * unread state, and settles notifications from it, changing the inbox and pending counts; seeing
  * notifications changes the inbox and counts; reading a group, the groups.
  */
-export const signalKeys = (workspaceId: string, signal: Signal.Value): Array<string> =>
-  Signal.Value.matchOrElse(
+export const signalKeys = (workspaceId: string, signal: Signal.Signal): Array<string> =>
+  Signal.Signal.matchOrElse(
     signal,
     {
       ThreadRead: () => [
@@ -361,7 +364,7 @@ const run = Effect.fnUntraced(function* (
       },
       Signal: (message) => {
         const signal = message.signal;
-        if (Signal.Value.isAnyOf(["Typing"])(signal))
+        if (Signal.Signal.isAnyOf(["Typing"])(signal))
           registry.update(typists, (current) => typing(current, signal, Date.now()));
         const keys = signalKeys(workspaceId, signal);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;

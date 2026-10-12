@@ -1,22 +1,22 @@
-import { Performer } from "../../src/identity/performer.ts";
+import * as Performer from "../../src/identity/Performer.ts";
 import { Subject } from "@amends-dev/core/journal";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Cause, Context, Crypto, DateTime, Deferred, Effect, Exit, Option, Schema } from "effect";
-import { Actor } from "../../src/identity/actor.ts";
-import { Identity } from "../../src/identity/identity.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Entry } from "../../src/journal/entry.ts";
-import { Event } from "../../src/journal/event.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { MemberId } from "../../src/workspace/member/id.ts";
-import { make, type Fixture } from "../memory-store.ts";
+import * as Actor from "../../src/identity/Actor.ts";
+import * as Identity from "../../src/identity/Identity.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Entry from "../../src/journal/Entry.ts";
+import * as Event from "../../src/journal/Event.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Projection from "../../src/journal/Projection.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Transaction from "../../src/journal/Transaction.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
+import * as MemberId from "../../src/workspace/MemberId.ts";
+import { make, type Fixture } from "../memory.ts";
 import { testCrypto, testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");
@@ -32,13 +32,13 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Log.Service | Transaction.Service | Checkpoint.Service | Crypto.Crypto
+    Log.Log | Transaction.Transaction | Checkpoint.Checkpoint | Crypto.Crypto
   >,
 ) =>
   program.pipe(
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Crypto.Crypto, testCrypto),
   );
 const setup = Journal.make({ logId, projections: [] });
@@ -50,14 +50,14 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const actor = Actor.Value.make({
+          const actor = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("agent-membership"),
             identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("agent") }),
           });
           const occurredAt = DateTime.makeUnsafe("2025-01-01T00:00:00Z");
           const attribution = Publication.makeForActor(occurredAt).pipe(
-            Effect.provideService(Actor.Service, actor),
+            Effect.provideService(Actor.Actor, actor),
           );
           const [one, two] = yield* Effect.all([attribution, attribution], {
             concurrency: "unbounded",
@@ -66,8 +66,8 @@ it.effect(
           const journal = yield* setup;
           const events = yield* journal.commit(
             Effect.all([
-              journal.publish(Changed, 1).pipe(Effect.provideService(Publication.Service, one)),
-              journal.publish(Changed, 2).pipe(Effect.provideService(Publication.Service, one)),
+              journal.publish(Changed, 1).pipe(Effect.provideService(Publication.Publication, one)),
+              journal.publish(Changed, 2).pipe(Effect.provideService(Publication.Publication, one)),
             ]),
           );
           for (const event of events) {
@@ -97,7 +97,7 @@ it.effect("causation survives commits and can change performer while preserving 
         const journal = yield* setup;
         const parent = yield* journal
           .publish(Changed, 1)
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         const human = {
           _tag: "Identity",
           identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") }),
@@ -105,7 +105,7 @@ it.effect("causation survives commits and can change performer while preserving 
         const next = yield* Publication.makeCausedBy(parent, human);
         const child = yield* journal
           .publish(Changed, 2)
-          .pipe(Effect.provideService(Publication.Service, next));
+          .pipe(Effect.provideService(Publication.Publication, next));
         expect(child.commitId).not.toBe(parent.commitId);
         expect(child.provenance).toMatchObject({
           performedBy: human,
@@ -128,23 +128,23 @@ it.effect(
       const fixture = yield* make();
       const journal = yield* run(
         fixture,
-        setup.pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId))),
+        setup.pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId))),
       );
       const publish = journal.publish(Changed, 0).pipe(
-        Effect.provideService(Actor.Service, {
+        Effect.provideService(Actor.Actor, {
           workspaceId,
           memberId: MemberId.Id.make("alice"),
           identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") }),
         }),
       );
-      expectTypeOf<Effect.Services<typeof publish>>().toEqualTypeOf<Publication.Service>();
+      expectTypeOf<Effect.Services<typeof publish>>().toEqualTypeOf<Publication.Publication>();
       // An intentionally incomplete runtime context models a JavaScript caller bypassing the type check.
       const exit = yield* Effect.exit(
-        publish.pipe(Effect.provide(Context.makeUnsafe<Publication.Service>(new Map()))),
+        publish.pipe(Effect.provide(Context.makeUnsafe<Publication.Publication>(new Map()))),
       );
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit))
-        expect(Cause.pretty(exit.cause)).toContain("@amends-dev/core/journal/publication/Service");
+        expect(Cause.pretty(exit.cause)).toContain("@amends-dev/core/journal/Publication");
       expect((yield* fixture.snapshot).logs.size).toBe(0);
     }),
 );
@@ -158,7 +158,7 @@ it.effect("foreign workspaces, dangling causes and changed correlations reject w
         const journal = yield* setup;
         const parent = yield* journal
           .publish(Changed, 1)
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         const next = yield* Publication.makeCausedBy(parent);
         const cause = Event.makeReference(parent);
         const invalid = [
@@ -176,7 +176,7 @@ it.effect("foreign workspaces, dangling causes and changed correlations reject w
             (yield* Effect.flip(
               journal
                 .publish(Changed, 2)
-                .pipe(Effect.provideService(Publication.Service, provenance)),
+                .pipe(Effect.provideService(Publication.Publication, provenance)),
             ))._tag,
           ).toBe("SchemaError");
         }
@@ -185,10 +185,10 @@ it.effect("foreign workspaces, dangling causes and changed correlations reject w
             Effect.gen(function* () {
               yield* journal
                 .publish(Changed, 3)
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
               yield* journal.publish(Changed, 4).pipe(
                 Effect.provideService(
-                  Publication.Service,
+                  Publication.Publication,
                   Object.assign({}, next, {
                     causedBy: Object.assign({}, cause, { id: Entry.Id.make("missing") }),
                   }),
@@ -215,13 +215,13 @@ it.effect("replay preserves recorded attribution without a current publication c
       Effect.gen(function* () {
         return yield* (yield* setup)
           .publish(Changed, 2)
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
       }),
     );
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const seen: Event.Record[] = [];
+        const seen: Event.Event[] = [];
         const projection = Projection.make("provenance", { version: 1 }).on(Changed, (event) =>
           Effect.sync(() => {
             seen.push(event);
@@ -253,7 +253,7 @@ it.effect("publication owns nested attribution before projections and committed 
         const journal = yield* setup;
         const event = yield* journal
           .publish(Changed, 1)
-          .pipe(Effect.provideService(Publication.Service, provenance));
+          .pipe(Effect.provideService(Publication.Publication, provenance));
         expect(event.provenance).not.toBe(provenance);
         expect(Object.isFrozen(event.provenance)).toBe(true);
         if (Performer.Reference.isAnyOf(["System"])(event.provenance.performedBy))
@@ -278,12 +278,12 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const alice = Actor.Value.make({
+          const alice = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("alice"),
             identity: { _tag: "Human", id: Identity.HumanId.make("alice") },
           });
-          const bob = Actor.Value.make({
+          const bob = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("bob"),
             identity: { _tag: "Agent", id: Identity.AgentId.make("bob") },
@@ -291,22 +291,22 @@ it.effect(
           const aliceReady = yield* Deferred.make<void>();
           const bobReady = yield* Deferred.make<void>();
           const operation = (
-            actor: Actor.Value,
-            other: Actor.Value,
+            actor: Actor.Actor["Service"],
+            other: Actor.Actor["Service"],
             ready: Deferred.Deferred<void>,
             otherReady: Deferred.Deferred<void>,
           ) =>
             Effect.gen(function* () {
-              const original = yield* Publication.Service;
+              const original = yield* Publication.Publication;
               yield* Deferred.succeed(ready, undefined);
               yield* Deferred.await(otherReady);
               const first = yield* journal.publish(Changed, 1);
               // A temporary authorization actor must not replace the operation's publication context.
               const nested = yield* journal
                 .publish(Changed, 2)
-                .pipe(Publication.withActor, Effect.provideService(Actor.Service, other));
+                .pipe(Publication.withActor, Effect.provideService(Actor.Actor, other));
               const last = yield* journal.publish(Changed, 3);
-              expect(yield* Publication.Service).toEqual(original);
+              expect(yield* Publication.Publication).toEqual(original);
               for (const event of [first, nested, last]) {
                 expect(event.provenance).toEqual(original);
                 expect(event.provenance.performedBy).toEqual({
@@ -316,7 +316,7 @@ it.effect(
                 });
               }
               return [first, nested, last] as const;
-            }).pipe(Publication.withActor, Effect.provideService(Actor.Service, actor));
+            }).pipe(Publication.withActor, Effect.provideService(Actor.Actor, actor));
           const [first, second] = yield* journal.commit(
             Effect.all(
               [
@@ -328,7 +328,7 @@ it.effect(
           );
           expect(first[0].commitId).toBe(second[0].commitId);
           expect(first[0].provenance.correlationId).not.toBe(second[0].provenance.correlationId);
-          expect(Option.isNone(yield* Effect.serviceOption(Publication.Service))).toBe(true);
+          expect(Option.isNone(yield* Effect.serviceOption(Publication.Publication))).toBe(true);
         }),
       );
     }),
@@ -345,15 +345,15 @@ it.effect(
           const journal = yield* setup;
           const parent = yield* journal
             .publish(Changed, 1)
-            .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-          const actor = Actor.Value.make({
+            .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
+          const actor = Actor.Actor.of({
             workspaceId,
             memberId: MemberId.Id.make("worker"),
             identity: { _tag: "Agent", id: Identity.AgentId.make("worker") },
           });
           const time = DateTime.makeUnsafe("2025-01-01T00:00:00Z");
           yield* Effect.gen(function* () {
-            const original = yield* Publication.Service;
+            const original = yield* Publication.Publication;
             const child = yield* journal
               .publish(Changed, 2)
               .pipe(Publication.withCause(parent, time));
@@ -361,10 +361,10 @@ it.effect(
             expect(child.provenance.causedBy).toEqual(Event.makeReference(parent));
             expect(child.provenance.correlationId).toBe(parent.provenance.correlationId);
             expect(child.provenance.occurredAt).toEqual(time);
-            expect(yield* Publication.Service).toEqual(original);
+            expect(yield* Publication.Publication).toEqual(original);
             const temporary = testProvenance(workspaceId).performedBy;
             const failure = yield* Effect.gen(function* () {
-              const changed = yield* Publication.Service;
+              const changed = yield* Publication.Publication;
               expect(changed.performedBy).toEqual(temporary);
               expect(changed.occurredAt).toEqual(time);
               expect(changed.causedBy).toEqual(Event.makeReference(parent));
@@ -377,13 +377,13 @@ it.effect(
               Effect.flip,
             );
             expect(failure).toBe("expected failure");
-            expect(yield* Publication.Service).toEqual(original);
+            expect(yield* Publication.Publication).toEqual(original);
             const after = yield* journal.publish(Changed, 3);
             expect(after.provenance).toEqual(original);
             expect(after.provenance.correlationId).not.toBe(child.provenance.correlationId);
             expect(after.provenance.causedBy).toBeNull();
-          }).pipe(Publication.withActor, Effect.provideService(Actor.Service, actor));
-          expect(Option.isNone(yield* Effect.serviceOption(Publication.Service))).toBe(true);
+          }).pipe(Publication.withActor, Effect.provideService(Actor.Actor, actor));
+          expect(Option.isNone(yield* Effect.serviceOption(Publication.Publication))).toBe(true);
         }),
       );
     }),
@@ -398,13 +398,13 @@ it.effect("a scoped cause cannot switch the current publication workspace", () =
         const journal = yield* setup;
         const parent = yield* journal
           .publish(Changed, 1)
-          .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
         const failure = yield* journal
           .publish(Changed, 2)
           .pipe(
             Publication.withCause(parent),
             Effect.provideService(
-              Publication.Service,
+              Publication.Publication,
               testProvenance(WorkspaceId.Id.make("other")),
             ),
             Effect.flip,

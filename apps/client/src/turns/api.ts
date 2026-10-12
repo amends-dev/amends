@@ -1,4 +1,6 @@
-import { ApiErrors, Turn, Workspace } from "@amends-dev/api-http";
+import * as ApiErrors from "@amends-dev/http/ApiErrors";
+import { Turn } from "@amends-dev/core/turn";
+import { Workspace } from "@amends-dev/core/workspace";
 import type { TurnProblem } from "@amends-dev/ui/screens/turns";
 import { Cause, Effect, Exit, Option, Queue, Schema, Stream } from "effect";
 import { Atom } from "effect/reactivity";

@@ -1,19 +1,19 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Schema, SchemaIssue } from "effect";
-import { Grant } from "../../src/authorization/grant.ts";
-import { Permission } from "../../src/authorization/permission.ts";
-import { Scope } from "../../src/authorization/scope.ts";
-import { Target } from "../../src/authorization/target.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { MemberPermissions } from "../../src/workspace/member/permissions.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as Grant from "../../src/authorization/Grant.ts";
+import * as Permission from "../../src/authorization/Permission.ts";
+import * as Scope from "../../src/authorization/Scope.ts";
+import * as Target from "../../src/authorization/Target.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const workspaceId = Workspace.Id.make("workspace-1");
-const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
-const exactWorkspace = Scope.Value.cases.Target.make({
+const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId });
+const exactWorkspace = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Workspace.make({ workspaceId }),
 });
-const exactMember = Scope.Value.cases.Target.make({
+const exactMember = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: Member.Id.make("member-1") }),
 });
 const ManageWorkspace = Permission.make("test.workspace.manage", {

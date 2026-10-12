@@ -107,10 +107,11 @@ destinations.
 
 ## Boundaries
 
-Only the modules in `api/` and each feature's `api.ts` import the HTTP contract and gateway
-schemas. Client imports UI's types only, as a development dependency, and no UI code, icons,
-styling, router, Storybook, platform entry points, or backend implementations; UI imports no
-client code. `bun run check:packages` enforces both across source and manifests.
+Only the modules in `api/` and each feature's `api.ts` import the HTTP contract, by its modules such
+as `@amends-dev/http/Api` and never its handlers, and the schemas it carries from core's features
+and the gateway. Client imports UI's types only, as a development dependency, and no UI code, icons,
+styling, router, Storybook, platform entry points, or backend implementations; UI imports no client
+code. `bun run check:packages` enforces both across source and manifests.
 
 Feature API modules also expose the existing schema helpers their views use to branch
 on decoded values. The client exports `DirectoryState`, `SignInState`, and

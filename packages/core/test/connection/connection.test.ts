@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Redacted, Schema } from "effect";
-import { Connection } from "../../src/connection/connection.ts";
+import * as Connection from "../../src/connection/Connection.ts";
 
 const accepts = (schema: Schema.Decoder<unknown>, value: unknown) =>
   Schema.decodeUnknownExit(schema)(value)._tag === "Success";

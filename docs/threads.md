@@ -227,20 +227,25 @@ Turn activity, task activity, and renames are never delivered.
 
 ## Code conventions
 
-The thread feature, and the task and channel features built on it, are written as the published
-packages are, `@amends-dev/harness` and `@amends-dev/sandbox`, which follow the Effect repository:
-they are read by developers outside this repository, and documentation is generated from them.
+Every package is written as the published ones, `@amends-dev/harness` and `@amends-dev/sandbox`,
+which follow the Effect repository: they are read by developers outside this repository, and
+documentation is generated from them.
 
 - **One module per namespace, named after it.** `ThreadMessageService.ts` exports
   `ThreadMessageService`, flat in the feature directory, as `effect/ai` is flat. Helpers no
-  consumer imports go in `internal/`. The barrel, `index.ts`, documents each export.
+  consumer imports go in `internal/`. The barrel, `index.ts`, is written by `bun run barrels`, as
+  Effect's codegen writes its own: every module beside it, with the module's `@since`. A module does
+  not re-export itself: the barrel exports it with `export * as`, and modules import one another
+  with `import * as`, so a module's class can carry its name.
 - **A header on every module**: a paragraph saying what the module is for and how it relates to its
   neighbours, then `@since`.
 - **`@category` and `@since` on every export**, with a sentence or more on what it is, except a
-  type that twins a schema, which carries only the tags. A service's `Interface` methods are
-  documented one by one. The categories are `schemas`, `options` for operation inputs and options,
-  `models` for types that are not schemas, `errors`, `services`, `constructors`, `layers`,
-  `utils`, `facts`, `projections`, `permissions`, and `kinds` for activity kinds.
+  type that twins a schema, which carries only the tags. A service is a class named after its
+  module, `ThreadStore.ThreadStore`, with its methods documented one by one in its shape. The
+  categories are `schemas`, `options` for operation inputs and options, `models` for types that
+  are not schemas, `errors`, `services`, `constructors`, `layers`, `utils`, `facts`,
+  `projections`, `permissions`, `kinds` for activity kinds, and `testing` for a conformance suite
+  and its fixture.
 - **Examples** where a reader would otherwise have to find a caller: `**Example** (Title)` and a
   ```ts block, formatted at the repository's print width, verified by extraction as
   [publishing](publishing.md) describes.
@@ -249,8 +254,7 @@ they are read by developers outside this repository, and documentation is genera
   service key names its module: `@amends-dev/core/thread/ThreadStore`.
 - `@since` is `0.1.0`, the version core will first be published at.
 
-The rest of core follows when touched. [Core's guide](../packages/core/README.md) records the
-convention beside its schema vocabulary.
+[Core's guide](../packages/core/README.md) records the convention beside its schema vocabulary.
 
 ## What changes
 
@@ -258,10 +262,10 @@ In core:
 
 0. The thread feature takes the layout and documentation above, with no change of behavior: a
    move and a documentation pass, checked by core's tests and every dependent's typecheck.
-1. `Thread.Record` and `thread.created` gain `title` and `origin`; the fact takes version 2.
+1. `Thread.Thread` and `thread.created` gain `title` and `origin`; the fact takes version 2.
    `thread.renamed` fact, projection, activity kind, and `thread.rename` permission.
 2. The opening union in the thread command is removed; `create` takes the opening message.
-3. `ThreadMessage.Record` takes `via` and `content`; the message store gains an update for edits
+3. `ThreadMessage.ThreadMessage` takes `via` and `content`; the message store gains an update for edits
    and deletions and a reply count; `thread.message.edited` and `thread.message.deleted` facts,
    projections, kinds, and operations; `thread.moderate` permission.
 4. `ThreadActivityKind` gains `version`, recorded on the activity.

@@ -1,6 +1,36 @@
-/** Notification records, the inbox, marking them seen, storage, and projections. */
-export { Notification } from "./notification.ts";
-export { NotificationService } from "./service.ts";
-export { NotificationInbox } from "./inbox.ts";
-export { NotificationProjection } from "./projection.ts";
-export { NotificationStore } from "./store.ts";
+/**
+ * Notifications: each one recipient's reference to a committed thread activity, for a person, an
+ * agent, a contact, or triage, and where its handling stands. `Notification` is the record;
+ * `NotificationService` and `NotificationInbox` the operations an actor calls and what the inbox
+ * shows; `NotificationProjection` how recorded activity generates and settles them; and
+ * `NotificationStore` the contract every storage adapter implements.
+ *
+ * @since 0.1.0
+ */
+
+// @barrel: Auto-generated exports. Do not edit manually.
+
+/**
+ * @since 0.1.0
+ */
+export * as Notification from "./Notification.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as NotificationInbox from "./NotificationInbox.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as NotificationProjection from "./NotificationProjection.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as NotificationService from "./NotificationService.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as NotificationStore from "./NotificationStore.ts";

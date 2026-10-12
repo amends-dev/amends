@@ -8,10 +8,10 @@
  * @since 0.1.0
  */
 import { Effect, Option } from "effect";
-import { GroupMembershipFacts } from "../group/membership/facts.ts";
-import { Projection } from "../journal/projection.ts";
-import { ThreadParticipationFacts } from "./ThreadParticipationFacts.ts";
-import { ThreadParticipationStore } from "./ThreadParticipationStore.ts";
+import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
+import * as Projection from "../journal/Projection.ts";
+import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
+import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";
 
 /**
  * Inserts each admitted participation, ends the one an unfollow names, and ends every
@@ -24,7 +24,7 @@ export const definition = Projection.make("thread.participation", { version: 1 }
   .on(
     ThreadParticipationFacts.Ended,
     Effect.fn("ThreadParticipationProjection.ended")(function* ({ payload, provenance }) {
-      const threadParticipationStore = yield* ThreadParticipationStore.Service;
+      const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
       if (payload.reason !== "unfollowed") {
         const found = yield* threadParticipationStore.get(payload.participationId);
         if (Option.isSome(found) && found.value.status === "ended") return;
@@ -37,16 +37,14 @@ export const definition = Projection.make("thread.participation", { version: 1 }
     Effect.fn("ThreadParticipationProjection.added")(function* ({
       payload: { groupId: _group, ...payload },
     }) {
-      const threadParticipationStore = yield* ThreadParticipationStore.Service;
+      const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
       yield* threadParticipationStore.insert(payload);
     }),
   )
   .on(
     GroupMembershipFacts.Removed,
     Effect.fn("ThreadParticipationProjection.departed")(function* ({ payload, provenance }) {
-      const threadParticipationStore = yield* ThreadParticipationStore.Service;
+      const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore;
       yield* threadParticipationStore.endByAdmission(payload.membershipId, provenance.occurredAt);
     }),
   );
-
-export * as ThreadParticipationProjection from "./ThreadParticipationProjection.ts";

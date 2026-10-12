@@ -9,17 +9,19 @@ what the thread's contacts were told to the conversation. Jobs enter workspaces 
 [gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an actor does. The
 [local host](../../hosts/local/README.md) runs them.
 
-| Module                        | What it holds                                                                                                               |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `jobs/turn-job.ts`            | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
-| `jobs/delivery-job.ts`        | `DeliveryJob`: the `amends/DeliveryJob` entity, its `Deliver` request, the requests commits store, and the worker for them. |
-| `jobs/requests.ts`            | `JobRequests`: how every job handles a request that fails, tried again until it holds or is dropped.                        |
-| `deliveries/runner.ts`        | `DeliveryRunner`: a bound thread's deliveries, accepted and posted one at a time; see [delivering](#delivering).            |
-| `turns/runner.ts`             | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
-| `turns/session-log-writer.ts` | `SessionLogWriter`: what a run writes to its participation's session log.                                                   |
-| `turns/agent.ts`              | `TurnAgent`: starting the session of the agent a turn runs, built from what core gives with the host's integrations.        |
-| `turns/workspace.ts`          | `TurnWorkspace`: the workspace as a run calls it, each call entering it through the gateway for itself.                     |
-| `jobs/pruning.ts`             | `JobPruning`, the hourly job that removes handled requests.                                                                 |
+| Module              | What it holds                                                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `TurnJob.ts`        | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
+| `DeliveryJob.ts`    | `DeliveryJob`: the `amends/DeliveryJob` entity, its `Deliver` request, the requests commits store, and the worker for them. |
+| `JobRequests.ts`    | `JobRequests`: how every job handles a request that fails, tried again until it holds or is dropped.                        |
+| `DeliveryRunner.ts` | `DeliveryRunner`: a bound thread's deliveries, accepted and posted one at a time; see [delivering](#delivering).            |
+| `TurnRunner.ts`     | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
+| `JobPruning.ts`     | `JobPruning`, the hourly job that removes handled requests.                                                                 |
+
+`TurnRunner` keeps three steps of a run under `internal/`: `session-log-writer.ts`, what a run
+writes to its participation's session log; `turn-agent.ts`, starting the session of the agent a
+turn runs from what core gives and the host's integrations; and `turn-workspace.ts`, the workspace
+as a run calls it, each call entering it through the gateway for itself.
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and connection
 contracts. It knows no harness, model provider, sandbox platform, or channel's system: the host
@@ -39,16 +41,16 @@ membership, and the thread, whose requests ask it to run the agent's next turn (
 turn (`Stop`). Its runs take turns, while a stop reaches the run in progress, so the entity takes
 its requests side by side and its [turn runner](#running-a-turn) runs one turn at a time.
 
-`TurnJob.layerRequests` provides core's `TurnJobs.Service`, through which core's reactions request a
-run or a stop in the commit whose facts ask for it, keyed by the commit, so a commit that asks twice
-asks once. Sent inside the commit, a request is stored in the commit's transaction when Cluster's
-message storage uses the same SQL client as the workspace's storage; the host composing them owns
-that. Cluster saves such a request and only notifies its runner best-effort, and its notice comes
-before the commit can show the request, so `layerRequests` asks the commit's `afterCommit` to have
-this process's runner read storage again (`Sharding.pollStorage`). A request for a job another
-process runs waits for that process's next read, unless sockets carry it. `TurnJob.layerWorker`
-registers the entity and handles its requests, and `TurnJob.layer` provides both. Every runner over
-the same storage runs the worker, as Cluster requires of every entity type.
+`TurnJob.layerRequests` provides core's `TurnJobs.TurnJobs`, through which core's reactions request
+a run or a stop in the commit whose facts ask for it, keyed by the commit, so a commit that asks
+twice asks once. Sent inside the commit, a request is stored in the commit's transaction when
+Cluster's message storage uses the same SQL client as the workspace's storage; the host composing
+them owns that. Cluster saves such a request and only notifies its runner best-effort, and its
+notice comes before the commit can show the request, so `layerRequests` asks the commit's
+`afterCommit` to have this process's runner read storage again (`Sharding.pollStorage`). A request
+for a job another process runs waits for that process's next read, unless sockets carry it.
+`TurnJob.layerWorker` registers the entity and handles its requests, and `TurnJob.layer` provides
+both. Every runner over the same storage runs the worker, as Cluster requires of every entity type.
 
 A request that fails is tried again where it is, after `JobRequests.retryDelays`, which doubles from
 two seconds up to five minutes, until it holds or has failed `JobRequests.maxFailures` (eight) times
@@ -63,11 +65,12 @@ Failures are logged.
 
 A delivery job is one bound thread: an entity, `amends/DeliveryJob`, keyed by workspace and thread,
 whose one request, `Deliver`, asks it to carry what the thread's contacts were told to the
-conversation. `DeliveryJob.layerRequests` provides core's `DeliveryJobs.Service`, storing requests
-as `TurnJob`'s does, keyed by the commit; `DeliveryJob.layerWorker` handles them one at a time, so a
-thread's messages reach its conversation in order, and `DeliveryJob.layer` provides both. A request
-that fails is tried again as above; then the delivery its runs could not post is given up, which
-fails it and is tried until it holds, so a delivery never stays requested with nothing to post it.
+conversation. `DeliveryJob.layerRequests` provides core's `DeliveryJobs.DeliveryJobs`, storing
+requests as `TurnJob`'s does, keyed by the commit; `DeliveryJob.layerWorker` handles them one at a
+time, so a thread's messages reach its conversation in order, and `DeliveryJob.layer` provides both.
+A request that fails is tried again as above; then the delivery its runs could not post is given up,
+which fails it and is tried until it holds, so a delivery never stays requested with nothing to post
+it.
 
 ### Pruning
 
@@ -81,7 +84,7 @@ not yet handled are kept however old.
 ## Delivering
 
 `DeliveryRunner.make(job)` carries one bound thread's messages to its conversation over
-`Gateway.Service` and the host's `Integrations`, each call entering the workspace through the
+`Gateway.Gateway` and the host's `Integrations`, each call entering the workspace through the
 gateway for itself. `deliver` asks core's `DeliveryExecution` to `accept` what the thread's contacts
 were told into deliveries, then for each still requested, in the order of the messages: `start` it,
 which answers `Idle` for one no longer requested or failed as it stood, and otherwise `Ready` with
@@ -94,7 +97,7 @@ trying. The runner counts the tries it made of each delivery, which the delivery
 
 ## Running a turn
 
-`TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Service` and the host's
+`TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Gateway` and the host's
 `Integrations`. It calls the workspace through `TurnWorkspace`: core's `TurnExecution` and the
 session log store as a run calls them, each call entering the workspace through the gateway for
 itself, so the runner holds the workspace only while a call runs. `runNextTurn` runs one turn at a

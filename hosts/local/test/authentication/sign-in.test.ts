@@ -4,14 +4,14 @@ import { Accounts, SessionTokens, SignIn } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Cause, Clock, Crypto, Deferred, Effect, Exit, Fiber, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
-import { DevelopmentSignIn } from "../../src/authentication/sign-in.ts";
-import { DevelopmentSessionTokens } from "../../src/authentication/session-tokens.ts";
-import { DevelopmentAuthentication } from "../../src/authentication/authentication.ts";
+import * as DevelopmentSignIn from "../../src/DevelopmentSignIn.ts";
+import * as DevelopmentSessionTokens from "../../src/DevelopmentSessionTokens.ts";
+import * as DevelopmentAuthentication from "../../src/DevelopmentAuthentication.ts";
 
 /** Accounts in memory: an address gets a random human ID the first time it comes up. */
-const inMemoryAccounts = Layer.sync(Accounts.Service, () => {
+const inMemoryAccounts = Layer.sync(Accounts.Accounts, () => {
   const ids = new Map<Accounts.Email, Identity.HumanId>();
-  return Accounts.Service.of({
+  return Accounts.Accounts.of({
     findOrCreate: (email) =>
       Effect.sync(() => {
         const id = ids.get(email) ?? Identity.HumanId.make(crypto.randomUUID());
@@ -26,7 +26,7 @@ const inMemoryAccounts = Layer.sync(Accounts.Service, () => {
 });
 /** The session completing sign-in gives an address: its account, whose ID is the token. */
 const sessionFor = (email: Accounts.Email) =>
-  Effect.flatMap(Accounts.Service, (accounts) => accounts.findOrCreate(email)).pipe(
+  Effect.flatMap(Accounts.Accounts, (accounts) => accounts.findOrCreate(email)).pipe(
     Effect.map((account): SignIn.Session => ({ token: account.id, account })),
   );
 
@@ -45,13 +45,13 @@ it.effect.each(["make", "layer"] as const)(
         return code;
       };
       const program = Effect.gen(function* () {
-        const signIn = yield* SignIn.Service;
-        const sessionTokens = yield* SessionTokens.Service;
+        const signIn = yield* SignIn.SignIn;
+        const sessionTokens = yield* SessionTokens.SessionTokens;
         const alice = Accounts.Email.make("alice@example.com");
         const bob = Accounts.Email.make("bob@example.com");
         expect(delivered.size).toBe(0);
-        yield* signIn.start(alice);
-        yield* signIn.start(bob);
+        yield* signIn.start(alice, undefined);
+        yield* signIn.start(bob, undefined);
         const aliceCode = codeFor(alice);
         const wrong = SignIn.Code.make(aliceCode === "000000" ? "000001" : "000000");
         expect(yield* Effect.flip(signIn.complete(alice, wrong))).toMatchObject({
@@ -88,8 +88,8 @@ it.effect.each(["make", "layer"] as const)(
         construction === "make"
           ? Effect.flatMap(DevelopmentSignIn.make(deliver), (signIn) =>
               program.pipe(
-                Effect.provideService(SignIn.Service, signIn),
-                Effect.provideService(SessionTokens.Service, DevelopmentSessionTokens.make()),
+                Effect.provideService(SignIn.SignIn, signIn),
+                Effect.provideService(SessionTokens.SessionTokens, DevelopmentSessionTokens.make()),
               ),
             )
           : program.pipe(Effect.provide(DevelopmentAuthentication.layer(deliver)));
@@ -109,7 +109,7 @@ it.effect("each evaluation of the sign-in constructor owns its pending codes", (
       const first = yield* acquire;
       const second = yield* acquire;
       const email = Accounts.Email.make("alice@example.com");
-      yield* first.start(email);
+      yield* first.start(email, undefined);
       const code = delivered;
       if (code === undefined) throw new Error("No code was delivered");
       expect(yield* Effect.flip(second.complete(email, code))).toMatchObject({
@@ -136,9 +136,9 @@ it.effect("completing sign-in signs in as the address's account, the same one ea
         delivered.set(email, code);
       }),
     );
-    const accounts = yield* Accounts.Service;
+    const accounts = yield* Accounts.Accounts;
     const signInAs = Effect.fn(function* (email: Accounts.Email) {
-      yield* signIn.start(email);
+      yield* signIn.start(email, undefined);
       const code = delivered.get(email);
       if (code === undefined) return yield* Effect.die("No code was delivered");
       return yield* signIn.complete(email, code);
@@ -164,7 +164,7 @@ it.effect("concurrent completions consume a code once even when the clock suspen
       }),
     );
     const email = Accounts.Email.make("alice@example.com");
-    yield* signIn.start(email);
+    yield* signIn.start(email, undefined);
     const code = delivered;
     if (code === undefined) return yield* Effect.die("No code delivered");
     const gate = yield* Deferred.make<void>();
@@ -211,8 +211,8 @@ it.effect("a repeated request replaces the previous code", () =>
         }),
       );
       const email = Accounts.Email.make("alice@example.com");
-      yield* signIn.start(email);
-      yield* signIn.start(email);
+      yield* signIn.start(email, undefined);
+      yield* signIn.start(email, undefined);
       const [first, second] = delivered;
       if (first === undefined || second === undefined)
         return yield* Effect.die("Expected two codes");
@@ -235,14 +235,14 @@ it.effect("a failed delivery leaves no usable code and a later request can succe
       return Effect.void;
     });
     const email = Accounts.Email.make("alice@example.com");
-    expect(Exit.hasDies(yield* Effect.exit(signIn.start(email)))).toBe(true);
+    expect(Exit.hasDies(yield* Effect.exit(signIn.start(email, undefined)))).toBe(true);
     const failed = delivered[0];
     if (failed === undefined) return yield* Effect.die("Expected failed delivery");
     expect(yield* Effect.flip(signIn.complete(email, failed))).toMatchObject({
       reason: "unknown",
     });
     fail = false;
-    yield* signIn.start(email);
+    yield* signIn.start(email, undefined);
     const replacement = delivered[1];
     if (replacement === undefined) return yield* Effect.die("Expected replacement code");
     expect(yield* signIn.complete(email, replacement)).toEqual(yield* sessionFor(email));
@@ -267,13 +267,13 @@ it.effect.each(["failure", "interruption"] as const)(
         return Effect.void;
       });
       const email = Accounts.Email.make("alice@example.com");
-      const first = yield* Effect.forkScoped(signIn.start(email));
+      const first = yield* Effect.forkScoped(signIn.start(email, undefined));
       const firstCode = yield* Deferred.await(entered);
       // The delivery has started but has not succeeded yet.
       expect(yield* Effect.flip(signIn.complete(email, firstCode))).toMatchObject({
         reason: "unknown",
       });
-      yield* signIn.start(email);
+      yield* signIn.start(email, undefined);
       if (outcome === "interruption") yield* Fiber.interrupt(first);
       else {
         yield* Deferred.succeed(release, undefined);

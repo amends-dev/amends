@@ -15,10 +15,11 @@ export interface SignInProvider {
 }
 
 /** Why a code was not requested. */
-export type SignInEmailError = "invalid-email" | "request-failed";
+export type SignInEmailError = "invalid-email" | "rate-limited" | "request-failed";
 
 const emailErrors: { readonly [Error in SignInEmailError]: string } = {
   "invalid-email": "Enter a valid email address.",
+  "rate-limited": "Too many codes were requested lately. Try again later.",
   "request-failed": "We couldn’t request a code. Try again.",
 };
 
@@ -79,8 +80,8 @@ export function SignInEmail(props: SignInEmailProps) {
               required
             />
           </Field.Root>
-          <Show when={props.error === "request-failed"}>
-            <Field.Alert>{emailErrors["request-failed"]}</Field.Alert>
+          <Show when={props.error !== "invalid-email" && props.error}>
+            {(error) => <Field.Alert>{emailErrors[error()]}</Field.Alert>}
           </Show>
           <Button type="submit" variant="primary" size="large" wide disabled={props.pending}>
             Continue
@@ -127,6 +128,7 @@ export type SignInCodeError =
   | "expired"
   | "unknown"
   | "verify-failed"
+  | "resend-limited"
   | "resend-failed";
 
 // The code's own problems mark the field; failed requests leave it valid.
@@ -136,6 +138,9 @@ const codeErrors: { readonly [Error in SignInCodeError]: { field?: string; form?
   expired: { field: "This code has expired. Request a new one." },
   unknown: { field: "This code is no longer available. Request a new one." },
   "verify-failed": { form: "We couldn’t verify your code. Try again." },
+  "resend-limited": {
+    form: "Too many codes were requested lately. Use the last one, or try later.",
+  },
   "resend-failed": { form: "We couldn’t request a new code. Try again." },
 };
 

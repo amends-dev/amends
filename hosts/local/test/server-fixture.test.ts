@@ -112,8 +112,8 @@ it("importing host modules does not read configuration or launch the application
       {
         command: script(`process.env.AMENDS_PORT = "invalid";
       await Promise.all([
-        import("./hosts/local/src/config.ts"), import("./hosts/local/src/host.ts"),
-        import("./hosts/local/src/server.ts"), import("./hosts/local/src/authentication/authentication.ts"),
+        import("./hosts/local/src/LocalConfig.ts"), import("./hosts/local/src/LocalHost.ts"),
+        import("./hosts/local/src/LocalServer.ts"), import("./hosts/local/src/DevelopmentAuthentication.ts"),
       ]);
       console.error("Host imports completed without startup");`),
       },

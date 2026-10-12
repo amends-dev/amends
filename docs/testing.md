@@ -25,7 +25,7 @@ bun run check
 ```
 
 The root configuration discovers only application tests. The `backend` project
-covers shared packages and the memory adapter. The `postgresql` project covers the
+covers shared packages, whose tests run over the memory implementation in core and the gateway. The `postgresql` project covers the
 PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
 headless state; web and desktop test their own route/UI integration, and web's bundle test builds the app and fails when
 core's implementation reaches the browser bundle; verify both frontend builds and desktop
@@ -81,7 +81,7 @@ tests. The two-worker command limits concurrent test processes for lower CPU pre
 the default is four, and fewer workers can take longer.
 
 For changes that do not involve database storage or the host, excluding `postgresql`
-keeps the memory adapter's conformance suites and every frontend project. Run the full
+keeps every shared package's tests and every frontend project. Run the full
 suite before relying on integration coverage; CI always includes the PostgreSQL project.
 
 The `backend` and `postgresql` projects reuse Bun worker processes and imported modules
@@ -238,18 +238,19 @@ anything.
 
 ## Storage conformance
 
-The [conformance suites](../packages/storage-conformance/README.md) specify storage
-behavior once and run it on every adapter. Each adapter's `test/harness.ts` supplies
+The [conformance suites](../packages/gateway/README.md#conformance) specify what the storage
+contracts promise once and run it on every adapter. Each adapter's `test/fixture.ts` supplies
 fresh storage per test, further hosts over it, a way to discard projections before replay,
-and a count of stored records for rollback checks. A test file registers one suite, such as
-`Suites.journal(harness)`, and adds tests only for what that adapter stores or fails
-differently. The memory adapter runs the same suites as the reference implementation; its
-tests run in the `backend` project.
+and a count of stored records for rollback checks. Its `conformance.test.ts` runs every suite
+with `run(fixture)`, and its other test files cover only what that adapter stores or fails
+differently. The gateway's own `test/conformance.test.ts` runs the suites over the memory
+implementation, in the `backend` project.
 
-The suites cover the journal and transactions, direct store contracts, and every workflow the
-stores serve: workspaces, access, invitations, the gateway, groups, threads, notifications, and
-read state. Each adapter's own tests cover only construction, access paths, and what it stores or
-fails differently.
+The suites cover the journal, transactions, and standalone appends, the change feed and signals
+across hosts, session logs, idempotency keys, fact metadata, reads beside a writer, the direct
+store contracts, accounts, and sign-in storage. Every workflow the stores
+serve, from workspaces and access to threads, notifications, turns, and channels, is tested in
+the gateway's tests over the memory implementation, as a host runs it.
 
 ## Limits of current coverage
 

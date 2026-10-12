@@ -1,15 +1,15 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import { TestClock } from "effect/testing";
-import { ChangeFeedSource } from "../../src/change-feed/source.ts";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Subject } from "../../src/journal/subject.ts";
-import { make } from "../memory-store.ts";
+import * as ChangeFeedSource from "../../src/change-feed/ChangeFeedSource.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Subject from "../../src/journal/Subject.ts";
+import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const Noted = Fact.make("test.noted", {
@@ -28,8 +28,8 @@ it.effect(
           Log.layer.pipe(
             Layer.provideMerge(
               Layer.mergeAll(
-                Layer.succeed(Store.Service, fixture.store),
-                Layer.succeed(Checkpoint.Service, fixture.checkpoints),
+                Layer.succeed(Store.Store, fixture.store),
+                Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
               ),
             ),
           ),
@@ -37,7 +37,7 @@ it.effect(
       );
       // The follower's first read delivers one commit and then loses its connection.
       let reads = 0;
-      const flaky = Journal.Service.of(
+      const flaky = Journal.Journal.of(
         Object.assign({}, journal, {
           log: Object.assign({}, journal.log, {
             tail: (options: Parameters<typeof journal.log.tail>[0]) => {
@@ -61,10 +61,10 @@ it.effect(
       const note = (text: string) =>
         journal
           .commit(journal.publish(Noted, text))
-          .pipe(Effect.provideService(Publication.Service, testProvenance()));
+          .pipe(Effect.provideService(Publication.Publication, testProvenance()));
 
       const source = yield* ChangeFeedSource.make().pipe(
-        Effect.provideService(Journal.Service, flaky),
+        Effect.provideService(Journal.Journal, flaky),
       );
       const subscription = yield* source.subscribe(Option.none());
       const received = yield* Effect.forkChild(

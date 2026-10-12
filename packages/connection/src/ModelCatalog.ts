@@ -9,19 +9,33 @@
  *
  * A catalog holds no credentials. A connection to a provider holds those, and gives the settings
  * that the provider's URLs name.
+ *
+ * @since 0.1.0
  */
 import { ModelEndpoint } from "@amends-dev/harness";
 import { Context, Effect, Layer, Schema } from "effect";
-import { snapshot } from "./snapshot.ts";
+import { snapshot } from "./internal/snapshot.ts";
 
-/** A kind of content a model takes or gives. */
+/**
+ * A kind of content a model takes or gives.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Modality = Schema.Literals(["text", "image", "audio", "video", "pdf"]);
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type Modality = typeof Modality.Type;
 
 /**
  * How a request controls a model's reasoning. A model that reasons and has none of these controls
  * reasons as its provider decides.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Reasoning = Schema.Struct({
   /** A request can turn the model's reasoning on and off. */
@@ -36,11 +50,20 @@ export const Reasoning = Schema.Struct({
   ),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Reasoning extends Schema.Schema.Type<typeof Reasoning> {}
 
 // TODO: Add the higher prices that some providers charge once a request's context passes a size,
 // and the prices of audio, once a turn's cost is worked out from its usage.
-/** What a model costs, in US dollars for a million tokens. */
+/**
+ * What a model costs, in US dollars for a million tokens.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Cost = Schema.Struct({
   input: Schema.Finite,
   output: Schema.Finite,
@@ -55,10 +78,21 @@ export const Cost = Schema.Struct({
   reasoning: Schema.optionalKey(Schema.Finite),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Cost extends Schema.Schema.Type<typeof Cost> {}
 
 // TODO: Add whether a model answers in JSON to a schema and takes a temperature, which models.dev
 // also records, once a turn's settings depend on them.
+/**
+ * A model the catalog lists: how it is reached, when it came out, its limits, what it takes and
+ * gives, whether it calls tools, how it reasons, and what it costs.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Model = Schema.Struct({
   /** The provider's id for the model, which requests name it by. No other model of the provider has it. */
   id: Schema.NonEmptyString,
@@ -104,8 +138,19 @@ export const Model = Schema.Struct({
   cost: Schema.optionalKey(Cost),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Model extends Schema.Schema.Type<typeof Model> {}
 
+/**
+ * A model provider the catalog lists: its documentation, the settings its URLs name, and its
+ * models. `ModelIntegrations.catalogProviders` gives an integration for each.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Provider = Schema.Struct({
   /** models.dev's id for the provider, such as `anthropic`. No other provider has it. */
   id: Schema.NonEmptyString,
@@ -125,13 +170,34 @@ export const Provider = Schema.Struct({
   models: Schema.Array(Model),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Provider extends Schema.Schema.Type<typeof Provider> {}
 
-/** The providers, in order of id. */
+/**
+ * The model catalog: its providers, in order of id. `ModelsDev.toCatalog` makes one from
+ * models.dev's data.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const Catalog = Schema.Struct({ providers: Schema.Array(Provider) });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Catalog extends Schema.Schema.Type<typeof Catalog> {}
 
+/**
+ * The service through which hosts and integrations read the model catalog. `layer` provides the
+ * catalog this package ships, and `make` one of any catalog.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class ModelCatalog extends Context.Service<
   ModelCatalog,
   {
@@ -146,7 +212,12 @@ export class ModelCatalog extends Context.Service<
   }
 >()("@amends-dev/connection/ModelCatalog") {}
 
-/** A model catalog of the providers in `catalog`. */
+/**
+ * A model catalog of the providers in `catalog`.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = (catalog: Catalog): ModelCatalog["Service"] => {
   const providers = new Map(catalog.providers.map((provider) => [provider.id, provider]));
   const models = new Map(
@@ -162,7 +233,12 @@ export const make = (catalog: Catalog): ModelCatalog["Service"] => {
   });
 };
 
-/** The catalog this package ships, as models.dev had it when `snapshot.ts` was last written. */
+/**
+ * The catalog this package ships, as models.dev had it when `snapshot.ts` was last written.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer: Layer.Layer<ModelCatalog> = Layer.effect(
   ModelCatalog,
   Schema.decodeEffect(Schema.fromJsonString(Catalog))(snapshot).pipe(

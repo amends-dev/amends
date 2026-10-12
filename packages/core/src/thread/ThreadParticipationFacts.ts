@@ -5,13 +5,13 @@
  *
  * @since 0.1.0
  */
-import { Fact } from "../journal/fact.ts";
+import * as Fact from "../journal/Fact.ts";
 import { Schema } from "effect";
-import { Subject } from "../journal/subject.ts";
-import { Group } from "../group/group.ts";
-import { GroupId } from "../group/id.ts";
-import { MemberId } from "../workspace/member/id.ts";
-import { ThreadParticipation } from "./ThreadParticipation.ts";
+import * as Subject from "../journal/Subject.ts";
+import * as Group from "../group/Group.ts";
+import * as GroupId from "../group/GroupId.ts";
+import * as MemberId from "../workspace/MemberId.ts";
+import * as ThreadParticipation from "./ThreadParticipation.ts";
 
 /**
  * A participant was admitted to a thread: the participation as it began, active and not ended.
@@ -47,5 +47,3 @@ export const Ended = Fact.make("thread.participation.ended", {
     reason: ThreadParticipation.EndReason,
   }),
 });
-
-export * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";

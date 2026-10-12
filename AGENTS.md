@@ -19,7 +19,8 @@ drop the database. The host tests also spawn the server entry point. Use
 `bun install` runs `effect-tsgo patch` and `lefthook install` through the `prepare`
 script. This enables Effect diagnostics in the TypeScript compiler and workspace
 language server, and installs the Git hooks. Before each commit, Lefthook runs
-dependency boundary, generated-icon, type, lint, and formatting checks in parallel across the working tree.
+dependency boundary, generated-barrel, generated-icon, type, lint, and formatting checks in parallel
+across the working tree.
 The hook checks files without modifying or staging them. Fix failures before
 committing; `bun run lefthook run pre-commit --force` runs the same checks manually,
 even when no files are staged. CI runs these checks, the tests, and the frontend builds
@@ -30,58 +31,57 @@ currently run through TypeScript. Check compatibility before changing this setup
 
 ## Workspace layout
 
-- `packages/*`: portable shared packages. Effect is their only external dependency,
-  besides `@effect/vitest` for test suites a package ships from the root catalog.
-  They may depend on other shared packages with `workspace:*`, but never hosts or
-  apps. This applies to all dependency sections; development tools live at the root.
-  `core` operates within one workspace with a trusted actor; its services are the
-  operations. Each core feature keeps the operations actors call in `service.ts`, the
-  internal writes other operations share in one `command.ts` service, and the internal
-  reads in one `query.ts` service; a command may read through the query, a query never
-  writes, and a step with one caller stays a private function of that caller. `gateway` is how a host enters core: it bootstraps
-  a workspace and resolves an authenticated identity into the actor, and it holds
-  the host contracts for storage, accounts, sign-in, session token resolution, and the
-  workspace directory. `api-http` is the HTTP contract shared by servers and clients, and
-  `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
-  over the same gateway rather than new gateway methods. `storage-conformance` holds
-  the test suites every storage adapter runs against itself through a harness; behavior
-  core relies on belongs there, and adapter tests keep only what one adapter stores or
-  fails differently. `harness` is the contract every harness implements: an agent's sessions
-  and turns, streamed in one format whichever agent runs them, and the bridge through which a host
-  drives an agent inside a sandbox. `sandbox` is the contract every sandbox provider implements,
-  with the suites each provider runs from `@amends-dev/sandbox/conformance`; a sandbox knows nothing
-  of what harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server
-  or an HTTP API, one shape. `channel` is the contract every channel transport implements: how one
+- `packages/*`: portable shared packages. Effect is their only external dependency, besides
+  `@effect/vitest` for test suites a package ships from the root catalog. They may depend on other
+  shared packages with `workspace:*`, but never hosts or apps. This applies to all dependency
+  sections; development tools live at the root. `core` operates within one workspace with a trusted
+  actor; its services are the operations. Each core feature keeps the operations actors call in
+  `service.ts`, the internal writes other operations share in one `command.ts` service, and the
+  internal reads in one `query.ts` service; a command may read through the query, a query never
+  writes, and a step with one caller stays a private function of that caller. `gateway` is how a
+  host enters core: it bootstraps a workspace and resolves an authenticated identity into the actor,
+  and it holds the host contracts for storage, accounts, sign-in, session token resolution, and the
+  workspace directory. `http` is the HTTP protocol: the contract clients call, which they import by
+  module, and the handlers that implement it over the gateway, including its authentication. Another
+  protocol adds its own package over the same gateway rather than new gateway methods. The gateway's
+  `conformance` module holds the test suites every storage adapter runs against itself through a
+  fixture: what the storage contracts promise, from transactions and logs to accounts, across hosts
+  over the same storage. The gateway's tests run them over the memory implementation, and test
+  core's operations as a host runs them; adapter tests keep only what one adapter stores or fails
+  differently. `harness` is the contract every harness implements: an agent's sessions and turns,
+  streamed in one format whichever agent runs them, and the bridge through which a host drives an
+  agent inside a sandbox. `sandbox` is the contract every sandbox provider implements, with the
+  suites each provider runs from `@amends-dev/sandbox/conformance`; a sandbox knows nothing of what
+  harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server or an
+  HTTP API, one shape. `channel` is the contract every channel transport implements: how one
   external system's conversations are received and replied to; an adapter implements it for one
   system, and the host declares that system's integration. `connection` holds the integrations a
-  host installs, what each gives a workspace's connections (models, tools, sandboxes, harnesses,
-  and channels), and the model catalog.
-  `cluster` runs jobs, the work outside requests, on Effect Cluster: entities whose requests a
-  commit stores, with their retries and pruning. Jobs enter workspaces through the gateway like
-  any other caller. Its turn job, one for each agent in each thread, runs the agent's turns on
-  `harness` and writes their session logs.
+  host installs, what each gives a workspace's connections
+  (models, tools, sandboxes, harnesses, and channels), and the model catalog. `cluster` runs jobs,
+  the work outside requests, on Effect Cluster: entities whose requests a commit stores, with their
+  retries and pruning. Jobs enter workspaces through the gateway like any other caller. Its turn
+  job, one for each agent in each thread, runs the agent's turns on `harness` and writes their
+  session logs.
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `harness-amends` is amends's own agent, a loop over Effect AI's
   `LanguageModel` with the model providers' clients, and `harness-opencode` runs opencode behind its
   bridge in a sandbox; each gives the integration a host installs. `sandbox-local` and
   `sandbox-daytona` implement the sandbox contract over this machine's directories and over
   Daytona, and depend on it and their platform's SDK alone; the host declares their integrations.
-  `storage-postgresql` implements workspace storage,
-  the workspace directory, and accounts over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
-  per record field, except the kind-specific `details` of a thread activity or a session log
-  entry, stored as JSON;
-  `storage-memory` implements them in process memory as the reference
-  implementation of the storage contracts, with no dependencies. Both follow one shape:
-  a module per store over a workspace binding, merged at the edge.
+  `storage-postgresql` implements workspace storage, the workspace directory, accounts, and sign-in
+  storage over PostgreSQL with Drizzle and `@effect/sql-pg`, one column per record field, except
+  the kind-specific `details` of a thread activity or a session log entry, stored as JSON. The
+  reference implementation of the same contracts, in process memory, is each contract's
+  `layerMemory`, beside it in core and the gateway, which their tests run over. Both follow one
+  shape: each store over a workspace binding, merged at the edge.
   Hosts compose adapters and implement no storage themselves; shared packages never
   depend on adapters.
 - `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves
   the HTTP API over the PostgreSQL adapter at `AMENDS_DATABASE_URL`, with development
   sign-in and credentials.
   Hosts may install their runtime's dependencies and consume shared packages. A host
-  implements gateway contracts and serves protocol handler packages; it does not
-  depend on a protocol's contract package, which is for clients. A host's tests may
-  take a contract as a development dependency to act as a client.
+  implements gateway contracts and serves protocol packages' handlers; its tests act as a
+  client through the same package's contract.
 - `apps/*`: user-facing clients, the site, and shared UI. `icons` holds canonical drawings and
   generated Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume
   it. `ui` is the pattern-based design system built from the Lunacy mocks in
@@ -131,7 +131,9 @@ into an app page.
 
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links. Run `bun install` at the repository root after manifest changes.
-`bun run check:packages` checks shared-package dependency declarations.
+`bun run check:packages` checks shared-package dependency declarations. A barrel, an `index.ts`
+marked `// @barrel`, is generated as Effect's are: `bun run barrels` lists every module beside it,
+and `bun run check:barrels` fails when one is out of date.
 
 ## Design and review
 
@@ -187,11 +189,11 @@ to verify APIs rather than guessing from prior versions or web snippets.
 - Domain design: `docs/core-model.md`.
 
 Name a variable that holds a service after the service, so a call says who it calls:
-`const threadStore = yield* ThreadStore.Service`, `const threadQuery = yield* ThreadQuery.Service`,
-and `(threadService) => threadService.get(id)` for a callback given one. Effect's platform
-services keep the names Effect gives them, such as `sql` and `fs`. Name a function for what it
-does, so a reader needn't open it: `deriveStartIds`, `findRetriedStart`, `authorizeParticipants`,
-not a bare word such as `begin`, `opening`, or `load`.
+`const threadStore = yield* ThreadStore.ThreadStore`,
+`const threadQuery = yield* ThreadQuery.ThreadQuery`, and `(threadService) => threadService.get(id)`
+for a callback given one. Effect's platform services keep the names Effect gives them, such as `sql`
+and `fs`. Name a function for what it does, so a reader needn't open it: `deriveStartIds`,
+`findRetriedStart`, `authorizeParticipants`, not a bare word such as `begin`, `opening`, or `load`.
 
 ## Vendored repositories
 

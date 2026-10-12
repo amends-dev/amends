@@ -6,10 +6,10 @@ import {
 } from "@amends-dev/connection";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Result, Schema } from "effect";
-import { AgentReadiness } from "../../src/agent/readiness.ts";
-import { Connection } from "../../src/connection/connection.ts";
-import { Member } from "../../src/workspace/member/member.ts";
-import { Workspace } from "../../src/workspace/workspace.ts";
+import * as AgentReadiness from "../../src/agent/AgentReadiness.ts";
+import * as Connection from "../../src/connection/Connection.ts";
+import * as Member from "../../src/workspace/Member.ts";
+import * as Workspace from "../../src/workspace/Workspace.ts";
 
 const unused = () => Effect.die("No test makes a harness or a sandbox provider");
 
@@ -69,7 +69,7 @@ const connection = (
   id: string,
   integration: string,
   settings: Connection.Settings = {},
-): Connection.Record => ({
+): Connection.Connection => ({
   id: Connection.Id.make(id),
   workspaceId: Workspace.Id.make("workspace-one"),
   integration,

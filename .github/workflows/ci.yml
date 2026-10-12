@@ -30,6 +30,8 @@ jobs:
         run: bun run format:check
       - name: Package boundaries
         run: bun run check:packages
+      - name: Generated barrels
+        run: bun run check:barrels
       - name: Generated icons
         run: bun run check:icons
       # Migrations are generated from the schema, never edited: regenerating must change nothing.

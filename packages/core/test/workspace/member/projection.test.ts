@@ -1,19 +1,19 @@
-import { Publication } from "../../../src/journal/publication.ts";
+import * as Publication from "../../../src/journal/Publication.ts";
 import { testProvenance } from "../../publication.ts";
 import { expect, it } from "@effect/vitest";
 import { Effect, Option } from "effect";
-import { Identity } from "../../../src/identity/identity.ts";
-import { Checkpoint } from "../../../src/journal/checkpoint.ts";
-import { Journal } from "../../../src/journal/journal.ts";
-import { Log } from "../../../src/journal/log.ts";
-import { Store } from "../../../src/journal/store.ts";
-import { Transaction } from "../../../src/journal/transaction.ts";
-import { MemberFacts } from "../../../src/workspace/member/facts.ts";
-import { MemberProjection } from "../../../src/workspace/member/projection.ts";
-import { MemberStore } from "../../../src/workspace/member/store.ts";
-import { Member } from "../../../src/workspace/member/member.ts";
-import { Workspace } from "../../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../../memory-store.ts";
+import * as Identity from "../../../src/identity/Identity.ts";
+import * as Checkpoint from "../../../src/journal/Checkpoint.ts";
+import * as Journal from "../../../src/journal/Journal.ts";
+import * as Log from "../../../src/journal/Log.ts";
+import * as Store from "../../../src/journal/Store.ts";
+import * as Transaction from "../../../src/journal/Transaction.ts";
+import * as MemberFacts from "../../../src/workspace/MemberFacts.ts";
+import * as MemberProjection from "../../../src/workspace/MemberProjection.ts";
+import * as MemberStore from "../../../src/workspace/MemberStore.ts";
+import * as Member from "../../../src/workspace/Member.ts";
+import * as Workspace from "../../../src/workspace/Workspace.ts";
+import { make, type Fixture } from "../../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const logId = Log.Id.make("workspace-one/journal");
@@ -37,19 +37,19 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    | Publication.Service
-    | Log.Service
-    | Transaction.Service
-    | Checkpoint.Service
-    | MemberStore.Service
+    | Publication.Publication
+    | Log.Log
+    | Transaction.Transaction
+    | Checkpoint.Checkpoint
+    | MemberStore.MemberStore
   >,
 ) =>
   program.pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
-    Effect.provideService(MemberStore.Service, fixture.members(workspaceId)),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
+    Effect.provideService(MemberStore.MemberStore, fixture.members),
   );
 it.effect(
   "membership projection adds humans and agents, preserves removal, and admits a fresh membership",
@@ -60,7 +60,7 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const memberStore = yield* MemberStore.Service;
+          const memberStore = yield* MemberStore.MemberStore;
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(MemberFacts.Added, added(firstId, human));
@@ -142,7 +142,7 @@ it.effect("replay reconstructs membership history and resumes without reapplying
         );
         expect((yield* fixture.snapshot).members.size).toBe(0);
         yield* (yield* setup).replay;
-        const memberStore = yield* MemberStore.Service;
+        const memberStore = yield* MemberStore.MemberStore;
         expect(yield* memberStore.get(firstId)).toEqual(
           Option.some({
             id: firstId,
@@ -236,7 +236,7 @@ it.effect(
             _tag: "Projection.Failure",
             cause: { _tag: "MemberStore.Conflict", operation: "markRemoved" },
           });
-          expect(yield* (yield* MemberStore.Service).get(firstId)).toEqual(
+          expect(yield* (yield* MemberStore.MemberStore).get(firstId)).toEqual(
             Option.some({
               id: firstId,
               workspaceId,
@@ -263,7 +263,7 @@ it.effect("membership changes roll back when the first commit cannot record live
     const failure = new Store.Failure({ operation: "checkpoint.setLive", cause: "unavailable" });
     const broken: Fixture = {
       ...fixture,
-      checkpoints: Checkpoint.Service.of({
+      checkpoints: Checkpoint.Checkpoint.of({
         ...fixture.checkpoints,
         setLive: () => Effect.fail(failure),
       }),

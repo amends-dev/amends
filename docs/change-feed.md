@@ -1,6 +1,6 @@
 # Change feed
 
-Workspace pages stay current through the workspace [change feed](../packages/api-http/README.md)
+Workspace pages stay current through the workspace [change feed](../packages/http/README.md)
 (`GET /workspaces/:id/changes`, server-sent events). Nothing polls. Client owns the connection
 and cache invalidation; apps mount it once per workspace view; features show its state.
 

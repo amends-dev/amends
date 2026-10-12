@@ -1,16 +1,16 @@
 import { Subject } from "@amends-dev/core/journal";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
-import { Checkpoint } from "../../src/journal/checkpoint.ts";
-import { Fact } from "../../src/journal/fact.ts";
-import { Journal } from "../../src/journal/journal.ts";
-import { Log } from "../../src/journal/log.ts";
-import { Projection } from "../../src/journal/projection.ts";
-import { Publication } from "../../src/journal/publication.ts";
-import { Store } from "../../src/journal/store.ts";
-import { Transaction } from "../../src/journal/transaction.ts";
-import { WorkspaceId } from "../../src/workspace/id.ts";
-import { Counter, make, type Fixture } from "../memory-store.ts";
+import * as Checkpoint from "../../src/journal/Checkpoint.ts";
+import * as Fact from "../../src/journal/Fact.ts";
+import * as Journal from "../../src/journal/Journal.ts";
+import * as Log from "../../src/journal/Log.ts";
+import * as Projection from "../../src/journal/Projection.ts";
+import * as Publication from "../../src/journal/Publication.ts";
+import * as Store from "../../src/journal/Store.ts";
+import * as Transaction from "../../src/journal/Transaction.ts";
+import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
+import { Counter, make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");
@@ -39,14 +39,14 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    Log.Service | Transaction.Service | Counter | Checkpoint.Service | Publication.Service
+    Log.Log | Transaction.Transaction | Counter | Checkpoint.Checkpoint | Publication.Publication
   >,
 ) =>
   program.pipe(
-    Effect.provideService(Publication.Service, testProvenance(workspaceId)),
+    Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
     Effect.provide(Log.layer),
-    Effect.provideService(Store.Service, fixture.store),
-    Effect.provideService(Checkpoint.Service, fixture.checkpoints),
+    Effect.provideService(Store.Store, fixture.store),
+    Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
     Effect.provideService(Counter, fixture.counter),
   );
 it.effect(

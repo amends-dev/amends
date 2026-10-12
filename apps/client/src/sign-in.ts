@@ -39,10 +39,11 @@ export interface SignInController {
 const decodeEmail = Schema.decodeUnknownOption(Accounts.Email);
 const isCode = Schema.is(SignIn.Code);
 const isRejected = Schema.is(SignIn.Rejected);
-/** Why the host refused a code, when it did. */
-const rejectionOf = (cause: Cause.Cause<unknown>): SignIn.Rejected["reason"] | undefined => {
+const isLimited = Schema.is(SignIn.Limited);
+/** The error the host answered with, when `is` recognizes it. */
+const failureOf = <E>(cause: Cause.Cause<unknown>, is: (error: unknown) => error is E) => {
   for (const reason of cause.reasons)
-    if (Cause.isFailReason(reason) && isRejected(reason.error)) return reason.error.reason;
+    if (Cause.isFailReason(reason) && is(reason.error)) return reason.error;
   return undefined;
 };
 
@@ -80,7 +81,10 @@ export function useSignIn(): SignInController {
     const exit = await sendCode.run(email.value);
     if (exit === undefined) return;
     if (Exit.isSuccess(exit)) askForCode(email.value, false);
-    else setState(SignInState.Email({ email: typed, pending: false, error: "request-failed" }));
+    else {
+      const error = failureOf(exit.cause, isLimited) ? "rate-limited" : "request-failed";
+      setState(SignInState.Email({ email: typed, pending: false, error }));
+    }
   }
   async function verifyCode(draft?: string) {
     const step = idle("Code");
@@ -106,7 +110,7 @@ export function useSignIn(): SignInController {
         SignInState.Code({
           ...verifying,
           pending: undefined,
-          error: rejectionOf(exit.cause) ?? "verify-failed",
+          error: failureOf(exit.cause, isRejected)?.reason ?? "verify-failed",
         }),
       );
   }
@@ -123,7 +127,10 @@ export function useSignIn(): SignInController {
     const exit = await sendCode.run(step.email);
     if (exit === undefined) return;
     if (Exit.isSuccess(exit)) askForCode(step.email, true);
-    else setState(SignInState.Code({ ...resending, pending: undefined, error: "resend-failed" }));
+    else {
+      const error = failureOf(exit.cause, isLimited) ? "resend-limited" : "resend-failed";
+      setState(SignInState.Code({ ...resending, pending: undefined, error }));
+    }
   }
   return {
     state,

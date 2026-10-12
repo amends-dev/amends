@@ -39,7 +39,7 @@ confirmation, and each completed change confirms itself with a toast.
 
 Core keeps connections and their keys apart; see
 [core's connections](../packages/core/README.md#connections). The
-[HTTP contract](../packages/api-http/README.md#connections) serves the installed integrations
+[HTTP contract](../packages/http/README.md#connections) serves the installed integrations
 and the connections, and never returns a key. Client's `useConnections` turns each integration's
 settings form into the screens' fields and their text back into settings, keeps each draft with
 what it was made against, runs checks beside changes, and reports failures by the change that

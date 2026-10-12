@@ -1,18 +1,15 @@
 export { Identity };
+import * as ApiErrors from "@amends-dev/http/ApiErrors";
+import { Group, GroupMembership } from "@amends-dev/core/group";
+import { Identity } from "@amends-dev/core/identity";
+import { Notification, NotificationInbox } from "@amends-dev/core/notification";
 import {
-  Group,
-  GroupMembership,
-  Member,
-  Notification,
-  NotificationInbox,
   Thread,
   ThreadMessage,
   ThreadParticipation,
   ThreadTimeline,
-  Workspace,
-  Identity,
-  ApiErrors,
-} from "@amends-dev/api-http";
+} from "@amends-dev/core/thread";
+import { Member, Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/reactivity";
 import type { Api, ApiClient } from "../api/client.ts";
@@ -112,7 +109,7 @@ const rosterOf = perClient((client: ApiClient, key: string) => {
       Effect.gen(function* () {
         const api = yield* client;
         const params = { workspaceId, groupId: Group.Id.make(id) };
-        const admissions: Array<GroupMembership.Record> = [];
+        const admissions: Array<GroupMembership.GroupMembership> = [];
         let after: GroupMembership.Id | undefined;
         while (true) {
           const page = yield* api.groups.members({
@@ -218,7 +215,7 @@ const previousOf = <A>(get: Atom.AtomContext): Option.Option<Paged<A>> =>
   );
 
 /** Newest start first, then ID in descending binary order: the stream's page order. */
-const newerThan = (left: Thread.Record, right: Thread.Record) =>
+const newerThan = (left: Thread.Thread, right: Thread.Thread) =>
   DateTime.toEpochMillis(left.createdAt) - DateTime.toEpochMillis(right.createdAt) ||
   (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
 const streamOf = perClient((client: ApiClient, key: string): PagedRead<Thread.Opening, unknown> => {
@@ -321,7 +318,7 @@ export const timelineRead = (client: ApiClient, workspaceId: string, threadId: s
 /** How many notifications one inbox page reads. */
 export const inboxPageSize = 25;
 /** Newest first, then ID in descending binary order: the inbox's page order. */
-const recordedAfter = (left: Notification.Record, right: Notification.Record) =>
+const recordedAfter = (left: Notification.Notification, right: Notification.Notification) =>
   DateTime.toEpochMillis(left.recordedAt) - DateTime.toEpochMillis(right.recordedAt) ||
   (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
 /** Everything in the reader's inbox, or only what is still pending for them. */
@@ -343,7 +340,7 @@ const inboxOf = perClient(
           );
           const more = Option.isNone(previous) || requested > previous.value.earlier;
           const newestFirst: Array<NotificationInbox.Item> = [];
-          let before: Pick<Notification.Record, "recordedAt" | "id"> | undefined;
+          let before: Pick<Notification.Notification, "recordedAt" | "id"> | undefined;
           let complete = false;
           while (true) {
             const page = yield* api.notifications.inbox({
@@ -395,7 +392,8 @@ export const pendingCountRead = (client: ApiClient, workspaceId: string) =>
  * inbox and pending counts when its signal arrives through the change feed.
  */
 export const markSeenThrough =
-  (workspace: string) => (api: Api, through: Pick<Notification.Record, "recordedAt" | "id">) =>
+  (workspace: string) =>
+  (api: Api, through: Pick<Notification.Notification, "recordedAt" | "id">) =>
     Effect.gen(function* () {
       const { marked } = yield* api.notifications.markSeenThrough({
         params: { workspaceId: yield* command(Workspace.Id)(workspace) },

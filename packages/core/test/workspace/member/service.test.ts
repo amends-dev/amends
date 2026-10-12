@@ -1,51 +1,51 @@
 import { GroupCommand } from "@amends-dev/core/group";
-import { Publication } from "../../../src/journal/publication.ts";
-import { GroupMembershipStore } from "../../../src/group/membership/store.ts";
+import * as Publication from "../../../src/journal/Publication.ts";
+import * as GroupMembershipStore from "../../../src/group/GroupMembershipStore.ts";
 import { testCrypto, testProvenance } from "../../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Crypto, Effect, Layer, Option } from "effect";
-import { AssignmentFacts } from "../../../src/authorization/assignment/facts.ts";
-import { AssignmentProjection } from "../../../src/authorization/assignment/projection.ts";
-import { AssignmentStore } from "../../../src/authorization/assignment/store.ts";
-import { Assignment } from "../../../src/authorization/assignment/assignment.ts";
-import { Delegation } from "../../../src/authorization/delegation.ts";
-import { Authorization } from "../../../src/authorization/authorization.ts";
-import { GrantResolver } from "../../../src/authorization/grant-resolver.ts";
-import { Grant } from "../../../src/authorization/grant.ts";
-import { PermissionCatalog } from "../../../src/authorization/permission-catalog.ts";
-import { RoleStore } from "../../../src/authorization/role/store.ts";
-import { Scope } from "../../../src/authorization/scope.ts";
-import { Target } from "../../../src/authorization/target.ts";
-import { Actor } from "../../../src/identity/actor.ts";
-import { Identity } from "../../../src/identity/identity.ts";
-import { Checkpoint } from "../../../src/journal/checkpoint.ts";
-import { Journal } from "../../../src/journal/journal.ts";
-import { Log } from "../../../src/journal/log.ts";
-import { Store } from "../../../src/journal/store.ts";
-import { InvitationStore } from "../../../src/workspace/invitation/store.ts";
-import { MemberService } from "../../../src/workspace/member/service.ts";
-import { MemberFacts } from "../../../src/workspace/member/facts.ts";
-import { MemberPermissions } from "../../../src/workspace/member/permissions.ts";
-import { MemberProjection } from "../../../src/workspace/member/projection.ts";
-import { MemberStore } from "../../../src/workspace/member/store.ts";
-import { Member } from "../../../src/workspace/member/member.ts";
-import { WorkspaceStore } from "../../../src/workspace/store.ts";
-import { Workspace } from "../../../src/workspace/workspace.ts";
-import { make, type Fixture } from "../../memory-store.ts";
+import * as AssignmentFacts from "../../../src/authorization/AssignmentFacts.ts";
+import * as AssignmentProjection from "../../../src/authorization/AssignmentProjection.ts";
+import * as AssignmentStore from "../../../src/authorization/AssignmentStore.ts";
+import * as Assignment from "../../../src/authorization/Assignment.ts";
+import * as Delegation from "../../../src/authorization/Delegation.ts";
+import * as Authorization from "../../../src/authorization/Authorization.ts";
+import * as GrantResolver from "../../../src/authorization/GrantResolver.ts";
+import * as Grant from "../../../src/authorization/Grant.ts";
+import * as PermissionCatalog from "../../../src/authorization/PermissionCatalog.ts";
+import * as RoleStore from "../../../src/authorization/RoleStore.ts";
+import * as Scope from "../../../src/authorization/Scope.ts";
+import * as Target from "../../../src/authorization/Target.ts";
+import * as Actor from "../../../src/identity/Actor.ts";
+import * as Identity from "../../../src/identity/Identity.ts";
+import * as Checkpoint from "../../../src/journal/Checkpoint.ts";
+import * as Journal from "../../../src/journal/Journal.ts";
+import * as Log from "../../../src/journal/Log.ts";
+import * as Store from "../../../src/journal/Store.ts";
+import * as InvitationStore from "../../../src/workspace/InvitationStore.ts";
+import * as MemberService from "../../../src/workspace/MemberService.ts";
+import * as MemberFacts from "../../../src/workspace/MemberFacts.ts";
+import * as MemberPermissions from "../../../src/workspace/MemberPermissions.ts";
+import * as MemberProjection from "../../../src/workspace/MemberProjection.ts";
+import * as MemberStore from "../../../src/workspace/MemberStore.ts";
+import * as Member from "../../../src/workspace/Member.ts";
+import * as WorkspaceStore from "../../../src/workspace/WorkspaceStore.ts";
+import * as Workspace from "../../../src/workspace/Workspace.ts";
+import { make, type Fixture } from "../../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const foreignWorkspaceId = Workspace.Id.make("workspace-two");
-const alice = Actor.Value.make({
+const alice = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("alice"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") }),
 });
-const agent = Actor.Value.make({
+const agent = Actor.Actor.of({
   workspaceId,
   memberId: Member.Id.make("agent"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("agent") }),
 });
-const bob = Member.Record.make({
+const bob = Member.Member.make({
   id: Member.Id.make("bob"),
   workspaceId,
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
@@ -53,15 +53,15 @@ const bob = Member.Record.make({
   status: "active",
 });
 const missingId = Member.Id.make("missing");
-const bobScope = Scope.Value.cases.Target.make({
+const bobScope = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: bob.id }),
 });
 const assignment = (
   id: string,
-  scope: Scope.Value = bobScope,
+  scope: Scope.Scope = bobScope,
   permission = MemberPermissions.Read,
 ) =>
-  Assignment.Record.make({
+  Assignment.Assignment.make({
     id: Assignment.Id.make(id),
     workspaceId,
     memberId: alice.memberId,
@@ -72,19 +72,19 @@ const assignment = (
   });
 const configured = (
   fixture: Fixture,
-  overrides: Partial<MemberStore.Interface> = {},
-  workspaceOverrides: Partial<WorkspaceStore.Interface> = {},
+  overrides: Partial<MemberStore.MemberStore["Service"]> = {},
+  workspaceOverrides: Partial<WorkspaceStore.WorkspaceStore["Service"]> = {},
 ) => {
-  const members = Layer.succeed(MemberStore.Service, {
-    ...fixture.members(workspaceId),
+  const members = Layer.succeed(MemberStore.MemberStore, {
+    ...fixture.members,
     ...overrides,
   });
   const host = Layer.mergeAll(
     members,
-    Layer.succeed(Store.Service, fixture.store),
-    Layer.succeed(Checkpoint.Service, fixture.checkpoints),
-    Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
-    Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
+    Layer.succeed(Store.Store, fixture.store),
+    Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
+    Layer.succeed(RoleStore.RoleStore, fixture.roles),
+    Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
     PermissionCatalog.layer([MemberPermissions.Read, MemberPermissions.Remove]),
   );
   const journal = Journal.layer({
@@ -93,7 +93,7 @@ const configured = (
   }).pipe(Layer.provide(Log.layer));
   const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
   const services = Layer.mergeAll(journal, authorization).pipe(Layer.provide(host));
-  const workspace = Layer.succeed(WorkspaceStore.Service, {
+  const workspace = Layer.succeed(WorkspaceStore.WorkspaceStore, {
     get: Effect.succeedSome({
       id: workspaceId,
       createdBy: Identity.HumanId.make("alice"),
@@ -105,14 +105,14 @@ const configured = (
     transferOwnership: () => Effect.die("Ownership transfer is not used by membership operations"),
     ...workspaceOverrides,
   });
-  const invitations = Layer.succeed(InvitationStore.Service, {
+  const invitations = Layer.succeed(InvitationStore.InvitationStore, {
     listPendingByRecipient: () => Effect.succeed([]),
     list: Effect.succeed([]),
     get: () => Effect.die("Invitation lookup is not used in these member tests"),
     insert: () => Effect.die("Invitation insertion is not used in these member tests"),
     settle: () => Effect.die("These member tests have no pending invitations"),
   });
-  const groupMemberships = Layer.succeed(GroupMembershipStore.Service, {
+  const groupMemberships = Layer.succeed(GroupMembershipStore.GroupMembershipStore, {
     listActiveByMember: () => Effect.succeed([]),
     get: () => Effect.die("These member tests have no group admissions"),
     getMany: () => Effect.die("These member tests have no group admissions"),
@@ -137,8 +137,8 @@ const configured = (
         invitations,
         groupMemberships,
         delegation,
-        Layer.succeed(Store.Service, fixture.store),
-        Layer.succeed(GroupCommand.Service, {
+        Layer.succeed(Store.Store, fixture.store),
+        Layer.succeed(GroupCommand.GroupCommand, {
           admitMember: () => Effect.die("These member tests admit no one to a group"),
           removeMembership: () => Effect.die("These member tests have no group admissions"),
           establishDirect: () => Effect.die("These member tests start no direct groups"),
@@ -149,40 +149,40 @@ const configured = (
   );
 };
 const get = Effect.fn("MemberApplicationTest.get")(function* (id: Member.Id) {
-  return yield* (yield* MemberService.Service).get(id);
+  return yield* (yield* MemberService.MemberService).get(id);
 });
 const remove = Effect.fn("MemberApplicationTest.remove")(function* (id: Member.Id) {
-  return yield* (yield* MemberService.Service).remove(id);
+  return yield* (yield* MemberService.MemberService).remove(id);
 });
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
     A,
     E,
-    | MemberService.Service
-    | Journal.Service
-    | Authorization.Service
-    | Delegation.Service
-    | WorkspaceStore.Service
-    | InvitationStore.Service
-    | GroupMembershipStore.Service
-    | GroupCommand.Service
-    | Actor.Service
+    | MemberService.MemberService
+    | Journal.Journal
+    | Authorization.Authorization
+    | Delegation.Delegation
+    | WorkspaceStore.WorkspaceStore
+    | InvitationStore.InvitationStore
+    | GroupMembershipStore.GroupMembershipStore
+    | GroupCommand.GroupCommand
+    | Actor.Actor
     | Crypto.Crypto
   >,
-  actor: Actor.Value = alice,
-  overrides: Partial<MemberStore.Interface> = {},
-  workspaceOverrides: Partial<WorkspaceStore.Interface> = {},
+  actor: Actor.Actor["Service"] = alice,
+  overrides: Partial<MemberStore.MemberStore["Service"]> = {},
+  workspaceOverrides: Partial<WorkspaceStore.WorkspaceStore["Service"]> = {},
 ) =>
   program.pipe(
     Effect.provide(configured(fixture, overrides, workspaceOverrides)),
-    Effect.provideService(Actor.Service, actor),
+    Effect.provideService(Actor.Actor, actor),
     Effect.provideService(Crypto.Crypto, testCrypto),
   );
-const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Record> = []) =>
+const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Assignment> = []) =>
   fixture.store.transaction(
     Effect.gen(function* () {
-      const members = fixture.members(workspaceId);
+      const members = fixture.members;
       for (const actor of [alice, agent]) {
         yield* members.insert({
           id: actor.memberId,
@@ -193,29 +193,29 @@ const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Record> = 
         });
       }
       yield* members.insert(bob);
-      for (const value of assignments) yield* fixture.assignments(workspaceId).insert(value);
+      for (const value of assignments) yield* fixture.assignments.insert(value);
     }),
   );
 it.effect("member reads require only the current actor and leave the journal unchanged", () =>
   Effect.gen(function* () {
     expectTypeOf<Layer.Services<typeof MemberService.layer>>().toEqualTypeOf<
-      | MemberStore.Service
-      | WorkspaceStore.Service
-      | InvitationStore.Service
-      | GroupMembershipStore.Service
-      | GroupCommand.Service
-      | Authorization.Service
-      | Delegation.Service
-      | Journal.Service
+      | MemberStore.MemberStore
+      | WorkspaceStore.WorkspaceStore
+      | InvitationStore.InvitationStore
+      | GroupMembershipStore.GroupMembershipStore
+      | GroupCommand.GroupCommand
+      | Authorization.Authorization
+      | Delegation.Delegation
+      | Journal.Journal
       | Crypto.Crypto
-      | Store.Service
+      | Store.Store
     >();
     expectTypeOf<Layer.Error<typeof MemberService.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
-      Effect.Services<ReturnType<MemberService.Interface["get"]>>
-    >().toEqualTypeOf<Actor.Service>();
+      Effect.Services<ReturnType<MemberService.MemberService["Service"]["get"]>>
+    >().toEqualTypeOf<Actor.Actor>();
     expectTypeOf<
-      Effect.Error<ReturnType<MemberService.Interface["get"]>>
+      Effect.Error<ReturnType<MemberService.MemberService["Service"]["get"]>>
     >().toEqualTypeOf<MemberService.Error>();
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
@@ -224,7 +224,7 @@ it.effect("member reads require only the current actor and leave the journal unc
     expect(yield* run(fixture, get(bob.id))).toEqual(bob);
     expect(yield* fixture.attempts).toBe(attempts);
     expect(yield* fixture.snapshot).toEqual(before);
-    yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(bob.id));
+    yield* fixture.store.transaction(fixture.members.markRemoved(bob.id));
     expect(yield* run(fixture, get(bob.id))).toMatchObject({ id: bob.id, status: "removed" });
   }),
 );
@@ -239,7 +239,7 @@ it.effect(
       const overrides = {
         get: Effect.fn("MemberApplicationTest.observeGet")(function* (id: Member.Id) {
           lookedUp.push(id);
-          return yield* fixture.members(workspaceId).get(id);
+          return yield* fixture.members.get(id);
         }),
       };
       for (const id of [agent.memberId, missingId]) {
@@ -253,9 +253,9 @@ it.effect(
       }
       expect(lookedUp).toEqual([alice.memberId, alice.memberId]);
       yield* fixture.store.transaction(
-        fixture
-          .assignments(workspaceId)
-          .insert(assignment("read-workspace", Scope.Value.cases.Workspace.make({ workspaceId }))),
+        fixture.assignments.insert(
+          assignment("read-workspace", Scope.Scope.cases.Workspace.make({ workspaceId })),
+        ),
       );
       expect(yield* run(fixture, get(missingId).pipe(Effect.flip))).toMatchObject({
         _tag: "MemberService.NotFound",
@@ -269,16 +269,15 @@ it.effect("a shared member application uses each call's actor and current member
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
-    const application = yield* run(fixture, MemberService.Service);
+    const application = yield* run(fixture, MemberService.MemberService);
     const read = application.get(bob.id);
-    expect(yield* read.pipe(Effect.provideService(Actor.Service, alice))).toEqual(bob);
-    expect(
-      yield* read.pipe(Effect.provideService(Actor.Service, agent), Effect.flip),
-    ).toMatchObject({ _tag: "Authorization.Denied", memberId: agent.memberId });
-    yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(alice.memberId));
-    expect(
-      yield* read.pipe(Effect.provideService(Actor.Service, alice), Effect.flip),
-    ).toMatchObject({
+    expect(yield* read.pipe(Effect.provideService(Actor.Actor, alice))).toEqual(bob);
+    expect(yield* read.pipe(Effect.provideService(Actor.Actor, agent), Effect.flip)).toMatchObject({
+      _tag: "Authorization.Denied",
+      memberId: agent.memberId,
+    });
+    yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
+    expect(yield* read.pipe(Effect.provideService(Actor.Actor, alice), Effect.flip)).toMatchObject({
       _tag: "Authorization.InvalidActor",
       reason: "membership-removed",
     });
@@ -296,8 +295,8 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const journal = yield* Journal.Service;
-          const memberService = yield* MemberService.Service;
+          const journal = yield* Journal.Journal;
+          const memberService = yield* MemberService.MemberService;
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal
@@ -307,10 +306,10 @@ it.effect(
                   memberId: alice.memberId,
                   source: readBob.source,
                 })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: bob.id })
-                .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
               expect(yield* memberService.get(bob.id)).toMatchObject({
                 id: bob.id,
                 status: "removed",
@@ -337,8 +336,8 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
     const failure = yield* run(
       fixture,
       Effect.gen(function* () {
-        const journal = yield* Journal.Service;
-        const memberService = yield* MemberService.Service;
+        const journal = yield* Journal.Journal;
+        const memberService = yield* MemberService.MemberService;
         return yield* journal.commit(
           Effect.gen(function* () {
             yield* journal
@@ -347,7 +346,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
                 assignmentId: readBob.id,
                 memberId: alice.memberId,
               })
-              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+              .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
             return yield* memberService.get(bob.id);
           }),
         );
@@ -365,7 +364,7 @@ it.effect("member reads refuse an actor from another workspace", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
-    const foreignActor = Actor.Value.make({
+    const foreignActor = Actor.Actor.of({
       workspaceId: foreignWorkspaceId,
       memberId: alice.memberId,
       identity: alice.identity,
@@ -383,8 +382,7 @@ it.effect("member reads pass storage failures through", () =>
     const storageFailure = new MemberStore.Failure({ operation: "get", cause: "unavailable" });
     expect(
       yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
-        get: (id) =>
-          id === bob.id ? Effect.fail(storageFailure) : fixture.members(workspaceId).get(id),
+        get: (id) => (id === bob.id ? Effect.fail(storageFailure) : fixture.members.get(id)),
       }),
     ).toBe(storageFailure);
   }),
@@ -395,11 +393,11 @@ it.effect(
   () =>
     Effect.gen(function* () {
       expectTypeOf<
-        Effect.Services<ReturnType<MemberService.Interface["remove"]>>
-      >().toEqualTypeOf<Actor.Service>();
+        Effect.Services<ReturnType<MemberService.MemberService["Service"]["remove"]>>
+      >().toEqualTypeOf<Actor.Actor>();
       const fixture = yield* make();
       yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
-      const application = yield* run(fixture, MemberService.Service);
+      const application = yield* run(fixture, MemberService.MemberService);
       expect(yield* run(fixture, get(bob.id).pipe(Effect.flip))).toMatchObject({
         _tag: "Authorization.Denied",
       });
@@ -414,8 +412,8 @@ it.effect(
         name: bob.name,
         status: "removed",
       });
-      expect(yield* fixture.members(workspaceId).get(bob.id)).toEqual(Option.some(removed));
-      const staleActor = Actor.Value.make({
+      expect(yield* fixture.members.get(bob.id)).toEqual(Option.some(removed));
+      const staleActor = Actor.Actor.of({
         workspaceId,
         memberId: bob.id,
         identity: bob.identity,
@@ -423,7 +421,7 @@ it.effect(
       expect(
         yield* application
           .get(bob.id)
-          .pipe(Effect.provideService(Actor.Service, staleActor), Effect.flip),
+          .pipe(Effect.provideService(Actor.Actor, staleActor), Effect.flip),
       ).toMatchObject({
         _tag: "Authorization.InvalidActor",
         reason: "membership-removed",
@@ -450,12 +448,12 @@ it.effect(
         });
       }
       expect(yield* fixture.snapshot).toEqual(before);
-      const workspaceScope = Scope.Value.cases.Workspace.make({ workspaceId });
+      const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId });
       const ownerGrant = assignment("remove-workspace", workspaceScope, MemberPermissions.Remove);
       yield* fixture.store.transaction(
         Effect.gen(function* () {
-          yield* fixture.assignments(workspaceId).insert(ownerGrant);
-          yield* fixture.assignments(workspaceId).insert({
+          yield* fixture.assignments.insert(ownerGrant);
+          yield* fixture.assignments.insert({
             id: Assignment.Id.make("agent-remove-workspace"),
             workspaceId,
             memberId: agent.memberId,
@@ -511,8 +509,8 @@ it.effect(
       yield* seed(fixture);
       const granted = assignment("remove-bob", bobScope, MemberPermissions.Remove);
       const program = Effect.gen(function* () {
-        const journal = yield* Journal.Service;
-        const memberService = yield* MemberService.Service;
+        const journal = yield* Journal.Journal;
+        const memberService = yield* MemberService.MemberService;
         return yield* journal.commit(
           Effect.gen(function* () {
             yield* journal
@@ -522,7 +520,7 @@ it.effect(
                 memberId: alice.memberId,
                 source: granted.source,
               })
-              .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
+              .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
             return yield* memberService.remove(bob.id);
           }),
         );
@@ -531,7 +529,7 @@ it.effect(
       const failure = yield* run(
         fixture,
         Effect.gen(function* () {
-          const journal = yield* Journal.Service;
+          const journal = yield* Journal.Journal;
           return yield* journal.commit(
             Effect.gen(function* () {
               yield* program;
@@ -556,7 +554,10 @@ it.effect(
   "listing returns the memberships the actor may read, including removed ones, and nothing more",
   () =>
     Effect.gen(function* () {
-      const list = Effect.flatMap(MemberService.Service, (memberService) => memberService.list);
+      const list = Effect.flatMap(
+        MemberService.MemberService,
+        (memberService) => memberService.list,
+      );
       const fixture = yield* make();
       yield* seed(fixture, [assignment("read-bob")]);
       // An exact grant sees that member only; the actor's own record needs its own grant.
@@ -566,10 +567,10 @@ it.effect(
       // A workspace-scoped grant sees everyone, and removal keeps the record listed.
       yield* fixture.store.transaction(
         Effect.gen(function* () {
-          yield* fixture
-            .assignments(workspaceId)
-            .insert(assignment("read-all", Scope.Value.cases.Workspace.make({ workspaceId })));
-          yield* fixture.members(workspaceId).markRemoved(bob.id);
+          yield* fixture.assignments.insert(
+            assignment("read-all", Scope.Scope.cases.Workspace.make({ workspaceId })),
+          );
+          yield* fixture.members.markRemoved(bob.id);
         }),
       );
       const statuses = new Map(
@@ -583,7 +584,7 @@ it.effect(
         ]),
       );
       // A removed actor cannot list at all.
-      yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(alice.memberId));
+      yield* fixture.store.transaction(fixture.members.markRemoved(alice.memberId));
       expect(yield* run(fixture, Effect.flip(list))).toMatchObject({
         _tag: "Authorization.InvalidActor",
         reason: "membership-removed",
