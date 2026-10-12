@@ -76,6 +76,7 @@ import * as GrantResolver from "./authorization/GrantResolver.ts";
 import * as PermissionCatalog from "./authorization/PermissionCatalog.ts";
 import * as RoleProjection from "./authorization/RoleProjection.ts";
 import * as Journal from "./journal/Journal.ts";
+import * as Entry from "./journal/Entry.ts";
 import * as Log from "./journal/Log.ts";
 import * as NotificationService from "./notification/NotificationService.ts";
 import * as NotificationProjection from "./notification/NotificationProjection.ts";
@@ -183,7 +184,7 @@ const activityResolvers = [
  * @category constructors
  * @since 0.1.0
  */
-export const journalLog = Log.Id.make("journal");
+export const journalLog = Entry.LogId.make("journal");
 
 /**
  * The domain journal and its log, over host storage. A commit that publishes a fact that changes

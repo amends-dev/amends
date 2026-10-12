@@ -21,7 +21,7 @@ import {
   GroupStore,
 } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { Context, DateTime, Effect, Option, Ref } from "effect";
 import * as Support from "./support.ts";
@@ -39,7 +39,7 @@ import { withStorage } from "./fixture.ts";
 
 const { core, initialized } = Support;
 describe("groups", () => {
-  const journalId = Log.Id.make("journal");
+  const journalId = Entry.LogId.make("journal");
   const memberId = Member.Id.make("group-member");
   const agentId = Member.Id.make("group-agent");
   const memberIdentity = Identity.MemberReference.cases.Human.make({

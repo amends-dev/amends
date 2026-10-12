@@ -20,7 +20,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -122,7 +122,7 @@ describe("threads", () => {
     Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name, memberIds: members }),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const seed = (bound: Bound) =>
     publish(
       bound,

@@ -18,6 +18,7 @@ import * as Scope from "../../src/authorization/Scope.ts";
 import * as Target from "../../src/authorization/Target.ts";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Store from "../../src/journal/Store.ts";
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";
@@ -168,7 +169,7 @@ it.effect(
       yield* Effect.gen(function* () {
         const grantResolver = yield* GrantResolver.GrantResolver;
         const journal = yield* Journal.make({
-          logId: Log.Id.make("workspace-one/journal"),
+          logId: Entry.LogId.make("workspace-one/journal"),
           projections: [RoleProjection.definition, AssignmentProjection.definition],
         });
         yield* journal.commit(

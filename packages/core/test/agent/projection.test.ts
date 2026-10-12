@@ -7,6 +7,7 @@ import * as AgentStore from "../../src/agent/AgentStore.ts";
 import * as Connection from "../../src/connection/Connection.ts";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Publication from "../../src/journal/Publication.ts";
 import * as Store from "../../src/journal/Store.ts";
@@ -16,7 +17,7 @@ import { make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
-const logId = Log.Id.make("workspace-one/journal");
+const logId = Entry.LogId.make("workspace-one/journal");
 
 const created: Agent.Agent = {
   id: Agent.Id.make("agent-one"),

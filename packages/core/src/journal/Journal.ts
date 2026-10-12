@@ -17,6 +17,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import * as Checkpoint from "./Checkpoint.ts";
 import * as Codec from "./Codec.ts";
+import type * as Entry from "./Entry.ts";
 import * as Event from "./Event.ts";
 import * as Fact from "./Fact.ts";
 import * as Log from "./Log.ts";
@@ -25,50 +26,6 @@ import * as Publication from "./Publication.ts";
 import type * as Reaction from "./Reaction.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
-
-/**
- * `Event.Envelope`, `Event.FactMismatch`, `Event.decode`, and `Event.storageCodec`, re-exported
- * for readers of the journal's log.
- *
- * @since 0.1.0
- */
-export {
-  /**
-   * A fact event as the journal's log reads and writes it: the header, and the payload's encoded
-   * bytes. Only the payload is stored as binary, through `storageCodec`.
-   *
-   * @category schemas
-   * @since 0.1.0
-   */
-  Envelope,
-  /**
-   * A fact event does not match the definition it is read or published with: it records another
-   * name or version, or a subject other than the one the definition derives, or two definitions
-   * registered under one name and version differ in payload schema, subject, or occurrence rule.
-   *
-   * @category errors
-   * @since 0.1.0
-   */
-  FactMismatch,
-  /**
-   * Decodes a journal entry as an event of `fact`, its matching versioned definition. Fails with
-   * `FactMismatch` when the entry records another name or version, or a subject other than the one
-   * `fact` derives from the decoded payload. The event's provenance is frozen.
-   *
-   * @category utils
-   * @since 0.1.0
-   */
-  decode,
-  /**
-   * The journal log's entry codec: the header goes to storage as `Store.Content.fact` and the
-   * payload bytes as they are, preserving the envelope's typed metadata without encoding a second
-   * binary wrapper. Each direction copies the bytes.
-   *
-   * @category utils
-   * @since 0.1.0
-   */
-  storageCodec,
-} from "./Event.ts";
 
 /**
  * The journal of one log, through which every domain publishes its facts. Domains obtain it with
@@ -143,7 +100,7 @@ export interface Options<
   ReactionRequirements = never,
 > {
   /** The log it records facts in, such as core's `journalLog`. */
-  readonly logId: Log.Id;
+  readonly logId: Entry.LogId;
   /**
    * The projections every commit applies, in registration order. Each one's requirements are
    * inferred separately, then combined at construction.

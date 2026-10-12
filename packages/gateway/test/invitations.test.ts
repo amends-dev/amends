@@ -1,7 +1,7 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Group } from "@amends-dev/core/group";
 import { Actor } from "@amends-dev/core/identity";
-import { Journal, Log } from "@amends-dev/core/journal";
+import { Entry, Journal } from "@amends-dev/core/journal";
 import { Invitation, InvitationService, Member } from "@amends-dev/core/workspace";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Result } from "effect";
@@ -58,11 +58,11 @@ describe("invitations", () => {
                 });
                 expect(yield* bound.members.get(joined.id)).toEqual(Option.some(renamed));
                 // The same name again records nothing; a name needs text without surrounding space.
-                const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 50 });
+                const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 50 });
                 expect(
                   yield* Operations.renameMember(workspace.id, bob, Member.Name.make("Bob Chen")),
                 ).toEqual(renamed);
-                expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 50 })).toEqual(
+                expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 50 })).toEqual(
                   before,
                 );
                 for (const name of [
@@ -147,12 +147,12 @@ describe("invitations", () => {
                     Operations.invite(workspace.id, bob, request(yield* future, charlie.id)),
                   ),
                 ).toMatchObject({ _tag: "Authorization.Denied" });
-                const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+                const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
                 expect(before).toHaveLength(3);
                 // The member, their role, their admission to general, and the acceptance.
                 expect(before[2]?.entries).toHaveLength(4);
                 yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
-                expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
+                expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
                   before,
                 );
                 yield* Operations.removeMember(workspace.id, alice, first.id);
@@ -204,9 +204,9 @@ describe("invitations", () => {
               );
               yield* Operations.revokeInvitation(workspace.id, alice, invitation.details.id);
               const bound = yield* boundTo(workspace.id);
-              const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
+              const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
               yield* Operations.revokeInvitation(workspace.id, alice, invitation.details.id);
-              expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
+              expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(
                 before,
               );
               return { workspace, invitation };

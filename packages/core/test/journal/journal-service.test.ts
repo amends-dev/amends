@@ -6,6 +6,7 @@ import { Cause, Context, Effect, Exit, Layer, Option, Ref, Schema } from "effect
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Fact from "../../src/journal/Fact.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Store from "../../src/journal/Store.ts";
@@ -53,11 +54,14 @@ it.effect.each(["make", "layer"] as const)(
         }),
       );
       const configured = Journal.layer({
-        logId: Log.Id.make("domain"),
+        logId: Entry.LogId.make("domain"),
         projections: [counter, audit],
       });
       const registrations = [counter, audit];
-      const fromArray = Journal.layer({ logId: Log.Id.make("domain"), projections: registrations });
+      const fromArray = Journal.layer({
+        logId: Entry.LogId.make("domain"),
+        projections: registrations,
+      });
       expectTypeOf<Layer.Services<typeof fromArray>>().toEqualTypeOf<
         Layer.Services<typeof configured>
       >();
@@ -122,7 +126,7 @@ it.effect.each(["make", "layer"] as const)(
           Effect.provideService(Transaction.Transaction, transaction),
         );
         return yield* Journal.make({
-          logId: Log.Id.make("domain"),
+          logId: Entry.LogId.make("domain"),
           projections: [counter, audit],
         }).pipe(
           Effect.provideService(Log.Log, logs),
@@ -186,7 +190,7 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       const journal = yield* log.commit(
         Effect.gen(function* () {
           boundIn.add((yield* Store.Transaction).id);
-          return yield* Journal.make({ logId: Log.Id.make("domain"), projections: [scoped] });
+          return yield* Journal.make({ logId: Entry.LogId.make("domain"), projections: [scoped] });
         }),
       );
       yield* journal
@@ -203,7 +207,7 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       expect(yield* Ref.get(finalized)).toBe(3);
       expect(yield* fixture.counter.get).toBe(6);
       expect(yield* fixture.attempts).toBe(3);
-      const source = yield* Journal.make({ logId: Log.Id.make("history"), projections: [] });
+      const source = yield* Journal.make({ logId: Entry.LogId.make("history"), projections: [] });
       yield* source
         .publish(Changed, 4)
         .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)));
@@ -230,7 +234,7 @@ it.effect("projection defects remain defects and still roll back the publication
   Effect.gen(function* () {
     const fixture = yield* make();
     const broken = counter.on(Changed, () => Effect.die(new Error("bug in handler")));
-    const live = Journal.layer({ logId: Log.Id.make("domain"), projections: [broken] }).pipe(
+    const live = Journal.layer({ logId: Entry.LogId.make("domain"), projections: [broken] }).pipe(
       Layer.provide(Log.layer),
       Layer.provide(
         Layer.mergeAll(

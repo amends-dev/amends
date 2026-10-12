@@ -21,7 +21,7 @@ import { testCrypto, testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("journal");
+const logId = Entry.LogId.make("journal");
 const Changed = Fact.make("example.changed", {
   subject: testSubject,
   version: 1,

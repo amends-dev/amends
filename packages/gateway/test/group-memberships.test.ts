@@ -22,7 +22,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
 import {
   Invitation,
   InvitationFacts,
@@ -56,7 +56,7 @@ import { withStorage } from "./fixture.ts";
 
 const { core, initialized, runGateway } = Support;
 describe("group memberships", () => {
-  const journalId = Log.Id.make("journal");
+  const journalId = Entry.LogId.make("journal");
   const managerId = Member.Id.make("manager");
   const humanId = Member.Id.make("new-human");
   const agentId = Member.Id.make("new-agent");

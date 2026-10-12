@@ -5,6 +5,7 @@ import { Effect, Option } from "effect";
 import * as Identity from "../../../src/identity/Identity.ts";
 import * as Checkpoint from "../../../src/journal/Checkpoint.ts";
 import * as Journal from "../../../src/journal/Journal.ts";
+import * as Entry from "../../../src/journal/Entry.ts";
 import * as Log from "../../../src/journal/Log.ts";
 import * as Store from "../../../src/journal/Store.ts";
 import * as Transaction from "../../../src/journal/Transaction.ts";
@@ -16,7 +17,7 @@ import * as Workspace from "../../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../../memory.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
-const logId = Log.Id.make("workspace-one/journal");
+const logId = Entry.LogId.make("workspace-one/journal");
 const firstId = Member.Id.make("member-one");
 const secondId = Member.Id.make("member-two");
 const agentId = Member.Id.make("member-agent");
@@ -250,7 +251,7 @@ it.effect(
             name: MemberProjection.definition.name,
             version: MemberProjection.definition.version,
           });
-          expect(Option.isSome(cursor) && cursor.value.position).toBe(Log.Position.make(0));
+          expect(Option.isSome(cursor) && cursor.value.position).toBe(Entry.Position.make(0));
           expect(yield* journal.log.read({ limit: 10 })).toHaveLength(2);
         }),
       );

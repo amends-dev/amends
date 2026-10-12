@@ -11,7 +11,7 @@ import {
   GroupPermissions,
 } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication } from "@amends-dev/core/journal";
 import {
   Thread,
   ThreadService,
@@ -56,7 +56,7 @@ describe("group follows", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound)),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 });
   const follow = (groupId: Group.Id, memberId: Member.Id) =>
     Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
       groupFollowService.follow({ groupId, memberId }),

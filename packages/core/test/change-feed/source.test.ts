@@ -5,6 +5,7 @@ import * as ChangeFeedSource from "../../src/change-feed/ChangeFeedSource.ts";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Fact from "../../src/journal/Fact.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Publication from "../../src/journal/Publication.ts";
 import * as Store from "../../src/journal/Store.ts";
@@ -23,7 +24,10 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
-      const journal = yield* Journal.make({ logId: Log.Id.make("journal"), projections: [] }).pipe(
+      const journal = yield* Journal.make({
+        logId: Entry.LogId.make("journal"),
+        projections: [],
+      }).pipe(
         Effect.provide(
           Log.layer.pipe(
             Layer.provideMerge(

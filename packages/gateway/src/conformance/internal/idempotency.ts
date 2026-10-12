@@ -1,13 +1,13 @@
 import { Role, RoleFacts } from "@amends-dev/core/authorization";
-import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Journal, Log, Occurrence, Publication, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema, Result } from "effect";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import { forWorkspace, otherWorkspaceId, testProvenance, workspaceId } from "../Support.ts";
 
-const key = Log.IdempotencyKey.make("occurrence/one");
-const executionId = Log.Id.make("execution");
+const key = Occurrence.Key.make("occurrence/one");
+const executionId = Entry.LogId.make("execution");
 const options = { idempotencyKey: key };
 
 /** Keyed appends: durable identity, validation, rollback, and concurrent attempts. */
@@ -22,7 +22,7 @@ export const idempotency = (fixture: Fixture) => {
           yield* Effect.gen(function* () {
             const journal = yield* Journal.Journal;
             const log = (yield* Log.Log).open({ id: executionId, schema: Schema.String });
-            const keyOf = (index: number) => Log.IdempotencyKey.make(`output/${index}`);
+            const keyOf = (index: number) => Occurrence.Key.make(`output/${index}`);
             const count = 6_000;
             yield* journal.commit(
               Effect.gen(function* () {
@@ -168,13 +168,13 @@ export const idempotency = (fixture: Fixture) => {
               );
             expect(
               (yield* Effect.flip(
-                bound.store.transaction(append([], Log.IdempotencyKey.make("empty"))),
+                bound.store.transaction(append([], Occurrence.Key.make("empty"))),
               ))._tag,
             ).toBe("JournalStore.Conflict");
             const invalid: Store.AppendInput = {
               logId: executionId,
               entries: input.map((payload) => ({ payload })),
-              idempotencyKey: Log.IdempotencyKey.make("valid"),
+              idempotencyKey: Occurrence.Key.make("valid"),
             };
             Reflect.set(invalid, "idempotencyKey", " ");
             expect(

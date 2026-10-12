@@ -6,7 +6,7 @@ import { GroupService, GroupMembershipService } from "@amends-dev/core/group";
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
 import {
   Notification,
   NotificationService,
@@ -93,7 +93,7 @@ describe("marking notifications seen", () => {
     listOldestFirst(bound.notifications, Notification.ofMember(member.memberId, member.identity), {
       limit: 100,
     });
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const seenAt = DateTime.makeUnsafe("2026-09-21T12:00:00.123Z");
   const seenState = (seenAt: DateTime.Utc): Notification.State =>
     Notification.State.cases.Seen.make({ seenAt });
@@ -401,7 +401,7 @@ describe("marking notifications seen", () => {
             });
             const missing = changed(p.humanNote, {
               id: Notification.Id.make("missing-source"),
-              source: { logId: Log.Id.make("other-log"), entryId: p.humanNote.source.entryId },
+              source: { logId: Entry.LogId.make("other-log"), entryId: p.humanNote.source.entryId },
             });
             yield* p.bound.store.transaction(p.bound.notifications.insert(missing));
             expect((yield* run(bound, human, markSeen(missing.id))).state._tag).toBe("Seen");
@@ -614,7 +614,7 @@ describe("marking notifications seen", () => {
             const before = yield* snapshot(p);
             const staged = changed(p.humanNote, {
               id: Notification.Id.make("staged"),
-              source: { logId: Log.Id.make("staged"), entryId: p.humanNote.source.entryId },
+              source: { logId: Entry.LogId.make("staged"), entryId: p.humanNote.source.entryId },
             });
             const operation = facts(
               p.bound,
@@ -765,7 +765,7 @@ describe("marking notifications seen", () => {
             yield* initialized(foreign);
             const discarded = changed(p.humanNote, {
               id: Notification.Id.make("discarded"),
-              source: { logId: Log.Id.make("discarded"), entryId: p.humanNote.source.entryId },
+              source: { logId: Entry.LogId.make("discarded"), entryId: p.humanNote.source.entryId },
               state: { _tag: "Discarded", reason: "participation-ended" },
             });
             yield* p.bound.store.transaction(p.bound.notifications.insert(discarded));
@@ -776,7 +776,10 @@ describe("marking notifications seen", () => {
                   p.bound.notifications.insert(
                     changed(p.humanNote, {
                       id: Notification.Id.make("inserted-seen"),
-                      source: { logId: Log.Id.make("seen"), entryId: p.humanNote.source.entryId },
+                      source: {
+                        logId: Entry.LogId.make("seen"),
+                        entryId: p.humanNote.source.entryId,
+                      },
                       state: seenState(seenAt),
                     }),
                   ),

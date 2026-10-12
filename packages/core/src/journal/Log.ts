@@ -14,50 +14,9 @@ import { Array, Context, Effect, Layer, Option, Schema, Stream } from "effect";
 import * as Codec from "./Codec.ts";
 import * as Commit from "./Commit.ts";
 import * as StoredEntry from "./Entry.ts";
+import * as Occurrence from "./Occurrence.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
-
-/**
- * Names a log within a workspace, `Entry.LogId`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = StoredEntry.LogId;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = StoredEntry.LogId;
-
-/**
- * A commit's position within one log, `Entry.Position`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Position = StoredEntry.Position;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Position = StoredEntry.Position;
-
-/**
- * Identifies one append within a workspace and log across retries, `Store.IdempotencyKey`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const IdempotencyKey = Store.IdempotencyKey;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type IdempotencyKey = Store.IdempotencyKey;
 
 /**
  * A log entry with its payload decoded by the log's schema.
@@ -77,8 +36,8 @@ export interface Entry<A> extends StoredEntry.Metadata {
  * @since 0.1.0
  */
 export interface Batch<A> {
-  readonly logId: Id;
-  readonly position: Position;
+  readonly logId: StoredEntry.LogId;
+  readonly position: StoredEntry.Position;
   readonly commit: Commit.Commit;
   readonly entries: ReadonlyArray<Entry<A>>;
 }
@@ -140,12 +99,12 @@ export type TailError = ReadError | TailInTransaction;
  */
 export interface Handle<S extends Schema.Constraint> {
   /** The log's ID. */
-  readonly id: Id;
+  readonly id: StoredEntry.LogId;
   /** The schema of the log's values. */
   readonly schema: S;
   /** Read the original append slice for a durable key, including own staged writes. */
   readonly getAppend: (
-    key: IdempotencyKey,
+    key: Occurrence.Key,
   ) => Effect.Effect<
     Option.Option<ReadonlyArray<Entry<S["Type"]>>>,
     ReadError,
@@ -198,7 +157,7 @@ export interface Handle<S extends Schema.Constraint> {
     options: Store.ReadOptions,
   ) => Effect.Effect<ReadonlyArray<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>;
   /** The latest batch's position, or None while the log is empty. */
-  readonly head: Effect.Effect<Option.Option<Position>, ReadError>;
+  readonly head: Effect.Effect<Option.Option<StoredEntry.Position>, ReadError>;
   /**
    * Replay complete batches until an empty page is observed; this is not a live
    * subscription or a fixed snapshot. Reads use the store's current transaction
@@ -244,7 +203,7 @@ export class Log extends Context.Service<
      * defaults to `Codec.makeEntryCodec(schema)`; the journal passes `Event.storageCodec`.
      */
     readonly open: <S extends Schema.Constraint>(options: {
-      readonly id: Id;
+      readonly id: StoredEntry.LogId;
       readonly schema: S;
       readonly storageCodec?: Codec.EntryCodec<S>;
     }) => Handle<S>;
@@ -299,7 +258,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
     schema,
     storageCodec,
   }: {
-    readonly id: Id;
+    readonly id: StoredEntry.LogId;
     readonly schema: S;
     readonly storageCodec?: Codec.EntryCodec<S>;
   }): Handle<S> => {
@@ -329,8 +288,8 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
       };
     });
 
-    const receipt = Effect.fnUntraced(function* (key: IdempotencyKey) {
-      const validKey = yield* Schema.decodeEffect(IdempotencyKey)(key);
+    const receipt = Effect.fnUntraced(function* (key: Occurrence.Key) {
+      const validKey = yield* Schema.decodeEffect(Occurrence.Key)(key);
       return yield* Schema.decodeEffect(
         Schema.Option(
           Schema.toType(Store.AppendReceipt).check(
@@ -343,7 +302,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
         ),
       )(yield* transaction.step(store.getAppend(id, validKey)));
     });
-    const getAppend = Effect.fn("Log.getAppend")(function* (key: IdempotencyKey) {
+    const getAppend = Effect.fn("Log.getAppend")(function* (key: Occurrence.Key) {
       const found = yield* receipt(key);
       return Option.isNone(found)
         ? Option.none()
@@ -464,7 +423,7 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
 
     const head = Effect.flatMap(
       Effect.suspend(() => transaction.step(store.head(id))),
-      (position) => Schema.decodeEffect(Schema.Option(Position))(position),
+      (position) => Schema.decodeEffect(Schema.Option(StoredEntry.Position))(position),
     ).pipe(Effect.withSpan("Log.head"));
 
     const read = Effect.fn("Log.read")(function* (options: Store.ReadOptions) {

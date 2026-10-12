@@ -133,20 +133,6 @@ export const ReadOptions = Schema.Struct({
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
 /**
- * Identifies one append occurrence within a workspace and log, across retries; `Occurrence.Key`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const IdempotencyKey = Occurrence.Key;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type IdempotencyKey = typeof IdempotencyKey.Type;
-
-/**
  * How an append is conditioned: on the log's current position, and on whether a key already
  * names it.
  *
@@ -160,7 +146,7 @@ export const AppendOptions = Schema.Struct({
    * Names the append: a retry with the same content returns the original entries, and different
    * content conflicts.
    */
-  idempotencyKey: Schema.optionalKey(IdempotencyKey),
+  idempotencyKey: Schema.optionalKey(Occurrence.Key),
 });
 
 /**
@@ -203,7 +189,7 @@ export interface AppendInput extends Schema.Schema.Type<typeof AppendInput> {}
  */
 export const AppendReceipt = Schema.Struct({
   logId: LogEntry.LogId,
-  key: IdempotencyKey,
+  key: Occurrence.Key,
   commitId: Commit.Id,
   firstIndex: Schema.Natural,
   entryCount: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -366,7 +352,7 @@ export class Store extends Context.Service<
      */
     readonly getAppend: (
       logId: LogEntry.LogId,
-      key: IdempotencyKey,
+      key: Occurrence.Key,
     ) => Effect.Effect<Option.Option<AppendReceipt>, Failure>;
     /**
      * Host transaction primitive. Provides Transaction and enlists all log writes
@@ -496,7 +482,7 @@ export const make = (driver: Store["Service"]): Store["Service"] => {
     getAppend: Effect.fn("Store.getAppend")(function* (logId, key) {
       return yield* driver.getAppend(
         yield* read("getAppend", LogEntry.LogId, logId),
-        yield* read("getAppend", IdempotencyKey, key),
+        yield* read("getAppend", Occurrence.Key, key),
       );
     }),
     transaction: (program) =>
@@ -811,7 +797,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
   const receiptOf = Effect.fnUntraced(function* (
     space: MemoryDatabase.Space,
     logId: LogEntry.LogId,
-    key: IdempotencyKey,
+    key: Occurrence.Key,
   ) {
     const slice = space.appends.get(MemoryDatabase.keyOf(logId, key));
     if (slice === undefined) return Option.none<AppendReceipt>();

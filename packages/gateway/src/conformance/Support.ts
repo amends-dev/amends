@@ -22,7 +22,7 @@ import {
   GroupStore,
 } from "@amends-dev/core/group";
 import { type Actor, Identity, Performer } from "@amends-dev/core/identity";
-import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Checkpoint, Entry, Event, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   type ThreadActivity,
@@ -114,7 +114,7 @@ export const otherWorkspaceId = Workspace.Id.make("workspace-two");
  * @category utils
  * @since 0.1.0
  */
-export const journalLog = Log.Id.make("journal");
+export const journalLog = Entry.LogId.make("journal");
 
 /**
  * The bound stores by name, for direct assertions beside the context core receives.

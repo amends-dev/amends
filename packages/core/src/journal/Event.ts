@@ -153,34 +153,6 @@ export class FactMismatch extends Schema.TaggedError<FactMismatch>()("Journal.Fa
 }) {}
 
 /**
- * Names a fact event: the ID of the log entry that records it, `Entry.Id`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = Entry.Id;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = typeof Id.Type;
-
-/**
- * Names the commit that recorded a fact event, `Commit.Id`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const CommitId = Commit.Id;
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type CommitId = typeof CommitId.Type;
-
-/**
  * A published fact carries the metadata of its underlying log entry, with its subject and
  * provenance, whatever its fact.
  *

@@ -3,10 +3,12 @@ import { Context, Effect, Layer, Schema } from "effect";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Fact from "../../src/journal/Fact.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Publication from "../../src/journal/Publication.ts";
 import type * as Reaction from "../../src/journal/Reaction.ts";
+import * as Occurrence from "../../src/journal/Occurrence.ts";
 import * as Store from "../../src/journal/Store.ts";
 import * as Subject from "../../src/journal/Subject.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
@@ -14,7 +16,7 @@ import { Counter, make } from "../memory.ts";
 import { testProvenance } from "../publication.ts";
 
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("domain");
+const logId = Entry.LogId.make("domain");
 const subject = () => Subject.make("test", "entity");
 const Noted = Fact.make("test.noted", {
   subject,
@@ -144,7 +146,7 @@ it.effect("a retried publication and a projection's rebuild run no reaction agai
   Effect.gen(function* () {
     const requests = recordedRequests();
     const { plain, counting, fixture } = yield* journalWith(requests.service);
-    const once = { idempotencyKey: Store.IdempotencyKey.make("count-once") };
+    const once = { idempotencyKey: Occurrence.Key.make("count-once") };
     yield* Effect.gen(function* () {
       const journal = yield* Journal.Journal;
       yield* journal.commit(journal.publish(Counted, 2, once));

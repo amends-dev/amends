@@ -4,6 +4,8 @@ import { Effect, Option, Schema } from "effect";
 import * as Checkpoint from "../../src/journal/Checkpoint.ts";
 import * as Fact from "../../src/journal/Fact.ts";
 import * as Journal from "../../src/journal/Journal.ts";
+import * as Occurrence from "../../src/journal/Occurrence.ts";
+import * as Entry from "../../src/journal/Entry.ts";
 import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Publication from "../../src/journal/Publication.ts";
@@ -15,7 +17,7 @@ import { testProvenance } from "../publication.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
-const logId = Log.Id.make("journal");
+const logId = Entry.LogId.make("journal");
 const Payload = Schema.Struct({
   source: Schema.NonEmptyString,
   requestId: Schema.NullOr(Schema.String),
@@ -68,9 +70,7 @@ it.effect(
       });
       yield* Effect.gen(function* () {
         const key = yield* Fact.makeOccurrenceKey(Received, input);
-        expect(key).toBe(
-          Log.IdempotencyKey.make('fact:["counter.received",["provider","message"]]'),
-        );
+        expect(key).toBe(Occurrence.Key.make('fact:["counter.received",["provider","message"]]'));
         expect(yield* Fact.makeOccurrenceKey(version2, input)).toBe(key);
         const keys = yield* Effect.all([
           Fact.makeOccurrenceKey(Received, { ...input, source: "a:b", requestId: "c" }),
@@ -169,7 +169,7 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const manual = Log.IdempotencyKey.make("manual-request");
+          const manual = Occurrence.Key.make("manual-request");
           expect(
             (yield* Effect.flip(journal.publish(Received, input, { idempotencyKey: manual })))._tag,
           ).toBe("JournalStore.Conflict");

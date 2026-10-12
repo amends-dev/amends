@@ -9,7 +9,7 @@ import {
 } from "@amends-dev/core/authorization";
 import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Entry, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 import {
   Notification,
@@ -79,7 +79,7 @@ describe("notification sources", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
     );
-  const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
+  const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 });
   const notifications = (bound: Bound, id: Member.Id) =>
     listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
       limit: 100,
@@ -194,7 +194,7 @@ describe("notification sources", () => {
       human: yield* notifications(bound, humanId),
       agent: yield* notifications(bound, agentId),
       checkpoint: yield* bound.checkpoints.get({
-        logId: Log.Id.make("journal"),
+        logId: Entry.LogId.make("journal"),
         name: "notifications",
         version: 1,
       }),
@@ -570,7 +570,7 @@ describe("notification sources", () => {
             if (!nonActivity) return yield* Effect.die("Missing fixture fact");
             for (const source of [
               { logId: note.source.logId, entryId: Entry.Id.make("missing") },
-              { logId: Log.Id.make("another-log"), entryId: note.source.entryId },
+              { logId: Entry.LogId.make("another-log"), entryId: note.source.entryId },
               { logId: nonActivity.logId, entryId: nonActivity.id },
             ])
               expect(
@@ -587,7 +587,7 @@ describe("notification sources", () => {
                 Effect.succeedSome(changed(entry, { fact: changed(header, { version: 999 }) })),
             });
             expect(yield* run({ ...bound, context }, human, sourceOf(note.id))).toBeUndefined();
-            expect(yield* bound.store.getEntry(Log.Id.make("another-log"), entry.id)).toEqual(
+            expect(yield* bound.store.getEntry(Entry.LogId.make("another-log"), entry.id)).toEqual(
               Option.none(),
             );
             const foreign = yield* boundTo(otherWorkspaceId);
@@ -839,7 +839,7 @@ describe("notification sources", () => {
             const bound = yield* boundTo(workspaceId);
             const unavailable = changed(saved.note, {
               id: Notification.Id.make("missing-source"),
-              source: { logId: Log.Id.make("journal"), entryId: Entry.Id.make("missing") },
+              source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("missing") },
             });
             yield* bound.store.transaction(bound.notifications.insert(unavailable));
             expect(
