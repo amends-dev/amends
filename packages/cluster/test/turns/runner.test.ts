@@ -4,7 +4,7 @@ import { HarnessError, type StreamPart } from "@amends-dev/harness"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Stream } from "effect"
 import { Prompt } from "effect/ai"
-import * as SessionLogWriter from "../../src/internal/session-log-writer.ts"
+import * as SessionLogWriter from "../../src/internal/sessionLogWriter.ts"
 import * as TurnRunner from "../../src/TurnRunner.ts"
 import {
   type FakeWorkspace,

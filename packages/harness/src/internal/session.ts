@@ -19,7 +19,7 @@ import * as GenerateResult from "../GenerateResult.ts"
 import * as HarnessError from "../HarnessError.ts"
 import * as Session from "../Session.ts"
 import * as StreamPart from "../StreamPart.ts"
-import { type ApprovalResponse, makeHostTools } from "./host-tools.ts"
+import { type ApprovalResponse, makeHostTools } from "./hostTools.ts"
 
 /**
  * Where a session is, and its conversation so far. They change together, so that a turn that

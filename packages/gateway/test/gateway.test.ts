@@ -17,7 +17,7 @@ import { expect, it } from "@effect/vitest"
 import { Cause, Context, Crypto, Deferred, Effect, Exit, Fiber, Layer, Option, Result, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import * as Gateway from "../src/Gateway.ts"
-import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts"
+import * as WorkspaceRuntime from "../src/internal/workspaceRuntime.ts"
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace")

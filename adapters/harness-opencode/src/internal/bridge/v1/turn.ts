@@ -19,7 +19,7 @@
 
 import type { StreamPart } from "@amends-dev/harness"
 import type * as Response from "effect/ai/Response"
-import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts"
+import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../steps.ts"
 import {
   type AssistantMessage,
   type Failure,
@@ -29,7 +29,7 @@ import {
   type Part,
   type SessionEvent,
   type ToolPart
-} from "./Event.ts"
+} from "./event.ts"
 
 /** A step of the turn: an assistant message that started during it. */
 interface Step {

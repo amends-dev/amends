@@ -15,9 +15,9 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse"
 import * as Schema from "effect/Schema"
 import type * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
-import type { RemoteMcpServer } from "../HostTools.ts"
-import * as Server from "../Server.ts"
-import { type MessageModel, Message, Part, SessionEvent } from "./Event.ts"
+import type { RemoteMcpServer } from "../hostTools.ts"
+import * as Server from "../server.ts"
+import { type MessageModel, Message, Part, SessionEvent } from "./event.ts"
 
 /** A part of a prompt: text, or a file the model reads, at a URL such as a `data:` URL. */
 export type PromptPart =

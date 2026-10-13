@@ -16,8 +16,8 @@ import * as Base64 from "effect/encoding/Base64"
 import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
-import type { ModelRef } from "../Driver.ts"
-import { ToolContent } from "./Event.ts"
+import type { ModelRef } from "../driver.ts"
+import { ToolContent } from "./event.ts"
 
 /** A prompt as opencode 2 takes it: its text, and its files by URL. */
 export interface PromptInput {

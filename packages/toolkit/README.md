@@ -73,8 +73,8 @@ the tools with `tools/list` and runs them with `tools/call`, and does nothing el
 no resources or prompts, and answers no request a server makes of its client.
 
 `Mcp` is the source, which lists the tools and runs them over a transport, with two helpers under
-`src/internal`. `mcp-transport.ts` speaks to the server, and knows nothing of tools: it settles how
-the server is spoken to and sends a request. `mcp-headers.ts` holds the rules for the headers that
+`src/internal`. `mcpTransport.ts` speaks to the server, and knows nothing of tools: it settles how
+the server is spoken to and sends a request. `mcpHeaders.ts` holds the rules for the headers that
 mirror a tool's parameters.
 
 The transport speaks the stateless protocol of 2026-07-28 to a server that does, which it finds out

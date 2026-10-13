@@ -33,7 +33,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import type * as Scope from "effect/Scope"
-import * as WorkspaceRuntime from "./internal/workspace-runtime.ts"
+import * as WorkspaceRuntime from "./internal/workspaceRuntime.ts"
 import * as WorkspaceStorage from "./WorkspaceStorage.ts"
 
 /**

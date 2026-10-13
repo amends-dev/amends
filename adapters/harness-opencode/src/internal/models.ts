@@ -18,7 +18,7 @@ import * as Record from "effect/Record"
 import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import type * as Schema from "effect/Schema"
-import type { ModelRef } from "./bridge/Driver.ts"
+import type { ModelRef } from "./bridge/driver.ts"
 import type { Version } from "./template.ts"
 
 type Endpoints = Array.NonEmptyReadonlyArray<ModelEndpoint.ModelEndpoint>

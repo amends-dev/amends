@@ -19,7 +19,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Binding from "./binding.ts"
 import { storeError } from "./errors.ts"
-import { inIds } from "./id-list.ts"
+import { inIds } from "./idList.ts"
 import { threadActivities } from "./schema.ts"
 const validate = Schema.decodeEffect(Schema.toType(ThreadActivity.ThreadActivity))
 const decode = Schema.decodeUnknownEffect(

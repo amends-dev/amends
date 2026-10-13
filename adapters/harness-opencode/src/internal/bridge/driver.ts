@@ -2,7 +2,7 @@
  * opencode's driver, which runs opencode for the bridge in its sandbox. One opencode server, which
  * the driver starts when the first session starts, serves every session there, each an opencode
  * session in the session's directory. The sessions are those of the API the bridge's version of
- * opencode speaks: `v1/Session.ts` creates them over opencode 1's session API, and `v2/Session.ts`
+ * opencode speaks: `v1/session.ts` creates them over opencode 1's session API, and `v2/session.ts`
  * over opencode 2's, and each bridge program makes the driver with its own.
  *
  * opencode's server runs until the bridge stops. A server that fails to start is started again by
@@ -23,7 +23,7 @@ import * as Ref from "effect/Ref"
 import * as Schema from "effect/Schema"
 import * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
-import * as Server from "./Server.ts"
+import * as Server from "./server.ts"
 
 /** A model, as opencode names one: its provider, its id there, and a variant such as `high`. */
 export const ModelRef = Schema.Struct({

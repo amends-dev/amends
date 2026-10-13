@@ -3,7 +3,7 @@
  * 2's session API, as `BunBridge.runProgram` runs it.
  */
 
-import * as BunBridge from "../BunBridge.ts"
-import { makeCreateSession } from "./Session.ts"
+import * as BunBridge from "../bunBridge.ts"
+import { makeCreateSession } from "./session.ts"
 
 BunBridge.runProgram("opencode2", import.meta.dirname, makeCreateSession)

@@ -10,7 +10,7 @@ import * as Network from "../../Network.ts"
 import * as Sandbox from "../../Sandbox.ts"
 import type * as SandboxError from "../../SandboxError.ts"
 import type * as Fixture from "../Fixture.ts"
-import { newSandboxId, providerForTest } from "./fixture.ts"
+import { newSandboxId, providerForTest } from "./perTest.ts"
 
 /** Whether `change` was applied, or the reason it failed with. */
 const outcomeOf = (change: Effect.Effect<void, SandboxError.SandboxError>) =>

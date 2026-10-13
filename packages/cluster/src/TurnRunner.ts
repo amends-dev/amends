@@ -35,8 +35,8 @@ import * as Ref from "effect/Ref"
 import type * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
 import * as Stream from "effect/Stream"
-import * as SessionLogWriter from "./internal/session-log-writer.ts"
-import * as TurnAgent from "./internal/turn-agent.ts"
+import * as SessionLogWriter from "./internal/sessionLogWriter.ts"
+import * as TurnAgent from "./internal/turnAgent.ts"
 
 /** The least time between two drafts of a step's text, in milliseconds. */
 const draftInterval = 100

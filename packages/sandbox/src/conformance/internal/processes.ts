@@ -10,7 +10,7 @@ import * as Queue from "effect/Queue"
 import * as Stream from "effect/Stream"
 import * as Sandbox from "../../Sandbox.ts"
 import type * as Fixture from "../Fixture.ts"
-import { providerForTest } from "./fixture.ts"
+import { providerForTest } from "./perTest.ts"
 
 /**
  * A command that echoes two lines of its input, then exits without waiting for the input to

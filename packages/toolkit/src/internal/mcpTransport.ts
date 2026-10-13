@@ -23,7 +23,7 @@ import * as Schema from "effect/Schema"
 import * as Semaphore from "effect/Semaphore"
 import * as Stream from "effect/Stream"
 import * as ToolSourceError from "../ToolSourceError.ts"
-import { encodeHeaderValue } from "./mcp-headers.ts"
+import { encodeHeaderValue } from "./mcpHeaders.ts"
 
 /**
  * What `streamableHttp` and `Mcp.http` take: the source's name, the server's address, the client

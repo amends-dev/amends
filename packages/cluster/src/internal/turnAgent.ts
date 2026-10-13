@@ -11,7 +11,7 @@ import type { Connection } from "@amends-dev/core/connection"
 import type { Agent, Session } from "@amends-dev/harness"
 import { Sandbox } from "@amends-dev/sandbox"
 import * as Effect from "effect/Effect"
-import type * as SessionLogWriter from "./session-log-writer.ts"
+import type * as SessionLogWriter from "./sessionLogWriter.ts"
 
 /**
  * The session a turn's agent started, and the agent's id, which what the session resumes from

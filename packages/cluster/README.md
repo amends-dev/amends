@@ -19,8 +19,8 @@ each call to core, so a job holds a workspace only while a call runs. The
 | `TurnRunner.ts`     | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                                                                                |
 | `JobPruning.ts`     | `JobPruning`, the hourly job that removes handled requests.                                                                                                                            |
 
-`TurnRunner` keeps two steps of a run under `internal/`: `session-log-writer.ts`, what a run
-writes to its participation's session log; and `turn-agent.ts`, starting the session of the agent a
+`TurnRunner` keeps two steps of a run under `internal/`: `sessionLogWriter.ts`, what a run
+writes to its participation's session log; and `turnAgent.ts`, starting the session of the agent a
 turn runs from what core gives and the host's integrations.
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and connection

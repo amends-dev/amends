@@ -1,7 +1,7 @@
 import { GenerateResult, type StreamPart } from "@amends-dev/harness"
 import { describe, expect, it } from "@effect/vitest"
 import { Result } from "effect"
-import * as Turn from "../../src/internal/bridge/v2/Turn.ts"
+import * as Turn from "../../src/internal/bridge/v2/turn.ts"
 import { answerEvents, decode, eventsOf, type RawEvent } from "./fakes.ts"
 
 const sessionID = "ses_turn"

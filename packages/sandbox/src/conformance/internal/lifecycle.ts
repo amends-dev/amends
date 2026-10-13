@@ -10,7 +10,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Sandbox from "../../Sandbox.ts"
 import * as Template from "../../Template.ts"
 import type * as Fixture from "../Fixture.ts"
-import { newIdentity, newSandboxId, providerForTest } from "./fixture.ts"
+import { newIdentity, newSandboxId, providerForTest } from "./perTest.ts"
 
 class PrepareFailed extends Data.TaggedError("PrepareFailed") {}
 

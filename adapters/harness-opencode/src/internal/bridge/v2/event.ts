@@ -10,8 +10,8 @@
  */
 
 import * as Schema from "effect/Schema"
-import { ModelRef } from "../Driver.ts"
-import { Tokens } from "../Steps.ts"
+import { ModelRef } from "../driver.ts"
+import { Tokens } from "../steps.ts"
 
 /** An error opencode reports, as its sessions record it. */
 export const SessionError = Schema.Struct({ type: Schema.String, message: Schema.String })

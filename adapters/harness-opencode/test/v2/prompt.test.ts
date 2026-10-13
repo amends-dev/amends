@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Result } from "effect"
 import { Prompt } from "effect/ai"
-import { messagesOf, promptOf } from "../../src/internal/bridge/v2/Prompt.ts"
+import { messagesOf, promptOf } from "../../src/internal/bridge/v2/prompt.ts"
 
 const recording = { sessionID: "ses_d3a8b1f4cffeBYbN21QzYS7lIf", now: 1_791_073_617_000 }
 

@@ -35,7 +35,7 @@ import * as Schema from "effect/Schema"
 import * as Semaphore from "effect/Semaphore"
 import * as Stream from "effect/Stream"
 import { compactAt, compactMessages, keepUpTo, keptFromOf, tokensOf } from "./internal/compaction.ts"
-import { errorPartOf, finishPartOf, streamPartsOf, turnFinishOf, unknownFinish } from "./internal/stream-parts.ts"
+import { errorPartOf, finishPartOf, streamPartsOf, turnFinishOf, unknownFinish } from "./internal/streamParts.ts"
 import * as Models from "./Models.ts"
 import * as Tools from "./Tools.ts"
 

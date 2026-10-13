@@ -13,7 +13,7 @@
  */
 
 import * as Schema from "effect/Schema"
-import { Tokens } from "../Steps.ts"
+import { Tokens } from "../steps.ts"
 
 /** What opencode reports of a failure: its kind, such as `MessageAbortedError`, and its message. */
 export const Failure = Schema.Struct({

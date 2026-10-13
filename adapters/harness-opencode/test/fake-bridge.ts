@@ -13,7 +13,7 @@
 import { type Bridge, BridgeServer, type StreamPart } from "@amends-dev/harness"
 import { BunRuntime, BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Option, Path, Ref, Schedule, Schema, Stream } from "effect"
-import * as BunBridge from "../src/internal/bridge/BunBridge.ts"
+import * as BunBridge from "../src/internal/bridge/bunBridge.ts"
 
 /** A session's state: the turns it has run. */
 const State = Schema.Struct({ turns: Schema.Int })

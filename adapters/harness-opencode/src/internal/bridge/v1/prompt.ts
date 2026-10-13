@@ -8,7 +8,7 @@
 
 import type * as Prompt from "effect/ai/Prompt"
 import * as Base64 from "effect/encoding/Base64"
-import type { PromptPart } from "./Api.ts"
+import type { PromptPart } from "./api.ts"
 
 /** The parts of a user message, as opencode 1 takes them: its texts, and its files by URL. */
 export const promptPartsOf = (message: Prompt.UserMessage): ReadonlyArray<PromptPart> =>

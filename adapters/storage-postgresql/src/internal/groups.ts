@@ -22,7 +22,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Binding from "./binding.ts"
 import { storeError } from "./errors.ts"
-import { inIds } from "./id-list.ts"
+import { inIds } from "./idList.ts"
 import { groups } from "./schema.ts"
 
 const validateRecord = Schema.decodeEffect(Schema.toType(Group.Group))

@@ -20,7 +20,7 @@ import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
 import * as Scope from "effect/Scope"
-import * as Driver from "./Driver.ts"
+import * as Driver from "./driver.ts"
 
 /**
  * Runs the bridge program of the agent `agent`, which a host launches in its sandbox. It reads the

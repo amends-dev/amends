@@ -19,8 +19,8 @@ import { HarnessError, type StreamPart } from "@amends-dev/harness"
 import type * as Response from "effect/ai/Response"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
-import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts"
-import type { SessionError, SessionEvent, ToolContent } from "./Event.ts"
+import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../steps.ts"
+import type { SessionError, SessionEvent, ToolContent } from "./event.ts"
 
 /** A text, a reasoning, or a tool's input the turn is streaming, and what it has streamed. */
 interface Writing {

@@ -5,8 +5,8 @@
  * `start` picks a free port for it, since opencode takes port 0 as its default port, 4096, where
  * the server of a bridge with other options may listen already. The bridge is the server's only
  * client and lives exactly as long as it, so the password is kept nowhere else. The requests the
- * bridge makes of the server are those of the API its version of opencode speaks, in `v1/Api.ts`
- * and `v2/Api.ts`, over the client `start` returns.
+ * bridge makes of the server are those of the API its version of opencode speaks, in `v1/api.ts`
+ * and `v2/api.ts`, over the client `start` returns.
  *
  * opencode reads the configuration `start` is given from a directory that `start` makes for it and
  * removes when the scope closes, in place of the global configuration of the sandbox's user, which

@@ -18,7 +18,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Binding from "./binding.ts"
 import { storeError } from "./errors.ts"
-import { inIds } from "./id-list.ts"
+import { inIds } from "./idList.ts"
 import { members } from "./schema.ts"
 
 /** Selected in the record's shape; decoding checks the brands and the identity union. */

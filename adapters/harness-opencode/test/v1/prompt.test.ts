@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Prompt } from "effect/ai"
-import { conversationPartsOf, promptPartsOf } from "../../src/internal/bridge/v1/Prompt.ts"
+import { conversationPartsOf, promptPartsOf } from "../../src/internal/bridge/v1/prompt.ts"
 
 describe("opencode 1 prompts", () => {
   it("gives a prompt's texts as they are, and its files by URL", () => {

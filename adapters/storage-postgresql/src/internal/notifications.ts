@@ -24,7 +24,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Binding from "./binding.ts"
 import { storeError } from "./errors.ts"
-import { inIds } from "./id-list.ts"
+import { inIds } from "./idList.ts"
 import { insertChunked } from "./parameters.ts"
 import { notificationSeen, notifications } from "./schema.ts"
 

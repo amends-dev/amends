@@ -10,7 +10,7 @@ import type { Scope } from "effect"
 import { HttpClientRequest, HttpServer } from "effect/http"
 import { HttpApiMiddleware, HttpApiTest } from "effect/http-api"
 import { Api, Authentication, BearerAuthentication, ChangeFeedHandlers, WorkspaceMember } from "../src/index.ts"
-import * as WorkspaceMemberServer from "../src/internal/workspace-member.ts"
+import * as WorkspaceMemberServer from "../src/internal/workspaceMember.ts"
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
