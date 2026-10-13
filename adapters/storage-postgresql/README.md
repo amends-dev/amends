@@ -17,7 +17,7 @@ Gateway.layer().pipe(
 ```
 
 `PostgresStorage.layer(options)` provides the storage contract, with its signal hubs, the directory, the
-accounts, and the sign-in storage, leaving the database, and the cryptography that issues human IDs, to the host. Its
+accounts, and the sign-in storage, leaving the database, and the cryptography that names accounts, commits, and journal entries, to the host. Its
 options are the [lock and timeout](#locks-and-timeouts) settings and `credentialKey`, the 32 bytes,
 as base64, that seal connections' credentials; without it the store keeps none and reports
 `Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as

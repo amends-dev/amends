@@ -35,6 +35,35 @@ input. The form comes from the settings schema, with each field's `title` and `d
 annotations, so settings are asked for without code for each integration; `make` throws for settings
 that make no form, such as a nested object or an empty struct, which takes any value.
 
+An integration of a chat system's rooms, whose connections give channels and authenticate with a
+key, for example:
+
+```ts
+import type { ChannelTransport } from "@amends-dev/channel"
+import { Connection, Integration } from "@amends-dev/connection"
+import { Effect, type Redacted, Schema } from "effect"
+
+// The transport for one room server, written as `@amends-dev/channel` shows.
+declare const roomTransport: (url: string, apiKey: Redacted.Redacted<string>) => ChannelTransport.ChannelTransport
+// The HTTP status the server at `url` answers a request with the key with.
+declare const statusOf: (url: string, apiKey: Redacted.Redacted<string>) => Effect.Effect<number, Error>
+
+export const rooms = Integration.make({
+  id: "rooms",
+  name: "Rooms",
+  settings: Schema.Struct({
+    url: Schema.NonEmptyString.annotate({ title: "Server URL", description: "Where the room server answers." })
+  }),
+  auth: ["apiKey"],
+  channels: ({ settings, apiKey }) => Effect.succeed(roomTransport(settings.url, apiKey)),
+  check: ({ settings, apiKey }) =>
+    statusOf(settings.url, apiKey).pipe(
+      Effect.map((status) => Connection.healthOfStatus(status, settings.url)),
+      Effect.orElseSucceed(() => Connection.unanswered(settings.url))
+    )
+})
+```
+
 A **connection** is a workspace's link to one integration: its id, the integration's id, a name, its
 settings as JSON, and the auth method it uses. Its **credential**, the API key, is kept apart, so
 that a connection can be shown and stored without it. An integration's operations take the two as
