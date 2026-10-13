@@ -22,7 +22,7 @@ const listen = <E, R>(watch: Effect.Effect<Stream.Stream<ChangeFeed.Message, Cor
       Stream.runForEach((message) => Queue.offer(queue, message)),
       Effect.forkScoped
     )
-    return Queue.take(queue).pipe(Effect.timeout("10 seconds"))
+    return Queue.take(queue)
   })
 const committed = (message: ChangeFeed.Message) => {
   if (!ChangeFeed.Message.isAnyOf(["Committed"])(message)) throw new Error(`Expected a commit, got ${message._tag}`)
@@ -53,7 +53,7 @@ const marker = (bound: Bound) =>
     )
   ).pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)), Effect.provide(core(bound)))
 describe("change feed", () => {
-  it.live("thread activity reaches the group's members with read access, and nobody else", () =>
+  it.effect("thread activity reaches the group's members with read access, and nobody else", () =>
     withStorage((storage) =>
       runHost(
         storage,
@@ -115,7 +115,7 @@ describe("change feed", () => {
     )
   )
 
-  it.live("a mention's notification reaches its recipient as their inbox lists it", () =>
+  it.effect("a mention's notification reaches its recipient as their inbox lists it", () =>
     withStorage((storage) =>
       runHost(
         storage,
