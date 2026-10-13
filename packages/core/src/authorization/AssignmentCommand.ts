@@ -22,6 +22,7 @@ import type * as Member from "../workspace/Member.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentFacts from "./AssignmentFacts.ts"
 import type * as Role from "./Role.ts"
+import * as Scope from "./Scope.ts"
 
 /**
  * What the writes can fail with.
@@ -77,7 +78,7 @@ export const make = Effect.fn("AssignmentCommand.make")(function* () {
       status: "active",
       source: Assignment.Source.cases.Role.make({
         roleId,
-        scope: { _tag: "Workspace", workspaceId }
+        scope: Scope.Scope.cases.Workspace.make({ workspaceId })
       })
     })
     yield* journal.publish(AssignmentFacts.Created, {

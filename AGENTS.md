@@ -214,6 +214,11 @@ the whole value, so keep them for input of unknown shape. Recover from one reaso
 give a default message, in a union piped through `Schema.toTaggedUnion("_tag")`, as harness's
 `HarnessError` shows. Reading `_tag` as data, such as the kind a row stores, is fine.
 
+Build a variant in source with its constructor, `Union.cases.Member.make({ memberId })`, which
+checks it as decoding would and throws when it does not hold. A value that something else checks
+stays a literal: a row before its decoder, a store driver's record before its encoder, and a
+request's encoded payload. Tests may write the values they expect as literals.
+
 Name a variable that holds a service after the service, so a call says who it calls:
 `const threadStore = yield* ThreadStore.ThreadStore`,
 `const threadQuery = yield* ThreadQuery.ThreadQuery`, and `(threadService) => threadService.get(id)`

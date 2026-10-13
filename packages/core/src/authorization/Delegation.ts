@@ -34,6 +34,8 @@ import * as PermissionCatalog from "./PermissionCatalog.ts"
 import * as Requirement from "./Requirement.ts"
 import * as Role from "./Role.ts"
 import * as RoleStore from "./RoleStore.ts"
+import * as Scope from "./Scope.ts"
+import * as Target from "./Target.ts"
 
 /**
  * What a delegation check can fail with: the outcomes above, authorization's, and
@@ -185,7 +187,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
         yield* Effect.orDie(
           Schema.decodeEffect(Grant.makeSchema(definition.value))({
             permission: name,
-            scope: { _tag: "Workspace", workspaceId }
+            scope: Scope.Scope.cases.Workspace.make({ workspaceId })
           })
         )
     }
@@ -195,7 +197,9 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     assignmentStore.listActiveByMember(memberId)
   )
   const requireGrant = Effect.fn("Delegation.requireGrant")(function* (roleId: Role.Id) {
-    yield* authorization.require([Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId })])
+    yield* authorization.require([
+      Requirement.make(AssignmentPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId }))
+    ])
     if (roleId === BuiltinRoles.OwnerId)
       return yield* new CoreError.Conflict({ reason: new CoreError.OwnerProtected() })
     const role = yield* loadRole(roleId)

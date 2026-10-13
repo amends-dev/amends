@@ -18,6 +18,7 @@ import * as Schema from "effect/Schema"
 import * as AgentPermissions from "../agent/AgentPermissions.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Group from "../group/Group.ts"
 import * as GroupCommand from "../group/GroupCommand.ts"
@@ -242,7 +243,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         })
       if (Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
         yield* authorization.require([
-          Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId })
+          Requirement.make(AgentPermissions.Use, Target.Reference.cases.Member.make({ workspaceId, memberId }))
         ])
     }
   })
@@ -252,7 +253,9 @@ export const make = Effect.fn("ThreadService.make")(function* () {
    * with the author's agent use when the assignee is an agent, since assigning one directs it.
    */
   const authorizeTask = Effect.fnUntraced(function* (groupId: Group.Id, task: Task.Options) {
-    yield* authorization.require([Requirement.make(TaskPermissions.Create, { _tag: "Group", workspaceId, groupId })])
+    yield* authorization.require([
+      Requirement.make(TaskPermissions.Create, Target.Reference.cases.Group.make({ workspaceId, groupId }))
+    ])
     if (task.assignee === undefined) return
     const eligible = yield* threadQuery.eligibleMembers(groupId, [task.assignee])
     yield* authorizeParticipants([task.assignee], [task.assignee], eligible)
@@ -281,10 +284,10 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       groupId,
       title: opening.title ?? null,
       origin: opening.origin ?? null,
-      participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
+      participants: participants.map((memberId) => ThreadParticipation.Reference.cases.Member.make({ memberId })),
       message: {
         messageId: ids.messageId,
-        author: { _tag: "Member", memberId: authorId },
+        author: ThreadMessage.Author.cases.Member.make({ memberId: authorId }),
         text: opening.text,
         mentions: opening.mentions,
         via: null
@@ -308,7 +311,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
             thread: started.thread,
             ...Task.initial(opening.task),
             createdBy: started.thread.createdBy,
-            by: { _tag: "Member", memberId: authorId },
+            by: ThreadParticipation.Reference.cases.Member.make({ memberId: authorId }),
             occurredAt
           })).task
     return { thread: started.thread, message: started.message, task } satisfies Thread.Started
@@ -356,11 +359,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         })
       const { group, created } = yield* groupCommand.establishDirect(memberIds, actor.memberId, yield* DateTime.now)
       yield* authorization.require([
-        Requirement.make(ThreadPermissions.Start, {
-          _tag: "Group",
-          workspaceId,
-          groupId: group.id
-        })
+        Requirement.make(ThreadPermissions.Start, Target.Reference.cases.Group.make({ workspaceId, groupId: group.id }))
       ])
       const ids = yield* deriveStartIds("thread.start-direct", options.requestKey)
       const retried = yield* findRetriedStart(options.requestKey, ids)
@@ -382,11 +381,10 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input)
       yield* groupQuery.requireAudience(request.groupId)
       yield* authorization.require([
-        Requirement.make(ThreadPermissions.Start, {
-          _tag: "Group",
-          workspaceId,
-          groupId: request.groupId
-        })
+        Requirement.make(
+          ThreadPermissions.Start,
+          Target.Reference.cases.Group.make({ workspaceId, groupId: request.groupId })
+        )
       ])
       const actor = yield* Actor.Actor
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
@@ -419,11 +417,10 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       // Only its group's members may rename a thread; to anyone else it is missing.
       const thread = yield* threadQuery.requireAccess(request.threadId)
       yield* authorization.require([
-        Requirement.make(ThreadPermissions.Rename, {
-          _tag: "Thread",
-          workspaceId,
-          threadId: thread.id
-        })
+        Requirement.make(
+          ThreadPermissions.Rename,
+          Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
+        )
       ])
       if (thread.title === request.title) return thread
       if (thread.title !== request.expectedTitle)
@@ -437,7 +434,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         ? []
         : Task.recipients(
             yield* threadQuery.currentParticipants(thread),
-            { _tag: "Member", memberId: actor.memberId },
+            ThreadParticipation.Reference.cases.Member.make({ memberId: actor.memberId }),
             Task.asked(task.value)
           )
       const renamed = yield* threadCommand

@@ -63,8 +63,8 @@ export type Participant = typeof Participant.Type
 export const recipientOf = (participant: Participant): Notification.Recipient =>
   Participant.match(participant, {
     Member: ({ memberId, identity }): Notification.Recipient => Notification.ofMember(memberId, identity),
-    Contact: ({ contactId }): Notification.Recipient => ({ _tag: "Contact", id: contactId }),
-    Triage: (): Notification.Recipient => ({ _tag: "Triage" })
+    Contact: ({ contactId }): Notification.Recipient => Notification.Recipient.cases.Contact.make({ id: contactId }),
+    Triage: (): Notification.Recipient => Notification.Recipient.cases.Triage.make({})
   })
 
 /**
@@ -160,9 +160,9 @@ export const memberOf = (participant: Participant | Reference): MemberId.Id | un
  */
 export const referenceOf = (participant: Participant): Reference =>
   Participant.match(participant, {
-    Member: ({ memberId }): Reference => ({ _tag: "Member", memberId }),
-    Contact: ({ contactId }): Reference => ({ _tag: "Contact", contactId }),
-    Triage: (): Reference => ({ _tag: "Triage" })
+    Member: ({ memberId }): Reference => Reference.cases.Member.make({ memberId }),
+    Contact: ({ contactId }): Reference => Reference.cases.Contact.make({ contactId }),
+    Triage: (): Reference => Reference.cases.Triage.make({})
   })
 
 /**

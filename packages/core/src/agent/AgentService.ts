@@ -288,7 +288,9 @@ export const make = Effect.fn("AgentService.make")(function* () {
   const create = Effect.fn("AgentService.create")(
     function* (input: Agent.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Agent.CreateInput))(input)
-      yield* authorization.require([Requirement.make(AgentPermissions.Create, { _tag: "Workspace", workspaceId })])
+      yield* authorization.require([
+        Requirement.make(AgentPermissions.Create, Target.Reference.cases.Workspace.make({ workspaceId }))
+      ])
       yield* delegation.requireGrant(request.roleId)
       const actor = yield* Actor.Actor
       const agentId = Agent.Id.make(

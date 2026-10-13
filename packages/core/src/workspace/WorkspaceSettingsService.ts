@@ -20,6 +20,7 @@ import * as AssignmentService from "../authorization/AssignmentService.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Delegation from "../authorization/Delegation.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Journal from "../journal/Journal.ts"
@@ -116,15 +117,17 @@ export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
     if (Option.isNone(value)) return yield* Effect.die("A workspace's record is missing")
     return value.value
   })
-  const renamePermission = Requirement.make(WorkspaceSettingsPermissions.Rename, {
-    _tag: "Workspace",
-    workspaceId
-  })
+  const renamePermission = Requirement.make(
+    WorkspaceSettingsPermissions.Rename,
+    Target.Reference.cases.Workspace.make({ workspaceId })
+  )
   const get = Effect.gen(function* () {
     yield* authorization.require([])
     const roles = yield* assignmentService.roles
     const canReadInvitations = yield* Delegation.isAllowedBy(
-      authorization.require([Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId })])
+      authorization.require([
+        Requirement.make(InvitationPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId }))
+      ])
     )
     return {
       workspace: yield* readWorkspace,
@@ -141,10 +144,10 @@ export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
     // One grant resolution answers every permission, and role choices load once, so the reads
     // grow with the member count only by each member's assignments.
     const [canManageAny = false, ...permissions] = yield* authorization.permitted([
-      Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId }),
+      Requirement.make(AssignmentPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId })),
       ...visible.flatMap(({ id: memberId }) => [
-        Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId }),
-        Requirement.make(MemberPermissions.Remove, { _tag: "Member", workspaceId, memberId })
+        Requirement.make(AssignmentPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId })),
+        Requirement.make(MemberPermissions.Remove, Target.Reference.cases.Member.make({ workspaceId, memberId }))
       ])
     ])
     const roles = yield* assignmentService.roles

@@ -22,6 +22,7 @@ import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
@@ -167,7 +168,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         roleId: request.roleId
       }
       yield* journal.publish(InvitationFacts.Issued, details).pipe(Publication.withOccurredAt(issuedAt))
-      return { details, state: { _tag: "Pending" } } satisfies Invitation.Invitation
+      return { details, state: Invitation.State.cases.Pending.make({}) } satisfies Invitation.Invitation
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -219,9 +220,11 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         })
       )
       const identity = Identity.MemberReference.cases.Human.make({ id: recipient })
-      const provenance = yield* Publication.make(workspaceId, { _tag: "Identity", identity }, acceptedAt).pipe(
-        Effect.provideService(Crypto.Crypto, crypto)
-      )
+      const provenance = yield* Publication.make(
+        workspaceId,
+        Performer.Reference.cases.Identity.make({ identity }),
+        acceptedAt
+      ).pipe(Effect.provideService(Crypto.Crypto, crypto))
       return yield* Effect.gen(function* () {
         const member = yield* memberCommand.add({
           identity,
@@ -230,11 +233,9 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
           joinedAt: acceptedAt
         })
         yield* journal.publish(InvitationFacts.Accepted, {
-          _tag: "Accepted",
           workspaceId,
           invitationId: id,
-          memberId: member.id,
-          acceptedAt
+          ...Invitation.State.cases.Accepted.make({ memberId: member.id, acceptedAt })
         })
         return member
       }).pipe(Effect.provideService(Publication.Publication, provenance))

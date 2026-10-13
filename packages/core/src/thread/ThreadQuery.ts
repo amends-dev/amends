@@ -15,6 +15,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Group from "../group/Group.ts"
 import * as GroupFollowStore from "../group/GroupFollowStore.ts"
@@ -206,11 +207,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   const requireReadable = Effect.fn("ThreadQuery.requireReadable")(function* (threadId: Thread.Id) {
     const thread = yield* requireAccess(threadId)
     yield* authorization.require([
-      Requirement.make(ThreadPermissions.Read, {
-        _tag: "Thread",
-        workspaceId,
-        threadId: thread.id
-      })
+      Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id }))
     ])
     return thread
   })
@@ -334,7 +331,9 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
       const latest = new Map((yield* threadStore.getLatest(ids)).map((value) => [value.threadId, value] as const))
       const tasks = new Map((yield* taskStore.getMany(ids)).map((task) => [task.threadId, task] as const))
       const allowed = yield* authorization.permitted(
-        ids.map((threadId) => Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId }))
+        ids.map((threadId) =>
+          Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))
+        )
       )
       const readableIds = ids.filter((_, index) => allowed[index] === true)
       const positions = new Map(

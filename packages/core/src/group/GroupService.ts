@@ -216,7 +216,9 @@ export const make = Effect.fn("GroupService.make")(function* () {
   const get = Effect.fn("GroupService.get")(function* (groupId: Group.Id) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId)
     yield* groupQuery.requireAudience(id)
-    yield* authorization.require([Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id })])
+    yield* authorization.require([
+      Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId: id }))
+    ])
     return yield* requireGroup(id)
   }, Operation.report)
 
@@ -224,11 +226,10 @@ export const make = Effect.fn("GroupService.make")(function* () {
     function* (input: Group.RenameInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.RenameInput))(input)
       yield* authorization.require([
-        Requirement.make(GroupPermissions.Rename, {
-          _tag: "Group",
-          workspaceId,
-          groupId: request.groupId
-        })
+        Requirement.make(
+          GroupPermissions.Rename,
+          Target.Reference.cases.Group.make({ workspaceId, groupId: request.groupId })
+        )
       ])
       // Only its members may rename a group; to anyone else it is missing.
       yield* groupQuery.requireAudience(request.groupId)
@@ -264,14 +265,13 @@ export const make = Effect.fn("GroupService.make")(function* () {
     const candidates = [...admissions.keys()]
     const allowed = yield* authorization.permitted(
       candidates.flatMap((groupId) => [
-        Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId }),
-        Requirement.make(GroupMembershipPermissions.Manage, {
-          _tag: "Group",
-          workspaceId,
-          groupId
-        }),
-        Requirement.make(GroupPermissions.Rename, { _tag: "Group", workspaceId, groupId }),
-        Requirement.make(GroupPermissions.Moderate, { _tag: "Group", workspaceId, groupId })
+        Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId })),
+        Requirement.make(
+          GroupMembershipPermissions.Manage,
+          Target.Reference.cases.Group.make({ workspaceId, groupId })
+        ),
+        Requirement.make(GroupPermissions.Rename, Target.Reference.cases.Group.make({ workspaceId, groupId })),
+        Requirement.make(GroupPermissions.Moderate, Target.Reference.cases.Group.make({ workspaceId, groupId }))
       ])
     )
     const grants = new Map(
@@ -352,11 +352,10 @@ export const make = Effect.fn("GroupService.make")(function* () {
       if (page.length === 0) break
       const allowed = yield* authorization.permitted(
         page.map((group) =>
-          Requirement.make(GroupMembershipPermissions.Join, {
-            _tag: "Group",
-            workspaceId,
-            groupId: group.id
-          })
+          Requirement.make(
+            GroupMembershipPermissions.Join,
+            Target.Reference.cases.Group.make({ workspaceId, groupId: group.id })
+          )
         )
       )
       const joinable = page.filter((_, index) => allowed[index] === true)

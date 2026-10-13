@@ -493,13 +493,12 @@ describe("a run advancing with each part", () => {
       [finish, 120]
     ])
     expect(entries).toEqual([
-      { _tag: "Started", turnId: turn.id, agent: "scripted" },
-      {
-        _tag: "Step",
+      SessionLog.Entry.cases.Started.make({ turnId: turn.id, agent: "scripted" }),
+      SessionLog.Entry.cases.Step.make({
         turnId: turn.id,
         id: "2.0",
         step: { parts: [{ type: "text", text: "The plan is " }], finish: stepEnd }
-      }
+      })
     ])
     expect(drafts).toEqual([
       { responseId: "2.0", part: 0, offset: 0, text: "The " },

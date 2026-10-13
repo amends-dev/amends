@@ -192,13 +192,8 @@ export interface ThreadMessage extends Schema.Schema.Type<typeof ThreadMessage> 
  * @category utils
  * @since 0.1.0
  */
-export const published = (text: Text, mentions: ReadonlyArray<MemberId.Id>): Content => ({
-  _tag: "Text",
-  text,
-  mentions,
-  revision: 1,
-  editedAt: null
-})
+export const published = (text: Text, mentions: ReadonlyArray<MemberId.Id>): Content =>
+  Content.cases.Text.make({ text, mentions, revision: 1, editedAt: null })
 
 /**
  * What a reply says and whom it addresses. Without mentions it addresses every current

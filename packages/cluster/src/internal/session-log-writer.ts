@@ -66,22 +66,20 @@ export const openingOf = (
   if (prompted !== undefined) {
     const history = SessionLog.historyOf(before)
     return {
-      entries: [{ _tag: "Interrupted", turnId, reason: "Its run stopped short." }],
+      entries: [SessionLog.Entry.cases.Interrupted.make({ turnId, reason: "Its run stopped short." })],
       history,
       prompt: prompted.prompt,
       resumeFrom: unfinishedTurnOf(entries, turnId, prompted.prompt, id, history) ?? sessionStateOf(ready, id, history)
     }
   }
   const joining: ReadonlyArray<SessionLog.Entry> =
-    entries.length === 0 && joined.length > 0 ? [{ _tag: "Joined", conversation: joined }] : []
+    entries.length === 0 && joined.length > 0 ? [SessionLog.Entry.cases.Joined.make({ conversation: joined })] : []
   const history = SessionLog.historyOf([...before, ...joining])
   return {
-    entries: Array.append(joining, {
-      _tag: "Prompted",
-      turnId,
-      prompt: ready.prompt,
-      messages: ready.messages
-    }),
+    entries: Array.append(
+      joining,
+      SessionLog.Entry.cases.Prompted.make({ turnId, prompt: ready.prompt, messages: ready.messages })
+    ),
     history,
     prompt: ready.prompt,
     resumeFrom: sessionStateOf(ready, id, history)

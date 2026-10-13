@@ -331,8 +331,8 @@ export class ThreadCommand extends Context.Service<
 /** The participant an author publishes as. */
 const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.Reference =>
   ThreadMessage.Author.isAnyOf(["Member"])(author)
-    ? { _tag: "Member", memberId: author.memberId }
-    : { _tag: "Contact", contactId: author.contactId }
+    ? ThreadParticipation.Reference.cases.Member.make({ memberId: author.memberId })
+    : ThreadParticipation.Reference.cases.Contact.make({ contactId: author.contactId })
 
 /**
  * Whom a message by `author` notifies, of the participants selected for it. Mentions address
@@ -405,12 +405,11 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       return yield* new CoreError.Conflict({
         reason: new CoreError.ParticipantUnavailable({ memberId: reference.memberId })
       })
-    return {
-      _tag: "Member",
+    return ThreadParticipation.Participant.cases.Member.make({
       memberId: reference.memberId,
       groupMembershipId: candidate.admission.id,
       identity: candidate.member.identity
-    }
+    })
   })
 
   /**
@@ -539,7 +538,10 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     const selected = new Set(input.participants.map(ThreadParticipation.keyOf))
     if (
       !selected.has(ThreadParticipation.keyOf(authorAsParticipant(input.author))) ||
-      input.mentions.some((memberId) => !selected.has(ThreadParticipation.keyOf({ _tag: "Member", memberId })))
+      input.mentions.some(
+        (memberId) =>
+          !selected.has(ThreadParticipation.keyOf(ThreadParticipation.Reference.cases.Member.make({ memberId })))
+      )
     )
       return yield* Effect.die("A message's author and mentions must be selected participants")
     const thread = yield* threadOf(input)
@@ -603,17 +605,16 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       occurredAt: input.occurredAt,
       admit: [
         authorAsParticipant(message.author),
-        ...joining.map((memberId) => ({ _tag: "Member" as const, memberId }))
+        ...joining.map((memberId) => ThreadParticipation.Reference.cases.Member.make({ memberId }))
       ],
       step: ({ admitted }) =>
         Effect.gen(function* () {
-          const content: ThreadMessage.Content = {
-            _tag: "Text",
+          const content: ThreadMessage.Content = ThreadMessage.Content.cases.Text.make({
             text: input.text,
             mentions: input.mentions,
             revision,
             editedAt: input.occurredAt
-          }
+          })
           const fact = yield* journal
             .publish(ThreadMessageFacts.Edited, {
               workspaceId,
@@ -659,7 +660,9 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       occurredAt: input.occurredAt,
       step: () =>
         Effect.gen(function* () {
-          const content: ThreadMessage.Content = { _tag: "Deleted", deletedAt: input.occurredAt }
+          const content: ThreadMessage.Content = ThreadMessage.Content.cases.Deleted.make({
+            deletedAt: input.occurredAt
+          })
           const fact = yield* journal
             .publish(ThreadMessageFacts.Deleted, {
               workspaceId,

@@ -243,13 +243,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     record: Connection.Connection
   ): Effect.fn.Return<Connection.Readiness> {
     const integration = yield* Effect.option(integrations.find(record.integration))
-    if (Option.isNone(integration)) return { _tag: "Uninstalled" }
+    if (Option.isNone(integration)) return Connection.Readiness.cases.Uninstalled.make({})
     return yield* Effect.match(integration.value.validate(Connection.connectionOf(record)), {
-      onFailure: (error): Connection.Readiness => ({
-        _tag: "Invalid",
-        description: error.reason.message
-      }),
-      onSuccess: (): Connection.Readiness => ({ _tag: "Ready" })
+      onFailure: (error): Connection.Readiness =>
+        Connection.Readiness.cases.Invalid.make({ description: error.reason.message }),
+      onSuccess: (): Connection.Readiness => Connection.Readiness.cases.Ready.make({})
     })
   })
 
@@ -340,7 +338,9 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const create = Effect.fn("ConnectionService.create")(
     function* (input: Connection.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Connection.CreateInput))(input)
-      yield* authorization.require([Requirement.make(ConnectionPermissions.Create, { _tag: "Workspace", workspaceId })])
+      yield* authorization.require([
+        Requirement.make(ConnectionPermissions.Create, Target.Reference.cases.Workspace.make({ workspaceId }))
+      ])
       const actor = yield* Actor.Actor
       const connectionId = Connection.Id.make(
         yield* Request.idFor(options.requestKey, ["connection.create", workspaceId, actor.memberId])

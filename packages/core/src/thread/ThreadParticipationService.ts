@@ -15,6 +15,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as GroupStore from "../group/GroupStore.ts"
 import * as Actor from "../identity/Actor.ts"
@@ -85,19 +86,20 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
     function* (threadId: Thread.Id) {
       const thread = yield* threadQuery.requireAccess(threadId)
       yield* authorization.require([
-        Requirement.make(ThreadParticipationPermissions.Follow, {
-          _tag: "Thread",
-          workspaceId,
-          threadId: thread.id
-        })
+        Requirement.make(
+          ThreadParticipationPermissions.Follow,
+          Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
+        )
       ])
       const actor = yield* Actor.Actor
-      const [current] = yield* threadQuery.findParticipants(thread, [{ _tag: "Member", memberId: actor.memberId }])
+      const [current] = yield* threadQuery.findParticipants(thread, [
+        ThreadParticipation.Reference.cases.Member.make({ memberId: actor.memberId })
+      ])
       if (current !== undefined) return ThreadParticipation.toSummary(current)
       const followed = yield* threadCommand.publishActivity({
         thread,
         occurredAt: yield* DateTime.now,
-        admit: [{ _tag: "Member", memberId: actor.memberId }],
+        admit: [ThreadParticipation.Reference.cases.Member.make({ memberId: actor.memberId })],
         step: ({ admitted }) => {
           const [participant] = admitted.participants
           const [added] = admitted.added

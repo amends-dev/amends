@@ -21,6 +21,7 @@ import * as Group from "../group/Group.ts"
 import * as GroupCommand from "../group/GroupCommand.ts"
 import * as GroupFacts from "../group/GroupFacts.ts"
 import * as Identity from "../identity/Identity.ts"
+import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
@@ -70,10 +71,10 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   // Creation runs before the workspace's operations exist, so it builds the commands it shares.
   const assignmentCommand = yield* AssignmentCommand.make()
   const groupCommand = yield* GroupCommand.make()
-  const provenance = yield* Publication.make(workspaceId, {
-    _tag: "Identity",
-    identity: Identity.Reference.cases.Human.make({ id: createdBy })
-  })
+  const provenance = yield* Publication.make(
+    workspaceId,
+    Performer.Reference.cases.Identity.make({ identity: Identity.Reference.cases.Human.make({ id: createdBy }) })
+  )
   return yield* journal.commit(
     Effect.gen(function* () {
       if (Option.isSome(yield* workspaceStore.get)) return yield* new AlreadyInitialized({ workspaceId })

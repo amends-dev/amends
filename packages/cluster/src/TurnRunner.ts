@@ -186,12 +186,11 @@ export const advance = (run: Run, progress: Progress, part: StreamPart.StreamPar
   const noted: Progress = { ...progress, started: progress.started || notesStart }
   const entries: Array<SessionLog.Entry> = notesStart
     ? [
-        {
-          _tag: "Started",
+        SessionLog.Entry.cases.Started.make({
           turnId: run.turnId,
           agent: run.agent,
           ...(part.type === "turn-start" ? { agentState: part.agentState } : {})
-        }
+        })
       ]
     : []
   switch (part.type) {
@@ -201,12 +200,9 @@ export const advance = (run: Run, progress: Progress, part: StreamPart.StreamPar
     case "finish-step": {
       const [step] = StreamPart.stepsOf([...progress.stepParts, part])
       if (step !== undefined)
-        entries.push({
-          _tag: "Step",
-          turnId: run.turnId,
-          id: stepId(run.openedAt, progress.steps),
-          step
-        })
+        entries.push(
+          SessionLog.Entry.cases.Step.make({ turnId: run.turnId, id: stepId(run.openedAt, progress.steps), step })
+        )
       return {
         progress: { ...noted, stepParts: [], steps: progress.steps + 1, shown: new Map() },
         entries,
@@ -342,7 +338,9 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
       const [unfinished] = StreamPart.stepsOf(stepParts)
       if (unfinished !== undefined)
         yield* inWorkspace(
-          writer.append([{ _tag: "Step", turnId, id: stepId(writer.openedAt, steps), step: unfinished }])
+          writer.append([
+            SessionLog.Entry.cases.Step.make({ turnId, id: stepId(writer.openedAt, steps), step: unfinished })
+          ])
         )
       const started = yield* Ref.get(startedSession)
       const resume = yield* releaseSession(started)

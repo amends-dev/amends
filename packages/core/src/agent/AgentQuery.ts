@@ -107,7 +107,7 @@ export class AgentQuery extends Context.Service<
 
 /** `selection` as the setup whose readiness says whether it can run. */
 const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
-  harness: { _tag: "Connection", connectionId: selection.harness.connectionId },
+  harness: Agent.Harness.cases.Connection.make({ connectionId: selection.harness.connectionId }),
   model: selection.model,
   sandbox: selection.sandbox
 })
@@ -115,7 +115,7 @@ const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
 /** A connection's failure to give `part`, as the issue it is to the agent. */
 const invalid = (part: Agent.Part, description: string) =>
   new CoreError.Invalid({
-    reason: new CoreError.Incomplete({ issues: [{ _tag: "Invalid", part, description }] })
+    reason: new CoreError.Incomplete({ issues: [Agent.Issue.cases.Invalid.make({ part, description })] })
   })
 
 /**
@@ -168,7 +168,7 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     const chosen = AgentReadiness.chooseHarness(choices, previous?.harness.connectionId)
     if (chosen === undefined)
       return yield* new CoreError.Invalid({
-        reason: new CoreError.Incomplete({ issues: [{ _tag: "NoHarness" }] })
+        reason: new CoreError.Incomplete({ issues: [Agent.Issue.cases.NoHarness.make({})] })
       })
     return chosen
   })

@@ -318,7 +318,9 @@ export const make = Effect.fn("GroupMembershipService.make")(function* () {
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId)
     yield* groupQuery.requireAudience(id)
-    yield* authorization.require([Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id })])
+    yield* authorization.require([
+      Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId: id }))
+    ])
     return yield* pageCurrentMemberships(id, options)
   }, Operation.report)
   return GroupMembershipService.of({

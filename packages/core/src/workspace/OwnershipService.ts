@@ -21,6 +21,7 @@ import * as BuiltinRoles from "../authorization/BuiltinRoles.ts"
 import * as Delegation from "../authorization/Delegation.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Scope from "../authorization/Scope.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
@@ -106,10 +107,10 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   const journal = yield* Journal.Journal
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
-  const requirement = Requirement.make(OwnershipPermissions.Transfer, {
-    _tag: "Workspace",
-    workspaceId
-  })
+  const requirement = Requirement.make(
+    OwnershipPermissions.Transfer,
+    Target.Reference.cases.Workspace.make({ workspaceId })
+  )
   const requireMember = Effect.fn("OwnershipService.requireMember")(function* (memberId: Member.Id) {
     const found = yield* memberStore.get(memberId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id: memberId })

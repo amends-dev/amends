@@ -73,7 +73,7 @@ export interface Options {
 }
 
 const quoted = (text: string) => `“${text}”`
-const memberOf = (memberId: Member.Id): ThreadMessage.Author => ({ _tag: "Member", memberId })
+const memberOf = (memberId: Member.Id): ThreadMessage.Author => ThreadMessage.Author.cases.Member.make({ memberId })
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** What `author` is called: "you" for the agent itself. */
@@ -128,7 +128,7 @@ const personOf = (reference: ThreadParticipation.Reference): ReadonlyArray<Threa
   ThreadParticipation.Reference.isAnyOf(["Member"])(reference)
     ? [memberOf(reference.memberId)]
     : ThreadParticipation.Reference.isAnyOf(["Contact"])(reference)
-      ? [{ _tag: "Contact", contactId: reference.contactId }]
+      ? [ThreadMessage.Author.cases.Contact.make({ contactId: reference.contactId })]
       : []
 
 /** How an agent reads activity of one kind: whom it names, and what it says, if anything. */

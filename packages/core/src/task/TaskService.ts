@@ -17,6 +17,7 @@ import * as Schema from "effect/Schema"
 import * as AgentPermissions from "../agent/AgentPermissions.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import type * as Group from "../group/Group.ts"
 import * as Actor from "../identity/Actor.ts"
@@ -27,6 +28,7 @@ import * as Store from "../journal/Store.ts"
 import type * as StoreError from "../journal/StoreError.ts"
 import * as Operation from "../operation/Operation.ts"
 import type * as Thread from "../thread/Thread.ts"
+import * as ThreadMessage from "../thread/ThreadMessage.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
 import type * as Member from "../workspace/Member.ts"
@@ -150,22 +152,25 @@ export const make = Effect.fn("TaskService.make")(function* () {
         reason: new CoreError.ParticipantUnavailable({ memberId })
       })
     if (Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity))
-      yield* authorization.require([Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId })])
+      yield* authorization.require([
+        Requirement.make(AgentPermissions.Use, Target.Reference.cases.Member.make({ workspaceId, memberId }))
+      ])
   })
 
   /** The actor as a member, who created the task or made the change, and is told nothing of it. */
-  const actorAsMember = Effect.map(Actor.Actor, (actor) => ({ _tag: "Member", memberId: actor.memberId }) as const)
+  const actorAsMember = Effect.map(Actor.Actor, (actor) =>
+    ThreadMessage.Author.cases.Member.make({ memberId: actor.memberId })
+  )
 
   const create = Effect.fn("TaskService.create")(
     function* (input: Task.CreateInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Task.CreateInput))(input)
       const thread = yield* threadQuery.requireAccess(request.threadId)
       yield* authorization.require([
-        Requirement.make(TaskPermissions.Create, {
-          _tag: "Group",
-          workspaceId,
-          groupId: thread.groupId
-        })
+        Requirement.make(
+          TaskPermissions.Create,
+          Target.Reference.cases.Group.make({ workspaceId, groupId: thread.groupId })
+        )
       ])
       if (Option.isSome(yield* taskStore.get(thread.id)))
         return yield* new CoreError.Conflict({
@@ -195,11 +200,10 @@ export const make = Effect.fn("TaskService.make")(function* () {
       const thread = yield* threadQuery.requireAccess(request.threadId)
       const task = yield* requireTask(thread)
       yield* authorization.require([
-        Requirement.make(TaskPermissions.Update, {
-          _tag: "Thread",
-          workspaceId,
-          threadId: thread.id
-        })
+        Requirement.make(
+          TaskPermissions.Update,
+          Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
+        )
       ])
       const { change } = request
       if (Task.valueOf(task, change) === change.to) return task

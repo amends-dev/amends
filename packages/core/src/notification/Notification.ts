@@ -228,6 +228,6 @@ export const fromActivity = (
   recordedAt: entry.recordedAt,
   state:
     Recipient.isAnyOf(["Agent"])(selected.recipient) && !selected.requestsWork
-      ? { _tag: "Informational" }
-      : { _tag: "Pending" }
+      ? State.cases.Informational.make({})
+      : State.cases.Pending.make({})
 })

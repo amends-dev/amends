@@ -33,7 +33,7 @@ import type * as ThreadActivity from "../thread/ThreadActivity.ts"
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
 import * as ThreadCommand from "../thread/ThreadCommand.ts"
 import type * as ThreadMessage from "../thread/ThreadMessage.ts"
-import type * as ThreadParticipation from "../thread/ThreadParticipation.ts"
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
 import * as TurnCommand from "../turn/TurnCommand.ts"
@@ -127,14 +127,12 @@ export class TaskCommand extends Context.Service<
   }
 >()("@amends-dev/core/task/TaskCommand") {}
 
-const member = (memberId: Member.Id): ThreadParticipation.Reference => ({
-  _tag: "Member",
-  memberId
-})
+const member = (memberId: Member.Id): ThreadParticipation.Reference =>
+  ThreadParticipation.Reference.cases.Member.make({ memberId })
 
 /** Who takes part through a task in this state: triage while it is in triage, and its assignee. */
 const participantsOf = (task: Pick<Task.Task, "status" | "assignee">): ReadonlyArray<ThreadParticipation.Reference> => [
-  ...(task.status === "triage" ? [{ _tag: "Triage" } as const] : []),
+  ...(task.status === "triage" ? [ThreadParticipation.Reference.cases.Triage.make({})] : []),
   ...(task.assignee === null ? [] : [member(task.assignee)])
 ]
 
@@ -147,7 +145,7 @@ const admittedBy = (change: Task.Change, next: Task.Task) =>
     Assignee: ({ to }) => (to === null ? [] : [member(to)]),
     Status: ({ to }) =>
       to === "triage"
-        ? [{ _tag: "Triage" } as const]
+        ? [ThreadParticipation.Reference.cases.Triage.make({})]
         : Task.working(to) && next.assignee !== null
           ? [member(next.assignee)]
           : [],

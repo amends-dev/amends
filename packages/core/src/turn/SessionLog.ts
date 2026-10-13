@@ -193,24 +193,25 @@ export const reader = (turnId: Turn.Id, after: number): Reader => {
       Started: constVoid,
       Prompted: ({ messages }) => {
         lastResponse = undefined
-        items.push({ _tag: "InputTaken", at, messages })
+        items.push(Turn.LogItem.cases.InputTaken.make({ at, messages }))
       },
       Step: ({ id, step }) => {
         const text = textOf(step)
         if (text === "") return
         lastResponse = items.length
-        items.push({
-          _tag: "Responded",
-          at,
-          responseId: id,
-          text,
-          parts: step.parts.flatMap((part, index) => (part.type === "text" ? [index] : [])),
-          reply: false
-        })
+        items.push(
+          Turn.LogItem.cases.Responded.make({
+            at,
+            responseId: id,
+            text,
+            parts: step.parts.flatMap((part, index) => (part.type === "text" ? [index] : [])),
+            reply: false
+          })
+        )
       },
       Interrupted: ({ reason }) => {
         lastResponse = undefined
-        items.push({ _tag: "Interrupted", at, reason, retryable: true })
+        items.push(Turn.LogItem.cases.Interrupted.make({ at, reason, retryable: true }))
       }
     })
   const end: Reader["end"] = (messageIds) => {

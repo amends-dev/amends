@@ -25,7 +25,7 @@ import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
-import type * as Notification from "../notification/Notification.ts"
+import * as Notification from "../notification/Notification.ts"
 import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Request from "../request/Request.ts"
@@ -225,7 +225,7 @@ export const make = Effect.fn("DeliveryExecution.make")(function* () {
     for (const { participant } of participants) {
       if (!ThreadParticipation.Participant.isAnyOf(["Contact"])(participant)) continue
       const records = yield* notificationStore.listPendingByThread(
-        { _tag: "Contact", id: participant.contactId },
+        Notification.Recipient.cases.Contact.make({ id: participant.contactId }),
         thread.id,
         Number.MAX_SAFE_INTEGER
       )

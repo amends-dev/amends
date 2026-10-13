@@ -82,7 +82,7 @@ export const issuesOf = Effect.fnUntraced(function* (
   const issues = named.filter((issue) => issue !== undefined)
   if (Agent.Harness.isAnyOf(["Connection"])(setup.harness)) return issues
   const choices = yield* harnessesToChoose(setup, connections, integrations)
-  return choices.length === 0 ? [{ _tag: "NoHarness" }, ...issues] : issues
+  return choices.length === 0 ? [Agent.Issue.cases.NoHarness.make({}), ...issues] : issues
 })
 
 /**
@@ -92,7 +92,9 @@ export const issuesOf = Effect.fnUntraced(function* (
  * @since 0.1.0
  */
 export const readinessOf = (issues: ReadonlyArray<Agent.Issue>): Agent.Readiness =>
-  Array.isReadonlyArrayNonEmpty(issues) ? { _tag: "Incomplete", issues } : { _tag: "Ready" }
+  Array.isReadonlyArrayNonEmpty(issues)
+    ? Agent.Readiness.cases.Incomplete.make({ issues })
+    : Agent.Readiness.cases.Ready.make({})
 
 /**
  * What a connection is to an agent's setup: removed, of an integration its host no longer
@@ -150,8 +152,9 @@ const issueOf = Effect.fnUntraced(function* (
   if (!Resolved.$is("Installed")(resolved)) return { _tag: resolved._tag, part }
   const { integration, connection } = resolved
   const refusal = yield* refusalOf(part, integration, connection, setup)
-  if (refusal !== undefined) return { _tag: "Invalid", part, description: refusal }
-  if (part === "harness" && integration.requiresSandbox && setup.sandbox === null) return { _tag: "SandboxRequired" }
+  if (refusal !== undefined) return Agent.Issue.cases.Invalid.make({ part, description: refusal })
+  if (part === "harness" && integration.requiresSandbox && setup.sandbox === null)
+    return Agent.Issue.cases.SandboxRequired.make({})
   return undefined
 })
 

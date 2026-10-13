@@ -25,6 +25,7 @@ import * as Struct from "effect/Struct"
 import * as AgentPermissions from "../agent/AgentPermissions.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as ChangeFeedSource from "../change-feed/ChangeFeedSource.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
@@ -204,7 +205,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
   const { workspaceId } = yield* Store.Store
 
   const readThreadRequirement = (threadId: ThreadId.Id) =>
-    Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId })
+    Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))
   /**
    * The thread, when the reader may open it and read it, as its timeline requires: every read of
    * its turns checks this. Outside its audience, it is missing to them.
@@ -225,11 +226,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     return turn
   })
   const directAgentRequirement = (turn: Turn.Turn) =>
-    Requirement.make(AgentPermissions.Use, {
-      _tag: "Member",
-      workspaceId,
-      memberId: turn.memberId
-    })
+    Requirement.make(AgentPermissions.Use, Target.Reference.cases.Member.make({ workspaceId, memberId: turn.memberId }))
 
   /** Why the turn can't be retried now, or undefined when it can. */
   const whyNotRetryable = Effect.fnUntraced(function* (turn: Turn.Turn) {

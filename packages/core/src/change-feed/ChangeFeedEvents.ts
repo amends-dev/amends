@@ -18,6 +18,7 @@ import * as AssignmentFacts from "../authorization/AssignmentFacts.ts"
 import * as AssignmentPermissions from "../authorization/AssignmentPermissions.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as RoleFacts from "../authorization/RoleFacts.ts"
+import * as Target from "../authorization/Target.ts"
 import * as ChannelFacts from "../channel/ChannelFacts.ts"
 import type * as ChannelId from "../channel/ChannelId.ts"
 import * as ChannelPermissions from "../channel/ChannelPermissions.ts"
@@ -174,25 +175,21 @@ const registerFact = <F extends Standalone, View extends Schema.Constraint = F["
 }
 
 const readThreadRequirement = (threadId: ThreadId.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId })
+  Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))
 const readGroupRequirement = (groupId: Group.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId })
+  Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId }))
 const readMemberRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(MemberPermissions.Read, { _tag: "Member", workspaceId, memberId })
+  Requirement.make(MemberPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
 const readAccessRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId })
+  Requirement.make(AssignmentPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
 const readConnectionRequirement = (connectionId: Connection.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(ConnectionPermissions.Read, {
-    _tag: "Connection",
-    workspaceId,
-    connectionId
-  })
+  Requirement.make(ConnectionPermissions.Read, Target.Reference.cases.Connection.make({ workspaceId, connectionId }))
 const readAgentRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(AgentPermissions.Read, { _tag: "Member", workspaceId, memberId })
+  Requirement.make(AgentPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
 const readChannelRequirement = (channelId: ChannelId.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(ChannelPermissions.Read, { _tag: "Channel", workspaceId, channelId })
+  Requirement.make(ChannelPermissions.Read, Target.Reference.cases.Channel.make({ workspaceId, channelId }))
 const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId })
+  Requirement.make(InvitationPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId }))
 
 /**
  * Every fact the feed may deliver, each version registered separately. Readers see an event

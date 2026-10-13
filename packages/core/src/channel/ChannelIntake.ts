@@ -161,7 +161,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     Effect.flatMap(
       Publication.make(
         workspaceId,
-        Performer.Reference.cases.Identity.make({ identity: { _tag: "Contact", id: contactId } })
+        Performer.Reference.cases.Identity.make({ identity: Identity.Reference.cases.Contact.make({ id: contactId }) })
       ),
       (provenance) => step.pipe(Effect.provideService(Publication.Publication, provenance))
     ).pipe(journal.commit)
@@ -219,15 +219,15 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     )
     const title =
       event.title === undefined ? null : Option.getOrNull(Schema.decodeOption(Thread.Title)(event.title.trim()))
-    const author: ThreadMessage.Author = { _tag: "Contact", contactId: contact.id }
+    const author: ThreadMessage.Author = ThreadMessage.Author.cases.Contact.make({ contactId: contact.id })
     // The group's human followers join; its agents come through triage, assignment, or a mention.
     const followers = (yield* threadQuery.followers(channel.groupId)).filter(({ member }) =>
       Identity.MemberReference.isAnyOf(["Human"])(member.identity)
     )
     const participants: Array<ThreadParticipation.Reference> = [
-      { _tag: "Contact", contactId: contact.id },
-      ...followers.map(({ member }) => ({ _tag: "Member" as const, memberId: member.id })),
-      ...(channel.opensTasks ? [{ _tag: "Triage" as const }] : [])
+      ThreadParticipation.Reference.cases.Contact.make({ contactId: contact.id }),
+      ...followers.map(({ member }) => ThreadParticipation.Reference.cases.Member.make({ memberId: member.id })),
+      ...(channel.opensTasks ? [ThreadParticipation.Reference.cases.Triage.make({})] : [])
     ]
     const created = yield* admitted(
       threadCommand.create({
@@ -241,7 +241,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
           author,
           text,
           mentions: [],
-          via: { _tag: "Channel", channelId: channel.id, externalMessageId: event.messageId }
+          via: ThreadMessage.Via.cases.Channel.make({ channelId: channel.id, externalMessageId: event.messageId })
         },
         occurredAt
       })
@@ -262,7 +262,7 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
           thread: created.thread,
           ...Task.initial({}),
           createdBy: author,
-          by: { _tag: "Contact", contactId: contact.id },
+          by: ThreadParticipation.Reference.cases.Contact.make({ contactId: contact.id }),
           occurredAt
         })
       )
@@ -282,10 +282,9 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     if (Option.isSome(yield* threadMessageStore.get(messageId))) return ignored("duplicate")
     const thread = yield* threadOf(binding)
     // The contact is readmitted if their participation ended; everyone taking part is told.
-    const contactReference: ThreadParticipation.Reference = {
-      _tag: "Contact",
+    const contactReference: ThreadParticipation.Reference = ThreadParticipation.Reference.cases.Contact.make({
       contactId: contact.id
-    }
+    })
     const current = yield* threadQuery.currentParticipants(thread)
     const byKey = new Map(
       [contactReference, ...current.map((p) => ThreadParticipation.referenceOf(p.participant))].map(
@@ -296,12 +295,12 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
       threadCommand.publishMessage({
         messageId,
         threadId: thread.id,
-        author: { _tag: "Contact", contactId: contact.id },
+        author: ThreadMessage.Author.cases.Contact.make({ contactId: contact.id }),
         text,
         mentions: [],
         participants: [...byKey.values()],
         occurredAt,
-        via: { _tag: "Channel", channelId: channel.id, externalMessageId: event.messageId }
+        via: ThreadMessage.Via.cases.Channel.make({ channelId: channel.id, externalMessageId: event.messageId })
       })
     )
     return Intake.cases.Replied.make({ threadId: thread.id, messageId })

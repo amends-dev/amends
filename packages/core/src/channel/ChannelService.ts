@@ -18,6 +18,7 @@ import * as Schema from "effect/Schema"
 import * as Authorization from "../authorization/Authorization.ts"
 import type * as Permission from "../authorization/Permission.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import type * as Connection from "../connection/Connection.ts"
 import * as ConnectionPermissions from "../connection/ConnectionPermissions.ts"
 import * as ConnectionStore from "../connection/ConnectionStore.ts"
@@ -172,7 +173,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
 
-  const channelTarget = (channelId: Channel.Id) => ({ _tag: "Channel", workspaceId, channelId }) as const
+  const channelTarget = (channelId: Channel.Id) => Target.Reference.cases.Channel.make({ workspaceId, channelId })
 
   /** A channel the actor may act on with `permission`; to anyone else it is missing. */
   const requirePermitted = Effect.fnUntraced(function* (
@@ -195,7 +196,9 @@ export const make = Effect.fn("ChannelService.make")(function* () {
    */
   const requireDestination = Effect.fnUntraced(function* (groupId: Group.Id) {
     yield* groupQuery.requireAudience(groupId)
-    yield* authorization.require([Requirement.make(ThreadPermissions.Start, { _tag: "Group", workspaceId, groupId })])
+    yield* authorization.require([
+      Requirement.make(ThreadPermissions.Start, Target.Reference.cases.Group.make({ workspaceId, groupId }))
+    ])
   })
 
   /**
@@ -206,7 +209,7 @@ export const make = Effect.fn("ChannelService.make")(function* () {
     const unavailable = () => new CoreError.Invalid({ reason: new CoreError.ConnectionUnusable({ connectionId }) })
     const found = yield* connectionStore.get(connectionId)
     if (Option.isNone(found) || found.value.status !== "active") return yield* unavailable()
-    const target = { _tag: "Connection", workspaceId, connectionId } as const
+    const target = Target.Reference.cases.Connection.make({ workspaceId, connectionId })
     const [readable = false, usable = false] = yield* authorization.permitted([
       Requirement.make(ConnectionPermissions.Read, target),
       Requirement.make(ConnectionPermissions.Use, target)
@@ -219,7 +222,9 @@ export const make = Effect.fn("ChannelService.make")(function* () {
   const create = Effect.fn("ChannelService.create")(
     function* (input: Channel.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Channel.CreateInput))(input)
-      yield* authorization.require([Requirement.make(ChannelPermissions.Create, { _tag: "Workspace", workspaceId })])
+      yield* authorization.require([
+        Requirement.make(ChannelPermissions.Create, Target.Reference.cases.Workspace.make({ workspaceId }))
+      ])
       const actor = yield* Actor.Actor
       const channelId = Channel.Id.make(
         yield* Request.idFor(options.requestKey, ["channel.create", workspaceId, actor.memberId])

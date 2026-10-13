@@ -762,7 +762,8 @@ describe("threads", () => {
                   bound.messages.insert(
                     Object.assign({}, first.message, {
                       id: ThreadMessage.Id.make("blank"),
-                      content: ThreadMessage.published("  ", [])
+                      // Text the store must refuse, which `ThreadMessage.published` would not build.
+                      content: { _tag: "Text", text: "  ", mentions: [], revision: 1, editedAt: null }
                     })
                   )
                 )

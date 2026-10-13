@@ -16,6 +16,7 @@ import * as Schema from "effect/Schema"
 import * as AgentPermissions from "../agent/AgentPermissions.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
@@ -104,11 +105,10 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
       // People follow for themselves under group.follow; unfollowing needs no grant.
       if (following)
         yield* authorization.require([
-          Requirement.make(GroupPermissions.Follow, {
-            _tag: "Group",
-            workspaceId,
-            groupId: group.id
-          })
+          Requirement.make(
+            GroupPermissions.Follow,
+            Target.Reference.cases.Group.make({ workspaceId, groupId: group.id })
+          )
         ])
       return own
     }
@@ -129,11 +129,7 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
       })
     // Directing an agent's attention is using it, in either direction.
     yield* authorization.require([
-      Requirement.make(AgentPermissions.Use, {
-        _tag: "Member",
-        workspaceId,
-        memberId: member.id
-      })
+      Requirement.make(AgentPermissions.Use, Target.Reference.cases.Member.make({ workspaceId, memberId: member.id }))
     ])
     return admission.value
   })

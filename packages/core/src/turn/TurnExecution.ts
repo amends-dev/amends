@@ -24,6 +24,7 @@ import type * as Agent from "../agent/Agent.ts"
 import * as AgentQuery from "../agent/AgentQuery.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as ContactStore from "../channel/ContactStore.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
@@ -35,6 +36,7 @@ import * as Store from "../journal/Store.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as NotificationStore from "../notification/NotificationStore.ts"
 import * as Operation from "../operation/Operation.ts"
+import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as Thread from "../thread/Thread.ts"
@@ -576,7 +578,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     })
     const context = yield* readContext(turn.threadId)
     const retriedBy: ReadonlyArray<ThreadMessage.Author> =
-      turn.retry === null ? [] : [{ _tag: "Member", memberId: turn.retry.by }]
+      turn.retry === null ? [] : [ThreadMessage.Author.cases.Member.make({ memberId: turn.retry.by })]
     const names = yield* readNames([...TurnPrompt.peopleOf(context, items), ...retriedBy])
     const prompt = TurnPrompt.promptOf(context, items, {
       self: turn.memberId,
@@ -675,14 +677,15 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   ) {
     const turn = yield* requireTurn(turnId)
     if (turn.status !== "running" || draft.text === "") return
-    yield* signalHub.publish({
-      _tag: "TurnDraft",
-      workspaceId,
-      groupId: turn.groupId,
-      threadId: turn.threadId,
-      turnId: turn.id,
-      draft
-    })
+    yield* signalHub.publish(
+      Signal.Signal.cases.TurnDraft.make({
+        workspaceId,
+        groupId: turn.groupId,
+        threadId: turn.threadId,
+        turnId: turn.id,
+        draft
+      })
+    )
   }, Operation.report)
 
   /**
@@ -697,15 +700,16 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     )
     if (Option.isNone(thread)) return Result.fail("The agent can no longer open this thread.")
     const [mayPublish] = yield* authorization.permitted([
-      Requirement.make(ThreadMessagePermissions.Publish, {
-        _tag: "Thread",
-        workspaceId,
-        threadId: turn.threadId
-      })
+      Requirement.make(
+        ThreadMessagePermissions.Publish,
+        Target.Reference.cases.Thread.make({ workspaceId, threadId: turn.threadId })
+      )
     ])
     if (mayPublish !== true) return Result.fail("The agent may no longer post in this thread.")
     const current = yield* threadQuery.currentParticipants(thread.value)
-    const agent: ThreadParticipation.Reference = { _tag: "Member", memberId: turn.memberId }
+    const agent: ThreadParticipation.Reference = ThreadParticipation.Reference.cases.Member.make({
+      memberId: turn.memberId
+    })
     if (!current.some((p) => ThreadParticipation.keyOf(p.participant) === ThreadParticipation.keyOf(agent)))
       return Result.fail("The agent no longer takes part in this thread.")
     return Result.succeed(current.map((p) => ThreadParticipation.referenceOf(p.participant)))
@@ -743,12 +747,12 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         const published = yield* threadCommand.publishMessage({
           messageId: ThreadMessage.Id.make(yield* crypto.randomUUIDv4),
           threadId: turn.threadId,
-          author: { _tag: "Member", memberId: turn.memberId },
+          author: ThreadMessage.Author.cases.Member.make({ memberId: turn.memberId }),
           text: text.value,
           mentions: [],
           participants: participants.success,
           occurredAt: yield* DateTime.now,
-          via: { _tag: "Turn", turnId: turn.id }
+          via: ThreadMessage.Via.cases.Turn.make({ turnId: turn.id })
         })
         const messageIds = [published.message.id]
         yield* turnCommand.endTurn(turn, { outcome: "completed", messageIds })

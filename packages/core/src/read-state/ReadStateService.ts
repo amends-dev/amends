@@ -15,6 +15,7 @@ import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as GroupPermissions from "../group/GroupPermissions.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
@@ -92,11 +93,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
     const memberId = yield* requireHuman()
     const thread = yield* threadQuery.requireAccess(request.threadId)
     yield* authorization.require([
-      Requirement.make(ThreadPermissions.Read, {
-        _tag: "Thread",
-        workspaceId,
-        threadId: thread.id
-      })
+      Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id }))
     ])
     const found = yield* threadActivityStore.latest(thread.id)
     const latest = Option.isNone(found) ? 0 : found.value.sequence
@@ -133,11 +130,10 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
     const memberId = yield* requireHuman()
     yield* groupQuery.requireAudience(request.groupId)
     yield* authorization.require([
-      Requirement.make(GroupPermissions.Read, {
-        _tag: "Group",
-        workspaceId,
-        groupId: request.groupId
-      })
+      Requirement.make(
+        GroupPermissions.Read,
+        Target.Reference.cases.Group.make({ workspaceId, groupId: request.groupId })
+      )
     ])
     const readAt = yield* DateTime.now
     yield* readStateStore.advanceGroup({

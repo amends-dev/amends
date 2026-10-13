@@ -19,6 +19,7 @@ import * as Schema from "effect/Schema"
 import * as AgentPermissions from "../agent/AgentPermissions.ts"
 import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
@@ -146,11 +147,11 @@ const selectedFor = (
   mentions: ReadonlyArray<Member.Id>,
   current: ReadonlyArray<ThreadParticipation.ThreadParticipation>
 ): ReadonlyArray<ThreadParticipation.Reference> => {
-  const author: ThreadParticipation.Reference = { _tag: "Member", memberId: authorId }
+  const author: ThreadParticipation.Reference = ThreadParticipation.Reference.cases.Member.make({ memberId: authorId })
   const addressed: ReadonlyArray<ThreadParticipation.Reference> =
     mentions.length === 0
       ? current.map(({ participant }) => ThreadParticipation.referenceOf(participant))
-      : mentions.map((memberId) => ({ _tag: "Member", memberId }))
+      : mentions.map((memberId) => ThreadParticipation.Reference.cases.Member.make({ memberId }))
   const byKey = new Map([author, ...addressed].map((reference) => [ThreadParticipation.keyOf(reference), reference]))
   return [...byKey.values()]
 }
@@ -190,11 +191,10 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   const requirePublishable = Effect.fnUntraced(function* (threadId: Thread.Id) {
     const thread = yield* threadQuery.requireAccess(threadId)
     yield* authorization.require([
-      Requirement.make(ThreadMessagePermissions.Publish, {
-        _tag: "Thread",
-        workspaceId,
-        threadId: thread.id
-      })
+      Requirement.make(
+        ThreadMessagePermissions.Publish,
+        Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
+      )
     ])
     return thread
   })
@@ -266,17 +266,16 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           request.mentions.includes(reference.memberId)
         )
           yield* authorization.require([
-            Requirement.make(AgentPermissions.Use, {
-              _tag: "Member",
-              workspaceId,
-              memberId: reference.memberId
-            })
+            Requirement.make(
+              AgentPermissions.Use,
+              Target.Reference.cases.Member.make({ workspaceId, memberId: reference.memberId })
+            )
           ])
       }
       const published = yield* threadCommand.publishMessage({
         ...request,
         messageId,
-        author: { _tag: "Member", memberId: actor.memberId },
+        author: ThreadMessage.Author.cases.Member.make({ memberId: actor.memberId }),
         via: null,
         participants: selected,
         occurredAt: yield* DateTime.now
@@ -311,11 +310,10 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           reason: new CoreError.NotAuthor({ messageId: message.id })
         })
       yield* authorization.require([
-        Requirement.make(ThreadMessagePermissions.Publish, {
-          _tag: "Thread",
-          workspaceId,
-          threadId: thread.id
-        })
+        Requirement.make(
+          ThreadMessagePermissions.Publish,
+          Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
+        )
       ])
       if (!ThreadMessage.Content.isAnyOf(["Text"])(message.content))
         return yield* new CoreError.Conflict({
@@ -331,7 +329,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const participating = new Set(
         (yield* threadQuery.findParticipants(
           thread,
-          joining.map((memberId) => ({ _tag: "Member" as const, memberId }))
+          joining.map((memberId) => ThreadParticipation.Reference.cases.Member.make({ memberId }))
         )).flatMap(({ participant }) => ThreadParticipation.memberOf(participant) ?? [])
       )
       const eligible = yield* threadQuery.eligibleMembers(thread.groupId, joining)
@@ -343,7 +341,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           })
         if (Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity) && !participating.has(memberId))
           yield* authorization.require([
-            Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId })
+            Requirement.make(AgentPermissions.Use, Target.Reference.cases.Member.make({ workspaceId, memberId }))
           ])
       }
       const edited = yield* threadCommand.editMessage({
@@ -370,16 +368,14 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       // The author deletes their own message as they published it; anyone else moderates the group.
       yield* authorization.require([
         wroteBy(message, actor)
-          ? Requirement.make(ThreadMessagePermissions.Publish, {
-              _tag: "Thread",
-              workspaceId,
-              threadId: thread.id
-            })
-          : Requirement.make(ThreadMessagePermissions.Moderate, {
-              _tag: "Group",
-              workspaceId,
-              groupId: thread.groupId
-            })
+          ? Requirement.make(
+              ThreadMessagePermissions.Publish,
+              Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id })
+            )
+          : Requirement.make(
+              ThreadMessagePermissions.Moderate,
+              Target.Reference.cases.Group.make({ workspaceId, groupId: thread.groupId })
+            )
       ])
       if (ThreadMessage.Content.isAnyOf(["Deleted"])(message.content)) return message
       const deleted = yield* threadCommand

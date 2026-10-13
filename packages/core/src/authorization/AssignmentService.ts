@@ -32,6 +32,7 @@ import type * as Permission from "./Permission.ts"
 import * as PermissionCatalog from "./PermissionCatalog.ts"
 import * as Requirement from "./Requirement.ts"
 import * as Scope from "./Scope.ts"
+import * as Target from "./Target.ts"
 
 /**
  * What the assignment operations can fail with: the outcomes above, and delegation's.
@@ -146,17 +147,17 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   const crypto = yield* Crypto.Crypto
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
   const { workspaceId } = yield* Store.Store
-  const manageRequirement = Requirement.make(AssignmentPermissions.Manage, {
-    _tag: "Workspace",
-    workspaceId
-  })
+  const manageRequirement = Requirement.make(
+    AssignmentPermissions.Manage,
+    Target.Reference.cases.Workspace.make({ workspaceId })
+  )
   const workspaceWide = permissionCatalog.definitions.filter((permission) => permission.targetKind === "Workspace")
   const permissions = Effect.gen(function* () {
     const covered = yield* authorization.permitted(
       workspaceWide.map((permission) =>
         Requirement.Requirement.make({
           permission: { name: permission.name, targetKind: permission.targetKind },
-          target: { _tag: "Workspace", workspaceId }
+          target: Target.Reference.cases.Workspace.make({ workspaceId })
         })
       )
     )
@@ -186,7 +187,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   }).pipe(Operation.report)
   const list = Effect.fn("AssignmentService.list")(function* (memberId: Member.Id) {
     yield* authorization.require([
-      Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId })
+      Requirement.make(AssignmentPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
     ])
     const record = yield* requireMember(memberId)
     return Assignment.Access.make({

@@ -66,7 +66,11 @@ export const definition = Projection.make("notifications", { version: 4 })
     Effect.fn("NotificationProjection.turnCreated")(function* ({ payload }) {
       // A turn's acceptance settles the notifications it took, in the same commit.
       const notificationStore = yield* NotificationStore.NotificationStore
-      yield* notificationStore.accept(payload.notificationIds, { _tag: "Turn", turnId: payload.id }, payload.createdAt)
+      yield* notificationStore.accept(
+        payload.notificationIds,
+        Notification.AcceptedBy.cases.Turn.make({ turnId: payload.id }),
+        payload.createdAt
+      )
     })
   )
   .on(
@@ -76,7 +80,7 @@ export const definition = Projection.make("notifications", { version: 4 })
       const notificationStore = yield* NotificationStore.NotificationStore
       yield* notificationStore.accept(
         payload.notificationIds,
-        { _tag: "Delivery", deliveryId: payload.id },
+        Notification.AcceptedBy.cases.Delivery.make({ deliveryId: payload.id }),
         payload.requestedAt
       )
     })

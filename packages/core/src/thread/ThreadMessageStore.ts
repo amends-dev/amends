@@ -161,6 +161,7 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
         return yield* StoreError.rejected("ThreadMessageStore", "edit", "Expected a message with text")
       if (edited.revision !== found.value.content.revision + 1)
         return yield* StoreError.rejected("ThreadMessageStore", "edit", "Expected the message's next revision")
+      // The row's encoder checks the edit, so a literal leaves its failure to the store.
       const content: ThreadMessage.Content = {
         _tag: "Text",
         text: edited.text,

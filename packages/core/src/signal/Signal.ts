@@ -9,6 +9,7 @@
 
 import * as Schema from "effect/Schema"
 import * as Requirement from "../authorization/Requirement.ts"
+import * as Target from "../authorization/Target.ts"
 import * as Group from "../group/Group.ts"
 import * as GroupId from "../group/GroupId.ts"
 import type * as Audience from "../journal/Audience.ts"
@@ -98,11 +99,10 @@ const threadReaders = (signal: {
   readonly threadId: ThreadId.Id
 }): Reach => ({
   audience: [Group.audienceOf(signal.groupId)],
-  requirement: Requirement.make(ThreadPermissions.Read, {
-    _tag: "Thread",
-    workspaceId: signal.workspaceId,
-    threadId: signal.threadId
-  })
+  requirement: Requirement.make(
+    ThreadPermissions.Read,
+    Target.Reference.cases.Thread.make({ workspaceId: signal.workspaceId, threadId: signal.threadId })
+  )
 })
 
 /**

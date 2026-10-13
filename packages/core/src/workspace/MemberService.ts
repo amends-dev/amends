@@ -27,6 +27,7 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
+import * as Invitation from "./Invitation.ts"
 import * as InvitationFacts from "./InvitationFacts.ts"
 import * as InvitationStore from "./InvitationStore.ts"
 import * as Member from "./Member.ts"
@@ -209,9 +210,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
             yield* journal.publish(InvitationFacts.Revoked, {
               workspaceId,
               invitationId: invitation.details.id,
-              _tag: "Revoked",
-              revokedBy: actor.memberId,
-              revokedAt
+              ...Invitation.State.cases.Revoked.make({ revokedBy: actor.memberId, revokedAt })
             })
         }).pipe(Publication.withCause(removed, revokedAt))
       }

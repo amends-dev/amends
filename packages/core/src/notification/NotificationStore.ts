@@ -660,7 +660,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
             continue
           const row = yield* rows.encode({
             ...record,
-            state: { _tag: "Discarded", reason: "participation-ended" }
+            state: Notification.State.cases.Discarded.make({ reason: "participation-ended" })
           })
           space.records.of("notifications").set(record.id, row)
         }
@@ -681,7 +681,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
           )
             continue
           const reason = Notification.Recipient.isAnyOf(["Agent"])(recipient) ? "participation-ended" : "access-lost"
-          const row = yield* rows.encode({ ...record, state: { _tag: "Discarded", reason } })
+          const row = yield* rows.encode({ ...record, state: Notification.State.cases.Discarded.make({ reason }) })
           space.records.of("notifications").set(record.id, row)
         }
       },
