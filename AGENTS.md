@@ -51,9 +51,10 @@ runs them, and keeps `console` to tests and scripts.
   shared packages with `workspace:*`, but never hosts or apps. This applies to all dependency
   sections; development tools live at the root. `core` operates within one workspace with a trusted
   actor; its services are the operations. Each core feature keeps the operations actors call in
-  `service.ts`, the internal writes other operations share in one `command.ts` service, and the
-  internal reads in one `query.ts` service; a command may read through the query, a query never
-  writes, and a step with one caller stays a private function of that caller. `gateway` is how a
+  its service module, such as `ThreadService`, the internal writes other operations share in one
+  command service, `ThreadCommand`, and the internal reads in one query service, `ThreadQuery`; a
+  command may read through the query, a query never writes, and a step with one caller stays a
+  private function of that caller. `gateway` is how a
   host enters core: it bootstraps a workspace and resolves an authenticated identity into the actor,
   and it holds the host contracts for storage, accounts, sign-in, session token resolution, and the
   workspace directory. `http` is the HTTP protocol: the contract clients call, which they import by

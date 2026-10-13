@@ -140,9 +140,11 @@ revealed or sent.
 
 ## HTTP coverage
 
-HTTP exposes sign-in, accounts, workspace creation and the directory, members, invitations, assignments, ownership,
-the notification inbox, its sources and marking them seen, groups, threads, replies, following, read
-state, the change feed, and typing. No operation reaches a group from outside it, so there is no
+HTTP exposes sign-in and signing out, accounts, workspace creation and the directory, workspace
+settings, members, invitations, assignments, ownership, the notification inbox, its sources and
+marking them seen, groups, threads, replies, following, read state, tasks, connections and the
+integrations they use, agents, turns and their logs, channels and the events their systems send,
+the change feed, and typing. No operation reaches a group from outside it, so there is no
 workspace-wide oversight of private groups or direct groups by design.
 
 ## Conversations in the apps
@@ -328,9 +330,8 @@ page boundaries, and an account popup with appearance and sign-out controls.
 The [change feed](change-feed.md) keeps workspace views current. Invitations
 from other workspaces appear only when the page wakes or reloads, since no identity-level feed
 exists.
-Only local sign-out exists; server revocation,
-token refresh, native credential storage, and web/desktop login synchronization are
-future work.
+Signing out revokes the credential on the host as well as forgetting it locally; token refresh,
+native credential storage, and web/desktop login synchronization are future work.
 Route focus management, Tauri signing/updates,
 and cross-platform installer verification are pending.
 

@@ -25,7 +25,9 @@ bun run check
 ```
 
 The root configuration discovers only application tests. The `backend` project
-covers shared packages, whose tests run over the memory implementation in core and the gateway. The `postgresql` project covers the
+covers shared packages, whose tests run over the memory implementation in core and the gateway, and
+the sandbox and harness adapters, whose live tests run only when an `AMENDS_TEST_*` flag asks, as
+[integration resources](#integration-resources) describes. The `postgresql` project covers the
 PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
 headless state; web and desktop test their own route/UI integration, and web's bundle test builds the app and fails when
 core's implementation reaches the browser bundle; verify both frontend builds and desktop
