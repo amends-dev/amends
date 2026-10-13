@@ -40,7 +40,7 @@ const byName = (live: ReadonlyArray<Checkpoint.LiveVersion>) =>
 export const journal = (fixture: Fixture.Fixture) => {
   const { core, initialized, seed } = Support
   describe.skipIf(!fixture.available)(`${fixture.name}: journal`, () => {
-    it.live("separate hosts observe live appends; identical log IDs stay isolated by workspace", () =>
+    it.effect("separate hosts observe live appends; identical log IDs stay isolated by workspace", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const host = yield* storage.connect()

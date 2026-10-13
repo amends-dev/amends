@@ -39,7 +39,7 @@ const holding = (bound: Support.Bound, logs: ReadonlyArray<Entry.LogId>, outcome
 /** Appends outside any transaction, which wait only for their log's other writers. */
 export const standaloneAppends = (fixture: Fixture.Fixture) => {
   describe.skipIf(!fixture.available)(`${fixture.name}: standalone appends`, () => {
-    it.live("a standalone append commits while another host's transaction holds the workspace", () =>
+    it.effect("a standalone append commits while another host's transaction holds the workspace", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const writer = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
@@ -62,7 +62,7 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("standalone appends from several hosts take consecutive positions, and none is lost", () =>
+    it.effect("standalone appends from several hosts take consecutive positions, and none is lost", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const hosts = yield* Effect.forEach([1, 2, 3], () =>
@@ -154,7 +154,7 @@ export const standaloneAppends = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("keys and expected positions hold across standalone and transaction appends", () =>
+    it.effect("keys and expected positions hold across standalone and transaction appends", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const writer = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)

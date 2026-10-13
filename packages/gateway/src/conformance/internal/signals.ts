@@ -37,7 +37,7 @@ const buffer = <A, E>(stream: Stream.Stream<A, E>) =>
       Effect.forkScoped
     )
     // @effect-diagnostics-next-line returnEffectInGen:off
-    return Queue.take(queue).pipe(Effect.timeout("10 seconds"))
+    return Queue.take(queue)
   })
 const sameSignal = Schema.toEquivalence(Signal.Signal)
 /** The values taken before the marker, which the caller published after what it expects. */
@@ -137,7 +137,7 @@ export const signals = (fixture: Fixture.Fixture) => {
     })
 
   describe.skipIf(!fixture.available)(`${fixture.name}: signals`, () => {
-    it.live("signals reach the workspace's subscribers on every host in order, and only while subscribed", () =>
+    it.effect("signals reach the workspace's subscribers on every host in order, and only while subscribed", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const first = yield* storage.connect()
@@ -177,7 +177,7 @@ export const signals = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("typing on one host reaches the thread's readers on another, and nobody else", () =>
+    it.effect("typing on one host reaches the thread's readers on another, and nobody else", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { first, owner, groupId, threadId, as, feed } = yield* world(storage)
@@ -215,7 +215,7 @@ export const signals = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("typing needs access to the thread and permission to post in it", () =>
+    it.effect("typing needs access to the thread and permission to post in it", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { threadId, as } = yield* world(storage)
@@ -240,7 +240,7 @@ export const signals = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("a person's read state reaches their sessions on every host, and nobody else", () =>
+    it.effect("a person's read state reaches their sessions on every host, and nobody else", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { first, owner, groupId, threadId, as, feed } = yield* world(storage)

@@ -76,7 +76,7 @@ const interrupted: SessionLog.Entry = { _tag: "Interrupted", turnId, reason: "Th
 /** Each participation's session log: append-only, apart from every commit. */
 export const sessionLogs = (fixture: Fixture.Fixture) => {
   describe.skipIf(!fixture.available)(`${fixture.name}: session logs`, () => {
-    it.live("appends entries after the latest, at the next positions, and reads them as recorded", () =>
+    it.effect("appends entries after the latest, at the next positions, and reads them as recorded", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const { sessionLogs } = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
@@ -101,7 +101,7 @@ export const sessionLogs = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("refuses an append after any position but the latest, taking none of it", () =>
+    it.effect("refuses an append after any position but the latest, taking none of it", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const one = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
@@ -130,7 +130,7 @@ export const sessionLogs = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("keeps each participation's log apart, and each workspace's", () =>
+    it.effect("keeps each participation's log apart, and each workspace's", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const host = yield* storage.connect()
@@ -152,7 +152,7 @@ export const sessionLogs = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("takes part in no commit: an append in a transaction that rolls back is kept", () =>
+    it.effect("takes part in no commit: an append in a transaction that rolls back is kept", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)

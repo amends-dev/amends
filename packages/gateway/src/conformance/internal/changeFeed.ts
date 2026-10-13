@@ -35,7 +35,7 @@ const listen = <E, R>(watch: Effect.Effect<Stream.Stream<ChangeFeed.Message, Cor
       Effect.forkScoped
     )
     // @effect-diagnostics-next-line returnEffectInGen:off
-    return Queue.take(queue).pipe(Effect.timeout("10 seconds"))
+    return Queue.take(queue)
   })
 const committed = (message: ChangeFeed.Message) => {
   if (!ChangeFeed.Message.isAnyOf(["Committed"])(message)) throw new Error(`Expected a commit, got ${message._tag}`)
@@ -49,7 +49,7 @@ const human = (name: string) => Identity.HumanId.make(name)
 export const changeFeed = (fixture: Fixture.Fixture) => {
   const { gateway } = Support
   describe.skipIf(!fixture.available)(`${fixture.name}: change feed`, () => {
-    it.live("a subscriber receives commits made through its own host and through another", () =>
+    it.effect("a subscriber receives commits made through its own host and through another", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           // Each host keeps one gateway for the test, as a running process would.
@@ -92,7 +92,7 @@ export const changeFeed = (fixture: Fixture.Fixture) => {
       )
     )
 
-    it.live("a cursor resumes on another host with the commits missed in between", () =>
+    it.effect("a cursor resumes on another host with the commits missed in between", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const first = yield* storage.connect()
