@@ -549,9 +549,11 @@ describe("BridgeClient", () => {
         const first = yield* Effect.forEach(sessions, (session) =>
           Stream.runCollect(session.stream({ prompt: "reply first" }))
         )
-        // A bridge another took the place of exits within a second or so of running no turn.
-        yield* Effect.sleep("3 seconds")
-        const running = yield* Effect.filter(yield* launchedPids(sandbox), isRunning)
+        // The bridge the other took the place of exits once it runs no turn.
+        const running = yield* Effect.filter(yield* launchedPids(sandbox), isRunning).pipe(
+          Effect.repeat({ until: (running) => running.length <= 1, schedule: Schedule.spaced("50 millis") }),
+          Effect.timeout("10 seconds")
+        )
         const second = yield* Effect.forEach(sessions, (session) =>
           Stream.runCollect(session.stream({ prompt: "reply second" }))
         )
