@@ -24,17 +24,18 @@
  *
  * @since 0.1.0
  */
-import { Network, Sandbox } from "@amends-dev/sandbox";
-import type * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-import type * as Scope from "effect/Scope";
-import type * as Stream from "effect/Stream";
-import * as Prompt from "effect/ai/Prompt";
-import * as Rpc from "effect/rpc/Rpc";
-import * as RpcGroup from "effect/rpc/RpcGroup";
-import * as Agent from "./Agent.ts";
-import * as HarnessError from "./HarnessError.ts";
-import * as StreamPart from "./StreamPart.ts";
+
+import { Network, Sandbox } from "@amends-dev/sandbox"
+import * as Prompt from "effect/ai/Prompt"
+import type * as Effect from "effect/Effect"
+import * as Rpc from "effect/rpc/Rpc"
+import * as RpcGroup from "effect/rpc/RpcGroup"
+import * as Schema from "effect/Schema"
+import type * as Scope from "effect/Scope"
+import type * as Stream from "effect/Stream"
+import * as Agent from "./Agent.ts"
+import * as HarnessError from "./HarnessError.ts"
+import * as StreamPart from "./StreamPart.ts"
 
 /**
  * A tool the host runs, as the agent reads it: its name, what it does, and its parameters.
@@ -47,8 +48,8 @@ export const ToolDefinition = Schema.Struct({
   description: Schema.optional(Schema.String),
 
   /** The tool's parameters, as a JSON Schema. */
-  parameters: Schema.Json,
-});
+  parameters: Schema.Json
+})
 
 /**
  * @category schemas
@@ -64,14 +65,14 @@ export interface ToolDefinition extends Schema.Schema.Type<typeof ToolDefinition
  */
 export const ResponseFormat = Schema.Union([
   Schema.Struct({ type: Schema.tag("text") }),
-  Schema.Struct({ type: Schema.tag("json"), objectName: Schema.String, schema: Schema.Json }),
-]);
+  Schema.Struct({ type: Schema.tag("json"), objectName: Schema.String, schema: Schema.Json })
+])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type ResponseFormat = typeof ResponseFormat.Type;
+export type ResponseFormat = typeof ResponseFormat.Type
 
 /**
  * A turn's settings, as `Agent.TurnOptions` gives them, with the host's tools and the answer's
@@ -85,8 +86,8 @@ export const TurnOptions = Schema.Struct({
   instructions: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   tools: Schema.Array(ToolDefinition),
-  responseFormat: ResponseFormat,
-});
+  responseFormat: ResponseFormat
+})
 
 /**
  * @category schemas
@@ -102,19 +103,19 @@ export interface TurnOptions extends Schema.Schema.Type<typeof TurnOptions> {}
  * @since 0.1.0
  */
 export interface CreateSessionOptions {
-  readonly id: Agent.SessionId;
+  readonly id: Agent.SessionId
 
   /** The absolute directory the session works in. It exists before `createSession`. */
-  readonly directory: string;
+  readonly directory: string
 
   /**
    * The conversation so far, empty for a new session. An agent given `agentState` has it already;
    * any other loads it before its first turn.
    */
-  readonly history: Prompt.Prompt;
+  readonly history: Prompt.Prompt
 
   /** What the session's `state` returned when it last ran on this agent. */
-  readonly agentState?: Schema.Json | undefined;
+  readonly agentState?: Schema.Json | undefined
 }
 
 /**
@@ -130,27 +131,25 @@ export interface DriverSession {
    * names, rather than from `history`, as it does when it lost that conversation or had none. The
    * bridge continues a turn it did not finish only in a conversation the agent kept.
    */
-  readonly keptConversation: boolean;
+  readonly keptConversation: boolean
 
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
-  readonly promptTurn: (
-    options: TurnOptions,
-  ) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>;
+  readonly promptTurn: (options: TurnOptions) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>
 
-  readonly submitToolResult: Agent.AgentSession["submitToolResult"];
+  readonly submitToolResult: Agent.AgentSession["submitToolResult"]
 
-  readonly approve: Agent.AgentSession["approve"];
+  readonly approve: Agent.AgentSession["approve"]
 
-  readonly compact: Agent.AgentSession["compact"];
+  readonly compact: Agent.AgentSession["compact"]
 
   /**
    * What `createSession` takes as `agentState` to start the session again, as a restarted bridge
    * does.
    */
-  readonly state: Effect.Effect<Schema.Json, HarnessError.HarnessError>;
+  readonly state: Effect.Effect<Schema.Json, HarnessError.HarnessError>
 
   /** Deletes what the agent keeps of the session. Its scope closes afterwards. */
-  readonly destroy: Effect.Effect<void, HarnessError.HarnessError>;
+  readonly destroy: Effect.Effect<void, HarnessError.HarnessError>
 }
 
 /**
@@ -161,23 +160,23 @@ export interface DriverSession {
  * **Example** (A driver over an agent's own session API)
  *
  * ```ts
- * import { Bridge, StreamPart } from "@amends-dev/harness";
- * import { Effect, Stream } from "effect";
+ * import { Bridge, StreamPart } from "@amends-dev/harness"
+ * import { Effect, Stream } from "effect"
  *
  * // What the adapter has of its agent in the sandbox: a client of the agent's own API.
  * declare const agent: {
- *   readonly createSession: (directory: string) => Effect.Effect<string>;
- *   readonly prompt: (sessionId: string, text: string) => Stream.Stream<StreamPart.StreamPart>;
- *   readonly deleteSession: (sessionId: string) => Effect.Effect<void>;
- * };
+ *   readonly createSession: (directory: string) => Effect.Effect<string>
+ *   readonly prompt: (sessionId: string, text: string) => Stream.Stream<StreamPart.StreamPart>
+ *   readonly deleteSession: (sessionId: string) => Effect.Effect<void>
+ * }
  *
  * const driver: Bridge.Driver = {
  *   id: "my-agent",
  *   createSession: (options) =>
  *     Effect.gen(function* () {
  *       // A session the bridge starts again finds the agent's own session in `agentState`.
- *       const kept = typeof options.agentState === "string" ? options.agentState : undefined;
- *       const sessionId = kept ?? (yield* agent.createSession(options.directory));
+ *       const kept = typeof options.agentState === "string" ? options.agentState : undefined
+ *       const sessionId = kept ?? (yield* agent.createSession(options.directory))
  *       const session: Bridge.DriverSession = {
  *         keptConversation: kept !== undefined,
  *         promptTurn: ({ prompt }) => agent.prompt(sessionId, JSON.stringify(prompt.content)),
@@ -185,11 +184,11 @@ export interface DriverSession {
  *         approve: () => Effect.void,
  *         compact: () => Effect.die("my-agent compacts only by itself"),
  *         state: Effect.succeed(sessionId),
- *         destroy: agent.deleteSession(sessionId),
- *       };
- *       return session;
- *     }),
- * };
+ *         destroy: agent.deleteSession(sessionId)
+ *       }
+ *       return session
+ *     })
+ * }
  * ```
  *
  * @category models
@@ -197,15 +196,15 @@ export interface DriverSession {
  */
 export interface Driver {
   /** Names the agent it drives, such as `opencode`, as the agent's `Agent.Agent` for hosts does. */
-  readonly id: string;
+  readonly id: string
 
   /**
    * Creates a session: a new one, or one created again from its `state`. The session runs until its
    * scope closes, when a host stops or destroys it, or the bridge exits.
    */
   readonly createSession: (
-    options: CreateSessionOptions,
-  ) => Effect.Effect<DriverSession, HarnessError.HarnessError, Scope.Scope>;
+    options: CreateSessionOptions
+  ) => Effect.Effect<DriverSession, HarnessError.HarnessError, Scope.Scope>
 }
 
 /**
@@ -215,13 +214,13 @@ export interface Driver {
  * @category schemas
  * @since 0.1.0
  */
-export const TurnId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("TurnId"));
+export const TurnId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("TurnId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type TurnId = typeof TurnId.Type;
+export type TurnId = typeof TurnId.Type
 
 /**
  * A part of a turn, numbered from 1 in the order the turn streamed it.
@@ -229,7 +228,7 @@ export type TurnId = typeof TurnId.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const NumberedPart = Schema.Struct({ seq: Schema.Int, part: StreamPart.StreamPart });
+export const NumberedPart = Schema.Struct({ seq: Schema.Int, part: StreamPart.StreamPart })
 
 /**
  * @category schemas
@@ -245,7 +244,7 @@ export interface NumberedPart extends Schema.Schema.Type<typeof NumberedPart> {}
  * @category constants
  * @since 0.1.0
  */
-export const protocolVersion = 2;
+export const protocolVersion = 2
 
 /**
  * Names a bridge after everything a host launches it with, as `Sandbox.isName` checks, so that a
@@ -255,13 +254,13 @@ export const protocolVersion = 2;
  * @category schemas
  * @since 0.1.0
  */
-export const BridgeId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("BridgeId"));
+export const BridgeId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("BridgeId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type BridgeId = typeof BridgeId.Type;
+export type BridgeId = typeof BridgeId.Type
 
 /**
  * What a bridge writes to `listeningFile` in its state directory once it listens, for hosts to find
@@ -270,7 +269,7 @@ export type BridgeId = typeof BridgeId.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Listening = Schema.Struct({ port: Network.Port });
+export const Listening = Schema.Struct({ port: Network.Port })
 
 /**
  * @category schemas
@@ -284,7 +283,7 @@ export interface Listening extends Schema.Schema.Type<typeof Listening> {}
  * @category constants
  * @since 0.1.0
  */
-export const listeningFile = "listening.json";
+export const listeningFile = "listening.json"
 
 /**
  * Answers which agent the bridge runs, and which bridge it is, for a host to check that it reached
@@ -294,11 +293,11 @@ export const listeningFile = "listening.json";
  * @since 0.1.0
  */
 export const Hello = Rpc.make("Hello", {
-  success: Schema.Struct({ agent: Schema.String, bridge: BridgeId }),
-});
+  success: Schema.Struct({ agent: Schema.String, bridge: BridgeId })
+})
 
 /** The session a request is about. Every request but `StartSession` needs it started. */
-const inSession = { session: Agent.SessionId };
+const inSession = { session: Agent.SessionId }
 
 /**
  * The protocol between a host and a bridge: the requests a host sends over its WebSocket, which
@@ -321,10 +320,10 @@ export class Rpcs extends RpcGroup.make(
       directory: Schema.String,
       history: Prompt.Prompt,
       agentState: Schema.optionalKey(Schema.Json),
-      unfinishedTurn: Schema.optional(TurnId),
+      unfinishedTurn: Schema.optional(TurnId)
     },
     success: Schema.Struct({ hasUnfinishedTurn: Schema.Boolean, agentState: Schema.Json }),
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /**
@@ -336,7 +335,7 @@ export class Rpcs extends RpcGroup.make(
    */
   Rpc.make("StartTurn", {
     payload: { ...inSession, turn: TurnId, options: TurnOptions },
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /**
@@ -348,13 +347,13 @@ export class Rpcs extends RpcGroup.make(
     payload: { ...inSession, turn: TurnId, after: Schema.Int },
     success: NumberedPart,
     error: HarnessError.HarnessError,
-    stream: true,
+    stream: true
   }),
 
   /** Aborts the turn. Aborting a turn that ended does nothing. */
   Rpc.make("AbortTurn", {
     payload: { ...inSession, turn: TurnId },
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /** Gives the running turn the result of a host tool it called. */
@@ -365,10 +364,10 @@ export class Rpcs extends RpcGroup.make(
         id: Schema.String,
         name: Schema.String,
         result: Schema.Json,
-        isFailure: Schema.Boolean,
-      }),
+        isFailure: Schema.Boolean
+      })
     },
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /** Answers a `tool-approval-request` of the running turn. */
@@ -378,38 +377,38 @@ export class Rpcs extends RpcGroup.make(
       response: Schema.Struct({
         approvalId: Schema.String,
         approved: Schema.Boolean,
-        reason: Schema.optional(Schema.String),
-      }),
+        reason: Schema.optional(Schema.String)
+      })
     },
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /** Asks the agent to summarize the conversation so far, between turns, answering with it. */
   Rpc.make("Compact", {
     payload: { ...inSession, instructions: Schema.optional(Schema.String) },
     success: StreamPart.CompactionPart,
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /** What `StartSession` takes as `agentState` to start the session again. */
   Rpc.make("ReadState", {
     payload: inSession,
     success: Schema.Json,
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /** Aborts the running turn and ends the session, answering what `ReadState` would. */
   Rpc.make("StopSession", {
     payload: inSession,
     success: Schema.Json,
-    error: HarnessError.HarnessError,
+    error: HarnessError.HarnessError
   }),
 
   /** Aborts the running turn, deletes the session and its turns, and ends it. */
   Rpc.make("DestroySession", {
     payload: inSession,
-    error: HarnessError.HarnessError,
-  }),
+    error: HarnessError.HarnessError
+  })
 ) {}
 
 /**
@@ -433,8 +432,8 @@ export const LaunchOptions = Schema.Struct({
   stateDirectory: Schema.String,
 
   /** The adapter's own options, such as the agent's configuration and its model providers' keys. */
-  agentOptions: Schema.Json,
-});
+  agentOptions: Schema.Json
+})
 
 /**
  * @category schemas

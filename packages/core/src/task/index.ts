@@ -12,44 +12,44 @@
 /**
  * @since 0.1.0
  */
-export * as Task from "./Task.ts";
+export * as Task from "./Task.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskActivity from "./TaskActivity.ts";
+export * as TaskActivity from "./TaskActivity.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskCommand from "./TaskCommand.ts";
+export * as TaskCommand from "./TaskCommand.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskFacts from "./TaskFacts.ts";
+export * as TaskFacts from "./TaskFacts.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskPermissions from "./TaskPermissions.ts";
+export * as TaskPermissions from "./TaskPermissions.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskProjection from "./TaskProjection.ts";
+export * as TaskProjection from "./TaskProjection.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskService from "./TaskService.ts";
+export * as TaskService from "./TaskService.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskStore from "./TaskStore.ts";
+export * as TaskStore from "./TaskStore.ts"
 
 /**
  * @since 0.1.0
  */
-export * as TaskTimeline from "./TaskTimeline.ts";
+export * as TaskTimeline from "./TaskTimeline.ts"

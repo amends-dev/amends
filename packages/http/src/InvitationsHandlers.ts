@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { InvitationService } from "@amends-dev/core/workspace";
-import { Accounts } from "@amends-dev/gateway";
-import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+
+import { InvitationService } from "@amends-dev/core/workspace"
+import { Accounts } from "@amends-dev/gateway"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Api from "./Api.ts"
 
 /**
  * Register invitation handlers. An invitation goes to the account of the address it names, which
@@ -23,23 +24,20 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "invitations",
   Effect.fn(function* (handlers) {
-    const accounts = yield* Accounts.Accounts;
+    const accounts = yield* Accounts.Accounts
     return handlers.handleAll({
-      list: () =>
-        InvitationService.InvitationService.use((invitationService) => invitationService.list),
+      list: () => InvitationService.InvitationService.use((invitationService) => invitationService.list),
       issue: ({ headers, payload: { email, ...invitation } }) =>
         Effect.gen(function* () {
-          const recipient = yield* accounts.findOrCreate(email);
-          const invitationService = yield* InvitationService.InvitationService;
+          const recipient = yield* accounts.findOrCreate(email)
+          const invitationService = yield* InvitationService.InvitationService
           return yield* invitationService.issue(
             { ...invitation, recipientId: recipient.id },
-            { requestKey: headers["idempotency-key"] },
-          );
+            { requestKey: headers["idempotency-key"] }
+          )
         }),
       revoke: ({ params }) =>
-        InvitationService.InvitationService.use((invitationService) =>
-          invitationService.revoke(params.invitationId),
-        ),
-    });
-  }),
-);
+        InvitationService.InvitationService.use((invitationService) => invitationService.revoke(params.invitationId))
+    })
+  })
+)

@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { SignIn } from "@amends-dev/gateway";
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+
+import { SignIn } from "@amends-dev/gateway"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Option from "effect/Option"
+import * as Api from "./Api.ts"
 
 /**
  * Register session handlers over the host's sign-in service, which limits codes by the address a
@@ -23,12 +24,11 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "session",
   Effect.fn(function* (handlers) {
-    const signIn = yield* SignIn.SignIn;
+    const signIn = yield* SignIn.SignIn
     return handlers.handleAll({
       methods: () => Effect.succeed(signIn.methods),
-      start: ({ payload, request }) =>
-        signIn.start(payload.email, Option.getOrUndefined(request.remoteAddress)),
-      complete: ({ payload }) => signIn.complete(payload.email, payload.code),
-    });
-  }),
-);
+      start: ({ payload, request }) => signIn.start(payload.email, Option.getOrUndefined(request.remoteAddress)),
+      complete: ({ payload }) => signIn.complete(payload.email, payload.code)
+    })
+  })
+)

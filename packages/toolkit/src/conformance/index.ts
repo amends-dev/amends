@@ -11,11 +11,12 @@
  *
  * @since 0.1.0
  */
-import { calls } from "./internal/calls.ts";
-import { conditions } from "./internal/conditions.ts";
-import { discovery } from "./internal/discovery.ts";
-import type * as Fixture from "./Fixture.ts";
-import { toolkit } from "./internal/toolkit.ts";
+
+import type * as Fixture from "./Fixture.ts"
+import { calls } from "./internal/calls.ts"
+import { conditions } from "./internal/conditions.ts"
+import { discovery } from "./internal/discovery.ts"
+import { toolkit } from "./internal/toolkit.ts"
 
 export type {
   /**
@@ -48,8 +49,8 @@ export type {
    * @category testing
    * @since 0.1.0
    */
-  ToolCase,
-} from "./Fixture.ts";
+  ToolCase
+} from "./Fixture.ts"
 
 /**
  * Runs every suite against the source `fixture` makes, in the test file that calls it.
@@ -57,42 +58,42 @@ export type {
  * **Example** (The conformance test of the MCP source)
  *
  * ```ts
- * import { Mcp } from "@amends-dev/toolkit";
- * import * as Conformance from "@amends-dev/toolkit/conformance";
- * import { Effect, Scope } from "effect";
- * import { HttpClient } from "effect/http";
+ * import { Mcp } from "@amends-dev/toolkit"
+ * import * as Conformance from "@amends-dev/toolkit/conformance"
+ * import { Effect, Scope } from "effect"
+ * import { HttpClient } from "effect/http"
  *
  * // Serves `echo`, `failing`, and `blocking` over MCP in `condition`, until the scope closes.
  * declare const serveMcp: (condition: Conformance.Condition) => Effect.Effect<
  *   {
- *     readonly client: HttpClient.HttpClient;
- *     readonly started: Effect.Effect<void>;
- *     readonly secrets: ReadonlyArray<string>;
+ *     readonly client: HttpClient.HttpClient
+ *     readonly started: Effect.Effect<void>
+ *     readonly secrets: ReadonlyArray<string>
  *   },
  *   never,
  *   Scope.Scope
- * >;
+ * >
  *
  * Conformance.run({
  *   make: Effect.fnUntraced(function* (condition) {
- *     const { client, started, secrets } = yield* serveMcp(condition);
- *     const source = yield* Mcp.http({ name: "fixture", url: "http://localhost/mcp", client });
- *     return { source, blockedCallStarted: started, secrets };
+ *     const { client, started, secrets } = yield* serveMcp(condition)
+ *     const source = yield* Mcp.http({ name: "fixture", url: "http://localhost/mcp", client })
+ *     return { source, blockedCallStarted: started, secrets }
  *   }),
  *   tools: {
  *     echo: { tool: "echo", input: (text) => ({ text }), invalidInput: { text: 7 } },
  *     failing: { tool: "failing", input: {} },
- *     blocking: { tool: "blocking", input: {} },
- *   },
- * });
+ *     blocking: { tool: "blocking", input: {} }
+ *   }
+ * })
  * ```
  *
  * @category testing
  * @since 0.1.0
  */
 export const run = (fixture: Fixture.Fixture) => {
-  discovery(fixture);
-  calls(fixture);
-  conditions(fixture);
-  toolkit(fixture);
-};
+  discovery(fixture)
+  calls(fixture)
+  conditions(fixture)
+  toolkit(fixture)
+}

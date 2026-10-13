@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Create a task in a group: with its thread, or in one of the group's conversations.
@@ -14,8 +15,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Create = Permission.make("task.create", {
   targetKind: "Group",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Change a task's status, assignee, or priority.
@@ -25,5 +26,5 @@ export const Create = Permission.make("task.create", {
  */
 export const Update = Permission.make("task.update", {
   targetKind: "Thread",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})

@@ -139,17 +139,17 @@ comment and destroys when the pull request closes; see the
   `@effect/vitest`.
 
 ```ts
-import { expect, it } from "@effect/vitest";
-import { Effect, Fiber } from "effect";
-import { TestClock } from "effect/testing";
+import { expect, it } from "@effect/vitest"
+import { Effect, Fiber } from "effect"
+import { TestClock } from "effect/testing"
 
 it.effect("completes after the delay", () =>
   Effect.gen(function* () {
-    const pending = yield* Effect.sleep("1 minute").pipe(Effect.as("complete"), Effect.forkChild);
-    yield* TestClock.adjust("1 minute");
-    expect(yield* Fiber.join(pending)).toBe("complete");
-  }),
-);
+    const pending = yield* Effect.sleep("1 minute").pipe(Effect.as("complete"), Effect.forkChild)
+    yield* TestClock.adjust("1 minute")
+    expect(yield* Fiber.join(pending)).toBe("complete")
+  })
+)
 ```
 
 `it.effect.each` passes each case as one value. Destructure tuple cases with

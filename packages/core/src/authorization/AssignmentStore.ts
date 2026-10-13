@@ -7,19 +7,20 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Store from "../journal/Store.ts";
-import * as Member from "../workspace/Member.ts";
-import * as Assignment from "./Assignment.ts";
-import * as Role from "./Role.ts";
-import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import * as StoreError from "../journal/StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
+import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import * as StoreInput from "../journal/StoreInput.ts"
+import * as Member from "../workspace/Member.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Assignment from "./Assignment.ts"
+import * as Role from "./Role.ts"
 
 /**
  * The assignment store, bound to one workspace by the host.
@@ -48,35 +49,31 @@ export class AssignmentStore extends Context.Service<
   {
     /** Find an active or revoked assignment in this workspace; None if absent. */
     readonly get: (
-      assignmentId: Assignment.Id,
-    ) => Effect.Effect<Option.Option<Assignment.Assignment>, StoreError.StoreError>;
+      assignmentId: Assignment.Id
+    ) => Effect.Effect<Option.Option<Assignment.Assignment>, StoreError.StoreError>
 
     /** All active role and direct grant assignments for this member in this workspace. */
     readonly listActiveByMember: (
-      memberId: Member.Id,
-    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>;
+      memberId: Member.Id
+    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>
 
     /** All active Role-source assignments referencing this role in this workspace. */
     readonly listActiveByRole: (
-      roleId: Role.Id,
-    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>;
+      roleId: Role.Id
+    ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>
 
     /**
      * Insert an active assignment. Reject a reused assignment ID, including
      * revoked IDs. Overlapping grants remain separate assignments. Never upsert.
      */
-    readonly insert: (
-      record: Assignment.Assignment,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly insert: (record: Assignment.Assignment) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
 
     /**
      * Change an active assignment to revoked, retaining its ID, workspace, member,
      * and source. Rejected if absent or already revoked. Assigning access
      * again requires a fresh ID.
      */
-    readonly markRevoked: (
-      assignmentId: Assignment.Id,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly markRevoked: (assignmentId: Assignment.Id) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/authorization/AssignmentStore") {}
 
@@ -87,97 +84,75 @@ export class AssignmentStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (
-  workspaceId: WorkspaceId.Id,
-  driver: AssignmentStore["Service"],
-): AssignmentStore["Service"] => {
-  const read = StoreInput.read("AssignmentStore");
-  const write = StoreInput.write("AssignmentStore", workspaceId);
+export const make = (workspaceId: WorkspaceId.Id, driver: AssignmentStore["Service"]): AssignmentStore["Service"] => {
+  const read = StoreInput.read("AssignmentStore")
+  const write = StoreInput.write("AssignmentStore", workspaceId)
   return {
     get: (assignmentId) => Effect.flatMap(read("get", Assignment.Id, assignmentId), driver.get),
     listActiveByMember: (memberId) =>
       Effect.flatMap(read("listActiveByMember", Member.Id, memberId), driver.listActiveByMember),
-    listActiveByRole: (roleId) =>
-      Effect.flatMap(read("listActiveByRole", Role.Id, roleId), driver.listActiveByRole),
+    listActiveByRole: (roleId) => Effect.flatMap(read("listActiveByRole", Role.Id, roleId), driver.listActiveByRole),
     insert: (record) =>
       write("insert", Assignment.Assignment, record).pipe(
         Effect.filterOrFail(
           (record) => record.status === "active",
-          () => StoreError.rejected("AssignmentStore", "insert", "Expected an active assignment"),
+          () => StoreError.rejected("AssignmentStore", "insert", "Expected an active assignment")
         ),
-        Effect.flatMap(driver.insert),
+        Effect.flatMap(driver.insert)
       ),
-    markRevoked: (assignmentId) =>
-      Effect.flatMap(write("markRevoked", Assignment.Id, assignmentId), driver.markRevoked),
-  };
-};
+    markRevoked: (assignmentId) => Effect.flatMap(write("markRevoked", Assignment.Id, assignmentId), driver.markRevoked)
+  }
+}
 
-const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Assignment.Assignment));
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Assignment.Assignment))
 
 /**
  * Access assigned to memberships, by role or directly; revoked rows keep their source.
  */
 const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const { workspaceId, read, write } = yield* Store.MemoryBinding
   const select = (operation: string, predicate: (record: Assignment.Assignment) => boolean) =>
     Effect.flatMap(read, (space) => rows.all(space.records.of("assignments"))).pipe(
       Effect.map((records) => records.filter(predicate)),
-      Effect.mapError(StoreError.failed("AssignmentStore", operation)),
-    );
+      Effect.mapError(StoreError.failed("AssignmentStore", operation))
+    )
   const driver: AssignmentStore["Service"] = {
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.of("assignments"), id)).pipe(
-        Effect.mapError(StoreError.failed("AssignmentStore", "get")),
+        Effect.mapError(StoreError.failed("AssignmentStore", "get"))
       ),
     listActiveByMember: (memberId) =>
-      select(
-        "listActiveByMember",
-        (record) => record.status === "active" && record.memberId === memberId,
-      ),
+      select("listActiveByMember", (record) => record.status === "active" && record.memberId === memberId),
     listActiveByRole: (roleId) =>
       select(
         "listActiveByRole",
         (record) =>
           record.status === "active" &&
           Assignment.Source.isAnyOf(["Role"])(record.source) &&
-          record.source.roleId === roleId,
+          record.source.roleId === roleId
       ),
     insert: Effect.fn("AssignmentStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(
-        Effect.mapError(StoreError.failed("AssignmentStore", "insert")),
-      );
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("AssignmentStore", "insert")))
       if (space.records.of("assignments").has(record.id))
-        return yield* StoreError.rejected(
-          "AssignmentStore",
-          "insert",
-          "Assignment ID already exists",
-        );
-      const row = yield* rows
-        .encode(record)
-        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "insert")));
-      space.records.of("assignments").set(record.id, row);
+        return yield* StoreError.rejected("AssignmentStore", "insert", "Assignment ID already exists")
+      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("AssignmentStore", "insert")))
+      space.records.of("assignments").set(record.id, row)
     }),
     markRevoked: Effect.fn("AssignmentStore.memory.markRevoked")(function* (id) {
-      const space = yield* write.pipe(
-        Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")),
-      );
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")))
       const current = yield* rows
         .get(space.records.of("assignments"), id)
-        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")));
+        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")))
       if (Option.isNone(current) || current.value.status !== "active")
-        return yield* StoreError.rejected(
-          "AssignmentStore",
-          "markRevoked",
-          "Expected an active assignment",
-        );
+        return yield* StoreError.rejected("AssignmentStore", "markRevoked", "Expected an active assignment")
       const row = yield* rows
         .encode({ ...current.value, status: "revoked" })
-        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")));
-      space.records.of("assignments").set(id, row);
-    }),
-  };
-  return make(workspaceId, driver);
-});
+        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")))
+      space.records.of("assignments").set(id, row)
+    })
+  }
+  return make(workspaceId, driver)
+})
 
 /**
  * Provide `AssignmentStore` in process memory, over the workspace's `Store.MemoryBinding`. It keeps
@@ -188,4 +163,4 @@ const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(AssignmentStore, makeMemory());
+export const layerMemory = Layer.effect(AssignmentStore, makeMemory())

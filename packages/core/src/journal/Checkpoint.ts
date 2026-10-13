@@ -8,17 +8,18 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Commit from "./Commit.ts";
-import * as Entry from "./Entry.ts";
-import * as Store from "./Store.ts";
-import * as StoreInput from "./StoreInput.ts";
-import * as MemoryDatabase from "./MemoryDatabase.ts";
-import * as StoreError from "./StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Commit from "./Commit.ts"
+import * as Entry from "./Entry.ts"
+import * as MemoryDatabase from "./MemoryDatabase.ts"
+import * as Store from "./Store.ts"
+import * as StoreError from "./StoreError.ts"
+import * as StoreInput from "./StoreInput.ts"
 
 /**
  * Names one projection version's progress on one log: the log, the projection's name, and its
@@ -30,8 +31,8 @@ import * as StoreError from "./StoreError.ts";
 export const Key = Schema.Struct({
   logId: Entry.LogId,
   name: Schema.NonEmptyString,
-  version: Schema.Finite,
-});
+  version: Schema.Finite
+})
 
 /**
  * @category schemas
@@ -50,8 +51,8 @@ export const Cursor = Schema.Struct({
   position: Entry.Position,
   commitId: Commit.Id,
   index: Schema.Natural,
-  entryId: Entry.Id,
-});
+  entryId: Entry.Id
+})
 
 /**
  * @category schemas
@@ -67,8 +68,8 @@ export interface Cursor extends Schema.Schema.Type<typeof Cursor> {}
  */
 export const LiveVersion = Schema.Struct({
   name: Key.fields.name,
-  version: Key.fields.version,
-});
+  version: Key.fields.version
+})
 
 /**
  * @category schemas
@@ -86,9 +87,9 @@ export const LiveVersions = Schema.Array(LiveVersion).check(
   Schema.makeFilter(
     (versions) =>
       new Set(versions.map(({ name }) => name)).size === versions.length ||
-      "A projection name can have only one live version",
-  ),
-);
+      "A projection name can have only one live version"
+  )
+)
 
 /**
  * The checkpoint store, bound to one workspace by the host, which shares the journal's native
@@ -110,33 +111,28 @@ export class Checkpoint extends Context.Service<
      * Progress of a consumer that reads behind the log, such as a projection being rebuilt.
      * Use the current transaction's view when present, otherwise committed state.
      */
-    readonly get: (key: Key) => Effect.Effect<Option.Option<Cursor>, StoreError.StoreError>;
+    readonly get: (key: Key) => Effect.Effect<Option.Option<Cursor>, StoreError.StoreError>
     /**
      * Enlist in the active Store.Transaction, alongside the projection's domain
      * writes. Reads followed by set must be serializable, including an absent key:
      * concurrent runners must serialize or be rejected, never both apply
      * the same batch. Reject expired or foreign transaction handles. Do not retry.
      */
-    readonly set: (
-      key: Key,
-      cursor: Cursor,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly set: (key: Key, cursor: Cursor) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
     /**
      * The projection versions live on this log, in binary name order. A version is live when
      * every commit since it went live applied it, so it needs no progress of its own. Use the
      * current transaction's view when present, otherwise committed state.
      */
-    readonly listLive: (
-      logId: Entry.LogId,
-    ) => Effect.Effect<ReadonlyArray<LiveVersion>, StoreError.StoreError>;
+    readonly listLive: (logId: Entry.LogId) => Effect.Effect<ReadonlyArray<LiveVersion>, StoreError.StoreError>
     /**
      * Replace this log's live versions with exactly these, enlisted in the active
      * Store.Transaction. Reject expired or foreign transaction handles. Do not retry.
      */
     readonly setLive: (
       logId: Entry.LogId,
-      versions: ReadonlyArray<LiveVersion>,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+      versions: ReadonlyArray<LiveVersion>
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/journal/Checkpoint") {}
 
@@ -148,74 +144,69 @@ export class Checkpoint extends Context.Service<
  * @since 0.1.0
  */
 export const make = (driver: Checkpoint["Service"]): Checkpoint["Service"] => {
-  const read = StoreInput.read("Checkpoint");
-  const write = StoreInput.write("Checkpoint");
+  const read = StoreInput.read("Checkpoint")
+  const write = StoreInput.write("Checkpoint")
   return {
     get: (key) => Effect.flatMap(read("get", Key, key), driver.get),
     set: Effect.fn("Checkpoint.set")(function* (key, cursor) {
-      return yield* driver.set(yield* write("set", Key, key), yield* write("set", Cursor, cursor));
+      return yield* driver.set(yield* write("set", Key, key), yield* write("set", Cursor, cursor))
     }),
     listLive: (logId) => Effect.flatMap(read("listLive", Entry.LogId, logId), driver.listLive),
     setLive: Effect.fn("Checkpoint.setLive")(function* (logId, versions) {
       return yield* driver.setLive(
         yield* write("setLive", Entry.LogId, logId),
-        yield* write("setLive", LiveVersions, versions),
-      );
-    }),
-  };
-};
+        yield* write("setLive", LiveVersions, versions)
+      )
+    })
+  }
+}
 
-const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Cursor));
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Cursor))
 /** A log's live versions, stored together as one row. */
-const liveRows = MemoryDatabase.makeRows(Schema.fromJsonString(LiveVersions));
-const idOf = (key: Key) => MemoryDatabase.keyOf(key.logId, key.name, key.version);
+const liveRows = MemoryDatabase.makeRows(Schema.fromJsonString(LiveVersions))
+const idOf = (key: Key) => MemoryDatabase.keyOf(key.logId, key.name, key.version)
 
 /**
  * Each projection version's progress through one log while it is rebuilt, written with the
  * projection's rows, and the versions that are live.
  */
 const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
-  const { read, write } = yield* Store.MemoryBinding;
+  const { read, write } = yield* Store.MemoryBinding
   const driver: Checkpoint["Service"] = {
     get: Effect.fn("Checkpoint.memory.get")(
       function* (key) {
-        return yield* rows.get((yield* read).records.of("checkpoints"), idOf(key));
+        return yield* rows.get((yield* read).records.of("checkpoints"), idOf(key))
       },
-      Effect.mapError(StoreError.failed("Checkpoint", "get")),
+      Effect.mapError(StoreError.failed("Checkpoint", "get"))
     ),
     set: Effect.fn("Checkpoint.memory.set")(
       function* (key, cursor) {
-        const space = yield* write;
-        const row = yield* rows.encode(cursor);
-        space.records.of("checkpoints").set(idOf(key), row);
+        const space = yield* write
+        const row = yield* rows.encode(cursor)
+        space.records.of("checkpoints").set(idOf(key), row)
       },
-      Effect.mapError(StoreError.failed("Checkpoint", "set")),
+      Effect.mapError(StoreError.failed("Checkpoint", "set"))
     ),
     listLive: Effect.fn("Checkpoint.memory.listLive")(
       function* (logId) {
-        const live = yield* liveRows.get(
-          (yield* read).records.of("liveProjections"),
-          MemoryDatabase.keyOf(logId),
-        );
+        const live = yield* liveRows.get((yield* read).records.of("liveProjections"), MemoryDatabase.keyOf(logId))
         return Option.isSome(live)
-          ? live.value.toSorted((left, right) =>
-              MemoryDatabase.compareBinary(left.name, right.name),
-            )
-          : [];
+          ? live.value.toSorted((left, right) => MemoryDatabase.compareBinary(left.name, right.name))
+          : []
       },
-      Effect.mapError(StoreError.failed("Checkpoint", "listLive")),
+      Effect.mapError(StoreError.failed("Checkpoint", "listLive"))
     ),
     setLive: Effect.fn("Checkpoint.memory.setLive")(
       function* (logId, versions) {
-        const space = yield* write;
-        const row = yield* liveRows.encode(versions);
-        space.records.of("liveProjections").set(MemoryDatabase.keyOf(logId), row);
+        const space = yield* write
+        const row = yield* liveRows.encode(versions)
+        space.records.of("liveProjections").set(MemoryDatabase.keyOf(logId), row)
       },
-      Effect.mapError(StoreError.failed("Checkpoint", "setLive")),
-    ),
-  };
-  return make(driver);
-});
+      Effect.mapError(StoreError.failed("Checkpoint", "setLive"))
+    )
+  }
+  return make(driver)
+})
 
 /**
  * Provide `Checkpoint` in process memory, over the workspace's `Store.MemoryBinding`: each
@@ -227,4 +218,4 @@ const makeMemory = Effect.fn("Checkpoint.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(Checkpoint, makeMemory());
+export const layerMemory = Layer.effect(Checkpoint, makeMemory())

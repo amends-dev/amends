@@ -17,17 +17,18 @@
  *
  * @since 0.1.0
  */
-import type { ModelEndpoint } from "@amends-dev/harness";
-import * as Effect from "effect/Effect";
-import * as Redacted from "effect/Redacted";
-import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import type * as HttpClientResponse from "effect/http/HttpClientResponse";
-import * as Connection from "./Connection.ts";
-import * as Integration from "./Integration.ts";
-import * as ModelCatalog from "./ModelCatalog.ts";
+
+import type { ModelEndpoint } from "@amends-dev/harness"
+import * as Effect from "effect/Effect"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientRequest from "effect/http/HttpClientRequest"
+import type * as HttpClientResponse from "effect/http/HttpClientResponse"
+import * as Redacted from "effect/Redacted"
+import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
+import * as Connection from "./Connection.ts"
+import * as Integration from "./Integration.ts"
+import * as ModelCatalog from "./ModelCatalog.ts"
 
 /**
  * The integrations of the catalog's providers, which check connections over the host's client,
@@ -37,10 +38,10 @@ import * as ModelCatalog from "./ModelCatalog.ts";
  * @since 0.1.0
  */
 export const catalogProviders = Effect.gen(function* () {
-  const catalog = yield* ModelCatalog.ModelCatalog;
-  const client = yield* HttpClient.HttpClient;
-  return (yield* catalog.providers).map((provider) => providerIntegration(provider, client));
-});
+  const catalog = yield* ModelCatalog.ModelCatalog
+  const client = yield* HttpClient.HttpClient
+  return (yield* catalog.providers).map((provider) => providerIntegration(provider, client))
+})
 
 /**
  * The integration of an OpenAI-compatible API, `openai-compatible`, which checks connections over
@@ -56,8 +57,8 @@ export const openAiCompatible = Effect.map(HttpClient.HttpClient, (client) =>
     settings: Schema.Struct({
       url: Schema.NonEmptyString.annotate({
         title: "Base URL",
-        description: "The base URL of the API, which /chat/completions follows.",
-      }),
+        description: "The base URL of the API, which /chat/completions follows."
+      })
     }),
     auth: ["apiKey", "none"],
     models: {
@@ -71,15 +72,15 @@ export const openAiCompatible = Effect.map(HttpClient.HttpClient, (client) =>
           model: options.model,
           protocol: "openai-chat",
           url: settings.url.replace(/\/+$/, ""),
-          ...withOptions(apiKey, options),
-        }),
+          ...withOptions(apiKey, options)
+        })
     },
     check: ({ settings, apiKey }) => {
-      const url = `${settings.url.replace(/\/+$/, "")}/models`;
-      return checkWith(client, url, HttpClientRequest.get(url).pipe(withBearer(apiKey)));
-    },
-  }),
-);
+      const url = `${settings.url.replace(/\/+$/, "")}/models`
+      return checkWith(client, url, HttpClientRequest.get(url).pipe(withBearer(apiKey)))
+    }
+  })
+)
 
 const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient.HttpClient) =>
   Integration.make({
@@ -89,19 +90,17 @@ const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient
     settings:
       provider.settings.length === 0
         ? undefined
-        : Schema.Struct(
-            Object.fromEntries(provider.settings.map((name) => [name, Schema.NonEmptyString])),
-          ),
+        : Schema.Struct(Object.fromEntries(provider.settings.map((name) => [name, Schema.NonEmptyString]))),
     auth: ["apiKey"],
     models: {
       listed: provider.models,
       unlisted: false,
       endpoint: ({ settings, apiKey }, options) => {
         // A connection offers only the models it lists, so an endpoint is asked only for one of them.
-        const model = provider.models.find((listed) => listed.id === options.model);
+        const model = provider.models.find((listed) => listed.id === options.model)
         if (model === undefined) {
-          const description = `The catalog has no model ${options.model} of ${provider.name}`;
-          return Result.fail(new Connection.UnsupportedError({ description }));
+          const description = `The catalog has no model ${options.model} of ${provider.name}`
+          return Result.fail(new Connection.UnsupportedError({ description }))
         }
         return Result.succeed({
           provider: provider.id,
@@ -109,22 +108,17 @@ const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient
           protocol: model.protocol,
           url: urlWith(model.url, settings),
           ...(model.limits.context > 0 ? { contextWindow: model.limits.context } : {}),
-          ...withOptions(apiKey, options),
-        });
-      },
+          ...withOptions(apiKey, options)
+        })
+      }
     },
     check: ({ settings, apiKey }) => {
-      const model = modelToCheckWith(provider);
-      if (model === undefined) return Effect.succeed({ status: "healthy" });
-      const request = requestToRefuse(
-        model.protocol,
-        urlWith(model.url, settings),
-        model.id,
-        apiKey,
-      );
-      return checkWith(client, request.url, request);
-    },
-  });
+      const model = modelToCheckWith(provider)
+      if (model === undefined) return Effect.succeed({ status: "healthy" })
+      const request = requestToRefuse(model.protocol, urlWith(model.url, settings), model.id, apiKey)
+      return checkWith(client, request.url, request)
+    }
+  })
 
 /**
  * The model a check names, which the provider's key reaches as it does any other: the one released
@@ -136,24 +130,20 @@ const modelToCheckWith = (provider: ModelCatalog.Provider) =>
   provider.models
     .filter((model) => model.status === undefined)
     .reduce<ModelCatalog.Model | undefined>(
-      (latest, model) =>
-        latest === undefined || model.released > latest.released ? model : latest,
-      undefined,
-    ) ?? provider.models[0];
+      (latest, model) => (latest === undefined || model.released > latest.released ? model : latest),
+      undefined
+    ) ?? provider.models[0]
 
 /** The parts of an endpoint that come from the connection's key and the agent's options. */
-const withOptions = (
-  apiKey: Redacted.Redacted<string> | undefined,
-  options: Integration.EndpointOptions,
-) => ({
+const withOptions = (apiKey: Redacted.Redacted<string> | undefined, options: Integration.EndpointOptions) => ({
   ...(apiKey === undefined ? {} : { apiKey }),
   ...(options.effort === undefined ? {} : { effort: options.effort }),
-  ...(options.maxOutputTokens === undefined ? {} : { maxOutputTokens: options.maxOutputTokens }),
-});
+  ...(options.maxOutputTokens === undefined ? {} : { maxOutputTokens: options.maxOutputTokens })
+})
 
 /** `url` with the settings it names, between braces, as the catalog writes them. */
 const urlWith = (url: string, settings: { readonly [name: string]: string }) =>
-  url.replaceAll(/\{(\w+)\}/g, (_, name: string) => settings[name] ?? "").replace(/\/+$/, "");
+  url.replaceAll(/\{(\w+)\}/g, (_, name: string) => settings[name] ?? "").replace(/\/+$/, "")
 
 /**
  * A request for a response that has no messages, which the provider of `protocol` at `url` must
@@ -163,49 +153,43 @@ const requestToRefuse = (
   protocol: ModelEndpoint.Protocol,
   url: string,
   model: string,
-  apiKey: Redacted.Redacted<string> | undefined,
+  apiKey: Redacted.Redacted<string> | undefined
 ) => {
   switch (protocol) {
     case "anthropic-messages":
       return HttpClientRequest.post(`${url}/messages`).pipe(
         HttpClientRequest.setHeader("anthropic-version", "2023-06-01"),
-        apiKey === undefined
-          ? (request) => request
-          : HttpClientRequest.setHeader("x-api-key", Redacted.value(apiKey)),
-        HttpClientRequest.bodyJsonUnsafe({ model, max_tokens: 1, messages: [] }),
-      );
+        apiKey === undefined ? (request) => request : HttpClientRequest.setHeader("x-api-key", Redacted.value(apiKey)),
+        HttpClientRequest.bodyJsonUnsafe({ model, max_tokens: 1, messages: [] })
+      )
     case "openai-responses":
       // The API takes an output limit of 16 tokens at least, so it refuses this one.
       return HttpClientRequest.post(`${url}/responses`).pipe(
         withBearer(apiKey),
-        HttpClientRequest.bodyJsonUnsafe({ model, input: [], max_output_tokens: 1 }),
-      );
+        HttpClientRequest.bodyJsonUnsafe({ model, input: [], max_output_tokens: 1 })
+      )
     case "openai-chat":
       return HttpClientRequest.post(`${url}/chat/completions`).pipe(
         withBearer(apiKey),
-        HttpClientRequest.bodyJsonUnsafe({ model, messages: [] }),
-      );
+        HttpClientRequest.bodyJsonUnsafe({ model, messages: [] })
+      )
   }
-};
+}
 
-const withBearer =
-  (apiKey: Redacted.Redacted<string> | undefined) =>
-  (request: HttpClientRequest.HttpClientRequest) =>
-    apiKey === undefined ? request : HttpClientRequest.bearerToken(request, Redacted.value(apiKey));
+const withBearer = (apiKey: Redacted.Redacted<string> | undefined) => (request: HttpClientRequest.HttpClientRequest) =>
+  apiKey === undefined ? request : HttpClientRequest.bearerToken(request, Redacted.value(apiKey))
 
 /** Sends `request`, and says what its answer, or its failing to be answered, says of the connection. */
 const checkWith = (
   client: HttpClient.HttpClient,
   url: string,
-  request: HttpClientRequest.HttpClientRequest,
+  request: HttpClientRequest.HttpClientRequest
 ): Effect.Effect<Connection.Health> =>
   client.execute(request).pipe(
-    Effect.map((response: HttpClientResponse.HttpClientResponse) =>
-      Connection.healthOf(response.status, url),
-    ),
+    Effect.map((response: HttpClientResponse.HttpClientResponse) => Connection.healthOf(response.status, url)),
     Effect.timeout("15 seconds"),
     Effect.orElseSucceed((): Connection.Health => ({
       status: "unavailable",
-      description: `Nothing answered at ${url}`,
-    })),
-  );
+      description: `Nothing answered at ${url}`
+    }))
+  )

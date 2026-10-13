@@ -49,29 +49,29 @@ A transport is a plain object, usually made once per connection to the system wi
 connection's settings and secret. Slack, for example:
 
 ```ts
-import { ChannelTransport } from "@amends-dev/channel";
-import { Effect, Schema } from "effect";
+import { ChannelTransport } from "@amends-dev/channel"
+import { Effect, Schema } from "effect"
 
 export const slack = (options: {
-  readonly botToken: string;
-  readonly signingSecret: string;
-  readonly botUserId: string;
+  readonly botToken: string
+  readonly signingSecret: string
+  readonly botUserId: string
 }): ChannelTransport.ChannelTransport => ({
   self: ChannelTransport.ExternalId.make(options.botUserId),
   receive: (inbound) =>
     Effect.gen(function* () {
-      yield* verifySignature(inbound, options.signingSecret); // TransportError "rejected"
-      const payload = yield* decodeEventsApi(inbound.body);
-      if (payload.type === "url_verification") return { events: [], answer: payload.challenge };
-      return { events: yield* eventsOf(payload) };
+      yield* verifySignature(inbound, options.signingSecret) // TransportError "rejected"
+      const payload = yield* decodeEventsApi(inbound.body)
+      if (payload.type === "url_verification") return { events: [], answer: payload.challenge }
+      return { events: yield* eventsOf(payload) }
     }),
   post: (conversation, outgoing) =>
     chatPostMessage(options.botToken, {
       channel: conversation.details.channel,
       thread_ts: conversation.details.thread_ts,
-      text: `${outgoing.author}: ${outgoing.text}`,
-    }).pipe(Effect.map((posted) => ({ messageId: posted.ts }))),
-});
+      text: `${outgoing.author}: ${outgoing.text}`
+    }).pipe(Effect.map((posted) => ({ messageId: posted.ts })))
+})
 ```
 
 A `MessageReceived` event's conversation is the Slack channel and thread it arrived in, with the

@@ -6,12 +6,13 @@
  *
  * @since 0.1.0
  */
-import { ChannelTransport } from "@amends-dev/channel";
-import * as Schema from "effect/Schema";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as ChannelId from "./ChannelId.ts";
+
+import { ChannelTransport } from "@amends-dev/channel"
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ChannelId from "./ChannelId.ts"
 
 /**
  * A thread's binding to the external conversation it came from.
@@ -30,8 +31,8 @@ export const ChannelBinding = Schema.Struct({
    * transport needs to post there, kept as the transport gave it.
    */
   conversation: ChannelTransport.Conversation,
-  boundAt: Schema.DateTimeUtcFromString,
-});
+  boundAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas

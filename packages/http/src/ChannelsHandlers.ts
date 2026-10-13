@@ -7,13 +7,14 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
-import { Gateway } from "@amends-dev/gateway";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as HttpServerRequest from "effect/http/HttpServerRequest";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+
+import { ChannelIntake, ChannelService } from "@amends-dev/core/channel"
+import { Gateway } from "@amends-dev/gateway"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
+import * as Layer from "effect/Layer"
+import * as Api from "./Api.ts"
 
 /**
  * Register channel handlers.
@@ -26,24 +27,19 @@ export const layerChannels = HttpApiBuilder.group(Api.Api, "channels", (handlers
     list: () => ChannelService.ChannelService.use((channelService) => channelService.list),
     create: ({ headers, payload }) =>
       ChannelService.ChannelService.use((channelService) =>
-        channelService.create(payload, { requestKey: headers["idempotency-key"] }),
+        channelService.create(payload, { requestKey: headers["idempotency-key"] })
       ),
-    get: ({ params }) =>
-      ChannelService.ChannelService.use((channelService) => channelService.get(params.channelId)),
+    get: ({ params }) => ChannelService.ChannelService.use((channelService) => channelService.get(params.channelId)),
     redirect: ({ params, payload }) =>
       ChannelService.ChannelService.use((channelService) =>
-        channelService.redirect({ channelId: params.channelId, groupId: payload.groupId }),
+        channelService.redirect({ channelId: params.channelId, groupId: payload.groupId })
       ),
     remove: ({ params }) =>
-      ChannelService.ChannelService.use((channelService) =>
-        channelService.remove(params.channelId),
-      ),
+      ChannelService.ChannelService.use((channelService) => channelService.remove(params.channelId)),
     binding: ({ params }) =>
-      ChannelService.ChannelService.use((channelService) =>
-        channelService.getBinding(params.threadId),
-      ),
-  }),
-);
+      ChannelService.ChannelService.use((channelService) => channelService.getBinding(params.threadId))
+  })
+)
 
 /**
  * Register the handler for what external systems send a channel: the request's headers and body
@@ -56,25 +52,25 @@ export const layerEvents = HttpApiBuilder.group(
   Api.Api,
   "channelEvents",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
+    const gateway = yield* Gateway.Gateway
     return handlers.handleAll({
       receive: ({ params, payload }) =>
         Effect.gen(function* () {
-          const request = yield* HttpServerRequest.HttpServerRequest;
+          const request = yield* HttpServerRequest.HttpServerRequest
           const received = yield* gateway.inWorkspace(
             params.workspaceId,
             Effect.flatMap(ChannelIntake.ChannelIntake, (channelIntake) =>
               channelIntake.receive(params.channelId, {
                 headers: { ...request.headers },
-                body: payload,
-              }),
-            ),
-          );
-          return received.answer ?? "";
-        }),
-    });
-  }),
-);
+                body: payload
+              })
+            )
+          )
+          return received.answer ?? ""
+        })
+    })
+  })
+)
 
 /**
  * Both channel groups' handlers, `layerChannels` and `layerEvents`, as `Routes` registers them.
@@ -82,4 +78,4 @@ export const layerEvents = HttpApiBuilder.group(
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.merge(layerChannels, layerEvents);
+export const layer = Layer.merge(layerChannels, layerEvents)

@@ -13,9 +13,9 @@
 /**
  * @since 0.1.0
  */
-export * as Opencode2Agent from "./Opencode2Agent.ts";
+export * as Opencode2Agent from "./Opencode2Agent.ts"
 
 /**
  * @since 0.1.0
  */
-export * as OpencodeAgent from "./OpencodeAgent.ts";
+export * as OpencodeAgent from "./OpencodeAgent.ts"

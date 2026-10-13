@@ -1,6 +1,6 @@
-import { For, Match, Switch, type JSX } from "solid-js";
-import { classes } from "../../internal/props.ts";
-import * as s from "./state-art.css.ts";
+import { For, Match, Switch, type JSX } from "solid-js"
+import { classes } from "../../internal/props.ts"
+import * as s from "./state-art.css.ts"
 
 /**
  * The mark's empty and error states, each drawn from its own parts.
@@ -25,31 +25,29 @@ export type StateArtKind =
   | "came-apart"
   | "lost-thread"
   | "nothing-here"
-  | "held-back";
+  | "held-back"
 
 export interface StateArtProps {
-  readonly kind: StateArtKind;
-  readonly class?: string;
+  readonly kind: StateArtKind
+  readonly class?: string
 }
 
-const wide = new Set<StateArtKind>(["sew-in", "reach", "lost-thread"]);
+const wide = new Set<StateArtKind>(["sew-in", "reach", "lost-thread"])
 // The four stitches across the seam, as the mark draws them.
-const stitches = ["M18.5 37 H25.5", "M18.5 30 H25.5", "M30 18.5 V25.5", "M37 18.5 V25.5"];
+const stitches = ["M18.5 37 H25.5", "M18.5 30 H25.5", "M30 18.5 V25.5", "M37 18.5 V25.5"]
 
-const Base = () => <rect class={s.ink} x="3" y="3" width="42" height="42" />;
+const Base = () => <rect class={s.ink} x="3" y="3" width="42" height="42" />
 const Patch = (props: { readonly class?: string }) => (
   <g class={props.class}>
     <rect class={s.patch} x="22" y="22" width="39" height="39" />
   </g>
-);
+)
 const Stitches = (props: { readonly class?: string; readonly paths?: ReadonlyArray<string> }) => (
-  <For each={props.paths ?? stitches}>
-    {(d) => <path class={classes(s.knockLine, props.class)} d={d} />}
-  </For>
-);
+  <For each={props.paths ?? stitches}>{(d) => <path class={classes(s.knockLine, props.class)} d={d} />}</For>
+)
 const Ghost = (props: { readonly x: number; readonly y: number; readonly size: number }) => (
   <rect class={s.ghost} x={props.x} y={props.y} width={props.size} height={props.size} />
-);
+)
 
 /** An animated state from the mark, decorative beside the words that name the state. */
 export function StateArt(props: StateArtProps): JSX.Element {
@@ -112,5 +110,5 @@ export function StateArt(props: StateArtProps): JSX.Element {
         </Match>
       </Switch>
     </svg>
-  );
+  )
 }

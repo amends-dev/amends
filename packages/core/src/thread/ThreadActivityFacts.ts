@@ -5,12 +5,13 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Group from "../group/Group.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadActivity from "./ThreadActivity.ts";
+
+import * as Schema from "effect/Schema"
+import * as Group from "../group/Group.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as ThreadActivity from "./ThreadActivity.ts"
 
 /**
  * An activity was recorded at its position in a thread, with the recipients it selected, each
@@ -32,8 +33,8 @@ export const Recorded = Fact.make("thread.activity.recorded", {
       Schema.makeFilter(
         (values) =>
           new Set(values.map((value) => value.participationId)).size === values.length ||
-          "Duplicate activity recipients",
-      ),
-    ),
-  }),
-});
+          "Duplicate activity recipients"
+      )
+    )
+  })
+})

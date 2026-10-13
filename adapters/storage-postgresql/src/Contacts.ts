@@ -8,30 +8,31 @@
  *
  * @since 0.1.0
  */
-import { Contact, ContactStore } from "@amends-dev/core/channel";
-import { and, eq } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { storeError } from "./internal/errors.ts";
-import { inIds } from "./internal/id-list.ts";
-import { contacts } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { Contact, ContactStore } from "@amends-dev/core/channel"
+import { StoreError } from "@amends-dev/core/journal"
+import { and, eq } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { inIds } from "./internal/id-list.ts"
+import { contacts } from "./internal/schema.ts"
 
 const decodeRows = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Contact.Contact.fields, createdAt: Schema.DateTimeUtcFromDate })),
-);
+  Schema.Array(Schema.Struct({ ...Contact.Contact.fields, createdAt: Schema.DateTimeUtcFromDate }))
+)
 const toRow = (record: Contact.Contact): typeof contacts.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   channelId: record.channelId,
   externalId: record.externalId,
   name: record.name,
-  createdAt: DateTime.toDate(record.createdAt),
-});
+  createdAt: DateTime.toDate(record.createdAt)
+})
 
 /**
  * Builds the contact store for the binding's workspace: this module's driver inside
@@ -41,9 +42,9 @@ const toRow = (record: Contact.Contact): typeof contacts.$inferInsert => ({
  * @since 0.1.0
  */
 export const make = Effect.fn("Contacts.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(contacts.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(contacts.workspaceId, workspaceId)
   const driver: ContactStore.ContactStore["Service"] = {
     get: Effect.fn("Contacts.get")(
       function* (id) {
@@ -51,27 +52,27 @@ export const make = Effect.fn("Contacts.make")(function* () {
           db
             .select()
             .from(contacts)
-            .where(and(inWorkspace, eq(contacts.id, id))),
-        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
+            .where(and(inWorkspace, eq(contacts.id, id)))
+        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("ContactStore", "get")),
+      Effect.mapError(StoreError.failed("ContactStore", "get"))
     ),
     getMany: Effect.fn("Contacts.getMany")(
       function* (ids) {
-        if (ids.length === 0) return [];
+        if (ids.length === 0) return []
         return yield* guard(
           db
             .select()
             .from(contacts)
-            .where(and(inWorkspace, inIds(contacts.id, ids))),
-        ).pipe(Effect.flatMap(decodeRows));
+            .where(and(inWorkspace, inIds(contacts.id, ids)))
+        ).pipe(Effect.flatMap(decodeRows))
       },
-      Effect.mapError(StoreError.failed("ContactStore", "getMany")),
+      Effect.mapError(StoreError.failed("ContactStore", "getMany"))
     ),
     insert: Effect.fn("Contacts.insert")(function* (record) {
       yield* guard(db.insert(contacts).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError("ContactStore", "insert")),
-      );
+        Effect.mapError(storeError("ContactStore", "insert"))
+      )
     }),
     update: Effect.fn("Contacts.update")(function* (record) {
       const updated = yield* guard(
@@ -80,14 +81,13 @@ export const make = Effect.fn("Contacts.make")(function* () {
           .set(toRow(record))
           .where(and(inWorkspace, eq(contacts.id, record.id)))
           .returning({ id: contacts.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("ContactStore", "update")));
-      if (updated.length === 0)
-        return yield* StoreError.rejected("ContactStore", "update", "Expected a stored contact");
-    }),
-  };
-  return ContactStore.make(workspaceId, driver);
-});
+        true
+      ).pipe(Effect.mapError(storeError("ContactStore", "update")))
+      if (updated.length === 0) return yield* StoreError.rejected("ContactStore", "update", "Expected a stored contact")
+    })
+  }
+  return ContactStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `ContactStore.ContactStore` over the caller's `Binding.Binding`.
@@ -95,4 +95,4 @@ export const make = Effect.fn("Contacts.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ContactStore.ContactStore, make());
+export const layer = Layer.effect(ContactStore.ContactStore, make())

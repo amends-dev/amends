@@ -1,7 +1,9 @@
 # Project guidance
 
 Use Bun for dependency installation, scripts, and application execution.
-Use TypeScript 7 for type-checking, Oxlint for linting, and Oxfmt for formatting.
+Use TypeScript 7 for type-checking, Oxlint for linting, and Oxfmt for formatting. Oxfmt formats as
+Effect's dprint does: 120 columns, no semicolons, no trailing commas, and imports sorted. A
+module's header is followed by a blank line, which keeps it first when the imports below it sort.
 Run `bun run check` after changes and `bun run test` after changing behavior.
 Tests use `@effect/vitest` through Vitest running on Bun. Use `it.effect` for Effect
 programs, `it.live` only for integrations that need live clocks, and plain `it`

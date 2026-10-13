@@ -8,24 +8,25 @@
  *
  * @since 0.1.0
  */
-import { Integrations } from "@amends-dev/connection";
-import * as Array from "effect/Array";
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Connection from "../connection/Connection.ts";
-import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
-import * as ConnectionStore from "../connection/ConnectionStore.ts";
-import * as Identity from "../identity/Identity.ts";
-import type * as MemberId from "../workspace/MemberId.ts";
-import * as MemberStore from "../workspace/MemberStore.ts";
-import * as Agent from "./Agent.ts";
-import * as AgentReadiness from "./AgentReadiness.ts";
-import * as AgentStore from "./AgentStore.ts";
-import * as CoreError from "../error/CoreError.ts";
-import type * as StoreError from "../journal/StoreError.ts";
+
+import { Integrations } from "@amends-dev/connection"
+import * as Array from "effect/Array"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Connection from "../connection/Connection.ts"
+import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts"
+import * as ConnectionStore from "../connection/ConnectionStore.ts"
+import * as CoreError from "../error/CoreError.ts"
+import * as Identity from "../identity/Identity.ts"
+import type * as StoreError from "../journal/StoreError.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
+import * as MemberStore from "../workspace/MemberStore.ts"
+import * as Agent from "./Agent.ts"
+import * as AgentReadiness from "./AgentReadiness.ts"
+import * as AgentStore from "./AgentStore.ts"
 
 /**
  * What reading the agent of a member can fail with.
@@ -33,7 +34,7 @@ import type * as StoreError from "../journal/StoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = CoreError.NotFound | StoreError.StoreError;
+export type ReadError = CoreError.NotFound | StoreError.StoreError
 
 /**
  * What selecting can fail with: what reading the agent and the workspace's connections meets, and
@@ -43,7 +44,7 @@ export type ReadError = CoreError.NotFound | StoreError.StoreError;
  * @category errors
  * @since 0.1.0
  */
-export type SelectError = ReadError | StoreError.StoreError | CoreError.Invalid;
+export type SelectError = ReadError | StoreError.StoreError | CoreError.Invalid
 
 /**
  * What building can fail with: what selecting meets, and a connection whose key cannot be read.
@@ -51,7 +52,7 @@ export type SelectError = ReadError | StoreError.StoreError | CoreError.Invalid;
  * @category errors
  * @since 0.1.0
  */
-export type BuildError = SelectError | StoreError.StoreError;
+export type BuildError = SelectError | StoreError.StoreError
 
 /**
  * An agent ready to run on a selection, as data: what it works by, and the connections of its
@@ -67,8 +68,8 @@ export const Runnable = Schema.Struct({
   /** The model's connection, and the model as its integration's endpoint takes it. */
   model: Schema.Struct({ ...Connection.Access.fields, model: Agent.Model }),
   /** The sandbox's connection, or none for an agent that works without a sandbox. */
-  sandbox: Schema.NullOr(Connection.Access),
-});
+  sandbox: Schema.NullOr(Connection.Access)
+})
 /**
  * @category schemas
  * @since 0.1.0
@@ -91,8 +92,8 @@ export class AgentQuery extends Context.Service<
      */
     readonly select: (
       memberId: MemberId.Id,
-      previous: Agent.Selection | undefined,
-    ) => Effect.Effect<Agent.Selection, SelectError>;
+      previous: Agent.Selection | undefined
+    ) => Effect.Effect<Agent.Selection, SelectError>
 
     /**
      * The agent of `memberId` ready to run on `selection`: its instructions, and each connection of
@@ -100,10 +101,7 @@ export class AgentQuery extends Context.Service<
      * connection of the selection can no longer give its part, as when it was removed since the
      * selection was made, or it has no key.
      */
-    readonly buildRunnable: (
-      memberId: MemberId.Id,
-      selection: Agent.Selection,
-    ) => Effect.Effect<Runnable, BuildError>;
+    readonly buildRunnable: (memberId: MemberId.Id, selection: Agent.Selection) => Effect.Effect<Runnable, BuildError>
   }
 >()("@amends-dev/core/agent/AgentQuery") {}
 
@@ -111,14 +109,14 @@ export class AgentQuery extends Context.Service<
 const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
   harness: { _tag: "Connection", connectionId: selection.harness.connectionId },
   model: selection.model,
-  sandbox: selection.sandbox,
-});
+  sandbox: selection.sandbox
+})
 
 /** A connection's failure to give `part`, as the issue it is to the agent. */
 const invalid = (part: Agent.Part, description: string) =>
   new CoreError.Invalid({
-    reason: new CoreError.Incomplete({ issues: [{ _tag: "Invalid", part, description }] }),
-  });
+    reason: new CoreError.Incomplete({ issues: [{ _tag: "Invalid", part, description }] })
+  })
 
 /**
  * Capture the stores and the host's integrations; each read finds the agent by its membership.
@@ -127,35 +125,34 @@ const invalid = (part: Agent.Part, description: string) =>
  * @since 0.1.0
  */
 export const make = Effect.fn("AgentQuery.make")(function* () {
-  const memberStore = yield* MemberStore.MemberStore;
-  const agentStore = yield* AgentStore.AgentStore;
-  const connectionStore = yield* ConnectionStore.ConnectionStore;
-  const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore;
-  const integrations = yield* Integrations.Integrations;
+  const memberStore = yield* MemberStore.MemberStore
+  const agentStore = yield* AgentStore.AgentStore
+  const connectionStore = yield* ConnectionStore.ConnectionStore
+  const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore
+  const integrations = yield* Integrations.Integrations
 
   /** The agent whose membership `memberId` is, while it lasts. */
   const requireAgent = Effect.fnUntraced(function* (memberId: MemberId.Id) {
-    const member = yield* memberStore.get(memberId);
+    const member = yield* memberStore.get(memberId)
     if (Option.isNone(member) || member.value.status !== "active")
-      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
-    const { identity } = member.value;
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId })
+    const { identity } = member.value
     if (!Identity.MemberReference.isAnyOf(["Agent"])(identity))
-      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
-    const found = yield* agentStore.get(identity.id);
-    if (Option.isNone(found))
-      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId });
-    return found.value;
-  });
+      return yield* new CoreError.NotFound({ resource: "Agent", id: memberId })
+    const found = yield* agentStore.get(identity.id)
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Agent", id: memberId })
+    return found.value
+  })
 
   /** Fails unless an agent set up as `setup` can run over `connections`. */
   const requireRunnable = Effect.fnUntraced(function* (
     setup: AgentReadiness.Setup,
-    connections: AgentReadiness.Connections,
+    connections: AgentReadiness.Connections
   ) {
-    const issues = yield* AgentReadiness.issuesOf(setup, connections, integrations);
+    const issues = yield* AgentReadiness.issuesOf(setup, connections, integrations)
     if (Array.isReadonlyArrayNonEmpty(issues))
-      return yield* new CoreError.Invalid({ reason: new CoreError.Incomplete({ issues }) });
-  });
+      return yield* new CoreError.Invalid({ reason: new CoreError.Incomplete({ issues }) })
+  })
 
   /**
    * The connection whose harness the agent runs on: the one its setup names, or, on `Auto`, the
@@ -164,17 +161,17 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
   const harnessFor = Effect.fnUntraced(function* (
     record: Agent.Agent,
     connections: AgentReadiness.Connections,
-    previous: Agent.Selection | undefined,
+    previous: Agent.Selection | undefined
   ) {
-    if (record.harness._tag === "Connection") return record.harness.connectionId;
-    const choices = yield* AgentReadiness.harnessesToChoose(record, connections, integrations);
-    const chosen = AgentReadiness.chooseHarness(choices, previous?.harness.connectionId);
+    if (record.harness._tag === "Connection") return record.harness.connectionId
+    const choices = yield* AgentReadiness.harnessesToChoose(record, connections, integrations)
+    const chosen = AgentReadiness.chooseHarness(choices, previous?.harness.connectionId)
     if (chosen === undefined)
       return yield* new CoreError.Invalid({
-        reason: new CoreError.Incomplete({ issues: [{ _tag: "NoHarness" }] }),
-      });
-    return chosen;
-  });
+        reason: new CoreError.Incomplete({ issues: [{ _tag: "NoHarness" }] })
+      })
+    return chosen
+  })
 
   /**
    * The connection for `part` as its integration takes it, with the key it holds. Fails for `part`
@@ -184,69 +181,59 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
   const accessFor = Effect.fnUntraced(function* (
     part: Agent.Part,
     connectionId: Connection.Id,
-    connections: AgentReadiness.Connections,
+    connections: AgentReadiness.Connections
   ) {
-    const resolved = yield* AgentReadiness.resolveConnection(
-      connectionId,
-      connections,
-      integrations,
-    );
+    const resolved = yield* AgentReadiness.resolveConnection(connectionId, connections, integrations)
     if (resolved._tag !== "Installed")
       return yield* new CoreError.Invalid({
-        reason: new CoreError.Incomplete({ issues: [{ _tag: resolved._tag, part }] }),
-      });
-    const { connection } = resolved;
-    if (connection.auth === "none")
-      return { connection, credential: null } satisfies Connection.Access;
+        reason: new CoreError.Incomplete({ issues: [{ _tag: resolved._tag, part }] })
+      })
+    const { connection } = resolved
+    if (connection.auth === "none") return { connection, credential: null } satisfies Connection.Access
     const credential = yield* connectionCredentialStore
       .get(connectionId)
-      .pipe(
-        Effect.catchTag("CoreError.Unavailable", ({ reason }) => invalid(part, reason.message)),
-      );
-    if (Option.isNone(credential))
-      return yield* invalid(part, `The connection ${connection.name} has no API key`);
-    return { connection, credential: credential.value } satisfies Connection.Access;
-  });
+      .pipe(Effect.catchTag("CoreError.Unavailable", ({ reason }) => invalid(part, reason.message)))
+    if (Option.isNone(credential)) return yield* invalid(part, `The connection ${connection.name} has no API key`)
+    return { connection, credential: credential.value } satisfies Connection.Access
+  })
 
   const select = Effect.fn("AgentQuery.select")(function* (
     memberId: MemberId.Id,
-    previous: Agent.Selection | undefined,
+    previous: Agent.Selection | undefined
   ) {
-    const record = yield* requireAgent(memberId);
-    const connections = yield* connectionStore.listActive;
+    const record = yield* requireAgent(memberId)
+    const connections = yield* connectionStore.listActive
     const selection: Agent.Selection = {
       harness: { connectionId: yield* harnessFor(record, connections, previous) },
       model: record.model,
-      sandbox: record.sandbox,
-    };
-    yield* requireRunnable(setupOf(selection), connections);
-    return selection;
-  });
+      sandbox: record.sandbox
+    }
+    yield* requireRunnable(setupOf(selection), connections)
+    return selection
+  })
 
   const buildRunnable = Effect.fn("AgentQuery.buildRunnable")(function* (
     memberId: MemberId.Id,
-    selection: Agent.Selection,
+    selection: Agent.Selection
   ) {
-    const record = yield* requireAgent(memberId);
-    const connections = yield* connectionStore.listActive;
-    yield* requireRunnable(setupOf(selection), connections);
-    const harness = yield* accessFor("harness", selection.harness.connectionId, connections);
-    const model = yield* accessFor("model", selection.model.connectionId, connections);
+    const record = yield* requireAgent(memberId)
+    const connections = yield* connectionStore.listActive
+    yield* requireRunnable(setupOf(selection), connections)
+    const harness = yield* accessFor("harness", selection.harness.connectionId, connections)
+    const model = yield* accessFor("model", selection.model.connectionId, connections)
     const sandbox =
-      selection.sandbox === null
-        ? null
-        : yield* accessFor("sandbox", selection.sandbox.connectionId, connections);
+      selection.sandbox === null ? null : yield* accessFor("sandbox", selection.sandbox.connectionId, connections)
     const runnable: Runnable = {
       instructions: record.instructions,
       harness,
       model: { ...model, model: selection.model },
-      sandbox,
-    };
-    return runnable;
-  });
+      sandbox
+    }
+    return runnable
+  })
 
-  return AgentQuery.of({ select, buildRunnable });
-});
+  return AgentQuery.of({ select, buildRunnable })
+})
 
 /**
  * Provide the agent reads over the member, agent, connection, and credential stores, and the
@@ -255,4 +242,4 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(AgentQuery, make());
+export const layer = Layer.effect(AgentQuery, make())

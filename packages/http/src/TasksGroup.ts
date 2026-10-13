@@ -8,21 +8,22 @@
  *
  * @since 0.1.0
  */
-import { Group } from "@amends-dev/core/group";
-import { Task } from "@amends-dev/core/task";
-import { Thread } from "@amends-dev/core/thread";
-import * as Schema from "effect/Schema";
-import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import * as Authentication from "./Authentication.ts";
-import * as WorkspaceMember from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
-import { limit } from "./internal/paging.ts";
 
-const thread = { threadId: Thread.Id };
-const inGroup = { groupId: Group.Id };
-const record = Task.Task.annotate({ identifier: "Task" });
+import { Group } from "@amends-dev/core/group"
+import { Task } from "@amends-dev/core/task"
+import { Thread } from "@amends-dev/core/thread"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import { limit } from "./internal/paging.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
+
+const thread = { threadId: Thread.Id }
+const inGroup = { groupId: Group.Id }
+const record = Task.Task.annotate({ identifier: "Task" })
 
 /**
  * Tasks: the work a thread tracks, with a status, priority, and assignee. A task is created with
@@ -42,29 +43,29 @@ export class TasksGroup extends HttpApiGroup.make("tasks")
         status: Schema.optionalKey(Task.Status),
         before: Schema.optionalKey(Schema.fromJsonString(Task.ListCursor)).annotate({
           description:
-            "Exclusive boundary as JSON containing the last item's task createdAt (UTC ISO string) and threadId.",
-        }),
+            "Exclusive boundary as JSON containing the last item's task createdAt (UTC ISO string) and threadId."
+        })
       },
       success: Schema.Array(Thread.ListItem.annotate({ identifier: "ThreadListItem" })),
-      error: [...ApiErrors.workspace, ...ApiErrors.taskRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.taskRead]
     }),
     HttpApiEndpoint.get("get", "/threads/:threadId/task", {
       params: thread,
       success: record,
-      error: [...ApiErrors.workspace, ...ApiErrors.taskRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.taskRead]
     }),
     HttpApiEndpoint.post("create", "/threads/:threadId/task", {
       params: thread,
       payload: Task.Options,
       success: record.pipe(HttpApiSchema.status(201)),
-      error: [...ApiErrors.workspace, ...ApiErrors.taskCreate],
+      error: [...ApiErrors.workspace, ...ApiErrors.taskCreate]
     }),
     HttpApiEndpoint.patch("update", "/threads/:threadId/task", {
       params: thread,
       payload: Schema.Struct({ change: Task.UpdateInput.fields.change }),
       success: record,
-      error: [...ApiErrors.workspace, ...ApiErrors.taskUpdate],
-    }),
+      error: [...ApiErrors.workspace, ...ApiErrors.taskUpdate]
+    })
   )
   .middleware(WorkspaceMember.WorkspaceMember)
   .middleware(Authentication.Authentication) {}

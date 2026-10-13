@@ -11,23 +11,24 @@
  *
  * @since 0.1.0
  */
-import { Thread, ThreadStore, ThreadMessage } from "@amends-dev/core/thread";
-import * as Array from "effect/Array";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
-import { threads } from "./internal/schema.ts";
-import * as Binding from "./Binding.ts";
-import { inIds } from "./internal/id-list.ts";
-import { storeError } from "./internal/errors.ts";
-import { StoreError } from "@amends-dev/core/journal";
-const validate = Schema.decodeEffect(Schema.toType(Thread.Thread));
+
+import { StoreError } from "@amends-dev/core/journal"
+import { Thread, ThreadStore, ThreadMessage } from "@amends-dev/core/thread"
+import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { inIds } from "./internal/id-list.ts"
+import { threads } from "./internal/schema.ts"
+const validate = Schema.decodeEffect(Schema.toType(Thread.Thread))
 const decode = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Thread.Thread.fields, createdAt: Schema.DateTimeUtcFromDate })),
-);
-type Row = typeof threads.$inferSelect;
+  Schema.Array(Schema.Struct({ ...Thread.Thread.fields, createdAt: Schema.DateTimeUtcFromDate }))
+)
+type Row = typeof threads.$inferSelect
 /** Each creator kind reads only its own column; the table constraint rejects mixed rows. */
 const toRecord = ({
   createdByKind,
@@ -41,24 +42,19 @@ const toRecord = ({
   createdBy:
     createdByKind === "Member"
       ? { _tag: createdByKind, memberId: createdByMemberId }
-      : { _tag: createdByKind, contactId: createdByContactId },
-});
+      : { _tag: createdByKind, contactId: createdByContactId }
+})
 const creatorColumns = (
-  creator: Thread.Thread["createdBy"],
-): Pick<
-  typeof threads.$inferInsert,
-  "createdByKind" | "createdByMemberId" | "createdByContactId"
-> =>
+  creator: Thread.Thread["createdBy"]
+): Pick<typeof threads.$inferInsert, "createdByKind" | "createdByMemberId" | "createdByContactId"> =>
   ThreadMessage.Author.isAnyOf(["Member"])(creator)
     ? { createdByKind: "Member", createdByMemberId: creator.memberId, createdByContactId: null }
-    : { createdByKind: "Contact", createdByMemberId: null, createdByContactId: creator.contactId };
+    : { createdByKind: "Contact", createdByMemberId: null, createdByContactId: creator.contactId }
 const decodeLatest = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Thread.Latest.fields, occurredAt: Schema.DateTimeUtcFromDate })),
-);
+  Schema.Array(Schema.Struct({ ...Thread.Latest.fields, occurredAt: Schema.DateTimeUtcFromDate }))
+)
 const decodeRows = (rows: ReadonlyArray<Row>) =>
-  decode(rows.map(toRecord)).pipe(
-    Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
-  );
+  decode(rows.map(toRecord)).pipe(Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))))
 /**
  * Builds the thread store for the binding's workspace: this module's driver inside
  * `ThreadStore.make`, which checks every input first.
@@ -67,9 +63,9 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
  * @since 0.1.0
  */
 export const make = Effect.fn("Threads.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(threads.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(threads.workspaceId, workspaceId)
   const driver: ThreadStore.ThreadStore["Service"] = {
     get: Effect.fn("Threads.get")(
       function* (id) {
@@ -77,22 +73,22 @@ export const make = Effect.fn("Threads.make")(function* () {
           db
             .select()
             .from(threads)
-            .where(and(inWorkspace, eq(threads.id, id))),
-        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
+            .where(and(inWorkspace, eq(threads.id, id)))
+        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("ThreadStore", "get")),
+      Effect.mapError(StoreError.failed("ThreadStore", "get"))
     ),
     getMany: Effect.fn("Threads.getMany")(
       function* (ids) {
-        if (ids.length === 0) return [];
+        if (ids.length === 0) return []
         return yield* guard(
           db
             .select()
             .from(threads)
-            .where(and(inWorkspace, inIds(threads.id, ids))),
-        ).pipe(Effect.flatMap(decodeRows));
+            .where(and(inWorkspace, inIds(threads.id, ids)))
+        ).pipe(Effect.flatMap(decodeRows))
       },
-      Effect.mapError(StoreError.failed("ThreadStore", "getMany")),
+      Effect.mapError(StoreError.failed("ThreadStore", "getMany"))
     ),
     listByGroup: Effect.fn("Threads.listByGroup")(
       function* (id) {
@@ -101,14 +97,14 @@ export const make = Effect.fn("Threads.make")(function* () {
             .select()
             .from(threads)
             .where(and(inWorkspace, eq(threads.groupId, id)))
-            .orderBy(sql`${threads.id} COLLATE "C"`),
-        ).pipe(Effect.flatMap(decodeRows));
+            .orderBy(sql`${threads.id} COLLATE "C"`)
+        ).pipe(Effect.flatMap(decodeRows))
       },
-      Effect.mapError(StoreError.failed("ThreadStore", "listByGroup")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByGroup"))
     ),
     listByLatest: Effect.fn("Threads.listByLatest")(
       function* (groupId, options) {
-        const orderedId = sql`${threads.id} COLLATE "C"`;
+        const orderedId = sql`${threads.id} COLLATE "C"`
         return yield* guard(
           db
             .select()
@@ -121,18 +117,18 @@ export const make = Effect.fn("Threads.make")(function* () {
                 // A row comparison bounds the index scan; the equivalent OR form only filters it.
                 options.before === undefined
                   ? undefined
-                  : sql`(${threads.latestActivityAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.latestActivityAt), threads.latestActivityAt)}, ${options.before.threadId})`,
-              ),
+                  : sql`(${threads.latestActivityAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.latestActivityAt), threads.latestActivityAt)}, ${options.before.threadId})`
+              )
             )
             .orderBy(desc(threads.latestActivityAt), desc(orderedId))
-            .limit(options.limit),
-        ).pipe(Effect.flatMap(decodeRows));
+            .limit(options.limit)
+        ).pipe(Effect.flatMap(decodeRows))
       },
-      Effect.mapError(StoreError.failed("ThreadStore", "listByLatest")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByLatest"))
     ),
     listByStart: Effect.fn("Threads.listByStart")(
       function* (groupId, options) {
-        const orderedId = sql`${threads.id} COLLATE "C"`;
+        const orderedId = sql`${threads.id} COLLATE "C"`
         return yield* guard(
           db
             .select()
@@ -143,30 +139,30 @@ export const make = Effect.fn("Threads.make")(function* () {
                 eq(threads.groupId, groupId),
                 options.before === undefined
                   ? undefined
-                  : sql`(${threads.createdAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.createdAt), threads.createdAt)}, ${options.before.threadId})`,
-              ),
+                  : sql`(${threads.createdAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.createdAt), threads.createdAt)}, ${options.before.threadId})`
+              )
             )
             .orderBy(desc(threads.createdAt), desc(orderedId))
-            .limit(options.limit),
-        ).pipe(Effect.flatMap(decodeRows));
+            .limit(options.limit)
+        ).pipe(Effect.flatMap(decodeRows))
       },
-      Effect.mapError(StoreError.failed("ThreadStore", "listByStart")),
+      Effect.mapError(StoreError.failed("ThreadStore", "listByStart"))
     ),
     getLatest: Effect.fn("Threads.getLatest")(
       function* (ids) {
-        if (ids.length === 0) return [];
+        if (ids.length === 0) return []
         return yield* guard(
           db
             .select({
               threadId: threads.id,
               sequence: threads.latestSequence,
-              occurredAt: threads.latestActivityAt,
+              occurredAt: threads.latestActivityAt
             })
             .from(threads)
-            .where(and(inWorkspace, inIds(threads.id, ids), isNotNull(threads.latestSequence))),
-        ).pipe(Effect.flatMap(decodeLatest));
+            .where(and(inWorkspace, inIds(threads.id, ids), isNotNull(threads.latestSequence)))
+        ).pipe(Effect.flatMap(decodeLatest))
       },
-      Effect.mapError(StoreError.failed("ThreadStore", "getLatest")),
+      Effect.mapError(StoreError.failed("ThreadStore", "getLatest"))
     ),
     recordLatest: Effect.fn("Threads.recordLatest")(function* (latest) {
       const advanced = yield* guard(
@@ -174,29 +170,28 @@ export const make = Effect.fn("Threads.make")(function* () {
           .update(threads)
           .set({
             latestSequence: latest.sequence,
-            latestActivityAt: DateTime.toDate(latest.occurredAt),
+            latestActivityAt: DateTime.toDate(latest.occurredAt)
           })
           .where(
             and(
               inWorkspace,
               eq(threads.id, latest.threadId),
-              or(isNull(threads.latestSequence), lt(threads.latestSequence, latest.sequence)),
-            ),
+              or(isNull(threads.latestSequence), lt(threads.latestSequence, latest.sequence))
+            )
           )
           .returning({ id: threads.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("ThreadStore", "recordLatest")));
-      if (advanced.length > 0) return;
+        true
+      ).pipe(Effect.mapError(storeError("ThreadStore", "recordLatest")))
+      if (advanced.length > 0) return
       // Nothing advanced: an earlier position changes nothing, but the thread must exist.
       const found = yield* guard(
         db
           .select({ id: threads.id })
           .from(threads)
           .where(and(inWorkspace, eq(threads.id, latest.threadId))),
-        true,
-      ).pipe(Effect.mapError(storeError("ThreadStore", "recordLatest")));
-      if (found.length === 0)
-        return yield* StoreError.rejected("ThreadStore", "recordLatest", "Thread is missing");
+        true
+      ).pipe(Effect.mapError(storeError("ThreadStore", "recordLatest")))
+      if (found.length === 0) return yield* StoreError.rejected("ThreadStore", "recordLatest", "Thread is missing")
     }),
     rename: Effect.fn("Threads.rename")(function* (renamed) {
       const updated = yield* guard(
@@ -205,30 +200,29 @@ export const make = Effect.fn("Threads.make")(function* () {
           .set({ title: renamed.title })
           .where(and(inWorkspace, eq(threads.id, renamed.threadId)))
           .returning({ id: threads.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("ThreadStore", "rename")));
-      if (updated.length === 0)
-        return yield* StoreError.rejected("ThreadStore", "rename", "Thread is missing");
+        true
+      ).pipe(Effect.mapError(storeError("ThreadStore", "rename")))
+      if (updated.length === 0) return yield* StoreError.rejected("ThreadStore", "rename", "Thread is missing")
     }),
     insert: Effect.fn("Threads.insert")(function* (record) {
-      const creator = record.createdBy;
-      const { createdBy: _, ...fields } = record;
+      const creator = record.createdBy
+      const { createdBy: _, ...fields } = record
       yield* guard(
         db.insert(threads).values({
           ...fields,
           ...creatorColumns(creator),
-          createdAt: DateTime.toDate(record.createdAt),
+          createdAt: DateTime.toDate(record.createdAt)
         }),
-        true,
-      ).pipe(Effect.mapError(storeError("ThreadStore", "insert")));
-    }),
-  };
-  return ThreadStore.make(workspaceId, driver);
-});
+        true
+      ).pipe(Effect.mapError(storeError("ThreadStore", "insert")))
+    })
+  }
+  return ThreadStore.make(workspaceId, driver)
+})
 /**
  * Provides `ThreadStore.ThreadStore` over the caller's `Binding.Binding`.
  *
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ThreadStore.ThreadStore, make());
+export const layer = Layer.effect(ThreadStore.ThreadStore, make())

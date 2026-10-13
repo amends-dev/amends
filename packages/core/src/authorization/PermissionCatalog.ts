@@ -7,11 +7,12 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Permission from "./Permission.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Permission from "./Permission.ts"
 
 /**
  * The name is not a declared permission: no feature registered it with this host.
@@ -20,7 +21,7 @@ import * as Permission from "./Permission.ts";
  * @since 0.1.0
  */
 export class Unknown extends Schema.TaggedError<Unknown>()("PermissionCatalog.Unknown", {
-  name: Permission.Name,
+  name: Permission.Name
 }) {}
 
 /**
@@ -30,7 +31,7 @@ export class Unknown extends Schema.TaggedError<Unknown>()("PermissionCatalog.Un
  * @since 0.1.0
  */
 export class Duplicate extends Schema.TaggedError<Duplicate>()("PermissionCatalog.Duplicate", {
-  name: Permission.Name,
+  name: Permission.Name
 }) {}
 
 /**
@@ -43,13 +44,13 @@ export class PermissionCatalog extends Context.Service<
   PermissionCatalog,
   {
     /** Validated, immutable declarations in registration order, also used to construct built-in roles. */
-    readonly definitions: ReadonlyArray<Permission.Definition>;
+    readonly definitions: ReadonlyArray<Permission.Definition>
     /** Resolve an explicitly registered name to its validated definition. */
-    readonly get: (name: Permission.Name) => Effect.Effect<Permission.Definition, Unknown>;
+    readonly get: (name: Permission.Name) => Effect.Effect<Permission.Definition, Unknown>
   }
 >()("@amends-dev/core/authorization/PermissionCatalog") {}
 
-const decodeDefinition = Schema.decodeEffect(Permission.Definition);
+const decodeDefinition = Schema.decodeEffect(Permission.Definition)
 
 /**
  * Construct an immutable catalog from domain definitions, rejecting every duplicate name.
@@ -58,32 +59,30 @@ const decodeDefinition = Schema.decodeEffect(Permission.Definition);
  * @since 0.1.0
  */
 export const make = Effect.fn("PermissionCatalog.make")(function* (
-  definitions: ReadonlyArray<Permission.Definition>,
+  definitions: ReadonlyArray<Permission.Definition>
 ): Effect.fn.Return<PermissionCatalog["Service"], Duplicate | Schema.SchemaError> {
-  const byName = new Map<Permission.Name, Permission.Definition>();
+  const byName = new Map<Permission.Name, Permission.Definition>()
   for (const input of definitions) {
-    const definition = yield* decodeDefinition(input);
-    if (byName.has(definition.name)) return yield* new Duplicate({ name: definition.name });
+    const definition = yield* decodeDefinition(input)
+    if (byName.has(definition.name)) return yield* new Duplicate({ name: definition.name })
     byName.set(
       definition.name,
       Object.freeze({
         name: definition.name,
         targetKind: definition.targetKind,
-        builtinTier: definition.builtinTier,
-      }),
-    );
+        builtinTier: definition.builtinTier
+      })
+    )
   }
 
   const get = Effect.fn("PermissionCatalog.get")(function* (name: Permission.Name) {
-    const definition = byName.get(name);
-    if (definition === undefined) return yield* new Unknown({ name });
-    return definition;
-  });
+    const definition = byName.get(name)
+    if (definition === undefined) return yield* new Unknown({ name })
+    return definition
+  })
 
-  return Object.freeze(
-    PermissionCatalog.of({ definitions: Object.freeze([...byName.values()]), get }),
-  );
-});
+  return Object.freeze(PermissionCatalog.of({ definitions: Object.freeze([...byName.values()]), get }))
+})
 
 /**
  * Provide the permission catalog constructed from domain declarations.
@@ -92,4 +91,4 @@ export const make = Effect.fn("PermissionCatalog.make")(function* (
  * @since 0.1.0
  */
 export const layer = (definitions: ReadonlyArray<Permission.Definition>) =>
-  Layer.effect(PermissionCatalog, make(definitions));
+  Layer.effect(PermissionCatalog, make(definitions))

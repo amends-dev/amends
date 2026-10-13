@@ -6,12 +6,13 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Member from "../workspace/Member.ts";
-import * as Group from "./Group.ts";
-import * as GroupMembership from "./GroupMembership.ts";
+
+import * as Schema from "effect/Schema"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Member from "../workspace/Member.ts"
+import * as Group from "./Group.ts"
+import * as GroupMembership from "./GroupMembership.ts"
 
 /**
  * A member was admitted to a group, as the admission says. The group's members learn who joined,
@@ -27,9 +28,9 @@ export const Added = Fact.make("group.membership.added", {
   occurrence: (payload) => [payload.id],
   payload: Schema.Struct({
     ...GroupMembership.GroupMembership.fields,
-    status: Schema.Literal("active"),
-  }),
-});
+    status: Schema.Literal("active")
+  })
+})
 
 /**
  * An admission ended, for the reason the removal says. Ends exactly one admission; rejoining
@@ -43,5 +44,5 @@ export const Removed = Fact.make("group.membership.removed", {
   version: 1,
   subject: (payload) => Subject.make("group-membership", payload.membershipId),
   occurrence: (payload) => [payload.membershipId],
-  payload: GroupMembership.Removal,
-});
+  payload: GroupMembership.Removal
+})

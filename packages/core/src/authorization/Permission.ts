@@ -8,8 +8,9 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Target from "./Target.ts";
+
+import * as Schema from "effect/Schema"
+import * as Target from "./Target.ts"
 
 /**
  * Stable identifier referenced by action requirements and permission assignments.
@@ -17,13 +18,13 @@ import * as Target from "./Target.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Name = Schema.NonEmptyString.pipe(Schema.brand("PermissionName"));
+export const Name = Schema.NonEmptyString.pipe(Schema.brand("PermissionName"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type Name = typeof Name.Type
 
 /**
  * The action metadata carried by requirements; it contains no role-construction policy.
@@ -31,7 +32,7 @@ export type Name = typeof Name.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Reference = Schema.Struct({ name: Name, targetKind: Target.Kind });
+export const Reference = Schema.Struct({ name: Name, targetKind: Target.Kind })
 
 /**
  * @category schemas
@@ -45,13 +46,13 @@ export interface Reference extends Schema.Schema.Type<typeof Reference> {}
  * @category schemas
  * @since 0.1.0
  */
-export const BuiltinTier = Schema.Literals(["member", "administrator", "owner"]);
+export const BuiltinTier = Schema.Literals(["member", "administrator", "owner"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type BuiltinTier = typeof BuiltinTier.Type;
+export type BuiltinTier = typeof BuiltinTier.Type
 
 /**
  * A domain-owned action with an explicit placement in the built-in role bundles.
@@ -61,17 +62,15 @@ export type BuiltinTier = typeof BuiltinTier.Type;
  */
 export const Definition = Schema.Struct({
   ...Reference.fields,
-  builtinTier: BuiltinTier,
-});
+  builtinTier: BuiltinTier
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export interface Definition<K extends Target.Kind = Target.Kind> extends Schema.Schema.Type<
-  typeof Definition
-> {
-  readonly targetKind: K;
+export interface Definition<K extends Target.Kind = Target.Kind> extends Schema.Schema.Type<typeof Definition> {
+  readonly targetKind: K
 }
 
 /**
@@ -82,12 +81,12 @@ export interface Definition<K extends Target.Kind = Target.Kind> extends Schema.
  */
 export const make = <const K extends Target.Kind>(
   name: string,
-  options: { readonly targetKind: K; readonly builtinTier: BuiltinTier },
+  options: { readonly targetKind: K; readonly builtinTier: BuiltinTier }
 ): Definition<K> => {
-  const definition = { name, targetKind: options.targetKind, builtinTier: options.builtinTier };
-  Schema.asserts(Definition, definition);
-  return definition;
-};
+  const definition = { name, targetKind: options.targetKind, builtinTier: options.builtinTier }
+  Schema.asserts(Definition, definition)
+  return definition
+}
 
 /**
  * A feature's permissions under one prefix: `make` declares each action with its tier, on the
@@ -98,12 +97,12 @@ export const make = <const K extends Target.Kind>(
  */
 export interface Group<K extends Target.Kind = Target.Kind> {
   readonly make: {
-    (action: string, options: { readonly builtinTier: BuiltinTier }): Definition<K>;
+    (action: string, options: { readonly builtinTier: BuiltinTier }): Definition<K>
     <const Override extends Target.Kind>(
       action: string,
-      options: { readonly targetKind: Override; readonly builtinTier: BuiltinTier },
-    ): Definition<Override>;
-  };
+      options: { readonly targetKind: Override; readonly builtinTier: BuiltinTier }
+    ): Definition<Override>
+  }
 }
 
 /**
@@ -116,28 +115,25 @@ export interface Group<K extends Target.Kind = Target.Kind> {
  */
 export const makeGroup = <const K extends Target.Kind>(
   prefix: string,
-  options: { readonly targetKind: K },
+  options: { readonly targetKind: K }
 ): Group<K> => {
-  const namespace = Schema.NonEmptyString.make(prefix);
-  const defaultKind = Target.Kind.make(options.targetKind);
+  const namespace = Schema.NonEmptyString.make(prefix)
+  const defaultKind = Target.Kind.make(options.targetKind)
 
-  function makePermission(
-    action: string,
-    options: { readonly builtinTier: BuiltinTier },
-  ): Definition<K>;
+  function makePermission(action: string, options: { readonly builtinTier: BuiltinTier }): Definition<K>
   function makePermission<const Override extends Target.Kind>(
     action: string,
-    options: { readonly targetKind: Override; readonly builtinTier: BuiltinTier },
-  ): Definition<Override>;
+    options: { readonly targetKind: Override; readonly builtinTier: BuiltinTier }
+  ): Definition<Override>
   function makePermission(
     action: string,
-    options: { readonly targetKind?: Target.Kind; readonly builtinTier: BuiltinTier },
+    options: { readonly targetKind?: Target.Kind; readonly builtinTier: BuiltinTier }
   ): Definition {
     return make(`${namespace}.${Schema.NonEmptyString.make(action)}`, {
       targetKind: options?.targetKind ?? defaultKind,
-      builtinTier: options?.builtinTier,
-    });
+      builtinTier: options?.builtinTier
+    })
   }
 
-  return { make: makePermission };
-};
+  return { make: makePermission }
+}

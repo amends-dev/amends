@@ -12,14 +12,14 @@
 /**
  * @since 0.1.0
  */
-export * as LocalSignalHub from "./LocalSignalHub.ts";
+export * as LocalSignalHub from "./LocalSignalHub.ts"
 
 /**
  * @since 0.1.0
  */
-export * as Signal from "./Signal.ts";
+export * as Signal from "./Signal.ts"
 
 /**
  * @since 0.1.0
  */
-export * as SignalHub from "./SignalHub.ts";
+export * as SignalHub from "./SignalHub.ts"

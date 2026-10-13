@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import { EmailSender, EmailSignIn } from "@amends-dev/gateway";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
-import * as LocalConfig from "./LocalConfig.ts";
+
+import { EmailSender, EmailSignIn } from "@amends-dev/gateway"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Redacted from "effect/Redacted"
+import * as LocalConfig from "./LocalConfig.ts"
 
 /**
  * Send email by logging it where the server runs, as the host does until it is given an email
@@ -20,9 +21,8 @@ import * as LocalConfig from "./LocalConfig.ts";
  * @since 0.1.0
  */
 export const logEmails = EmailSender.EmailSender.of({
-  send: (message) =>
-    Effect.logInfo(`Email to ${message.to}: ${message.subject}\n${Redacted.value(message.text)}`),
-});
+  send: (message) => Effect.logInfo(`Email to ${message.to}: ${message.subject}\n${Redacted.value(message.text)}`)
+})
 
 /**
  * Compose email sign-in and its sessions over the host's sign-in storage, accounts, and
@@ -35,5 +35,5 @@ export const logEmails = EmailSender.EmailSender.of({
  */
 export const layer = (credentialKey: Redacted.Redacted<string> | undefined) =>
   EmailSignIn.layer({
-    codeKey: Redacted.make(LocalConfig.deriveSecret(credentialKey, "amends/sign-in-codes")),
-  }).pipe(Layer.provide(Layer.succeed(EmailSender.EmailSender, logEmails)));
+    codeKey: Redacted.make(LocalConfig.deriveSecret(credentialKey, "amends/sign-in-codes"))
+  }).pipe(Layer.provide(Layer.succeed(EmailSender.EmailSender, logEmails)))

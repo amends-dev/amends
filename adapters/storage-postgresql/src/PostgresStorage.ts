@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import * as Layer from "effect/Layer";
-import * as PostgresAccounts from "./PostgresAccounts.ts";
-import * as PostgresDirectory from "./PostgresDirectory.ts";
-import * as PostgresSignInStorage from "./PostgresSignInStorage.ts";
-import * as PostgresWorkspaceStorage from "./PostgresWorkspaceStorage.ts";
+
+import * as Layer from "effect/Layer"
+import * as PostgresAccounts from "./PostgresAccounts.ts"
+import * as PostgresDirectory from "./PostgresDirectory.ts"
+import * as PostgresSignInStorage from "./PostgresSignInStorage.ts"
+import * as PostgresWorkspaceStorage from "./PostgresWorkspaceStorage.ts"
 
 /**
  * What `layer` takes: the limits on each workspace's transactions and reads, and the key that
@@ -19,7 +20,7 @@ import * as PostgresWorkspaceStorage from "./PostgresWorkspaceStorage.ts";
  * @category options
  * @since 0.1.0
  */
-export type Options = PostgresWorkspaceStorage.Options;
+export type Options = PostgresWorkspaceStorage.Options
 
 /**
  * The gateway contracts this adapter implements, over one connected database: workspace
@@ -34,5 +35,5 @@ export const layer = (options: Options = {}) =>
     PostgresWorkspaceStorage.layer(options),
     PostgresDirectory.layer,
     PostgresAccounts.layer,
-    PostgresSignInStorage.layer,
-  );
+    PostgresSignInStorage.layer
+  )

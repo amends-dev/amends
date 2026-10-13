@@ -3,15 +3,16 @@
  * each part of a response as the harness's, a response's `finish` as the end of a step, and the
  * turn's own `finish` and `error`.
  */
-import type { StreamPart } from "@amends-dev/harness";
-import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-import { flow } from "effect/Function";
-import * as AiError from "effect/ai/AiError";
-import type * as LanguageModel from "effect/ai/LanguageModel";
-import * as Response from "effect/ai/Response";
-import type * as Tool from "effect/ai/Tool";
-import * as Toolkit from "effect/ai/Toolkit";
+
+import type { StreamPart } from "@amends-dev/harness"
+import * as AiError from "effect/ai/AiError"
+import type * as LanguageModel from "effect/ai/LanguageModel"
+import * as Response from "effect/ai/Response"
+import type * as Tool from "effect/ai/Tool"
+import * as Toolkit from "effect/ai/Toolkit"
+import * as Effect from "effect/Effect"
+import { flow } from "effect/Function"
+import * as Schema from "effect/Schema"
 
 /**
  * The parts the harness streams for one of Effect AI's. Calls and results of the agent's own tools
@@ -20,7 +21,7 @@ import * as Toolkit from "effect/ai/Toolkit";
  */
 export const streamPartsOf = <Tools extends Record<string, Tool.Any>>(
   part: Response.StreamPart<Tools>,
-  isOwnTool: (name: string) => boolean,
+  isOwnTool: (name: string) => boolean
 ): Effect.Effect<ReadonlyArray<StreamPart.StreamPart>> => {
   switch (part.type) {
     case "tool-call":
@@ -31,9 +32,9 @@ export const streamPartsOf = <Tools extends Record<string, Tool.Any>>(
           name: part.name,
           params: part.params,
           providerExecuted: isOwnTool(part.name),
-          metadata: part.metadata,
-        },
-      ]);
+          metadata: part.metadata
+        }
+      ])
     case "tool-result":
       return Effect.succeed(
         isOwnTool(part.name)
@@ -46,39 +47,39 @@ export const streamPartsOf = <Tools extends Record<string, Tool.Any>>(
                 isFailure: part.isFailure,
                 providerExecuted: true,
                 preliminary: part.preliminary,
-                metadata: part.metadata,
-              },
+                metadata: part.metadata
+              }
             ]
-          : [],
-      );
+          : []
+      )
     case "finish":
       return Effect.map(encodeFinishPart(part), (finish) => [
         {
           type: "finish-step",
           reason: finish.reason,
           usage: finish.usage,
-          metadata: finish.metadata,
-        },
-      ]);
+          metadata: finish.metadata
+        }
+      ])
     default:
-      return Effect.map(encodeStreamPart(part), (encoded) => [encoded]);
+      return Effect.map(encodeStreamPart(part), (encoded) => [encoded])
   }
-};
+}
 
 /** How a step finished when the model did not say. */
 export const unknownFinish = Response.makePart("finish", {
   reason: "unknown",
   usage: new Response.Usage({ inputTokens: {}, outputTokens: {} }),
-  response: undefined,
-});
+  response: undefined
+})
 
 /** How the step that `response` answered whole finished. */
 export const finishPartOf = (response: LanguageModel.GenerateTextResponse<{}>) =>
   Response.makePart("finish", {
     reason: response.finishReason,
     usage: response.usage,
-    response: undefined,
-  });
+    response: undefined
+  })
 
 /** The turn's `finish`: why its last step ended, or `error`, and the tokens its steps used. */
 export const turnFinishOf = (steps: ReadonlyArray<Response.FinishPart>, failed: boolean) =>
@@ -86,45 +87,42 @@ export const turnFinishOf = (steps: ReadonlyArray<Response.FinishPart>, failed: 
     Response.makePart("finish", {
       reason: failed ? "error" : (steps.at(-1)?.reason ?? "unknown"),
       usage: usageOf(steps),
-      response: undefined,
-    }),
-  );
+      response: undefined
+    })
+  )
 
 /** The `error` part reporting the model's failure, with the `AiError` as JSON. */
 export const errorPartOf = (error: AiError.AiError) =>
   Effect.map(encodeAiError(error), (json): StreamPart.StreamPart => ({
     type: "error",
-    error: json,
-  }));
+    error: json
+  }))
 
 // Encoding what Effect AI decoded cannot fail.
-const encodeStreamPart = flow(
-  Schema.encodeEffect(Response.StreamPart(Toolkit.empty)),
-  Effect.orDie,
-);
+const encodeStreamPart = flow(Schema.encodeEffect(Response.StreamPart(Toolkit.empty)), Effect.orDie)
 
-const encodeFinishPart = flow(Schema.encodeEffect(Response.FinishPart), Effect.orDie);
+const encodeFinishPart = flow(Schema.encodeEffect(Response.FinishPart), Effect.orDie)
 
-const encodeAiError = flow(Schema.encodeEffect(Schema.toCodecJson(AiError.AiError)), Effect.orDie);
+const encodeAiError = flow(Schema.encodeEffect(Schema.toCodecJson(AiError.AiError)), Effect.orDie)
 
 /** The tokens `steps` used together. */
 const usageOf = (steps: ReadonlyArray<Response.FinishPart>) => {
   const sum = (tokens: (usage: Response.Usage) => number | undefined) =>
     steps.reduce<number | undefined>((total, step) => {
-      const used = tokens(step.usage);
-      return used === undefined ? total : (total ?? 0) + used;
-    }, undefined);
+      const used = tokens(step.usage)
+      return used === undefined ? total : (total ?? 0) + used
+    }, undefined)
   return new Response.Usage({
     inputTokens: {
       uncached: sum((usage) => usage.inputTokens.uncached),
       total: sum((usage) => usage.inputTokens.total),
       cacheRead: sum((usage) => usage.inputTokens.cacheRead),
-      cacheWrite: sum((usage) => usage.inputTokens.cacheWrite),
+      cacheWrite: sum((usage) => usage.inputTokens.cacheWrite)
     },
     outputTokens: {
       total: sum((usage) => usage.outputTokens.total),
       text: sum((usage) => usage.outputTokens.text),
-      reasoning: sum((usage) => usage.outputTokens.reasoning),
-    },
-  });
-};
+      reasoning: sum((usage) => usage.outputTokens.reasoning)
+    }
+  })
+}

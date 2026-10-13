@@ -1,8 +1,8 @@
-import { style } from "@vanilla-extract/css";
-import { media } from "../../foundations/layout/tokens.ts";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
-import { knockoutVar } from "../status-mark/status-mark.css.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
+import { knockoutVar } from "../status-mark/status-mark.css.ts"
 
 // The Lunacy "Status v01" notices: the tone's fill and outline, its mark, the words in its text
 // color, and at most one action at the end. Phones put the action under the words.
@@ -19,38 +19,38 @@ export const notice = style({
     "&[data-tone=danger]": {
       borderColor: vars.color.status.danger.border,
       backgroundColor: vars.color.status.danger.surface,
-      vars: { [knockoutVar]: vars.color.status.danger.surface },
-    },
+      vars: { [knockoutVar]: vars.color.status.danger.surface }
+    }
   },
   "@media": {
-    [media.mobile]: { gridTemplateColumns: "0.625rem minmax(0, 1fr)", rowGap: "0.75rem" },
-  },
-});
+    [media.mobile]: { gridTemplateColumns: "0.625rem minmax(0, 1fr)", rowGap: "0.75rem" }
+  }
+})
 
 // On the title's first line; beside an action, everything centers on the button instead.
 export const mark = style({
   marginBlockStart: "0.3125rem",
-  selectors: { [`${notice}[data-action] &`]: { alignSelf: "center", marginBlockStart: 0 } },
-});
+  selectors: { [`${notice}[data-action] &`]: { alignSelf: "center", marginBlockStart: 0 } }
+})
 
 export const text = style({
   display: "flex",
   flexDirection: "column",
   gap: "0.25rem",
-  selectors: { [`${notice}[data-action] &`]: { alignSelf: "center" } },
-});
+  selectors: { [`${notice}[data-action] &`]: { alignSelf: "center" } }
+})
 
 export const title = style({
   ...typeScale.control,
   margin: 0,
   color: vars.color.status.caution.text,
   fontWeight: fontWeight.medium,
-  selectors: { [`${notice}[data-tone=danger] &`]: { color: vars.color.status.danger.text } },
-});
+  selectors: { [`${notice}[data-tone=danger] &`]: { color: vars.color.status.danger.text } }
+})
 
-export const body = style({ ...typeScale.control, margin: 0, color: vars.color.text.secondary });
+export const body = style({ ...typeScale.control, margin: 0, color: vars.color.text.secondary })
 
 export const action = style({
   alignSelf: "center",
-  "@media": { [media.mobile]: { gridColumn: 2, justifySelf: "start" } },
-});
+  "@media": { [media.mobile]: { gridColumn: 2, justifySelf: "start" } }
+})

@@ -4,13 +4,13 @@
  *
  * @since 0.1.0
  */
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Projection from "../journal/Projection.ts";
 
-import * as AssignmentFacts from "./AssignmentFacts.ts";
-import * as AssignmentStore from "./AssignmentStore.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
+import * as Projection from "../journal/Projection.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import * as AssignmentFacts from "./AssignmentFacts.ts"
+import * as AssignmentStore from "./AssignmentStore.ts"
 
 /**
  * Inserts each created assignment and marks each revoked one, without re-evaluating current
@@ -23,27 +23,27 @@ export const definition = Projection.make("workspace.assignments", { version: 1 
   .on(
     AssignmentFacts.Created,
     Effect.fn("AssignmentProjection.created")(function* ({ payload }) {
-      const assignmentStore = yield* AssignmentStore.AssignmentStore;
+      const assignmentStore = yield* AssignmentStore.AssignmentStore
       yield* assignmentStore.insert({
         id: payload.assignmentId,
         workspaceId: payload.workspaceId,
         memberId: payload.memberId,
         source: payload.source,
-        status: "active",
-      });
-    }),
+        status: "active"
+      })
+    })
   )
   .on(
     AssignmentFacts.Revoked,
     Effect.fn("AssignmentProjection.revoked")(function* ({ payload }) {
-      const assignmentStore = yield* AssignmentStore.AssignmentStore;
-      const recorded = yield* assignmentStore.get(payload.assignmentId);
+      const assignmentStore = yield* AssignmentStore.AssignmentStore
+      const recorded = yield* assignmentStore.get(payload.assignmentId)
       if (Option.isSome(recorded) && recorded.value.memberId !== payload.memberId)
         return yield* StoreError.rejected(
           "AssignmentStore",
           "project",
-          "Revocation names another member than its assignment",
-        );
-      yield* assignmentStore.markRevoked(payload.assignmentId);
-    }),
-  );
+          "Revocation names another member than its assignment"
+        )
+      yield* assignmentStore.markRevoked(payload.assignmentId)
+    })
+  )

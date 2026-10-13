@@ -7,18 +7,19 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Authorization from "../authorization/Authorization.ts";
-import * as Actor from "../identity/Actor.ts";
-import * as GroupId from "./GroupId.ts";
-import type * as GroupMembership from "./GroupMembership.ts";
-import * as GroupMembershipStore from "./GroupMembershipStore.ts";
-import * as CoreError from "../error/CoreError.ts";
-import type * as StoreError from "../journal/StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Authorization from "../authorization/Authorization.ts"
+import * as CoreError from "../error/CoreError.ts"
+import * as Actor from "../identity/Actor.ts"
+import type * as StoreError from "../journal/StoreError.ts"
+import * as GroupId from "./GroupId.ts"
+import type * as GroupMembership from "./GroupMembership.ts"
+import * as GroupMembershipStore from "./GroupMembershipStore.ts"
 
 /**
  * What checking the audience can fail with.
@@ -26,11 +27,7 @@ import type * as StoreError from "../journal/StoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type AudienceError =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.NotFound;
+export type AudienceError = Authorization.Error | StoreError.StoreError | Schema.SchemaError | CoreError.NotFound
 
 /**
  * The shared read of groups. Internal: not among `Core.Operations`.
@@ -47,8 +44,8 @@ export class GroupQuery extends Context.Service<
      * no transaction; writes must call it inside their commit. Never cache its result as authority.
      */
     readonly requireAudience: (
-      groupId: GroupId.Id,
-    ) => Effect.Effect<GroupMembership.GroupMembership, AudienceError, Actor.Actor>;
+      groupId: GroupId.Id
+    ) => Effect.Effect<GroupMembership.GroupMembership, AudienceError, Actor.Actor>
   }
 >()("@amends-dev/core/group/GroupQuery") {}
 
@@ -60,20 +57,20 @@ export class GroupQuery extends Context.Service<
  * @since 0.1.0
  */
 export const make = Effect.fn("GroupQuery.make")(function* () {
-  const authorization = yield* Authorization.Authorization;
-  const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore;
+  const authorization = yield* Authorization.Authorization
+  const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore
 
   const requireAudience = Effect.fn("GroupQuery.requireAudience")(function* (groupId: GroupId.Id) {
-    const id = yield* Schema.decodeEffect(GroupId.Id)(groupId);
-    yield* authorization.require([]);
-    const actor = yield* Actor.Actor;
-    const found = yield* groupMembershipStore.findActive(id, actor.memberId);
-    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Group", id });
-    return found.value;
-  });
+    const id = yield* Schema.decodeEffect(GroupId.Id)(groupId)
+    yield* authorization.require([])
+    const actor = yield* Actor.Actor
+    const found = yield* groupMembershipStore.findActive(id, actor.memberId)
+    if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Group", id })
+    return found.value
+  })
 
-  return GroupQuery.of({ requireAudience });
-});
+  return GroupQuery.of({ requireAudience })
+})
 
 /**
  * Provide the shared read over the membership store and authorization.
@@ -81,4 +78,4 @@ export const make = Effect.fn("GroupQuery.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GroupQuery, make());
+export const layer = Layer.effect(GroupQuery, make())

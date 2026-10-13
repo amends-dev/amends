@@ -1,7 +1,7 @@
-import { style } from "@vanilla-extract/css";
-import { media } from "../foundations/layout/tokens.ts";
-import { vars } from "../foundations/theme/vars.css.ts";
-import { fontWeight, typeScale } from "../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../foundations/layout/tokens.ts"
+import { vars } from "../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../foundations/typography/tokens.ts"
 
 export const window = style({
   display: "grid",
@@ -13,8 +13,8 @@ export const window = style({
   boxShadow: "0 28px 48px rgb(0 0 0 / 0.12)",
   textAlign: "start",
   vars: { "--amends-logo-knockout": vars.color.surface.canvas },
-  "@media": { [media.desktop]: { height: "42.5rem" } },
-});
+  "@media": { [media.desktop]: { height: "42.5rem" } }
+})
 
 export const titleBar = style({
   ...typeScale.meta,
@@ -24,17 +24,17 @@ export const titleBar = style({
   minHeight: "1.875rem",
   paddingInline: "0.875rem",
   color: vars.color.text.secondary,
-  fontWeight: fontWeight.medium,
-});
+  fontWeight: fontWeight.medium
+})
 
-export const dots = style({ display: "flex", gap: "0.375rem" });
+export const dots = style({ display: "flex", gap: "0.375rem" })
 
 export const dot = style({
   width: "0.625rem",
   height: "0.625rem",
   borderRadius: "50%",
-  backgroundColor: vars.color.surface.railSelected,
-});
+  backgroundColor: vars.color.surface.railSelected
+})
 
 // Phones show the open thread alone; tablets add the group beside it; desktops add navigation.
 export const body = style({
@@ -47,10 +47,10 @@ export const body = style({
     [media.tablet]: { gridTemplateColumns: "minmax(0, 1fr) minmax(0, 20rem)" },
     [media.desktop]: {
       gridTemplateColumns: "3rem 13.5rem minmax(0, 1fr) minmax(0, 21.5rem)",
-      paddingInlineStart: 0,
-    },
-  },
-});
+      paddingInlineStart: 0
+    }
+  }
+})
 
 export const rail = style({
   display: "none",
@@ -61,12 +61,12 @@ export const rail = style({
       justifyItems: "center",
       gap: "1.25rem",
       paddingBlockStart: "0.75rem",
-      color: vars.color.text.muted,
-    },
-  },
-});
+      color: vars.color.text.muted
+    }
+  }
+})
 
-export const railIcon = style({ width: "1rem", height: "1rem" });
+export const railIcon = style({ width: "1rem", height: "1rem" })
 
 export const sidebar = style({
   display: "none",
@@ -76,10 +76,10 @@ export const sidebar = style({
       alignContent: "start",
       gap: "0.125rem",
       paddingBlockStart: "0.5rem",
-      minWidth: 0,
-    },
-  },
-});
+      minWidth: 0
+    }
+  }
+})
 
 export const workspace = style({
   ...typeScale.item,
@@ -88,16 +88,16 @@ export const workspace = style({
   gap: "0.5rem",
   paddingInline: "0.5rem",
   marginBlockEnd: "0.75rem",
-  fontWeight: fontWeight.semibold,
-});
+  fontWeight: fontWeight.semibold
+})
 
 export const search = style({
   ...typeScale.control,
   padding: "0.3125rem 0.625rem",
   marginBlockEnd: "0.75rem",
   backgroundColor: vars.color.surface.search,
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})
 
 export const item = style({
   ...typeScale.control,
@@ -107,26 +107,26 @@ export const item = style({
   minHeight: "1.75rem",
   paddingInline: "0.5rem",
   color: vars.color.text.secondary,
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
 export const itemSelected = style({
   backgroundColor: vars.color.surface.selected,
   boxShadow: `inset 2px 0 ${vars.color.action.indicator}`,
   color: vars.color.text.primary,
-  fontWeight: fontWeight.medium,
-});
+  fontWeight: fontWeight.medium
+})
 
-export const itemNested = style({ paddingInlineStart: "1.75rem" });
+export const itemNested = style({ paddingInlineStart: "1.75rem" })
 
-export const itemIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+export const itemIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" })
 
 export const itemLabel = style({
   flex: 1,
   minWidth: 0,
   overflow: "hidden",
-  textOverflow: "ellipsis",
-});
+  textOverflow: "ellipsis"
+})
 
 export const sectionLabel = style({
   ...typeScale.meta,
@@ -136,8 +136,8 @@ export const sectionLabel = style({
   fontWeight: fontWeight.semibold,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})
 
 export const pane = style({
   display: "grid",
@@ -146,20 +146,17 @@ export const pane = style({
   minHeight: 0,
   border: `1px solid ${vars.color.border.default}`,
   backgroundColor: vars.color.surface.panel,
-  overflow: "hidden",
-});
+  overflow: "hidden"
+})
 
-export const groupPane = style([
-  pane,
-  { display: "none", "@media": { [media.tablet]: { display: "grid" } } },
-]);
+export const groupPane = style([pane, { display: "none", "@media": { [media.tablet]: { display: "grid" } } }])
 
 export const paneHeader = style({
   display: "grid",
   gap: "0.125rem",
   padding: "0.875rem 1.25rem 0",
-  borderBottom: `1px solid ${vars.color.border.divider}`,
-});
+  borderBottom: `1px solid ${vars.color.border.divider}`
+})
 
 export const paneTitle = style({
   ...typeScale.title,
@@ -167,31 +164,31 @@ export const paneTitle = style({
   alignItems: "center",
   gap: "0.375rem",
   margin: 0,
-  fontWeight: fontWeight.semibold,
-});
+  fontWeight: fontWeight.semibold
+})
 
 export const paneSubtitle = style({
   ...typeScale.control,
   margin: 0,
   paddingBlockEnd: "0.875rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
-export const tabs = style({ display: "flex", gap: "1.25rem", paddingBlockStart: "0.5rem" });
+export const tabs = style({ display: "flex", gap: "1.25rem", paddingBlockStart: "0.5rem" })
 
 export const tab = style({
   ...typeScale.control,
   display: "flex",
   gap: "0.375rem",
   paddingBlock: "0.375rem 0.5rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 export const tabCurrent = style({
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
-  boxShadow: `inset 0 -2px ${vars.color.action.indicator}`,
-});
+  boxShadow: `inset 0 -2px ${vars.color.action.indicator}`
+})
 
 export const timeline = style({
   display: "grid",
@@ -199,14 +196,14 @@ export const timeline = style({
   alignContent: "start",
   gap: "1.5rem",
   padding: "1rem 1.25rem",
-  overflow: "hidden",
-});
+  overflow: "hidden"
+})
 
 export const mention = style({
   paddingInline: "0.125rem",
   backgroundColor: vars.color.surface.mention,
-  fontWeight: fontWeight.medium,
-});
+  fontWeight: fontWeight.medium
+})
 
 export const composer = style({
   ...typeScale.control,
@@ -215,5 +212,5 @@ export const composer = style({
   padding: "0.75rem",
   border: `1px solid ${vars.color.border.default}`,
   backgroundColor: vars.color.surface.field,
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})

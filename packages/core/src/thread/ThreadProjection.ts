@@ -4,11 +4,12 @@
  *
  * @since 0.1.0
  */
-import * as Effect from "effect/Effect";
-import * as Projection from "../journal/Projection.ts";
-import * as ThreadActivityFacts from "./ThreadActivityFacts.ts";
-import * as ThreadFacts from "./ThreadFacts.ts";
-import * as ThreadStore from "./ThreadStore.ts";
+
+import * as Effect from "effect/Effect"
+import * as Projection from "../journal/Projection.ts"
+import * as ThreadActivityFacts from "./ThreadActivityFacts.ts"
+import * as ThreadFacts from "./ThreadFacts.ts"
+import * as ThreadStore from "./ThreadStore.ts"
 
 /**
  * Inserts each created thread, sets the title of each renamed one, and advances a thread's latest
@@ -22,26 +23,26 @@ export const definition = Projection.make("threads", { version: 1 })
   .on(
     ThreadFacts.Created,
     Effect.fn("ThreadProjection.created")(function* ({ payload }) {
-      const threadStore = yield* ThreadStore.ThreadStore;
-      yield* threadStore.insert(payload);
-    }),
+      const threadStore = yield* ThreadStore.ThreadStore
+      yield* threadStore.insert(payload)
+    })
   )
   .on(
     ThreadFacts.Renamed,
     Effect.fn("ThreadProjection.renamed")(function* ({ payload }) {
-      const threadStore = yield* ThreadStore.ThreadStore;
-      yield* threadStore.rename(payload);
-    }),
+      const threadStore = yield* ThreadStore.ThreadStore
+      yield* threadStore.rename(payload)
+    })
   )
   .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("ThreadProjection.activity")(function* ({ payload: { activity } }) {
-      const threadStore = yield* ThreadStore.ThreadStore;
-      if (!activity.newActivity) return;
+      const threadStore = yield* ThreadStore.ThreadStore
+      if (!activity.newActivity) return
       yield* threadStore.recordLatest({
         threadId: activity.threadId,
         sequence: activity.sequence,
-        occurredAt: activity.occurredAt,
-      });
-    }),
-  );
+        occurredAt: activity.occurredAt
+      })
+    })
+  )

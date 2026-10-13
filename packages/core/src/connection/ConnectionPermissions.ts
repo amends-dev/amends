@@ -6,7 +6,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Create a connection in the workspace, which gives the workspace access to an external system.
@@ -16,8 +17,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Create = Permission.make("connection.create", {
   targetKind: "Workspace",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})
 
 /**
  * Seeing a connection: its name, integration, settings, and readiness, never its key.
@@ -27,8 +28,8 @@ export const Create = Permission.make("connection.create", {
  */
 export const Read = Permission.make("connection.read", {
   targetKind: "Connection",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Renaming, configuring, replacing the key of, checking, and removing a connection. Checking sends
@@ -39,8 +40,8 @@ export const Read = Permission.make("connection.read", {
  */
 export const Manage = Permission.make("connection.manage", {
   targetKind: "Connection",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})
 
 /**
  * Giving a connection to what runs on it, as to an agent, which then reaches the connection's
@@ -51,5 +52,5 @@ export const Manage = Permission.make("connection.manage", {
  */
 export const Use = Permission.make("connection.use", {
   targetKind: "Connection",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})

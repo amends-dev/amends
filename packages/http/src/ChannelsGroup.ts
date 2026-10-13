@@ -8,23 +8,24 @@
  *
  * @since 0.1.0
  */
-import { Channel, ChannelBinding } from "@amends-dev/core/channel";
-import { Group } from "@amends-dev/core/group";
-import { Thread } from "@amends-dev/core/thread";
-import { Workspace } from "@amends-dev/core/workspace";
-import * as Schema from "effect/Schema";
-import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import * as Authentication from "./Authentication.ts";
-import * as WorkspaceMember from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
 
-const channel = { channelId: Channel.Id };
-const thread = { threadId: Thread.Id };
-const record = Channel.Channel.annotate({ identifier: "Channel" });
+import { Channel, ChannelBinding } from "@amends-dev/core/channel"
+import { Group } from "@amends-dev/core/group"
+import { Thread } from "@amends-dev/core/thread"
+import { Workspace } from "@amends-dev/core/workspace"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
+
+const channel = { channelId: Channel.Id }
+const thread = { threadId: Thread.Id }
+const record = Channel.Channel.annotate({ identifier: "Channel" })
 /** The body an external system sends, and the answer it is given, as text: the transport reads it. */
-const text = Schema.String.pipe(HttpApiSchema.asText());
+const text = Schema.String.pipe(HttpApiSchema.asText())
 
 /**
  * Channels: a connection's external conversations, which become threads in one group, as tasks in
@@ -40,35 +41,35 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
   .add(
     HttpApiEndpoint.get("list", "/channels", {
       success: Schema.Array(record),
-      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead]
     }),
     HttpApiEndpoint.post("create", "/channels", {
       headers: ApiErrors.requestKey,
       payload: Channel.CreateInput,
       success: record.pipe(HttpApiSchema.status(201)),
-      error: [...ApiErrors.workspace, ...ApiErrors.channelCreate],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelCreate]
     }),
     HttpApiEndpoint.get("get", "/channels/:channelId", {
       params: channel,
       success: record,
-      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead]
     }),
     HttpApiEndpoint.post("redirect", "/channels/:channelId/redirect", {
       params: channel,
       payload: Schema.Struct({ groupId: Group.Id }),
       success: record,
-      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead]
     }),
     HttpApiEndpoint.delete("remove", "/channels/:channelId", {
       params: channel,
       success: HttpApiSchema.NoContent,
-      error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
+      error: [...ApiErrors.workspace, ...ApiErrors.channelRead]
     }),
     HttpApiEndpoint.get("binding", "/threads/:threadId/channel", {
       params: thread,
       success: ChannelBinding.ChannelBinding.annotate({ identifier: "ChannelBinding" }),
-      error: [...ApiErrors.workspace, ...ApiErrors.channelBinding],
-    }),
+      error: [...ApiErrors.workspace, ...ApiErrors.channelBinding]
+    })
   )
   .middleware(WorkspaceMember.WorkspaceMember)
   .middleware(Authentication.Authentication) {}
@@ -86,6 +87,6 @@ export class ChannelEventsGroup extends HttpApiGroup.make("channelEvents").add(
     params: { workspaceId: Workspace.Id, channelId: Channel.Id },
     payload: text,
     success: text,
-    error: [...ApiErrors.workspace, ...ApiErrors.channelEvents],
-  }),
+    error: [...ApiErrors.workspace, ...ApiErrors.channelEvents]
+  })
 ) {}

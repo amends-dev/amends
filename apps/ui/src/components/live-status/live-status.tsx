@@ -1,9 +1,9 @@
-import { Show } from "solid-js";
-import * as s from "./live-status.css.ts";
+import { Show } from "solid-js"
+import * as s from "./live-status.css.ts"
 
 export interface LiveStatusProps {
   /** Changes have stopped arriving. Undefined while live. */
-  readonly status?: "connecting" | "reconnecting";
+  readonly status?: "connecting" | "reconnecting"
 }
 
 /**
@@ -22,5 +22,5 @@ export function LiveStatus(props: LiveStatusProps) {
         )}
       </Show>
     </p>
-  );
+  )
 }

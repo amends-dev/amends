@@ -1,19 +1,14 @@
-export {
-  AddAgent,
-  ConfirmRemoveAgent,
-  type AddAgentProps,
-  type ConfirmRemoveAgentProps,
-} from "./add-agent.tsx";
-export { AgentPane, type AgentPaneProps } from "./agent-pane.tsx";
+export { AddAgent, ConfirmRemoveAgent, type AddAgentProps, type ConfirmRemoveAgentProps } from "./add-agent.tsx"
+export { AgentPane, type AgentPaneProps } from "./agent-pane.tsx"
 export {
   AgentAvatar,
   AgentList,
   AgentsPane,
   type AgentListProps,
   type AgentsPaneProps,
-  type AgentsTab,
-} from "./agents-pane.tsx";
-export { SetupFields, autoHarness, type SetupFieldsProps } from "./setup-fields.tsx";
+  type AgentsTab
+} from "./agents-pane.tsx"
+export { SetupFields, autoHarness, type SetupFieldsProps } from "./setup-fields.tsx"
 export {
   agentStatus,
   agentsMessage,
@@ -35,5 +30,5 @@ export {
   type ModelOption,
   type SetupConnection,
   type SetupField,
-  type SetupPart,
-} from "./wording.tsx";
+  type SetupPart
+} from "./wording.tsx"

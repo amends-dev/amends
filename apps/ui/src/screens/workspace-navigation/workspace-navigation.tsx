@@ -1,4 +1,3 @@
-import { For, Show, type JSX } from "solid-js";
 import {
   IconList,
   IconMarkAgents,
@@ -11,104 +10,105 @@ import {
   IconMarkSettings,
   IconMarkTasks,
   IconMarkTriage,
-  IconMessage,
-} from "@amends-dev/icons";
-import { IconButton } from "../../components/icon-button/index.ts";
-import type { Status } from "../../components/status-mark/index.ts";
-import { Menu } from "../../components/menu/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import type { IconComponent } from "../../internal/props.ts";
-import type { TaskState } from "../../components/task-status/index.ts";
-import type { AvatarToneName } from "../../foundations/color/tokens.ts";
-import { paletteOptions, type ColorPalette } from "../../foundations/color/palettes.ts";
-import { Rail } from "../../patterns/rail/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { Sidebar } from "../../patterns/sidebar/index.ts";
+  IconMessage
+} from "@amends-dev/icons"
+import { For, Show, type JSX } from "solid-js"
+import { IconButton } from "../../components/icon-button/index.ts"
+import { Menu } from "../../components/menu/index.ts"
+import type { Status } from "../../components/status-mark/index.ts"
+import type { TaskState } from "../../components/task-status/index.ts"
+import { paletteOptions, type ColorPalette } from "../../foundations/color/palettes.ts"
+import type { AvatarToneName } from "../../foundations/color/tokens.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import type { IconComponent } from "../../internal/props.ts"
+import { Rail } from "../../patterns/rail/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { Sidebar } from "../../patterns/sidebar/index.ts"
 
-export type Destination = "home" | "agents" | "connections";
+export type Destination = "home" | "agents" | "connections"
 
 const destinations = [
   { id: "home", label: "Home", icon: IconMarkHome },
   { id: "agents", label: "Agents", icon: IconMarkAgents },
-  { id: "connections", label: "Connections", icon: IconMarkConnections },
-] as const;
+  { id: "connections", label: "Connections", icon: IconMarkConnections }
+] as const
 
 export interface NavigationLink {
-  readonly href: string;
-  readonly current?: boolean;
+  readonly href: string
+  readonly current?: boolean
 }
 
 export interface NavigationThread extends NavigationLink {
-  readonly id: string;
-  readonly title: string;
+  readonly id: string
+  readonly title: string
   /** For a task, its state; plain threads show a message icon. */
-  readonly state?: TaskState;
+  readonly state?: TaskState
 }
 
 export interface NavigationGroup extends NavigationLink {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
   /** Open threads and tasks shown under the group. */
-  readonly threads?: ReadonlyArray<NavigationThread>;
+  readonly threads?: ReadonlyArray<NavigationThread>
   /** Agents at work in the group: the most pressing turn state. */
-  readonly activity?: "queued" | "working" | "stopping";
+  readonly activity?: "queued" | "working" | "stopping"
   /** Notifications addressed to the reader from the group. */
-  readonly pending?: number;
+  readonly pending?: number
   /** Activity the reader has not seen. */
-  readonly unread?: boolean;
+  readonly unread?: boolean
 }
 
 export interface NavigationDirect extends NavigationLink {
-  readonly id: string;
-  readonly name: string;
-  readonly initials?: string;
-  readonly tone?: AvatarToneName;
+  readonly id: string
+  readonly name: string
+  readonly initials?: string
+  readonly tone?: AvatarToneName
   /** The other member's state, as a patch on their avatar, such as an agent that needs setup. */
-  readonly status?: Status;
+  readonly status?: Status
   /** Notifications addressed to the reader from the conversation. */
-  readonly pending?: number;
+  readonly pending?: number
   /** Activity the reader has not seen. */
-  readonly unread?: boolean;
+  readonly unread?: boolean
 }
 
-export type Appearance = "system" | "light" | "dark";
+export type Appearance = "system" | "light" | "dark"
 
 /** The account menu the rail's avatar opens. */
 export interface AccountMenu {
   /** The address the reader signs in with. */
-  readonly identity: string;
-  readonly appearance: Appearance;
-  readonly onAppearanceChange: (appearance: Appearance) => void;
-  readonly palette?: ColorPalette;
-  readonly onPaletteChange?: (palette: ColorPalette) => void;
-  readonly onOpenSettings: () => void;
-  readonly onChangeName: () => void;
-  readonly onSignOut: () => void;
+  readonly identity: string
+  readonly appearance: Appearance
+  readonly onAppearanceChange: (appearance: Appearance) => void
+  readonly palette?: ColorPalette
+  readonly onPaletteChange?: (palette: ColorPalette) => void
+  readonly onOpenSettings: () => void
+  readonly onChangeName: () => void
+  readonly onSignOut: () => void
 }
 
 export interface WorkspaceNavigationProps {
-  readonly workspace: { readonly name: string; readonly initials?: string };
+  readonly workspace: { readonly name: string; readonly initials?: string }
   readonly account: {
-    readonly name: string;
-    readonly initials?: string;
-    readonly tone?: AvatarToneName;
+    readonly name: string
+    readonly initials?: string
+    readonly tone?: AvatarToneName
     /** Opens from the avatar, in place of `onOpenAccount`. */
-    readonly menu?: AccountMenu;
-  };
-  readonly homeHref: string;
+    readonly menu?: AccountMenu
+  }
+  readonly homeHref: string
   /** The rail's destinations. Default all of them. */
-  readonly destinations?: ReadonlyArray<Destination>;
+  readonly destinations?: ReadonlyArray<Destination>
   /** The current destination, if the page is one. */
-  readonly destination?: Destination;
-  readonly destinationHref: (destination: Destination) => string;
+  readonly destination?: Destination
+  readonly destinationHref: (destination: Destination) => string
   /** The rail's Settings, a destination of its own. */
-  readonly settings: NavigationLink;
+  readonly settings: NavigationLink
   /** Shows the rail's Search and the sidebar's "Find anything". */
-  readonly onSearch?: () => void;
-  readonly onSwitchWorkspace: () => void;
-  readonly onOpenAccount?: () => void;
+  readonly onSearch?: () => void
+  readonly onSwitchWorkspace: () => void
+  readonly onOpenAccount?: () => void
   /** The current destination's sidebar: HomeSidebar or DestinationSidebar. */
-  readonly children: JSX.Element;
+  readonly children: JSX.Element
 }
 
 /**
@@ -124,9 +124,7 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
         <Rail.List>
           <For
             each={destinations.filter((destination) =>
-              (props.destinations ?? destinations.map((entry) => entry.id)).includes(
-                destination.id,
-              ),
+              (props.destinations ?? destinations.map((entry) => entry.id)).includes(destination.id)
             )}
           >
             {(destination) => (
@@ -139,9 +137,7 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
             )}
           </For>
           <Show when={props.onSearch}>
-            {(search) => (
-              <Rail.Item icon={IconMarkSearch} label="Search" onClick={() => search()()} />
-            )}
+            {(search) => <Rail.Item icon={IconMarkSearch} label="Search" onClick={() => search()()} />}
           </Show>
         </Rail.List>
         <Rail.Footer>
@@ -192,9 +188,7 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
                           onChange={(value) => changePalette()(value as ColorPalette)}
                         >
                           <For each={paletteOptions}>
-                            {(option) => (
-                              <Menu.RadioItem value={option.value}>{option.label}</Menu.RadioItem>
-                            )}
+                            {(option) => <Menu.RadioItem value={option.value}>{option.label}</Menu.RadioItem>}
                           </For>
                         </Menu.RadioGroup>
                       </>
@@ -230,23 +224,23 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
         <Sidebar.Body>{props.children}</Sidebar.Body>
       </Sidebar.Root>
     </Shell.Navigation>
-  );
+  )
 }
 
 export interface HomeSidebarProps {
-  readonly inbox: NavigationLink & { readonly unread?: number };
-  readonly triage: NavigationLink & { readonly count?: number };
-  readonly tasks: NavigationLink;
+  readonly inbox: NavigationLink & { readonly unread?: number }
+  readonly triage: NavigationLink & { readonly count?: number }
+  readonly tasks: NavigationLink
   /** The directory of groups the title links to. */
-  readonly groupsDirectory: NavigationLink;
-  readonly groups: ReadonlyArray<NavigationGroup>;
+  readonly groupsDirectory: NavigationLink
+  readonly groups: ReadonlyArray<NavigationGroup>
   /** The groups are still loading, so an empty list says nothing yet. */
-  readonly groupsLoading?: boolean;
-  readonly directMessages: ReadonlyArray<NavigationDirect>;
-  readonly onBrowseGroups: () => void;
+  readonly groupsLoading?: boolean
+  readonly directMessages: ReadonlyArray<NavigationDirect>
+  readonly onBrowseGroups: () => void
   /** Shows Create group, for readers who may create groups. */
-  readonly onCreateGroup?: () => void;
-  readonly onNewMessage: () => void;
+  readonly onCreateGroup?: () => void
+  readonly onNewMessage: () => void
 }
 
 /** Home's sidebar: Inbox, Triage, Tasks, groups, and direct messages. */
@@ -277,11 +271,7 @@ export function HomeSidebar(props: HomeSidebarProps) {
         </Sidebar.Item>
       </Sidebar.List>
       <Sidebar.Section>
-        <Sidebar.SectionHeader
-          title="Groups"
-          href={props.groupsDirectory.href}
-          current={props.groupsDirectory.current}
-        >
+        <Sidebar.SectionHeader title="Groups" href={props.groupsDirectory.href} current={props.groupsDirectory.current}>
           <IconButton
             icon={IconMarkSearch}
             label="Browse groups"
@@ -290,12 +280,7 @@ export function HomeSidebar(props: HomeSidebarProps) {
           />
           <Show when={props.onCreateGroup}>
             {(create) => (
-              <IconButton
-                icon={IconMarkNew}
-                label="Create group"
-                size="compact"
-                onClick={() => create()()}
-              />
+              <IconButton icon={IconMarkNew} label="Create group" size="compact" onClick={() => create()()} />
             )}
           </Show>
         </Sidebar.SectionHeader>
@@ -336,12 +321,7 @@ export function HomeSidebar(props: HomeSidebarProps) {
       </Sidebar.Section>
       <Sidebar.Section>
         <Sidebar.SectionHeader title="Direct messages">
-          <IconButton
-            icon={IconMarkNew}
-            label="New message"
-            size="compact"
-            onClick={() => props.onNewMessage()}
-          />
+          <IconButton icon={IconMarkNew} label="New message" size="compact" onClick={() => props.onNewMessage()} />
         </Sidebar.SectionHeader>
         <Sidebar.List>
           <Keyed each={props.directMessages} by={(direct) => direct.id}>
@@ -352,7 +332,7 @@ export function HomeSidebar(props: HomeSidebarProps) {
                 person={{
                   name: direct().name,
                   initials: direct().initials,
-                  tone: direct().tone,
+                  tone: direct().tone
                 }}
                 status={direct().status}
                 activity={direct().status?.activity}
@@ -367,52 +347,52 @@ export function HomeSidebar(props: HomeSidebarProps) {
         </Sidebar.List>
       </Sidebar.Section>
     </>
-  );
+  )
 }
 
 /** One of a destination's items, such as an agent or a connection. */
 export interface NavigationEntry extends NavigationLink {
-  readonly id: string;
-  readonly name: string;
+  readonly id: string
+  readonly name: string
   /** An icon before the name. */
-  readonly icon?: IconComponent;
+  readonly icon?: IconComponent
   /** An avatar before the name, for an agent. */
   readonly person?: {
-    readonly name: string;
-    readonly initials?: string;
-    readonly tone?: AvatarToneName;
-  };
+    readonly name: string
+    readonly initials?: string
+    readonly tone?: AvatarToneName
+  }
   /** Agents at work: the most pressing turn state. */
-  readonly activity?: "queued" | "working" | "stopping";
+  readonly activity?: "queued" | "working" | "stopping"
   /**
    * Its state: a patch on the avatar, or a mark at the row's end for an item without one, such
    * as an agent that needs setup. Word it with the destination's status helpers.
    */
-  readonly status?: Status;
+  readonly status?: Status
 }
 
 /** A titled list of a destination's items, with Browse and Create beside the title. */
 export interface NavigationSection {
-  readonly id: string;
+  readonly id: string
   /** Without a title, the items stand alone, as Home's Inbox does. */
-  readonly title?: string;
+  readonly title?: string
   /** The title links to the full list in the main content. */
-  readonly href?: string;
+  readonly href?: string
   /** The full list is showing. */
-  readonly current?: boolean;
+  readonly current?: boolean
   /** Shows Browse, opening the full list, named such as "Browse agents". */
-  readonly browse?: { readonly label: string; readonly onBrowse: () => void };
+  readonly browse?: { readonly label: string; readonly onBrowse: () => void }
   /** Shows Create, for a reader who may, named such as "Add agent". */
-  readonly create?: { readonly label: string; readonly onCreate: () => void };
-  readonly entries: ReadonlyArray<NavigationEntry>;
+  readonly create?: { readonly label: string; readonly onCreate: () => void }
+  readonly entries: ReadonlyArray<NavigationEntry>
   /** The entries are still loading, so an empty list says nothing yet. */
-  readonly loading?: boolean;
+  readonly loading?: boolean
   /** Where the list has no entries, such as "No agents yet". */
-  readonly empty?: string;
+  readonly empty?: string
 }
 
 export interface DestinationSidebarProps {
-  readonly sections: ReadonlyArray<NavigationSection>;
+  readonly sections: ReadonlyArray<NavigationSection>
 }
 
 /**
@@ -426,11 +406,7 @@ export function DestinationSidebar(props: DestinationSidebarProps) {
         <Sidebar.Section>
           <Show when={section().title}>
             {(title) => (
-              <Sidebar.SectionHeader
-                title={title()}
-                href={section().href}
-                current={section().current}
-              >
+              <Sidebar.SectionHeader title={title()} href={section().href} current={section().current}>
                 <Show when={section().browse}>
                   {(browse) => (
                     <IconButton
@@ -476,5 +452,5 @@ export function DestinationSidebar(props: DestinationSidebarProps) {
         </Sidebar.Section>
       )}
     </Keyed>
-  );
+  )
 }

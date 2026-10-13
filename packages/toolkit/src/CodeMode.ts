@@ -18,14 +18,15 @@
  *
  * @since 0.1.0
  */
-import * as Duration from "effect/Duration";
-import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-import * as Tool from "effect/ai/Tool";
-import * as Toolkit from "effect/ai/Toolkit";
-import * as Presentation from "./Presentation.ts";
-import * as ToolSource from "./ToolSource.ts";
-import { declare } from "./internal/declarations.ts";
+
+import * as Tool from "effect/ai/Tool"
+import * as Toolkit from "effect/ai/Toolkit"
+import * as Duration from "effect/Duration"
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import { declare } from "./internal/declarations.ts"
+import * as Presentation from "./Presentation.ts"
+import * as ToolSource from "./ToolSource.ts"
 
 /**
  * Why code did not finish: it threw, or the runtime could not run it. A `CodeRuntime` fails with
@@ -34,17 +35,15 @@ import { declare } from "./internal/declarations.ts";
  * @category errors
  * @since 0.1.0
  */
-export class CodeError extends Schema.TaggedError<CodeError>(
-  "@amends-dev/toolkit/CodeMode/CodeError",
-)("CodeError", {
+export class CodeError extends Schema.TaggedError<CodeError>("@amends-dev/toolkit/CodeMode/CodeError")("CodeError", {
   /** What went wrong, which the model reads, such as the message of what the code threw. */
   description: Schema.String,
 
   /** What the code logged before it failed. */
-  logs: Schema.Array(Schema.String),
+  logs: Schema.Array(Schema.String)
 }) {
   override get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -56,19 +55,16 @@ export class CodeError extends Schema.TaggedError<CodeError>(
  */
 export interface Execution {
   /** The code, as the body of an async function, which `return`s what the run gives back. */
-  readonly code: string;
+  readonly code: string
 
   /** The names of the tools the code may call, as `tools.<name>`, which any other name is not. */
-  readonly tools: ReadonlyArray<string>;
+  readonly tools: ReadonlyArray<string>
 
   /**
    * Calls a tool with an input object, which the code gave or left empty, and answers with what the
    * tool gave, or fails as the tool failed. The code reads a failure as an error it can catch.
    */
-  readonly call: (
-    tool: string,
-    input: Schema.JsonObject,
-  ) => Effect.Effect<Schema.Json, ToolSource.Failure>;
+  readonly call: (tool: string, input: Schema.JsonObject) => Effect.Effect<Schema.Json, ToolSource.Failure>
 }
 
 /**
@@ -82,8 +78,8 @@ export const Outcome = Schema.Struct({
   result: Schema.Json,
 
   /** What the code logged, a line for each call of `console.log`. */
-  logs: Schema.Array(Schema.String),
-});
+  logs: Schema.Array(Schema.String)
+})
 
 /**
  * @category schemas
@@ -104,7 +100,7 @@ export interface CodeRuntime {
    * Runs the code, and ends the run when interrupted. It fails with `CodeError` when the code
    * throws, and for anything else that stops the run, such as a runtime that cannot start.
    */
-  readonly run: (execution: Execution) => Effect.Effect<Outcome, CodeError>;
+  readonly run: (execution: Execution) => Effect.Effect<Outcome, CodeError>
 }
 
 /**
@@ -115,16 +111,16 @@ export interface CodeRuntime {
  */
 export interface Options {
   /** How long a run may take, which its tool calls count in. A minute by default. */
-  readonly timeout?: Duration.Input;
+  readonly timeout?: Duration.Input
 
   /** The most characters of JSON a run may return. 50,000 by default. */
-  readonly maxResultLength?: number;
+  readonly maxResultLength?: number
 }
 
-const defaultMaxResultLength = 50_000;
+const defaultMaxResultLength = 50_000
 
 /** The tool that has the model's code run. A tool of the presented toolkit may not have its name. */
-const executeName = "execute";
+const executeName = "execute"
 
 /**
  * Makes the toolkit of `execute`, and the tools of `presented` that need approval, over `presented`
@@ -133,39 +129,40 @@ const executeName = "execute";
  * @category constructors
  * @since 0.1.0
  */
-export const toolkit = Effect.fn("CodeMode.toolkit")(function* <
-  Tools extends Record<string, Tool.Any>,
->(presented: Toolkit.WithHandler<Tools>, runtime: CodeRuntime, options?: Options) {
-  const services = yield* Effect.context<Tool.HandlerServices<Tools[keyof Tools]>>();
-  const timeout = options?.timeout ?? "1 minute";
-  const maxResultLength = options?.maxResultLength ?? defaultMaxResultLength;
+export const toolkit = Effect.fn("CodeMode.toolkit")(function* <Tools extends Record<string, Tool.Any>>(
+  presented: Toolkit.WithHandler<Tools>,
+  runtime: CodeRuntime,
+  options?: Options
+) {
+  const services = yield* Effect.context<Tool.HandlerServices<Tools[keyof Tools]>>()
+  const timeout = options?.timeout ?? "1 minute"
+  const maxResultLength = options?.maxResultLength ?? defaultMaxResultLength
 
-  const tools = Object.values<Tool.Any>(presented.tools);
+  const tools = Object.values<Tool.Any>(presented.tools)
   // A tool whose approval depends on the call may need it, so code cannot call it.
-  const needsApproval = (tool: Tool.Any) =>
-    tool.needsApproval !== undefined && tool.needsApproval !== false;
-  const direct = tools.filter(needsApproval);
-  const callable = tools.filter((tool) => !needsApproval(tool));
+  const needsApproval = (tool: Tool.Any) => tool.needsApproval !== undefined && tool.needsApproval !== false
+  const direct = tools.filter(needsApproval)
+  const callable = tools.filter((tool) => !needsApproval(tool))
   if (direct.some((tool) => tool.name === executeName)) {
-    return yield* Effect.die(new Error(`A tool that needs approval is named ${executeName}`));
+    return yield* Effect.die(new Error(`A tool that needs approval is named ${executeName}`))
   }
-  const callableNames = new Set(callable.map((tool) => tool.name));
+  const callableNames = new Set(callable.map((tool) => tool.name))
 
   const Execute = Tool.make(executeName, {
     description: describeExecute(callable, direct.length > 0),
     parameters: Schema.Struct({
-      code: Schema.String.annotate({ description: "The body of an async function" }),
+      code: Schema.String.annotate({ description: "The body of an async function" })
     }),
     success: Outcome,
     failure: ToolSource.Failure,
     // Code that fails is told so, and the model writes it again.
-    failureMode: "return",
-  });
+    failureMode: "return"
+  })
 
   const callTool = (name: string, input: Schema.JsonObject) =>
     Presentation.hasTool(presented, name) && callableNames.has(name)
       ? Presentation.call(presented, name, input).pipe(Effect.provide(services))
-      : Effect.fail(Presentation.failure("NotFoundError", `There is no tool named ${name}`));
+      : Effect.fail(Presentation.failure("NotFoundError", `There is no tool named ${name}`))
 
   const run = (code: string) =>
     runtime.run({ code, tools: [...callableNames], call: callTool }).pipe(
@@ -174,11 +171,8 @@ export const toolkit = Effect.fn("CodeMode.toolkit")(function* <
         duration: timeout,
         orElse: () =>
           Effect.fail(
-            Presentation.failure(
-              "Timeout",
-              `The code ran longer than ${Duration.toMillis(timeout) / 1000} seconds`,
-            ),
-          ),
+            Presentation.failure("Timeout", `The code ran longer than ${Duration.toMillis(timeout) / 1000} seconds`)
+          )
       }),
       Effect.filterOrFail(
         (outcome) => JSON.stringify(outcome.result).length <= maxResultLength,
@@ -186,20 +180,17 @@ export const toolkit = Effect.fn("CodeMode.toolkit")(function* <
           Presentation.failure(
             "ResultTooLarge",
             `The result is ${JSON.stringify(outcome.result).length} characters, more than the ` +
-              `${maxResultLength} a run may return. Return only what you need of it.`,
-          ),
-      ),
-    );
+              `${maxResultLength} a run may return. Return only what you need of it.`
+          )
+      )
+    )
 
-  const ExecuteToolkit = Toolkit.make(Execute);
+  const ExecuteToolkit = Toolkit.make(Execute)
   const executeToolkit = yield* ExecuteToolkit.pipe(
-    Effect.provide(ExecuteToolkit.toLayer({ [executeName]: ({ code }) => run(code) })),
-  );
-  return Presentation.merge(
-    executeToolkit,
-    Presentation.restrict(presented, new Set(direct.map((tool) => tool.name))),
-  );
-});
+    Effect.provide(ExecuteToolkit.toLayer({ [executeName]: ({ code }) => run(code) }))
+  )
+  return Presentation.merge(executeToolkit, Presentation.restrict(presented, new Set(direct.map((tool) => tool.name))))
+})
 
 /** What the model reads of `execute`: how to write the code, and the tools it can call. */
 const describeExecute = (callable: ReadonlyArray<Tool.Any>, hasDirect: boolean) =>
@@ -213,13 +204,11 @@ const describeExecute = (callable: ReadonlyArray<Tool.Any>, hasDirect: boolean) 
       callable.map((tool) => ({
         name: tool.name,
         description: Tool.getDescription(tool),
-        inputSchema: Presentation.inputSchemaOf(tool),
-      })),
+        inputSchema: Presentation.inputSchemaOf(tool)
+      }))
     ),
-    ...(hasDirect
-      ? ["Tools that need a person's approval are not in `tools`: call them as tools of their own."]
-      : []),
-  ].join("\n\n");
+    ...(hasDirect ? ["Tools that need a person's approval are not in `tools`: call them as tools of their own."] : [])
+  ].join("\n\n")
 
 /** What the model reads of code that failed: what it said, and what it logged before. */
 const failureOfCodeError = (error: CodeError): ToolSource.Failure =>
@@ -227,5 +216,5 @@ const failureOfCodeError = (error: CodeError): ToolSource.Failure =>
     "CodeError",
     error.logs.length === 0
       ? error.description
-      : `${error.description}\n\nLogged before it failed:\n${error.logs.join("\n")}`,
-  );
+      : `${error.description}\n\nLogged before it failed:\n${error.logs.join("\n")}`
+  )

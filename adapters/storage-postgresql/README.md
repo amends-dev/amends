@@ -12,8 +12,8 @@ every storage adapter runs. It is internal to this repository and not published 
 ```ts
 Gateway.layer().pipe(
   Layer.provideMerge(PostgresStorage.layer()),
-  Layer.provide(PostgresDatabase.layer({ url: Redacted.make(databaseUrl) })),
-);
+  Layer.provide(PostgresDatabase.layer({ url: Redacted.make(databaseUrl) }))
+)
 ```
 
 `PostgresStorage.layer(options)` provides the storage contract, with its signal hubs, the directory, the

@@ -4,11 +4,11 @@
  *
  * @since 0.1.0
  */
-import * as Effect from "effect/Effect";
-import * as Projection from "../journal/Projection.ts";
 
-import * as InvitationFacts from "./InvitationFacts.ts";
-import * as InvitationStore from "./InvitationStore.ts";
+import * as Effect from "effect/Effect"
+import * as Projection from "../journal/Projection.ts"
+import * as InvitationFacts from "./InvitationFacts.ts"
+import * as InvitationStore from "./InvitationStore.ts"
 
 /**
  * Inserts each issued invitation as pending, and settles it as accepted or revoked on those facts.
@@ -24,9 +24,9 @@ export const definition = Projection.make("workspace.invitations", { version: 1 
     Effect.fn("InvitationProjection.issued")(function* ({ payload }) {
       yield* (yield* InvitationStore.InvitationStore).insert({
         details: payload,
-        state: { _tag: "Pending" },
-      });
-    }),
+        state: { _tag: "Pending" }
+      })
+    })
   )
   .on(
     InvitationFacts.Accepted,
@@ -34,9 +34,9 @@ export const definition = Projection.make("workspace.invitations", { version: 1 
       yield* (yield* InvitationStore.InvitationStore).settle(payload.invitationId, {
         _tag: "Accepted",
         memberId: payload.memberId,
-        acceptedAt: payload.acceptedAt,
-      });
-    }),
+        acceptedAt: payload.acceptedAt
+      })
+    })
   )
   .on(
     InvitationFacts.Revoked,
@@ -44,7 +44,7 @@ export const definition = Projection.make("workspace.invitations", { version: 1 
       yield* (yield* InvitationStore.InvitationStore).settle(payload.invitationId, {
         _tag: "Revoked",
         revokedBy: payload.revokedBy,
-        revokedAt: payload.revokedAt,
-      });
-    }),
-  );
+        revokedAt: payload.revokedAt
+      })
+    })
+  )

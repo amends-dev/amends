@@ -12,21 +12,22 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Agent from "../agent/Agent.ts";
-import * as Requirement from "../authorization/Requirement.ts";
-import * as Role from "../authorization/Role.ts";
-import * as Connection from "../connection/Connection.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as Identity from "../identity/Identity.ts";
-import * as Commit from "../journal/Commit.ts";
-import * as Notification from "../notification/Notification.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
-import * as Turn from "../turn/Turn.ts";
-import * as Invitation from "../workspace/Invitation.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+
+import * as Schema from "effect/Schema"
+import * as Agent from "../agent/Agent.ts"
+import * as Requirement from "../authorization/Requirement.ts"
+import * as Role from "../authorization/Role.ts"
+import * as Connection from "../connection/Connection.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as Commit from "../journal/Commit.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
+import * as Turn from "../turn/Turn.ts"
+import * as Invitation from "../workspace/Invitation.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * What an error names, as core's modules name it.
@@ -51,14 +52,14 @@ export const Resource = Schema.Literals([
   "ThreadMessage",
   "ThreadParticipation",
   "Turn",
-  "Workspace",
-]);
+  "Workspace"
+])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Resource = typeof Resource.Type;
+export type Resource = typeof Resource.Type
 
 /**
  * The caller named something that is missing, or out of their reach, as a thread outside their
@@ -71,10 +72,10 @@ export type Resource = typeof Resource.Type;
  */
 export class NotFound extends Schema.TaggedError<NotFound>()("CoreError.NotFound", {
   resource: Resource,
-  id: Schema.String,
+  id: Schema.String
 }) {
   override get message(): string {
-    return `${this.resource} ${this.id} not found`;
+    return `${this.resource} ${this.id} not found`
   }
 }
 
@@ -88,10 +89,10 @@ export class NotFound extends Schema.TaggedError<NotFound>()("CoreError.NotFound
  */
 export class Changed extends Schema.TaggedError<Changed>()("CoreError.Changed", {
   resource: Resource,
-  id: Schema.String,
+  id: Schema.String
 }) {
   override get message(): string {
-    return `${this.resource} ${this.id} changed since it was read`;
+    return `${this.resource} ${this.id} changed since it was read`
   }
 }
 
@@ -103,10 +104,10 @@ export class Changed extends Schema.TaggedError<Changed>()("CoreError.Changed", 
  */
 export class NotGranted extends Schema.TaggedClass<NotGranted>()("NotGranted", {
   memberId: MemberId.Id,
-  requirement: Requirement.Requirement,
+  requirement: Requirement.Requirement
 }) {
   get message(): string {
-    return `Member ${this.memberId} holds no grant of ${this.requirement.permission.name}`;
+    return `Member ${this.memberId} holds no grant of ${this.requirement.permission.name}`
   }
 }
 
@@ -118,10 +119,10 @@ export class NotGranted extends Schema.TaggedClass<NotGranted>()("NotGranted", {
  * @since 0.1.0
  */
 export class NotMember extends Schema.TaggedClass<NotMember>()("NotMember", {
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.Id
 }) {
   get message(): string {
-    return `Not a member of workspace ${this.workspaceId}`;
+    return `Not a member of workspace ${this.workspaceId}`
   }
 }
 
@@ -133,10 +134,10 @@ export class NotMember extends Schema.TaggedClass<NotMember>()("NotMember", {
  */
 export class InvalidActor extends Schema.TaggedClass<InvalidActor>()("InvalidActor", {
   memberId: MemberId.Id,
-  reason: Schema.Literals(["membership-missing", "membership-removed", "identity-mismatch"]),
+  reason: Schema.Literals(["membership-missing", "membership-removed", "identity-mismatch"])
 }) {
   get message(): string {
-    return `Member ${this.memberId} cannot act: ${this.reason}`;
+    return `Member ${this.memberId} cannot act: ${this.reason}`
   }
 }
 
@@ -149,10 +150,10 @@ export class InvalidActor extends Schema.TaggedClass<InvalidActor>()("InvalidAct
  * @since 0.1.0
  */
 export class OwnerRequired extends Schema.TaggedClass<OwnerRequired>()("OwnerRequired", {
-  reason: Schema.Literals(["administrator-role", "protected-member", "ownership-transfer"]),
+  reason: Schema.Literals(["administrator-role", "protected-member", "ownership-transfer"])
 }) {
   get message(): string {
-    return `Only the owner may do this: ${this.reason}`;
+    return `Only the owner may do this: ${this.reason}`
   }
 }
 
@@ -163,10 +164,10 @@ export class OwnerRequired extends Schema.TaggedClass<OwnerRequired>()("OwnerReq
  * @since 0.1.0
  */
 export class NotAuthor extends Schema.TaggedClass<NotAuthor>()("NotAuthor", {
-  messageId: ThreadMessageId.Id,
+  messageId: ThreadMessageId.Id
 }) {
   get message(): string {
-    return `Only the author edits message ${this.messageId}`;
+    return `Only the author edits message ${this.messageId}`
   }
 }
 
@@ -177,10 +178,10 @@ export class NotAuthor extends Schema.TaggedClass<NotAuthor>()("NotAuthor", {
  * @since 0.1.0
  */
 export class NotRecipient extends Schema.TaggedClass<NotRecipient>()("NotRecipient", {
-  invitationId: Invitation.Id,
+  invitationId: Invitation.Id
 }) {
   get message(): string {
-    return `Invitation ${this.invitationId} is for someone else`;
+    return `Invitation ${this.invitationId} is for someone else`
   }
 }
 
@@ -194,7 +195,7 @@ export class NotRecipient extends Schema.TaggedClass<NotRecipient>()("NotRecipie
  */
 export class HumanRequired extends Schema.TaggedClass<HumanRequired>()("HumanRequired", {}) {
   get message(): string {
-    return "Only a person may do this";
+    return "Only a person may do this"
   }
 }
 
@@ -206,10 +207,10 @@ export class HumanRequired extends Schema.TaggedClass<HumanRequired>()("HumanReq
  * @since 0.1.0
  */
 export class AgentRequired extends Schema.TaggedClass<AgentRequired>()("AgentRequired", {
-  memberId: MemberId.Id,
+  memberId: MemberId.Id
 }) {
   get message(): string {
-    return `Member ${this.memberId} is not an agent`;
+    return `Member ${this.memberId} is not an agent`
   }
 }
 
@@ -227,14 +228,14 @@ export const DeniedReason = Schema.Union([
   NotAuthor,
   NotRecipient,
   HumanRequired,
-  AgentRequired,
-]);
+  AgentRequired
+])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type DeniedReason = typeof DeniedReason.Type;
+export type DeniedReason = typeof DeniedReason.Type
 
 /**
  * The actor may not do what they asked, for the `reason` given; nothing was recorded.
@@ -242,25 +243,25 @@ export type DeniedReason = typeof DeniedReason.Type;
  * **Example** (Treating a missing grant as not allowed)
  *
  * ```ts
- * import type { CoreError } from "@amends-dev/core/error";
- * import { Effect } from "effect";
+ * import type { CoreError } from "@amends-dev/core/error"
+ * import { Effect } from "effect"
  *
- * declare const check: Effect.Effect<void, CoreError.Denied>;
+ * declare const check: Effect.Effect<void, CoreError.Denied>
  *
  * const allowed = check.pipe(
  *   Effect.as(true),
- *   Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false)),
- * );
+ *   Effect.catchReason("CoreError.Denied", "NotGranted", () => Effect.succeed(false))
+ * )
  * ```
  *
  * @category errors
  * @since 0.1.0
  */
 export class Denied extends Schema.TaggedError<Denied>()("CoreError.Denied", {
-  reason: DeniedReason,
+  reason: DeniedReason
 }) {
   override get message(): string {
-    return this.reason.message;
+    return this.reason.message
   }
 }
 
@@ -273,10 +274,10 @@ export class Denied extends Schema.TaggedError<Denied>()("CoreError.Denied", {
  */
 export class Contention extends Schema.TaggedClass<Contention>()("Contention", {
   operation: Schema.String,
-  description: Schema.String,
+  description: Schema.String
 }) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -289,7 +290,7 @@ export class Contention extends Schema.TaggedClass<Contention>()("Contention", {
  */
 export class Reloading extends Schema.TaggedClass<Reloading>()("Reloading", {}) {
   get message(): string {
-    return "Another host changed this workspace's read models; try again once they are rebuilt";
+    return "Another host changed this workspace's read models; try again once they are rebuilt"
   }
 }
 
@@ -299,12 +300,9 @@ export class Reloading extends Schema.TaggedClass<Reloading>()("Reloading", {}) 
  * @category reasons
  * @since 0.1.0
  */
-export class ChangeFeedInterrupted extends Schema.TaggedClass<ChangeFeedInterrupted>()(
-  "ChangeFeedInterrupted",
-  {},
-) {
+export class ChangeFeedInterrupted extends Schema.TaggedClass<ChangeFeedInterrupted>()("ChangeFeedInterrupted", {}) {
   get message(): string {
-    return "The change feed stopped; subscribe again and refresh";
+    return "The change feed stopped; subscribe again and refresh"
   }
 }
 
@@ -316,7 +314,7 @@ export class ChangeFeedInterrupted extends Schema.TaggedClass<ChangeFeedInterrup
  */
 export class LogInterrupted extends Schema.TaggedClass<LogInterrupted>()("LogInterrupted", {}) {
   get message(): string {
-    return "Following the turn's log stopped short; follow it again from the start";
+    return "Following the turn's log stopped short; follow it again from the start"
   }
 }
 
@@ -328,12 +326,11 @@ export class LogInterrupted extends Schema.TaggedClass<LogInterrupted>()("LogInt
  * @category reasons
  * @since 0.1.0
  */
-export class ChannelUnreachable extends Schema.TaggedClass<ChannelUnreachable>()(
-  "ChannelUnreachable",
-  { description: Schema.String },
-) {
+export class ChannelUnreachable extends Schema.TaggedClass<ChannelUnreachable>()("ChannelUnreachable", {
+  description: Schema.String
+}) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -344,12 +341,11 @@ export class ChannelUnreachable extends Schema.TaggedClass<ChannelUnreachable>()
  * @category reasons
  * @since 0.1.0
  */
-export class CredentialsUnavailable extends Schema.TaggedClass<CredentialsUnavailable>()(
-  "CredentialsUnavailable",
-  { description: Schema.String },
-) {
+export class CredentialsUnavailable extends Schema.TaggedClass<CredentialsUnavailable>()("CredentialsUnavailable", {
+  description: Schema.String
+}) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -365,14 +361,14 @@ export const UnavailableReason = Schema.Union([
   ChangeFeedInterrupted,
   LogInterrupted,
   ChannelUnreachable,
-  CredentialsUnavailable,
-]);
+  CredentialsUnavailable
+])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type UnavailableReason = typeof UnavailableReason.Type;
+export type UnavailableReason = typeof UnavailableReason.Type
 
 /**
  * What the operation needs cannot be reached or used now, for the `reason` given; nothing was
@@ -382,10 +378,10 @@ export type UnavailableReason = typeof UnavailableReason.Type;
  * @since 0.1.0
  */
 export class Unavailable extends Schema.TaggedError<Unavailable>()("CoreError.Unavailable", {
-  reason: UnavailableReason,
+  reason: UnavailableReason
 }) {
   override get message(): string {
-    return this.reason.message;
+    return this.reason.message
   }
 }
 
@@ -397,10 +393,10 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()("CoreError.Un
  * @since 0.1.0
  */
 export class InactiveMember extends Schema.TaggedClass<InactiveMember>()("InactiveMember", {
-  memberId: MemberId.Id,
+  memberId: MemberId.Id
 }) {
   get message(): string {
-    return `Member ${this.memberId} is no longer active`;
+    return `Member ${this.memberId} is no longer active`
   }
 }
 
@@ -411,12 +407,11 @@ export class InactiveMember extends Schema.TaggedClass<InactiveMember>()("Inacti
  * @category reasons
  * @since 0.1.0
  */
-export class ParticipantUnavailable extends Schema.TaggedClass<ParticipantUnavailable>()(
-  "ParticipantUnavailable",
-  { memberId: MemberId.Id },
-) {
+export class ParticipantUnavailable extends Schema.TaggedClass<ParticipantUnavailable>()("ParticipantUnavailable", {
+  memberId: MemberId.Id
+}) {
   get message(): string {
-    return `Member ${this.memberId} cannot take part`;
+    return `Member ${this.memberId} cannot take part`
   }
 }
 
@@ -429,7 +424,7 @@ export class ParticipantUnavailable extends Schema.TaggedClass<ParticipantUnavai
  */
 export class OwnerProtected extends Schema.TaggedClass<OwnerProtected>()("OwnerProtected", {}) {
   get message(): string {
-    return "The owner is out of reach until ownership is transferred";
+    return "The owner is out of reach until ownership is transferred"
   }
 }
 
@@ -441,10 +436,10 @@ export class OwnerProtected extends Schema.TaggedClass<OwnerProtected>()("OwnerP
  */
 export class AlreadyMember extends Schema.TaggedClass<AlreadyMember>()("AlreadyMember", {
   groupId: GroupId.Id,
-  memberId: MemberId.Id,
+  memberId: MemberId.Id
 }) {
   get message(): string {
-    return `Member ${this.memberId} is in group ${this.groupId} already`;
+    return `Member ${this.memberId} is in group ${this.groupId} already`
   }
 }
 
@@ -456,10 +451,10 @@ export class AlreadyMember extends Schema.TaggedClass<AlreadyMember>()("AlreadyM
  * @since 0.1.0
  */
 export class AlreadyJoined extends Schema.TaggedClass<AlreadyJoined>()("AlreadyJoined", {
-  recipientId: Identity.HumanId,
+  recipientId: Identity.HumanId
 }) {
   get message(): string {
-    return "This person is a member of the workspace already";
+    return "This person is a member of the workspace already"
   }
 }
 
@@ -472,10 +467,10 @@ export class AlreadyJoined extends Schema.TaggedClass<AlreadyJoined>()("AlreadyJ
  */
 export class AlreadyEnded extends Schema.TaggedClass<AlreadyEnded>()("AlreadyEnded", {
   resource: Resource,
-  id: Schema.String,
+  id: Schema.String
 }) {
   get message(): string {
-    return `${this.resource} ${this.id} has ended already`;
+    return `${this.resource} ${this.id} has ended already`
   }
 }
 
@@ -487,10 +482,10 @@ export class AlreadyEnded extends Schema.TaggedClass<AlreadyEnded>()("AlreadyEnd
  * @since 0.1.0
  */
 export class AlreadyHandled extends Schema.TaggedClass<AlreadyHandled>()("AlreadyHandled", {
-  notificationId: Notification.Id,
+  notificationId: Notification.Id
 }) {
   get message(): string {
-    return `Notification ${this.notificationId} was handled already`;
+    return `Notification ${this.notificationId} was handled already`
   }
 }
 
@@ -501,10 +496,10 @@ export class AlreadyHandled extends Schema.TaggedClass<AlreadyHandled>()("Alread
  * @since 0.1.0
  */
 export class AlreadyTask extends Schema.TaggedClass<AlreadyTask>()("AlreadyTask", {
-  threadId: ThreadId.Id,
+  threadId: ThreadId.Id
 }) {
   get message(): string {
-    return `Thread ${this.threadId} is a task already`;
+    return `Thread ${this.threadId} is a task already`
   }
 }
 
@@ -515,10 +510,10 @@ export class AlreadyTask extends Schema.TaggedClass<AlreadyTask>()("AlreadyTask"
  * @since 0.1.0
  */
 export class Deleted extends Schema.TaggedClass<Deleted>()("Deleted", {
-  messageId: ThreadMessageId.Id,
+  messageId: ThreadMessageId.Id
 }) {
   get message(): string {
-    return `Message ${this.messageId} was deleted`;
+    return `Message ${this.messageId} was deleted`
   }
 }
 
@@ -530,10 +525,10 @@ export class Deleted extends Schema.TaggedClass<Deleted>()("Deleted", {
  */
 export class TurnNotActive extends Schema.TaggedClass<TurnNotActive>()("TurnNotActive", {
   turnId: Turn.Id,
-  status: Turn.Status,
+  status: Turn.Status
 }) {
   get message(): string {
-    return `Turn ${this.turnId} is ${this.status}`;
+    return `Turn ${this.turnId} is ${this.status}`
   }
 }
 
@@ -546,10 +541,10 @@ export class TurnNotActive extends Schema.TaggedClass<TurnNotActive>()("TurnNotA
  */
 export class NotRetryable extends Schema.TaggedClass<NotRetryable>()("NotRetryable", {
   turnId: Turn.Id,
-  reason: Turn.NotRetryableReason,
+  reason: Turn.NotRetryableReason
 }) {
   get message(): string {
-    return `Turn ${this.turnId} cannot be retried: ${this.reason}`;
+    return `Turn ${this.turnId} cannot be retried: ${this.reason}`
   }
 }
 
@@ -562,10 +557,10 @@ export class NotRetryable extends Schema.TaggedClass<NotRetryable>()("NotRetryab
 export class BeyondTimeline extends Schema.TaggedClass<BeyondTimeline>()("BeyondTimeline", {
   threadId: ThreadId.Id,
   throughSequence: Schema.Int,
-  latestSequence: Schema.Int,
+  latestSequence: Schema.Int
 }) {
   get message(): string {
-    return `Thread ${this.threadId} ends at ${this.latestSequence}, before ${this.throughSequence}`;
+    return `Thread ${this.threadId} ends at ${this.latestSequence}, before ${this.throughSequence}`
   }
 }
 
@@ -578,10 +573,10 @@ export class BeyondTimeline extends Schema.TaggedClass<BeyondTimeline>()("Beyond
  */
 export class InvalidRecipient extends Schema.TaggedClass<InvalidRecipient>()("InvalidRecipient", {
   memberId: MemberId.Id,
-  reason: Schema.Literals(["same-owner", "removed", "agent"]),
+  reason: Schema.Literals(["same-owner", "removed", "agent"])
 }) {
   get message(): string {
-    return `Member ${this.memberId} cannot become owner: ${this.reason}`;
+    return `Member ${this.memberId} cannot become owner: ${this.reason}`
   }
 }
 
@@ -594,10 +589,10 @@ export class InvalidRecipient extends Schema.TaggedClass<InvalidRecipient>()("In
  */
 export class InvitationClosed extends Schema.TaggedClass<InvitationClosed>()("InvitationClosed", {
   invitationId: Invitation.Id,
-  reason: Schema.Literals(["expired", "revoked", "accepted"]),
+  reason: Schema.Literals(["expired", "revoked", "accepted"])
 }) {
   get message(): string {
-    return `Invitation ${this.invitationId} is ${this.reason}`;
+    return `Invitation ${this.invitationId} is ${this.reason}`
   }
 }
 
@@ -621,14 +616,14 @@ export const ConflictReason = Schema.Union([
   NotRetryable,
   BeyondTimeline,
   InvalidRecipient,
-  InvitationClosed,
-]);
+  InvitationClosed
+])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type ConflictReason = typeof ConflictReason.Type;
+export type ConflictReason = typeof ConflictReason.Type
 
 /**
  * The state of what the request acts on refuses it, for the `reason` given, as a member already
@@ -639,10 +634,10 @@ export type ConflictReason = typeof ConflictReason.Type;
  * @since 0.1.0
  */
 export class Conflict extends Schema.TaggedError<Conflict>()("CoreError.Conflict", {
-  reason: ConflictReason,
+  reason: ConflictReason
 }) {
   override get message(): string {
-    return this.reason.message;
+    return this.reason.message
   }
 }
 
@@ -654,10 +649,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("CoreError.Conflict
  * @since 0.1.0
  */
 export class Malformed extends Schema.TaggedClass<Malformed>()("Malformed", {
-  description: Schema.String,
+  description: Schema.String
 }) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -668,10 +663,10 @@ export class Malformed extends Schema.TaggedClass<Malformed>()("Malformed", {
  * @since 0.1.0
  */
 export class UnsupportedRole extends Schema.TaggedClass<UnsupportedRole>()("UnsupportedRole", {
-  roleId: Role.Id,
+  roleId: Role.Id
 }) {
   get message(): string {
-    return `Role ${this.roleId} is not a built-in role`;
+    return `Role ${this.roleId} is not a built-in role`
   }
 }
 
@@ -683,7 +678,7 @@ export class UnsupportedRole extends Schema.TaggedClass<UnsupportedRole>()("Unsu
  */
 export class PastExpiry extends Schema.TaggedClass<PastExpiry>()("PastExpiry", {}) {
   get message(): string {
-    return "The expiry is not after now";
+    return "The expiry is not after now"
   }
 }
 
@@ -693,12 +688,9 @@ export class PastExpiry extends Schema.TaggedClass<PastExpiry>()("PastExpiry", {
  * @category reasons
  * @since 0.1.0
  */
-export class DirectMembersRequired extends Schema.TaggedClass<DirectMembersRequired>()(
-  "DirectMembersRequired",
-  {},
-) {
+export class DirectMembersRequired extends Schema.TaggedClass<DirectMembersRequired>()("DirectMembersRequired", {}) {
   get message(): string {
-    return "A direct group needs the author and at least one other member";
+    return "A direct group needs the author and at least one other member"
   }
 }
 
@@ -709,10 +701,10 @@ export class DirectMembersRequired extends Schema.TaggedClass<DirectMembersRequi
  * @since 0.1.0
  */
 export class NotRenamable extends Schema.TaggedClass<NotRenamable>()("NotRenamable", {
-  groupId: GroupId.Id,
+  groupId: GroupId.Id
 }) {
   get message(): string {
-    return `Group ${this.groupId} is named by its members`;
+    return `Group ${this.groupId} is named by its members`
   }
 }
 
@@ -723,10 +715,10 @@ export class NotRenamable extends Schema.TaggedClass<NotRenamable>()("NotRenamab
  * @since 0.1.0
  */
 export class FixedMembership extends Schema.TaggedClass<FixedMembership>()("FixedMembership", {
-  groupId: GroupId.Id,
+  groupId: GroupId.Id
 }) {
   get message(): string {
-    return `Group ${this.groupId} has fixed members`;
+    return `Group ${this.groupId} has fixed members`
   }
 }
 
@@ -736,14 +728,11 @@ export class FixedMembership extends Schema.TaggedClass<FixedMembership>()("Fixe
  * @category reasons
  * @since 0.1.0
  */
-export class GeneralMembership extends Schema.TaggedClass<GeneralMembership>()(
-  "GeneralMembership",
-  {
-    groupId: GroupId.Id,
-  },
-) {
+export class GeneralMembership extends Schema.TaggedClass<GeneralMembership>()("GeneralMembership", {
+  groupId: GroupId.Id
+}) {
   get message(): string {
-    return `Everyone belongs to the general group ${this.groupId}`;
+    return `Everyone belongs to the general group ${this.groupId}`
   }
 }
 
@@ -754,10 +743,10 @@ export class GeneralMembership extends Schema.TaggedClass<GeneralMembership>()(
  * @since 0.1.0
  */
 export class NotFollowable extends Schema.TaggedClass<NotFollowable>()("NotFollowable", {
-  groupId: GroupId.Id,
+  groupId: GroupId.Id
 }) {
   get message(): string {
-    return `Group ${this.groupId} has nothing to follow`;
+    return `Group ${this.groupId} has nothing to follow`
   }
 }
 
@@ -767,14 +756,11 @@ export class NotFollowable extends Schema.TaggedClass<NotFollowable>()("NotFollo
  * @category reasons
  * @since 0.1.0
  */
-export class FixedParticipation extends Schema.TaggedClass<FixedParticipation>()(
-  "FixedParticipation",
-  {
-    threadId: ThreadId.Id,
-  },
-) {
+export class FixedParticipation extends Schema.TaggedClass<FixedParticipation>()("FixedParticipation", {
+  threadId: ThreadId.Id
+}) {
   get message(): string {
-    return `Everyone takes part in thread ${this.threadId}`;
+    return `Everyone takes part in thread ${this.threadId}`
   }
 }
 
@@ -784,14 +770,11 @@ export class FixedParticipation extends Schema.TaggedClass<FixedParticipation>()
  * @category reasons
  * @since 0.1.0
  */
-export class UnknownIntegration extends Schema.TaggedClass<UnknownIntegration>()(
-  "UnknownIntegration",
-  {
-    integration: Schema.String,
-  },
-) {
+export class UnknownIntegration extends Schema.TaggedClass<UnknownIntegration>()("UnknownIntegration", {
+  integration: Schema.String
+}) {
   get message(): string {
-    return `This host does not install ${this.integration}`;
+    return `This host does not install ${this.integration}`
   }
 }
 
@@ -803,14 +786,11 @@ export class UnknownIntegration extends Schema.TaggedClass<UnknownIntegration>()
  * @category reasons
  * @since 0.1.0
  */
-export class IntegrationRefused extends Schema.TaggedClass<IntegrationRefused>()(
-  "IntegrationRefused",
-  {
-    description: Schema.String,
-  },
-) {
+export class IntegrationRefused extends Schema.TaggedClass<IntegrationRefused>()("IntegrationRefused", {
+  description: Schema.String
+}) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -821,27 +801,27 @@ export class IntegrationRefused extends Schema.TaggedClass<IntegrationRefused>()
  * @since 0.1.0
  */
 export class Keyless extends Schema.TaggedClass<Keyless>()("Keyless", {
-  connectionId: Connection.Id,
+  connectionId: Connection.Id
 }) {
   get message(): string {
-    return `Connection ${this.connectionId} takes no key`;
+    return `Connection ${this.connectionId} takes no key`
   }
 }
 
 const describeIssue = (issue: Agent.Issue): string => {
   switch (issue._tag) {
     case "Removed":
-      return `The connection for the agent's ${issue.part} was removed.`;
+      return `The connection for the agent's ${issue.part} was removed.`
     case "Uninstalled":
-      return `The integration of the agent's ${issue.part} connection is not installed here.`;
+      return `The integration of the agent's ${issue.part} connection is not installed here.`
     case "Invalid":
-      return issue.description;
+      return issue.description
     case "SandboxRequired":
-      return "The agent's harness works only in a sandbox, and the agent has none.";
+      return "The agent's harness works only in a sandbox, and the agent has none."
     case "NoHarness":
-      return "No connection gives a harness the agent can run on.";
+      return "No connection gives a harness the agent can run on."
   }
-};
+}
 
 /**
  * The agent cannot run as it would be set up, for the issues its readiness reports.
@@ -850,10 +830,10 @@ const describeIssue = (issue: Agent.Issue): string => {
  * @since 0.1.0
  */
 export class Incomplete extends Schema.TaggedClass<Incomplete>()("Incomplete", {
-  issues: Schema.NonEmptyArray(Agent.Issue),
+  issues: Schema.NonEmptyArray(Agent.Issue)
 }) {
   get message(): string {
-    return this.issues.map(describeIssue).join(" ");
+    return this.issues.map(describeIssue).join(" ")
   }
 }
 
@@ -865,15 +845,12 @@ export class Incomplete extends Schema.TaggedClass<Incomplete>()("Incomplete", {
  * @category reasons
  * @since 0.1.0
  */
-export class ConnectionUnusable extends Schema.TaggedClass<ConnectionUnusable>()(
-  "ConnectionUnusable",
-  {
-    connectionId: Connection.Id,
-    part: Schema.optional(Agent.Part),
-  },
-) {
+export class ConnectionUnusable extends Schema.TaggedClass<ConnectionUnusable>()("ConnectionUnusable", {
+  connectionId: Connection.Id,
+  part: Schema.optional(Agent.Part)
+}) {
   get message(): string {
-    return `Connection ${this.connectionId} cannot be used here`;
+    return `Connection ${this.connectionId} cannot be used here`
   }
 }
 
@@ -885,10 +862,10 @@ export class ConnectionUnusable extends Schema.TaggedClass<ConnectionUnusable>()
  * @since 0.1.0
  */
 export class Unverified extends Schema.TaggedClass<Unverified>()("Unverified", {
-  description: Schema.String,
+  description: Schema.String
 }) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -913,14 +890,14 @@ export const InvalidReason = Schema.Union([
   Keyless,
   Incomplete,
   ConnectionUnusable,
-  Unverified,
-]);
+  Unverified
+])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type InvalidReason = typeof InvalidReason.Type;
+export type InvalidReason = typeof InvalidReason.Type
 
 /**
  * The request cannot be done as asked, whatever the state, for the `reason` given, such as values
@@ -931,10 +908,10 @@ export type InvalidReason = typeof InvalidReason.Type;
  * @since 0.1.0
  */
 export class Invalid extends Schema.TaggedError<Invalid>()("CoreError.Invalid", {
-  reason: InvalidReason,
+  reason: InvalidReason
 }) {
   override get message(): string {
-    return this.reason.message;
+    return this.reason.message
   }
 }
 
@@ -947,10 +924,10 @@ export class Invalid extends Schema.TaggedError<Invalid>()("CoreError.Invalid", 
  * @since 0.1.0
  */
 export class Uncertain extends Schema.TaggedError<Uncertain>()("CoreError.Uncertain", {
-  commitId: Commit.Id,
+  commitId: Commit.Id
 }) {
   override get message(): string {
-    return `Commit ${this.commitId} may or may not have taken effect`;
+    return `Commit ${this.commitId} may or may not have taken effect`
   }
 }
 
@@ -960,17 +937,9 @@ export class Uncertain extends Schema.TaggedError<Uncertain>()("CoreError.Uncert
  * @category schemas
  * @since 0.1.0
  */
-export const CoreError = Schema.Union([
-  NotFound,
-  Changed,
-  Denied,
-  Conflict,
-  Invalid,
-  Unavailable,
-  Uncertain,
-]);
+export const CoreError = Schema.Union([NotFound, Changed, Denied, Conflict, Invalid, Unavailable, Uncertain])
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type CoreError = typeof CoreError.Type;
+export type CoreError = typeof CoreError.Type

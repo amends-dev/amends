@@ -24,37 +24,33 @@ and owns it, creates a session in it, and runs turns. Releasing the session retu
 JSON-encodable data, to resume it later on any host, and on any agent.
 
 ```ts
-import { Agent, Harness, Session } from "@amends-dev/harness";
-import { SandboxProvider } from "@amends-dev/sandbox";
-import { Console, Effect, Schema, Stream } from "effect";
+import { Agent, Harness, Session } from "@amends-dev/harness"
+import { SandboxProvider } from "@amends-dev/sandbox"
+import { Console, Effect, Schema, Stream } from "effect"
 
-declare const agent: Agent.Agent; // from an adapter, such as @amends-dev/harness-opencode
+declare const agent: Agent.Agent // from an adapter, such as @amends-dev/harness-opencode
 
-const SessionStateJson = Schema.fromJsonString(Schema.toCodecJson(Session.SessionState));
+const SessionStateJson = Schema.fromJsonString(Schema.toCodecJson(Session.SessionState))
 
 const program = Effect.gen(function* () {
-  const harness = Harness.make(agent);
-  const sandboxes = yield* SandboxProvider.SandboxProvider;
-  const sandbox = yield* sandboxes.create({ template: harness.agent.template });
+  const harness = Harness.make(agent)
+  const sandboxes = yield* SandboxProvider.SandboxProvider
+  const sandbox = yield* sandboxes.create({ template: harness.agent.template })
 
-  const session = yield* harness.createSession({ sandbox, id: Agent.SessionId.make("review") });
+  const session = yield* harness.createSession({ sandbox, id: Agent.SessionId.make("review") })
   yield* session
     .stream({ prompt: "Summarize README.md" })
-    .pipe(
-      Stream.runForEach((part) =>
-        part.type === "text-delta" ? Console.log(part.delta) : Effect.void,
-      ),
-    );
+    .pipe(Stream.runForEach((part) => (part.type === "text-delta" ? Console.log(part.delta) : Effect.void)))
 
   // Store the session as JSON, and resume it later, on any host and any agent.
-  const saved = yield* Schema.encodeEffect(SessionStateJson)(yield* session.detach);
+  const saved = yield* Schema.encodeEffect(SessionStateJson)(yield* session.detach)
   const resumed = yield* harness.createSession({
     sandbox,
-    resumeFrom: yield* Schema.decodeEffect(SessionStateJson)(saved),
-  });
-  const answer = yield* resumed.generate({ prompt: "Now list its headings" });
-  return answer.text;
-});
+    resumeFrom: yield* Schema.decodeEffect(SessionStateJson)(saved)
+  })
+  const answer = yield* resumed.generate({ prompt: "Now list its headings" })
+  return answer.text
+})
 ```
 
 `Harness.layer(agent)` provides the harness as a service to a program that runs one agent.
@@ -83,20 +79,20 @@ A `Session` runs one turn at a time. `stream` runs a turn as a stream of `Stream
 asks the agent to answer in JSON and decodes the answer with a schema:
 
 ```ts
-import { Session } from "@amends-dev/harness";
-import { Effect, Schema } from "effect";
+import { Session } from "@amends-dev/harness"
+import { Effect, Schema } from "effect"
 
-declare const session: Session.Session;
+declare const session: Session.Session
 
 const Review = Schema.Struct({
   verdict: Schema.Literals(["approve", "request-changes"]),
-  notes: Schema.String,
-});
+  notes: Schema.String
+})
 
 const review = Effect.gen(function* () {
-  const result = yield* session.generateObject({ prompt: "Review the diff", schema: Review });
-  return result.value; // { verdict, notes }
-});
+  const result = yield* session.generateObject({ prompt: "Review the diff", schema: Review })
+  return result.value // { verdict, notes }
+})
 ```
 
 A failure the agent reports during a turn, such as its model rejecting a key, arrives in the stream
@@ -118,34 +114,34 @@ refuses it, which answers the agent `execution-denied`. The requests for calls m
 together, to answer in any order.
 
 ```ts
-import { Agent, Harness } from "@amends-dev/harness";
-import { Effect, Schema, Stream } from "effect";
-import { Tool, Toolkit } from "effect/ai";
+import { Agent, Harness } from "@amends-dev/harness"
+import { Effect, Schema, Stream } from "effect"
+import { Tool, Toolkit } from "effect/ai"
 
 const Delete = Tool.make("Delete", {
   description: "Deletes a file in the workspace",
   parameters: Schema.Struct({ path: Schema.String }),
   success: Schema.String,
-  needsApproval: true,
-});
-const Tools = Toolkit.make(Delete);
+  needsApproval: true
+})
+const Tools = Toolkit.make(Delete)
 
 const program = Effect.gen(function* () {
-  const harness = yield* Harness.Harness;
+  const harness = yield* Harness.Harness
   const toolkit = yield* Tools.pipe(
-    Effect.provide(Tools.toLayer({ Delete: ({ path }) => Effect.succeed(`deleted ${path}`) })),
-  );
-  const session = yield* harness.createSession({ id: Agent.SessionId.make("cleanup") });
+    Effect.provide(Tools.toLayer({ Delete: ({ path }) => Effect.succeed(`deleted ${path}`) }))
+  )
+  const session = yield* harness.createSession({ id: Agent.SessionId.make("cleanup") })
   yield* session
     .stream({ prompt: "Delete the build output", toolkit })
     .pipe(
       Stream.runForEach((part) =>
         part.type === "tool-approval-request"
           ? session.approve({ approvalId: part.approvalId, approved: true })
-          : Effect.void,
-      ),
-    );
-});
+          : Effect.void
+      )
+    )
+})
 ```
 
 `generate` and `generateObject` return only when the turn ends, so nothing can answer their
@@ -220,8 +216,8 @@ host's process makes an Effect AI language model of each endpoint; an agent in a
 configured with them.
 
 ```ts
-import { ModelEndpoint } from "@amends-dev/harness";
-import { Redacted } from "effect";
+import { ModelEndpoint } from "@amends-dev/harness"
+import { Redacted } from "effect"
 
 const sonnet: ModelEndpoint.ModelEndpoint = {
   provider: "anthropic",
@@ -229,8 +225,8 @@ const sonnet: ModelEndpoint.ModelEndpoint = {
   protocol: "anthropic-messages",
   url: "https://api.anthropic.com/v1",
   apiKey: Redacted.make(process.env.ANTHROPIC_API_KEY ?? ""),
-  contextWindow: 200_000,
-};
+  contextWindow: 200_000
+}
 ```
 
 ## Errors

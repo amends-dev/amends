@@ -6,13 +6,14 @@
  *
  * @since 0.1.0
  */
-import * as DateTime from "effect/DateTime";
-import * as Schema from "effect/Schema";
-import * as Audience from "../journal/Audience.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Text from "../text/Text.ts";
-import * as GroupId from "./GroupId.ts";
+
+import * as DateTime from "effect/DateTime"
+import * as Schema from "effect/Schema"
+import * as Audience from "../journal/Audience.ts"
+import * as Text from "../text/Text.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as GroupId from "./GroupId.ts"
 
 /**
  * Names a group; `GroupId.Id`, where models that only refer to groups import it from.
@@ -20,13 +21,13 @@ import * as GroupId from "./GroupId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = GroupId.Id;
+export const Id = GroupId.Id
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = GroupId.Id;
+export type Id = GroupId.Id
 
 /**
  * A team group's name as recorded; names chosen now are `NewName`.
@@ -34,13 +35,13 @@ export type Id = GroupId.Id;
  * @category schemas
  * @since 0.1.0
  */
-export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
+export const Name = Schema.Trimmed.check(Schema.isMinLength(1))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type Name = typeof Name.Type
 
 /**
  * A name chosen for a team group: 1 to 80 characters, without hidden ones.
@@ -48,7 +49,7 @@ export type Name = typeof Name.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
+export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName)
 
 /**
  * Who can find a team group: only its members see a private one, while anyone in the workspace
@@ -57,13 +58,13 @@ export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isNa
  * @category schemas
  * @since 0.1.0
  */
-export const Visibility = Schema.Literals(["Private", "Public"]);
+export const Visibility = Schema.Literals(["Private", "Public"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Visibility = typeof Visibility.Type;
+export type Visibility = typeof Visibility.Type
 
 /**
  * A team group's membership is managed; its name identifies it to people.
@@ -78,8 +79,8 @@ export const Team = Schema.Struct({
   visibility: Visibility,
   name: Name,
   createdBy: MemberId.Id,
-  createdAt: Schema.DateTimeUtcFromString,
-});
+  createdAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -96,7 +97,7 @@ export interface Team extends Schema.Schema.Type<typeof Team> {}
  * @category utils
  * @since 0.1.0
  */
-export const GeneralId = Id.make("general");
+export const GeneralId = Id.make("general")
 
 /**
  * The general group's name when a workspace is created.
@@ -104,7 +105,7 @@ export const GeneralId = Id.make("general");
  * @category utils
  * @since 0.1.0
  */
-export const generalName: Name = "general";
+export const generalName: Name = "general"
 
 /**
  * Whether a group is its workspace's general group.
@@ -112,10 +113,10 @@ export const generalName: Name = "general";
  * @category utils
  * @since 0.1.0
  */
-export const isGeneral = (group: { readonly id: string }) => group.id === GeneralId;
+export const isGeneral = (group: { readonly id: string }) => group.id === GeneralId
 
 /** Canonical member order for a direct group; its key depends on nothing else. */
-const ascending = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
+const ascending = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
 
 /**
  * A direct group's fixed members: two or more, in strictly ascending ID order.
@@ -126,11 +127,10 @@ const ascending = (left: string, right: string) => (left < right ? -1 : left > r
 export const DirectMembers = Schema.Array(MemberId.Id).check(
   Schema.makeFilter(
     (ids) =>
-      (ids.length >= 2 &&
-        ids.every((id, index) => index === 0 || ascending(ids[index - 1]!, id) < 0)) ||
-      "Direct-group members must be at least two distinct IDs in ascending order",
-  ),
-);
+      (ids.length >= 2 && ids.every((id, index) => index === 0 || ascending(ids[index - 1]!, id) < 0)) ||
+      "Direct-group members must be at least two distinct IDs in ascending order"
+  )
+)
 
 /**
  * A direct group's members never change; the same member set always resolves to one group.
@@ -144,14 +144,12 @@ export const Direct = Schema.Struct({
   kind: Schema.Literal("Direct"),
   memberIds: DirectMembers,
   createdBy: MemberId.Id,
-  createdAt: Schema.DateTimeUtcFromString,
+  createdAt: Schema.DateTimeUtcFromString
 }).check(
   Schema.makeFilter(
-    (record) =>
-      record.memberIds.includes(record.createdBy) ||
-      "A direct group's creator must be one of its members",
-  ),
-);
+    (record) => record.memberIds.includes(record.createdBy) || "A direct group's creator must be one of its members"
+  )
+)
 
 /**
  * @category schemas
@@ -166,13 +164,13 @@ export interface Direct extends Schema.Schema.Type<typeof Direct> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Group = Schema.Union([Team, Direct]);
+export const Group = Schema.Union([Team, Direct])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Group = typeof Group.Type;
+export type Group = typeof Group.Type
 
 /**
  * Order a direct group's requested members canonically, removing repeats.
@@ -181,7 +179,7 @@ export type Group = typeof Group.Type;
  * @since 0.1.0
  */
 export const directMembers = <Id extends string>(memberIds: ReadonlyArray<Id>): ReadonlyArray<Id> =>
-  [...new Set(memberIds)].sort(ascending);
+  [...new Set(memberIds)].sort(ascending)
 
 /**
  * Storage key for a direct group's member set. Member IDs change on readmission, so do keys.
@@ -189,8 +187,7 @@ export const directMembers = <Id extends string>(memberIds: ReadonlyArray<Id>): 
  * @category utils
  * @since 0.1.0
  */
-export const directKey = (memberIds: ReadonlyArray<string>): string =>
-  JSON.stringify(directMembers(memberIds));
+export const directKey = (memberIds: ReadonlyArray<string>): string => JSON.stringify(directMembers(memberIds))
 
 /**
  * When any of a group's threads last had content activity. What `GroupProjection` advances and
@@ -201,8 +198,8 @@ export const directKey = (memberIds: ReadonlyArray<string>): string =>
  */
 export const Latest = Schema.Struct({
   groupId: GroupId.Id,
-  occurredAt: Schema.DateTimeUtcFromString,
-});
+  occurredAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -219,8 +216,8 @@ export interface Latest extends Schema.Schema.Type<typeof Latest> {}
  */
 export const ListOptions = Schema.Struct({
   after: Schema.optionalKey(GroupId.Id),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -252,8 +249,8 @@ export const ListItem = Schema.Struct({
    */
   membersRemovable: Schema.Boolean,
   /** The reader may rename the group: a team group whose name they may change. */
-  renamable: Schema.Boolean,
-});
+  renamable: Schema.Boolean
+})
 
 /**
  * @category schemas
@@ -268,9 +265,9 @@ export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
  * @since 0.1.0
  */
 export interface Grants {
-  readonly manage: boolean;
-  readonly rename: boolean;
-  readonly moderate: boolean;
+  readonly manage: boolean
+  readonly rename: boolean
+  readonly moderate: boolean
 }
 
 /**
@@ -280,10 +277,10 @@ export interface Grants {
  * @since 0.1.0
  */
 export interface Activity {
-  readonly latestActivityAt: DateTime.Utc | null;
-  readonly readAt: DateTime.Utc | null;
-  readonly following: boolean;
-  readonly pending: number;
+  readonly latestActivityAt: DateTime.Utc | null
+  readonly readAt: DateTime.Utc | null
+  readonly following: boolean
+  readonly pending: number
 }
 
 /**
@@ -296,9 +293,8 @@ export interface Activity {
 export const hasNewActivity = (
   latestActivityAt: DateTime.Utc | null,
   readAt: DateTime.Utc | null,
-  admittedAt: DateTime.Utc,
-): boolean =>
-  latestActivityAt !== null && DateTime.isGreaterThan(latestActivityAt, readAt ?? admittedAt);
+  admittedAt: DateTime.Utc
+): boolean => latestActivityAt !== null && DateTime.isGreaterThan(latestActivityAt, readAt ?? admittedAt)
 
 /**
  * `group` as a reader admitted at `admittedAt` lists it, with its `activity` as it stands to them
@@ -309,13 +305,8 @@ export const hasNewActivity = (
  * @category utils
  * @since 0.1.0
  */
-export const listItem = (
-  group: Group,
-  admittedAt: DateTime.Utc,
-  activity: Activity,
-  grants: Grants,
-): ListItem => {
-  const team = group.kind === "Team";
+export const listItem = (group: Group, admittedAt: DateTime.Utc, activity: Activity, grants: Grants): ListItem => {
+  const team = group.kind === "Team"
   return {
     group,
     latestActivityAt: activity.latestActivityAt,
@@ -325,9 +316,9 @@ export const listItem = (
     pending: activity.pending,
     manageable: team && grants.manage,
     membersRemovable: team && grants.manage && (group.visibility === "Private" || grants.moderate),
-    renamable: team && grants.rename,
-  };
-};
+    renamable: team && grants.rename
+  }
+}
 
 /**
  * A team group's new name, and the name the renamer last saw, so a rename made meanwhile is not
@@ -336,7 +327,7 @@ export const listItem = (
  * @category options
  * @since 0.1.0
  */
-export const RenameInput = Schema.Struct({ groupId: Id, name: NewName, expectedName: Name });
+export const RenameInput = Schema.Struct({ groupId: Id, name: NewName, expectedName: Name })
 
 /**
  * @category options
@@ -350,7 +341,7 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name });
+export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name })
 
 /**
  * @category schemas
@@ -368,8 +359,8 @@ export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
 export const CreateTeamInput = Schema.Struct({
   name: NewName,
   memberIds: Schema.UniqueArray(MemberId.Id),
-  visibility: Schema.optionalKey(Visibility),
-});
+  visibility: Schema.optionalKey(Visibility)
+})
 
 /**
  * @category options
@@ -387,8 +378,8 @@ export interface CreateTeamInput extends Schema.Schema.Type<typeof CreateTeamInp
 export const PublicItem = Schema.Struct({
   group: Team,
   members: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  joined: Schema.Boolean,
-});
+  joined: Schema.Boolean
+})
 
 /**
  * @category schemas
@@ -406,8 +397,8 @@ export interface PublicItem extends Schema.Schema.Type<typeof PublicItem> {}
 export const Summary = Schema.Struct({
   groupId: Id,
   members: Schema.Int.check(Schema.isGreaterThan(0)),
-  joined: Schema.Boolean,
-});
+  joined: Schema.Boolean
+})
 
 /**
  * @category schemas
@@ -422,4 +413,4 @@ export interface Summary extends Schema.Schema.Type<typeof Summary> {}
  * @category utils
  * @since 0.1.0
  */
-export const audienceOf = (groupId: Id): Audience.Scope => Audience.make("group", groupId);
+export const audienceOf = (groupId: Id): Audience.Scope => Audience.make("group", groupId)

@@ -9,7 +9,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * The identity of a connection, as core records it.
@@ -17,13 +18,13 @@ import * as Schema from "effect/Schema";
  * @category schemas
  * @since 0.1.0
  */
-export const ConnectionId = Schema.NonEmptyString.pipe(Schema.brand("ConnectionId"));
+export const ConnectionId = Schema.NonEmptyString.pipe(Schema.brand("ConnectionId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type ConnectionId = typeof ConnectionId.Type;
+export type ConnectionId = typeof ConnectionId.Type
 
 // TODO: Add OAuth, once an integration a connection is made to takes it.
 /**
@@ -32,13 +33,13 @@ export type ConnectionId = typeof ConnectionId.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const AuthMethod = Schema.Literals(["apiKey", "none"]);
+export const AuthMethod = Schema.Literals(["apiKey", "none"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type AuthMethod = typeof AuthMethod.Type;
+export type AuthMethod = typeof AuthMethod.Type
 
 /**
  * A workspace's link to one integration, as core stores it and an integration's operations take
@@ -61,8 +62,8 @@ export const Connection = Schema.Struct({
   settings: Schema.Record(Schema.String, Schema.Json),
 
   /** How the connection authenticates, as one of the methods its integration offers. */
-  auth: AuthMethod,
-});
+  auth: AuthMethod
+})
 
 /**
  * @category schemas
@@ -76,7 +77,7 @@ export interface Connection extends Schema.Schema.Type<typeof Connection> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Credential = Schema.Struct({ apiKey: Schema.Redacted(Schema.String) });
+export const Credential = Schema.Struct({ apiKey: Schema.Redacted(Schema.String) })
 
 /**
  * @category schemas
@@ -96,8 +97,8 @@ export const Health = Schema.Struct({
   status: Schema.Literals(["healthy", "unauthorized", "misconfigured", "unavailable"]),
 
   /** What the check found, for a status other than `healthy`. */
-  description: Schema.optionalKey(Schema.String),
-});
+  description: Schema.optionalKey(Schema.String)
+})
 
 /**
  * @category schemas
@@ -116,18 +117,18 @@ export interface Health extends Schema.Schema.Type<typeof Health> {}
  */
 export const healthOf = (status: number, url: string): Health => {
   if (status === 401 || status === 403) {
-    return { status: "unauthorized", description: `${url} refused the key (${status})` };
+    return { status: "unauthorized", description: `${url} refused the key (${status})` }
   }
   if (status === 408 || status === 429 || status >= 500) {
-    return { status: "unavailable", description: `${url} could not answer now (${status})` };
+    return { status: "unavailable", description: `${url} could not answer now (${status})` }
   }
   if (status === 404 || status === 405) {
-    return { status: "misconfigured", description: `${url} serves no such request (${status})` };
+    return { status: "misconfigured", description: `${url} serves no such request (${status})` }
   }
-  return { status: "healthy" };
-};
+  return { status: "healthy" }
+}
 
-const described = { description: Schema.String };
+const described = { description: Schema.String }
 
 /**
  * The host has no integration of the id a connection names.
@@ -136,10 +137,10 @@ const described = { description: Schema.String };
  * @since 0.1.0
  */
 export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends-dev/connection/ConnectionError/NotFoundError",
+  "@amends-dev/connection/ConnectionError/NotFoundError"
 )("NotFoundError", described) {
   override get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -151,10 +152,10 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>(
  * @since 0.1.0
  */
 export class InvalidConnectionError extends Schema.TaggedError<InvalidConnectionError>(
-  "@amends-dev/connection/ConnectionError/InvalidConnectionError",
+  "@amends-dev/connection/ConnectionError/InvalidConnectionError"
 )("InvalidConnectionError", described) {
   override get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -166,10 +167,10 @@ export class InvalidConnectionError extends Schema.TaggedError<InvalidConnection
  * @since 0.1.0
  */
 export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends-dev/connection/ConnectionError/UnsupportedError",
+  "@amends-dev/connection/ConnectionError/UnsupportedError"
 )("UnsupportedError", described) {
   override get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -180,10 +181,10 @@ export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
  * @since 0.1.0
  */
 export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends-dev/connection/ConnectionError/UnavailableError",
+  "@amends-dev/connection/ConnectionError/UnavailableError"
 )("UnavailableError", described) {
   override get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -198,14 +199,14 @@ export const ConnectionErrorReason = Schema.Union([
   NotFoundError,
   InvalidConnectionError,
   UnsupportedError,
-  UnavailableError,
-]);
+  UnavailableError
+])
 
 /**
  * @category errors
  * @since 0.1.0
  */
-export type ConnectionErrorReason = typeof ConnectionErrorReason.Type;
+export type ConnectionErrorReason = typeof ConnectionErrorReason.Type
 
 /**
  * What every operation of an integration fails with: the integration of the connection, by its
@@ -214,23 +215,24 @@ export type ConnectionErrorReason = typeof ConnectionErrorReason.Type;
  * @category errors
  * @since 0.1.0
  */
-export class ConnectionError extends Schema.TaggedError<ConnectionError>(
-  "@amends-dev/connection/ConnectionError",
-)("ConnectionError", {
-  /** The integration of the connection, as its id names it. */
-  integration: Schema.String,
+export class ConnectionError extends Schema.TaggedError<ConnectionError>("@amends-dev/connection/ConnectionError")(
+  "ConnectionError",
+  {
+    /** The integration of the connection, as its id names it. */
+    integration: Schema.String,
 
-  /** Why the operation failed. */
-  reason: ConnectionErrorReason,
+    /** Why the operation failed. */
+    reason: ConnectionErrorReason,
 
-  /** The failure underneath, such as the error of decoding a connection's settings. */
-  cause: Schema.optional(Schema.Defect()),
-}) {
+    /** The failure underneath, such as the error of decoding a connection's settings. */
+    cause: Schema.optional(Schema.Defect())
+  }
+) {
   get isRetryable(): boolean {
-    return this.reason._tag === "UnavailableError";
+    return this.reason._tag === "UnavailableError"
   }
 
   override get message(): string {
-    return `${this.integration}: ${this.reason.message}`;
+    return `${this.integration}: ${this.reason.message}`
   }
 }

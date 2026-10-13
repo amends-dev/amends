@@ -10,22 +10,23 @@
  *
  * @since 0.1.0
  */
-import { Assignment, AssignmentStore } from "@amends-dev/core/authorization";
-import type { Workspace } from "@amends-dev/core/workspace";
-import { and, eq, type SQL } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { storeError } from "./internal/errors.ts";
-import { assignments } from "./internal/schema.ts";
-import * as ScopeColumns from "./ScopeColumns.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { Assignment, AssignmentStore } from "@amends-dev/core/authorization"
+import { StoreError } from "@amends-dev/core/journal"
+import type { Workspace } from "@amends-dev/core/workspace"
+import { and, eq, type SQL } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { assignments } from "./internal/schema.ts"
+import * as ScopeColumns from "./ScopeColumns.ts"
 
 /** A row is one of two source cases, so it is shaped in code before decoding checks it. */
 const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
-  const scope = ScopeColumns.decode(row.workspaceId as Workspace.Id, row);
+  const scope = ScopeColumns.decode(row.workspaceId as Workspace.Id, row)
   return {
     id: row.id,
     workspaceId: row.workspaceId,
@@ -34,10 +35,10 @@ const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
     source:
       row.sourceKind === "Role"
         ? { _tag: "Role", roleId: row.roleId, scope }
-        : { _tag: "Direct", grant: { permission: row.permission, scope } },
-  };
-};
-const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Assignment));
+        : { _tag: "Direct", grant: { permission: row.permission, scope } }
+  }
+}
+const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Assignment))
 
 /**
  * Builds the assignment store for the binding's workspace: this module's driver inside
@@ -47,20 +48,20 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Assignment));
  * @since 0.1.0
  */
 export const make = Effect.fn("Assignments.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(assignments.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(assignments.workspaceId, workspaceId)
   const select = (operation: string, where: SQL | undefined) =>
     guard(db.select().from(assignments).where(where).orderBy(assignments.id)).pipe(
       Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))),
-      Effect.mapError(StoreError.failed("AssignmentStore", operation)),
-    );
+      Effect.mapError(StoreError.failed("AssignmentStore", operation))
+    )
   const driver: AssignmentStore.AssignmentStore["Service"] = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(assignments.id, id))), Array.head),
     listActiveByMember: (memberId) =>
       select(
         "listActiveByMember",
-        and(inWorkspace, eq(assignments.memberId, memberId), eq(assignments.status, "active")),
+        and(inWorkspace, eq(assignments.memberId, memberId), eq(assignments.status, "active"))
       ),
     listActiveByRole: (roleId) =>
       select(
@@ -69,11 +70,11 @@ export const make = Effect.fn("Assignments.make")(function* () {
           inWorkspace,
           eq(assignments.sourceKind, "Role"),
           eq(assignments.roleId, roleId),
-          eq(assignments.status, "active"),
-        ),
+          eq(assignments.status, "active")
+        )
       ),
     insert: Effect.fn("Assignments.insert")(function* (record) {
-      const source = record.source;
+      const source = record.source
       yield* guard(
         db.insert(assignments).values({
           workspaceId,
@@ -82,15 +83,11 @@ export const make = Effect.fn("Assignments.make")(function* () {
           status: record.status,
           sourceKind: source._tag,
           roleId: Assignment.Source.isAnyOf(["Role"])(source) ? source.roleId : null,
-          permission: Assignment.Source.isAnyOf(["Direct"])(source)
-            ? source.grant.permission
-            : null,
-          ...ScopeColumns.encode(
-            Assignment.Source.isAnyOf(["Role"])(source) ? source.scope : source.grant.scope,
-          ),
+          permission: Assignment.Source.isAnyOf(["Direct"])(source) ? source.grant.permission : null,
+          ...ScopeColumns.encode(Assignment.Source.isAnyOf(["Role"])(source) ? source.scope : source.grant.scope)
         }),
-        true,
-      ).pipe(Effect.mapError(storeError("AssignmentStore", "insert")));
+        true
+      ).pipe(Effect.mapError(storeError("AssignmentStore", "insert")))
     }),
     markRevoked: Effect.fn("Assignments.markRevoked")(function* (id) {
       const rows = yield* guard(
@@ -99,18 +96,14 @@ export const make = Effect.fn("Assignments.make")(function* () {
           .set({ status: "revoked" })
           .where(and(inWorkspace, eq(assignments.id, id), eq(assignments.status, "active")))
           .returning({ id: assignments.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("AssignmentStore", "markRevoked")));
+        true
+      ).pipe(Effect.mapError(storeError("AssignmentStore", "markRevoked")))
       if (rows.length === 0)
-        return yield* StoreError.rejected(
-          "AssignmentStore",
-          "markRevoked",
-          "Expected an active assignment",
-        );
-    }),
-  };
-  return AssignmentStore.make(workspaceId, driver);
-});
+        return yield* StoreError.rejected("AssignmentStore", "markRevoked", "Expected an active assignment")
+    })
+  }
+  return AssignmentStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `AssignmentStore.AssignmentStore` over the caller's `Binding.Binding`.
@@ -118,4 +111,4 @@ export const make = Effect.fn("Assignments.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(AssignmentStore.AssignmentStore, make());
+export const layer = Layer.effect(AssignmentStore.AssignmentStore, make())

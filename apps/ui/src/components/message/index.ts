@@ -1,4 +1,4 @@
-export * as Message from "./message.tsx";
+export * as Message from "./message.tsx"
 export type {
   ActionProps as MessageActionProps,
   ActionsProps as MessageActionsProps,
@@ -11,5 +11,5 @@ export type {
   RootProps as MessageRootProps,
   TaskReferenceProps as MessageTaskReferenceProps,
   TextProps as MessageTextProps,
-  ThreadActivity as MessageThreadActivity,
-} from "./message.tsx";
+  ThreadActivity as MessageThreadActivity
+} from "./message.tsx"

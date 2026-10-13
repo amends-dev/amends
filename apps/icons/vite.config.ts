@@ -1,6 +1,6 @@
-import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
-import solid from "vite-plugin-solid";
+import { fileURLToPath } from "node:url"
+import solid from "vite-plugin-solid"
+import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   plugins: [solid()],
@@ -9,6 +9,6 @@ export default defineConfig({
     name: "@amends-dev/icons",
     environment: "happy-dom",
     setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
-    include: ["test/**/*.test.{ts,tsx}"],
-  },
-});
+    include: ["test/**/*.test.{ts,tsx}"]
+  }
+})

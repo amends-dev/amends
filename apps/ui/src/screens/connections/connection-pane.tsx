@@ -1,16 +1,17 @@
-import { For, Match, Show, Switch, createUniqueId } from "solid-js";
-import { IconMarkConnections } from "@amends-dev/icons";
-import { Button } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { EmptyState } from "../../components/empty-state/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { FormFields, type FormIssue } from "../../components/form-fields/index.ts";
-import { Input } from "../../components/input/index.ts";
-import { Notice } from "../../components/notice/index.ts";
-import { StatusMark, type StatusMarkKind } from "../../components/status-mark/index.ts";
-import { calendarDate } from "../../internal/when.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
+import { IconMarkConnections } from "@amends-dev/icons"
+import { For, Match, Show, Switch, createUniqueId } from "solid-js"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { EmptyState } from "../../components/empty-state/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { FormFields, type FormIssue } from "../../components/form-fields/index.ts"
+import { Input } from "../../components/input/index.ts"
+import { Notice } from "../../components/notice/index.ts"
+import { StatusMark, type StatusMarkKind } from "../../components/status-mark/index.ts"
+import { calendarDate } from "../../internal/when.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import * as s from "./connections.css.ts"
 import {
   ConnectionsAlert,
   healthWording,
@@ -18,54 +19,53 @@ import {
   type ConnectionHealth,
   type ConnectionSummary,
   type ConnectionsAction,
-  type ConnectionsFailure,
-} from "./wording.tsx";
-import * as s from "./connections.css.ts";
+  type ConnectionsFailure
+} from "./wording.tsx"
 
 const healthMarks = {
   healthy: "available",
   unauthorized: "blocked",
   misconfigured: "blocked",
-  unavailable: "attention",
-} as const satisfies Record<ConnectionHealth["status"], StatusMarkKind>;
+  unavailable: "attention"
+} as const satisfies Record<ConnectionHealth["status"], StatusMarkKind>
 
 export interface ConnectionPaneProps {
   /** Under the title on phones. */
-  readonly workspaceName: string;
+  readonly workspaceName: string
   /** The connection, once it has loaded. */
-  readonly connection?: ConnectionSummary;
+  readonly connection?: ConnectionSummary
   /** In place of the page, while it loads or when it cannot show. */
-  readonly status?: "loading" | "failed" | "unavailable";
-  readonly onRetry?: () => void;
+  readonly status?: "loading" | "failed" | "unavailable"
+  readonly onRetry?: () => void
   /** Opens the full list of connections, from one that is gone. */
-  readonly onBrowse?: () => void;
+  readonly onBrowse?: () => void
   /** The name being edited. */
-  readonly name: string;
-  readonly onNameChange: (name: string) => void;
+  readonly name: string
+  readonly onNameChange: (name: string) => void
   /** The name differs from the saved one and can be saved. */
-  readonly nameChanged: boolean;
-  readonly onSaveName: () => void;
+  readonly nameChanged: boolean
+  readonly onSaveName: () => void
   /** A setting's value being edited, by key, as its field shows it. */
-  readonly value: (key: string) => string;
-  readonly onValueChange: (key: string, value: string) => void;
+  readonly value: (key: string) => string
+  readonly onValueChange: (key: string, value: string) => void
   /** Why a setting's value would be refused. */
-  readonly issue?: (key: string) => FormIssue | undefined;
+  readonly issue?: (key: string) => FormIssue | undefined
   /** The settings differ from the saved ones and can be saved. */
-  readonly settingsChanged: boolean;
-  readonly onSaveSettings: () => void;
+  readonly settingsChanged: boolean
+  readonly onSaveSettings: () => void
   /** Asks for a new key in place of the saved one. */
-  readonly onReplaceKey?: () => void;
+  readonly onReplaceKey?: () => void
   /** Asks the connection's system whether it works as set up. */
-  readonly onCheck?: () => void;
+  readonly onCheck?: () => void
   /** What the last check found, until the page closes. */
-  readonly health?: ConnectionHealth;
+  readonly health?: ConnectionHealth
   /** Asks to remove the connection. */
-  readonly onRemove?: () => void;
+  readonly onRemove?: () => void
   /** The change or check running, if any. */
-  readonly pending?: ConnectionsAction | "refresh";
+  readonly pending?: ConnectionsAction | "refresh"
   /** A failed change made here, or a read that failed. */
-  readonly failure?: ConnectionsFailure;
-  readonly onRefresh?: () => void;
+  readonly failure?: ConnectionsFailure
+  readonly onRefresh?: () => void
 }
 
 /**
@@ -75,27 +75,23 @@ export interface ConnectionPaneProps {
  * it sees the same values without the actions; one whose integration is gone can only remove it.
  */
 export function ConnectionPane(props: ConnectionPaneProps) {
-  const nameForm = `connection-name-${createUniqueId()}`;
-  const settingsForm = `connection-settings-${createUniqueId()}`;
-  const manageable = () => props.connection?.manageable ?? false;
-  const installed = () => props.connection?.integration !== undefined;
-  const busy = () => props.pending !== undefined;
+  const nameForm = `connection-name-${createUniqueId()}`
+  const settingsForm = `connection-settings-${createUniqueId()}`
+  const manageable = () => props.connection?.manageable ?? false
+  const installed = () => props.connection?.integration !== undefined
+  const busy = () => props.pending !== undefined
   /** Why its integration refuses its setup, while it does. */
   const refusal = () => {
-    const readiness = props.connection?.readiness;
-    return readiness?.state === "invalid" ? readiness.description : undefined;
-  };
+    const readiness = props.connection?.readiness
+    return readiness?.state === "invalid" ? readiness.description : undefined
+  }
   const alert = (action: ConnectionsAction | "refresh") => (
     <Show when={props.failure?.action === action && props.failure}>
       {(failure) => (
-        <ConnectionsAlert
-          failure={failure()}
-          onRefresh={props.onRefresh}
-          refreshing={props.pending === "refresh"}
-        />
+        <ConnectionsAlert failure={failure()} onRefresh={props.onRefresh} refreshing={props.pending === "refresh"} />
       )}
     </Show>
-  );
+  )
   return (
     <Pane.Root class={s.pane}>
       <Pane.Header>
@@ -128,9 +124,7 @@ export function ConnectionPane(props: ConnectionPaneProps) {
               title="Couldn’t load connections"
               lines={["Try again once the host is reachable."]}
             >
-              <Show when={props.onRetry}>
-                {(retry) => <Button onClick={() => retry()()}>Retry</Button>}
-              </Show>
+              <Show when={props.onRetry}>{(retry) => <Button onClick={() => retry()()}>Retry</Button>}</Show>
             </EmptyState>
           </Pane.Body>
         </Match>
@@ -159,9 +153,7 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                   </Match>
                   <Match when={refusal()}>
                     {(description) => (
-                      <Notice
-                        title={`${connection().integration?.name ?? "Its integration"} refuses this setup`}
-                      >
+                      <Notice title={`${connection().integration?.name ?? "Its integration"} refuses this setup`}>
                         {description()}
                       </Notice>
                     )}
@@ -176,8 +168,7 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                       <Switch
                         fallback={
                           <p class={s.note}>
-                            Ask {connection().integration?.name} whether this connection works as it
-                            is set up.
+                            Ask {connection().integration?.name} whether this connection works as it is set up.
                           </p>
                         }
                       >
@@ -187,14 +178,9 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                         <Match when={props.health}>
                           {(health) => (
                             <div class={s.health}>
-                              <StatusMark
-                                mark={healthMarks[health().status]}
-                                class={s.healthMark}
-                              />
+                              <StatusMark mark={healthMarks[health().status]} class={s.healthMark} />
                               <p class={s.title}>{healthWording[health().status].title}</p>
-                              <p class={s.healthLine}>
-                                {health().description ?? healthWording[health().status].line}
-                              </p>
+                              <p class={s.healthLine}>{health().description ?? healthWording[health().status].line}</p>
                             </div>
                           )}
                         </Match>
@@ -214,8 +200,8 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                   id={nameForm}
                   class={s.form}
                   onSubmit={(event) => {
-                    event.preventDefault();
-                    if (props.nameChanged && !busy()) props.onSaveName();
+                    event.preventDefault()
+                    if (props.nameChanged && !busy()) props.onSaveName()
                   }}
                 >
                   <Field.Root>
@@ -260,8 +246,8 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                     class={s.form}
                     aria-label="Settings"
                     onSubmit={(event) => {
-                      event.preventDefault();
-                      if (props.settingsChanged && !busy()) props.onSaveSettings();
+                      event.preventDefault()
+                      if (props.settingsChanged && !busy()) props.onSaveSettings()
                     }}
                   >
                     <FormFields
@@ -273,11 +259,7 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                     />
                     {alert("configure")}
                     <Show when={manageable()}>
-                      <Button
-                        type="submit"
-                        class={s.start}
-                        disabled={!props.settingsChanged || busy()}
-                      >
+                      <Button type="submit" class={s.start} disabled={!props.settingsChanged || busy()}>
                         Save settings
                       </Button>
                     </Show>
@@ -327,12 +309,7 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                                 {(docs) => (
                                   <>
                                     {" · "}
-                                    <a
-                                      class={s.link}
-                                      href={docs()}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
+                                    <a class={s.link} href={docs()} target="_blank" rel="noreferrer">
                                       Documentation
                                     </a>
                                   </>
@@ -380,7 +357,7 @@ export function ConnectionPane(props: ConnectionPaneProps) {
         </Match>
       </Switch>
     </Pane.Root>
-  );
+  )
 }
 
 function Heading(props: { readonly children: string }) {
@@ -389,5 +366,5 @@ function Heading(props: { readonly children: string }) {
       <h4 class={s.headingText}>{props.children}</h4>
       <Divider class={s.headingStitch} />
     </div>
-  );
+  )
 }

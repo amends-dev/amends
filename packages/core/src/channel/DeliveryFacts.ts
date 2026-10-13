@@ -6,14 +6,15 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Group from "../group/Group.ts";
-import * as Notification from "../notification/Notification.ts";
-import * as Delivery from "./Delivery.ts";
 
-const audience = (payload: { readonly groupId: Group.Id }) => [Group.audienceOf(payload.groupId)];
+import * as Schema from "effect/Schema"
+import * as Group from "../group/Group.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as Delivery from "./Delivery.ts"
+
+const audience = (payload: { readonly groupId: Group.Id }) => [Group.audienceOf(payload.groupId)]
 
 /**
  * The delivery job accepted contact notifications of one message into a new delivery, as its
@@ -29,9 +30,9 @@ export const Created = Fact.make("channel.delivery.created", {
   audience,
   payload: Schema.Struct({
     ...Delivery.Delivery.fields,
-    notificationIds: Schema.NonEmptyArray(Notification.Id),
-  }),
-});
+    notificationIds: Schema.NonEmptyArray(Notification.Id)
+  })
+})
 
 /**
  * The message was posted in the external conversation, which gave it an id of its own.
@@ -44,8 +45,8 @@ export const Sent = Fact.make("channel.delivery.sent", {
   subject: (payload) => Subject.make("channel-delivery", payload.deliveryId),
   occurrence: (payload) => [payload.deliveryId],
   audience,
-  payload: Delivery.Sent,
-});
+  payload: Delivery.Sent
+})
 
 /**
  * The job gave the delivery up, for the reason recorded.
@@ -58,5 +59,5 @@ export const Failed = Fact.make("channel.delivery.failed", {
   subject: (payload) => Subject.make("channel-delivery", payload.deliveryId),
   occurrence: (payload) => [payload.deliveryId],
   audience,
-  payload: Delivery.Failed,
-});
+  payload: Delivery.Failed
+})

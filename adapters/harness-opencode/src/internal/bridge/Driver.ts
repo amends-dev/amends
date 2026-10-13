@@ -9,27 +9,28 @@
  * the next session, and one that exits by itself completes `serverExited`, for the bridge to exit
  * with it.
  */
-import type { Bridge, HarnessError } from "@amends-dev/harness";
-import type * as Crypto from "effect/Crypto";
-import * as Deferred from "effect/Deferred";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import type * as FileSystem from "effect/FileSystem";
-import type * as Path from "effect/Path";
-import * as Ref from "effect/Ref";
-import * as Schema from "effect/Schema";
-import * as Scope from "effect/Scope";
-import * as Semaphore from "effect/Semaphore";
-import type * as HttpClient from "effect/http/HttpClient";
-import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import * as Server from "./Server.ts";
+
+import type { Bridge, HarnessError } from "@amends-dev/harness"
+import type * as Crypto from "effect/Crypto"
+import * as Deferred from "effect/Deferred"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import type * as FileSystem from "effect/FileSystem"
+import type * as HttpClient from "effect/http/HttpClient"
+import type * as Path from "effect/Path"
+import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Ref from "effect/Ref"
+import * as Schema from "effect/Schema"
+import * as Scope from "effect/Scope"
+import * as Semaphore from "effect/Semaphore"
+import * as Server from "./Server.ts"
 
 /** A model, as opencode names one: its provider, its id there, and a variant such as `high`. */
 export const ModelRef = Schema.Struct({
   id: Schema.String,
   providerID: Schema.String,
-  variant: Schema.optionalKey(Schema.String),
-});
+  variant: Schema.optionalKey(Schema.String)
+})
 
 export interface ModelRef extends Schema.Schema.Type<typeof ModelRef> {}
 
@@ -56,8 +57,8 @@ export const Options = Schema.Struct({
   config: Schema.Record(Schema.String, Schema.Json),
 
   /** Environment variables opencode runs with. */
-  env: Schema.Record(Schema.String, Schema.String),
-});
+  env: Schema.Record(Schema.String, Schema.String)
+})
 
 export interface Options extends Schema.Schema.Type<typeof Options> {}
 
@@ -66,7 +67,7 @@ export interface Driver extends Bridge.Driver {
    * Completes when opencode's server exits before the bridge stops it, for the bridge to exit with
    * it.
    */
-  readonly serverExited: Effect.Effect<void>;
+  readonly serverExited: Effect.Effect<void>
 }
 
 /**
@@ -78,12 +79,8 @@ export interface Driver extends Bridge.Driver {
 export type CreateSession = (
   server: Server.Server,
   options: Pick<Options, "model" | "models">,
-  sessionOptions: Bridge.CreateSessionOptions,
-) => Effect.Effect<
-  Bridge.DriverSession,
-  HarnessError.HarnessError,
-  Scope.Scope | FileSystem.FileSystem | Crypto.Crypto
->;
+  sessionOptions: Bridge.CreateSessionOptions
+) => Effect.Effect<Bridge.DriverSession, HarnessError.HarnessError, Scope.Scope | FileSystem.FileSystem | Crypto.Crypto>
 
 /**
  * The driver of the agent `id`, which starts opencode's server with `options` when the first
@@ -93,53 +90,46 @@ export type CreateSession = (
 export const make = Effect.fn("Driver.make")(function* (
   id: string,
   options: Required<Options>,
-  createSession: CreateSession,
+  createSession: CreateSession
 ) {
   const services = yield* Effect.context<
-    | ChildProcessSpawner.ChildProcessSpawner
-    | HttpClient.HttpClient
-    | Crypto.Crypto
-    | FileSystem.FileSystem
-    | Path.Path
-  >();
-  const driverScope = yield* Effect.scope;
-  const serverExited = yield* Deferred.make<void>();
-  const running = yield* Ref.make<Server.Server | undefined>(undefined);
+    ChildProcessSpawner.ChildProcessSpawner | HttpClient.HttpClient | Crypto.Crypto | FileSystem.FileSystem | Path.Path
+  >()
+  const driverScope = yield* Effect.scope
+  const serverExited = yield* Deferred.make<void>()
+  const running = yield* Ref.make<Server.Server | undefined>(undefined)
   /** Held while the server starts, so that sessions starting together start one. */
-  const starting = yield* Semaphore.make(1);
+  const starting = yield* Semaphore.make(1)
 
   /** opencode's server, which the first session to need it starts. */
   const startedServer = Semaphore.withPermit(
     starting,
     Effect.gen(function* () {
-      const current = yield* Ref.get(running);
-      if (current !== undefined) return current;
-      const serverScope = yield* Scope.fork(driverScope);
+      const current = yield* Ref.get(running)
+      if (current !== undefined) return current
+      const serverScope = yield* Scope.fork(driverScope)
       const server = yield* Server.start({
         agent: id,
         command: options.command,
         config: options.config,
-        env: options.env,
+        env: options.env
       }).pipe(
         Scope.provide(serverScope),
-        Effect.onError((cause) => Scope.close(serverScope, Exit.failCause(cause))),
-      );
-      yield* Effect.forkIn(
-        Effect.andThen(server.exited, Deferred.succeed(serverExited, undefined)),
-        serverScope,
-      );
-      yield* Ref.set(running, server);
-      return server;
-    }),
-  ).pipe(Effect.provide(services));
+        Effect.onError((cause) => Scope.close(serverScope, Exit.failCause(cause)))
+      )
+      yield* Effect.forkIn(Effect.andThen(server.exited, Deferred.succeed(serverExited, undefined)), serverScope)
+      yield* Ref.set(running, server)
+      return server
+    })
+  ).pipe(Effect.provide(services))
 
   const driver: Driver = {
     id,
     serverExited: Deferred.await(serverExited),
     createSession: (sessionOptions) =>
       Effect.flatMap(startedServer, (server) =>
-        createSession(server, options, sessionOptions).pipe(Effect.provide(services)),
-      ),
-  };
-  return driver;
-});
+        createSession(server, options, sessionOptions).pipe(Effect.provide(services))
+      )
+  }
+  return driver
+})

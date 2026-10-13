@@ -4,16 +4,17 @@
  *
  * @since 0.1.0
  */
-import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-import type * as PlatformError from "effect/PlatformError";
-import * as CoreError from "../error/CoreError.ts";
-import type * as Log from "../journal/Log.ts";
-import * as Projection from "../journal/Projection.ts";
-import * as Store from "../journal/Store.ts";
-import * as StoreError from "../journal/StoreError.ts";
-import type * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
-import type * as ThreadCommand from "../thread/ThreadCommand.ts";
+
+import * as Effect from "effect/Effect"
+import type * as PlatformError from "effect/PlatformError"
+import * as Schema from "effect/Schema"
+import * as CoreError from "../error/CoreError.ts"
+import type * as Log from "../journal/Log.ts"
+import * as Projection from "../journal/Projection.ts"
+import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import type * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
+import type * as ThreadCommand from "../thread/ThreadCommand.ts"
 
 /**
  * What core's internals fail with: storage and its commits, the journal's log and projections,
@@ -30,7 +31,7 @@ export type Internal =
   | Projection.Error
   | ThreadActivityKind.Mismatch
   | ThreadCommand.PositionChanged
-  | PlatformError.PlatformError;
+  | PlatformError.PlatformError
 
 /**
  * What an operation whose work fails with `E` reports: its kinds as they are, storage and read
@@ -44,17 +45,15 @@ export type Internal =
  */
 export type Failure<E> =
   | Exclude<E, Internal>
-  | (E extends StoreError.StoreError | Projection.Behind | Projection.Unregistered
-      ? CoreError.Unavailable
-      : never)
+  | (E extends StoreError.StoreError | Projection.Behind | Projection.Unregistered ? CoreError.Unavailable : never)
   | (E extends Store.CommitUncertain ? CoreError.Uncertain : never)
-  | (E extends Schema.SchemaError ? CoreError.Invalid : never);
+  | (E extends Schema.SchemaError ? CoreError.Invalid : never)
 
-const isCoreError = Schema.is(CoreError.CoreError);
-const isStoreError = Schema.is(StoreError.StoreError);
-const isCommitUncertain = Schema.is(Store.CommitUncertain);
-const isBehind = Schema.is(Projection.Behind);
-const isUnregistered = Schema.is(Projection.Unregistered);
+const isCoreError = Schema.is(CoreError.CoreError)
+const isStoreError = Schema.is(StoreError.StoreError)
+const isCommitUncertain = Schema.is(Store.CommitUncertain)
+const isBehind = Schema.is(Projection.Behind)
+const isUnregistered = Schema.is(Projection.Unregistered)
 
 /**
  * The kind an operation reports `error` as, or none for a defect. Values reach core decoded, and
@@ -67,23 +66,22 @@ const isUnregistered = Schema.is(Projection.Unregistered);
  * @since 0.1.0
  */
 export const classify = (error: unknown): CoreError.CoreError | undefined => {
-  if (isCoreError(error)) return error;
+  if (isCoreError(error)) return error
   if (isStoreError(error) && error.reason._tag === "Contended")
     return new CoreError.Unavailable({
       reason: new CoreError.Contention({
         operation: error.operation,
-        description: error.reason.description,
-      }),
-    });
-  if (isCommitUncertain(error)) return new CoreError.Uncertain({ commitId: error.commitId });
-  if (isBehind(error) || isUnregistered(error))
-    return new CoreError.Unavailable({ reason: new CoreError.Reloading() });
+        description: error.reason.description
+      })
+    })
+  if (isCommitUncertain(error)) return new CoreError.Uncertain({ commitId: error.commitId })
+  if (isBehind(error) || isUnregistered(error)) return new CoreError.Unavailable({ reason: new CoreError.Reloading() })
   if (Schema.isSchemaError(error))
     return new CoreError.Invalid({
-      reason: new CoreError.Malformed({ description: error.message }),
-    });
-  return undefined;
-};
+      reason: new CoreError.Malformed({ description: error.message })
+    })
+  return undefined
+}
 
 /**
  * Report an operation's failures by kind, as `classify` decides, and the rest as defects that keep
@@ -92,10 +90,8 @@ export const classify = (error: unknown): CoreError.CoreError | undefined => {
  * @category utils
  * @since 0.1.0
  */
-export const report = <A, E, R>(
-  operation: Effect.Effect<A, E, R>,
-): Effect.Effect<A, Failure<E>, R> =>
+export const report = <A, E, R>(operation: Effect.Effect<A, E, R>): Effect.Effect<A, Failure<E>, R> =>
   Effect.catch(operation, (error) => {
-    const kind = classify(error);
-    return kind === undefined ? Effect.die(error) : Effect.fail(kind as Failure<E>);
-  });
+    const kind = classify(error)
+    return kind === undefined ? Effect.die(error) : Effect.fail(kind as Failure<E>)
+  })

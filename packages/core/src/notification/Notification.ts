@@ -7,17 +7,18 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import type * as DateTime from "effect/DateTime";
-import * as Identity from "../identity/Identity.ts";
-import * as Entry from "../journal/Entry.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as TurnId from "../turn/TurnId.ts";
-import * as DeliveryId from "../channel/DeliveryId.ts";
+
+import type * as DateTime from "effect/DateTime"
+import * as Schema from "effect/Schema"
+import * as DeliveryId from "../channel/DeliveryId.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as Entry from "../journal/Entry.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
+import * as TurnId from "../turn/TurnId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * Names a notification. One generated from thread activity is named by its source entry and the
@@ -26,13 +27,13 @@ import * as DeliveryId from "../channel/DeliveryId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
+export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type Id = typeof Id.Type
 
 /**
  * The committed journal entry a notification tells of, by log and entry, in the notification's
@@ -43,8 +44,8 @@ export type Id = typeof Id.Type;
  */
 export const Source = Schema.Struct({
   logId: Entry.LogId,
-  entryId: Entry.Id,
-});
+  entryId: Entry.Id
+})
 
 /**
  * @category schemas
@@ -62,8 +63,8 @@ export interface Source extends Schema.Schema.Type<typeof Source> {}
 export const ThreadReference = Schema.Struct({
   threadId: ThreadId.Id,
   groupId: GroupId.Id,
-  sequence: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  sequence: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category schemas
@@ -84,14 +85,14 @@ export const Recipient = Schema.TaggedUnion({
   Human: { ...Identity.Reference.cases.Human.fields, memberId: MemberId.Id },
   Agent: { ...Identity.Reference.cases.Agent.fields, memberId: MemberId.Id },
   Contact: Identity.Reference.cases.Contact.fields,
-  Triage: {},
-});
+  Triage: {}
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Recipient = typeof Recipient.Type;
+export type Recipient = typeof Recipient.Type
 
 /**
  * The recipient a member is notified as: their identity, within this membership.
@@ -99,10 +100,8 @@ export type Recipient = typeof Recipient.Type;
  * @category constructors
  * @since 0.1.0
  */
-export const ofMember = <const I extends Identity.MemberReference>(
-  memberId: MemberId.Id,
-  identity: I,
-) => Object.assign({}, identity, { memberId });
+export const ofMember = <const I extends Identity.MemberReference>(memberId: MemberId.Id, identity: I) =>
+  Object.assign({}, identity, { memberId })
 
 /**
  * What accepted a notification and owns the work from then on: an agent's turn, for an agent's,
@@ -113,14 +112,14 @@ export const ofMember = <const I extends Identity.MemberReference>(
  */
 export const AcceptedBy = Schema.TaggedUnion({
   Turn: { turnId: TurnId.Id },
-  Delivery: { deliveryId: DeliveryId.Id },
-});
+  Delivery: { deliveryId: DeliveryId.Id }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type AcceptedBy = typeof AcceptedBy.Type;
+export type AcceptedBy = typeof AcceptedBy.Type
 
 /**
  * Where a notification stands. Pending waits for its recipient: a person sees it, an agent accepts
@@ -145,14 +144,14 @@ export const State = Schema.TaggedUnion({
    * The source told this recipient something without asking anything of it, as another agent's
    * message tells an agent: settled when created, so it never waits for handling.
    */
-  Informational: {},
-});
+  Informational: {}
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type State = typeof State.Type;
+export type State = typeof State.Type
 
 /**
  * Only people see their notifications; only an agent's are accepted by a turn, and only a
@@ -166,7 +165,7 @@ export const fitsRecipient = (recipient: Recipient, state: State) =>
   (!State.isAnyOf(["Accepted"])(state) ||
     (AcceptedBy.isAnyOf(["Turn"])(state.by)
       ? Recipient.isAnyOf(["Agent"])(recipient)
-      : Recipient.isAnyOf(["Contact"])(recipient)));
+      : Recipient.isAnyOf(["Contact"])(recipient)))
 
 /**
  * One recipient's notification of a recorded source. Generation chooses
@@ -186,13 +185,10 @@ export const Notification = Schema.Struct({
   thread: Schema.optionalKey(ThreadReference),
   recipient: Recipient,
   recordedAt: Schema.DateTimeUtcFromString,
-  state: State,
+  state: State
 }).check(
-  Schema.makeFilter(
-    (record) =>
-      fitsRecipient(record.recipient, record.state) || "State does not match the recipient",
-  ),
-);
+  Schema.makeFilter((record) => fitsRecipient(record.recipient, record.state) || "State does not match the recipient")
+)
 
 /**
  * @category schemas
@@ -212,16 +208,16 @@ export interface Notification extends Schema.Schema.Type<typeof Notification> {}
 export const fromActivity = (
   entry: { readonly logId: Entry.LogId; readonly id: Entry.Id; readonly recordedAt: DateTime.Utc },
   activity: {
-    readonly workspaceId: WorkspaceId.Id;
-    readonly groupId: GroupId.Id;
-    readonly threadId: ThreadId.Id;
-    readonly sequence: number;
+    readonly workspaceId: WorkspaceId.Id
+    readonly groupId: GroupId.Id
+    readonly threadId: ThreadId.Id
+    readonly sequence: number
   },
   selected: {
-    readonly participationId: ThreadParticipationId.Id;
-    readonly recipient: Recipient;
-    readonly requestsWork: boolean;
-  },
+    readonly participationId: ThreadParticipationId.Id
+    readonly recipient: Recipient
+    readonly requestsWork: boolean
+  }
 ): Notification => ({
   id: Id.make(JSON.stringify([entry.logId, entry.id, selected.participationId])),
   workspaceId: activity.workspaceId,
@@ -233,5 +229,5 @@ export const fromActivity = (
   state:
     Recipient.isAnyOf(["Agent"])(selected.recipient) && !selected.requestsWork
       ? { _tag: "Informational" }
-      : { _tag: "Pending" },
-});
+      : { _tag: "Pending" }
+})

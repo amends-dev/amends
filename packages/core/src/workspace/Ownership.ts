@@ -5,10 +5,11 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Assignment from "../authorization/Assignment.ts";
-import * as Member from "./Member.ts";
-import * as Workspace from "./Workspace.ts";
+
+import * as Schema from "effect/Schema"
+import * as Assignment from "../authorization/Assignment.ts"
+import * as Member from "./Member.ts"
+import * as Workspace from "./Workspace.ts"
 
 /**
  * The member to make owner, and the Owner assignment the caller reviewed; a transfer since then
@@ -19,8 +20,8 @@ import * as Workspace from "./Workspace.ts";
  */
 export const TransferInput = Schema.Struct({
   memberId: Member.Id,
-  expectedOwnerAssignmentId: Assignment.Id,
-}).annotate({ identifier: "OwnershipTransferInput" });
+  expectedOwnerAssignmentId: Assignment.Id
+}).annotate({ identifier: "OwnershipTransferInput" })
 
 /**
  * @category options
@@ -39,14 +40,12 @@ export interface TransferInput extends Schema.Schema.Type<typeof TransferInput> 
 export const Change = Schema.Struct({
   workspaceId: Workspace.Id,
   previousOwnerMemberId: Member.Id,
-  ownerMemberId: Member.Id,
+  ownerMemberId: Member.Id
 }).check(
   Schema.makeFilter(
-    (change) =>
-      change.previousOwnerMemberId !== change.ownerMemberId ||
-      "Ownership must move to another member",
-  ),
-);
+    (change) => change.previousOwnerMemberId !== change.ownerMemberId || "Ownership must move to another member"
+  )
+)
 
 /**
  * @category schemas
@@ -69,8 +68,8 @@ export const View = Schema.Struct({
   /** Whether the actor is the owner, a person, and holds `workspace.transfer-ownership`. */
   canTransfer: Schema.Boolean,
   /** The other active human members, when the actor may transfer; empty otherwise. */
-  candidates: Schema.Array(Member.Member),
-}).annotate({ identifier: "WorkspaceOwnership" });
+  candidates: Schema.Array(Member.Member)
+}).annotate({ identifier: "WorkspaceOwnership" })
 
 /**
  * @category schemas

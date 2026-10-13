@@ -7,38 +7,39 @@
  * that has marked a parameter refuses a call that sends the value without the header. `Mcp.http`
  * finds the marks when it lists a server's tools, and sends the headers with each call.
  */
-import * as Result from "effect/Result";
-import type * as Schema from "effect/Schema";
-import * as Base64 from "effect/encoding/Base64";
+
+import * as Base64 from "effect/encoding/Base64"
+import * as Result from "effect/Result"
+import type * as Schema from "effect/Schema"
 
 /**
  * A parameter of a tool that is also sent as a header.
  */
 export interface Binding {
   /** What follows `Mcp-Param-` in the name of the header. */
-  readonly headerName: string;
+  readonly headerName: string
 
   /** The names of the properties that lead from the input of the tool to the parameter. */
-  readonly path: ReadonlyArray<string>;
+  readonly path: ReadonlyArray<string>
 }
 
-type Json = Schema.Json;
-type JsonObject = { readonly [key: string]: Json };
+type Json = Schema.Json
+type JsonObject = { readonly [key: string]: Json }
 
 const isObject = (value: Json | undefined): value is JsonObject =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
-const annotation = "x-mcp-header";
+const annotation = "x-mcp-header"
 
 /** HTTP's `token`, which a field name is made of. */
-const isToken = (text: string) => /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(text);
+const isToken = (text: string) => /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(text)
 
 /**
  * The types of parameter that can be sent as a header. The protocol leaves out `number`, but the
  * conformance suite of the MCP SDK sends one, and so does the SDK's client, so a tool that marks one
  * is not refused.
  */
-const mirroredTypes = ["string", "integer", "number", "boolean"];
+const mirroredTypes = ["string", "integer", "number", "boolean"]
 
 /** The keywords whose value is a schema, or a list of them, that no chain of `properties` leads to. */
 const schemaKeywords = [
@@ -55,17 +56,17 @@ const schemaKeywords = [
   "else",
   "oneOf",
   "anyOf",
-  "allOf",
-];
+  "allOf"
+]
 
 /** The keywords whose value holds schemas by name, as `properties` does. */
-const namedSchemaKeywords = ["patternProperties", "dependentSchemas", "$defs", "definitions"];
+const namedSchemaKeywords = ["patternProperties", "dependentSchemas", "$defs", "definitions"]
 
 interface Declaration {
   /** `undefined` when no chain of `properties` leads from the root to the schema. */
-  readonly path: ReadonlyArray<string> | undefined;
-  readonly name: Json | undefined;
-  readonly type: Json | undefined;
+  readonly path: ReadonlyArray<string> | undefined
+  readonly name: Json | undefined
+  readonly type: Json | undefined
 }
 
 /**
@@ -75,67 +76,57 @@ interface Declaration {
  */
 const declarationsIn = (
   schema: Json | undefined,
-  path: ReadonlyArray<string> | undefined,
+  path: ReadonlyArray<string> | undefined
 ): ReadonlyArray<Declaration> => {
-  if (!isObject(schema)) return [];
-  const here = Object.hasOwn(schema, annotation)
-    ? [{ path, name: schema[annotation], type: schema["type"] }]
-    : [];
+  if (!isObject(schema)) return []
+  const here = Object.hasOwn(schema, annotation) ? [{ path, name: schema[annotation], type: schema["type"] }] : []
   const holders = (keyword: string) => {
-    const held = schema[keyword];
-    return isObject(held) ? Object.entries(held) : [];
-  };
+    const held = schema[keyword]
+    return isObject(held) ? Object.entries(held) : []
+  }
   const reached = holders("properties").flatMap(([name, child]) =>
-    declarationsIn(child, path === undefined ? undefined : [...path, name]),
-  );
+    declarationsIn(child, path === undefined ? undefined : [...path, name])
+  )
   const elsewhere = [
     ...schemaKeywords.flatMap((keyword) => {
-      const held = schema[keyword];
-      return Array.isArray(held) ? held : [held];
+      const held = schema[keyword]
+      return Array.isArray(held) ? held : [held]
     }),
-    ...namedSchemaKeywords.flatMap((keyword) => holders(keyword).map(([, child]) => child)),
-  ].flatMap((child) => declarationsIn(child, undefined));
-  return [...here, ...reached, ...elsewhere];
-};
+    ...namedSchemaKeywords.flatMap((keyword) => holders(keyword).map(([, child]) => child))
+  ].flatMap((child) => declarationsIn(child, undefined))
+  return [...here, ...reached, ...elsewhere]
+}
 
 /**
  * The parameters that the `inputSchema` of a tool marks as headers, or why the tool is not one a
  * client may use: a client has to leave out a tool whose marks the protocol does not allow, such as
  * a mark on a parameter that is an object, or two of the same name.
  */
-export const findBindings = (
-  inputSchema: Schema.JsonObject,
-): Result.Result<ReadonlyArray<Binding>, string> => {
-  const bindings: Array<Binding> = [];
+export const findBindings = (inputSchema: Schema.JsonObject): Result.Result<ReadonlyArray<Binding>, string> => {
+  const bindings: Array<Binding> = []
   for (const declaration of declarationsIn(inputSchema, [])) {
-    const { path, name, type } = declaration;
+    const { path, name, type } = declaration
     if (path === undefined || path.length === 0) {
-      return Result.fail(
-        `${annotation} is only allowed on a property that "properties" lead to from the root`,
-      );
+      return Result.fail(`${annotation} is only allowed on a property that "properties" lead to from the root`)
     }
-    const where = path.join(".");
+    const where = path.join(".")
     if (typeof name !== "string" || !isToken(name)) {
-      return Result.fail(
-        `${where}: ${annotation} ${JSON.stringify(name)} is not the name of a header`,
-      );
+      return Result.fail(`${where}: ${annotation} ${JSON.stringify(name)} is not the name of a header`)
     }
     if (typeof type !== "string" || !mirroredTypes.includes(type)) {
-      return Result.fail(
-        `${where}: ${annotation} is only allowed on a string, a number or a boolean`,
-      );
+      return Result.fail(`${where}: ${annotation} is only allowed on a string, a number or a boolean`)
     }
-    const lowerCased = name.toLowerCase();
+    const lowerCased = name.toLowerCase()
     if (bindings.some((binding) => binding.headerName.toLowerCase() === lowerCased)) {
-      return Result.fail(`${where}: ${annotation} "${name}" is used by another property`);
+      return Result.fail(`${where}: ${annotation} "${name}" is used by another property`)
     }
-    bindings.push({ headerName: name, path });
+    bindings.push({ headerName: name, path })
   }
-  return Result.succeed(bindings);
-};
+  return Result.succeed(bindings)
+}
 
-const sentinelStart = "=?base64?";
-const sentinelEnd = "?=";
+const sentinelStart = "=?base64?"
+const sentinelEnd = "?="
 
 /**
  * The value of a header that says `text`: the text itself when a header can hold it as it is, or
@@ -147,29 +138,29 @@ export const encodeHeaderValue = (text: string): string => {
   const isPlain =
     /^[\x20-\x7E]*$/.test(text) &&
     !/^[ \t]|[ \t]$/.test(text) &&
-    !(text.startsWith(sentinelStart) && text.endsWith(sentinelEnd));
-  return isPlain ? text : `${sentinelStart}${Base64.encode(text)}${sentinelEnd}`;
-};
+    !(text.startsWith(sentinelStart) && text.endsWith(sentinelEnd))
+  return isPlain ? text : `${sentinelStart}${Base64.encode(text)}${sentinelEnd}`
+}
 
 const valueAt = (input: Json, path: ReadonlyArray<string>): Json | undefined => {
-  let node: Json | undefined = input;
+  let node: Json | undefined = input
   for (const key of path) {
-    if (!isObject(node)) return undefined;
-    node = node[key];
+    if (!isObject(node)) return undefined
+    node = node[key]
   }
-  return node;
-};
+  return node
+}
 
 /** The text a value is sent as, which a value that is not a string, a number, or a boolean has not. */
 const textOf = (value: Json | undefined): string | undefined => {
-  if (typeof value === "string") return value;
-  if (typeof value === "boolean") return String(value);
+  if (typeof value === "string") return value
+  if (typeof value === "boolean") return String(value)
   // An integer beyond what a number holds exactly is not the integer that the body says.
   if (typeof value === "number" && Number.isFinite(value)) {
-    return Number.isInteger(value) && !Number.isSafeInteger(value) ? undefined : String(value);
+    return Number.isInteger(value) && !Number.isSafeInteger(value) ? undefined : String(value)
   }
-  return undefined;
-};
+  return undefined
+}
 
 /**
  * The headers to send with a call of a tool, for the parameters it marks. A parameter the input
@@ -177,13 +168,11 @@ const textOf = (value: Json | undefined): string | undefined => {
  */
 export const headersOf = (
   bindings: ReadonlyArray<Binding>,
-  input: Schema.JsonObject,
+  input: Schema.JsonObject
 ): Readonly<Record<string, string>> =>
   Object.fromEntries(
     bindings.flatMap((binding) => {
-      const text = textOf(valueAt(input, binding.path));
-      return text === undefined
-        ? []
-        : [[`mcp-param-${binding.headerName.toLowerCase()}`, encodeHeaderValue(text)]];
-    }),
-  );
+      const text = textOf(valueAt(input, binding.path))
+      return text === undefined ? [] : [[`mcp-param-${binding.headerName.toLowerCase()}`, encodeHeaderValue(text)]]
+    })
+  )

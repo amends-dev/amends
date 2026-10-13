@@ -1,26 +1,23 @@
-import { splitProps, type JSX } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import { focusRing } from "../../foundations/focus/styles.css.ts";
-import { classes, type IconComponent } from "../../internal/props.ts";
-import * as s from "./icon-button.css.ts";
+import { splitProps, type JSX } from "solid-js"
+import { Dynamic } from "solid-js/web"
+import { focusRing } from "../../foundations/focus/styles.css.ts"
+import { classes, type IconComponent } from "../../internal/props.ts"
+import * as s from "./icon-button.css.ts"
 
-export type IconButtonSize = "regular" | "compact";
+export type IconButtonSize = "regular" | "compact"
 
-export type IconButtonProps = Omit<
-  JSX.ButtonHTMLAttributes<HTMLButtonElement>,
-  "children" | "aria-label"
-> & {
-  icon: IconComponent;
+export type IconButtonProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children" | "aria-label"> & {
+  icon: IconComponent
   /** The accessible name; icon buttons have no visible label. */
-  label: string;
+  label: string
   /** Regular is 32px with an 18px icon; compact is 24px with 14px. Both are 44px on touch. */
-  size?: IconButtonSize;
-};
+  size?: IconButtonSize
+}
 
 /** A square button showing one icon. */
 export function IconButton(props: IconButtonProps) {
-  const [local, native] = splitProps(props, ["icon", "label", "size", "class", "type"]);
-  const size = () => local.size ?? "regular";
+  const [local, native] = splitProps(props, ["icon", "label", "size", "class", "type"])
+  const size = () => local.size ?? "regular"
   return (
     <button
       {...native}
@@ -31,5 +28,5 @@ export function IconButton(props: IconButtonProps) {
     >
       <Dynamic component={local.icon} class={classes(s.icon[size()], s.touchIcon)} />
     </button>
-  );
+  )
 }

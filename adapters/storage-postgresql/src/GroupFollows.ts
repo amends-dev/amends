@@ -10,28 +10,29 @@
  *
  * @since 0.1.0
  */
-import { GroupFollow, GroupFollowStore } from "@amends-dev/core/group";
-import { and, eq, sql } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { inIds } from "./internal/id-list.ts";
-import { storeError } from "./internal/errors.ts";
-import { groupFollows } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { GroupFollow, GroupFollowStore } from "@amends-dev/core/group"
+import { StoreError } from "@amends-dev/core/journal"
+import { and, eq, sql } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { inIds } from "./internal/id-list.ts"
+import { groupFollows } from "./internal/schema.ts"
 
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       ...GroupFollow.GroupFollow.fields,
       followedAt: Schema.DateTimeUtcFromDate,
-      endedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
-    }),
-  ),
-);
+      endedAt: Schema.NullOr(Schema.DateTimeUtcFromDate)
+    })
+  )
+)
 
 /**
  * Builds the group follow store for the binding's workspace: this module's driver inside
@@ -41,9 +42,9 @@ const decode = Schema.decodeUnknownEffect(
  * @since 0.1.0
  */
 export const make = Effect.fn("GroupFollows.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(groupFollows.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(groupFollows.workspaceId, workspaceId)
   const driver: GroupFollowStore.GroupFollowStore["Service"] = {
     get: Effect.fn("GroupFollows.get")(
       function* (id) {
@@ -51,10 +52,10 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
           db
             .select()
             .from(groupFollows)
-            .where(and(inWorkspace, eq(groupFollows.id, id))),
-        ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
+            .where(and(inWorkspace, eq(groupFollows.id, id)))
+        ).pipe(Effect.flatMap(decode), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("GroupFollowStore", "get")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "get"))
     ),
     findActive: Effect.fn("GroupFollows.findActive")(
       function* (id) {
@@ -62,34 +63,22 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
           db
             .select()
             .from(groupFollows)
-            .where(
-              and(
-                inWorkspace,
-                eq(groupFollows.groupMembershipId, id),
-                eq(groupFollows.status, "active"),
-              ),
-            ),
-        ).pipe(Effect.flatMap(decode), Effect.map(Array.head));
+            .where(and(inWorkspace, eq(groupFollows.groupMembershipId, id), eq(groupFollows.status, "active")))
+        ).pipe(Effect.flatMap(decode), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("GroupFollowStore", "findActive")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "findActive"))
     ),
     findActiveMany: Effect.fn("GroupFollows.findActiveMany")(
       function* (ids) {
-        if (ids.length === 0) return [];
+        if (ids.length === 0) return []
         return yield* guard(
           db
             .select()
             .from(groupFollows)
-            .where(
-              and(
-                inWorkspace,
-                inIds(groupFollows.groupMembershipId, ids),
-                eq(groupFollows.status, "active"),
-              ),
-            ),
-        ).pipe(Effect.flatMap(decode));
+            .where(and(inWorkspace, inIds(groupFollows.groupMembershipId, ids), eq(groupFollows.status, "active")))
+        ).pipe(Effect.flatMap(decode))
       },
-      Effect.mapError(StoreError.failed("GroupFollowStore", "findActiveMany")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "findActiveMany"))
     ),
     listActiveByGroup: Effect.fn("GroupFollows.listActiveByGroup")(
       function* (groupId) {
@@ -97,28 +86,22 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
           db
             .select()
             .from(groupFollows)
-            .where(
-              and(
-                inWorkspace,
-                eq(groupFollows.groupId, groupId),
-                eq(groupFollows.status, "active"),
-              ),
-            )
-            .orderBy(sql`${groupFollows.id} COLLATE "C"`),
-        ).pipe(Effect.flatMap(decode));
+            .where(and(inWorkspace, eq(groupFollows.groupId, groupId), eq(groupFollows.status, "active")))
+            .orderBy(sql`${groupFollows.id} COLLATE "C"`)
+        ).pipe(Effect.flatMap(decode))
       },
-      Effect.mapError(StoreError.failed("GroupFollowStore", "listActiveByGroup")),
+      Effect.mapError(StoreError.failed("GroupFollowStore", "listActiveByGroup"))
     ),
     insert: Effect.fn("GroupFollows.insert")(function* (record) {
-      const { followedAt, ...fields } = record;
+      const { followedAt, ...fields } = record
       yield* guard(
         db.insert(groupFollows).values({
           ...fields,
           followedAt: DateTime.toDate(followedAt),
-          endedAt: null,
+          endedAt: null
         }),
-        true,
-      ).pipe(Effect.mapError(storeError("GroupFollowStore", "insert")));
+        true
+      ).pipe(Effect.mapError(storeError("GroupFollowStore", "insert")))
     }),
     end: Effect.fn("GroupFollows.end")(function* (ending, endedAt) {
       const rows = yield* guard(
@@ -131,22 +114,18 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
               eq(groupFollows.id, ending.followId),
               eq(groupFollows.groupId, ending.groupId),
               eq(groupFollows.memberId, ending.memberId),
-              eq(groupFollows.status, "active"),
-            ),
+              eq(groupFollows.status, "active")
+            )
           )
           .returning({ id: groupFollows.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("GroupFollowStore", "end")));
+        true
+      ).pipe(Effect.mapError(storeError("GroupFollowStore", "end")))
       if (rows.length !== 1)
-        return yield* StoreError.rejected(
-          "GroupFollowStore",
-          "end",
-          "Follow is missing, mismatched, or already ended",
-        );
-    }),
-  };
-  return GroupFollowStore.make(workspaceId, driver);
-});
+        return yield* StoreError.rejected("GroupFollowStore", "end", "Follow is missing, mismatched, or already ended")
+    })
+  }
+  return GroupFollowStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `GroupFollowStore.GroupFollowStore` over the caller's `Binding.Binding`.
@@ -154,4 +133,4 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make());
+export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make())

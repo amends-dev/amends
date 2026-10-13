@@ -7,18 +7,19 @@
  *
  * @since 0.1.0
  */
-import { Connection as ConnectionContract } from "@amends-dev/connection";
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import type * as Option from "effect/Option";
-import * as Store from "../journal/Store.ts";
-import * as Connection from "./Connection.ts";
-import * as StoreInput from "../journal/StoreInput.ts";
-import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import type * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+
+import { Connection as ConnectionContract } from "@amends-dev/connection"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import type * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import type * as CoreError from "../error/CoreError.ts"
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
+import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import * as StoreInput from "../journal/StoreInput.ts"
+import * as Connection from "./Connection.ts"
 
 /**
  * Protected storage for connections' credentials, one for each connection that authenticates with
@@ -39,19 +40,14 @@ export class ConnectionCredentialStore extends Context.Service<
     /** Store the connection's credential, in place of any it had. */
     readonly set: (
       connectionId: Connection.Id,
-      credential: ConnectionContract.Credential,
-    ) => Effect.Effect<void, StoreError.StoreError | CoreError.Unavailable, Store.Transaction>;
+      credential: ConnectionContract.Credential
+    ) => Effect.Effect<void, StoreError.StoreError | CoreError.Unavailable, Store.Transaction>
     /** The connection's credential, for using it. No operation returns one to a reader. */
     readonly get: (
-      connectionId: Connection.Id,
-    ) => Effect.Effect<
-      Option.Option<ConnectionContract.Credential>,
-      StoreError.StoreError | CoreError.Unavailable
-    >;
+      connectionId: Connection.Id
+    ) => Effect.Effect<Option.Option<ConnectionContract.Credential>, StoreError.StoreError | CoreError.Unavailable>
     /** Delete the connection's credential; one already gone is left so. */
-    readonly remove: (
-      connectionId: Connection.Id,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/connection/ConnectionCredentialStore") {}
 
@@ -61,56 +57,51 @@ export class ConnectionCredentialStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (
-  driver: ConnectionCredentialStore["Service"],
-): ConnectionCredentialStore["Service"] => {
-  const read = StoreInput.read("ConnectionCredentialStore");
+export const make = (driver: ConnectionCredentialStore["Service"]): ConnectionCredentialStore["Service"] => {
+  const read = StoreInput.read("ConnectionCredentialStore")
   return {
     set: Effect.fn("ConnectionCredentialStore.set")(function* (connectionId, credential) {
       return yield* driver.set(
         yield* read("set", Connection.Id, connectionId),
-        yield* read("set", ConnectionContract.Credential, credential),
-      );
+        yield* read("set", ConnectionContract.Credential, credential)
+      )
     }),
     get: (connectionId) => Effect.flatMap(read("get", Connection.Id, connectionId), driver.get),
-    remove: (connectionId) =>
-      Effect.flatMap(read("remove", Connection.Id, connectionId), driver.remove),
-  };
-};
+    remove: (connectionId) => Effect.flatMap(read("remove", Connection.Id, connectionId), driver.remove)
+  }
+}
 
 /** A credential as JSON, its key as it is: this adapter is for tests. */
-const rows = MemoryDatabase.makeRows(
-  Schema.fromJsonString(Schema.toCodecJson(ConnectionContract.Credential)),
-);
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Schema.toCodecJson(ConnectionContract.Credential)))
 
 /**
  * Each connection's credential in the workspace's memory, written in its transactions.
  */
 const makeMemory = Effect.fn("ConnectionCredentialStore.makeMemory")(function* () {
-  const { read, write } = yield* Store.MemoryBinding;
+  const { read, write } = yield* Store.MemoryBinding
   const driver: ConnectionCredentialStore["Service"] = {
     set: Effect.fn("ConnectionCredentialStore.memory.set")(
       function* (connectionId, credential) {
-        const row = yield* rows.encode(credential);
-        (yield* write).connectionCredentials.set(connectionId, row);
+        const row = yield* rows.encode(credential)
+        ;(yield* write).connectionCredentials.set(connectionId, row)
       },
-      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "set")),
+      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "set"))
     ),
     get: Effect.fn("ConnectionCredentialStore.memory.get")(
       function* (connectionId) {
-        return yield* rows.get((yield* read).connectionCredentials, connectionId);
+        return yield* rows.get((yield* read).connectionCredentials, connectionId)
       },
-      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "get")),
+      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "get"))
     ),
     remove: Effect.fn("ConnectionCredentialStore.memory.remove")(
       function* (connectionId) {
-        (yield* write).connectionCredentials.delete(connectionId);
+        ;(yield* write).connectionCredentials.delete(connectionId)
       },
-      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "remove")),
-    ),
-  };
-  return make(driver);
-});
+      Effect.mapError(StoreError.failed("ConnectionCredentialStore", "remove"))
+    )
+  }
+  return make(driver)
+})
 
 /**
  * Provide `ConnectionCredentialStore` in process memory, over the workspace's
@@ -122,4 +113,4 @@ const makeMemory = Effect.fn("ConnectionCredentialStore.makeMemory")(function* (
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(ConnectionCredentialStore, makeMemory());
+export const layerMemory = Layer.effect(ConnectionCredentialStore, makeMemory())

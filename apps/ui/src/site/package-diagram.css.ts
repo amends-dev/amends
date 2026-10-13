@@ -1,8 +1,8 @@
-import { style } from "@vanilla-extract/css";
-import { media } from "../foundations/layout/tokens.ts";
-import { vars } from "../foundations/theme/vars.css.ts";
-import { monoFamily, typeScale } from "../foundations/typography/tokens.ts";
-import { stitchAcross, stitchDown, stitchLine } from "./stitch.css.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../foundations/layout/tokens.ts"
+import { vars } from "../foundations/theme/vars.css.ts"
+import { monoFamily, typeScale } from "../foundations/typography/tokens.ts"
+import { stitchAcross, stitchDown, stitchLine } from "./stitch.css.ts"
 
 export const diagram = style({
   display: "grid",
@@ -10,8 +10,8 @@ export const diagram = style({
   margin: 0,
   padding: "1.5rem",
   border: `1px solid ${vars.color.border.default}`,
-  backgroundColor: vars.color.surface.canvas,
-});
+  backgroundColor: vars.color.surface.canvas
+})
 
 const box = {
   ...typeScale.hint,
@@ -23,8 +23,8 @@ const box = {
   paddingInline: "0.75rem",
   fontFamily: monoFamily,
   textAlign: "center",
-  overflowWrap: "anywhere",
-} as const;
+  overflowWrap: "anywhere"
+} as const
 
 export const program = style({
   ...box,
@@ -32,8 +32,8 @@ export const program = style({
   minWidth: "60%",
   border: `1px solid ${vars.color.border.default}`,
   backgroundColor: vars.color.surface.panel,
-  color: vars.color.text.primary,
-});
+  color: vars.color.text.primary
+})
 
 export const contracts = style({
   position: "relative",
@@ -42,19 +42,19 @@ export const contracts = style({
   margin: 0,
   padding: 0,
   listStyle: "none",
-  "@media": { [media.tablet]: { gridTemplateColumns: "repeat(auto-fit, minmax(12rem, 1fr))" } },
-});
+  "@media": { [media.tablet]: { gridTemplateColumns: "repeat(auto-fit, minmax(12rem, 1fr))" } }
+})
 
 // The stitch from the program down into the contracts.
-export const seam = style([stitchLine, { marginBlockStart: "-0.875rem", marginInline: "25%" }]);
+export const seam = style([stitchLine, { marginBlockStart: "-0.875rem", marginInline: "25%" }])
 
-export const contract = style({ display: "grid", gap: "0.75rem", alignContent: "start" });
+export const contract = style({ display: "grid", gap: "0.75rem", alignContent: "start" })
 
 export const contractName = style({
   ...box,
   backgroundColor: vars.color.action.primary,
-  color: vars.color.text.onPrimary,
-});
+  color: vars.color.text.onPrimary
+})
 
 export const adapters = style({
   position: "relative",
@@ -70,9 +70,9 @@ export const adapters = style({
     insetBlock: "-0.75rem 1.25rem",
     insetInlineStart: "0.75rem",
     width: "1px",
-    backgroundImage: stitchDown,
-  },
-});
+    backgroundImage: stitchDown
+  }
+})
 
 export const adapter = style({
   ...box,
@@ -87,9 +87,9 @@ export const adapter = style({
     top: "50%",
     width: "1.25rem",
     height: "1px",
-    backgroundImage: stitchAcross,
-  },
-});
+    backgroundImage: stitchAcross
+  }
+})
 
 export const legend = style({
   ...typeScale.hint,
@@ -98,16 +98,16 @@ export const legend = style({
   margin: 0,
   padding: 0,
   listStyle: "none",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
-export const key = style({ display: "inline-flex", alignItems: "center", gap: "0.5rem" });
+export const key = style({ display: "inline-flex", alignItems: "center", gap: "0.5rem" })
 
-export const swatch = style({ width: "0.625rem", height: "0.625rem", boxSizing: "border-box" });
+export const swatch = style({ width: "0.625rem", height: "0.625rem", boxSizing: "border-box" })
 
-export const swatchContract = style({ backgroundColor: vars.color.action.primary });
+export const swatchContract = style({ backgroundColor: vars.color.action.primary })
 
 export const swatchAdapter = style({
   border: `1px solid ${vars.color.text.muted}`,
-  backgroundColor: vars.color.surface.panel,
-});
+  backgroundColor: vars.color.surface.panel
+})

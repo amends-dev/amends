@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Names a channel.
@@ -12,10 +13,10 @@ import * as Schema from "effect/Schema";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("ChannelId"));
+export const Id = Schema.NonEmptyString.pipe(Schema.brand("ChannelId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type Id = typeof Id.Type

@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Publish a message in a thread, or tell its readers one is being written. Replying needs no
@@ -15,8 +16,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Publish = Permission.make("thread.publish", {
   targetKind: "Thread",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Delete another member's message in a thread of the group.
@@ -26,5 +27,5 @@ export const Publish = Permission.make("thread.publish", {
  */
 export const Moderate = Permission.make("thread.moderate", {
   targetKind: "Group",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})

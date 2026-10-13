@@ -8,17 +8,18 @@
  *
  * @since 0.1.0
  */
-import { Assignment, Permission } from "@amends-dev/core/authorization";
-import { Member } from "@amends-dev/core/workspace";
-import * as Schema from "effect/Schema";
-import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import * as Authentication from "./Authentication.ts";
-import * as WorkspaceMember from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
 
-const member = { memberId: Member.Id };
-const error = [...ApiErrors.workspace, ...ApiErrors.assignment];
+import { Assignment, Permission } from "@amends-dev/core/authorization"
+import { Member } from "@amends-dev/core/workspace"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
+
+const member = { memberId: Member.Id }
+const error = [...ApiErrors.workspace, ...ApiErrors.assignment]
 
 /**
  * A member's access: the caller's own workspace-wide permissions, the built-in roles to choose
@@ -32,32 +33,32 @@ export class AssignmentsGroup extends HttpApiGroup.make("assignments")
   .add(
     HttpApiEndpoint.get("permissions", "/permissions", {
       success: Schema.Array(Permission.Name),
-      error: ApiErrors.workspace,
+      error: ApiErrors.workspace
     }),
     HttpApiEndpoint.get("roles", "/roles", {
       success: Schema.Array(Assignment.RoleChoice),
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation]
     }),
     HttpApiEndpoint.get("list", "/members/:memberId/assignments", {
       params: member,
       success: Assignment.Access,
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation]
     }),
     HttpApiEndpoint.post("assign", "/assignments", {
       payload: Assignment.AssignInput,
       success: Assignment.Assignment,
-      error,
+      error
     }),
     HttpApiEndpoint.put("change", "/assignments", {
       payload: Assignment.ChangeInput,
       success: Assignment.Assignment,
-      error,
+      error
     }),
     HttpApiEndpoint.delete("revoke", "/members/:memberId/assignments/:assignmentId", {
       params: { ...member, assignmentId: Assignment.Id },
       success: Assignment.Assignment,
-      error,
-    }),
+      error
+    })
   )
   .middleware(WorkspaceMember.WorkspaceMember)
   .middleware(Authentication.Authentication) {}

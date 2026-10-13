@@ -1,12 +1,12 @@
-import { getColumns, type Table } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as Effect from "effect/Effect";
+import { getColumns, type Table } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as Effect from "effect/Effect"
 
 /**
  * The most parameters one statement can bind. `@effect/sql-pg` encodes their count as a signed
  * 16-bit integer, below the protocol's own limit of 65535.
  */
-export const maxParameters = 32767;
+export const maxParameters = 32767
 
 /**
  * Insert rows in as few statements as stay within maxParameters: one per column and row, plus
@@ -17,16 +17,16 @@ export const insertChunked = <Row, E, R>(
   table: Table,
   rows: ReadonlyArray<Row>,
   insert: (chunk: Array.NonEmptyArray<Row>) => Effect.Effect<unknown, E, R>,
-  options: { readonly limit?: number; readonly extra?: number } = {},
+  options: { readonly limit?: number; readonly extra?: number } = {}
 ) =>
   Effect.forEach(
     Array.chunksOf(
       rows,
       Math.min(
         options.limit ?? Infinity,
-        Math.floor(maxParameters / (Object.keys(getColumns(table)).length + (options.extra ?? 0))),
-      ),
+        Math.floor(maxParameters / (Object.keys(getColumns(table)).length + (options.extra ?? 0)))
+      )
     ),
     insert,
-    { discard: true },
-  );
+    { discard: true }
+  )

@@ -7,15 +7,16 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as GroupId from "../group/GroupId.ts";
-import * as Notification from "../notification/Notification.ts";
-import type * as ThreadActivity from "../thread/ThreadActivity.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as ThreadMessage from "../thread/ThreadMessage.ts";
-import * as ThreadParticipation from "../thread/ThreadParticipation.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
+
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as Notification from "../notification/Notification.ts"
+import type * as ThreadActivity from "../thread/ThreadActivity.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadMessage from "../thread/ThreadMessage.ts"
+import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * Where a task stands: awaiting a decision in `triage`, being worked in `todo` and `doing`, set
@@ -25,13 +26,13 @@ import * as MemberId from "../workspace/MemberId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["triage", "todo", "doing", "held", "done", "dismissed"]);
+export const Status = Schema.Literals(["triage", "todo", "doing", "held", "done", "dismissed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * How urgent a task is.
@@ -39,13 +40,13 @@ export type Status = typeof Status.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Priority = Schema.Literals(["none", "low", "medium", "high", "urgent"]);
+export const Priority = Schema.Literals(["none", "low", "medium", "high", "urgent"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Priority = typeof Priority.Type;
+export type Priority = typeof Priority.Type
 
 /**
  * Whether a task in this status is being worked, so its assignee is asked to work it: `todo` and
@@ -54,7 +55,7 @@ export type Priority = typeof Priority.Type;
  * @category utils
  * @since 0.1.0
  */
-export const working = (status: Status): boolean => status === "todo" || status === "doing";
+export const working = (status: Status): boolean => status === "todo" || status === "doing"
 
 /**
  * The assignee, while the task is being worked and so asks them to work it; null otherwise.
@@ -63,7 +64,7 @@ export const working = (status: Status): boolean => status === "todo" || status 
  * @since 0.1.0
  */
 export const asked = (task: { readonly status: Status; readonly assignee: MemberId.Id | null }) =>
-  working(task.status) ? task.assignee : null;
+  working(task.status) ? task.assignee : null
 
 /**
  * A task as created and since changed. The thread is its key: a thread has at most one task, and a
@@ -83,8 +84,8 @@ export const Task = Schema.Struct({
   assignee: Schema.NullOr(MemberId.Id),
   /** Who created the task: a member, or the contact whose conversation a channel opened as one. */
   createdBy: ThreadMessage.Author,
-  createdAt: Schema.DateTimeUtcFromString,
-});
+  createdAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -103,14 +104,14 @@ export interface Task extends Schema.Schema.Type<typeof Task> {}
 export const Change = Schema.TaggedUnion({
   Status: { from: Status, to: Status },
   Assignee: { from: Schema.NullOr(MemberId.Id), to: Schema.NullOr(MemberId.Id) },
-  Priority: { from: Priority, to: Priority },
-});
+  Priority: { from: Priority, to: Priority }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Change = typeof Change.Type;
+export type Change = typeof Change.Type
 
 /**
  * The task's current value of what a change changes.
@@ -121,13 +122,13 @@ export type Change = typeof Change.Type;
 export const valueOf = (task: Task, change: Change): Change["from"] => {
   switch (change._tag) {
     case "Status":
-      return task.status;
+      return task.status
     case "Assignee":
-      return task.assignee;
+      return task.assignee
     case "Priority":
-      return task.priority;
+      return task.priority
   }
-};
+}
 
 /**
  * The task with a change applied.
@@ -139,8 +140,8 @@ export const apply = (task: Task, change: Change): Task =>
   Change.match(change, {
     Status: ({ to }): Task => Object.assign({}, task, { status: to }),
     Assignee: ({ to }): Task => Object.assign({}, task, { assignee: to }),
-    Priority: ({ to }): Task => Object.assign({}, task, { priority: to }),
-  });
+    Priority: ({ to }): Task => Object.assign({}, task, { priority: to })
+  })
 
 /**
  * How a task is created: its status, `triage` unless given, or `todo` when assigned; its priority,
@@ -152,8 +153,8 @@ export const apply = (task: Task, change: Change): Task =>
 export const Options = Schema.Struct({
   status: Schema.optionalKey(Status),
   priority: Schema.optionalKey(Priority),
-  assignee: Schema.optionalKey(MemberId.Id),
-});
+  assignee: Schema.optionalKey(MemberId.Id)
+})
 
 /**
  * @category options
@@ -170,8 +171,8 @@ export interface Options extends Schema.Schema.Type<typeof Options> {}
 export const initial = (options: Options): Pick<Task, "status" | "priority" | "assignee"> => ({
   status: options.status ?? (options.assignee === undefined ? "triage" : "todo"),
   priority: options.priority ?? "none",
-  assignee: options.assignee ?? null,
-});
+  assignee: options.assignee ?? null
+})
 
 /**
  * What creates a task in a conversation: the thread, and how the task starts.
@@ -179,7 +180,7 @@ export const initial = (options: Options): Pick<Task, "status" | "priority" | "a
  * @category options
  * @since 0.1.0
  */
-export const CreateInput = Schema.Struct({ threadId: ThreadId.Id, ...Options.fields });
+export const CreateInput = Schema.Struct({ threadId: ThreadId.Id, ...Options.fields })
 
 /**
  * @category options
@@ -193,7 +194,7 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category options
  * @since 0.1.0
  */
-export const UpdateInput = Schema.Struct({ threadId: ThreadId.Id, change: Change });
+export const UpdateInput = Schema.Struct({ threadId: ThreadId.Id, change: Change })
 
 /**
  * @category options
@@ -212,8 +213,8 @@ export const Updated = Schema.Struct({
   threadId: ThreadId.Id,
   groupId: GroupId.Id,
   change: Change,
-  changedAt: Schema.DateTimeUtcFromString,
-});
+  changedAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -230,8 +231,8 @@ export interface Updated extends Schema.Schema.Type<typeof Updated> {}
  */
 export const ListCursor = Schema.Struct({
   createdAt: Task.fields.createdAt,
-  threadId: ThreadId.Id,
-});
+  threadId: ThreadId.Id
+})
 
 /**
  * @category schemas
@@ -249,8 +250,8 @@ export interface ListCursor extends Schema.Schema.Type<typeof ListCursor> {}
 export const ListOptions = Schema.Struct({
   status: Schema.optionalKey(Status),
   before: Schema.optionalKey(ListCursor),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -268,21 +269,20 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
 export const recipients = (
   participants: ReadonlyArray<ThreadParticipation.ThreadParticipation>,
   by: ThreadParticipation.Reference | undefined,
-  asked: MemberId.Id | null,
+  asked: MemberId.Id | null
 ): ReadonlyArray<ThreadActivity.Recipient> => {
-  const byKey = by === undefined ? undefined : ThreadParticipation.keyOf(by);
+  const byKey = by === undefined ? undefined : ThreadParticipation.keyOf(by)
   return participants.flatMap(({ id, participant }) => {
     // A task's changes are never delivered: contacts are told of messages alone.
-    if (ThreadParticipation.Participant.isAnyOf(["Contact"])(participant)) return [];
-    if (ThreadParticipation.keyOf(participant) === byKey) return [];
-    const recipient = ThreadParticipation.recipientOf(participant);
+    if (ThreadParticipation.Participant.isAnyOf(["Contact"])(participant)) return []
+    if (ThreadParticipation.keyOf(participant) === byKey) return []
+    const recipient = ThreadParticipation.recipientOf(participant)
     return [
       {
         participationId: id,
         recipient,
-        requestsWork:
-          Notification.Recipient.isAnyOf(["Agent"])(recipient) && recipient.memberId === asked,
-      },
-    ];
-  });
-};
+        requestsWork: Notification.Recipient.isAnyOf(["Agent"])(recipient) && recipient.memberId === asked
+      }
+    ]
+  })
+}

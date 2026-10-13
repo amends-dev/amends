@@ -3,9 +3,5 @@
  * else inside the nearest Theme, so it inherits the mode's variables and fonts.
  */
 export function overlayMount(anchor: Element | undefined): HTMLElement | undefined {
-  return (
-    anchor?.closest<HTMLElement>("dialog[open]") ??
-    anchor?.closest<HTMLElement>("[data-mode]") ??
-    undefined
-  );
+  return anchor?.closest<HTMLElement>("dialog[open]") ?? anchor?.closest<HTMLElement>("[data-mode]") ?? undefined
 }

@@ -5,11 +5,12 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Schema from "effect/Schema";
-import type * as Effect from "effect/Effect";
-import type * as Redacted from "effect/Redacted";
-import type * as Accounts from "./Accounts.ts";
+
+import * as Context from "effect/Context"
+import type * as Effect from "effect/Effect"
+import type * as Redacted from "effect/Redacted"
+import * as Schema from "effect/Schema"
+import type * as Accounts from "./Accounts.ts"
 
 /**
  * An email to send: to whom, its subject, and its text, which may carry a code.
@@ -18,9 +19,9 @@ import type * as Accounts from "./Accounts.ts";
  * @since 0.1.0
  */
 export interface Message {
-  readonly to: Accounts.Email;
-  readonly subject: string;
-  readonly text: Redacted.Redacted<string>;
+  readonly to: Accounts.Email
+  readonly subject: string
+  readonly text: Redacted.Redacted<string>
 }
 
 /**
@@ -30,10 +31,10 @@ export interface Message {
  * @since 0.1.0
  */
 export class Undelivered extends Schema.TaggedError<Undelivered>()("EmailSender.Undelivered", {
-  description: Schema.String,
+  description: Schema.String
 }) {
   override get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -47,6 +48,6 @@ export class EmailSender extends Context.Service<
   EmailSender,
   {
     /** Hand the message to the email provider; success means the provider accepted it. */
-    readonly send: (message: Message) => Effect.Effect<void, Undelivered>;
+    readonly send: (message: Message) => Effect.Effect<void, Undelivered>
   }
 >()("@amends-dev/gateway/EmailSender") {}

@@ -6,12 +6,13 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { Gateway } from "@amends-dev/gateway";
-import { InvitationService } from "@amends-dev/core/workspace";
-import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
-import { requireHuman } from "./internal/human.ts";
+
+import { InvitationService } from "@amends-dev/core/workspace"
+import { Gateway } from "@amends-dev/gateway"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Api from "./Api.ts"
+import { requireHuman } from "./internal/human.ts"
 
 /**
  * Register the workspace handlers: creation, and accepting an invitation, reading the principal per
@@ -24,25 +25,25 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "workspaces",
   Effect.fn(function* (handlers) {
-    const gateway = yield* Gateway.Gateway;
+    const gateway = yield* Gateway.Gateway
     return handlers.handleAll({
       create: ({ headers, payload }) =>
         Effect.gen(function* () {
-          const person = yield* requireHuman;
+          const person = yield* requireHuman
           return yield* gateway.createWorkspace(person.id, payload, {
-            requestKey: headers["idempotency-key"],
-          });
+            requestKey: headers["idempotency-key"]
+          })
         }),
       acceptInvitation: ({ params, payload }) =>
         Effect.gen(function* () {
-          const person = yield* requireHuman;
+          const person = yield* requireHuman
           return yield* gateway.inWorkspace(
             params.workspaceId,
             Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-              invitationService.accept(params.invitationId, person.id, payload.name),
-            ),
-          );
-        }),
-    });
-  }),
-);
+              invitationService.accept(params.invitationId, person.id, payload.name)
+            )
+          )
+        })
+    })
+  })
+)

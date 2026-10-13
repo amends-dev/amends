@@ -1,26 +1,26 @@
-import * as Contract from "@amends-dev/http/Api";
-import * as Authentication from "@amends-dev/http/Authentication";
-import * as WorkspaceMember from "@amends-dev/http/WorkspaceMember";
-import { Workspace } from "@amends-dev/core/workspace";
-import * as Cause from "effect/Cause";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpApiClient from "effect/http-api/HttpApiClient";
-import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
-import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
-import type { SignIn } from "./contracts.ts";
+import { Workspace } from "@amends-dev/core/workspace"
+import * as Contract from "@amends-dev/http/Api"
+import * as Authentication from "@amends-dev/http/Authentication"
+import * as WorkspaceMember from "@amends-dev/http/WorkspaceMember"
+import * as Cause from "effect/Cause"
+import * as Effect from "effect/Effect"
+import * as HttpApiClient from "effect/http-api/HttpApiClient"
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientRequest from "effect/http/HttpClientRequest"
+import * as Layer from "effect/Layer"
+import * as AtomHttpApi from "effect/reactivity/AtomHttpApi"
+import * as Schema from "effect/Schema"
+import type { SignIn } from "./contracts.ts"
 
 export interface ApiClientOptions {
-  readonly baseUrl: string;
-  readonly transport?: Layer.Layer<HttpClient.HttpClient> | undefined;
+  readonly baseUrl: string
+  readonly transport?: Layer.Layer<HttpClient.HttpClient> | undefined
   /** The credential every request carries; none for a guest. */
-  readonly session?: SignIn.Session | undefined;
+  readonly session?: SignIn.Session | undefined
   /** Called when the host rejects the credential, so operations need no handling of their own. */
-  readonly rejected?: () => void;
+  readonly rejected?: () => void
 }
 
 /**
@@ -28,25 +28,25 @@ export interface ApiClientOptions {
  * there is one, and reporting a rejection of the credential.
  */
 const httpClientOf = (options: ApiClientOptions, workspaceId?: string) => {
-  const transport = options.transport ?? FetchHttpClient.layer;
-  const { session, rejected = () => {} } = options;
+  const transport = options.transport ?? FetchHttpClient.layer
+  const { session, rejected = () => {} } = options
   const signingOut = Layer.effect(
     HttpClient.HttpClient,
     Effect.map(
       HttpClient.HttpClient,
-      HttpClient.tap((response) => (response.status === 401 ? Effect.sync(rejected) : Effect.void)),
-    ),
-  ).pipe(Layer.provide(transport));
+      HttpClient.tap((response) => (response.status === 401 ? Effect.sync(rejected) : Effect.void))
+    )
+  ).pipe(Layer.provide(transport))
   return Layer.mergeAll(
     session ? signingOut : transport,
     HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-      next(session ? HttpClientRequest.bearerToken(request, session.token) : request),
+      next(session ? HttpClientRequest.bearerToken(request, session.token) : request)
     ),
     workspaceId === undefined
       ? WorkspaceMember.layerClientOutsideWorkspace
-      : WorkspaceMember.layerClient(Workspace.Id.make(workspaceId)),
-  );
-};
+      : WorkspaceMember.layerClient(Workspace.Id.make(workspaceId))
+  )
+}
 
 /**
  * The typed API for one credential, acting in the workspace `workspaceId` when one is given: the
@@ -55,16 +55,14 @@ const httpClientOf = (options: ApiClientOptions, workspaceId?: string) => {
  */
 export function createApiClient(options: ApiClientOptions, workspaceId?: string) {
   class Client extends AtomHttpApi.Service<Client>()(
-    workspaceId === undefined
-      ? "@amends-dev/client/api/ApiClient"
-      : `@amends-dev/client/api/ApiClient/${workspaceId}`,
+    workspaceId === undefined ? "@amends-dev/client/api/ApiClient" : `@amends-dev/client/api/ApiClient/${workspaceId}`,
     {
       api: Contract.Api,
       baseUrl: options.baseUrl,
-      httpClient: httpClientOf(options, workspaceId),
-    },
+      httpClient: httpClientOf(options, workspaceId)
+    }
   ) {}
-  return Client;
+  return Client
 }
 
 /**
@@ -77,14 +75,14 @@ export const revokeSession = (options: ApiClientOptions) =>
     Effect.flatMap((api) => api.me.signOut()),
     Effect.provide(httpClientOf(options)),
     Effect.timeout("10 seconds"),
-    Effect.ignore,
-  );
-export type ApiClient = ReturnType<typeof createApiClient>;
+    Effect.ignore
+  )
+export type ApiClient = ReturnType<typeof createApiClient>
 /** The generated HTTP client a workspace's operations call. */
-export type WorkspaceApi = ApiClient["Service"];
+export type WorkspaceApi = ApiClient["Service"]
 /** The part of it a client in no workspace calls: signing in, the account, and its workspaces. */
-export type Api = Pick<WorkspaceApi, "session" | "me" | "workspaces">;
+export type Api = Pick<WorkspaceApi, "session" | "me" | "workspaces">
 
-const unauthorized = Schema.is(Authentication.Unauthorized);
+const unauthorized = Schema.is(Authentication.Unauthorized)
 export const isUnauthorized = (cause: Cause.Cause<unknown>): boolean =>
-  cause.reasons.some((reason) => Cause.isFailReason(reason) && unauthorized(reason.error));
+  cause.reasons.some((reason) => Cause.isFailReason(reason) && unauthorized(reason.error))

@@ -9,14 +9,14 @@ The package is internal to this repository and not published to npm. A workspace
 `"@amends-dev/icons": "workspace:*"` to its dependencies and running `bun install` at the root.
 
 ```tsx
-import { IconMarkSearch, IconCircleCheck } from "@amends-dev/icons";
-import { IconMarkDone } from "@amends-dev/icons/mark-done";
+import { IconMarkSearch, IconCircleCheck } from "@amends-dev/icons"
+import { IconMarkDone } from "@amends-dev/icons/mark-done"
 
-<button aria-label="Search workspace">
+;<button aria-label="Search workspace">
   <IconMarkSearch />
-</button>;
-<IconCircleCheck label="Completed" size="sm" />;
-<IconMarkDone size={24} weight={1.75} />;
+</button>
+;<IconCircleCheck label="Completed" size="sm" />
+;<IconMarkDone size={24} weight={1.75} />
 ```
 
 The `mark-*` drawings are amends's own marks, drawn as portable SVGs, and are the reference for navigation and actions wherever it names the control. Their paths
@@ -61,7 +61,7 @@ belong to the consuming control.
 ## Catalog and raw SVGs
 
 ```ts
-import { iconCatalog, type IconName } from "@amends-dev/icons/catalog";
+import { iconCatalog, type IconName } from "@amends-dev/icons/catalog"
 ```
 
 Catalog records contain names, titles, categories, keywords, and component export

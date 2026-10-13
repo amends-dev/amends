@@ -1,11 +1,11 @@
+import { IconMarkSettings, IconUsers } from "@amends-dev/icons"
 // Workshop harness: Workspace settings with the Lunacy sample members and invitations, following
 // the mocks' behavior notes over local state. Not exported.
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { IconMarkSettings, IconUsers } from "@amends-dev/icons";
-import { Toast } from "../../components/toast/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { navigation } from "../sample.ts";
-import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { Toast } from "../../components/toast/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { navigation } from "../sample.ts"
+import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts"
 import {
   ConfirmRemoveMember,
   ConfirmRevokeInvitation,
@@ -22,34 +22,28 @@ import {
   type SettingsAction,
   type SettingsError,
   type SettingsInvitation,
-  type SettingsTab,
-} from "./index.ts";
+  type SettingsTab
+} from "./index.ts"
 
 const roles = [
   { id: "member", name: "Member" },
-  { id: "administrator", name: "Administrator" },
-] as const;
-const roleName = (id: string) =>
-  id === "owner" ? "Owner" : (roles.find((role) => role.id === id)?.name ?? id);
+  { id: "administrator", name: "Administrator" }
+] as const
+const roleName = (id: string) => (id === "owner" ? "Owner" : (roles.find((role) => role.id === id)?.name ?? id))
 
 interface SampleMember extends Omit<MemberDetail, "role"> {
-  readonly roleId: string;
+  readonly roleId: string
 }
 
-const email = (name: string) => `${name.split(" ")[0]?.toLowerCase()}@mercier.example`;
-const member = (
-  id: string,
-  name: string,
-  roleId: string,
-  rest: Partial<SampleMember> = {},
-): SampleMember => ({
+const email = (name: string) => `${name.split(" ")[0]?.toLowerCase()}@mercier.example`
+const member = (id: string, name: string, roleId: string, rest: Partial<SampleMember> = {}): SampleMember => ({
   id,
   name,
   roleId,
   status: "active",
   signIn: rest.agent ? `agent:${id}` : email(name),
-  ...rest,
-});
+  ...rest
+})
 
 export const sampleMembers: ReadonlyArray<SampleMember> = [
   member("jamie", "Jamie Morgan", "owner", { you: true, initials: "JM", tone: "neutral" }),
@@ -59,16 +53,16 @@ export const sampleMembers: ReadonlyArray<SampleMember> = [
   member("oliver", "Oliver", "member", { tone: "olive" }),
   member("caleb", "Caleb", "member", { tone: "sage" }),
   member("yumi", "Yumi", "member", { tone: "lilac", agent: true }),
-  member("riley", "Riley Chen", "member", { tone: "slate", status: "removed" }),
-];
+  member("riley", "Riley Chen", "member", { tone: "slate", status: "removed" })
+]
 
-const now = new Date();
-const days = (count: number) => new Date(now.getTime() + count * 86_400_000);
+const now = new Date()
+const days = (count: number) => new Date(now.getTime() + count * 86_400_000)
 const invitation = (
   recipient: string,
   role: string,
   status: SettingsInvitation["status"],
-  issued: number,
+  issued: number
 ): SettingsInvitation => ({
   id: recipient,
   recipient,
@@ -76,108 +70,100 @@ const invitation = (
   status,
   issuedAt: days(issued),
   expiresAt: days(issued + 7),
-  revocable: status === "pending",
-});
+  revocable: status === "pending"
+})
 
 export const sampleInvitations: ReadonlyArray<SettingsInvitation> = [
   invitation("casey@mercier.example", "Member", "pending", -2),
   invitation("taylor@mercier.example", "Administrator", "pending", -1),
   invitation("caleb@mercier.example", "Member", "accepted", -7),
   invitation("morgan@mercier.example", "Member", "expired", -12),
-  invitation("riley@mercier.example", "Member", "revoked", -9),
-].toSorted((left, right) => right.issuedAt.getTime() - left.issuedAt.getTime());
+  invitation("riley@mercier.example", "Member", "revoked", -9)
+].toSorted((left, right) => right.issuedAt.getTime() - left.issuedAt.getTime())
 
-type Dialog = "invite" | "history" | "transfer" | "remove" | "revoke";
+type Dialog = "invite" | "history" | "transfer" | "remove" | "revoke"
 
 export interface SettingsWorkspaceProps {
-  readonly tab?: SettingsTab;
+  readonly tab?: SettingsTab
   /** The member open in the side panel. */
-  readonly selected?: string;
-  readonly dialog?: Dialog;
-  readonly status?: "loading" | "failed";
+  readonly selected?: string
+  readonly dialog?: Dialog
+  readonly status?: "loading" | "failed"
   /** A reader who may only look: no rename, invite, role, removal, or transfer. */
-  readonly readOnly?: boolean;
+  readonly readOnly?: boolean
   /** The first attempt at this change finds the values out of date. */
-  readonly conflict?: SettingsAction;
+  readonly conflict?: SettingsAction
 }
 
 /** The settings' own rules over local state: drafts, confirmations, and toasts. */
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
-  const [tab, setTab] = createSignal<SettingsTab>(props.tab ?? "workspace");
-  const [name, setName] = createSignal("Mercier & Co");
-  const [draft, setDraft] = createSignal<string>();
-  const [members, setMembers] = createSignal(sampleMembers);
-  const [invitations, setInvitations] = createSignal(sampleInvitations);
-  const [selected, setSelected] = createSignal(props.selected);
-  const [roleDraft, setRoleDraft] = createSignal<string>();
-  const [query, setQuery] = createSignal("");
-  const [filter, setFilter] = createSignal<MemberFilter>("active");
-  const [dialog, setDialog] = createSignal<Dialog | undefined>(props.dialog);
-  const [revoking, setRevoking] = createSignal<string>(
-    props.dialog === "revoke" ? "casey@mercier.example" : "",
-  );
-  const [newOwner, setNewOwner] = createSignal<string>();
-  const [recipient, setRecipient] = createSignal(
-    props.dialog === "invite" ? "morgan@mercier.example" : "",
-  );
-  const [inviteRole, setInviteRole] = createSignal<string>("member");
-  const [highlight, setHighlight] = createSignal<string>();
-  const [failure, setFailure] = createSignal<{ action: SettingsAction; error: SettingsError }>();
-  const [conflict, setConflict] = createSignal(props.conflict);
-  const [toasts, setToasts] = createSignal<Array<{ id: number; text: string }>>([]);
-  let toastId = 0;
-  const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }]);
-  const can = !props.readOnly;
+  const [tab, setTab] = createSignal<SettingsTab>(props.tab ?? "workspace")
+  const [name, setName] = createSignal("Mercier & Co")
+  const [draft, setDraft] = createSignal<string>()
+  const [members, setMembers] = createSignal(sampleMembers)
+  const [invitations, setInvitations] = createSignal(sampleInvitations)
+  const [selected, setSelected] = createSignal(props.selected)
+  const [roleDraft, setRoleDraft] = createSignal<string>()
+  const [query, setQuery] = createSignal("")
+  const [filter, setFilter] = createSignal<MemberFilter>("active")
+  const [dialog, setDialog] = createSignal<Dialog | undefined>(props.dialog)
+  const [revoking, setRevoking] = createSignal<string>(props.dialog === "revoke" ? "casey@mercier.example" : "")
+  const [newOwner, setNewOwner] = createSignal<string>()
+  const [recipient, setRecipient] = createSignal(props.dialog === "invite" ? "morgan@mercier.example" : "")
+  const [inviteRole, setInviteRole] = createSignal<string>("member")
+  const [highlight, setHighlight] = createSignal<string>()
+  const [failure, setFailure] = createSignal<{ action: SettingsAction; error: SettingsError }>()
+  const [conflict, setConflict] = createSignal(props.conflict)
+  const [toasts, setToasts] = createSignal<Array<{ id: number; text: string }>>([])
+  let toastId = 0
+  const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }])
+  const can = !props.readOnly
 
   /** Runs a change, unless this scenario finds it out of date first. */
   const change = (action: SettingsAction, apply: () => string | undefined) => {
     if (conflict() === action) {
-      setConflict(undefined);
-      setFailure({ action, error: "changed" });
-      return;
+      setConflict(undefined)
+      setFailure({ action, error: "changed" })
+      return
     }
-    setFailure(undefined);
-    toast(settingsToast(action, apply()));
-  };
-  const errorFor = (action: SettingsAction) =>
-    failure()?.action === action ? failure()?.error : undefined;
-  const refresh = () => setFailure(undefined);
+    setFailure(undefined)
+    toast(settingsToast(action, apply()))
+  }
+  const errorFor = (action: SettingsAction) => (failure()?.action === action ? failure()?.error : undefined)
+  const refresh = () => setFailure(undefined)
 
   const shown = createMemo(() => {
-    const words = query().trim().toLowerCase();
+    const words = query().trim().toLowerCase()
     return members().filter(
       (person) =>
         person.status === filter() &&
-        (!words ||
-          person.name.toLowerCase().includes(words) ||
-          person.signIn?.toLowerCase().includes(words) === true),
-    );
-  });
-  const pending = () => invitations().filter((entry) => entry.status === "pending");
-  const current = () => members().find((person) => person.id === selected());
-  const you = () => members().find((person) => person.you);
-  const owner = () => members().find((person) => person.roleId === "owner");
-  const candidates = () =>
-    members().filter((person) => person.status === "active" && !person.you && !person.agent);
+        (!words || person.name.toLowerCase().includes(words) || person.signIn?.toLowerCase().includes(words) === true)
+    )
+  })
+  const pending = () => invitations().filter((entry) => entry.status === "pending")
+  const current = () => members().find((person) => person.id === selected())
+  const you = () => members().find((person) => person.you)
+  const owner = () => members().find((person) => person.roleId === "owner")
+  const candidates = () => members().filter((person) => person.status === "active" && !person.you && !person.agent)
   const closeDialog = () => {
-    setFailure(undefined);
-    setDialog(undefined);
-  };
+    setFailure(undefined)
+    setDialog(undefined)
+  }
   // The sidebar's links are plain hashes here: follow them to each section.
   onMount(() => {
     const follow = () => {
-      const target = window.location.hash.slice(1);
-      if (target !== "workspace" && target !== "members") return;
-      setSelected(undefined);
-      setTab(target);
-    };
-    window.addEventListener("hashchange", follow);
-    onCleanup(() => window.removeEventListener("hashchange", follow));
-  });
+      const target = window.location.hash.slice(1)
+      if (target !== "workspace" && target !== "members") return
+      setSelected(undefined)
+      setTab(target)
+    }
+    window.addEventListener("hashchange", follow)
+    onCleanup(() => window.removeEventListener("hashchange", follow))
+  })
   // Settings is not a rail destination; the rail marks its own entry instead.
   const { destination: _home, ...nav } = navigation({
-    groups: [{ id: "general", name: "general" }],
-  });
+    groups: [{ id: "general", name: "general" }]
+  })
   return (
     <Shell.Root>
       <WorkspaceNavigation {...nav} settings={{ href: "#settings", current: true }}>
@@ -192,17 +178,17 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   name: "Workspace",
                   href: "#workspace",
                   icon: IconMarkSettings,
-                  current: tab() === "workspace",
+                  current: tab() === "workspace"
                 },
                 {
                   id: "members",
                   name: "Members",
                   href: "#members",
                   icon: IconUsers,
-                  current: tab() === "members",
-                },
-              ],
-            },
+                  current: tab() === "members"
+                }
+              ]
+            }
           ]}
         />
       </WorkspaceNavigation>
@@ -213,8 +199,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           onInvite={
             can
               ? () => {
-                  setRecipient("");
-                  setDialog("invite");
+                  setRecipient("")
+                  setDialog("invite")
                 }
               : undefined
           }
@@ -232,17 +218,17 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 changed={draft() !== undefined && draft()?.trim() !== "" && draft() !== name()}
                 onSave={() =>
                   change("rename", () => {
-                    setName(draft()?.trim() ?? name());
-                    setDraft(undefined);
-                    return undefined;
+                    setName(draft()?.trim() ?? name())
+                    setDraft(undefined)
+                    return undefined
                   })
                 }
                 owner={owner()}
                 onTransfer={
                   can && owner()?.you
                     ? () => {
-                        setNewOwner(undefined);
-                        setDialog("transfer");
+                        setNewOwner(undefined)
+                        setDialog("transfer")
                       }
                     : undefined
                 }
@@ -262,9 +248,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               selectedId={selected()}
               memberHref={(id) => `#member-${id}`}
               onOpenMember={(id) => {
-                setRoleDraft(undefined);
-                setFailure(undefined);
-                setSelected(id);
+                setRoleDraft(undefined)
+                setFailure(undefined)
+                setSelected(id)
               }}
               invitations={pending()}
               highlightId={highlight()}
@@ -272,8 +258,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               onRevoke={
                 can
                   ? (id) => {
-                      setRevoking(id);
-                      setDialog("revoke");
+                      setRevoking(id)
+                      setDialog("revoke")
                     }
                   : undefined
               }
@@ -292,34 +278,26 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                     id: `${person().id}-role`,
                     name: roleName(person().roleId),
                     scope: "workspace",
-                    active: true,
-                  },
-                ],
+                    active: true
+                  }
+                ]
               }}
               onClose={() => setSelected(undefined)}
-              roles={
-                can && person().roleId !== "owner" && person().status === "active" ? roles : []
-              }
+              roles={can && person().roleId !== "owner" && person().status === "active" ? roles : []}
               role={roleDraft() ?? person().roleId}
               onRoleChange={setRoleDraft}
               roleChanged={roleDraft() !== undefined && roleDraft() !== person().roleId}
               onSaveRole={() =>
                 change("role", () => {
-                  const roleId = roleDraft();
+                  const roleId = roleDraft()
                   setMembers(
-                    members().map((other) =>
-                      other.id === person().id && roleId ? { ...other, roleId } : other,
-                    ),
-                  );
-                  setRoleDraft(undefined);
-                  return person().name;
+                    members().map((other) => (other.id === person().id && roleId ? { ...other, roleId } : other))
+                  )
+                  setRoleDraft(undefined)
+                  return person().name
                 })
               }
-              onRemove={
-                can && !person().you && person().roleId !== "owner"
-                  ? () => setDialog("remove")
-                  : undefined
-              }
+              onRemove={can && !person().you && person().roleId !== "owner" ? () => setDialog("remove") : undefined}
               error={errorFor("role")}
               onRefresh={refresh}
             />
@@ -335,18 +313,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         onChoose={setNewOwner}
         onConfirm={() =>
           change("transfer", () => {
-            const next = members().find((person) => person.id === newOwner());
+            const next = members().find((person) => person.id === newOwner())
             setMembers(
               members().map((person) =>
                 person.id === next?.id
                   ? { ...person, roleId: "owner" }
                   : person.id === you()?.id
                     ? { ...person, roleId: "administrator" }
-                    : person,
-              ),
-            );
-            setDialog(undefined);
-            return next?.name;
+                    : person
+              )
+            )
+            setDialog(undefined)
+            return next?.name
           })
         }
         error={errorFor("transfer")}
@@ -361,15 +339,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
             name={person().name}
             onConfirm={() =>
               change("remove", () => {
-                const { id, name: removed } = person();
-                setMembers(
-                  members().map((other) =>
-                    other.id === id ? { ...other, status: "removed" } : other,
-                  ),
-                );
-                setDialog(undefined);
-                setSelected(undefined);
-                return removed;
+                const { id, name: removed } = person()
+                setMembers(members().map((other) => (other.id === id ? { ...other, status: "removed" } : other)))
+                setDialog(undefined)
+                setSelected(undefined)
+                return removed
               })
             }
             error={errorFor("remove")}
@@ -395,13 +369,13 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               status: "pending" as const,
               issuedAt: new Date(),
               expiresAt: days(7),
-              revocable: true,
-            };
-            setInvitations([created, ...invitations()]);
-            setHighlight(created.id);
-            setRecipient("");
-            setDialog(undefined);
-            return created.recipient;
+              revocable: true
+            }
+            setInvitations([created, ...invitations()])
+            setHighlight(created.id)
+            setRecipient("")
+            setDialog(undefined)
+            return created.recipient
           })
         }
         error={errorFor("invite")}
@@ -415,16 +389,16 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         onRevoke={
           can
             ? (id) => {
-                setRevoking(id);
-                setDialog("revoke");
+                setRevoking(id)
+                setDialog("revoke")
               }
             : undefined
         }
         onInvite={
           can
             ? () => {
-                setRecipient("");
-                setDialog("invite");
+                setRecipient("")
+                setDialog("invite")
               }
             : undefined
         }
@@ -437,11 +411,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           change("revoke", () => {
             setInvitations(
               invitations().map((entry) =>
-                entry.id === revoking() ? { ...entry, status: "revoked", revocable: false } : entry,
-              ),
-            );
-            setDialog(undefined);
-            return revoking();
+                entry.id === revoking() ? { ...entry, status: "revoked", revocable: false } : entry
+              )
+            )
+            setDialog(undefined)
+            return revoking()
           })
         }
         error={errorFor("revoke")}
@@ -450,14 +424,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       <Toast.Region>
         <For each={toasts()}>
           {(item) => (
-            <Toast.Item
-              onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}
-            >
+            <Toast.Item onDismiss={() => setToasts(toasts().filter((other) => other.id !== item.id))}>
               {item.text}
             </Toast.Item>
           )}
         </For>
       </Toast.Region>
     </Shell.Root>
-  );
+  )
 }

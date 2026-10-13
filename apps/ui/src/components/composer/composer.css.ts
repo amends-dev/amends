@@ -1,7 +1,7 @@
-import { globalStyle, style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { globalStyle, style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // Reference minimum heights: 136px on desktop, 112px on tablets, and 92px on phones.
 export const composer = style({
@@ -16,9 +16,9 @@ export const composer = style({
   selectors: { "&:focus-within": { borderColor: vars.color.border.strong } },
   "@media": {
     [media.touch]: { minHeight: "7rem", padding: "0.75rem 1rem 0.25rem" },
-    [media.mobile]: { minHeight: "5.75rem", padding: "0.625rem 0.75rem 0.25rem" },
-  },
-});
+    [media.mobile]: { minHeight: "5.75rem", padding: "0.625rem 0.75rem 0.25rem" }
+  }
+})
 
 // The editor's text, formatted as messages show it, scrolling past 40% of the viewport.
 export const input = style({
@@ -40,31 +40,31 @@ export const input = style({
   fontFeatureSettings: '"liga" 0',
   "@media": {
     [media.touch]: typeScale.body,
-    [media.mobile]: typeScale.bodyTouch,
-  },
-});
+    [media.mobile]: typeScale.bodyTouch
+  }
+})
 
-export const host = style({ minWidth: 0 });
+export const host = style({ minWidth: 0 })
 
 // Blocks sit 8px apart, as in a message.
-globalStyle(`${input} > * + *`, { marginBlockStart: "0.5rem" });
-globalStyle(`${input} pre`, { whiteSpace: "pre-wrap" });
-globalStyle(`${input} [contenteditable="false"]`, { whiteSpace: "normal" });
+globalStyle(`${input} > * + *`, { marginBlockStart: "0.5rem" })
+globalStyle(`${input} pre`, { whiteSpace: "pre-wrap" })
+globalStyle(`${input} [contenteditable="false"]`, { whiteSpace: "normal" })
 globalStyle(`${input} img.ProseMirror-separator`, {
   display: "inline",
   width: 0,
   height: 0,
   margin: 0,
-  border: "none",
-});
-globalStyle(`${input}.ProseMirror-hideselection *::selection`, { background: "transparent" });
+  border: "none"
+})
+globalStyle(`${input}.ProseMirror-hideselection *::selection`, { background: "transparent" })
 globalStyle(`${input} p.is-editor-empty:first-child::before`, {
   content: "attr(data-placeholder)",
   float: "left",
   height: 0,
   color: vars.color.text.muted,
-  pointerEvents: "none",
-});
+  pointerEvents: "none"
+})
 
 // Formatting sits above the text, its icons lined up with the text's edge like the toolbar's.
 export const formatting = style({
@@ -76,8 +76,8 @@ export const formatting = style({
   overflowX: "auto",
   scrollbarWidth: "none",
   selectors: { "&[hidden]": { display: "none" } },
-  "@media": { [media.touch]: { gap: 0, marginInline: "-0.5rem", marginBlockEnd: "0.25rem" } },
-});
+  "@media": { [media.touch]: { gap: 0, marginInline: "-0.5rem", marginBlockEnd: "0.25rem" } }
+})
 
 // A pressed format reads as the selected row does; a proposal, since the mocks draw none.
 export const format = style({
@@ -85,19 +85,19 @@ export const format = style({
   selectors: {
     "&[aria-pressed=true]": {
       backgroundColor: vars.color.surface.selected,
-      color: vars.color.text.primary,
+      color: vars.color.text.primary
     },
-    "&:disabled": { color: vars.color.text.disabled, cursor: "default" },
-  },
-});
+    "&:disabled": { color: vars.color.text.disabled, cursor: "default" }
+  }
+})
 
 export const separator = style({
   flex: "none",
   width: "1px",
   height: "1rem",
   marginInline: "0.25rem",
-  backgroundColor: vars.color.border.divider,
-});
+  backgroundColor: vars.color.border.divider
+})
 
 // Where a link leads, floating above the text like the suggestions.
 export const linkForm = style({
@@ -111,10 +111,10 @@ export const linkForm = style({
   padding: "0.5rem",
   border: `1px solid ${vars.color.border.default}`,
   backgroundColor: vars.color.surface.popover,
-  boxShadow: vars.shadow.popover,
-});
+  boxShadow: vars.shadow.popover
+})
 
-export const linkAddress = style({ flex: 1, minWidth: 0 });
+export const linkAddress = style({ flex: 1, minWidth: 0 })
 
 // Icon buttons line their icons up with the text above; send sits at the far end.
 export const toolbar = style({
@@ -124,10 +124,10 @@ export const toolbar = style({
   marginBlockStart: "auto",
   paddingBlockStart: "0.5rem",
   marginInline: "-0.4375rem",
-  "@media": { [media.touch]: { gap: 0, marginInline: "-0.5rem", paddingBlockStart: "0.25rem" } },
-});
+  "@media": { [media.touch]: { gap: 0, marginInline: "-0.5rem", paddingBlockStart: "0.25rem" } }
+})
 
-export const send = style({ marginInlineStart: "auto" });
+export const send = style({ marginInlineStart: "auto" })
 
 // Suggestions open above the composer, since it sits at the bottom of its pane.
 export const suggestions = style({
@@ -144,8 +144,8 @@ export const suggestions = style({
   listStyle: "none",
   border: `1px solid ${vars.color.border.default}`,
   backgroundColor: vars.color.surface.popover,
-  boxShadow: vars.shadow.popover,
-});
+  boxShadow: vars.shadow.popover
+})
 
 export const suggestion = style({
   ...typeScale.control,
@@ -157,30 +157,30 @@ export const suggestion = style({
   color: vars.color.text.primary,
   cursor: "pointer",
   selectors: {
-    "&:hover, &[aria-selected=true]": { backgroundColor: vars.color.surface.subtle },
-  },
-});
+    "&:hover, &[aria-selected=true]": { backgroundColor: vars.color.surface.subtle }
+  }
+})
 
 export const suggestionName = style({
   minWidth: 0,
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
-  selectors: { "&[data-agent]": { color: vars.color.text.agent } },
-});
+  selectors: { "&[data-agent]": { color: vars.color.text.agent } }
+})
 
 export const commandName = style({
   flex: "none",
-  fontWeight: fontWeight.medium,
-});
+  fontWeight: fontWeight.medium
+})
 
 export const commandDescription = style({
   minWidth: 0,
   overflow: "hidden",
   color: vars.color.text.secondary,
   textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
 export const error = style({
   ...typeScale.hint,
@@ -189,7 +189,7 @@ export const error = style({
   gap: "0.375rem",
   margin: 0,
   paddingBlockStart: "0.375rem",
-  color: vars.color.status.danger.text,
-});
+  color: vars.color.status.danger.text
+})
 
-export const errorIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+export const errorIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" })

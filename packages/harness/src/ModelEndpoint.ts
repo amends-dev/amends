@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * The API a model is served through: Anthropic's Messages API, OpenAI's Responses API, or the Chat
@@ -16,13 +17,13 @@ import * as Schema from "effect/Schema";
  * @category schemas
  * @since 0.1.0
  */
-export const Protocol = Schema.Literals(["anthropic-messages", "openai-responses", "openai-chat"]);
+export const Protocol = Schema.Literals(["anthropic-messages", "openai-responses", "openai-chat"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Protocol = typeof Protocol.Type;
+export type Protocol = typeof Protocol.Type
 
 /**
  * How hard a model reasons before it answers, from least to most, as providers name the levels.
@@ -30,13 +31,13 @@ export type Protocol = typeof Protocol.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Effort = Schema.Literals(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+export const Effort = Schema.Literals(["none", "minimal", "low", "medium", "high", "xhigh", "max"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Effort = typeof Effort.Type;
+export type Effort = typeof Effort.Type
 
 /**
  * How an agent reaches one model.
@@ -44,8 +45,8 @@ export type Effort = typeof Effort.Type;
  * **Example** (An endpoint for a model at Anthropic)
  *
  * ```ts
- * import { ModelEndpoint } from "@amends-dev/harness";
- * import { Redacted } from "effect";
+ * import { ModelEndpoint } from "@amends-dev/harness"
+ * import { Redacted } from "effect"
  *
  * const sonnet: ModelEndpoint.ModelEndpoint = {
  *   provider: "anthropic",
@@ -54,8 +55,8 @@ export type Effort = typeof Effort.Type;
  *   url: "https://api.anthropic.com/v1",
  *   apiKey: Redacted.make(process.env.ANTHROPIC_API_KEY ?? ""),
  *   effort: "medium",
- *   contextWindow: 200_000,
- * };
+ *   contextWindow: 200_000
+ * }
  * ```
  *
  * @category schemas
@@ -100,8 +101,8 @@ export const ModelEndpoint = Schema.Struct({
    * The most tokens a request to the model holds, what it reads and writes together: its context
    * window, which an agent compacts its conversation to stay within. Absent when unknown.
    */
-  contextWindow: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
-});
+  contextWindow: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0)))
+})
 
 /**
  * @category schemas

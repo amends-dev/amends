@@ -5,9 +5,10 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "./Permission.ts";
 
-const assignment = Permission.makeGroup("assignment", { targetKind: "Member" });
+import * as Permission from "./Permission.ts"
+
+const assignment = Permission.makeGroup("assignment", { targetKind: "Member" })
 
 /**
  * Read a member's assignments and the roles on offer, and see the assignment events that concern
@@ -16,7 +17,7 @@ const assignment = Permission.makeGroup("assignment", { targetKind: "Member" });
  * @category permissions
  * @since 0.1.0
  */
-export const Read = assignment.make("read", { builtinTier: "member" });
+export const Read = assignment.make("read", { builtinTier: "member" })
 
 /**
  * Give, change, and revoke roles across the workspace, under the delegation rules; inviting with a
@@ -27,5 +28,5 @@ export const Read = assignment.make("read", { builtinTier: "member" });
  */
 export const Manage = assignment.make("manage", {
   targetKind: "Workspace",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})

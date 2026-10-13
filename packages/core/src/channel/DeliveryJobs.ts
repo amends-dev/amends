@@ -8,18 +8,19 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import type * as Event from "../journal/Event.ts";
-import type * as Reaction from "../journal/Reaction.ts";
-import type * as Store from "../journal/Store.ts";
-import * as Notification from "../notification/Notification.ts";
-import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import type * as StoreError from "../journal/StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import type * as Event from "../journal/Event.ts"
+import type * as Reaction from "../journal/Reaction.ts"
+import type * as Store from "../journal/Store.ts"
+import type * as StoreError from "../journal/StoreError.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * A delivery job: the deliveries of one bound thread.
@@ -27,7 +28,7 @@ import type * as StoreError from "../journal/StoreError.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Job = Schema.Struct({ workspaceId: WorkspaceId.Id, threadId: ThreadId.Id });
+export const Job = Schema.Struct({ workspaceId: WorkspaceId.Id, threadId: ThreadId.Id })
 
 /**
  * @category schemas
@@ -53,9 +54,7 @@ export class DeliveryJobs extends Context.Service<
      * told: the request is stored with the commit and discarded if it rolls back. Asking again before
      * it runs asks once.
      */
-    readonly requestDeliver: (
-      job: Job,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly requestDeliver: (job: Job) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/channel/DeliveryJobs") {}
 
@@ -66,8 +65,8 @@ export class DeliveryJobs extends Context.Service<
  * @since 0.1.0
  */
 export const noRunner: DeliveryJobs["Service"] = DeliveryJobs.of({
-  requestDeliver: () => Effect.void,
-});
+  requestDeliver: () => Effect.void
+})
 
 /**
  * `noRunner` as the workspace's delivery jobs, for a host that runs none.
@@ -75,27 +74,26 @@ export const noRunner: DeliveryJobs["Service"] = DeliveryJobs.of({
  * @category layers
  * @since 0.1.0
  */
-export const layerNoRunner = Layer.succeed(DeliveryJobs, noRunner);
+export const layerNoRunner = Layer.succeed(DeliveryJobs, noRunner)
 
 const decodeRecorded = Schema.decodeUnknownSync(
   Schema.Struct({
     activity: Schema.Struct({
-      threadId: ThreadActivityFacts.Recorded.payload.fields.activity.fields.threadId,
+      threadId: ThreadActivityFacts.Recorded.payload.fields.activity.fields.threadId
     }),
-    recipients: ThreadActivityFacts.Recorded.payload.fields.recipients,
-  }),
-);
+    recipients: ThreadActivityFacts.Recorded.payload.fields.recipients
+  })
+)
 
 /** Activity that tells a contact something has the thread's job deliver it. */
 const deliverToContacts = Effect.fnUntraced(function* (event: Event.Event) {
-  const { activity, recipients } = decodeRecorded(event.payload);
-  if (!recipients.some(({ recipient }) => Notification.Recipient.isAnyOf(["Contact"])(recipient)))
-    return;
+  const { activity, recipients } = decodeRecorded(event.payload)
+  if (!recipients.some(({ recipient }) => Notification.Recipient.isAnyOf(["Contact"])(recipient))) return
   yield* (yield* DeliveryJobs).requestDeliver({
     workspaceId: event.provenance.workspaceId,
-    threadId: activity.threadId,
-  });
-});
+    threadId: activity.threadId
+  })
+})
 
 /**
  * The facts that give a contact something to deliver request the thread's job, in the commit that
@@ -105,5 +103,5 @@ const deliverToContacts = Effect.fnUntraced(function* (event: Event.Event) {
  * @since 0.1.0
  */
 export const reactions: ReadonlyArray<Reaction.Definition<DeliveryJobs>> = [
-  { fact: ThreadActivityFacts.Recorded.name, react: deliverToContacts },
-];
+  { fact: ThreadActivityFacts.Recorded.name, react: deliverToContacts }
+]

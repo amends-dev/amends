@@ -13,24 +13,24 @@
 /**
  * @since 0.1.0
  */
-export * as Notification from "./Notification.ts";
+export * as Notification from "./Notification.ts"
 
 /**
  * @since 0.1.0
  */
-export * as NotificationInbox from "./NotificationInbox.ts";
+export * as NotificationInbox from "./NotificationInbox.ts"
 
 /**
  * @since 0.1.0
  */
-export * as NotificationProjection from "./NotificationProjection.ts";
+export * as NotificationProjection from "./NotificationProjection.ts"
 
 /**
  * @since 0.1.0
  */
-export * as NotificationService from "./NotificationService.ts";
+export * as NotificationService from "./NotificationService.ts"
 
 /**
  * @since 0.1.0
  */
-export * as NotificationStore from "./NotificationStore.ts";
+export * as NotificationStore from "./NotificationStore.ts"

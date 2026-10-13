@@ -5,16 +5,17 @@
  *
  * @since 0.1.0
  */
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as PubSub from "effect/PubSub";
-import * as RcMap from "effect/RcMap";
-import * as Stream from "effect/Stream";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import type * as Signal from "./Signal.ts";
+
+import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
+import * as PubSub from "effect/PubSub"
+import * as RcMap from "effect/RcMap"
+import * as Stream from "effect/Stream"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import type * as Signal from "./Signal.ts"
 
 /** Signals a subscriber may fall behind by before it misses the oldest. */
-const capacity = 256;
+const capacity = 256
 
 /**
  * Every workspace's signals within one process. A subscriber hears what its workspace publishes
@@ -27,22 +28,22 @@ const capacity = 256;
 export const make = Effect.gen(function* () {
   const workspaces = yield* RcMap.make({
     lookup: (_workspaceId: WorkspaceId.Id) =>
-      Effect.acquireRelease(PubSub.sliding<Signal.Signal>(capacity), PubSub.shutdown),
-  });
+      Effect.acquireRelease(PubSub.sliding<Signal.Signal>(capacity), PubSub.shutdown)
+  })
   /** Offer a signal to its workspace's subscribers in this process. */
   const publish = (signal: Signal.Signal) =>
     Effect.scoped(
       Effect.flatMap(RcMap.getOption(workspaces, signal.workspaceId), (pubsub) =>
-        Option.isSome(pubsub) ? Effect.asVoid(PubSub.publish(pubsub.value, signal)) : Effect.void,
-      ),
-    );
+        Option.isSome(pubsub) ? Effect.asVoid(PubSub.publish(pubsub.value, signal)) : Effect.void
+      )
+    )
   /** A workspace's signals published in this process after this registers, until the scope closes. */
   const subscribe = (workspaceId: WorkspaceId.Id) =>
     Effect.flatMap(RcMap.get(workspaces, workspaceId), (pubsub) =>
-      Effect.map(PubSub.subscribe(pubsub), Stream.fromSubscription),
-    );
-  return { publish, subscribe };
-});
+      Effect.map(PubSub.subscribe(pubsub), Stream.fromSubscription)
+    )
+  return { publish, subscribe }
+})
 
 /**
  * One process's hub, as `make` builds it.
@@ -50,4 +51,4 @@ export const make = Effect.gen(function* () {
  * @category models
  * @since 0.1.0
  */
-export type LocalSignalHub = Effect.Success<typeof make>;
+export type LocalSignalHub = Effect.Success<typeof make>

@@ -18,16 +18,17 @@
  *
  * @since 0.1.0
  */
-import { Sandbox, type Template } from "@amends-dev/sandbox";
-import type * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-import type * as Stream from "effect/Stream";
-import type * as LanguageModel from "effect/ai/LanguageModel";
-import type * as Prompt from "effect/ai/Prompt";
-import type * as Tool from "effect/ai/Tool";
-import type * as HarnessError from "./HarnessError.ts";
-import type * as ModelEndpoint from "./ModelEndpoint.ts";
-import type * as StreamPart from "./StreamPart.ts";
+
+import { Sandbox, type Template } from "@amends-dev/sandbox"
+import type * as LanguageModel from "effect/ai/LanguageModel"
+import type * as Prompt from "effect/ai/Prompt"
+import type * as Tool from "effect/ai/Tool"
+import type * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import type * as Stream from "effect/Stream"
+import type * as HarnessError from "./HarnessError.ts"
+import type * as ModelEndpoint from "./ModelEndpoint.ts"
+import type * as StreamPart from "./StreamPart.ts"
 
 /**
  * What every agent is made with: the model a turn runs on when it names none, and the models a turn
@@ -38,8 +39,8 @@ import type * as StreamPart from "./StreamPart.ts";
  * @since 0.1.0
  */
 export interface Options {
-  readonly model: ModelEndpoint.ModelEndpoint;
-  readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>>;
+  readonly model: ModelEndpoint.ModelEndpoint
+  readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>>
 }
 
 /**
@@ -49,13 +50,13 @@ export interface Options {
  * @category schemas
  * @since 0.1.0
  */
-export const SessionId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("SessionId"));
+export const SessionId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("SessionId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type SessionId = typeof SessionId.Type;
+export type SessionId = typeof SessionId.Type
 
 /**
  * Where an agent works for a session: a sandbox, and the session's directory in it.
@@ -65,10 +66,10 @@ export type SessionId = typeof SessionId.Type;
  */
 export interface Workspace {
   /** The sandbox, prepared with the agent's `template`. The agent never stops or destroys it. */
-  readonly sandbox: Sandbox.Sandbox["Service"];
+  readonly sandbox: Sandbox.Sandbox["Service"]
 
   /** The absolute directory in the sandbox for this session. It exists before `createSession`. */
-  readonly directory: string;
+  readonly directory: string
 }
 
 /**
@@ -79,27 +80,27 @@ export interface Workspace {
  * @since 0.1.0
  */
 export interface CreateSessionOptions {
-  readonly id: SessionId;
+  readonly id: SessionId
 
   /** Where the agent works. Absent only for an agent that does not require a sandbox. */
-  readonly workspace?: Workspace | undefined;
+  readonly workspace?: Workspace | undefined
 
   /**
    * The conversation so far, empty for a new session. An agent that last ran this session, and is
    * given `agentState` or `unfinishedTurn`, has it already. Any other agent loads it before its
    * first turn, so that a session started on one agent can continue on another.
    */
-  readonly history: Prompt.Prompt;
+  readonly history: Prompt.Prompt
 
   /** What this agent's `detach` or `stop` returned when the session last ran on this agent. */
-  readonly agentState?: Schema.Json | undefined;
+  readonly agentState?: Schema.Json | undefined
 
   /**
    * What this agent's `suspendTurn` returned when the session's last turn was cut short on this
    * agent. The session starts ready for `continueTurn` instead of a new turn, if the agent still
    * has the turn.
    */
-  readonly unfinishedTurn?: Schema.Json | undefined;
+  readonly unfinishedTurn?: Schema.Json | undefined
 }
 
 /**
@@ -111,13 +112,13 @@ export interface CreateSessionOptions {
  */
 export interface TurnOptions {
   /** What the turn asks. Earlier turns are in the agent's own conversation and not sent again. */
-  readonly prompt: Prompt.UserMessage;
+  readonly prompt: Prompt.UserMessage
 
   /** Instructions for this turn, as system or developer instructions where the agent has them. */
-  readonly instructions?: string | undefined;
+  readonly instructions?: string | undefined
 
   /** The model for this turn, as the agent names models. The agent's default when omitted. */
-  readonly model?: string | undefined;
+  readonly model?: string | undefined
 
   /**
    * Tools the host runs. When the agent calls one, the turn streams a `tool-call` part that is not
@@ -125,10 +126,10 @@ export interface TurnOptions {
    * runs a tool; the agent waits for the result either way, and gets `execution-denied` for a
    * refusal.
    */
-  readonly tools: ReadonlyArray<Tool.Any>;
+  readonly tools: ReadonlyArray<Tool.Any>
 
   /** How the turn answers. JSON fails with `UnsupportedError` when the agent cannot answer so. */
-  readonly responseFormat: LanguageModel.ProviderOptions["responseFormat"];
+  readonly responseFormat: LanguageModel.ProviderOptions["responseFormat"]
 }
 
 /**
@@ -146,12 +147,10 @@ export interface AgentSession {
    * other than the one the turn ran in, has none, and the harness runs the turn again from its
    * prompt.
    */
-  readonly hasUnfinishedTurn: boolean;
+  readonly hasUnfinishedTurn: boolean
 
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
-  readonly promptTurn: (
-    options: TurnOptions,
-  ) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>;
+  readonly promptTurn: (options: TurnOptions) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>
 
   /**
    * Streams the turn `suspendTurn` cut short from the step after its first `finishedSteps`, which
@@ -161,55 +160,53 @@ export interface AgentSession {
    */
   readonly continueTurn: (
     options: TurnOptions,
-    finishedSteps: number,
-  ) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>;
+    finishedSteps: number
+  ) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>
 
   /** Gives the running turn the result of a host tool it called. */
   readonly submitToolResult: (
-    result: Pick<Prompt.ToolResultPart, "id" | "name" | "result" | "isFailure">,
-  ) => Effect.Effect<void, HarnessError.HarnessError>;
+    result: Pick<Prompt.ToolResultPart, "id" | "name" | "result" | "isFailure">
+  ) => Effect.Effect<void, HarnessError.HarnessError>
 
   /**
    * Answers a `tool-approval-request` of the running turn. Fails with `UnsupportedError` for an
    * agent that never asks.
    */
   readonly approve: (
-    response: Pick<Prompt.ToolApprovalResponsePart, "approvalId" | "approved" | "reason">,
-  ) => Effect.Effect<void, HarnessError.HarnessError>;
+    response: Pick<Prompt.ToolApprovalResponsePart, "approvalId" | "approved" | "reason">
+  ) => Effect.Effect<void, HarnessError.HarnessError>
 
   /**
    * Replaces the conversation so far with a summary, guided by `instructions`, and returns the
    * compaction. The session asks only between turns. Fails with `UnsupportedError` when the agent
    * compacts only by itself.
    */
-  readonly compact: (
-    instructions?: string,
-  ) => Effect.Effect<StreamPart.CompactionPart, HarnessError.HarnessError>;
+  readonly compact: (instructions?: string) => Effect.Effect<StreamPart.CompactionPart, HarnessError.HarnessError>
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns what
    * `createSession` takes as `unfinishedTurn` to continue the turn after any step whose
    * `finish-step` it delivered.
    */
-  readonly suspendTurn: Effect.Effect<Schema.Json, HarnessError.HarnessError>;
+  readonly suspendTurn: Effect.Effect<Schema.Json, HarnessError.HarnessError>
 
   /**
    * Releases the session between turns while the agent keeps running, returning what
    * `createSession` takes as `agentState`.
    */
-  readonly detach: Effect.Effect<Schema.Json, HarnessError.HarnessError>;
+  readonly detach: Effect.Effect<Schema.Json, HarnessError.HarnessError>
 
   /**
    * Stops the agent, returning what `createSession` takes as `agentState` to start it again with
    * its conversation.
    */
-  readonly stop: Effect.Effect<Schema.Json, HarnessError.HarnessError>;
+  readonly stop: Effect.Effect<Schema.Json, HarnessError.HarnessError>
 
   /**
    * Stops the agent for good, deleting what it keeps of the session. It also destroys a session
    * `suspendTurn`, `detach`, or `stop` released, and destroying it again succeeds.
    */
-  readonly destroy: Effect.Effect<void, HarnessError.HarnessError>;
+  readonly destroy: Effect.Effect<void, HarnessError.HarnessError>
 }
 
 /**
@@ -219,8 +216,8 @@ export interface AgentSession {
  * **Example** (An agent that answers from its model alone)
  *
  * ```ts
- * import { Agent, Harness, HarnessError } from "@amends-dev/harness";
- * import { Effect, Stream } from "effect";
+ * import { Agent, Harness, HarnessError } from "@amends-dev/harness"
+ * import { Effect, Stream } from "effect"
  *
  * const echo: Agent.Agent = {
  *   id: "echo",
@@ -234,7 +231,7 @@ export interface AgentSession {
  *           { type: "text-delta", id: "answer", delta: JSON.stringify(prompt.content) },
  *           { type: "text-end", id: "answer" },
  *           { type: "finish-step", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
- *           { type: "finish", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
+ *           { type: "finish", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } }
  *         ),
  *       continueTurn: () => Stream.empty,
  *       submitToolResult: () => Effect.void,
@@ -243,19 +240,19 @@ export interface AgentSession {
  *       suspendTurn: Effect.succeed(null),
  *       detach: Effect.succeed(null),
  *       stop: Effect.succeed(null),
- *       destroy: Effect.void,
- *     }),
- * };
+ *       destroy: Effect.void
+ *     })
+ * }
  *
  * const unsupported = (description: string) =>
  *   Effect.fail(
  *     new HarnessError.HarnessError({
  *       agent: "echo",
- *       reason: new HarnessError.UnsupportedError({ description }),
- *     }),
- *   );
+ *       reason: new HarnessError.UnsupportedError({ description })
+ *     })
+ *   )
  *
- * const harness = Harness.make(echo);
+ * const harness = Harness.make(echo)
  * ```
  *
  * @category models
@@ -263,22 +260,20 @@ export interface AgentSession {
  */
 export interface Agent {
   /** Names the agent, such as `opencode`. Errors and saved sessions carry it. */
-  readonly id: string;
+  readonly id: string
 
   /** Whether every session needs a sandbox. An agent that runs in the host's process may not. */
-  readonly requiresSandbox: boolean;
+  readonly requiresSandbox: boolean
 
   /** Installs the agent in a sandbox. An agent that runs in the host's process has none. */
-  readonly template?: Template.Template;
+  readonly template?: Template.Template
 
   /**
    * The longest name of a host tool the agent takes, for an agent that adds to the names it is
    * given and so leaves a model API's 64 characters too few. A host names its tools to fit.
    */
-  readonly maxToolNameLength?: number | undefined;
+  readonly maxToolNameLength?: number | undefined
 
   /** Creates a session: a new one, or one picked up again from what an earlier session returned. */
-  readonly createSession: (
-    options: CreateSessionOptions,
-  ) => Effect.Effect<AgentSession, HarnessError.HarnessError>;
+  readonly createSession: (options: CreateSessionOptions) => Effect.Effect<AgentSession, HarnessError.HarnessError>
 }

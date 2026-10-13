@@ -5,7 +5,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Issue, revoke, and list invitations; the authority to delegate their role is checked separately.
@@ -15,5 +16,5 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Manage = Permission.make("invitation.manage", {
   targetKind: "Workspace",
-  builtinTier: "administrator",
-});
+  builtinTier: "administrator"
+})

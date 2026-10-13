@@ -12,10 +12,11 @@
  *
  * @since 0.1.0
  */
-import type { Fixture } from "./Fixture.ts";
-import { lifecycle } from "./internal/lifecycle.ts";
-import { network } from "./internal/network.ts";
-import { processes } from "./internal/processes.ts";
+
+import type { Fixture } from "./Fixture.ts"
+import { lifecycle } from "./internal/lifecycle.ts"
+import { network } from "./internal/network.ts"
+import { processes } from "./internal/processes.ts"
 
 export type {
   /**
@@ -24,8 +25,8 @@ export type {
    * @category testing
    * @since 0.1.0
    */
-  Fixture,
-} from "./Fixture.ts";
+  Fixture
+} from "./Fixture.ts"
 
 /**
  * Runs every suite against the provider `fixture` makes, in the test file that calls it.
@@ -33,24 +34,20 @@ export type {
  * **Example** (A provider's conformance test)
  *
  * ```ts
- * import { Network, SandboxProvider } from "@amends-dev/sandbox";
- * import * as Conformance from "@amends-dev/sandbox/conformance";
- * import { Effect, Scope } from "effect";
- * import { FetchHttpClient } from "effect/http";
- * import { ChildProcess } from "effect/process";
+ * import { Network, SandboxProvider } from "@amends-dev/sandbox"
+ * import * as Conformance from "@amends-dev/sandbox/conformance"
+ * import { Effect, Scope } from "effect"
+ * import { FetchHttpClient } from "effect/http"
+ * import { ChildProcess } from "effect/process"
  *
- * declare const makeProvider: Effect.Effect<
- *   SandboxProvider.SandboxProvider["Service"],
- *   never,
- *   Scope.Scope
- * >;
- * declare const freePort: Effect.Effect<Network.Port>;
+ * declare const makeProvider: Effect.Effect<SandboxProvider.SandboxProvider["Service"], never, Scope.Scope>
+ * declare const freePort: Effect.Effect<Network.Port>
  *
  * // Answers each request on `PORT` with its headers, which the network suite checks.
  * const serveHeaders = `Bun.serve({
  *   port: Number(process.env.PORT),
  *   fetch: (request) => Response.json(Object.fromEntries(request.headers)),
- * })`;
+ * })`
  *
  * Conformance.run({
  *   layer: FetchHttpClient.layer,
@@ -59,17 +56,17 @@ export type {
  *   serveHeaders: (port) =>
  *     ChildProcess.make("bun", ["-e", serveHeaders], {
  *       env: { PORT: String(port) },
- *       extendEnv: true,
+ *       extendEnv: true
  *     }),
- *   timeout: 60_000,
- * });
+ *   timeout: 60_000
+ * })
  * ```
  *
  * @category testing
  * @since 0.1.0
  */
 export const run = <R>(fixture: Fixture<R>) => {
-  lifecycle(fixture);
-  processes(fixture);
-  network(fixture);
-};
+  lifecycle(fixture)
+  processes(fixture)
+  network(fixture)
+}

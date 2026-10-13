@@ -1,7 +1,7 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media, shell } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media, shell } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // The canvas frames one white card, as in the app shell; phones run it edge to edge.
 export const root = style({
@@ -14,10 +14,10 @@ export const root = style({
     [media.mobile]: {
       padding: 0,
       paddingTop: "env(safe-area-inset-top)",
-      backgroundColor: vars.color.surface.panel,
-    },
-  },
-});
+      backgroundColor: vars.color.surface.panel
+    }
+  }
+})
 
 export const card = style({
   display: "flex",
@@ -25,8 +25,8 @@ export const card = style({
   flex: 1,
   minWidth: 0,
   overflowY: "auto",
-  backgroundColor: vars.color.surface.panel,
-});
+  backgroundColor: vars.color.surface.panel
+})
 
 export const header = style({
   display: "flex",
@@ -36,8 +36,8 @@ export const header = style({
   flex: "none",
   boxSizing: "border-box",
   minHeight: "5rem",
-  padding: "1rem",
-});
+  padding: "1rem"
+})
 
 export const brand = style({
   ...typeScale.title,
@@ -48,18 +48,18 @@ export const brand = style({
   fontWeight: fontWeight.semibold,
   textDecoration: "none",
   selectors: {
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
-  },
-});
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
+  }
+})
 
 export const brandMark = style({
   display: "grid",
   placeItems: "center",
   width: "2.5rem",
-  height: "2.5rem",
-});
+  height: "2.5rem"
+})
 
-export const actions = style({ display: "flex", alignItems: "center", gap: "0.75rem" });
+export const actions = style({ display: "flex", alignItems: "center", gap: "0.75rem" })
 
 // A form sits in the middle of the card; a directory starts near the top.
 export const body = style({
@@ -74,14 +74,14 @@ export const body = style({
     "&[data-width=form]": {
       maxWidth: "calc(26.25rem + 3rem)",
       justifyContent: "center",
-      paddingBlock: "1.5rem 5rem",
+      paddingBlock: "1.5rem 5rem"
     },
-    "&[data-width=directory]": { maxWidth: "calc(50rem + 3rem)", paddingBlock: "5rem 4rem" },
+    "&[data-width=directory]": { maxWidth: "calc(50rem + 3rem)", paddingBlock: "5rem 4rem" }
   },
   "@media": {
     [media.mobile]: {
       paddingInline: "1rem",
-      selectors: { "&[data-width=directory]": { paddingBlockStart: "1.5rem" } },
-    },
-  },
-});
+      selectors: { "&[data-width=directory]": { paddingBlockStart: "1.5rem" } }
+    }
+  }
+})

@@ -5,9 +5,10 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
 
-const member = Permission.makeGroup("member", { targetKind: "Member" });
+import * as Permission from "../authorization/Permission.ts"
+
+const member = Permission.makeGroup("member", { targetKind: "Member" })
 
 /**
  * Read a membership, active or removed. A grant on the workspace reads everyone; a grant on one
@@ -16,7 +17,7 @@ const member = Permission.makeGroup("member", { targetKind: "Member" });
  * @category permissions
  * @since 0.1.0
  */
-export const Read = member.make("read", { builtinTier: "member" });
+export const Read = member.make("read", { builtinTier: "member" })
 
 /**
  * Remove a member: end their access, their group admissions, and their pending invitations. The
@@ -25,4 +26,4 @@ export const Read = member.make("read", { builtinTier: "member" });
  * @category permissions
  * @since 0.1.0
  */
-export const Remove = member.make("remove", { builtinTier: "administrator" });
+export const Remove = member.make("remove", { builtinTier: "administrator" })

@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Names a thread. A start names its thread itself, so a keyed start names the same thread on a
@@ -13,10 +14,10 @@ import * as Schema from "effect/Schema";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadId"));
+export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type Id = typeof Id.Type

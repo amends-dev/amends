@@ -7,14 +7,15 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
-import * as Result from "effect/Result";
-import * as Base64 from "effect/encoding/Base64";
-import type * as Option from "effect/Option";
+
+import * as Context from "effect/Context"
+import * as Data from "effect/Data"
+import * as Effect from "effect/Effect"
+import * as Base64 from "effect/encoding/Base64"
+import * as Layer from "effect/Layer"
+import type * as Option from "effect/Option"
+import * as Redacted from "effect/Redacted"
+import * as Result from "effect/Result"
 
 /**
  * The key is malformed, or a secret failed to seal or open.
@@ -23,8 +24,8 @@ import type * as Option from "effect/Option";
  * @since 0.1.0
  */
 export class Failure extends Data.TaggedError("CredentialKey.Failure")<{
-  readonly message: string;
-  readonly cause?: unknown;
+  readonly message: string
+  readonly cause?: unknown
 }> {}
 
 /**
@@ -36,9 +37,9 @@ export class Failure extends Data.TaggedError("CredentialKey.Failure")<{
  */
 export interface Cipher {
   /** Seal `secret`, bound to `binding`: only the same binding opens it. */
-  readonly seal: (secret: string, binding: string) => Effect.Effect<string, Failure>;
+  readonly seal: (secret: string, binding: string) => Effect.Effect<string, Failure>
   /** Open what `seal` returned for the same binding; anything else fails. */
-  readonly open: (sealed: string, binding: string) => Effect.Effect<string, Failure>;
+  readonly open: (sealed: string, binding: string) => Effect.Effect<string, Failure>
 }
 
 /**
@@ -48,21 +49,18 @@ export interface Cipher {
  * @since 0.1.0
  */
 export class CredentialKey extends Context.Service<CredentialKey, Option.Option<Cipher>>()(
-  "@amends-dev/storage-postgresql/CredentialKey",
+  "@amends-dev/storage-postgresql/CredentialKey"
 ) {}
 
-const version = "v1";
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+const version = "v1"
+const encoder = new TextEncoder()
+const decoder = new TextDecoder()
 const asFailure = (cause: unknown) =>
   cause instanceof Failure
     ? cause
-    : new Failure({ message: cause instanceof Error ? cause.message : String(cause), cause });
+    : new Failure({ message: cause instanceof Error ? cause.message : String(cause), cause })
 const bytes = (base64: string) =>
-  Result.getOrThrowWith(
-    Base64.decode(base64),
-    () => new Failure({ message: "The credential key must be base64" }),
-  );
+  Result.getOrThrowWith(Base64.decode(base64), () => new Failure({ message: "The credential key must be base64" }))
 
 /**
  * Import a base64-encoded 32-byte key, failing for anything else.
@@ -73,44 +71,43 @@ const bytes = (base64: string) =>
 export const make = (key: Redacted.Redacted<string>): Effect.Effect<Cipher, Failure> =>
   Effect.tryPromise({
     try: async () => {
-      const raw = bytes(Redacted.value(key));
-      if (raw.length !== 32)
-        throw new Failure({ message: "The credential key must be 32 bytes, encoded as base64" });
-      return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+      const raw = bytes(Redacted.value(key))
+      if (raw.length !== 32) throw new Failure({ message: "The credential key must be 32 bytes, encoded as base64" })
+      return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"])
     },
-    catch: asFailure,
+    catch: asFailure
   }).pipe(
     Effect.map((cryptoKey) => ({
       seal: (secret, binding) =>
         Effect.tryPromise({
           try: async () => {
-            const nonce = crypto.getRandomValues(new Uint8Array(12));
+            const nonce = crypto.getRandomValues(new Uint8Array(12))
             const sealed = await crypto.subtle.encrypt(
               { name: "AES-GCM", iv: nonce, additionalData: encoder.encode(binding) },
               cryptoKey,
-              encoder.encode(secret),
-            );
-            return `${version}:${Base64.encode(nonce)}:${Base64.encode(new Uint8Array(sealed))}`;
+              encoder.encode(secret)
+            )
+            return `${version}:${Base64.encode(nonce)}:${Base64.encode(new Uint8Array(sealed))}`
           },
-          catch: asFailure,
+          catch: asFailure
         }),
       open: (sealed, binding) =>
         Effect.tryPromise({
           try: async () => {
-            const [tag, nonce, data] = sealed.split(":");
+            const [tag, nonce, data] = sealed.split(":")
             if (tag !== version || nonce === undefined || data === undefined)
-              throw new Failure({ message: "Unrecognized sealed credential" });
+              throw new Failure({ message: "Unrecognized sealed credential" })
             const opened = await crypto.subtle.decrypt(
               { name: "AES-GCM", iv: bytes(nonce), additionalData: encoder.encode(binding) },
               cryptoKey,
-              bytes(data),
-            );
-            return decoder.decode(opened);
+              bytes(data)
+            )
+            return decoder.decode(opened)
           },
-          catch: asFailure,
-        }),
-    })),
-  );
+          catch: asFailure
+        })
+    }))
+  )
 
 /**
  * Provides `CredentialKey` with the key the host imported, or none.
@@ -118,4 +115,4 @@ export const make = (key: Redacted.Redacted<string>): Effect.Effect<Cipher, Fail
  * @category layers
  * @since 0.1.0
  */
-export const layer = (key: Option.Option<Cipher>) => Layer.succeed(CredentialKey, key);
+export const layer = (key: Option.Option<Cipher>) => Layer.succeed(CredentialKey, key)

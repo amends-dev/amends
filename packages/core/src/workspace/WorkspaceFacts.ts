@@ -5,12 +5,13 @@
  *
  * @since 0.1.0
  */
-import * as Subject from "../journal/Subject.ts";
-import * as Audience from "../journal/Audience.ts";
-import * as Fact from "../journal/Fact.ts";
-import * as Workspace from "./Workspace.ts";
-import * as Ownership from "./Ownership.ts";
-import * as WorkspaceSettings from "./WorkspaceSettings.ts";
+
+import * as Audience from "../journal/Audience.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Ownership from "./Ownership.ts"
+import * as Workspace from "./Workspace.ts"
+import * as WorkspaceSettings from "./WorkspaceSettings.ts"
 
 /**
  * The workspace's name changed, from `previousName` to `name`; each rename is its own fact, which
@@ -23,8 +24,8 @@ export const Renamed = Fact.make("workspace.renamed", {
   audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("workspace", payload.workspaceId),
   version: 1,
-  payload: WorkspaceSettings.NameChange,
-});
+  payload: WorkspaceSettings.NameChange
+})
 
 /**
  * The workspace was created, as its record says: the first fact in its journal, which
@@ -39,8 +40,8 @@ export const Initialized = Fact.make("workspace.initialized", {
   subject: (payload) => Subject.make("workspace", payload.id),
   version: 1,
   payload: Workspace.Workspace,
-  occurrence: (payload) => [payload.id],
-});
+  occurrence: (payload) => [payload.id]
+})
 
 /**
  * Ownership moved from one member to another, as `Ownership.Change` says.
@@ -54,5 +55,5 @@ export const OwnershipTransferred = Fact.make("workspace.ownership-transferred",
   audience: () => [Audience.workspace],
   subject: (payload) => Subject.make("workspace", payload.workspaceId),
   version: 1,
-  payload: Ownership.Change,
-});
+  payload: Ownership.Change
+})

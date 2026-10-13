@@ -9,4 +9,4 @@
 /**
  * @since 0.1.0
  */
-export * as CoreError from "./CoreError.ts";
+export * as CoreError from "./CoreError.ts"

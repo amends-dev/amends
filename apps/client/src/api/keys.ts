@@ -13,7 +13,7 @@ export type WorkspaceResource =
   | "permissions"
   | "connections"
   | "agents"
-  | "active-turns";
+  | "active-turns"
 export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "settings",
   "ownership",
@@ -25,39 +25,32 @@ export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "permissions",
   "connections",
   "agents",
-  "active-turns",
-];
+  "active-turns"
+]
 /** Everything the signed-in identity can reach, across workspaces. */
-export const directoryKey = "directory";
-export const workspaceKey = (workspaceId: string, resource: WorkspaceResource) =>
-  `workspace/${workspaceId}/${resource}`;
+export const directoryKey = "directory"
+export const workspaceKey = (workspaceId: string, resource: WorkspaceResource) => `workspace/${workspaceId}/${resource}`
 
 /**
  * Reads of one group, thread, or turn: a group's stream or roster, a thread, its timeline or
  * participants, or a turn. Each registers under its collection and its own ID, so one can be
  * invalidated alone and a collection all at once.
  */
-export type WorkspaceCollection =
-  | "streams"
-  | "threads"
-  | "timelines"
-  | "rosters"
-  | "participants"
-  | "turns";
+export type WorkspaceCollection = "streams" | "threads" | "timelines" | "rosters" | "participants" | "turns"
 export const workspaceCollections: ReadonlyArray<WorkspaceCollection> = [
   "streams",
   "threads",
   "timelines",
   "rosters",
   "participants",
-  "turns",
-];
+  "turns"
+]
 export const collectionKey = (workspaceId: string, collection: WorkspaceCollection) =>
-  `workspace/${workspaceId}/${collection}`;
+  `workspace/${workspaceId}/${collection}`
 /** The key a read of one item registers. */
 export const itemKeys = (workspaceId: string, collection: WorkspaceCollection, id: string) => ({
-  [collectionKey(workspaceId, collection)]: [id],
-});
+  [collectionKey(workspaceId, collection)]: [id]
+})
 /** The key that invalidates one item's read alone. */
 export const itemKey = (workspaceId: string, collection: WorkspaceCollection, id: string) =>
-  `${collectionKey(workspaceId, collection)}:${id}`;
+  `${collectionKey(workspaceId, collection)}:${id}`

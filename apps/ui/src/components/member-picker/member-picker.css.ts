@@ -1,9 +1,9 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
-export const picker = style({ position: "relative", flex: 1, minWidth: 0 });
+export const picker = style({ position: "relative", flex: 1, minWidth: 0 })
 
 // The field: chosen people as chips, then the search text. Open or focused, its edge darkens.
 export const control = style({
@@ -18,18 +18,18 @@ export const control = style({
   backgroundColor: vars.color.surface.field,
   cursor: "text",
   selectors: {
-    "&:focus-within, &[data-open]": { borderColor: vars.color.border.strong },
+    "&:focus-within, &[data-open]": { borderColor: vars.color.border.strong }
   },
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
 export const searchIcon = style({
   flex: "none",
   width: "1rem",
   height: "1rem",
   marginInline: "0.25rem 0",
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})
 
 export const input = style({
   ...typeScale.control,
@@ -44,8 +44,8 @@ export const input = style({
   color: vars.color.text.primary,
   fontFamily: "inherit",
   selectors: { "&::placeholder": { color: vars.color.text.muted, opacity: 1 } },
-  "@media": { [media.mobile]: typeScale.bodyTouch },
-});
+  "@media": { [media.mobile]: typeScale.bodyTouch }
+})
 
 export const toggle = style({
   display: "grid",
@@ -58,10 +58,10 @@ export const toggle = style({
   border: "none",
   background: "transparent",
   color: vars.color.text.secondary,
-  cursor: "pointer",
-});
+  cursor: "pointer"
+})
 
-export const toggleIcon = style({ width: "0.875rem", height: "0.875rem" });
+export const toggleIcon = style({ width: "0.875rem", height: "0.875rem" })
 
 export const chip = style({
   ...typeScale.hint,
@@ -73,8 +73,8 @@ export const chip = style({
   backgroundColor: vars.color.surface.selected,
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
-  selectors: { "&[data-locked]": { paddingInlineEnd: "0.5rem" } },
-});
+  selectors: { "&[data-locked]": { paddingInlineEnd: "0.5rem" } }
+})
 
 export const chipRemove = style({
   display: "grid",
@@ -88,11 +88,11 @@ export const chipRemove = style({
   cursor: "pointer",
   selectors: {
     "&:hover": { color: vars.color.text.primary },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
-  },
-});
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" }
+  }
+})
 
-export const chipRemoveIcon = style({ width: "0.75rem", height: "0.75rem" });
+export const chipRemoveIcon = style({ width: "0.75rem", height: "0.75rem" })
 
 export const popup = style({
   boxSizing: "border-box",
@@ -106,11 +106,11 @@ export const popup = style({
       flexDirection: "column",
       border: `1px solid ${vars.color.border.default}`,
       backgroundColor: vars.color.surface.popover,
-      boxShadow: vars.shadow.popover,
+      boxShadow: vars.shadow.popover
     },
-    "&[data-presentation=list]": { marginBlockStart: "1.25rem" },
-  },
-});
+    "&[data-presentation=list]": { marginBlockStart: "1.25rem" }
+  }
+})
 
 export const popupHeader = style({
   ...typeScale.hint,
@@ -124,12 +124,12 @@ export const popupHeader = style({
     [`${popup}[data-presentation=list] &`]: {
       ...typeScale.meta,
       paddingInline: 0,
-      textTransform: "uppercase",
-    },
-  },
-});
+      textTransform: "uppercase"
+    }
+  }
+})
 
-export const available = style({ color: vars.color.text.muted, fontWeight: fontWeight.regular });
+export const available = style({ color: vars.color.text.muted, fontWeight: fontWeight.regular })
 
 export const listbox = style({
   margin: 0,
@@ -139,8 +139,8 @@ export const listbox = style({
   minHeight: 0,
   maxHeight: "16rem",
   overflowY: "auto",
-  selectors: { [`${popup}[data-presentation=list] &`]: { padding: 0, maxHeight: "none" } },
-});
+  selectors: { [`${popup}[data-presentation=list] &`]: { padding: 0, maxHeight: "none" } }
+})
 
 export const option = style({
   display: "grid",
@@ -152,11 +152,11 @@ export const option = style({
   cursor: "pointer",
   selectors: {
     "&[data-active]": { backgroundColor: vars.color.surface.subtle },
-    [`${popup}[data-presentation=list] &`]: { minHeight: "3.5rem", paddingInline: 0 },
-  },
-});
+    [`${popup}[data-presentation=list] &`]: { minHeight: "3.5rem", paddingInline: 0 }
+  }
+})
 
-export const optionText = style({ display: "flex", flexDirection: "column", minWidth: 0 });
+export const optionText = style({ display: "flex", flexDirection: "column", minWidth: 0 })
 
 export const optionName = style({
   ...typeScale.control,
@@ -164,12 +164,12 @@ export const optionName = style({
   fontWeight: fontWeight.medium,
   overflow: "hidden",
   textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
-export const optionKind = style({ ...typeScale.hint, color: vars.color.text.secondary });
+export const optionKind = style({ ...typeScale.hint, color: vars.color.text.secondary })
 
-export const plus = style({ width: "1rem", height: "1rem", color: vars.color.text.secondary });
+export const plus = style({ width: "1rem", height: "1rem", color: vars.color.text.secondary })
 
 export const popupFooter = style({
   ...typeScale.hint,
@@ -178,6 +178,6 @@ export const popupFooter = style({
   color: vars.color.text.secondary,
   boxShadow: `inset 0 1px 0 ${vars.color.border.divider}`,
   selectors: {
-    [`${popup}[data-presentation=list] &`]: { paddingInline: 0, boxShadow: "none" },
-  },
-});
+    [`${popup}[data-presentation=list] &`]: { paddingInline: 0, boxShadow: "none" }
+  }
+})

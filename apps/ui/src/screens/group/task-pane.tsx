@@ -1,38 +1,38 @@
-import { For, Show, createUniqueId } from "solid-js";
-import type { IconProps } from "@amends-dev/icons";
-import { IconMessage, IconUsers } from "@amends-dev/icons";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { Menu } from "../../components/menu/index.ts";
-import { TaskStatus, taskStateLabel, type TaskState } from "../../components/task-status/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { Timeline } from "../timeline/index.ts";
-import type { TaskPerson } from "./group-tasks.tsx";
-import { ConversationComposer, type ConversationProps } from "./group-threads.tsx";
-import * as s from "./tasks.css.ts";
+import type { IconProps } from "@amends-dev/icons"
+import { IconMessage, IconUsers } from "@amends-dev/icons"
+import { For, Show, createUniqueId } from "solid-js"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { Menu } from "../../components/menu/index.ts"
+import { TaskStatus, taskStateLabel, type TaskState } from "../../components/task-status/index.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { Timeline } from "../timeline/index.ts"
+import type { TaskPerson } from "./group-tasks.tsx"
+import { ConversationComposer, type ConversationProps } from "./group-threads.tsx"
+import * as s from "./tasks.css.ts"
 
-const states: ReadonlyArray<TaskState> = ["triage", "open", "progress", "done"];
+const states: ReadonlyArray<TaskState> = ["triage", "open", "progress", "done"]
 
 export interface TaskDetail {
-  readonly key: string;
-  readonly title: string;
-  readonly state: TaskState;
-  readonly assignee?: TaskPerson;
-  readonly description: string;
+  readonly key: string
+  readonly title: string
+  readonly state: TaskState
+  readonly assignee?: TaskPerson
+  readonly description: string
   /** The message the task came from. */
-  readonly discussionHref?: string;
+  readonly discussionHref?: string
 }
 
 export interface TaskPaneProps extends ConversationProps {
-  readonly task: TaskDetail;
-  readonly groupName: string;
+  readonly task: TaskDetail
+  readonly groupName: string
   /** People the task can be assigned to. */
-  readonly people: ReadonlyArray<TaskPerson>;
-  readonly onStateChange: (state: TaskState) => void;
+  readonly people: ReadonlyArray<TaskPerson>
+  readonly onStateChange: (state: TaskState) => void
   /** A person's id, or "unassigned". */
-  readonly onAssigneeChange: (assignee: string) => void;
-  readonly onClose: () => void;
+  readonly onAssigneeChange: (assignee: string) => void
+  readonly onClose: () => void
 }
 
 /**
@@ -40,16 +40,16 @@ export interface TaskPaneProps extends ConversationProps {
  * its activity and replies above a composer. Render it while the task is open.
  */
 export function TaskPane(props: TaskPaneProps) {
-  const id = createUniqueId();
+  const id = createUniqueId()
   const ids = {
     state: `task-${id}-state`,
     stateValue: `task-${id}-state-value`,
     assignee: `task-${id}-assignee`,
-    assigneeValue: `task-${id}-assignee-value`,
-  };
+    assigneeValue: `task-${id}-assignee-value`
+  }
   const StateIcon = (icon: IconProps) => (
     <TaskStatus state={props.task.state} class={icon.class} size="1rem" decorative />
-  );
+  )
   return (
     <Shell.Aside aria-label={props.task.title} onClose={() => props.onClose()}>
       <Pane.Root variant="side">
@@ -72,11 +72,7 @@ export function TaskPane(props: TaskPaneProps) {
                   Status
                 </span>
                 <Menu.Root>
-                  <Menu.Trigger
-                    variant="quiet"
-                    class={s.property}
-                    aria-labelledby={`${ids.state} ${ids.stateValue}`}
-                  >
+                  <Menu.Trigger variant="quiet" class={s.property} aria-labelledby={`${ids.state} ${ids.stateValue}`}>
                     <TaskStatus state={props.task.state} decorative />
                     <span id={ids.stateValue}>{taskStateLabel(props.task.state)}</span>
                   </Menu.Trigger>
@@ -107,10 +103,7 @@ export function TaskPane(props: TaskPaneProps) {
                     class={s.property}
                     aria-labelledby={`${ids.assignee} ${ids.assigneeValue}`}
                   >
-                    <Show
-                      when={props.task.assignee}
-                      fallback={<IconUsers class={s.unassignedIcon} />}
-                    >
+                    <Show when={props.task.assignee} fallback={<IconUsers class={s.unassignedIcon} />}>
                       {(person) => (
                         <Avatar
                           name={person().name}
@@ -124,10 +117,7 @@ export function TaskPane(props: TaskPaneProps) {
                     <span id={ids.assigneeValue}>{props.task.assignee?.name ?? "Unassigned"}</span>
                   </Menu.Trigger>
                   <Menu.Content aria-label="Assignee">
-                    <Menu.RadioGroup
-                      value={props.task.assignee?.id ?? "unassigned"}
-                      onChange={props.onAssigneeChange}
-                    >
+                    <Menu.RadioGroup value={props.task.assignee?.id ?? "unassigned"} onChange={props.onAssigneeChange}>
                       <Menu.RadioItem value="unassigned">Unassigned</Menu.RadioItem>
                       <For each={props.people}>
                         {(person) => (
@@ -161,16 +151,11 @@ export function TaskPane(props: TaskPaneProps) {
               </Show>
             </div>
             <Divider label="Activity" align="start" />
-            <Timeline
-              entries={props.entries}
-              anchor="top"
-              onReact={props.onReact}
-              taskHref={props.taskHref}
-            />
+            <Timeline entries={props.entries} anchor="top" onReact={props.onReact} taskHref={props.taskHref} />
           </div>
         </Pane.Body>
         <ConversationComposer {...props} />
       </Pane.Root>
     </Shell.Aside>
-  );
+  )
 }

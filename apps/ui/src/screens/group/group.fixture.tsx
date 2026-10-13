@@ -1,9 +1,9 @@
 // Workshop harness: a small working workspace built from the screens. Not exported.
-import { For, Match, Show, Switch, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { Toast } from "../../components/toast/index.ts";
-import { Profiles } from "../../components/profile-card/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { GroupDirectory, type DirectoryTab } from "../groups/index.ts";
+import { For, Match, Show, Switch, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { Profiles } from "../../components/profile-card/index.ts"
+import { Toast } from "../../components/toast/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import { GroupDirectory, type DirectoryTab } from "../groups/index.ts"
 import {
   creationCandidates,
   groupEntries,
@@ -20,10 +20,10 @@ import {
   threadEntries,
   workspaceCandidates,
   workspaceGroups,
-  you,
-} from "../sample.ts";
-import type { TimelineEntry, TimelineMessage } from "../timeline/index.ts";
-import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
+  you
+} from "../sample.ts"
+import type { TimelineEntry, TimelineMessage } from "../timeline/index.ts"
+import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts"
 import {
   CreateGroup,
   GroupPane,
@@ -36,71 +36,67 @@ import {
   type GroupTab,
   type GroupVisibility,
   type TaskSort,
-  type TaskStateFilter,
-} from "./index.ts";
+  type TaskStateFilter
+} from "./index.ts"
 
-const noop = () => {};
+const noop = () => {}
 
 function react(entries: ReadonlyArray<TimelineEntry>, id: string, emoji: string) {
   return entries.map((entry) => {
-    if (entry.kind !== "message" || entry.id !== id) return entry;
+    if (entry.kind !== "message" || entry.id !== id) return entry
     const reactions = (entry.reactions ?? []).map((reaction) =>
       reaction.emoji === emoji
         ? {
             ...reaction,
             reacted: !reaction.reacted,
-            count: reaction.count + (reaction.reacted ? -1 : 1),
+            count: reaction.count + (reaction.reacted ? -1 : 1)
           }
-        : reaction,
-    );
-    return { ...entry, reactions };
-  });
+        : reaction
+    )
+    return { ...entry, reactions }
+  })
 }
 
-function append(
-  entries: ReadonlyArray<TimelineEntry>,
-  id: string,
-  text: string,
-): Array<TimelineEntry> {
+function append(entries: ReadonlyArray<TimelineEntry>, id: string, text: string): Array<TimelineEntry> {
   const message: TimelineMessage = {
     kind: "message",
     id,
     author: people.jordan,
     at: new Date(),
-    text,
-  };
-  return [...entries, message];
+    text
+  }
+  return [...entries, message]
 }
 
 interface GroupRecord {
-  readonly id: string;
-  readonly name: string;
-  readonly visibility: GroupVisibility;
-  readonly memberCount: number;
-  readonly joined: boolean;
+  readonly id: string
+  readonly name: string
+  readonly visibility: GroupVisibility
+  readonly memberCount: number
+  readonly joined: boolean
   /** Names for a new group's welcome. */
-  readonly memberNames?: ReadonlyArray<string>;
+  readonly memberNames?: ReadonlyArray<string>
 }
 
 const threadTitles: Record<string, string> = {
   general: "Composer paste crash",
-  launches: "Launch plan for next week",
-};
-const threadRoots: Record<string, string> = { general: "m5", launches: "l1" };
+  launches: "Launch plan for next week"
+}
+const threadRoots: Record<string, string> = { general: "m5", launches: "l1" }
 
 export type WorkspaceView =
   | { readonly kind: "group"; readonly id: string }
-  | { readonly kind: "directory"; readonly tab: DirectoryTab };
+  | { readonly kind: "directory"; readonly tab: DirectoryTab }
 
 export interface GroupWorkspaceProps {
-  readonly view?: WorkspaceView;
-  readonly tab?: GroupTab;
-  readonly thread?: boolean;
-  readonly task?: string;
-  readonly settings?: GroupSettingsTab;
-  readonly creating?: boolean;
+  readonly view?: WorkspaceView
+  readonly tab?: GroupTab
+  readonly thread?: boolean
+  readonly task?: string
+  readonly settings?: GroupSettingsTab
+  readonly creating?: boolean
   /** The group is the workspace's general group: people never leave it or are removed. */
-  readonly general?: boolean;
+  readonly general?: boolean
 }
 
 /**
@@ -108,110 +104,107 @@ export interface GroupWorkspaceProps {
  * Groups directory with previews, group creation, and toasts.
  */
 export function GroupWorkspace(props: GroupWorkspaceProps) {
-  const [view, setView] = createSignal<WorkspaceView>(
-    props.view ?? { kind: "group", id: "general" },
-  );
-  const [groups, setGroups] = createSignal<ReadonlyArray<GroupRecord>>(workspaceGroups);
+  const [view, setView] = createSignal<WorkspaceView>(props.view ?? { kind: "group", id: "general" })
+  const [groups, setGroups] = createSignal<ReadonlyArray<GroupRecord>>(workspaceGroups)
   const [timelines, setTimelines] = createSignal<Record<string, ReadonlyArray<TimelineEntry>>>({
     general: groupEntries,
-    launches: launchesEntries,
-  });
-  const [tab, setTab] = createSignal<GroupTab>(props.tab ?? "threads");
-  const [thread, setThread] = createSignal(props.thread ?? false);
-  const [task, setTask] = createSignal(props.task);
+    launches: launchesEntries
+  })
+  const [tab, setTab] = createSignal<GroupTab>(props.tab ?? "threads")
+  const [thread, setThread] = createSignal(props.thread ?? false)
+  const [task, setTask] = createSignal(props.task)
   const [replies, setReplies] = createSignal<Record<string, ReadonlyArray<TimelineEntry>>>({
     general: threadEntries,
-    launches: launchesThread,
-  });
-  const [taskReplies, setTaskReplies] = createSignal(taskEntries);
-  const [drafts, setDrafts] = createSignal<Record<string, string>>({});
-  const [reply, setReply] = createSignal("");
-  const [taskReply, setTaskReply] = createSignal("");
-  const [taskRows, setTaskRows] = createSignal(sampleTasks);
-  const [query, setQuery] = createSignal("");
-  const [state, setState] = createSignal<TaskStateFilter>("all");
-  const [assignee, setAssignee] = createSignal("all");
-  const [sort, setSort] = createSignal<TaskSort>("activity");
-  const [directoryQuery, setDirectoryQuery] = createSignal("");
-  const [settings, setSettings] = createSignal(props.settings !== undefined);
-  const [settingsTab, setSettingsTab] = createSignal<GroupSettingsTab>(props.settings ?? "general");
+    launches: launchesThread
+  })
+  const [taskReplies, setTaskReplies] = createSignal(taskEntries)
+  const [drafts, setDrafts] = createSignal<Record<string, string>>({})
+  const [reply, setReply] = createSignal("")
+  const [taskReply, setTaskReply] = createSignal("")
+  const [taskRows, setTaskRows] = createSignal(sampleTasks)
+  const [query, setQuery] = createSignal("")
+  const [state, setState] = createSignal<TaskStateFilter>("all")
+  const [assignee, setAssignee] = createSignal("all")
+  const [sort, setSort] = createSignal<TaskSort>("activity")
+  const [directoryQuery, setDirectoryQuery] = createSignal("")
+  const [settings, setSettings] = createSignal(props.settings !== undefined)
+  const [settingsTab, setSettingsTab] = createSignal<GroupSettingsTab>(props.settings ?? "general")
   // Settings opened by /rename start with the name ready to edit.
-  const [renaming, setRenaming] = createSignal(false);
-  const [followed, setFollowed] = createSignal<Record<string, boolean>>({});
-  const [name, setName] = createSignal("general");
-  const [visibility, setVisibility] = createSignal<GroupVisibility>("private");
+  const [renaming, setRenaming] = createSignal(false)
+  const [followed, setFollowed] = createSignal<Record<string, boolean>>({})
+  const [name, setName] = createSignal("general")
+  const [visibility, setVisibility] = createSignal<GroupVisibility>("private")
   const [members, setMembers] = createSignal(
-    props.general ? groupMembers.map((person) => ({ ...person, removable: false })) : groupMembers,
-  );
-  const [candidates, setCandidates] = createSignal(workspaceCandidates);
-  const [selected, setSelected] = createSignal<Array<string>>([]);
-  const [creating, setCreating] = createSignal(props.creating ?? false);
-  const [newName, setNewName] = createSignal("");
-  const [newVisibility, setNewVisibility] = createSignal<GroupVisibility>("private");
-  const [newMembers, setNewMembers] = createSignal<Array<string>>([]);
+    props.general ? groupMembers.map((person) => ({ ...person, removable: false })) : groupMembers
+  )
+  const [candidates, setCandidates] = createSignal(workspaceCandidates)
+  const [selected, setSelected] = createSignal<Array<string>>([])
+  const [creating, setCreating] = createSignal(props.creating ?? false)
+  const [newName, setNewName] = createSignal("")
+  const [newVisibility, setNewVisibility] = createSignal<GroupVisibility>("private")
+  const [newMembers, setNewMembers] = createSignal<Array<string>>([])
   const [toasts, setToasts] = createSignal<
     ReadonlyArray<{ id: number; text: string; action?: { label: string; onClick: () => void } }>
-  >([]);
-  let toastId = 0;
+  >([])
+  let toastId = 0
   const toast = (text: string, action?: { label: string; onClick: () => void }) =>
-    setToasts([...toasts(), { id: ++toastId, text, action }]);
+    setToasts([...toasts(), { id: ++toastId, text, action }])
 
   const current = createMemo(() => {
-    const active = view();
-    return active.kind === "group" ? groups().find((group) => group.id === active.id) : undefined;
-  });
-  const joined = createMemo(() => groups().filter((group) => group.joined));
+    const active = view()
+    return active.kind === "group" ? groups().find((group) => group.id === active.id) : undefined
+  })
+  const joined = createMemo(() => groups().filter((group) => group.joined))
   const openGroup = (id: string) => {
-    setView({ kind: "group", id });
-    setTab("threads");
-    setThread(false);
-    setTask(undefined);
-  };
+    setView({ kind: "group", id })
+    setTab("threads")
+    setThread(false)
+    setTask(undefined)
+  }
   const join = (id: string) =>
     setGroups(
       groups().map((group) =>
-        group.id === id ? { ...group, joined: true, memberCount: group.memberCount + 1 } : group,
-      ),
-    );
+        group.id === id ? { ...group, joined: true, memberCount: group.memberCount + 1 } : group
+      )
+    )
   const directoryGroups = createMemo(() => {
-    const active = view();
-    if (active.kind !== "directory") return [];
-    const text = directoryQuery().trim().toLowerCase();
+    const active = view()
+    if (active.kind !== "directory") return []
+    const text = directoryQuery().trim().toLowerCase()
     return groups()
       .filter(
         (group) =>
           group.joined === (active.tab === "joined") &&
           (active.tab === "joined" || group.visibility === "public") &&
-          group.name.includes(text),
+          group.name.includes(text)
       )
-      .map((group) => ({ ...group, href: `#${group.id}` }));
-  });
+      .map((group) => ({ ...group, href: `#${group.id}` }))
+  })
   const visibleTasks = createMemo(() => {
-    const text = query().trim().toLowerCase();
+    const text = query().trim().toLowerCase()
     const rows = taskRows().filter(
       (row) =>
         (state() === "all" || row.state === state()) &&
-        (assignee() === "all" ||
-          (assignee() === "unassigned" ? !row.assignee : row.assignee?.id === assignee())) &&
-        (row.title.toLowerCase().includes(text) || row.key.toLowerCase().includes(text)),
-    );
-    if (sort() === "activity") return rows;
-    const byKey = [...rows].sort((a, b) => a.key.localeCompare(b.key));
-    return sort() === "oldest" ? byKey : byKey.reverse();
-  });
-  const openTask = createMemo(() => taskRows().find((row) => row.key === task()));
+        (assignee() === "all" || (assignee() === "unassigned" ? !row.assignee : row.assignee?.id === assignee())) &&
+        (row.title.toLowerCase().includes(text) || row.key.toLowerCase().includes(text))
+    )
+    if (sort() === "activity") return rows
+    const byKey = [...rows].sort((a, b) => a.key.localeCompare(b.key))
+    return sort() === "oldest" ? byKey : byKey.reverse()
+  })
+  const openTask = createMemo(() => taskRows().find((row) => row.key === task()))
   const updateTask = (key: string, change: Partial<(typeof sampleTasks)[number]>) =>
-    setTaskRows(taskRows().map((row) => (row.key === key ? { ...row, ...change } : row)));
+    setTaskRows(taskRows().map((row) => (row.key === key ? { ...row, ...change } : row)))
   // The sidebar's links are plain hashes here; follow the ones that name a group or the directory.
   onMount(() => {
     const follow = () => {
-      const target = window.location.hash.slice(1);
-      if (target === "groups") setView({ kind: "directory", tab: "joined" });
-      else if (groups().some((group) => group.id === target)) openGroup(target);
-    };
-    window.addEventListener("hashchange", follow);
-    onCleanup(() => window.removeEventListener("hashchange", follow));
-  });
+      const target = window.location.hash.slice(1)
+      if (target === "groups") setView({ kind: "directory", tab: "joined" })
+      else if (groups().some((group) => group.id === target)) openGroup(target)
+    }
+    window.addEventListener("hashchange", follow)
+    onCleanup(() => window.removeEventListener("hashchange", follow))
+  })
 
   const nav = () =>
     navigation({
@@ -220,15 +213,10 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
       directory: view().kind === "directory",
       threadOpen: thread(),
       onOpenDirectory: (next) => setView({ kind: "directory", tab: next }),
-      onCreateGroup: () => setCreating(true),
-    });
+      onCreateGroup: () => setCreating(true)
+    })
   return (
-    <Profiles.Root
-      profile={profile}
-      onMessage={() => {}}
-      onOpenAgent={() => {}}
-      onChangeName={() => {}}
-    >
+    <Profiles.Root profile={profile} onMessage={() => {}} onOpenAgent={() => {}} onChangeName={() => {}}>
       <Shell.Root>
         <WorkspaceNavigation {...nav()}>
           <HomeSidebar {...nav()} />
@@ -241,25 +229,22 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
                   tab={(directory() as { tab: DirectoryTab }).tab}
                   tabHref={(next) => `#${next}`}
                   onTabChange={(next) => {
-                    setDirectoryQuery("");
-                    setView({ kind: "directory", tab: next });
+                    setDirectoryQuery("")
+                    setView({ kind: "directory", tab: next })
                   }}
                   joinedCount={joined().length}
-                  discoverCount={
-                    groups().filter((group) => !group.joined && group.visibility === "public")
-                      .length
-                  }
+                  discoverCount={groups().filter((group) => !group.joined && group.visibility === "public").length}
                   query={directoryQuery()}
                   onQueryChange={setDirectoryQuery}
                   groups={directoryGroups()}
                   onOpenGroup={openGroup}
                   onJoin={(id) => {
-                    join(id);
-                    const group = groups().find((candidate) => candidate.id === id);
+                    join(id)
+                    const group = groups().find((candidate) => candidate.id === id)
                     toast(`Joined #${group?.name ?? id}`, {
                       label: "Open",
-                      onClick: () => openGroup(id),
-                    });
+                      onClick: () => openGroup(id)
+                    })
                   }}
                   onCreateGroup={() => setCreating(true)}
                 />
@@ -275,25 +260,23 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
                   tab={tab()}
                   tabHref={(next) => `#${next}`}
                   onTabChange={(next) => {
-                    setTab(next);
-                    setThread(false);
-                    setTask(undefined);
+                    setTab(next)
+                    setThread(false)
+                    setTask(undefined)
                   }}
                   taskCount={group().id === "general" ? taskRows().length : 0}
                   onOpenMembers={() => {
-                    setSettingsTab("members");
-                    setSettings(true);
+                    setSettingsTab("members")
+                    setSettings(true)
                   }}
                   onOpenNotifications={noop}
                   onOpenSettings={() => {
-                    setSettingsTab("general");
-                    setSettings(true);
+                    setSettingsTab("general")
+                    setSettings(true)
                   }}
                   onSearch={noop}
                   preview={
-                    group().joined
-                      ? undefined
-                      : { onBack: () => setView({ kind: "directory", tab: "discover" }) }
+                    group().joined ? undefined : { onBack: () => setView({ kind: "directory", tab: "discover" }) }
                   }
                 >
                   <Switch>
@@ -305,7 +288,7 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
                         onReact={(id, emoji) =>
                           setTimelines({
                             ...timelines(),
-                            [group().id]: react(timelines()[group().id] ?? [], id, emoji),
+                            [group().id]: react(timelines()[group().id] ?? [], id, emoji)
                           })
                         }
                         taskHref={(key) => `#${key}`}
@@ -315,38 +298,34 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
                             ? { name: "unfollow", description: `Stop following #${group().name}` }
                             : {
                                 name: "follow",
-                                description: `Follow #${group().name} to take part in its new threads`,
+                                description: `Follow #${group().name} to take part in its new threads`
                               },
-                          { name: "rename", description: `Rename #${group().name}` },
+                          { name: "rename", description: `Rename #${group().name}` }
                         ]}
                         onCommand={(command) => {
                           if (command === "rename") {
-                            setSettingsTab("general");
-                            setRenaming(true);
-                            setSettings(true);
-                            return;
+                            setSettingsTab("general")
+                            setRenaming(true)
+                            setSettings(true)
+                            return
                           }
-                          const following = command === "follow";
-                          setFollowed({ ...followed(), [group().id]: following });
-                          toast(
-                            following
-                              ? `Following #${group().name}`
-                              : `Unfollowed #${group().name}`,
-                          );
+                          const following = command === "follow"
+                          setFollowed({ ...followed(), [group().id]: following })
+                          toast(following ? `Following #${group().name}` : `Unfollowed #${group().name}`)
                         }}
                         draft={drafts()[group().id] ?? ""}
                         onDraftChange={(text) => setDrafts({ ...drafts(), [group().id]: text })}
                         onSend={(text) => {
-                          const list = timelines()[group().id] ?? [];
+                          const list = timelines()[group().id] ?? []
                           setTimelines({
                             ...timelines(),
-                            [group().id]: append(list, `sent-${list.length}`, text),
-                          });
-                          setDrafts({ ...drafts(), [group().id]: "" });
+                            [group().id]: append(list, `sent-${list.length}`, text)
+                          })
+                          setDrafts({ ...drafts(), [group().id]: "" })
                         }}
                         welcome={{
                           groupName: group().name,
-                          memberNames: group().memberNames ?? ["You"],
+                          memberNames: group().memberNames ?? ["You"]
                         }}
                         preview={
                           group().joined
@@ -354,9 +333,9 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
                             : {
                                 groupName: group().name,
                                 onJoin: () => {
-                                  join(group().id);
-                                  toast(`Joined #${group().name}`);
-                                },
+                                  join(group().id)
+                                  toast(`Joined #${group().name}`)
+                                }
                               }
                         }
                       />
@@ -396,7 +375,7 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
               onReact={(id, emoji) =>
                 setReplies({
                   ...replies(),
-                  [group().id]: react(replies()[group().id] ?? [], id, emoji),
+                  [group().id]: react(replies()[group().id] ?? [], id, emoji)
                 })
               }
               taskHref={(key) => `#${key}`}
@@ -404,12 +383,12 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
               draft={reply()}
               onDraftChange={setReply}
               onSend={(text) => {
-                const list = replies()[group().id] ?? [];
+                const list = replies()[group().id] ?? []
                 setReplies({
                   ...replies(),
-                  [group().id]: append(list, `reply-${list.length}`, text),
-                });
-                setReply("");
+                  [group().id]: append(list, `reply-${list.length}`, text)
+                })
+                setReply("")
               }}
             />
           )}
@@ -420,14 +399,14 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
               task={{
                 ...row(),
                 description: taskDescriptions[row().key] ?? "No description yet.",
-                discussionHref: "#thread",
+                discussionHref: "#thread"
               }}
               groupName={current()?.name ?? "general"}
               people={taskPeople}
               onStateChange={(next) => updateTask(row().key, { state: next })}
               onAssigneeChange={(id) =>
                 updateTask(row().key, {
-                  assignee: taskPeople.find((candidate) => candidate.id === id),
+                  assignee: taskPeople.find((candidate) => candidate.id === id)
                 })
               }
               onClose={() => setTask(undefined)}
@@ -437,8 +416,8 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
               draft={taskReply()}
               onDraftChange={setTaskReply}
               onSend={(text) => {
-                setTaskReplies(append(taskReplies(), `task-${taskReplies().length}`, text));
-                setTaskReply("");
+                setTaskReplies(append(taskReplies(), `task-${taskReplies().length}`, text))
+                setTaskReply("")
               }}
             />
           )}
@@ -447,10 +426,10 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
           open={settings()}
           focusName={renaming()}
           onClose={() => {
-            setSettings(false);
-            setRenaming(false);
-            setName(current()?.name ?? "general");
-            setVisibility(current()?.visibility ?? "private");
+            setSettings(false)
+            setRenaming(false)
+            setName(current()?.name ?? "general")
+            setVisibility(current()?.visibility ?? "private")
           }}
           groupName={current()?.name ?? "general"}
           tab={settingsTab()}
@@ -460,32 +439,23 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
           nameError={name().trim() ? undefined : "Give the group a name."}
           visibility={visibility()}
           onVisibilityChange={setVisibility}
-          changed={
-            name().trim() !== "" &&
-            (name() !== current()?.name || visibility() !== current()?.visibility)
-          }
+          changed={name().trim() !== "" && (name() !== current()?.name || visibility() !== current()?.visibility)}
           onSave={() =>
             setGroups(
               groups().map((group) =>
-                group.id === current()?.id
-                  ? { ...group, name: name().trim(), visibility: visibility() }
-                  : group,
-              ),
+                group.id === current()?.id ? { ...group, name: name().trim(), visibility: visibility() } : group
+              )
             )
           }
           member={current()?.joined ?? true}
           general={props.general}
           canAdd={!props.general}
           onLeave={() =>
-            setGroups(
-              groups().map((group) =>
-                group.id === current()?.id ? { ...group, joined: false } : group,
-              ),
-            )
+            setGroups(groups().map((group) => (group.id === current()?.id ? { ...group, joined: false } : group)))
           }
           onJoin={() => {
-            const id = current()?.id;
-            if (id) join(id);
+            const id = current()?.id
+            if (id) join(id)
           }}
           members={members()}
           onRemove={(id) => setMembers(members().filter((person) => person.id !== id))}
@@ -493,18 +463,18 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
           selected={selected()}
           onSelectedChange={setSelected}
           onAdd={() => {
-            const added = candidates().filter((person) => selected().includes(person.id));
-            setMembers([...members(), ...added.map((person) => ({ ...person, removable: true }))]);
-            setCandidates(candidates().filter((person) => !selected().includes(person.id)));
-            setSelected([]);
+            const added = candidates().filter((person) => selected().includes(person.id))
+            setMembers([...members(), ...added.map((person) => ({ ...person, removable: true }))])
+            setCandidates(candidates().filter((person) => !selected().includes(person.id)))
+            setSelected([])
           }}
         />
         <CreateGroup
           open={creating()}
           onClose={() => {
-            setCreating(false);
-            setNewName("");
-            setNewMembers([]);
+            setCreating(false)
+            setNewName("")
+            setNewMembers([])
           }}
           name={newName()}
           onNameChange={setNewName}
@@ -515,13 +485,11 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
           selected={newMembers()}
           onSelectedChange={setNewMembers}
           onCreate={() => {
-            const groupName = newName().trim().toLowerCase().replaceAll(/\s+/g, "-");
+            const groupName = newName().trim().toLowerCase().replaceAll(/\s+/g, "-")
             const memberNames = [
               "You",
-              ...creationCandidates
-                .filter((person) => newMembers().includes(person.id))
-                .map((person) => person.name),
-            ];
+              ...creationCandidates.filter((person) => newMembers().includes(person.id)).map((person) => person.name)
+            ]
             setGroups([
               {
                 id: groupName,
@@ -529,15 +497,15 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
                 visibility: newVisibility(),
                 memberCount: memberNames.length,
                 joined: true,
-                memberNames,
+                memberNames
               },
-              ...groups(),
-            ]);
-            setCreating(false);
-            setNewName("");
-            setNewMembers([]);
-            openGroup(groupName);
-            toast("Group created");
+              ...groups()
+            ])
+            setCreating(false)
+            setNewName("")
+            setNewMembers([])
+            openGroup(groupName)
+            toast("Group created")
           }}
         />
         <Toast.Region>
@@ -554,5 +522,5 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
         </Toast.Region>
       </Shell.Root>
     </Profiles.Root>
-  );
+  )
 }

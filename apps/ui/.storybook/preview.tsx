@@ -1,16 +1,16 @@
-import type { Decorator, DefinePreviewInput } from "storybook-solidjs-vite";
-import { Show } from "solid-js";
-import { Theme, paletteOptions, type ColorPalette } from "../src/foundations/theme/index.ts";
-import "../src/foundations/typography/fonts.ts";
-import * as s from "./preview.css.ts";
+import { Show } from "solid-js"
+import type { Decorator, DefinePreviewInput } from "storybook-solidjs-vite"
+import { Theme, paletteOptions, type ColorPalette } from "../src/foundations/theme/index.ts"
+import "../src/foundations/typography/fonts.ts"
+import * as s from "./preview.css.ts"
 
-type Mode = "light" | "dark" | "both";
+type Mode = "light" | "dark" | "both"
 
 /** Wraps every story in the toolbar's mode, or shows light and dark side by side. */
 const withTheme: Decorator = (Story, context) => {
-  const mode = (): Mode => context.globals["mode"] ?? "light";
-  const palette = (): ColorPalette => context.globals["palette"] ?? "neutral";
-  const layout = context.parameters["layout"] === "fullscreen" ? s.fullscreen : s.frame;
+  const mode = (): Mode => context.globals["mode"] ?? "light"
+  const palette = (): ColorPalette => context.globals["palette"] ?? "neutral"
+  const layout = context.parameters["layout"] === "fullscreen" ? s.fullscreen : s.frame
   return (
     <Show
       when={mode() === "both"}
@@ -29,8 +29,8 @@ const withTheme: Decorator = (Story, context) => {
         </Theme>
       </div>
     </Show>
-  );
-};
+  )
+}
 
 const preview = {
   decorators: [withTheme],
@@ -41,8 +41,8 @@ const preview = {
         title: "Palette",
         icon: "paintbrush",
         items: paletteOptions.map((option) => ({ value: option.value, title: option.label })),
-        dynamicTitle: true,
-      },
+        dynamicTitle: true
+      }
     },
     mode: {
       description: "Color mode",
@@ -52,11 +52,11 @@ const preview = {
         items: [
           { value: "light", title: "Light" },
           { value: "dark", title: "Dark" },
-          { value: "both", title: "Side by side" },
+          { value: "both", title: "Side by side" }
         ],
-        dynamicTitle: true,
-      },
-    },
+        dynamicTitle: true
+      }
+    }
   },
   initialGlobals: { mode: "light", palette: "neutral" },
   parameters: {
@@ -65,8 +65,8 @@ const preview = {
     controls: { expanded: true },
     a11y: { test: "error" },
     options: {
-      storySort: { order: ["Foundations", "Components", "Patterns", "Screens", "Site"] },
-    },
-  },
-} satisfies DefinePreviewInput;
-export default preview;
+      storySort: { order: ["Foundations", "Components", "Patterns", "Screens", "Site"] }
+    }
+  }
+} satisfies DefinePreviewInput
+export default preview

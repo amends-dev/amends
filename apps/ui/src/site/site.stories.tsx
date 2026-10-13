@@ -1,8 +1,8 @@
-import { For } from "solid-js";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { expect, within } from "storybook/test";
-import { ButtonLink } from "../components/button/index.ts";
-import "./fonts.ts";
+import { For } from "solid-js"
+import type { Meta, StoryObj } from "storybook-solidjs-vite"
+import { expect, within } from "storybook/test"
+import { ButtonLink } from "../components/button/index.ts"
+import "./fonts.ts"
 import {
   AppPreview,
   CodeWindow,
@@ -16,17 +16,17 @@ import {
   SiteFooter,
   SiteHeader,
   Steps,
-  type FeatureArtKind,
-} from "./index.ts";
+  type FeatureArtKind
+} from "./index.ts"
 
 const meta = {
   title: "Site/Sections",
-  parameters: { layout: "fullscreen" as const },
-} satisfies Meta;
-export default meta;
-type Story = StoryObj;
+  parameters: { layout: "fullscreen" as const }
+} satisfies Meta
+export default meta
+type Story = StoryObj
 
-const github = "https://github.com/amends-dev/amends";
+const github = "https://github.com/amends-dev/amends"
 
 function Header(props: { current?: "packages" | "docs" }) {
   return (
@@ -43,15 +43,12 @@ function Header(props: { current?: "packages" | "docs" }) {
       </SiteHeader.Links>
       <SiteHeader.Action href="/docs/self-host">Self-host</SiteHeader.Action>
     </SiteHeader.Root>
-  );
+  )
 }
 
 function Footer() {
   return (
-    <SiteFooter.Root
-      tagline="Where people and agents work together."
-      legal="Released under the MIT license."
-    >
+    <SiteFooter.Root tagline="Where people and agents work together." legal="Released under the MIT license.">
       <SiteFooter.Column title="Product">
         <SiteFooter.Link href="/docs/self-host">Self-host</SiteFooter.Link>
       </SiteFooter.Column>
@@ -64,31 +61,31 @@ function Footer() {
         <SiteFooter.Link href={`${github}/blob/main/LICENSE`}>License</SiteFooter.Link>
       </SiteFooter.Column>
     </SiteFooter.Root>
-  );
+  )
 }
 
 const features: ReadonlyArray<{ kind: FeatureArtKind; title: string; text: string }> = [
   {
     kind: "threads",
     title: "Threads",
-    text: "Talk in groups and direct messages. Replies stay in their thread, and the inbox gathers what needs you.",
+    text: "Talk in groups and direct messages. Replies stay in their thread, and the inbox gathers what needs you."
   },
   {
     kind: "tasks",
     title: "Tasks",
-    text: "Any thread can become a task, with a status, a priority, and an assignee: a person or an agent.",
+    text: "Any thread can become a task, with a status, a priority, and an assignee: a person or an agent."
   },
   {
     kind: "agents",
     title: "Agents",
-    text: "Mention an agent and it takes a turn in the thread, then posts its answer.",
+    text: "Mention an agent and it takes a turn in the thread, then posts its answer."
   },
   {
     kind: "connections",
     title: "Connections",
-    text: "Connect the models, sandboxes, agents, and tools your workspace uses.",
-  },
-];
+    text: "Connect the models, sandboxes, agents, and tools your workspace uses."
+  }
+]
 
 // No import lines: the package boundary check reads them as this file's own imports.
 const code = `const program = Effect.gen(function* () {
@@ -96,7 +93,7 @@ const code = `const program = Effect.gen(function* () {
   const session = yield* harness.createSession({ id });
   const answer = yield* session.generate({ prompt: "Say hello" });
   return answer.text;
-});`;
+});`
 
 /** The home page's sections in order, as the site composes them. */
 export const Home = {
@@ -108,8 +105,7 @@ export const Home = {
           <Hero.Badge>Open source · MIT license</Hero.Badge>
           <Hero.Title>Where people and agents work together</Hero.Title>
           <Hero.Lead>
-            Conversations live in threads, work becomes tasks, and agents take turns when a thread
-            needs them.
+            Conversations live in threads, work becomes tasks, and agents take turns when a thread needs them.
           </Hero.Lead>
           <Hero.Actions centered>
             <ButtonLink href="/docs/self-host" variant="primary" size="large">
@@ -155,12 +151,8 @@ export const Home = {
               <Section.Intro>Packages of their own on npm, built on Effect.</Section.Intro>
             </Section.Header>
             <Section.Rows>
-              <Section.Row term="@amends-dev/harness">
-                Runs an agent and streams its turns.
-              </Section.Row>
-              <Section.Row term="@amends-dev/sandbox">
-                The contract every sandbox implements.
-              </Section.Row>
+              <Section.Row term="@amends-dev/harness">Runs an agent and streams its turns.</Section.Row>
+              <Section.Row term="@amends-dev/sandbox">The contract every sandbox implements.</Section.Row>
             </Section.Rows>
             <Section.Actions>
               <ButtonLink href="/packages" variant="primary" size="large">
@@ -193,16 +185,14 @@ export const Home = {
     </>
   ),
   play: async ({ canvasElement }) => {
-    const page = within(canvasElement);
+    const page = within(canvasElement)
     await expect(page.getAllByRole("heading", { level: 1 })[0]).toHaveTextContent(
-      "Where people and agents work together",
-    );
-    await expect(
-      page.getAllByRole("img", { name: /an agent answers a question/ })[0],
-    ).toBeInTheDocument();
-    await expect(page.getAllByRole("link", { name: "Packages" })[0]).toBeInTheDocument();
-  },
-} satisfies Story;
+      "Where people and agents work together"
+    )
+    await expect(page.getAllByRole("img", { name: /an agent answers a question/ })[0]).toBeInTheDocument()
+    await expect(page.getAllByRole("link", { name: "Packages" })[0]).toBeInTheDocument()
+  }
+} satisfies Story
 
 /** The packages page's headline, a contract's and an adapter's card, and the steps. */
 export const Packages = {
@@ -221,7 +211,7 @@ export const Packages = {
             program="Your Effect program"
             contracts={[
               { name: "@amends-dev/harness", adapters: ["harness-amends", "harness-opencode"] },
-              { name: "@amends-dev/sandbox", adapters: ["sandbox-local", "sandbox-daytona"] },
+              { name: "@amends-dev/sandbox", adapters: ["sandbox-local", "sandbox-daytona"] }
             ]}
           />
         </Hero.Aside>
@@ -235,14 +225,10 @@ export const Packages = {
             {(name) => (
               <li>
                 <PackageCard.Root name={`@amends-dev/${name}`} kind="Contract" version="0.1.0">
-                  <PackageCard.Description>
-                    What every implementation agrees on.
-                  </PackageCard.Description>
+                  <PackageCard.Description>What every implementation agrees on.</PackageCard.Description>
                   <PackageCard.Links>
                     <PackageCard.Link href={`/docs/packages/${name}`}>Docs</PackageCard.Link>
-                    <PackageCard.Link href={`https://www.npmjs.com/package/@amends-dev/${name}`}>
-                      npm
-                    </PackageCard.Link>
+                    <PackageCard.Link href={`https://www.npmjs.com/package/@amends-dev/${name}`}>npm</PackageCard.Link>
                   </PackageCard.Links>
                 </PackageCard.Root>
               </li>
@@ -255,9 +241,7 @@ export const Packages = {
           <Section.Part>
             <Steps.Root>
               <Steps.Step title="Make an agent">From an adapter.</Steps.Step>
-              <Steps.Step title="Run it with a harness">
-                Sessions and turns in one format.
-              </Steps.Step>
+              <Steps.Step title="Run it with a harness">Sessions and turns in one format.</Steps.Step>
             </Steps.Root>
           </Section.Part>
           <Section.Part>
@@ -269,13 +253,10 @@ export const Packages = {
     </>
   ),
   play: async ({ canvasElement }) => {
-    const page = within(canvasElement);
-    await expect(page.getAllByRole("link", { name: "Packages" })[0]).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    await expect(
-      page.getAllByRole("list", { name: "Implementations of @amends-dev/harness" })[0],
-    ).toHaveTextContent("harness-amendsharness-opencode");
-  },
-} satisfies Story;
+    const page = within(canvasElement)
+    await expect(page.getAllByRole("link", { name: "Packages" })[0]).toHaveAttribute("aria-current", "page")
+    await expect(page.getAllByRole("list", { name: "Implementations of @amends-dev/harness" })[0]).toHaveTextContent(
+      "harness-amendsharness-opencode"
+    )
+  }
+} satisfies Story

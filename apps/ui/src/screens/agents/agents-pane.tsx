@@ -1,17 +1,18 @@
-import { For, Match, Show, Switch, type JSX } from "solid-js";
-import { IconMarkAgents } from "@amends-dev/icons";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Button } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { EmptyState } from "../../components/empty-state/index.ts";
-import { SearchField } from "../../components/input/index.ts";
-import { markTone, type Status } from "../../components/status-mark/index.ts";
-import { Tabs } from "../../components/tabs/index.ts";
-import { Tooltip } from "../../components/tooltip/index.ts";
-import { TurnActivity } from "../../components/turn-status/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
+import { IconMarkAgents } from "@amends-dev/icons"
+import { For, Match, Show, Switch, type JSX } from "solid-js"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { EmptyState } from "../../components/empty-state/index.ts"
+import { SearchField } from "../../components/input/index.ts"
+import { markTone, type Status } from "../../components/status-mark/index.ts"
+import { Tabs } from "../../components/tabs/index.ts"
+import { Tooltip } from "../../components/tooltip/index.ts"
+import { TurnActivity } from "../../components/turn-status/index.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import * as s from "./agents.css.ts"
 import {
   AgentsAlert,
   agentStatus,
@@ -21,34 +22,33 @@ import {
   sandboxLine,
   turnStateWord,
   type AgentSummary,
-  type AgentsFailure,
-} from "./wording.tsx";
-import * as s from "./agents.css.ts";
+  type AgentsFailure
+} from "./wording.tsx"
 
 /** All agents, or those that need setup before they can run. */
-export type AgentsTab = "all" | "needs-setup";
+export type AgentsTab = "all" | "needs-setup"
 
 const tabs: ReadonlyArray<{ readonly id: AgentsTab; readonly label: string }> = [
   { id: "all", label: "All" },
-  { id: "needs-setup", label: "Needs setup" },
-];
+  { id: "needs-setup", label: "Needs setup" }
+]
 
 export interface AgentsPaneProps {
   /** Under the title on phones. */
-  readonly workspaceName: string;
-  readonly tab: AgentsTab;
-  readonly tabHref: (tab: AgentsTab) => string;
+  readonly workspaceName: string
+  readonly tab: AgentsTab
+  readonly tabHref: (tab: AgentsTab) => string
   /** Switches tabs in place of following their links. */
-  readonly onTabChange?: (tab: AgentsTab) => void;
+  readonly onTabChange?: (tab: AgentsTab) => void
   /** Agents in each tab, once they have loaded. */
-  readonly counts?: Readonly<Record<AgentsTab, number>>;
+  readonly counts?: Readonly<Record<AgentsTab, number>>
   /** Shows Add agent, for a reader who may add one. */
-  readonly onAdd?: () => void;
+  readonly onAdd?: () => void
   /** In place of the list, while agents load or when they cannot. */
-  readonly status?: "loading" | "failed" | "unavailable";
-  readonly onRetry?: () => void;
+  readonly status?: "loading" | "failed" | "unavailable"
+  readonly onRetry?: () => void
   /** The list: AgentList. */
-  readonly children: JSX.Element;
+  readonly children: JSX.Element
 }
 
 /** The workspace's agents in the main content: All, then those that need setup. */
@@ -79,9 +79,9 @@ export function AgentsPane(props: AgentsPaneProps) {
                   current={props.tab === tab.id}
                   count={props.counts?.[tab.id]}
                   onClick={(event: MouseEvent) => {
-                    if (!props.onTabChange) return;
-                    event.preventDefault();
-                    props.onTabChange(tab.id);
+                    if (!props.onTabChange) return
+                    event.preventDefault()
+                    props.onTabChange(tab.id)
                   }}
                 >
                   {tab.label}
@@ -123,28 +123,22 @@ export function AgentsPane(props: AgentsPaneProps) {
         </Match>
         <Match when={props.status === "failed"}>
           <Pane.Body>
-            <EmptyState
-              art="came-apart"
-              title="Couldn’t load agents"
-              lines={["Try again once the host is reachable."]}
-            >
-              <Show when={props.onRetry}>
-                {(retry) => <Button onClick={() => retry()()}>Retry</Button>}
-              </Show>
+            <EmptyState art="came-apart" title="Couldn’t load agents" lines={["Try again once the host is reachable."]}>
+              <Show when={props.onRetry}>{(retry) => <Button onClick={() => retry()()}>Retry</Button>}</Show>
             </EmptyState>
           </Pane.Body>
         </Match>
       </Switch>
     </Pane.Root>
-  );
+  )
 }
 
 /** An agent's avatar, with its state as a patch on the corner and the state's words on hover. */
 export function AgentAvatar(props: {
-  readonly name: string;
-  readonly size: 32 | 40;
-  readonly status?: Status;
-  readonly class?: string;
+  readonly name: string
+  readonly size: 32 | 40
+  readonly status?: Status
+  readonly class?: string
 }) {
   const avatar = (className?: string) => (
     <Avatar
@@ -156,39 +150,34 @@ export function AgentAvatar(props: {
       class={className}
       decorative
     />
-  );
+  )
   return (
     <Show when={props.status} fallback={avatar(props.class)}>
       {(status) => (
-        <Tooltip
-          title={status().label}
-          detail={status().detail}
-          tone={markTone(status().mark)}
-          class={props.class}
-        >
+        <Tooltip title={status().label} detail={status().detail} tone={markTone(status().mark)} class={props.class}>
           {avatar()}
         </Tooltip>
       )}
     </Show>
-  );
+  )
 }
 
 export interface AgentListProps {
-  readonly tab: AgentsTab;
-  readonly query: string;
-  readonly onQueryChange: (query: string) => void;
+  readonly tab: AgentsTab
+  readonly query: string
+  readonly onQueryChange: (query: string) => void
   /** The tab's agents after the search. */
-  readonly agents: ReadonlyArray<AgentSummary>;
+  readonly agents: ReadonlyArray<AgentSummary>
   /** Agents in the workspace, whatever the tab and search. */
-  readonly total: number;
+  readonly total: number
   /** Each agent's page. */
-  readonly agentHref: (id: string) => string;
+  readonly agentHref: (id: string) => string
   /** Starts adding an agent, for a reader who may. */
-  readonly onAdd?: () => void;
+  readonly onAdd?: () => void
   /** A read or change that failed, outside any dialog. */
-  readonly failure?: AgentsFailure;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly failure?: AgentsFailure
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 /**
@@ -198,18 +187,12 @@ export interface AgentListProps {
  * name. With no agents yet it offers adding one. Place it in AgentsPane.
  */
 export function AgentList(props: AgentListProps) {
-  const search = () => props.query.trim();
+  const search = () => props.query.trim()
   const alert = () => (
     <Show when={props.failure}>
-      {(failure) => (
-        <AgentsAlert
-          failure={failure()}
-          onRefresh={props.onRefresh}
-          refreshing={props.refreshing}
-        />
-      )}
+      {(failure) => <AgentsAlert failure={failure()} onRefresh={props.onRefresh} refreshing={props.refreshing} />}
     </Show>
-  );
+  )
   return (
     <Show
       when={props.total > 0}
@@ -222,7 +205,7 @@ export function AgentList(props: AgentListProps) {
             lines={[
               props.onAdd
                 ? "Add an agent: a member that works on a harness and a model your connections give."
-                : "An administrator can add agents to your workspace.",
+                : "An administrator can add agents to your workspace."
             ]}
           >
             <Show when={props.onAdd}>
@@ -276,16 +259,11 @@ export function AgentList(props: AgentListProps) {
             <ul class={s.list} aria-label="Agents">
               <Keyed each={props.agents} by={(agent) => agent.id}>
                 {(agent) => {
-                  const status = () => agentStatus(agent().issues, agent().activity);
+                  const status = () => agentStatus(agent().issues, agent().activity)
                   return (
                     <li>
                       <a href={props.agentHref(agent().id)} class={s.row}>
-                        <AgentAvatar
-                          name={agent().name}
-                          size={32}
-                          status={status()}
-                          class={s.rowAvatar}
-                        />
+                        <AgentAvatar name={agent().name} size={32} status={status()} class={s.rowAvatar} />
                         <span class={s.rowText}>
                           <span class={s.rowName}>
                             {agent().name}
@@ -312,9 +290,7 @@ export function AgentList(props: AgentListProps) {
                         </span>
                         <span class={s.rowColumn}>
                           <span class={s.rowValue}>{agent().model.name ?? agent().model.id}</span>
-                          <span class={s.rowDetail}>
-                            {agent().model.connection.name ?? "Removed connection"}
-                          </span>
+                          <span class={s.rowDetail}>{agent().model.connection.name ?? "Removed connection"}</span>
                         </span>
                         <span class={s.rowColumn}>
                           <Show when={agent().activity}>
@@ -332,7 +308,7 @@ export function AgentList(props: AgentListProps) {
                         </span>
                       </a>
                     </li>
-                  );
+                  )
                 }}
               </Keyed>
             </ul>
@@ -340,5 +316,5 @@ export function AgentList(props: AgentListProps) {
         </div>
       </Pane.Body>
     </Show>
-  );
+  )
 }

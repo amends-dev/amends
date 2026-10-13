@@ -4,10 +4,11 @@
  *
  * @since 0.1.0
  */
-import * as Effect from "effect/Effect";
-import * as Projection from "../journal/Projection.ts";
-import * as WorkspaceFacts from "./WorkspaceFacts.ts";
-import * as WorkspaceStore from "./WorkspaceStore.ts";
+
+import * as Effect from "effect/Effect"
+import * as Projection from "../journal/Projection.ts"
+import * as WorkspaceFacts from "./WorkspaceFacts.ts"
+import * as WorkspaceStore from "./WorkspaceStore.ts"
 
 /**
  * Inserts the workspace on its initialization, sets its name on each rename, and moves its owner
@@ -21,18 +22,18 @@ export const definition = Projection.make("workspace.metadata", { version: 1 })
   .on(
     WorkspaceFacts.Renamed,
     Effect.fn("WorkspaceProjection.renamed")(function* ({ payload }) {
-      yield* (yield* WorkspaceStore.WorkspaceStore).rename(payload);
-    }),
+      yield* (yield* WorkspaceStore.WorkspaceStore).rename(payload)
+    })
   )
   .on(
     WorkspaceFacts.Initialized,
     Effect.fn("WorkspaceProjection.initialized")(function* ({ payload }) {
-      yield* (yield* WorkspaceStore.WorkspaceStore).insert(payload);
-    }),
+      yield* (yield* WorkspaceStore.WorkspaceStore).insert(payload)
+    })
   )
   .on(
     WorkspaceFacts.OwnershipTransferred,
     Effect.fn("WorkspaceProjection.ownershipTransferred")(function* ({ payload }) {
-      yield* (yield* WorkspaceStore.WorkspaceStore).transferOwnership(payload);
-    }),
-  );
+      yield* (yield* WorkspaceStore.WorkspaceStore).transferOwnership(payload)
+    })
+  )

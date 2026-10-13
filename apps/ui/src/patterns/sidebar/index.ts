@@ -1,4 +1,4 @@
-export * as Sidebar from "./sidebar.tsx";
+export * as Sidebar from "./sidebar.tsx"
 export type {
   BodyProps as SidebarBodyProps,
   EmptyProps as SidebarEmptyProps,
@@ -11,5 +11,5 @@ export type {
   SectionHeaderProps as SidebarSectionHeaderProps,
   SectionProps as SidebarSectionProps,
   SubItemProps as SidebarSubItemProps,
-  WorkspaceProps as SidebarWorkspaceProps,
-} from "./sidebar.tsx";
+  WorkspaceProps as SidebarWorkspaceProps
+} from "./sidebar.tsx"

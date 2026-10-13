@@ -189,11 +189,11 @@ chooses its `builtinTier`, `member`, `administrator`, or `owner`; groups supply 
 default target kind, but never a tier:
 
 ```ts
-import { Permission } from "@amends-dev/core/authorization";
+import { Permission } from "@amends-dev/core/authorization"
 
-const member = Permission.makeGroup("member", { targetKind: "Member" });
-const Read = member.make("read", { builtinTier: "member" });
-const Remove = member.make("remove", { builtinTier: "administrator" });
+const member = Permission.makeGroup("member", { targetKind: "Member" })
+const Read = member.make("read", { builtinTier: "member" })
+const Remove = member.make("remove", { builtinTier: "administrator" })
 ```
 
 `PermissionCatalog` validates and freezes the registered definitions, and `BuiltinRoles.make` builds
@@ -763,13 +763,13 @@ checks an adapter's driver, and its `layerMemory` is the reference implementatio
 `index.ts` composes the layers and implements nothing itself.
 
 ```ts
-import { Log, Transaction } from "@amends-dev/core/journal";
-import { Effect } from "effect";
+import { Log, Transaction } from "@amends-dev/core/journal"
+import { Effect } from "effect"
 
 const makeLogs = Effect.gen(function* () {
-  const transaction = yield* Transaction.make();
-  return yield* Log.make().pipe(Effect.provideService(Transaction.Transaction, transaction));
-});
+  const transaction = yield* Transaction.make()
+  return yield* Log.make().pipe(Effect.provideService(Transaction.Transaction, transaction))
+})
 ```
 
 This still requires host storage, from which the coordinator takes its workspace. `Log.layer`

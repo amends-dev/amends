@@ -9,7 +9,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Storage failed while reading or writing, for the `cause` given.
@@ -18,10 +19,10 @@ import * as Schema from "effect/Schema";
  * @since 0.1.0
  */
 export class Failed extends Schema.TaggedClass<Failed>()("Failed", {
-  cause: Schema.Defect(),
+  cause: Schema.Defect()
 }) {
   get message(): string {
-    return this.cause instanceof Error ? this.cause.message : String(this.cause);
+    return this.cause instanceof Error ? this.cause.message : String(this.cause)
   }
 }
 
@@ -34,10 +35,10 @@ export class Failed extends Schema.TaggedClass<Failed>()("Failed", {
  * @since 0.1.0
  */
 export class Rejected extends Schema.TaggedClass<Rejected>()("Rejected", {
-  description: Schema.String,
+  description: Schema.String
 }) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -49,10 +50,10 @@ export class Rejected extends Schema.TaggedClass<Rejected>()("Rejected", {
  * @since 0.1.0
  */
 export class Contended extends Schema.TaggedClass<Contended>()("Contended", {
-  description: Schema.String,
+  description: Schema.String
 }) {
   get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -62,13 +63,13 @@ export class Contended extends Schema.TaggedClass<Contended>()("Contended", {
  * @category schemas
  * @since 0.1.0
  */
-export const Reason = Schema.Union([Failed, Rejected, Contended]);
+export const Reason = Schema.Union([Failed, Rejected, Contended])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Reason = typeof Reason.Type;
+export type Reason = typeof Reason.Type
 
 /**
  * A store's operation failed, for the `reason` given. `store` and `operation` name where, as
@@ -80,10 +81,10 @@ export type Reason = typeof Reason.Type;
 export class StoreError extends Schema.TaggedError<StoreError>()("StoreError", {
   store: Schema.String,
   operation: Schema.String,
-  reason: Reason,
+  reason: Reason
 }) {
   override get message(): string {
-    return `${this.store}.${this.operation}: ${this.reason.message}`;
+    return `${this.store}.${this.operation}: ${this.reason.message}`
   }
 }
 
@@ -100,8 +101,8 @@ export const failed =
     new StoreError({
       store,
       operation,
-      reason: cause instanceof StoreError ? cause.reason : new Failed({ cause }),
-    });
+      reason: cause instanceof StoreError ? cause.reason : new Failed({ cause })
+    })
 
 /**
  * The store's operation refused a write, as `description` says.
@@ -110,7 +111,7 @@ export const failed =
  * @since 0.1.0
  */
 export const rejected = (store: string, operation: string, description: string): StoreError =>
-  new StoreError({ store, operation, reason: new Rejected({ description }) });
+  new StoreError({ store, operation, reason: new Rejected({ description }) })
 
 /**
  * Another writer held or changed what the store's operation needed, as `description` says.
@@ -119,4 +120,4 @@ export const rejected = (store: string, operation: string, description: string):
  * @since 0.1.0
  */
 export const contended = (store: string, operation: string, description: string): StoreError =>
-  new StoreError({ store, operation, reason: new Contended({ description }) });
+  new StoreError({ store, operation, reason: new Contended({ description }) })

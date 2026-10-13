@@ -1,5 +1,5 @@
-import { defineConfig } from "vitest/config";
-import { onUnhandledError } from "./scripts/testing/unhandled-errors.ts";
+import { defineConfig } from "vitest/config"
+import { onUnhandledError } from "./scripts/testing/unhandled-errors.ts"
 
 export default defineConfig({
   test: {
@@ -20,9 +20,9 @@ export default defineConfig({
             "packages/*/test/**/*.test.ts",
             "adapters/sandbox-local/test/**/*.test.ts",
             "adapters/sandbox-daytona/test/**/*.test.ts",
-            "adapters/harness-*/test/**/*.test.ts",
-          ],
-        },
+            "adapters/harness-*/test/**/*.test.ts"
+          ]
+        }
       },
       {
         test: {
@@ -32,21 +32,21 @@ export default defineConfig({
           isolate: false,
           testTimeout: 20_000,
           globalSetup: ["adapters/storage-postgresql/test/global-setup.ts"],
-          include: ["adapters/storage-postgresql/test/**/*.test.ts", "hosts/*/test/**/*.test.ts"],
-        },
+          include: ["adapters/storage-postgresql/test/**/*.test.ts", "hosts/*/test/**/*.test.ts"]
+        }
       },
       {
         test: {
           name: "@amends-dev/site",
           environment: "node",
-          include: ["apps/site/test/**/*.test.ts"],
-        },
+          include: ["apps/site/test/**/*.test.ts"]
+        }
       },
       "apps/icons/vite.config.ts",
       "apps/ui/vite.config.ts",
       "apps/client/vite.config.ts",
       "apps/web/vite.config.ts",
-      "apps/desktop/vite.config.ts",
-    ],
-  },
-});
+      "apps/desktop/vite.config.ts"
+    ]
+  }
+})

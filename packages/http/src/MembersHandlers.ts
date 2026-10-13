@@ -5,9 +5,10 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { MemberService } from "@amends-dev/core/workspace";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+
+import { MemberService } from "@amends-dev/core/workspace"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Api from "./Api.ts"
 
 /**
  * Register member handlers.
@@ -18,11 +19,8 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 export const layer = HttpApiBuilder.group(Api.Api, "members", (handlers) =>
   handlers.handleAll({
     list: () => MemberService.MemberService.use((memberService) => memberService.list),
-    get: ({ params }) =>
-      MemberService.MemberService.use((memberService) => memberService.get(params.memberId)),
-    rename: ({ payload }) =>
-      MemberService.MemberService.use((memberService) => memberService.rename(payload.name)),
-    remove: ({ params }) =>
-      MemberService.MemberService.use((memberService) => memberService.remove(params.memberId)),
-  }),
-);
+    get: ({ params }) => MemberService.MemberService.use((memberService) => memberService.get(params.memberId)),
+    rename: ({ payload }) => MemberService.MemberService.use((memberService) => memberService.rename(payload.name)),
+    remove: ({ params }) => MemberService.MemberService.use((memberService) => memberService.remove(params.memberId))
+  })
+)

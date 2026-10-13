@@ -1,9 +1,9 @@
-import { Show, createUniqueId, splitProps, type JSX } from "solid-js";
+import { Show, createUniqueId, splitProps, type JSX } from "solid-js"
 
-export const iconSizes = { xs: "0.75rem", sm: "1rem", md: "1.25rem", lg: "1.5rem" } as const;
-export const iconWeights = [1.5, 1.75, 2] as const;
-export type IconSize = keyof typeof iconSizes | number;
-export type IconWeight = (typeof iconWeights)[number];
+export const iconSizes = { xs: "0.75rem", sm: "1rem", md: "1.25rem", lg: "1.5rem" } as const
+export const iconWeights = [1.5, 1.75, 2] as const
+export type IconSize = keyof typeof iconSizes | number
+export type IconWeight = (typeof iconWeights)[number]
 
 export type IconProps = Omit<
   JSX.SvgSVGAttributes<SVGSVGElement>,
@@ -27,22 +27,22 @@ export type IconProps = Omit<
   | "focusable"
 > & {
   /** Named sizes scale with root text; numbers are explicit CSS pixels. Default md. */
-  size?: IconSize;
+  size?: IconSize
   /** Stroke width on the 24-unit canvas, independent of rendered size. Default 2. */
-  weight?: IconWeight;
+  weight?: IconWeight
   /** Omit for decorative icons, including glyphs inside a named button. */
-  label?: string;
-};
+  label?: string
+}
 
 /** Private rendering contract shared by generated icons. */
 export function IconSvg(props: IconProps & { children: JSX.Element }): JSX.Element {
-  const [local, native] = splitProps(props, ["size", "weight", "label", "children"]);
-  const titleId = createUniqueId();
-  const label = () => local.label?.trim();
+  const [local, native] = splitProps(props, ["size", "weight", "label", "children"])
+  const titleId = createUniqueId()
+  const label = () => local.label?.trim()
   const dimension = () => {
-    const size = local.size ?? "md";
-    return typeof size === "number" ? size : iconSizes[size];
-  };
+    const size = local.size ?? "md"
+    return typeof size === "number" ? size : iconSizes[size]
+  }
   return (
     <svg
       {...native}
@@ -64,5 +64,5 @@ export function IconSvg(props: IconProps & { children: JSX.Element }): JSX.Eleme
       <Show when={label()}>{(name) => <title id={titleId}>{name()}</title>}</Show>
       {local.children}
     </svg>
-  );
+  )
 }

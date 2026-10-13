@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Names one participation: one participant's spell of taking part in a thread, from joining to
@@ -13,10 +14,10 @@ import * as Schema from "effect/Schema";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadParticipationId"));
+export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadParticipationId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type Id = typeof Id.Type

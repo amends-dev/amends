@@ -7,15 +7,16 @@
  *
  * @since 0.1.0
  */
-import { Member } from "@amends-dev/core/workspace";
-import * as Schema from "effect/Schema";
-import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import * as Authentication from "./Authentication.ts";
-import * as WorkspaceMember from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
 
-const params = { memberId: Member.Id };
+import { Member } from "@amends-dev/core/workspace"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
+
+const params = { memberId: Member.Id }
 
 /**
  * Membership reads and removal, authorized by core for the principal's membership, and the
@@ -29,27 +30,22 @@ export class MembersGroup extends HttpApiGroup.make("members")
     HttpApiEndpoint.put("rename", "/me/name", {
       payload: Schema.Struct({ name: Member.NewName }),
       success: Member.Member,
-      error: [...ApiErrors.workspace, ApiErrors.NotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound]
     }),
     HttpApiEndpoint.get("list", "/", {
       success: Schema.Array(Member.Member),
-      error: [...ApiErrors.workspace, ApiErrors.NotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound]
     }),
     HttpApiEndpoint.get("get", "/:memberId", {
       params,
       success: Member.Member,
-      error: [...ApiErrors.workspace, ApiErrors.NotFound],
+      error: [...ApiErrors.workspace, ApiErrors.NotFound]
     }),
     HttpApiEndpoint.delete("remove", "/:memberId", {
       params,
       success: Member.Member,
-      error: [
-        ...ApiErrors.workspace,
-        ApiErrors.Conflict,
-        ApiErrors.Conflict,
-        ...ApiErrors.delegation,
-      ],
-    }),
+      error: [...ApiErrors.workspace, ApiErrors.Conflict, ApiErrors.Conflict, ...ApiErrors.delegation]
+    })
   )
   .middleware(WorkspaceMember.WorkspaceMember)
   .middleware(Authentication.Authentication)

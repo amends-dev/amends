@@ -1,4 +1,4 @@
-export * as Menu from "./menu.tsx";
+export * as Menu from "./menu.tsx"
 export type {
   ContentProps as MenuContentProps,
   HeaderProps as MenuHeaderProps,
@@ -7,5 +7,5 @@ export type {
   RadioGroupProps as MenuRadioGroupProps,
   RadioItemProps as MenuRadioItemProps,
   RootProps as MenuRootProps,
-  TriggerProps as MenuTriggerProps,
-} from "./menu.tsx";
+  TriggerProps as MenuTriggerProps
+} from "./menu.tsx"

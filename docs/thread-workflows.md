@@ -12,19 +12,19 @@ contract](../packages/http/README.md#conversations) exposes each operation in th
 ## Starting a conversation
 
 ```ts
-import { Group } from "@amends-dev/core/group";
-import { ThreadService } from "@amends-dev/core/thread";
-import { Effect } from "effect";
+import { Group } from "@amends-dev/core/group"
+import { ThreadService } from "@amends-dev/core/thread"
+import { Effect } from "effect"
 
 const start = (groupId: Group.Id) =>
   Effect.gen(function* () {
-    const threads = yield* ThreadService.ThreadService;
+    const threads = yield* ThreadService.ThreadService
     return yield* threads.startInGroup({
       groupId,
       text: "Here's the proposal",
-      mentions: [],
-    });
-  });
+      mentions: []
+    })
+  })
 ```
 
 The result contains `thread` and `message`; the timeline holds the activity that places the
@@ -223,14 +223,14 @@ recipient rules alone ([turns](../packages/core/README.md#turns)).
 ## Replying to a conversation
 
 ```ts
-import { Thread, ThreadMessageService } from "@amends-dev/core/thread";
-import { Effect } from "effect";
+import { Thread, ThreadMessageService } from "@amends-dev/core/thread"
+import { Effect } from "effect"
 
 const reply = (threadId: Thread.Id) =>
   Effect.gen(function* () {
-    const messages = yield* ThreadMessageService.ThreadMessageService;
-    return yield* messages.publish({ threadId, text: "Here's my feedback", mentions: [] });
-  });
+    const messages = yield* ThreadMessageService.ThreadMessageService
+    return yield* messages.publish({ threadId, text: "Here's my feedback", mentions: [] })
+  })
 ```
 
 The result is the published message: its `content` holds the text and mentions at revision 1, and

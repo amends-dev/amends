@@ -10,21 +10,21 @@
  *
  * @since 0.1.0
  */
-import { SessionStateStore } from "@amends-dev/core/turn";
-import { and, eq, sql } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
 
-import { sessionStates } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
+import { StoreError } from "@amends-dev/core/journal"
+import { SessionStateStore } from "@amends-dev/core/turn"
+import { and, eq, sql } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { sessionStates } from "./internal/schema.ts"
 
-const decodeSaved = Schema.decodeUnknownEffect(SessionStateStore.Saved);
+const decodeSaved = Schema.decodeUnknownEffect(SessionStateStore.Saved)
 
-type Row = typeof sessionStates.$inferSelect;
+type Row = typeof sessionStates.$inferSelect
 
 /** The session a row stores, before its fields are checked. */
 const savedOf = (row: Row) => ({
@@ -36,18 +36,18 @@ const savedOf = (row: Row) => ({
     model: {
       connectionId: row.modelConnectionId,
       id: row.modelId,
-      ...(row.modelEffort === null ? {} : { effort: row.modelEffort }),
+      ...(row.modelEffort === null ? {} : { effort: row.modelEffort })
     },
-    sandbox: row.sandboxConnectionId === null ? null : { connectionId: row.sandboxConnectionId },
-  },
-});
+    sandbox: row.sandboxConnectionId === null ? null : { connectionId: row.sandboxConnectionId }
+  }
+})
 
 /**
  * What the agent returned, as its column holds it: JSON, even when it is JSON's `null`, which
  * the column's SQL NULL would otherwise take for none.
  */
 const agentStateColumn = (agentState: Schema.Json | undefined) =>
-  agentState === undefined ? null : sql`${JSON.stringify(agentState)}::jsonb`;
+  agentState === undefined ? null : sql`${JSON.stringify(agentState)}::jsonb`
 
 /**
  * Each participation's harness session in the workspace's database; writes join the commit that
@@ -57,28 +57,23 @@ const agentStateColumn = (agentState: Schema.Json | undefined) =>
  * @since 0.1.0
  */
 export const make = Effect.fn("SessionStates.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
   const ofParticipation = (participationId: string) =>
-    and(
-      eq(sessionStates.workspaceId, workspaceId),
-      eq(sessionStates.participationId, participationId),
-    );
+    and(eq(sessionStates.workspaceId, workspaceId), eq(sessionStates.participationId, participationId))
   const driver: SessionStateStore.SessionStateStore["Service"] = {
     get: Effect.fn("SessionStates.get")(
       function* (participationId) {
-        const rows = yield* guard(
-          db.select().from(sessionStates).where(ofParticipation(participationId)),
-        );
-        const found = Array.head(rows);
-        if (Option.isNone(found)) return Option.none();
-        return Option.some(yield* decodeSaved(savedOf(found.value)));
+        const rows = yield* guard(db.select().from(sessionStates).where(ofParticipation(participationId)))
+        const found = Array.head(rows)
+        if (Option.isNone(found)) return Option.none()
+        return Option.some(yield* decodeSaved(savedOf(found.value)))
       },
-      Effect.mapError(StoreError.failed("SessionStateStore", "get")),
+      Effect.mapError(StoreError.failed("SessionStateStore", "get"))
     ),
     set: Effect.fn("SessionStates.set")(
       function* (participationId, saved) {
-        const { selection } = saved;
+        const { selection } = saved
         const columns = {
           agent: saved.agent,
           agentState: agentStateColumn(saved.agentState),
@@ -87,24 +82,24 @@ export const make = Effect.fn("SessionStates.make")(function* () {
           modelConnectionId: selection.model.connectionId,
           modelId: selection.model.id,
           modelEffort: selection.model.effort ?? null,
-          sandboxConnectionId: selection.sandbox?.connectionId ?? null,
-        };
+          sandboxConnectionId: selection.sandbox?.connectionId ?? null
+        }
         yield* guard(
           db
             .insert(sessionStates)
             .values({ workspaceId, participationId, ...columns })
             .onConflictDoUpdate({
               target: [sessionStates.workspaceId, sessionStates.participationId],
-              set: columns,
+              set: columns
             }),
-          true,
-        );
+          true
+        )
       },
-      Effect.mapError(StoreError.failed("SessionStateStore", "set")),
-    ),
-  };
-  return SessionStateStore.make(driver);
-});
+      Effect.mapError(StoreError.failed("SessionStateStore", "set"))
+    )
+  }
+  return SessionStateStore.make(driver)
+})
 
 /**
  * Provides `SessionStateStore.SessionStateStore` over the caller's `Binding.Binding`.
@@ -112,4 +107,4 @@ export const make = Effect.fn("SessionStates.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(SessionStateStore.SessionStateStore, make());
+export const layer = Layer.effect(SessionStateStore.SessionStateStore, make())

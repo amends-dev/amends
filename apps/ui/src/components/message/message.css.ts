@@ -1,7 +1,7 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // Avatar, then a column of author line, text, and extras 4px apart.
 export const message = style({
@@ -22,7 +22,7 @@ export const message = style({
       marginBlock: "-0.5rem",
       paddingInline: "0.75rem",
       paddingBlock: "0.5rem",
-      backgroundColor: vars.color.surface.active,
+      backgroundColor: vars.color.surface.active
     },
     // A message stacked under its author's one before sits 6px beneath it, inside the
     // timeline's 24px gap (22px on phones). Between stacked messages a band reaches only 3px, half
@@ -30,11 +30,11 @@ export const message = style({
     "&[data-continued]": { marginBlockStart: "-1.125rem" },
     "&[data-continued][data-active]": {
       marginBlockStart: "-1.3125rem",
-      paddingBlockStart: "0.1875rem",
+      paddingBlockStart: "0.1875rem"
     },
     "&[data-active]:has(+ [data-continued])": {
       marginBlockEnd: "-0.1875rem",
-      paddingBlockEnd: "0.1875rem",
+      paddingBlockEnd: "0.1875rem"
     },
     // With no byline, the bar centers on the first line of text.
     "&[data-continued][data-active]::before": { top: "0.28125rem" },
@@ -45,15 +45,15 @@ export const message = style({
       top: "0.875rem",
       width: "2px",
       height: "1.25rem",
-      backgroundColor: vars.color.action.indicator,
-    },
+      backgroundColor: vars.color.action.indicator
+    }
   },
   "@media": {
     [media.mobile]: {
       selectors: {
         "&[data-continued]": { marginBlockStart: "-1rem" },
-        "&[data-continued][data-active]": { marginBlockStart: "-1.1875rem" },
-      },
+        "&[data-continued][data-active]": { marginBlockStart: "-1.1875rem" }
+      }
     },
     // Under the pointer, a quiet band reaching as the open thread's does, behind the text.
     "(hover: hover)": {
@@ -64,14 +64,14 @@ export const message = style({
           inset: "-0.375rem -0.75rem",
           zIndex: -1,
           backgroundColor: vars.color.surface.hover,
-          pointerEvents: "none",
+          pointerEvents: "none"
         },
         "&[data-continued]:hover:not([data-active])::after": { top: "-0.1875rem" },
-        "&:has(+ [data-continued]):hover:not([data-active])::after": { bottom: "-0.1875rem" },
-      },
-    },
-  },
-});
+        "&:has(+ [data-continued]):hover:not([data-active])::after": { bottom: "-0.1875rem" }
+      }
+    }
+  }
+})
 
 // Actions float over the message's top right edge, as a popover does, while it is under the pointer
 // or the keyboard is in them; on touch screens, once a tap has focused the message.
@@ -92,15 +92,15 @@ export const actions = style({
   selectors: {
     [`${message}:hover &, ${message}:has(:focus-visible) &`]: {
       opacity: 1,
-      pointerEvents: "auto",
-    },
+      pointerEvents: "auto"
+    }
   },
   "@media": {
     "(hover: none)": {
-      selectors: { [`${message}:focus-within &`]: { opacity: 1, pointerEvents: "auto" } },
-    },
-  },
-});
+      selectors: { [`${message}:focus-within &`]: { opacity: 1, pointerEvents: "auto" } }
+    }
+  }
+})
 
 // A stacked message's time, in the avatar's place, while the pointer or focus is on it.
 export const gutterTime = style({
@@ -111,26 +111,26 @@ export const gutterTime = style({
   whiteSpace: "nowrap",
   visibility: "hidden",
   selectors: { [`${message}:hover &, ${message}:focus-within &`]: { visibility: "visible" } },
-  "@media": { [media.mobile]: { lineHeight: typeScale.bodyTouch.lineHeight } },
-});
+  "@media": { [media.mobile]: { lineHeight: typeScale.bodyTouch.lineHeight } }
+})
 
-export const avatarTrigger = style({ display: "flex" });
+export const avatarTrigger = style({ display: "flex" })
 
 export const content = style({
   position: "relative",
   display: "flex",
   flexDirection: "column",
   gap: "0.25rem",
-  minWidth: 0,
-});
+  minWidth: 0
+})
 
 export const byline = style({
   display: "flex",
   alignItems: "baseline",
   gap: "0.625rem",
   minWidth: 0,
-  "@media": { [media.touch]: { gap: "0.5rem" } },
-});
+  "@media": { [media.touch]: { gap: "0.5rem" } }
+})
 
 // A stacked message's byline, for assistive technology only.
 export const hiddenByline = style({
@@ -139,15 +139,15 @@ export const hiddenByline = style({
   height: "1px",
   overflow: "hidden",
   clip: "rect(0 0 0 0)",
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
 export const author = style({
   ...typeScale.item,
   fontWeight: fontWeight.medium,
   color: vars.color.text.primary,
-  selectors: { "&[data-agent]": { color: vars.color.text.agent } },
-});
+  selectors: { "&[data-agent]": { color: vars.color.text.agent } }
+})
 
 export const time = style({
   ...typeScale.meta,
@@ -155,34 +155,34 @@ export const time = style({
   whiteSpace: "nowrap",
   "@media": {
     [media.touch]: { color: vars.color.text.secondary },
-    [media.mobile]: { ...typeScale.control, lineHeight: "1.125rem" },
-  },
-});
+    [media.mobile]: { ...typeScale.control, lineHeight: "1.125rem" }
+  }
+})
 
 export const text = style({
   ...typeScale.body,
   minWidth: 0,
   color: vars.color.text.primary,
   overflowWrap: "anywhere",
-  "@media": { [media.mobile]: typeScale.bodyTouch },
-});
+  "@media": { [media.mobile]: typeScale.bodyTouch }
+})
 
 export const activity = style({
   ...typeScale.control,
   display: "flex",
   alignItems: "center",
   gap: "0.5rem",
-  color: vars.color.text.muted,
-});
+  color: vars.color.text.muted
+})
 
-export const activityIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+export const activityIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" })
 
 export const extras = style({
   display: "flex",
   flexWrap: "wrap",
   gap: "0.5rem",
-  alignItems: "center",
-});
+  alignItems: "center"
+})
 
 // A 28px chip; phones keep a 44px target around it.
 export const reaction = style({
@@ -201,29 +201,29 @@ export const reaction = style({
     "&:hover": { borderColor: vars.color.border.default },
     // Your own reaction; a proposal, since the mocks show only others' reactions.
     "&[aria-pressed=true]": { borderColor: vars.color.border.strong },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
   },
   "@media": {
     [media.mobile]: {
       height: "2.75rem",
       backgroundClip: "content-box",
       paddingBlock: "0.5rem",
-      color: vars.color.text.primary,
-    },
-  },
-});
+      color: vars.color.text.primary
+    }
+  }
+})
 
 export const emoji = style({
   ...typeScale.item,
-  "@media": { [media.touch]: { fontSize: "0.9375rem" } },
-});
+  "@media": { [media.touch]: { fontSize: "0.9375rem" } }
+})
 
 export const reactionCount = style({
   ...typeScale.hint,
   fontWeight: fontWeight.medium,
   fontVariantNumeric: "tabular-nums",
-  "@media": { [media.touch]: typeScale.control },
-});
+  "@media": { [media.touch]: typeScale.control }
+})
 
 export const task = style({
   ...typeScale.hint,
@@ -242,19 +242,19 @@ export const task = style({
   textDecoration: "none",
   selectors: {
     "&:hover": { borderColor: vars.color.border.strong },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
   },
-  "@media": { [media.mobile]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.mobile]: { minHeight: "2.75rem" } }
+})
 
-export const taskKey = style({ fontWeight: fontWeight.medium, color: vars.color.text.primary });
+export const taskKey = style({ fontWeight: fontWeight.medium, color: vars.color.text.primary })
 
 export const taskTitle = style({
   minWidth: 0,
   overflow: "hidden",
   textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
 // The thread summary: who replied and how many, reached from the avatar by a stitched elbow.
 export const replies = style({
@@ -273,10 +273,10 @@ export const replies = style({
   fontFamily: "inherit",
   cursor: "pointer",
   selectors: {
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
   },
-  "@media": { [media.mobile]: { height: "2.75rem", paddingBlockStart: 0 } },
-});
+  "@media": { [media.mobile]: { height: "2.75rem", paddingBlockStart: 0 } }
+})
 
 export const repliesConnector = style({
   position: "absolute",
@@ -286,8 +286,8 @@ export const repliesConnector = style({
   height: "1.4375rem",
   overflow: "visible",
   color: vars.color.border.stitch,
-  pointerEvents: "none",
-});
+  pointerEvents: "none"
+})
 
 export const repliesCount = style({
   ...typeScale.control,
@@ -300,9 +300,9 @@ export const repliesCount = style({
   fontWeight: fontWeight.medium,
   selectors: { [`${replies}:hover &`]: { color: vars.color.text.primary } },
   "@media": {
-    [media.mobile]: { ...typeScale.item, lineHeight: "1.25rem", background: "transparent" },
-  },
-});
+    [media.mobile]: { ...typeScale.item, lineHeight: "1.25rem", background: "transparent" }
+  }
+})
 
 // A dot before the count while the thread has replies the reader has not seen.
 export const unread = style({
@@ -311,16 +311,16 @@ export const unread = style({
   height: "0.4375rem",
   marginInlineEnd: "0.4375rem",
   borderRadius: "50%",
-  backgroundColor: vars.color.action.indicator,
-});
+  backgroundColor: vars.color.action.indicator
+})
 
 export const repliesNote = style({
   ...typeScale.meta,
   color: vars.color.text.muted,
   whiteSpace: "nowrap",
   overflow: "hidden",
-  textOverflow: "ellipsis",
-});
+  textOverflow: "ellipsis"
+})
 
 // "Reply in thread" shows where there is no pointer, or while it notes typing or an agent's work.
 export const reply = style({
@@ -337,14 +337,14 @@ export const reply = style({
   cursor: "pointer",
   selectors: {
     "&:hover": { color: vars.color.text.primary },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" }
   },
-  "@media": { "(hover: hover)": { selectors: { "&:not([data-noted])": { display: "none" } } } },
-});
+  "@media": { "(hover: hover)": { selectors: { "&:not([data-noted])": { display: "none" } } } }
+})
 
 // Where there is a pointer, the message's Actions offer the reply, so only what it notes shows.
 export const replyLabel = style({
   ...typeScale.control,
   fontWeight: fontWeight.medium,
-  "@media": { "(hover: hover)": { display: "none" } },
-});
+  "@media": { "(hover: hover)": { display: "none" } }
+})

@@ -6,13 +6,14 @@
  *
  * @since 0.1.0
  */
-import * as Subject from "../journal/Subject.ts";
-import * as Schema from "effect/Schema";
-import * as Audience from "../journal/Audience.ts";
-import * as Fact from "../journal/Fact.ts";
-import * as Workspace from "../workspace/Workspace.ts";
-import * as BuiltinRoles from "./BuiltinRoles.ts";
-import * as Role from "./Role.ts";
+
+import * as Schema from "effect/Schema"
+import * as Audience from "../journal/Audience.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Workspace from "../workspace/Workspace.ts"
+import * as BuiltinRoles from "./BuiltinRoles.ts"
+import * as Role from "./Role.ts"
 
 /**
  * Establishes a workspace role with its initial permission names.
@@ -28,10 +29,10 @@ export const Created = Fact.make("workspace.role.created", {
     roleId: Role.Id,
     workspaceId: Workspace.Id,
     name: Role.Role.fields.name,
-    permissions: Role.Role.fields.permissions,
+    permissions: Role.Role.fields.permissions
   }),
-  occurrence: (payload) => [payload.roleId],
-});
+  occurrence: (payload) => [payload.roleId]
+})
 
 /**
  * Changes the display name while retaining the role's identity.
@@ -46,9 +47,9 @@ export const Renamed = Fact.make("workspace.role.renamed", {
   payload: Schema.Struct({
     roleId: Role.Id,
     workspaceId: Workspace.Id,
-    name: Role.Role.fields.name,
-  }),
-});
+    name: Role.Role.fields.name
+  })
+})
 
 /**
  * Replaces the complete permission list; an empty list removes all permissions.
@@ -63,9 +64,9 @@ export const PermissionsChanged = Fact.make("workspace.role.permissions-changed"
   payload: Schema.Struct({
     roleId: Role.Id,
     workspaceId: Workspace.Id,
-    permissions: Role.Role.fields.permissions,
-  }),
-});
+    permissions: Role.Role.fields.permissions
+  })
+})
 
 /**
  * The workspace's built-in roles now hold this revision's bundles. Recorded at initialization
@@ -79,5 +80,5 @@ export const BuiltinsRevised = Fact.make("workspace.role.builtins-revised", {
   subject: (payload) => Subject.make("builtin-roles", payload.workspaceId),
   version: 1,
   payload: Schema.Struct({ workspaceId: Workspace.Id, revision: BuiltinRoles.Revision }),
-  occurrence: (payload) => [String(payload.revision)],
-});
+  occurrence: (payload) => [String(payload.revision)]
+})

@@ -8,10 +8,11 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as GroupId from "./GroupId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+
+import * as Schema from "effect/Schema"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as GroupId from "./GroupId.ts"
 
 /**
  * Identifies one admission; a later readmission uses a fresh ID.
@@ -19,13 +20,13 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupMembershipId"));
+export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupMembershipId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type Id = typeof Id.Type
 
 /**
  * Whether the admission is current or has ended.
@@ -33,13 +34,13 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "removed"]);
+export const Status = Schema.Literals(["active", "removed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * One member's admission to one group, from when they were admitted until it ended, if it has.
@@ -54,8 +55,8 @@ export const GroupMembership = Schema.Struct({
   groupId: GroupId.Id,
   memberId: MemberId.Id,
   admittedAt: Schema.DateTimeUtcFromString,
-  status: Status,
-});
+  status: Status
+})
 
 /**
  * @category schemas
@@ -71,8 +72,8 @@ export interface GroupMembership extends Schema.Schema.Type<typeof GroupMembersh
  */
 export const ListOptions = Schema.Struct({
   after: Schema.optionalKey(Id),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -88,8 +89,8 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  */
 export const ByMemberOptions = Schema.Struct({
   afterGroupId: Schema.optionalKey(GroupId.Id),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -105,8 +106,8 @@ export interface ByMemberOptions extends Schema.Schema.Type<typeof ByMemberOptio
  */
 export const AddInput = Schema.Struct({
   groupId: GroupId.Id,
-  memberId: MemberId.Id,
-});
+  memberId: MemberId.Id
+})
 
 /**
  * @category options
@@ -122,8 +123,8 @@ export interface AddInput extends Schema.Schema.Type<typeof AddInput> {}
  */
 export const RemoveInput = Schema.Struct({
   groupId: GroupId.Id,
-  membershipId: Id,
-});
+  membershipId: Id
+})
 
 /**
  * @category options
@@ -137,7 +138,7 @@ export interface RemoveInput extends Schema.Schema.Type<typeof RemoveInput> {}
  * @category options
  * @since 0.1.0
  */
-export const LeaveInput = RemoveInput;
+export const LeaveInput = RemoveInput
 
 /**
  * @category options
@@ -157,8 +158,8 @@ export const Removal = Schema.Struct({
   ...RemoveInput.fields,
   workspaceId: WorkspaceId.Id,
   memberId: MemberId.Id,
-  reason: Schema.Literals(["removed", "left", "workspace-removed"]),
-});
+  reason: Schema.Literals(["removed", "left", "workspace-removed"])
+})
 
 /**
  * @category schemas

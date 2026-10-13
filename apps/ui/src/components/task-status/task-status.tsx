@@ -1,30 +1,30 @@
-import { Match, Switch, splitProps, type JSX } from "solid-js";
-import { vars } from "../../foundations/theme/vars.css.ts";
+import { Match, Switch, splitProps, type JSX } from "solid-js"
+import { vars } from "../../foundations/theme/vars.css.ts"
 
-export type TaskState = "triage" | "open" | "progress" | "done";
+export type TaskState = "triage" | "open" | "progress" | "done"
 
 const labels: Record<TaskState, string> = {
   triage: "Triage",
   open: "Open",
   progress: "In progress",
-  done: "Done",
-};
+  done: "Done"
+}
 
 export type TaskStatusProps = Omit<JSX.SvgSVGAttributes<SVGSVGElement>, "children"> & {
-  state: TaskState;
+  state: TaskState
   /** CSS length. Default 0.875rem. */
-  size?: string;
+  size?: string
   /** Hide from assistive technology when the state is written beside it. */
-  decorative?: boolean;
-};
+  decorative?: boolean
+}
 
 /**
  * A task's state as a 14px circle: outlined when open, half filled in progress, marked with "!"
  * in triage, and filled with a check when done.
  */
 export function TaskStatus(props: TaskStatusProps) {
-  const [local, native] = splitProps(props, ["state", "size", "decorative"]);
-  const ink = () => (local.state === "done" ? vars.color.text.primary : vars.color.text.secondary);
+  const [local, native] = splitProps(props, ["state", "size", "decorative"])
+  const ink = () => (local.state === "done" ? vars.color.text.primary : vars.color.text.secondary)
   return (
     <svg
       {...native}
@@ -64,8 +64,8 @@ export function TaskStatus(props: TaskStatusProps) {
         </Match>
       </Switch>
     </svg>
-  );
+  )
 }
 
 /** The state's name, such as "In progress". */
-export const taskStateLabel = (state: TaskState) => labels[state];
+export const taskStateLabel = (state: TaskState) => labels[state]

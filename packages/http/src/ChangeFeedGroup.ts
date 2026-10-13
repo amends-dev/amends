@@ -9,15 +9,16 @@
  *
  * @since 0.1.0
  */
-import { ChangeFeed } from "@amends-dev/core/change-feed";
-import * as Schema from "effect/Schema";
-import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import * as Authentication from "./Authentication.ts";
-import * as WorkspaceMember from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
-import { CoreError } from "@amends-dev/core/error";
+
+import { ChangeFeed } from "@amends-dev/core/change-feed"
+import { CoreError } from "@amends-dev/core/error"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
 
 /**
  * Live workspace changes the caller may see. Ready opens every subscription and says whether to
@@ -32,12 +33,12 @@ export class ChangeFeedGroup extends HttpApiGroup.make("changeFeed")
     HttpApiEndpoint.get("watch", "/changes", {
       query: {
         after: Schema.optionalKey(ChangeFeed.Cursor).annotate({
-          description: "Resume after the commit that carried this cursor.",
-        }),
+          description: "Resume after the commit that carried this cursor."
+        })
       },
       success: HttpApiSchema.StreamSse({ data: ChangeFeed.Message, error: CoreError.Unavailable }),
-      error: [...ApiErrors.workspace, ApiErrors.TooManyStreams],
-    }),
+      error: [...ApiErrors.workspace, ApiErrors.TooManyStreams]
+    })
   )
   .middleware(WorkspaceMember.WorkspaceMember)
   .middleware(Authentication.Authentication) {}

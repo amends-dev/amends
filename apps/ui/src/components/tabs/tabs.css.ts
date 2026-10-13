@@ -1,7 +1,7 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 // One row that scrolls sideways when the labels do not fit.
 export const list = style({
@@ -11,8 +11,8 @@ export const list = style({
   padding: 0,
   overflowX: "auto",
   scrollbarWidth: "none",
-  selectors: { "&::-webkit-scrollbar": { display: "none" } },
-});
+  selectors: { "&::-webkit-scrollbar": { display: "none" } }
+})
 
 // Label text sits 4px from the top and the 2px underline at the bottom of a 36px tab; touch
 // layouts center the label in 44px.
@@ -41,7 +41,7 @@ export const tab = style({
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
     "&[aria-current], &[aria-selected=true]": {
       color: vars.color.text.primary,
-      fontWeight: fontWeight.medium,
+      fontWeight: fontWeight.medium
     },
     "&[aria-current]::after, &[aria-selected=true]::after": {
       content: '""',
@@ -49,12 +49,12 @@ export const tab = style({
       insetInline: 0,
       bottom: 0,
       height: "2px",
-      backgroundColor: vars.color.action.indicator,
-    },
+      backgroundColor: vars.color.action.indicator
+    }
   },
   "@media": {
-    [media.touch]: { height: "2.75rem", alignItems: "center", paddingBlock: 0 },
-  },
-});
+    [media.touch]: { height: "2.75rem", alignItems: "center", paddingBlock: 0 }
+  }
+})
 
-export const count = style({ alignSelf: "center", marginBlockStart: "0.125rem" });
+export const count = style({ alignSelf: "center", marginBlockStart: "0.125rem" })

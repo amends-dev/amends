@@ -14,34 +14,34 @@
 /**
  * @since 0.1.0
  */
-export * as Connection from "./Connection.ts";
+export * as Connection from "./Connection.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts";
+export * as ConnectionCredentialStore from "./ConnectionCredentialStore.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ConnectionFacts from "./ConnectionFacts.ts";
+export * as ConnectionFacts from "./ConnectionFacts.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ConnectionPermissions from "./ConnectionPermissions.ts";
+export * as ConnectionPermissions from "./ConnectionPermissions.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ConnectionProjection from "./ConnectionProjection.ts";
+export * as ConnectionProjection from "./ConnectionProjection.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ConnectionService from "./ConnectionService.ts";
+export * as ConnectionService from "./ConnectionService.ts"
 
 /**
  * @since 0.1.0
  */
-export * as ConnectionStore from "./ConnectionStore.ts";
+export * as ConnectionStore from "./ConnectionStore.ts"

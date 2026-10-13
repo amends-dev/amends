@@ -1,26 +1,26 @@
-import { ChangeFeedState } from "./api.ts";
-import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js";
-import { useChangeFeed } from "./change-feed.tsx";
+import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js"
+import { ChangeFeedState } from "./api.ts"
+import { useChangeFeed } from "./change-feed.tsx"
 
 /** How long changes may stop arriving before the reader is told, covering a host restart. */
-export const liveGrace = 2_000;
+export const liveGrace = 2_000
 
 /**
  * Whether a live stream has been down for longer than `liveGrace`, so brief reconnections go
  * unmentioned.
  */
 export function useLastingDown(down: Accessor<boolean>): Accessor<boolean> {
-  const isDown = createMemo(down);
-  const [shown, setShown] = createSignal(false);
+  const isDown = createMemo(down)
+  const [shown, setShown] = createSignal(false)
   createEffect(
     on(isDown, (value) => {
-      setShown(false);
-      if (!value) return;
-      const timer = setTimeout(() => setShown(true), liveGrace);
-      onCleanup(() => clearTimeout(timer));
-    }),
-  );
-  return shown;
+      setShown(false)
+      if (!value) return
+      const timer = setTimeout(() => setShown(true), liveGrace)
+      onCleanup(() => clearTimeout(timer))
+    })
+  )
+  return shown
 }
 
 /**
@@ -29,13 +29,13 @@ export function useLastingDown(down: Accessor<boolean>): Accessor<boolean> {
  * brief reconnections. Mount inside ChangeFeedProvider.
  */
 export function useChangeFeedStatus(): Accessor<"connecting" | "reconnecting" | undefined> {
-  const feed = useChangeFeed();
+  const feed = useChangeFeed()
   const shown = useLastingDown(() => {
-    const state = feed.state()._tag;
-    return state === "Connecting" || state === "Reconnecting";
-  });
+    const state = feed.state()._tag
+    return state === "Connecting" || state === "Reconnecting"
+  })
   return () => {
-    if (!shown()) return undefined;
-    return ChangeFeedState.$is("Connecting")(feed.state()) ? "connecting" : "reconnecting";
-  };
+    if (!shown()) return undefined
+    return ChangeFeedState.$is("Connecting")(feed.state()) ? "connecting" : "reconnecting"
+  }
 }

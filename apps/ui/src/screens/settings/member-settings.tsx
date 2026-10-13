@@ -1,92 +1,85 @@
-import { For, Show, createUniqueId } from "solid-js";
-import { IconMarkForward, IconMarkMail } from "@amends-dev/icons";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Button } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { SearchField } from "../../components/input/index.ts";
-import { Menu } from "../../components/menu/index.ts";
-import { Select } from "../../components/select/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import { dateLabel, daysUntil } from "../../internal/when.ts";
-import { Modal } from "../../patterns/modal/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { SectionHeading, type SettingsFailure } from "./workspace-settings.tsx";
-import {
-  SettingsAlert,
-  displayName,
-  type SettingsError,
-  type SettingsPerson,
-  type SettingsRole,
-} from "./wording.tsx";
-import * as s from "./settings.css.ts";
+import { IconMarkForward, IconMarkMail } from "@amends-dev/icons"
+import { For, Show, createUniqueId } from "solid-js"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { SearchField } from "../../components/input/index.ts"
+import { Menu } from "../../components/menu/index.ts"
+import { Select } from "../../components/select/index.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import { dateLabel, daysUntil } from "../../internal/when.ts"
+import { Modal } from "../../patterns/modal/index.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import * as s from "./settings.css.ts"
+import { SettingsAlert, displayName, type SettingsError, type SettingsPerson, type SettingsRole } from "./wording.tsx"
+import { SectionHeading, type SettingsFailure } from "./workspace-settings.tsx"
 
 /** A member in the roster. */
 export interface RosterMember extends SettingsPerson {
-  readonly status: "active" | "removed";
+  readonly status: "active" | "removed"
   /** Their workspace role by name, when the reader may see it. */
-  readonly role?: string;
+  readonly role?: string
 }
 
-export type MemberFilter = "active" | "removed";
+export type MemberFilter = "active" | "removed"
 
-export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked";
+export type InvitationStatus = "pending" | "accepted" | "expired" | "revoked"
 
 export interface SettingsInvitation {
-  readonly id: string;
+  readonly id: string
   /** The sign-in email it was issued to. */
-  readonly recipient: string;
+  readonly recipient: string
   /** The role it gives, by name. */
-  readonly role: string;
-  readonly status: InvitationStatus;
-  readonly issuedAt: Date;
-  readonly expiresAt: Date;
+  readonly role: string
+  readonly status: InvitationStatus
+  readonly issuedAt: Date
+  readonly expiresAt: Date
   /** The reader may revoke it. */
-  readonly revocable?: boolean;
+  readonly revocable?: boolean
 }
 
 /** "Member · Expires in 5 days", "Member · Expired Sep 22", or when it was created. */
 export function invitationDetail(invitation: SettingsInvitation, now = new Date()) {
   if (invitation.status === "pending") {
-    const days = daysUntil(invitation.expiresAt, now);
-    return `${invitation.role} · Expires in ${days} ${days === 1 ? "day" : "days"}`;
+    const days = daysUntil(invitation.expiresAt, now)
+    return `${invitation.role} · Expires in ${days} ${days === 1 ? "day" : "days"}`
   }
-  if (invitation.status === "expired")
-    return `${invitation.role} · Expired ${dateLabel(invitation.expiresAt, now)}`;
-  return `${invitation.role} · Created ${dateLabel(invitation.issuedAt, now)}`;
+  if (invitation.status === "expired") return `${invitation.role} · Expired ${dateLabel(invitation.expiresAt, now)}`
+  return `${invitation.role} · Created ${dateLabel(invitation.issuedAt, now)}`
 }
 
 export interface MemberSettingsProps {
-  readonly query: string;
-  readonly onQueryChange: (query: string) => void;
-  readonly filter: MemberFilter;
-  readonly onFilterChange: (filter: MemberFilter) => void;
+  readonly query: string
+  readonly onQueryChange: (query: string) => void
+  readonly filter: MemberFilter
+  readonly onFilterChange: (filter: MemberFilter) => void
   /** Members after the search and filter. */
-  readonly members: ReadonlyArray<RosterMember>;
+  readonly members: ReadonlyArray<RosterMember>
   /** The member open in the side panel. */
-  readonly selectedId?: string;
-  readonly memberHref: (id: string) => string;
+  readonly selectedId?: string
+  readonly memberHref: (id: string) => string
   /** Opens a member in place of following their link. */
-  readonly onOpenMember?: (id: string) => void;
+  readonly onOpenMember?: (id: string) => void
   /** Pending invitations, newest first; absent when the reader may not see invitations. */
-  readonly invitations?: ReadonlyArray<SettingsInvitation>;
+  readonly invitations?: ReadonlyArray<SettingsInvitation>
   /** An invitation just created, marked in the list. */
-  readonly highlightId?: string;
+  readonly highlightId?: string
   /** Opens the invitation history. */
-  readonly onViewHistory?: () => void;
+  readonly onViewHistory?: () => void
   /** Asks to revoke a pending invitation. */
-  readonly onRevoke?: (id: string) => void;
+  readonly onRevoke?: (id: string) => void
   /** A read that failed. */
-  readonly failure?: SettingsFailure;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly failure?: SettingsFailure
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 const filters: ReadonlyArray<{ readonly value: MemberFilter; readonly label: string }> = [
   { value: "active", label: "Active members" },
-  { value: "removed", label: "Removed members" },
-];
+  { value: "removed", label: "Removed members" }
+]
 
 /**
  * The Members tab: search and filter above the roster, then pending invitations. Phones list
@@ -94,13 +87,9 @@ const filters: ReadonlyArray<{ readonly value: MemberFilter; readonly label: str
  */
 export function MemberSettings(props: MemberSettingsProps) {
   const kind = (member: RosterMember) =>
-    [
-      member.role,
-      member.agent ? "Agent" : undefined,
-      member.status === "removed" ? "Removed" : undefined,
-    ]
+    [member.role, member.agent ? "Agent" : undefined, member.status === "removed" ? "Removed" : undefined]
       .filter(Boolean)
-      .join(" · ");
+      .join(" · ")
   return (
     <>
       <Pane.Toolbar>
@@ -112,14 +101,9 @@ export function MemberSettings(props: MemberSettingsProps) {
         />
         <Pane.ToolbarEnd>
           <Menu.Root placement="bottom-end">
-            <Menu.Trigger>
-              {filters.find((filter) => filter.value === props.filter)?.label}
-            </Menu.Trigger>
+            <Menu.Trigger>{filters.find((filter) => filter.value === props.filter)?.label}</Menu.Trigger>
             <Menu.Content aria-label="Show members">
-              <Menu.RadioGroup
-                value={props.filter}
-                onChange={(value) => props.onFilterChange(value as MemberFilter)}
-              >
+              <Menu.RadioGroup value={props.filter} onChange={(value) => props.onFilterChange(value as MemberFilter)}>
                 <For each={filters}>
                   {(filter) => <Menu.RadioItem value={filter.value}>{filter.label}</Menu.RadioItem>}
                 </For>
@@ -158,10 +142,7 @@ export function MemberSettings(props: MemberSettingsProps) {
               </p>
             }
           >
-            <ul
-              class={s.list}
-              aria-label={props.filter === "removed" ? "Removed members" : "Members"}
-            >
+            <ul class={s.list} aria-label={props.filter === "removed" ? "Removed members" : "Members"}>
               <Keyed each={props.members} by={(member) => member.id}>
                 {(member) => (
                   <li>
@@ -170,9 +151,9 @@ export function MemberSettings(props: MemberSettingsProps) {
                       class={s.row}
                       aria-current={props.selectedId === member().id ? "true" : undefined}
                       onClick={(event) => {
-                        if (!props.onOpenMember) return;
-                        event.preventDefault();
-                        props.onOpenMember(member().id);
+                        if (!props.onOpenMember) return
+                        event.preventDefault()
+                        props.onOpenMember(member().id)
                       }}
                     >
                       <Avatar
@@ -192,9 +173,7 @@ export function MemberSettings(props: MemberSettingsProps) {
                         </Show>
                       </span>
                       <span class={s.role}>{member().role ?? ""}</span>
-                      <span class={s.status}>
-                        {member().status === "active" ? "Active" : "Removed"}
-                      </span>
+                      <span class={s.status}>{member().status === "active" ? "Active" : "Removed"}</span>
                       <IconMarkForward class={s.open} />
                     </a>
                   </li>
@@ -216,10 +195,7 @@ export function MemberSettings(props: MemberSettingsProps) {
                   >
                     Pending invitations
                   </SectionHeading>
-                  <Show
-                    when={invitations().length > 0}
-                    fallback={<p class={s.empty}>No invitations are waiting.</p>}
-                  >
+                  <Show when={invitations().length > 0} fallback={<p class={s.empty}>No invitations are waiting.</p>}>
                     <ul class={s.list} aria-label="Pending invitations">
                       <Keyed each={invitations()} by={(invitation) => invitation.id}>
                         {(invitation) => (
@@ -232,9 +208,7 @@ export function MemberSettings(props: MemberSettingsProps) {
                             </span>
                             <span class={s.invitationText}>
                               <span class={s.rowName}>{invitation().recipient}</span>
-                              <span class={s.invitationDetail}>
-                                {invitationDetail(invitation())}
-                              </span>
+                              <span class={s.invitationDetail}>{invitationDetail(invitation())}</span>
                             </span>
                             <Show when={invitation().revocable && props.onRevoke}>
                               {(revoke) => (
@@ -274,42 +248,42 @@ export function MemberSettings(props: MemberSettingsProps) {
         </div>
       </Pane.Body>
     </>
-  );
+  )
 }
 
 /** A member as their details show them. */
 export interface MemberDetail extends RosterMember {
   /** The address they sign in with, when the reader may see it. */
-  readonly signIn?: string;
+  readonly signIn?: string
   /** Their access, when the reader may read it. */
   readonly access?: ReadonlyArray<{
-    readonly id: string;
+    readonly id: string
     /** The role's name, or a permission. */
-    readonly name: string;
-    readonly scope: "workspace" | "target";
-    readonly active: boolean;
-  }>;
+    readonly name: string
+    readonly scope: "workspace" | "target"
+    readonly active: boolean
+  }>
 }
 
 export interface MemberDetailsProps {
-  readonly workspaceName: string;
-  readonly member: MemberDetail;
-  readonly onClose: () => void;
+  readonly workspaceName: string
+  readonly member: MemberDetail
+  readonly onClose: () => void
   /** Roles the reader may give; empty when they may not change this member's role. */
-  readonly roles: ReadonlyArray<SettingsRole>;
+  readonly roles: ReadonlyArray<SettingsRole>
   /** The chosen role's id. */
-  readonly role?: string;
-  readonly onRoleChange: (roleId: string) => void;
+  readonly role?: string
+  readonly onRoleChange: (roleId: string) => void
   /** The chosen role differs from their current one. */
-  readonly roleChanged: boolean;
-  readonly onSaveRole: () => void;
-  readonly saving?: boolean;
+  readonly roleChanged: boolean
+  readonly onSaveRole: () => void
+  readonly saving?: boolean
   /** Asks to remove the member; shown when the reader may. */
-  readonly onRemove?: () => void;
+  readonly onRemove?: () => void
   /** A failed role change. */
-  readonly error?: SettingsError;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly error?: SettingsError
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 /**
@@ -317,10 +291,10 @@ export interface MemberDetailsProps {
  * them. On phones it fills the screen, with its actions along the bottom.
  */
 export function MemberDetails(props: MemberDetailsProps) {
-  const formId = `member-role-${createUniqueId()}`;
-  const editable = () => props.roles.length > 0;
+  const formId = `member-role-${createUniqueId()}`
+  const editable = () => props.roles.length > 0
   const summary = () =>
-    `${props.member.agent ? "Agent" : "Person"} · ${props.member.status === "active" ? "Active" : "Removed"}`;
+    `${props.member.agent ? "Agent" : "Person"} · ${props.member.status === "active" ? "Active" : "Removed"}`
   return (
     <Shell.Aside aria-label="Member details" onClose={() => props.onClose()}>
       <Pane.Root variant="side">
@@ -357,8 +331,8 @@ export function MemberDetails(props: MemberDetailsProps) {
                 id={formId}
                 class={s.form}
                 onSubmit={(event) => {
-                  event.preventDefault();
-                  if (props.roleChanged && !props.saving) props.onSaveRole();
+                  event.preventDefault()
+                  if (props.roleChanged && !props.saving) props.onSaveRole()
                 }}
               >
                 <Field.Root hint="Changing the workspace role keeps any separate permissions in place.">
@@ -387,10 +361,7 @@ export function MemberDetails(props: MemberDetailsProps) {
               {(access) => (
                 <section class={s.section} aria-label="Access">
                   <SectionHeading>Access</SectionHeading>
-                  <Show
-                    when={access().length > 0}
-                    fallback={<p class={s.note}>No access is assigned.</p>}
-                  >
+                  <Show when={access().length > 0} fallback={<p class={s.note}>No access is assigned.</p>}>
                     <ul class={s.access}>
                       <For each={access()}>
                         {(entry) => (
@@ -412,9 +383,7 @@ export function MemberDetails(props: MemberDetailsProps) {
               <SectionHeading>Membership</SectionHeading>
               <Show
                 when={props.member.status === "active"}
-                fallback={
-                  <p class={s.note}>This membership has ended. Invite them again to rejoin.</p>
-                }
+                fallback={<p class={s.note}>This membership has ended. Invite them again to rejoin.</p>}
               >
                 <Show when={props.onRemove}>
                   {(remove) => (
@@ -431,38 +400,33 @@ export function MemberDetails(props: MemberDetailsProps) {
         <Show when={editable()}>
           <Modal.Actions>
             <Button onClick={() => props.onClose()}>Cancel</Button>
-            <Button
-              type="submit"
-              form={formId}
-              variant="primary"
-              disabled={!props.roleChanged || props.saving}
-            >
+            <Button type="submit" form={formId} variant="primary" disabled={!props.roleChanged || props.saving}>
               Save role
             </Button>
           </Modal.Actions>
         </Show>
       </Pane.Root>
     </Shell.Aside>
-  );
+  )
 }
 
 export interface ConfirmRemoveMemberProps {
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly workspaceName: string;
-  readonly name: string;
-  readonly onConfirm: () => void;
-  readonly pending?: boolean;
-  readonly error?: SettingsError;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly workspaceName: string
+  readonly name: string
+  readonly onConfirm: () => void
+  readonly pending?: boolean
+  readonly error?: SettingsError
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 /** Confirms removing a member from the workspace. */
 export function ConfirmRemoveMember(props: ConfirmRemoveMemberProps) {
   const close = () => {
-    if (!props.pending) props.onClose();
-  };
+    if (!props.pending) props.onClose()
+  }
   return (
     <Modal.Root open={props.open} onClose={close} aria-label="Remove member" size="compact">
       <Pane.Root variant="modal">
@@ -476,8 +440,8 @@ export function ConfirmRemoveMember(props: ConfirmRemoveMemberProps) {
         <Pane.Body>
           <div class={s.stack}>
             <p class={s.confirm}>
-              To rejoin, they’ll need a fresh invitation. Their previous membership will remain in
-              the removed-member history.
+              To rejoin, they’ll need a fresh invitation. Their previous membership will remain in the removed-member
+              history.
             </p>
             <Show when={props.error}>
               {(error) => (
@@ -501,5 +465,5 @@ export function ConfirmRemoveMember(props: ConfirmRemoveMemberProps) {
         </Modal.Actions>
       </Pane.Root>
     </Modal.Root>
-  );
+  )
 }

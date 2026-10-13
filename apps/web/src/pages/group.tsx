@@ -9,112 +9,94 @@ import {
   useRenameGroup,
   useTurnActivity,
   useWorkspace,
-  useWorkspaceGroups,
-} from "@amends-dev/client";
-import {
-  GroupPane,
-  GroupSettings,
-  GroupThreads,
-  type GroupSettingsTab,
-} from "@amends-dev/ui/screens/group";
-import { useNavigate, useParams } from "@solidjs/router";
-import { createSignal, Show } from "solid-js";
-import { useWorkspaceActions } from "../workspace-actions.ts";
-import { pickerPerson } from "../workspace-layout.tsx";
+  useWorkspaceGroups
+} from "@amends-dev/client"
+import { GroupPane, GroupSettings, GroupThreads, type GroupSettingsTab } from "@amends-dev/ui/screens/group"
+import { useNavigate, useParams } from "@solidjs/router"
+import { createSignal, Show } from "solid-js"
+import { useWorkspaceActions } from "../workspace-actions.ts"
+import { pickerPerson } from "../workspace-layout.tsx"
 
-const href = (path: string) => path;
+const href = (path: string) => path
 /** A group's stream; the workspace layout shows an open thread beside it. */
 export function GroupPage() {
-  const params = useParams<{ workspaceId: string; groupId: string; threadId?: string }>();
+  const params = useParams<{ workspaceId: string; groupId: string; threadId?: string }>()
   return (
     <Show when={params.groupId} keyed>
-      {(groupId) => (
-        <Group
-          workspaceId={params.workspaceId}
-          groupId={groupId}
-          openThread={() => params.threadId}
-        />
-      )}
+      {(groupId) => <Group workspaceId={params.workspaceId} groupId={groupId} openThread={() => params.threadId} />}
     </Show>
-  );
+  )
 }
 
 function Group(props: {
-  readonly workspaceId: string;
-  readonly groupId: string;
-  readonly openThread: () => string | undefined;
+  readonly workspaceId: string
+  readonly groupId: string
+  readonly openThread: () => string | undefined
 }) {
-  const { workspaceId, groupId } = props;
-  const navigate = useNavigate();
-  const workspace = useWorkspace(() => workspaceId);
-  const groups = useWorkspaceGroups(workspaceId);
-  const group = () => groups.group(groupId);
-  const conversation = useGroupConversation(workspaceId, groupId);
-  const activity = useTurnActivity(workspaceId);
+  const { workspaceId, groupId } = props
+  const navigate = useNavigate()
+  const workspace = useWorkspace(() => workspaceId)
+  const groups = useWorkspaceGroups(workspaceId)
+  const group = () => groups.group(groupId)
+  const conversation = useGroupConversation(workspaceId, groupId)
+  const activity = useTurnActivity(workspaceId)
   // Each thread notes the agents at work in it.
   const entries = () =>
     conversation.entries().map((entry) => {
-      const working = activity.inThread(entry.id);
+      const working = activity.inThread(entry.id)
       return working.length === 0 || entry.thread === undefined
         ? entry
         : {
             ...entry,
             thread: {
               ...entry.thread,
-              activity: working.map((turn) => ({ agent: turn.agent.name, state: turn.state })),
-            },
-          };
-    });
-  const composer = useNewThread(workspaceId, groupId);
-  const candidates = useMentionCandidates(workspaceId, groupId);
-  const actions = useWorkspaceActions();
+              activity: working.map((turn) => ({ agent: turn.agent.name, state: turn.state }))
+            }
+          }
+    })
+  const composer = useNewThread(workspaceId, groupId)
+  const candidates = useMentionCandidates(workspaceId, groupId)
+  const actions = useWorkspaceActions()
   const follow = useGroupFollow(workspaceId, groupId, {
-    changed: (following) =>
-      actions.toast(following ? `Following #${name()}` : `Unfollowed #${name()}`),
+    changed: (following) => actions.toast(following ? `Following #${name()}` : `Unfollowed #${name()}`),
     failed: (following) =>
-      actions.toast(
-        following
-          ? `Couldn’t follow #${name()}. Try again.`
-          : `Couldn’t unfollow #${name()}. Try again.`,
-      ),
-  });
-  const [selected, setSelected] = createSignal<Array<string>>([]);
+      actions.toast(following ? `Couldn’t follow #${name()}. Try again.` : `Couldn’t unfollow #${name()}. Try again.`)
+  })
+  const [selected, setSelected] = createSignal<Array<string>>([])
   const members = useGroupMembers(workspaceId, groupId, {
     added: () => setSelected([]),
-    left: () => navigate(paths.workspace(workspaceId)),
-  });
-  const people = useGroupPeople(workspaceId, members);
-  const [settings, setSettings] = createSignal<GroupSettingsTab>();
+    left: () => navigate(paths.workspace(workspaceId))
+  })
+  const people = useGroupPeople(workspaceId, members)
+  const [settings, setSettings] = createSignal<GroupSettingsTab>()
   // Settings opened by /rename start with the name ready to edit.
-  const [renaming, setRenaming] = createSignal(false);
-  const rename = useRenameGroup(workspaceId, groupId, () => setSettings(undefined));
+  const [renaming, setRenaming] = createSignal(false)
+  const rename = useRenameGroup(workspaceId, groupId, () => setSettings(undefined))
   const open = (tab: GroupSettingsTab) => {
-    rename.reset();
-    setSelected([]);
-    setRenaming(false);
-    setSettings(tab);
-  };
-  const name = () => group()?.name ?? "";
-  const direct = () => group()?.kind === "direct";
+    rename.reset()
+    setSelected([])
+    setRenaming(false)
+    setSettings(tab)
+  }
+  const name = () => group()?.name ?? ""
+  const direct = () => group()?.kind === "direct"
   // What "/" offers in the composer: following the group, and renaming it for those who may.
   const commands = () => [
     ...(follow.followable() && follow.following() !== undefined
       ? [
           follow.following()
             ? { name: "unfollow", description: `Stop following #${name()}` }
-            : { name: "follow", description: `Follow #${name()} to take part in its new threads` },
+            : { name: "follow", description: `Follow #${name()} to take part in its new threads` }
         ]
       : []),
-    ...(!direct() && rename.renamable()
-      ? [{ name: "rename", description: `Rename #${name()}` }]
-      : []),
-  ];
+    ...(!direct() && rename.renamable() ? [{ name: "rename", description: `Rename #${name()}` }] : [])
+  ]
   const command = (command: string) => {
     if (command === "rename") {
-      open("general");
-      setRenaming(true);
-    } else if ((command === "follow") !== follow.following()) follow.toggle();
-  };
+      open("general")
+      setRenaming(true)
+    } else if ((command === "follow") !== follow.following()) follow.toggle()
+  }
   return (
     <>
       <GroupPane
@@ -132,7 +114,7 @@ function Group(props: {
             ? {
                 following: follow.following() ?? false,
                 pending: follow.pending(),
-                onToggle: follow.toggle,
+                onToggle: follow.toggle
               }
             : undefined
         }
@@ -148,7 +130,7 @@ function Group(props: {
               ? {
                   loading: conversation.loadingEarlier(),
                   failed: conversation.earlierFailed(),
-                  onLoad: conversation.loadEarlier,
+                  onLoad: conversation.loadEarlier
                 }
               : undefined
           }
@@ -159,7 +141,7 @@ function Group(props: {
               ? {
                   groupName: name(),
                   memberNames: people.roster().map((person) => (person.you ? "You" : person.name)),
-                  direct: direct(),
+                  direct: direct()
                 }
               : undefined
           }
@@ -210,5 +192,5 @@ function Group(props: {
         adding={members.changing() === "add"}
       />
     </>
-  );
+  )
 }

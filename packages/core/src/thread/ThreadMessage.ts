@@ -7,16 +7,17 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "./ThreadId.ts";
-import * as ThreadMessageId from "./ThreadMessageId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as Identity from "../identity/Identity.ts";
-import * as Characters from "../text/Text.ts";
-import * as ChannelId from "../channel/ChannelId.ts";
-import * as TurnId from "../turn/TurnId.ts";
+
+import * as Schema from "effect/Schema"
+import * as ChannelId from "../channel/ChannelId.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as Characters from "../text/Text.ts"
+import * as TurnId from "../turn/TurnId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ThreadId from "./ThreadId.ts"
+import * as ThreadMessageId from "./ThreadMessageId.ts"
 
 /**
  * Names a message; `ThreadMessageId.Id`, where models that only refer to messages import it from.
@@ -24,13 +25,13 @@ import * as TurnId from "../turn/TurnId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = ThreadMessageId.Id;
+export const Id = ThreadMessageId.Id
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = ThreadMessageId.Id;
+export type Id = ThreadMessageId.Id
 
 /**
  * Markdown, preserved as submitted, including indentation; whitespace-only text and characters
@@ -41,20 +42,18 @@ export type Id = ThreadMessageId.Id;
  * @since 0.1.0
  */
 export const Text = Schema.NonEmptyString.check(
-  Schema.makeFilter(
-    (text) => /\S/u.test(text) || "Message text must contain non-whitespace content",
-  ),
-  Characters.isStorable,
-);
+  Schema.makeFilter((text) => /\S/u.test(text) || "Message text must contain non-whitespace content"),
+  Characters.isStorable
+)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Text = typeof Text.Type;
+export type Text = typeof Text.Type
 
 // Backslash-escaped so a name reads as itself, not as markdown, inside the link's label.
-const labelMarks = /[\\[\]*_`~<>]/gu;
+const labelMarks = /[\\[\]*_`~<>]/gu
 
 /**
  * A member mentioned in message text: `[@Ada](member:<id>)`. The label records the name they had
@@ -65,9 +64,9 @@ const labelMarks = /[\\[\]*_`~<>]/gu;
  * @since 0.1.0
  */
 export const mentionText = (memberId: string, name: string) =>
-  `[@${name.replaceAll(labelMarks, "\\$&")}](member:${encodeURIComponent(memberId)})`;
+  `[@${name.replaceAll(labelMarks, "\\$&")}](member:${encodeURIComponent(memberId)})`
 
-const mentionLinks = /\[@(?:\\.|[^\\\]])*\]\(member:([^)\s]+)\)/gu;
+const mentionLinks = /\[@(?:\\.|[^\\\]])*\]\(member:([^)\s]+)\)/gu
 
 /**
  * The members a text mentions, each once, in the order first mentioned.
@@ -79,13 +78,13 @@ export const mentionedIn = (text: string): ReadonlyArray<string> => [
   ...new Set(
     [...text.matchAll(mentionLinks)].flatMap(([, id]) => {
       try {
-        return [decodeURIComponent(id!)];
+        return [decodeURIComponent(id!)]
       } catch {
-        return [];
+        return []
       }
-    }),
-  ),
-];
+    })
+  )
+]
 
 /**
  * Who wrote a message: a member, human or agent, writing in a thread, or a contact whose message a
@@ -97,14 +96,14 @@ export const mentionedIn = (text: string): ReadonlyArray<string> => [
  */
 export const Author = Schema.TaggedUnion({
   Member: { memberId: MemberId.Id },
-  Contact: { contactId: Identity.ContactId },
-});
+  Contact: { contactId: Identity.ContactId }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Author = typeof Author.Type;
+export type Author = typeof Author.Type
 
 /**
  * How a message came about, when not written in amends: an agent's reply names the turn that
@@ -116,14 +115,14 @@ export type Author = typeof Author.Type;
  */
 export const Via = Schema.TaggedUnion({
   Turn: { turnId: TurnId.Id },
-  Channel: { channelId: ChannelId.Id, externalMessageId: Schema.NonEmptyString },
-});
+  Channel: { channelId: ChannelId.Id, externalMessageId: Schema.NonEmptyString }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Via = typeof Via.Type;
+export type Via = typeof Via.Type
 
 /**
  * Which edit of a message its content is: 1 as published, and one more per edit.
@@ -131,13 +130,13 @@ export type Via = typeof Via.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Revision = Schema.Int.check(Schema.isGreaterThan(0));
+export const Revision = Schema.Int.check(Schema.isGreaterThan(0))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Revision = typeof Revision.Type;
+export type Revision = typeof Revision.Type
 
 /**
  * What a message says now: its text and whom it addresses, at the revision its last edit made,
@@ -152,16 +151,16 @@ export const Content = Schema.TaggedUnion({
     mentions: Schema.UniqueArray(MemberId.Id),
     revision: Revision,
     /** When it was last edited, or null as published. */
-    editedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+    editedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
   },
-  Deleted: { deletedAt: Schema.DateTimeUtcFromString },
-});
+  Deleted: { deletedAt: Schema.DateTimeUtcFromString }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Content = typeof Content.Type;
+export type Content = typeof Content.Type
 
 /**
  * A message as published, edited, and deleted. Its position in the thread is on its activity, not
@@ -178,8 +177,8 @@ export const ThreadMessage = Schema.Struct({
   /** How it came about, or null for one written in amends. */
   via: Schema.NullOr(Via),
   publishedAt: Schema.DateTimeUtcFromString,
-  content: Content,
-});
+  content: Content
+})
 
 /**
  * @category schemas
@@ -198,8 +197,8 @@ export const published = (text: Text, mentions: ReadonlyArray<MemberId.Id>): Con
   text,
   mentions,
   revision: 1,
-  editedAt: null,
-});
+  editedAt: null
+})
 
 /**
  * What a reply says and whom it addresses. Without mentions it addresses every current
@@ -211,8 +210,8 @@ export const published = (text: Text, mentions: ReadonlyArray<MemberId.Id>): Con
 export const PublishInput = Schema.Struct({
   threadId: ThreadId.Id,
   text: Text,
-  mentions: Schema.UniqueArray(MemberId.Id),
-});
+  mentions: Schema.UniqueArray(MemberId.Id)
+})
 
 /**
  * @category options
@@ -231,8 +230,8 @@ export const EditInput = Schema.Struct({
   messageId: Id,
   text: Text,
   mentions: Schema.UniqueArray(MemberId.Id),
-  expectedRevision: Revision,
-});
+  expectedRevision: Revision
+})
 
 /**
  * @category options
@@ -255,8 +254,8 @@ export const Edited = Schema.Struct({
   revision: Revision,
   text: Text,
   mentions: Schema.UniqueArray(MemberId.Id),
-  editedAt: Schema.DateTimeUtcFromString,
-});
+  editedAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -275,8 +274,8 @@ export const Deleted = Schema.Struct({
   threadId: ThreadId.Id,
   groupId: GroupId.Id,
   messageId: Id,
-  deletedAt: Schema.DateTimeUtcFromString,
-});
+  deletedAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas

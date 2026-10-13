@@ -5,9 +5,10 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { AssignmentService } from "@amends-dev/core/authorization";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+
+import { AssignmentService } from "@amends-dev/core/authorization"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Api from "./Api.ts"
 
 /**
  * Register the assignment handlers.
@@ -17,25 +18,17 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
  */
 export const layer = HttpApiBuilder.group(Api.Api, "assignments", (handlers) =>
   handlers.handleAll({
-    permissions: () =>
-      AssignmentService.AssignmentService.use((assignmentService) => assignmentService.permissions),
-    roles: () =>
-      AssignmentService.AssignmentService.use((assignmentService) => assignmentService.roles),
+    permissions: () => AssignmentService.AssignmentService.use((assignmentService) => assignmentService.permissions),
+    roles: () => AssignmentService.AssignmentService.use((assignmentService) => assignmentService.roles),
     list: ({ params }) =>
-      AssignmentService.AssignmentService.use((assignmentService) =>
-        assignmentService.list(params.memberId),
-      ),
+      AssignmentService.AssignmentService.use((assignmentService) => assignmentService.list(params.memberId)),
     assign: ({ payload }) =>
-      AssignmentService.AssignmentService.use((assignmentService) =>
-        assignmentService.assign(payload),
-      ),
+      AssignmentService.AssignmentService.use((assignmentService) => assignmentService.assign(payload)),
     change: ({ payload }) =>
-      AssignmentService.AssignmentService.use((assignmentService) =>
-        assignmentService.change(payload),
-      ),
+      AssignmentService.AssignmentService.use((assignmentService) => assignmentService.change(payload)),
     revoke: ({ params }) =>
       AssignmentService.AssignmentService.use((assignmentService) =>
-        assignmentService.revoke(params.memberId, params.assignmentId),
-      ),
-  }),
-);
+        assignmentService.revoke(params.memberId, params.assignmentId)
+      )
+  })
+)

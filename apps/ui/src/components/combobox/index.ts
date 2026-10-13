@@ -1,1 +1,1 @@
-export { Combobox, type ComboboxProps, type ComboboxSuggestion } from "./combobox.tsx";
+export { Combobox, type ComboboxProps, type ComboboxSuggestion } from "./combobox.tsx"

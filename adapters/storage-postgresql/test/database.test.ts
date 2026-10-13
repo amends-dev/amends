@@ -1,14 +1,14 @@
-import { describe, it, expect } from "@effect/vitest";
-import { PgClient } from "@effect/sql-pg";
-import { GroupService } from "@amends-dev/core/group";
-import { Actor, Identity } from "@amends-dev/core/identity";
-import { Fact, Journal, Publication, Subject } from "@amends-dev/core/journal";
-import { ThreadService } from "@amends-dev/core/thread";
-import { Notification } from "@amends-dev/core/notification";
-import { Member, MemberFacts } from "@amends-dev/core/workspace";
-import { Array, DateTime, Effect, Option, Redacted, Schema, Exit } from "effect";
-import { SqlClient } from "effect/sql";
-import { PostgresDatabase } from "../src/index.ts";
+import { GroupService } from "@amends-dev/core/group"
+import { Actor, Identity } from "@amends-dev/core/identity"
+import { Fact, Journal, Publication, Subject } from "@amends-dev/core/journal"
+import { Notification } from "@amends-dev/core/notification"
+import { ThreadService } from "@amends-dev/core/thread"
+import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { PgClient } from "@effect/sql-pg"
+import { describe, it, expect } from "@effect/vitest"
+import { Array, DateTime, Effect, Option, Redacted, Schema, Exit } from "effect"
+import { SqlClient } from "effect/sql"
+import { PostgresDatabase } from "../src/index.ts"
 import {
   core,
   database,
@@ -18,54 +18,48 @@ import {
   setup,
   testProvenance,
   views,
-  workspaceId,
-} from "./support.ts";
+  workspaceId
+} from "./support.ts"
 
 const Noted = Fact.make("test.noted", {
   version: 1,
   subject: (payload) => Subject.make("test", payload.id),
-  payload: Schema.Struct({ id: Schema.String }),
-});
+  payload: Schema.Struct({ id: Schema.String })
+})
 
-const { available, withDatabase } = setup();
+const { available, withDatabase } = setup()
 describe.skipIf(!available)("PostgreSQL", () => {
   for (const construction of ["make", "layer"] as const)
-    it.effect(
-      `database ${construction} initializes every store and preserves data when reopened`,
-      () =>
-        withDatabase((url) =>
-          Effect.gen(function* () {
-            const program = Effect.gen(function* () {
-              const postgresDatabase = yield* PostgresDatabase.PostgresDatabase;
-              expect(postgresDatabase.sql).toBe(yield* SqlClient.SqlClient);
-              const bound = yield* (yield* views()).forWorkspace(workspaceId);
-              const record = yield* initialized(bound);
-              expect(yield* bound.invitations.list).toEqual([]);
-              return record;
-            });
-            const configured =
-              construction === "make"
-                ? Effect.flatMap(PostgresDatabase.make(), (database) =>
-                    program.pipe(
-                      Effect.provideService(PostgresDatabase.PostgresDatabase, database),
-                    ),
-                  ).pipe(
-                    Effect.provide(PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })),
-                  )
-                : program.pipe(Effect.provide(database(url)));
-            const record = yield* configured;
-            yield* inDatabase(
-              url,
-              Effect.gen(function* () {
-                const bound = yield* (yield* views()).forWorkspace(workspaceId);
-                expect(yield* bound.workspace.get).toEqual(Option.some(record));
-                expect(yield* bound.members.list).toHaveLength(1);
-                expect(yield* bound.invitations.list).toEqual([]);
-              }),
-            );
-          }),
-        ),
-    );
+    it.effect(`database ${construction} initializes every store and preserves data when reopened`, () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const program = Effect.gen(function* () {
+            const postgresDatabase = yield* PostgresDatabase.PostgresDatabase
+            expect(postgresDatabase.sql).toBe(yield* SqlClient.SqlClient)
+            const bound = yield* (yield* views()).forWorkspace(workspaceId)
+            const record = yield* initialized(bound)
+            expect(yield* bound.invitations.list).toEqual([])
+            return record
+          })
+          const configured =
+            construction === "make"
+              ? Effect.flatMap(PostgresDatabase.make(), (database) =>
+                  program.pipe(Effect.provideService(PostgresDatabase.PostgresDatabase, database))
+                ).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })))
+              : program.pipe(Effect.provide(database(url)))
+          const record = yield* configured
+          yield* inDatabase(
+            url,
+            Effect.gen(function* () {
+              const bound = yield* (yield* views()).forWorkspace(workspaceId)
+              expect(yield* bound.workspace.get).toEqual(Option.some(record))
+              expect(yield* bound.members.list).toHaveLength(1)
+              expect(yield* bound.invitations.list).toEqual([])
+            })
+          )
+        })
+      )
+    )
 
   it.live("processes starting together on an empty database each finish migrating", () =>
     withDatabase((url) =>
@@ -76,93 +70,87 @@ describe.skipIf(!available)("PostgreSQL", () => {
           () =>
             Effect.flatMap(
               PostgresDatabase.PostgresDatabase,
-              (postgresDatabase) => postgresDatabase.sql`SELECT 1`,
+              (postgresDatabase) => postgresDatabase.sql`SELECT 1`
             ).pipe(Effect.provide(database(url)), Effect.exit),
-          { concurrency: "unbounded" },
-        );
-        expect(opened.filter((exit) => Exit.isFailure(exit))).toEqual([]);
+          { concurrency: "unbounded" }
+        )
+        expect(opened.filter((exit) => Exit.isFailure(exit))).toEqual([])
         const applied = yield* inDatabase(
           url,
           Effect.flatMap(
             SqlClient.SqlClient,
             (sql) =>
               sql<{
-                readonly count: number;
-              }>`SELECT COUNT(*)::int AS count FROM drizzle.__drizzle_migrations`,
-          ),
-        );
-        expect(applied).toEqual([{ count: 1 }]);
-      }),
-    ),
-  );
+                readonly count: number
+              }>`SELECT COUNT(*)::int AS count FROM drizzle.__drizzle_migrations`
+          )
+        )
+        expect(applied).toEqual([{ count: 1 }])
+      })
+    )
+  )
 
   it.effect("commit entry lookups seek within one batch through the commit index", () =>
     withDatabase((url) =>
       inDatabase(
         url,
         Effect.gen(function* () {
-          const bound = yield* (yield* views()).forWorkspace(workspaceId);
-          yield* initialized(bound);
+          const bound = yield* (yield* views()).forWorkspace(workspaceId)
+          yield* initialized(bound)
           const batches = yield* Effect.gen(function* () {
-            const journal = yield* Journal.Journal;
+            const journal = yield* Journal.Journal
             return yield* Effect.forEach(Array.range(1, 20), (batch) =>
               journal.commit(
-                Effect.forEach(Array.range(1, 10), (entry) =>
-                  journal.publish(Noted, { id: `${batch}-${entry}` }),
-                ),
-              ),
-            );
-          }).pipe(
-            Effect.provideService(Publication.Publication, testProvenance()),
-            Effect.provide(core(bound)),
-          );
-          const commitId = batches[10]![0]!.commitId;
-          const sql = yield* SqlClient.SqlClient;
-          yield* sql`ANALYZE log_entries`;
+                Effect.forEach(Array.range(1, 10), (entry) => journal.publish(Noted, { id: `${batch}-${entry}` }))
+              )
+            )
+          }).pipe(Effect.provideService(Publication.Publication, testProvenance()), Effect.provide(core(bound)))
+          const commitId = batches[10]![0]!.commitId
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`ANALYZE log_entries`
           const plans = yield* sql.withTransaction(
             Effect.gen(function* () {
               // Compare index access paths; a small table is otherwise cheapest to scan.
-              yield* sql`SET LOCAL enable_seqscan = off`;
-              const plan = (
-                query: Effect.Effect<ReadonlyArray<{ "QUERY PLAN": string }>, unknown>,
-              ) => Effect.map(query, (rows) => rows.map((row) => row["QUERY PLAN"]).join("\n"));
+              yield* sql`SET LOCAL enable_seqscan = off`
+              const plan = (query: Effect.Effect<ReadonlyArray<{ "QUERY PLAN": string }>, unknown>) =>
+                Effect.map(query, (rows) => rows.map((row) => row["QUERY PLAN"]).join("\n"))
               // Appends seek the next index; keyed receipts read a slice of one batch.
               return yield* Effect.all([
                 plan(
-                  sql`EXPLAIN SELECT max(entry_index) FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND commit_id = ${commitId}`,
+                  sql`EXPLAIN SELECT max(entry_index) FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND commit_id = ${commitId}`
                 ),
                 plan(
-                  sql`EXPLAIN SELECT id, entry_index, payload FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND commit_id = ${commitId} AND entry_index >= ${1} AND entry_index < ${3} ORDER BY entry_index`,
-                ),
-              ]);
-            }),
-          );
+                  sql`EXPLAIN SELECT id, entry_index, payload FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND commit_id = ${commitId} AND entry_index >= ${1} AND entry_index < ${3} ORDER BY entry_index`
+                )
+              ])
+            })
+          )
           // The planner may still sort a tiny slice; the commit must bound the index scan itself.
           for (const plan of plans) {
-            expect(plan).toMatch(/Index (Only )?Scan (Backward )?(using|on) log_entries_by_commit/);
-            expect(plan).toMatch(/Index Cond: .*commit_id = /);
-            expect(plan).not.toMatch(/Filter: .*commit_id/);
+            expect(plan).toMatch(/Index (Only )?Scan (Backward )?(using|on) log_entries_by_commit/)
+            expect(plan).toMatch(/Index Cond: .*commit_id = /)
+            expect(plan).not.toMatch(/Filter: .*commit_id/)
           }
-        }),
-      ),
-    ),
-  );
+        })
+      )
+    )
+  )
 
   it.effect("thread, membership, inbox, journal, and directory lookups seek ordered indexes", () =>
     withDatabase((url) =>
       inDatabase(
         url,
         Effect.gen(function* () {
-          const bound = yield* (yield* views()).forWorkspace(workspaceId);
-          const workspace = yield* initialized(bound);
+          const bound = yield* (yield* views()).forWorkspace(workspaceId)
+          const workspace = yield* initialized(bound)
           const owner = Actor.Actor.of({
             workspaceId,
             memberId: workspace.ownerMemberId,
-            identity: { _tag: "Human", id: workspace.createdBy },
-          });
-          const memberIds = Array.makeBy(20, (index) => Member.Id.make(`member-${index}`));
+            identity: { _tag: "Human", id: workspace.createdBy }
+          })
+          const memberIds = Array.makeBy(20, (index) => Member.Id.make(`member-${index}`))
           const threads = yield* Effect.gen(function* () {
-            const journal = yield* Journal.Journal;
+            const journal = yield* Journal.Journal
             yield* journal
               .commit(
                 Effect.forEach(memberIds, (memberId) =>
@@ -170,168 +158,166 @@ describe.skipIf(!available)("PostgreSQL", () => {
                     workspaceId,
                     memberId,
                     identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
-                    name: Member.Name.make(memberId),
-                  }),
-                ),
+                    name: Member.Name.make(memberId)
+                  })
+                )
               )
-              .pipe(Effect.provideService(Publication.Publication, testProvenance()));
-            const groupService = yield* GroupService.GroupService;
-            const threadService = yield* ThreadService.ThreadService;
+              .pipe(Effect.provideService(Publication.Publication, testProvenance()))
+            const groupService = yield* GroupService.GroupService
+            const threadService = yield* ThreadService.ThreadService
             return yield* Effect.forEach([memberIds.slice(0, 10), memberIds.slice(10)], (members) =>
               Effect.gen(function* () {
                 const group = yield* groupService.createTeam({
                   name: "Team",
-                  memberIds: [owner.memberId, ...members],
-                });
+                  memberIds: [owner.memberId, ...members]
+                })
                 return yield* Effect.forEach(Array.range(1, 6), () =>
                   threadService.startInGroup({
                     groupId: group.id,
                     text: "Hello",
-                    mentions: members,
-                  }),
-                );
-              }),
-            ).pipe(Effect.map(Array.flatten), Effect.provideService(Actor.Actor, owner));
-          }).pipe(Effect.provide(core(bound)));
-          const thread = threads[0]!.thread;
-          const [admission] = yield* bound.groupMemberships.listActiveByMember(memberIds[0]!);
+                    mentions: members
+                  })
+                )
+              })
+            ).pipe(Effect.map(Array.flatten), Effect.provideService(Actor.Actor, owner))
+          }).pipe(Effect.provide(core(bound)))
+          const thread = threads[0]!.thread
+          const [admission] = yield* bound.groupMemberships.listActiveByMember(memberIds[0]!)
           // Mentioned members are notified; authors are not.
           const inbox = yield* bound.notifications.listLatestByRecipient(
             Notification.ofMember(memberIds[0]!, {
               _tag: "Human",
-              id: Identity.HumanId.make(memberIds[0]!),
+              id: Identity.HumanId.make(memberIds[0]!)
             }),
-            { limit: 2 },
-          );
+            { limit: 2 }
+          )
           const facts = yield* Effect.flatMap(Journal.Journal, (journal) =>
-            journal.read({ name: "thread.created", limit: 1 }),
-          ).pipe(Effect.provide(core(bound)));
-          const sql = yield* SqlClient.SqlClient;
-          yield* sql`ANALYZE`;
-          const pendingInbox = sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL ORDER BY recorded_at, id COLLATE "C" LIMIT 20`;
+            journal.read({ name: "thread.created", limit: 1 })
+          ).pipe(Effect.provide(core(bound)))
+          const sql = yield* SqlClient.SqlClient
+          yield* sql`ANALYZE`
+          const pendingInbox = sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL ORDER BY recorded_at, id COLLATE "C" LIMIT 20`
           const cases = [
             {
               index: "participations_by_thread",
               condition: "thread_id =",
-              query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${thread.id} ORDER BY id COLLATE "C"`,
+              query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${thread.id} ORDER BY id COLLATE "C"`
             },
             {
               index: "participations_by_thread",
               condition: "thread_id =",
-              query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${thread.id} AND member_id = ${memberIds[0]!}`,
+              query: sql`SELECT id FROM thread_participations WHERE workspace_id = ${workspaceId} AND thread_id = ${thread.id} AND member_id = ${memberIds[0]!}`
             },
             // A group departure ends every participation it held in one statement.
             {
               index: "participations_by_admission",
               condition: "group_membership_id =",
-              query: sql`UPDATE thread_participations SET status = 'ended', ended_at = now() WHERE workspace_id = ${workspaceId} AND group_membership_id = ${admission!.id} AND status = 'active'`,
+              query: sql`UPDATE thread_participations SET status = 'ended', ended_at = now() WHERE workspace_id = ${workspaceId} AND group_membership_id = ${admission!.id} AND status = 'active'`
             },
             {
               index: "group_memberships_by_member",
               condition: "member_id =",
-              query: sql`SELECT id FROM group_memberships WHERE workspace_id = ${workspaceId} AND member_id = ${memberIds[0]!} AND status = 'active' ORDER BY id COLLATE "C"`,
+              query: sql`SELECT id FROM group_memberships WHERE workspace_id = ${workspaceId} AND member_id = ${memberIds[0]!} AND status = 'active' ORDER BY id COLLATE "C"`
             },
             // Browsing pages public groups, and sizes a page of them with one read.
             {
               index: "public_groups",
               condition: "workspace_id =",
-              query: sql`SELECT id FROM groups WHERE workspace_id = ${workspaceId} AND visibility = 'Public' AND id COLLATE "C" > ${""} ORDER BY id COLLATE "C" LIMIT 20`,
+              query: sql`SELECT id FROM groups WHERE workspace_id = ${workspaceId} AND visibility = 'Public' AND id COLLATE "C" > ${""} ORDER BY id COLLATE "C" LIMIT 20`
             },
             {
               index: "active_group_membership",
               condition: "group_id =",
-              query: sql`SELECT group_id, count(*), bool_or(member_id = ${memberIds[0]!}) FROM group_memberships WHERE workspace_id = ${workspaceId} AND status = 'active' AND group_id = any(${[thread.groupId]}::text[]) GROUP BY group_id`,
+              query: sql`SELECT group_id, count(*), bool_or(member_id = ${memberIds[0]!}) FROM group_memberships WHERE workspace_id = ${workspaceId} AND status = 'active' AND group_id = any(${[thread.groupId]}::text[]) GROUP BY group_id`
             },
             {
               index: "threads_by_group",
               condition: "group_id =",
-              query: sql`SELECT id FROM threads WHERE workspace_id = ${workspaceId} AND group_id = ${thread.groupId} ORDER BY id COLLATE "C"`,
+              query: sql`SELECT id FROM threads WHERE workspace_id = ${workspaceId} AND group_id = ${thread.groupId} ORDER BY id COLLATE "C"`
             },
             {
               index: "notifications_by_recipient",
               condition: "ROW(recorded_at, (id)::text) >",
-              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND (recorded_at, id COLLATE "C") > (${DateTime.formatIso(inbox[0]!.recordedAt)}::timestamptz, ${inbox[0]!.id}) ORDER BY recorded_at, id COLLATE "C" LIMIT 20`,
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND (recorded_at, id COLLATE "C") > (${DateTime.formatIso(inbox[0]!.recordedAt)}::timestamptz, ${inbox[0]!.id}) ORDER BY recorded_at, id COLLATE "C" LIMIT 20`
             },
             // Pending reads use indexes that leave out what the reader has already seen.
             {
               index: "pending_notifications_by_recipient",
               condition: "recipient_kind =",
-              query: pendingInbox,
+              query: pendingInbox
             },
             {
               index: "pending_notifications_by_group",
               condition: "thread_group_id =",
-              query: sql`SELECT thread_group_id, count(*) FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = any(${[thread.groupId]}::text[]) GROUP BY thread_group_id`,
+              query: sql`SELECT thread_group_id, count(*) FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = any(${[thread.groupId]}::text[]) GROUP BY thread_group_id`
             },
             // Leaving a group settles the leaver's pending notifications from it through the same index.
             {
               index: "pending_notifications_by_group",
               condition: "thread_group_id =",
-              query: sql`UPDATE notifications SET state = 'Discarded', discard_reason = 'access-lost' WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = ${thread.groupId}`,
+              query: sql`UPDATE notifications SET state = 'Discarded', discard_reason = 'access-lost' WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = ${thread.groupId}`
             },
             // A reader's notifications from one thread seek by position, pending or in any state.
             {
               index: "notifications_by_thread",
               condition: "thread_id =",
-              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_id = ${thread.id} AND thread_sequence <= 10`,
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_id = ${thread.id} AND thread_sequence <= 10`
             },
             {
               index: "notifications_by_thread",
               condition: "thread_sequence >",
-              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Agent' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND thread_id = ${thread.id} AND thread_sequence > 0 AND thread_sequence <= 10 ORDER BY thread_sequence, id COLLATE "C"`,
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Agent' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND thread_id = ${thread.id} AND thread_sequence > 0 AND thread_sequence <= 10 ORDER BY thread_sequence, id COLLATE "C"`
             },
             {
               index: "pending_agent_notifications_by_participation",
               condition: "participation_id =",
-              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND participation_id = ${inbox[0]!.participationId ?? ""} AND recipient_kind = 'Agent' AND state = 'Pending'`,
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND participation_id = ${inbox[0]!.participationId ?? ""} AND recipient_kind = 'Agent' AND state = 'Pending'`
             },
             {
               index: "log_entries_by_fact",
               condition: 'ROW("position", entry_index) >',
-              query: sql`SELECT id FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND fact_name = ${"thread.created"} AND (position, entry_index) > (${facts[0]!.position}, ${facts[0]!.index}) ORDER BY position, entry_index LIMIT 20`,
+              query: sql`SELECT id FROM log_entries WHERE workspace_id = ${workspaceId} AND log_id = ${journalLog} AND fact_name = ${"thread.created"} AND (position, entry_index) > (${facts[0]!.position}, ${facts[0]!.index}) ORDER BY position, entry_index LIMIT 20`
             },
             {
               index: "members_by_identity",
               condition: "identity_id =",
-              query: sql`SELECT id FROM members WHERE identity_kind = 'Human' AND identity_id = ${workspace.createdBy} ORDER BY workspace_id, id`,
-            },
-          ];
+              query: sql`SELECT id FROM members WHERE identity_kind = 'Human' AND identity_id = ${workspace.createdBy} ORDER BY workspace_id, id`
+            }
+          ]
           const plans = yield* sql.withTransaction(
             Effect.gen(function* () {
               // Leave only ordered index scans, so any remaining sort means no index supplies the order.
-              yield* sql`SET LOCAL enable_seqscan = off`;
-              yield* sql`SET LOCAL enable_bitmapscan = off`;
-              yield* sql`SET LOCAL enable_sort = off`;
+              yield* sql`SET LOCAL enable_seqscan = off`
+              yield* sql`SET LOCAL enable_bitmapscan = off`
+              yield* sql`SET LOCAL enable_sort = off`
               return yield* Effect.forEach(cases, ({ query }) =>
                 Effect.map(sql<{ "QUERY PLAN": string }>`EXPLAIN ${query}`, (rows) =>
-                  rows.map((row) => row["QUERY PLAN"]).join("\n"),
-                ),
-              );
-            }),
-          );
+                  rows.map((row) => row["QUERY PLAN"]).join("\n")
+                )
+              )
+            })
+          )
           for (const [index, { index: name, condition }] of cases.entries()) {
-            const plan = plans[index]!;
-            expect(plan).toMatch(new RegExp(`Index (Only )?Scan (Backward )?using ${name} `));
-            expect(plan.split("\n").find((line) => line.includes("Index Cond:"))).toContain(
-              condition,
-            );
-            expect(plan).not.toMatch(/^\s*(->\s*)?Sort\b/m);
+            const plan = plans[index]!
+            expect(plan).toMatch(new RegExp(`Index (Only )?Scan (Backward )?using ${name} `))
+            expect(plan.split("\n").find((line) => line.includes("Index Cond:"))).toContain(condition)
+            expect(plan).not.toMatch(/^\s*(->\s*)?Sort\b/m)
           }
           // Seen notifications leave the pending indexes, so pending reads never visit them.
-          yield* bound.notifications.markSeen([inbox[0]!.id], inbox[0]!.recordedAt);
+          yield* bound.notifications.markSeen([inbox[0]!.id], inbox[0]!.recordedAt)
           const pendingPlan = yield* sql.withTransaction(
             Effect.gen(function* () {
-              yield* sql`SET LOCAL enable_seqscan = off`;
-              yield* sql`SET LOCAL enable_bitmapscan = off`;
-              const rows = yield* sql<{ "QUERY PLAN": string }>`EXPLAIN ANALYZE ${pendingInbox}`;
-              return rows.map((row) => row["QUERY PLAN"]).join("\n");
-            }),
-          );
-          expect(pendingPlan).toMatch(/Index Scan using pending_notifications_by_recipient /);
-          expect(pendingPlan).not.toMatch(/Rows Removed by Filter/);
+              yield* sql`SET LOCAL enable_seqscan = off`
+              yield* sql`SET LOCAL enable_bitmapscan = off`
+              const rows = yield* sql<{ "QUERY PLAN": string }>`EXPLAIN ANALYZE ${pendingInbox}`
+              return rows.map((row) => row["QUERY PLAN"]).join("\n")
+            })
+          )
+          expect(pendingPlan).toMatch(/Index Scan using pending_notifications_by_recipient /)
+          expect(pendingPlan).not.toMatch(/Rows Removed by Filter/)
           // An agent that leaves has its pending input from the group settled through the same
           // index, among the input agents elsewhere in the workspace have waiting.
-          const sample = inbox[0]!;
+          const sample = inbox[0]!
           yield* bound.store.transaction(
             bound.notifications.insertMany(
               Array.makeBy(200, (index) =>
@@ -341,33 +327,31 @@ describe.skipIf(!available)("PostgreSQL", () => {
                   thread: {
                     threadId: `agent-thread-${index}`,
                     groupId: `agent-group-${index % 10}`,
-                    sequence: 1,
+                    sequence: 1
                   },
                   recipient: Notification.ofMember(Member.Id.make(`agent-${index % 20}`), {
                     _tag: "Agent",
-                    id: Identity.AgentId.make(`agent-${index % 20}`),
-                  }),
-                }),
-              ),
-            ),
-          );
-          yield* sql`ANALYZE notifications`;
+                    id: Identity.AgentId.make(`agent-${index % 20}`)
+                  })
+                })
+              )
+            )
+          )
+          yield* sql`ANALYZE notifications`
           const agentPlan = yield* sql.withTransaction(
             Effect.gen(function* () {
-              yield* sql`SET LOCAL enable_seqscan = off`;
-              yield* sql`SET LOCAL enable_bitmapscan = off`;
+              yield* sql`SET LOCAL enable_seqscan = off`
+              yield* sql`SET LOCAL enable_bitmapscan = off`
               const rows = yield* sql<{
-                "QUERY PLAN": string;
-              }>`EXPLAIN UPDATE notifications SET state = 'Discarded', discard_reason = 'participation-ended' WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Agent' AND coalesce(recipient_member_id, recipient_id, '') = ${"agent-0"} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = ${"agent-group-0"}`;
-              return rows.map((row) => row["QUERY PLAN"]).join("\n");
-            }),
-          );
-          expect(agentPlan).toMatch(/Index Scan using pending_notifications_by_group /);
-          expect(agentPlan.split("\n").find((line) => line.includes("Index Cond:"))).toContain(
-            "thread_group_id =",
-          );
-        }),
-      ),
-    ),
-  );
-});
+                "QUERY PLAN": string
+              }>`EXPLAIN UPDATE notifications SET state = 'Discarded', discard_reason = 'participation-ended' WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Agent' AND coalesce(recipient_member_id, recipient_id, '') = ${"agent-0"} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = ${"agent-group-0"}`
+              return rows.map((row) => row["QUERY PLAN"]).join("\n")
+            })
+          )
+          expect(agentPlan).toMatch(/Index Scan using pending_notifications_by_group /)
+          expect(agentPlan.split("\n").find((line) => line.includes("Index Cond:"))).toContain("thread_group_id =")
+        })
+      )
+    )
+  )
+})

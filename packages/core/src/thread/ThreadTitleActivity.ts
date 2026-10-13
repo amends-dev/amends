@@ -4,9 +4,10 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Thread from "./Thread.ts";
-import * as ThreadActivityKind from "./ThreadActivityKind.ts";
+
+import * as Schema from "effect/Schema"
+import * as Thread from "./Thread.ts"
+import * as ThreadActivityKind from "./ThreadActivityKind.ts"
 
 /**
  * The thread was given a title, or its title changed. It is about its thread, and a thread is
@@ -20,14 +21,14 @@ export const Renamed = ThreadActivityKind.make("thread.renamed", {
   details: Schema.Struct({
     title: Thread.Title,
     /** The title it replaced, or null when the thread had none. */
-    previous: Schema.NullOr(Thread.Title),
+    previous: Schema.NullOr(Thread.Title)
   }),
   occurrence: () => null,
-  newActivity: false,
-});
+  newActivity: false
+})
 
 /**
  * @category kinds
  * @since 0.1.0
  */
-export type Renamed = ThreadActivityKind.Activity<typeof Renamed>;
+export type Renamed = ThreadActivityKind.Activity<typeof Renamed>

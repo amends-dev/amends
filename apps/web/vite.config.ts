@@ -1,7 +1,7 @@
-import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
-import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
-import solid from "vite-plugin-solid";
+import { fileURLToPath } from "node:url"
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin"
+import solid from "vite-plugin-solid"
+import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   plugins: [solid(), vanillaExtractPlugin()],
@@ -13,14 +13,14 @@ export default defineConfig({
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8787",
-        rewrite: (path) => path.replace(/^\/api/, ""),
-      },
-    },
+        rewrite: (path) => path.replace(/^\/api/, "")
+      }
+    }
   },
   test: {
     name: "@amends-dev/web",
     environment: "happy-dom",
     setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
-    include: ["test/**/*.test.{ts,tsx}"],
-  },
-});
+    include: ["test/**/*.test.{ts,tsx}"]
+  }
+})

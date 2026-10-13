@@ -1,220 +1,216 @@
-import { BuiltinRoles } from "@amends-dev/core/authorization";
-import { Identity } from "@amends-dev/core/identity";
-import { Request } from "@amends-dev/core/request";
-import { describe, expect, it } from "@effect/vitest";
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
-import { DateTime, Effect, Layer, Redacted } from "effect";
-import { Base64 } from "effect/encoding";
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
-import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
-import * as LocalHost from "../src/LocalHost.ts";
-import * as LocalServer from "../src/LocalServer.ts";
-import { setup } from "./database.ts";
-import { client } from "./client.ts";
+import { BuiltinRoles } from "@amends-dev/core/authorization"
+import { Identity } from "@amends-dev/core/identity"
+import { Request } from "@amends-dev/core/request"
+import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
+import { describe, expect, it } from "@effect/vitest"
+import { DateTime, Effect, Layer, Redacted } from "effect"
+import { Base64 } from "effect/encoding"
+import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http"
+import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
+import * as LocalHost from "../src/LocalHost.ts"
+import * as LocalServer from "../src/LocalServer.ts"
+import { client } from "./client.ts"
+import { setup } from "./database.ts"
 
-const alice = Identity.HumanId.make("alice");
-const secret = "sk-mcp-connections-test";
+const alice = Identity.HumanId.make("alice")
+const secret = "sk-mcp-connections-test"
 /** Where nothing listens, so checking a connection to it reaches nothing. */
-const nowhere = "http://127.0.0.1:1/mcp";
+const nowhere = "http://127.0.0.1:1/mcp"
 /** The real routes, gateway, integrations, and PostgreSQL storage behind a Bun test server. */
 const server = (url: string, credentialKey: Redacted.Redacted<string> | undefined) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       DevelopmentAuthentication.layer(() => Effect.void).pipe(
         Layer.provide(BunCrypto.layer),
-        Layer.provideMerge(LocalHost.layer(Redacted.make(url), { credentialKey })),
-      ),
+        Layer.provideMerge(LocalHost.layer(Redacted.make(url), { credentialKey }))
+      )
     ),
-    Layer.provideMerge(BunHttpServer.layerTest),
-  );
-const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
+    Layer.provideMerge(BunHttpServer.layerTest)
+  )
+const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))))
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
   const workspace = yield* (yield* client(alice)).workspaces.create({
     headers: {},
-    payload: { name: "Studio", memberName: "alice" },
-  });
-  const asAlice = yield* client(alice, workspace.id);
+    payload: { name: "Studio", memberName: "alice" }
+  })
+  const asAlice = yield* client(alice, workspace.id)
   const invitation = yield* asAlice.invitations.issue({
     headers: {},
     payload: {
       email: "bob@example.com",
       expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
-      roleId: BuiltinRoles.MemberId,
-    },
-  });
+      roleId: BuiltinRoles.MemberId
+    }
+  })
   // Development tokens are human IDs: Bob's is his account's, which the invitation names.
-  const asBob = yield* client(invitation.details.recipientId, workspace.id);
+  const asBob = yield* client(invitation.details.recipientId, workspace.id)
   yield* asBob.workspaces.acceptInvitation({
     params: { workspaceId: workspace.id, invitationId: invitation.details.id },
-    payload: { name: "bob" },
-  });
-  return { asAlice, asBob, workspaceId: workspace.id };
-});
-const { available, withDatabase } = setup();
+    payload: { name: "bob" }
+  })
+  return { asAlice, asBob, workspaceId: workspace.id }
+})
+const { available, withDatabase } = setup()
 describe.skipIf(!available)("PostgreSQL", () => {
-  it.live(
-    "connections are set up, checked, and managed over HTTP, and their keys never return",
-    () =>
-      withDatabase((url) =>
-        Effect.gen(function* () {
-          const { asAlice, asBob, workspaceId } = yield* workspaceWithBob;
-          // Every member sees what this host installed, with the form each one's settings make.
-          const integrations = yield* asBob.connections.integrations();
-          expect(integrations.find((integration) => integration.id === "mcp")).toMatchObject({
-            name: "MCP server",
-            auth: ["apiKey", "none"],
-            provides: ["tools"],
-            settings: {
-              type: "object",
-              properties: { url: { type: "string", title: "Server URL" } },
-              required: ["url"],
-            },
-          });
-          expect(integrations.find((integration) => integration.id === "amends")).toMatchObject({
-            auth: ["none"],
-            provides: ["harnesses"],
-            settings: { type: "object", properties: {} },
-          });
+  it.live("connections are set up, checked, and managed over HTTP, and their keys never return", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const { asAlice, asBob, workspaceId } = yield* workspaceWithBob
+        // Every member sees what this host installed, with the form each one's settings make.
+        const integrations = yield* asBob.connections.integrations()
+        expect(integrations.find((integration) => integration.id === "mcp")).toMatchObject({
+          name: "MCP server",
+          auth: ["apiKey", "none"],
+          provides: ["tools"],
+          settings: {
+            type: "object",
+            properties: { url: { type: "string", title: "Server URL" } },
+            required: ["url"]
+          }
+        })
+        expect(integrations.find((integration) => integration.id === "amends")).toMatchObject({
+          auth: ["none"],
+          provides: ["harnesses"],
+          settings: { type: "object", properties: {} }
+        })
 
-          const payload = {
-            integration: "mcp",
-            name: "Tools",
-            settings: { url: nowhere },
-            auth: "apiKey",
-            apiKey: Redacted.make(secret),
-          } as const;
-          const headers = { "idempotency-key": Request.Key.make("create-tools") };
-          const created = yield* asAlice.connections.create({
-            headers,
-            payload,
-          });
-          expect(created).toMatchObject({
-            name: "Tools",
-            integration: "mcp",
-            settings: { url: nowhere },
-            auth: "apiKey",
-            readiness: { _tag: "Ready" },
-            manageable: true,
-          });
-          // A retried create answers with the connection it made.
-          expect((yield* asAlice.connections.create({ headers, payload })).id).toBe(created.id);
-          const params = { workspaceId, connectionId: created.id };
+        const payload = {
+          integration: "mcp",
+          name: "Tools",
+          settings: { url: nowhere },
+          auth: "apiKey",
+          apiKey: Redacted.make(secret)
+        } as const
+        const headers = { "idempotency-key": Request.Key.make("create-tools") }
+        const created = yield* asAlice.connections.create({
+          headers,
+          payload
+        })
+        expect(created).toMatchObject({
+          name: "Tools",
+          integration: "mcp",
+          settings: { url: nowhere },
+          auth: "apiKey",
+          readiness: { _tag: "Ready" },
+          manageable: true
+        })
+        // A retried create answers with the connection it made.
+        expect((yield* asAlice.connections.create({ headers, payload })).id).toBe(created.id)
+        const params = { workspaceId, connectionId: created.id }
 
-          // Members read connections but only administrators add, change, or check them.
-          expect(yield* asBob.connections.list()).toMatchObject([
-            { id: created.id, manageable: false },
-          ]);
-          expect(
-            yield* asBob.connections
-              .replaceKey({ params, payload: { apiKey: Redacted.make("sk-bob") } })
-              .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } });
-          expect(yield* asBob.connections.check({ params }).pipe(Effect.flip)).toMatchObject({
-            _tag: "CoreError.Denied",
-            reason: { _tag: "NotGranted" },
-          });
+        // Members read connections but only administrators add, change, or check them.
+        expect(yield* asBob.connections.list()).toMatchObject([{ id: created.id, manageable: false }])
+        expect(
+          yield* asBob.connections
+            .replaceKey({ params, payload: { apiKey: Redacted.make("sk-bob") } })
+            .pipe(Effect.flip)
+        ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotGranted" } })
+        expect(yield* asBob.connections.check({ params }).pipe(Effect.flip)).toMatchObject({
+          _tag: "CoreError.Denied",
+          reason: { _tag: "NotGranted" }
+        })
 
-          // What the host has not installed, or does not take, is refused before anything is stored.
-          expect(
-            yield* asAlice.connections
-              .create({
-                headers: {},
-                payload: { integration: "missing", name: "Other", settings: {}, auth: "none" },
-              })
-              .pipe(Effect.flip),
-          ).toMatchObject({
-            _tag: "CoreError.Invalid",
-            reason: { _tag: "UnknownIntegration", integration: "missing" },
-          });
-          expect(
-            yield* asAlice.connections
-              .create({
-                headers: {},
-                payload: { integration: "mcp", name: "Other", settings: {}, auth: "none" },
-              })
-              .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused" } });
+        // What the host has not installed, or does not take, is refused before anything is stored.
+        expect(
+          yield* asAlice.connections
+            .create({
+              headers: {},
+              payload: { integration: "missing", name: "Other", settings: {}, auth: "none" }
+            })
+            .pipe(Effect.flip)
+        ).toMatchObject({
+          _tag: "CoreError.Invalid",
+          reason: { _tag: "UnknownIntegration", integration: "missing" }
+        })
+        expect(
+          yield* asAlice.connections
+            .create({
+              headers: {},
+              payload: { integration: "mcp", name: "Other", settings: {}, auth: "none" }
+            })
+            .pipe(Effect.flip)
+        ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused" } })
 
-          // The key is stored, and no read of the connection carries it.
-          const read = (path: string) =>
-            HttpClient.execute(
-              HttpClientRequest.get(`/connections${path}`).pipe(
-                HttpClientRequest.bearerToken(alice),
-                HttpClientRequest.setHeader("amends-workspace", workspaceId),
-              ),
-            ).pipe(Effect.flatMap((response) => response.text));
-          expect(yield* read("")).not.toContain(secret);
-          expect(yield* read(`/${created.id}`)).not.toContain(secret);
+        // The key is stored, and no read of the connection carries it.
+        const read = (path: string) =>
+          HttpClient.execute(
+            HttpClientRequest.get(`/connections${path}`).pipe(
+              HttpClientRequest.bearerToken(alice),
+              HttpClientRequest.setHeader("amends-workspace", workspaceId)
+            )
+          ).pipe(Effect.flatMap((response) => response.text))
+        expect(yield* read("")).not.toContain(secret)
+        expect(yield* read(`/${created.id}`)).not.toContain(secret)
 
-          // Checking reaches the server the settings name, where nothing answers.
-          expect(yield* asAlice.connections.check({ params })).toMatchObject({
-            status: "unavailable",
-          });
+        // Checking reaches the server the settings name, where nothing answers.
+        expect(yield* asAlice.connections.check({ params })).toMatchObject({
+          status: "unavailable"
+        })
 
-          const renamed = yield* asAlice.connections.rename({
+        const renamed = yield* asAlice.connections.rename({
+          params,
+          payload: { name: "Search tools", expectedName: "Tools" }
+        })
+        expect(renamed.name).toBe("Search tools")
+        expect(
+          yield* asAlice.connections
+            .rename({ params, payload: { name: "Other", expectedName: "Tools" } })
+            .pipe(Effect.flip)
+        ).toMatchObject({ _tag: "CoreError.Changed" })
+        const configured = yield* asAlice.connections.configure({
+          params,
+          payload: { settings: { url: "http://127.0.0.1:2/mcp", keyHeader: "X-Api-Key" } }
+        })
+        expect(configured.settings).toEqual({
+          url: "http://127.0.0.1:2/mcp",
+          keyHeader: "X-Api-Key"
+        })
+        expect(
+          yield* asAlice.connections
+            .configure({ params, payload: { settings: { url: nowhere, region: "eu" } } })
+            .pipe(Effect.flip)
+        ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused" } })
+        expect(
+          (yield* asAlice.connections.replaceKey({
             params,
-            payload: { name: "Search tools", expectedName: "Tools" },
-          });
-          expect(renamed.name).toBe("Search tools");
-          expect(
-            yield* asAlice.connections
-              .rename({ params, payload: { name: "Other", expectedName: "Tools" } })
-              .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "CoreError.Changed" });
-          const configured = yield* asAlice.connections.configure({
-            params,
-            payload: { settings: { url: "http://127.0.0.1:2/mcp", keyHeader: "X-Api-Key" } },
-          });
-          expect(configured.settings).toEqual({
-            url: "http://127.0.0.1:2/mcp",
-            keyHeader: "X-Api-Key",
-          });
-          expect(
-            yield* asAlice.connections
-              .configure({ params, payload: { settings: { url: nowhere, region: "eu" } } })
-              .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "IntegrationRefused" } });
-          expect(
-            (yield* asAlice.connections.replaceKey({
-              params,
-              payload: { apiKey: Redacted.make("sk-replaced") },
-            })).id,
-          ).toBe(created.id);
-          expect(yield* read(`/${created.id}`)).not.toContain("sk-replaced");
+            payload: { apiKey: Redacted.make("sk-replaced") }
+          })).id
+        ).toBe(created.id)
+        expect(yield* read(`/${created.id}`)).not.toContain("sk-replaced")
 
-          // A connection that authenticates with nothing takes no key.
-          const agent = yield* asAlice.connections.create({
-            headers: {},
-            payload: { integration: "amends", name: "Agent", settings: {}, auth: "none" },
-          });
-          expect(
-            yield* asAlice.connections.check({
+        // A connection that authenticates with nothing takes no key.
+        const agent = yield* asAlice.connections.create({
+          headers: {},
+          payload: { integration: "amends", name: "Agent", settings: {}, auth: "none" }
+        })
+        expect(
+          yield* asAlice.connections.check({
+            params: { connectionId: agent.id }
+          })
+        ).toEqual({ status: "healthy" })
+        expect(
+          yield* asAlice.connections
+            .replaceKey({
               params: { connectionId: agent.id },
-            }),
-          ).toEqual({ status: "healthy" });
-          expect(
-            yield* asAlice.connections
-              .replaceKey({
-                params: { connectionId: agent.id },
-                payload: { apiKey: Redacted.make(secret) },
-              })
-              .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Keyless" } });
+              payload: { apiKey: Redacted.make(secret) }
+            })
+            .pipe(Effect.flip)
+        ).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Keyless" } })
 
-          yield* asAlice.connections.remove({ params });
-          expect(yield* asBob.connections.get({ params }).pipe(Effect.flip)).toMatchObject({
-            _tag: "CoreError.NotFound",
-          });
-          expect(yield* asBob.connections.list()).toMatchObject([{ id: agent.id }]);
-        }).pipe(Effect.scoped, Effect.provide(server(url, credentialKey))),
-      ),
-  );
+        yield* asAlice.connections.remove({ params })
+        expect(yield* asBob.connections.get({ params }).pipe(Effect.flip)).toMatchObject({
+          _tag: "CoreError.NotFound"
+        })
+        expect(yield* asBob.connections.list()).toMatchObject([{ id: agent.id }])
+      }).pipe(Effect.scoped, Effect.provide(server(url, credentialKey)))
+    )
+  )
 
   it.live("a host without a credential key refuses keys but keeps keyless connections", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
-        const { asAlice } = yield* workspaceWithBob;
+        const { asAlice } = yield* workspaceWithBob
         expect(
           yield* asAlice.connections
             .create({
@@ -224,15 +220,15 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 name: "Tools",
                 settings: { url: nowhere },
                 auth: "apiKey",
-                apiKey: Redacted.make(secret),
-              },
+                apiKey: Redacted.make(secret)
+              }
             })
-            .pipe(Effect.flip),
+            .pipe(Effect.flip)
         ).toMatchObject({
           _tag: "CoreError.Unavailable",
-          reason: { _tag: "CredentialsUnavailable" },
-        });
-        expect(yield* asAlice.connections.list()).toEqual([]);
+          reason: { _tag: "CredentialsUnavailable" }
+        })
+        expect(yield* asAlice.connections.list()).toEqual([])
         expect(
           yield* asAlice.connections.create({
             headers: {},
@@ -240,11 +236,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
               integration: "mcp",
               name: "Tools",
               settings: { url: nowhere },
-              auth: "none",
-            },
-          }),
-        ).toMatchObject({ name: "Tools", auth: "none", readiness: { _tag: "Ready" } });
-      }).pipe(Effect.scoped, Effect.provide(server(url, undefined))),
-    ),
-  );
-});
+              auth: "none"
+            }
+          })
+        ).toMatchObject({ name: "Tools", auth: "none", readiness: { _tag: "Ready" } })
+      }).pipe(Effect.scoped, Effect.provide(server(url, undefined)))
+    )
+  )
+})

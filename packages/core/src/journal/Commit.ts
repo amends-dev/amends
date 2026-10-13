@@ -6,7 +6,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * Names a commit, as storage assigns it. `Store.CommitUncertain` reports it, so a commit whose
@@ -15,13 +16,13 @@ import * as Schema from "effect/Schema";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("JournalCommitId"));
+export const Id = Schema.NonEmptyString.pipe(Schema.brand("JournalCommitId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type Id = typeof Id.Type
 
 /**
  * A commit as each of its log batches carries it: its ID, how many entries it appended across
@@ -34,8 +35,8 @@ export const Commit = Schema.Struct({
   id: Id,
   /** Total entries appended across every log in this commit. */
   entryCount: Schema.Natural,
-  recordedAt: Schema.DateTimeUtcFromString,
-});
+  recordedAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas

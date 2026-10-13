@@ -6,14 +6,15 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import type * as Thread from "./Thread.ts";
-import type * as ThreadActivity from "./ThreadActivity.ts";
-import type * as ThreadActivityKind from "./ThreadActivityKind.ts";
-import type * as StoreError from "../journal/StoreError.ts";
+
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import type * as StoreError from "../journal/StoreError.ts"
+import type * as Thread from "./Thread.ts"
+import type * as ThreadActivity from "./ThreadActivity.ts"
+import type * as ThreadActivityKind from "./ThreadActivityKind.ts"
 
 /**
  * No resolver is registered for a recorded kind, as when a newer host recorded it. A defect, not a
@@ -23,7 +24,7 @@ import type * as StoreError from "../journal/StoreError.ts";
  * @since 0.1.0
  */
 export class Unknown extends Schema.TaggedError<Unknown>()("ThreadActivityResolvers.Unknown", {
-  kind: Schema.String,
+  kind: Schema.String
 }) {}
 
 /**
@@ -34,11 +35,11 @@ export class Unknown extends Schema.TaggedError<Unknown>()("ThreadActivityResolv
  * @since 0.1.0
  */
 export interface Resolver {
-  readonly kinds: ReadonlyArray<ThreadActivityKind.Definition>;
+  readonly kinds: ReadonlyArray<ThreadActivityKind.Definition>
   readonly resolve: (
     thread: Thread.Thread,
-    activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
-  ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, StoreError.StoreError>;
+    activities: ReadonlyArray<ThreadActivity.ThreadActivity>
+  ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, StoreError.StoreError>
 }
 
 /**
@@ -55,8 +56,8 @@ export class ThreadActivityResolvers extends Context.Service<
     /** Resolve a thread's activities of any registered kinds, in their order. */
     readonly resolve: (
       thread: Thread.Thread,
-      activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
-    ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, StoreError.StoreError>;
+      activities: ReadonlyArray<ThreadActivity.ThreadActivity>
+    ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, StoreError.StoreError>
   }
 >()("@amends-dev/core/thread/ThreadActivityResolvers") {}
 
@@ -66,37 +67,35 @@ export class ThreadActivityResolvers extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ThreadActivityResolvers.make")(function* (
-  resolvers: ReadonlyArray<Resolver>,
-) {
-  const byKind = new Map<string, Resolver>();
+export const make = Effect.fn("ThreadActivityResolvers.make")(function* (resolvers: ReadonlyArray<Resolver>) {
+  const byKind = new Map<string, Resolver>()
   for (const resolver of resolvers)
     for (const kind of resolver.kinds) {
-      if (byKind.has(kind.name)) return yield* Effect.die(`Kind ${kind.name} has two resolvers`);
-      byKind.set(kind.name, resolver);
+      if (byKind.has(kind.name)) return yield* Effect.die(`Kind ${kind.name} has two resolvers`)
+      byKind.set(kind.name, resolver)
     }
   const resolve = Effect.fn("ThreadActivityResolvers.resolve")(function* (
     thread: Thread.Thread,
-    activities: ReadonlyArray<ThreadActivity.ThreadActivity>,
+    activities: ReadonlyArray<ThreadActivity.ThreadActivity>
   ) {
-    const batches = new Map<Resolver, Array<ThreadActivity.ThreadActivity>>();
+    const batches = new Map<Resolver, Array<ThreadActivity.ThreadActivity>>()
     for (const activity of activities) {
-      const resolver = byKind.get(activity.kind);
-      if (resolver === undefined) return yield* Effect.die(new Unknown({ kind: activity.kind }));
-      const batch = batches.get(resolver) ?? [];
-      batch.push(activity);
-      batches.set(resolver, batch);
+      const resolver = byKind.get(activity.kind)
+      if (resolver === undefined) return yield* Effect.die(new Unknown({ kind: activity.kind }))
+      const batch = batches.get(resolver) ?? []
+      batch.push(activity)
+      batches.set(resolver, batch)
     }
-    const items = new Map<ThreadActivity.Id, ThreadActivityKind.Item>();
+    const items = new Map<ThreadActivity.Id, ThreadActivityKind.Item>()
     for (const [resolver, batch] of batches)
-      for (const item of yield* resolver.resolve(thread, batch)) items.set(item.activity.id, item);
+      for (const item of yield* resolver.resolve(thread, batch)) items.set(item.activity.id, item)
     return activities.flatMap((activity) => {
-      const item = items.get(activity.id);
-      return item === undefined ? [] : [item];
-    });
-  });
-  return ThreadActivityResolvers.of({ resolve });
-});
+      const item = items.get(activity.id)
+      return item === undefined ? [] : [item]
+    })
+  })
+  return ThreadActivityResolvers.of({ resolve })
+})
 
 /**
  * Register the domains' resolvers, each built over the stores it reads.
@@ -105,24 +104,16 @@ export const make = Effect.fn("ThreadActivityResolvers.make")(function* (
  * @since 0.1.0
  */
 export const layer = <const Resolvers extends ReadonlyArray<Effect.Effect<Resolver, any, any>>>(
-  resolvers: Resolvers,
-): Layer.Layer<
-  ThreadActivityResolvers,
-  Effect.Error<Resolvers[number]>,
-  Effect.Services<Resolvers[number]>
-> =>
+  resolvers: Resolvers
+): Layer.Layer<ThreadActivityResolvers, Effect.Error<Resolvers[number]>, Effect.Services<Resolvers[number]>> =>
   Layer.effect(
     ThreadActivityResolvers,
     Effect.flatMap(
       Effect.all(
         resolvers as ReadonlyArray<
-          Effect.Effect<
-            Resolver,
-            Effect.Error<Resolvers[number]>,
-            Effect.Services<Resolvers[number]>
-          >
-        >,
+          Effect.Effect<Resolver, Effect.Error<Resolvers[number]>, Effect.Services<Resolvers[number]>>
+        >
       ),
-      make,
-    ),
-  );
+      make
+    )
+  )

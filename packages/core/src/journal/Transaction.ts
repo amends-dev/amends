@@ -10,18 +10,19 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Semaphore from "effect/Semaphore";
-import type * as Cause from "effect/Cause";
-import type * as Scope from "effect/Scope";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Store from "./Store.ts";
-import type * as StoreError from "./StoreError.ts";
+
+import type * as Cause from "effect/Cause"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import type * as Scope from "effect/Scope"
+import * as Semaphore from "effect/Semaphore"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Store from "./Store.ts"
+import type * as StoreError from "./StoreError.ts"
 
 /**
  * A write in the commit had failed, though its caller caught the failure, so the commit rolls
@@ -31,7 +32,7 @@ import type * as StoreError from "./StoreError.ts";
  * @since 0.1.0
  */
 export class Aborted extends Schema.TaggedError<Aborted>()("Transaction.Aborted", {
-  cause: Schema.Defect(),
+  cause: Schema.Defect()
 }) {}
 
 /**
@@ -59,12 +60,9 @@ export class Foreign extends Schema.TaggedError<Foreign>()("Transaction.Foreign"
  * @category errors
  * @since 0.1.0
  */
-export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()(
-  "Transaction.WriteForbidden",
-  {
-    reason: Schema.String,
-  },
-) {}
+export class WriteForbidden extends Schema.TaggedError<WriteForbidden>()("Transaction.WriteForbidden", {
+  reason: Schema.String
+}) {}
 
 /**
  * A commit's storage work began a step while another fiber's step was running. A commit runs its
@@ -83,13 +81,7 @@ export class Concurrent extends Schema.TaggedError<Concurrent>()("Transaction.Co
  * @category errors
  * @since 0.1.0
  */
-export type Error =
-  | StoreError.StoreError
-  | Store.CommitUncertain
-  | Aborted
-  | Closed
-  | Foreign
-  | WriteForbidden;
+export type Error = StoreError.StoreError | Store.CommitUncertain | Aborted | Closed | Foreign | WriteForbidden
 
 /**
  * What a program run as a commit still requires once the commit provides its scope and
@@ -98,7 +90,7 @@ export type Error =
  * @category models
  * @since 0.1.0
  */
-export type Remaining<R> = Exclude<Exclude<R, Scope.Scope>, Store.Transaction>;
+export type Remaining<R> = Exclude<Exclude<R, Scope.Scope>, Store.Transaction>
 
 /**
  * The commit coordinator of one workspace's storage, shared by `Log` and `Journal`. `make` builds
@@ -111,47 +103,39 @@ export class Transaction extends Context.Service<
   Transaction,
   {
     /** The workspace whose storage it commits to. */
-    readonly workspaceId: WorkspaceId.Id;
+    readonly workspaceId: WorkspaceId.Id
     /**
      * Runs `program` as one commit in a native transaction, or within the current commit when
      * nested. A nested program or write that fails fails the outer commit, with `Aborted` when its
      * caller caught the failure.
      */
-    readonly run: <A, E, R>(
-      program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, E | Error, Remaining<R>>;
+    readonly run: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E | Error, Remaining<R>>
     /**
      * Run one compound write as a step of the commit, joining or starting it. Nested steps in the
      * same fiber run within it; a step from another fiber while it runs dies with Concurrent.
      */
-    readonly operation: <A, E, R>(
-      program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, E | Error, Remaining<R>>;
+    readonly operation: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E | Error, Remaining<R>>
     /**
      * Run a read as a step of the current commit, under the same rule as operation, so it never
      * overlaps the commit's writes. Outside a commit, run it as it is; after the commit ends, the
      * store rejects its expired handle.
      */
-    readonly step: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+    readonly step: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
   }
 >()("@amends-dev/core/journal/Transaction") {}
 
 interface State {
-  readonly owner: symbol;
-  readonly native: Store.Transaction["Service"];
-  readonly gate: Semaphore.Semaphore;
-  active: boolean;
-  failure: Option.Option<Cause.Cause<unknown>>;
+  readonly owner: symbol
+  readonly native: Store.Transaction["Service"]
+  readonly gate: Semaphore.Semaphore
+  active: boolean
+  failure: Option.Option<Cause.Cause<unknown>>
 }
-class Current extends Context.Service<Current, State>()(
-  "@amends-dev/core/journal/Transaction/Current",
-) {}
+class Current extends Context.Service<Current, State>()("@amends-dev/core/journal/Transaction/Current") {}
 class OperationOwner extends Context.Service<OperationOwner, number>()(
-  "@amends-dev/core/journal/Transaction/OperationOwner",
+  "@amends-dev/core/journal/Transaction/OperationOwner"
 ) {}
-class Forbidden extends Context.Service<Forbidden, string>()(
-  "@amends-dev/core/journal/Transaction/Forbidden",
-) {}
+class Forbidden extends Context.Service<Forbidden, string>()("@amends-dev/core/journal/Transaction/Forbidden") {}
 
 /**
  * Projections may update their stores, but may not append new log entries: runs `program` so that
@@ -161,17 +145,16 @@ class Forbidden extends Context.Service<Forbidden, string>()(
  * @since 0.1.0
  */
 export const withoutAppends = <A, E, R>(program: Effect.Effect<A, E, R>, reason: string) =>
-  Effect.provideService(program, Forbidden, reason);
+  Effect.provideService(program, Forbidden, reason)
 
 const recordFailure = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =>
   program.pipe(
     Effect.onExit((exit) =>
       Effect.sync(() => {
-        if (Exit.isFailure(exit) && Option.isNone(state.failure))
-          state.failure = Option.some(exit.cause);
-      }),
-    ),
-  );
+        if (Exit.isFailure(exit) && Option.isNone(state.failure)) state.failure = Option.some(exit.cause)
+      })
+    )
+  )
 
 /**
  * Construct a transaction coordinator over host storage. Each acquisition owns its commits: a
@@ -185,116 +168,103 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
   never,
   Store.Store
 > {
-  const store = yield* Store.Store;
-  const owner = Symbol("transaction coordinator");
+  const store = yield* Store.Store
+  const owner = Symbol("transaction coordinator")
 
   const run = Effect.fn("Transaction.run")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Effect.serviceOption(Current);
+    const current = yield* Effect.serviceOption(Current)
     if (Option.isSome(current)) {
-      const state = current.value;
-      if (!state.active) return yield* new Closed({});
-      if (state.owner !== owner) return yield* recordFailure(Effect.fail(new Foreign({})), state);
+      const state = current.value
+      if (!state.active) return yield* new Closed({})
+      if (state.owner !== owner) return yield* recordFailure(Effect.fail(new Foreign({})), state)
       return yield* recordFailure(
         program.pipe(Effect.scoped, Effect.provideService(Store.Transaction, state.native)),
-        state,
-      );
+        state
+      )
     }
     // A raw host transaction cannot safely acquire a second core commit context.
-    if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
-      return yield* new Foreign({});
+    if (Option.isSome(yield* Effect.serviceOption(Store.Transaction))) return yield* new Foreign({})
 
     return yield* store.transaction(
       Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
-          const storeTransaction = yield* Store.Transaction;
-          const gate = yield* Semaphore.make(1);
+          const storeTransaction = yield* Store.Transaction
+          const gate = yield* Semaphore.make(1)
           const state: State = {
             owner,
             native: storeTransaction,
             gate,
             active: true,
-            failure: Option.none(),
-          };
+            failure: Option.none()
+          }
           const exit = yield* Effect.exit(
             restore(
               program.pipe(
-                Effect.updateContext((context: Context.Context<R>) =>
-                  Context.add(context, Current, state),
-                ),
-                Effect.scoped,
-              ),
-            ),
-          );
+                Effect.updateContext((context: Context.Context<R>) => Context.add(context, Current, state)),
+                Effect.scoped
+              )
+            )
+          )
           // Drain accepted writes and fence any late use of the inherited context.
           yield* gate.withPermits(1)(
             Effect.sync(() => {
-              state.active = false;
-            }),
-          );
-          if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause);
-          if (Option.isSome(state.failure))
-            return yield* new Aborted({ cause: state.failure.value });
-          return exit.value;
-        }),
-      ),
-    );
-  });
+              state.active = false
+            })
+          )
+          if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause)
+          if (Option.isSome(state.failure)) return yield* new Aborted({ cause: state.failure.value })
+          return exit.value
+        })
+      )
+    )
+  })
 
   /**
    * One step at a time: a step nested in the running one, on the same fiber, runs within it; any
    * other step while one runs is a concurrency defect rather than a wait, which could deadlock a
    * child fiber on its parent's step or interleave a read with a write the store has staged.
    */
-  const runExclusively = Effect.fnUntraced(function* <A, E, R>(
-    state: State,
-    program: Effect.Effect<A, E, R>,
-  ) {
-    const fiberId = yield* Effect.fiberId;
-    const parent = yield* Effect.serviceOption(OperationOwner);
-    if (Option.isSome(parent) && parent.value === fiberId) return yield* program;
-    const result = yield* state.gate.withPermitsIfAvailable(1)(
-      Effect.provideService(program, OperationOwner, fiberId),
-    );
-    if (Option.isNone(result)) return yield* recordFailure(Effect.die(new Concurrent({})), state);
-    return result.value;
-  });
+  const runExclusively = Effect.fnUntraced(function* <A, E, R>(state: State, program: Effect.Effect<A, E, R>) {
+    const fiberId = yield* Effect.fiberId
+    const parent = yield* Effect.serviceOption(OperationOwner)
+    if (Option.isSome(parent) && parent.value === fiberId) return yield* program
+    const result = yield* state.gate.withPermitsIfAvailable(1)(Effect.provideService(program, OperationOwner, fiberId))
+    if (Option.isNone(result)) return yield* recordFailure(Effect.die(new Concurrent({})), state)
+    return result.value
+  })
 
-  const operation = Effect.fn("Transaction.operation")(function* <A, E, R>(
-    program: Effect.Effect<A, E, R>,
-  ) {
+  const operation = Effect.fn("Transaction.operation")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
     return yield* run(
       Effect.gen(function* () {
-        const current = yield* Effect.serviceOption(Current);
-        if (Option.isNone(current)) return yield* new Foreign({});
-        const state = current.value;
-        const forbidden = yield* Effect.serviceOption(Forbidden);
-        if (Option.isSome(forbidden)) return yield* new WriteForbidden({ reason: forbidden.value });
+        const current = yield* Effect.serviceOption(Current)
+        if (Option.isNone(current)) return yield* new Foreign({})
+        const state = current.value
+        const forbidden = yield* Effect.serviceOption(Forbidden)
+        if (Option.isSome(forbidden)) return yield* new WriteForbidden({ reason: forbidden.value })
         return yield* runExclusively(
           state,
           recordFailure(
             Effect.gen(function* () {
-              if (!state.active) return yield* new Closed({});
-              if (Option.isSome(state.failure))
-                return yield* new Aborted({ cause: state.failure.value });
-              return yield* program;
+              if (!state.active) return yield* new Closed({})
+              if (Option.isSome(state.failure)) return yield* new Aborted({ cause: state.failure.value })
+              return yield* program
             }),
-            state,
-          ),
-        );
-      }),
-    );
-  });
+            state
+          )
+        )
+      })
+    )
+  })
 
   const step = Effect.fn("Transaction.step")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
-    const current = yield* Effect.serviceOption(Current);
-    if (Option.isNone(current) || current.value.owner !== owner || !current.value.active)
-      return yield* program;
+    const current = yield* Effect.serviceOption(Current)
+    if (Option.isNone(current) || current.value.owner !== owner || !current.value.active) return yield* program
     // A read's own failure leaves the commit as it was; only running concurrently aborts it.
-    return yield* runExclusively(current.value, program);
-  });
+    return yield* runExclusively(current.value, program)
+  })
 
-  return Transaction.of({ workspaceId: store.workspaceId, run, operation, step });
-});
+  return Transaction.of({ workspaceId: store.workspaceId, run, operation, step })
+})
 
 /**
  * Provide one transaction coordinator over host storage.
@@ -302,4 +272,4 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Transaction, make());
+export const layer = Layer.effect(Transaction, make())

@@ -6,9 +6,10 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Workspace from "../workspace/Workspace.ts";
-import * as Target from "./Target.ts";
+
+import * as Schema from "effect/Schema"
+import * as Workspace from "../workspace/Workspace.ts"
+import * as Target from "./Target.ts"
 
 /**
  * The resources a grant covers: a whole workspace or one exact target.
@@ -18,16 +19,16 @@ import * as Target from "./Target.ts";
  */
 export const Scope = Schema.TaggedUnion({
   Workspace: { workspaceId: Workspace.Id },
-  Target: { target: Target.Reference },
-});
+  Target: { target: Target.Reference }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Scope = typeof Scope.Type;
+export type Scope = typeof Scope.Type
 
-const equivalentTarget = Schema.toEquivalence(Target.Reference);
+const equivalentTarget = Schema.toEquivalence(Target.Reference)
 
 /**
  * Whether a scope reaches a target: a workspace scope covers every target in that workspace, and
@@ -40,5 +41,5 @@ const equivalentTarget = Schema.toEquivalence(Target.Reference);
 export const covers = (scope: Scope, target: Target.Reference): boolean =>
   Scope.match(scope, {
     Workspace: ({ workspaceId }) => workspaceId === target.workspaceId,
-    Target: ({ target: exact }) => equivalentTarget(exact, target),
-  });
+    Target: ({ target: exact }) => equivalentTarget(exact, target)
+  })

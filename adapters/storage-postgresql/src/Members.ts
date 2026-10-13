@@ -10,17 +10,18 @@
  *
  * @since 0.1.0
  */
-import { Member, MemberStore } from "@amends-dev/core/workspace";
-import { and, eq, type SQL } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { inIds } from "./internal/id-list.ts";
-import { storeError } from "./internal/errors.ts";
-import { members } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { StoreError } from "@amends-dev/core/journal"
+import { Member, MemberStore } from "@amends-dev/core/workspace"
+import { and, eq, type SQL } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { inIds } from "./internal/id-list.ts"
+import { members } from "./internal/schema.ts"
 
 /** Selected in the record's shape; decoding checks the brands and the identity union. */
 const recordColumns = {
@@ -28,9 +29,9 @@ const recordColumns = {
   workspaceId: members.workspaceId,
   identity: { _tag: members.identityKind, id: members.identityId },
   name: members.name,
-  status: members.status,
-};
-const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Member));
+  status: members.status
+}
+const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Member))
 
 /**
  * Builds the membership store for the binding's workspace: this module's driver inside
@@ -40,19 +41,19 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Member.Member));
  * @since 0.1.0
  */
 export const make = Effect.fn("Members.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(members.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(members.workspaceId, workspaceId)
   const select = (operation: string, where: SQL | undefined) =>
     guard(db.select(recordColumns).from(members).where(where).orderBy(members.id)).pipe(
       Effect.flatMap(decode),
-      Effect.mapError(StoreError.failed("MemberStore", operation)),
-    );
+      Effect.mapError(StoreError.failed("MemberStore", operation))
+    )
   const driver: MemberStore.MemberStore["Service"] = {
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(members.id, id))), Array.head),
     getMany: Effect.fn("Members.getMany")(function* (ids) {
-      if (ids.length === 0) return [];
-      return yield* select("getMany", and(inWorkspace, inIds(members.id, ids)));
+      if (ids.length === 0) return []
+      return yield* select("getMany", and(inWorkspace, inIds(members.id, ids)))
     }),
     findActive: (identity) =>
       Effect.map(
@@ -62,10 +63,10 @@ export const make = Effect.fn("Members.make")(function* () {
             inWorkspace,
             eq(members.identityKind, identity._tag),
             eq(members.identityId, identity.id),
-            eq(members.status, "active"),
-          ),
+            eq(members.status, "active")
+          )
         ),
-        Array.head,
+        Array.head
       ),
     list: select("list", inWorkspace),
     insert: Effect.fn("Members.insert")(function* (record) {
@@ -76,10 +77,10 @@ export const make = Effect.fn("Members.make")(function* () {
           identityKind: record.identity._tag,
           identityId: record.identity.id,
           name: record.name,
-          status: record.status,
+          status: record.status
         }),
-        true,
-      ).pipe(Effect.mapError(storeError("MemberStore", "insert")));
+        true
+      ).pipe(Effect.mapError(storeError("MemberStore", "insert")))
     }),
     rename: Effect.fn("Members.rename")(function* (id, name) {
       const rows = yield* guard(
@@ -88,10 +89,9 @@ export const make = Effect.fn("Members.make")(function* () {
           .set({ name })
           .where(and(inWorkspace, eq(members.id, id), eq(members.status, "active")))
           .returning({ id: members.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("MemberStore", "rename")));
-      if (rows.length === 0)
-        return yield* StoreError.rejected("MemberStore", "rename", "Expected an active membership");
+        true
+      ).pipe(Effect.mapError(storeError("MemberStore", "rename")))
+      if (rows.length === 0) return yield* StoreError.rejected("MemberStore", "rename", "Expected an active membership")
     }),
     markRemoved: Effect.fn("Members.markRemoved")(function* (id) {
       const rows = yield* guard(
@@ -100,18 +100,14 @@ export const make = Effect.fn("Members.make")(function* () {
           .set({ status: "removed" })
           .where(and(inWorkspace, eq(members.id, id), eq(members.status, "active")))
           .returning({ id: members.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("MemberStore", "markRemoved")));
+        true
+      ).pipe(Effect.mapError(storeError("MemberStore", "markRemoved")))
       if (rows.length === 0)
-        return yield* StoreError.rejected(
-          "MemberStore",
-          "markRemoved",
-          "Expected an active membership",
-        );
-    }),
-  };
-  return MemberStore.make(workspaceId, driver);
-});
+        return yield* StoreError.rejected("MemberStore", "markRemoved", "Expected an active membership")
+    })
+  }
+  return MemberStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `MemberStore.MemberStore` over the caller's `Binding.Binding`.
@@ -119,4 +115,4 @@ export const make = Effect.fn("Members.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(MemberStore.MemberStore, make());
+export const layer = Layer.effect(MemberStore.MemberStore, make())

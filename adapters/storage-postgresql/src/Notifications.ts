@@ -14,22 +14,23 @@
  *
  * @since 0.1.0
  */
-import { Notification, NotificationStore } from "@amends-dev/core/notification";
-import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
-import type { PgInsertValue } from "drizzle-orm/pg-core";
-import * as Array from "effect/Array";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { storeError } from "./internal/errors.ts";
-import { inIds } from "./internal/id-list.ts";
-import { insertChunked } from "./internal/parameters.ts";
-import { notificationSeen, notifications } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Notification));
+import { StoreError } from "@amends-dev/core/journal"
+import { Notification, NotificationStore } from "@amends-dev/core/notification"
+import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm"
+import type { PgInsertValue } from "drizzle-orm/pg-core"
+import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { inIds } from "./internal/id-list.ts"
+import { insertChunked } from "./internal/parameters.ts"
+import { notificationSeen, notifications } from "./internal/schema.ts"
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Notification))
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
@@ -39,24 +40,22 @@ const decodeRows = Schema.decodeUnknownEffect(
         Notification.State.cases.Pending,
         Schema.Struct({
           ...Notification.State.cases.Seen.fields,
-          seenAt: Schema.DateTimeUtcFromDate,
+          seenAt: Schema.DateTimeUtcFromDate
         }),
         Schema.Struct({
           ...Notification.State.cases.Accepted.fields,
-          acceptedAt: Schema.DateTimeUtcFromDate,
+          acceptedAt: Schema.DateTimeUtcFromDate
         }),
         Notification.State.cases.Discarded,
-        Notification.State.cases.Informational,
-      ]),
-    }),
-  ),
-);
+        Notification.State.cases.Informational
+      ])
+    })
+  )
+)
 const decode = (rows: ReadonlyArray<unknown>) =>
-  decodeRows(rows).pipe(
-    Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))),
-  );
+  decodeRows(rows).pipe(Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))))
 
-type NotificationRow = typeof notifications.$inferSelect;
+type NotificationRow = typeof notifications.$inferSelect
 /** A row as reads show it. */
 const toEncodedRecord = (row: NotificationRow) => ({
   id: row.id,
@@ -78,8 +77,8 @@ const toEncodedRecord = (row: NotificationRow) => ({
         thread: {
           threadId: row.threadId,
           groupId: row.threadGroupId,
-          sequence: row.threadSequence,
-        },
+          sequence: row.threadSequence
+        }
       }),
   state:
     row.state === "Seen"
@@ -91,12 +90,12 @@ const toEncodedRecord = (row: NotificationRow) => ({
               row.acceptedByKind === "Turn"
                 ? { _tag: "Turn", turnId: row.acceptedTurnId }
                 : { _tag: "Delivery", deliveryId: row.acceptedDeliveryId },
-            acceptedAt: row.acceptedAt,
+            acceptedAt: row.acceptedAt
           }
         : row.state === "Discarded"
           ? { _tag: "Discarded", reason: row.discardReason }
-          : { _tag: row.state },
-});
+          : { _tag: row.state }
+})
 
 /** A membership for people and agents, a contact, or triage. */
 const inboxOf = (recipient: Notification.Recipient) =>
@@ -104,7 +103,7 @@ const inboxOf = (recipient: Notification.Recipient) =>
     ? ""
     : Notification.Recipient.isAnyOf(["Contact"])(recipient)
       ? recipient.id
-      : recipient.memberId;
+      : recipient.memberId
 
 /**
  * Builds the notification store for the binding's workspace: this module's driver inside
@@ -114,19 +113,19 @@ const inboxOf = (recipient: Notification.Recipient) =>
  * @since 0.1.0
  */
 export const make = Effect.fn("Notifications.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(notifications.workspaceId, workspaceId);
-  const orderedId = sql`${notifications.id} COLLATE "C"`;
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(notifications.workspaceId, workspaceId)
+  const orderedId = sql`${notifications.id} COLLATE "C"`
   /** Whose inbox a row is in, as the recipient indexes key it. */
-  const inbox = sql`coalesce(${notifications.recipientMemberId}, ${notifications.recipientId}, '')`;
-  const recorded = () => db.select().from(notifications);
-  const pendingOnly = eq(notifications.state, "Pending");
+  const inbox = sql`coalesce(${notifications.recipientMemberId}, ${notifications.recipientId}, '')`
+  const recorded = () => db.select().from(notifications)
+  const pendingOnly = eq(notifications.state, "Pending")
   const listPending = Effect.fnUntraced(function* (
     target: Notification.Recipient,
-    request: NotificationStore.ReadOptions,
+    request: NotificationStore.ReadOptions
   ) {
-    const after = request.after;
+    const after = request.after
     return yield* guard(
       recorded()
         .where(
@@ -138,21 +137,21 @@ export const make = Effect.fn("Notifications.make")(function* () {
             // A row comparison bounds the index scan; the equivalent OR form only filters it.
             after === undefined
               ? undefined
-              : sql`(${notifications.recordedAt}, ${orderedId}) > (${sql.param(DateTime.toDate(after.recordedAt), notifications.recordedAt)}, ${after.id})`,
-          ),
+              : sql`(${notifications.recordedAt}, ${orderedId}) > (${sql.param(DateTime.toDate(after.recordedAt), notifications.recordedAt)}, ${after.id})`
+          )
         )
         .orderBy(asc(notifications.recordedAt), asc(orderedId))
-        .limit(request.limit),
-    ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
-  });
+        .limit(request.limit)
+    ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))))
+  })
 
   /** Newest first: the recipient indexes read backwards. */
   const latest = Effect.fnUntraced(function* (
     target: Notification.Recipient,
     request: NotificationStore.LatestOptions,
-    pending: boolean,
+    pending: boolean
   ) {
-    const before = request.before;
+    const before = request.before
     return yield* guard(
       recorded()
         .where(
@@ -163,27 +162,24 @@ export const make = Effect.fn("Notifications.make")(function* () {
             pending ? pendingOnly : undefined,
             before === undefined
               ? undefined
-              : sql`(${notifications.recordedAt}, ${orderedId}) < (${sql.param(DateTime.toDate(before.recordedAt), notifications.recordedAt)}, ${before.id})`,
-          ),
+              : sql`(${notifications.recordedAt}, ${orderedId}) < (${sql.param(DateTime.toDate(before.recordedAt), notifications.recordedAt)}, ${before.id})`
+          )
         )
         .orderBy(desc(notifications.recordedAt), desc(orderedId))
-        .limit(request.limit),
-    ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
-  });
+        .limit(request.limit)
+    ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))))
+  })
 
   /** Write the records in as few statements as fit. */
-  const insert = Effect.fnUntraced(function* (
-    records: ReadonlyArray<Notification.Notification>,
-    operation: string,
-  ) {
-    const rows: Array<PgInsertValue<typeof notifications>> = [];
+  const insert = Effect.fnUntraced(function* (records: ReadonlyArray<Notification.Notification>, operation: string) {
+    const rows: Array<PgInsertValue<typeof notifications>> = []
     for (const record of records) {
       // A rebuild inserts notifications again; the Seen that outlived their rows comes back.
       const seenAt =
         Notification.Recipient.isAnyOf(["Human"])(record.recipient) &&
         Notification.State.isAnyOf(["Pending"])(record.state)
           ? sql`(SELECT seen_at FROM notification_seen WHERE workspace_id = ${workspaceId} AND notification_id = ${record.id})`
-          : null;
+          : null
       rows.push({
         workspaceId,
         id: record.id,
@@ -193,44 +189,35 @@ export const make = Effect.fn("Notifications.make")(function* () {
         threadId: record.thread?.threadId ?? null,
         threadGroupId: record.thread?.groupId ?? null,
         threadSequence: record.thread?.sequence ?? null,
-        discardReason: Notification.State.isAnyOf(["Discarded"])(record.state)
-          ? record.state.reason
-          : null,
+        discardReason: Notification.State.isAnyOf(["Discarded"])(record.state) ? record.state.reason : null,
         recipientKind: record.recipient._tag,
-        recipientId: Notification.Recipient.isAnyOf(["Triage"])(record.recipient)
-          ? null
-          : record.recipient.id,
+        recipientId: Notification.Recipient.isAnyOf(["Triage"])(record.recipient) ? null : record.recipient.id,
         recipientMemberId: Notification.Recipient.isAnyOf(["Human", "Agent"])(record.recipient)
           ? record.recipient.memberId
           : null,
         recordedAt: DateTime.toDate(record.recordedAt),
-        state:
-          seenAt === null
-            ? record.state._tag
-            : sql`CASE WHEN ${seenAt} IS NULL THEN 'Pending' ELSE 'Seen' END`,
-        seenAt,
-      });
+        state: seenAt === null ? record.state._tag : sql`CASE WHEN ${seenAt} IS NULL THEN 'Pending' ELSE 'Seen' END`,
+        seenAt
+      })
     }
-    if (rows.length === 0) return;
+    if (rows.length === 0) return
     yield* guard(
       insertChunked(notifications, rows, (chunk) => db.insert(notifications).values(chunk), {
-        extra: 2,
+        extra: 2
       }),
-      true,
-    ).pipe(Effect.mapError(storeError("NotificationStore", operation)));
-  });
+      true
+    ).pipe(Effect.mapError(storeError("NotificationStore", operation)))
+  })
 
   const driver: NotificationStore.NotificationStore["Service"] = {
     get: Effect.fn("Notifications.get")(
       function* (requestedId) {
-        return yield* guard(
-          recorded().where(and(inWorkspace, eq(notifications.id, requestedId))),
-        ).pipe(
+        return yield* guard(recorded().where(and(inWorkspace, eq(notifications.id, requestedId)))).pipe(
           Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))),
-          Effect.map(Array.head),
-        );
+          Effect.map(Array.head)
+        )
       },
-      Effect.mapError(StoreError.failed("NotificationStore", "get")),
+      Effect.mapError(StoreError.failed("NotificationStore", "get"))
     ),
     countPendingByRecipient: Effect.fn("Notifications.countPendingByRecipient")(
       function* (target) {
@@ -239,21 +226,16 @@ export const make = Effect.fn("Notifications.make")(function* () {
             .select({ count: sql<number>`count(*)::int` })
             .from(notifications)
             .where(
-              and(
-                inWorkspace,
-                eq(notifications.recipientKind, target._tag),
-                eq(inbox, inboxOf(target)),
-                pendingOnly,
-              ),
-            ),
-        );
-        return yield* Schema.decodeEffect(Schema.Int)(row?.count ?? 0);
+              and(inWorkspace, eq(notifications.recipientKind, target._tag), eq(inbox, inboxOf(target)), pendingOnly)
+            )
+        )
+        return yield* Schema.decodeEffect(Schema.Int)(row?.count ?? 0)
       },
-      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByRecipient"))
     ),
     countPendingByGroup: Effect.fn("Notifications.countPendingByGroup")(
       function* (target, groupIds) {
-        if (groupIds.length === 0) return [];
+        if (groupIds.length === 0) return []
         const rows = yield* guard(
           db
             .select({ groupId: notifications.threadGroupId, count: sql<number>`count(*)::int` })
@@ -264,16 +246,14 @@ export const make = Effect.fn("Notifications.make")(function* () {
                 eq(notifications.recipientKind, target._tag),
                 eq(inbox, inboxOf(target)),
                 pendingOnly,
-                inIds(notifications.threadGroupId, groupIds),
-              ),
+                inIds(notifications.threadGroupId, groupIds)
+              )
             )
-            .groupBy(notifications.threadGroupId),
-        );
-        return yield* Schema.decodeUnknownEffect(Schema.Array(NotificationStore.PendingCount))(
-          rows,
-        );
+            .groupBy(notifications.threadGroupId)
+        )
+        return yield* Schema.decodeUnknownEffect(Schema.Array(NotificationStore.PendingCount))(rows)
       },
-      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByGroup")),
+      Effect.mapError(StoreError.failed("NotificationStore", "countPendingByGroup"))
     ),
     listByThread: Effect.fn("Notifications.listByThread")(
       function* (target, threadId, range) {
@@ -286,13 +266,13 @@ export const make = Effect.fn("Notifications.make")(function* () {
                 eq(inbox, inboxOf(target)),
                 eq(notifications.threadId, threadId),
                 gt(notifications.threadSequence, range.afterSequence),
-                lte(notifications.threadSequence, range.throughSequence),
-              ),
+                lte(notifications.threadSequence, range.throughSequence)
+              )
             )
-            .orderBy(asc(notifications.threadSequence), asc(orderedId)),
-        ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
+            .orderBy(asc(notifications.threadSequence), asc(orderedId))
+        ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))))
       },
-      Effect.mapError(StoreError.failed("NotificationStore", "listByThread")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listByThread"))
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
       function* (target, threadId, through) {
@@ -305,29 +285,29 @@ export const make = Effect.fn("Notifications.make")(function* () {
                 eq(inbox, inboxOf(target)),
                 eq(notifications.threadId, threadId),
                 lte(notifications.threadSequence, through),
-                pendingOnly,
-              ),
+                pendingOnly
+              )
             )
-            .orderBy(asc(notifications.threadSequence), asc(orderedId)),
-        ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
+            .orderBy(asc(notifications.threadSequence), asc(orderedId))
+        ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))))
       },
-      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByThread")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByThread"))
     ),
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
       listPending,
-      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listPendingByRecipient"))
     ),
     listLatestByRecipient: Effect.fn("Notifications.listLatestByRecipient")(
       (recipient, options) => latest(recipient, options, false),
-      Effect.mapError(StoreError.failed("NotificationStore", "listLatestByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listLatestByRecipient"))
     ),
     listLatestPendingByRecipient: Effect.fn("Notifications.listLatestPendingByRecipient")(
       (recipient, options) => latest(recipient, options, true),
-      Effect.mapError(StoreError.failed("NotificationStore", "listLatestPendingByRecipient")),
+      Effect.mapError(StoreError.failed("NotificationStore", "listLatestPendingByRecipient"))
     ),
     markSeen: Effect.fn("Notifications.markSeen")(function* (ids, seenAt) {
-      const unique = [...new Set(ids)];
-      if (unique.length === 0) return;
+      const unique = [...new Set(ids)]
+      if (unique.length === 0) return
       // Check every notification, then record them in one statement, however many there are.
       const eligible = yield* guard(
         db
@@ -338,19 +318,19 @@ export const make = Effect.fn("Notifications.make")(function* () {
               inWorkspace,
               inIds(notifications.id, unique),
               eq(notifications.recipientKind, "Human"),
-              inArray(notifications.state, ["Pending", "Seen"]),
-            ),
-          ),
-      ).pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")));
+              inArray(notifications.state, ["Pending", "Seen"])
+            )
+          )
+      ).pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")))
       if (eligible.length !== unique.length)
         return yield* StoreError.rejected(
           "NotificationStore",
           "markSeen",
-          "Expected a pending notification of a human recipient",
-        );
+          "Expected a pending notification of a human recipient"
+        )
       // The row keeps the first time, and notification_seen keeps it through rebuilds. Updating
       // the row first serializes concurrent calls on its lock, and the later one finds it Seen.
-      const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt);
+      const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt)
       yield* guard(
         db.execute(sql`
           WITH seen AS (
@@ -361,15 +341,15 @@ export const make = Effect.fn("Notifications.make")(function* () {
           )
           INSERT INTO notification_seen (workspace_id, notification_id, seen_at)
           SELECT ${workspaceId}::text, id, seen_at FROM seen
-          ON CONFLICT DO NOTHING`),
-      ).pipe(Effect.mapError(storeError("NotificationStore", "markSeen")));
+          ON CONFLICT DO NOTHING`)
+      ).pipe(Effect.mapError(storeError("NotificationStore", "markSeen")))
     }),
     accept: Effect.fn("Notifications.accept")(function* (ids, by, acceptedAt) {
-      const unique = [...new Set(ids)];
-      if (unique.length === 0) return;
+      const unique = [...new Set(ids)]
+      if (unique.length === 0) return
       // A turn takes pending notifications of one agent; a delivery takes those of contacts. Check
       // every notification is one, then settle them together.
-      const byTurn = Notification.AcceptedBy.isAnyOf(["Turn"])(by);
+      const byTurn = Notification.AcceptedBy.isAnyOf(["Turn"])(by)
       const eligible = yield* guard(
         db
           .select({ id: notifications.id, memberId: notifications.recipientMemberId })
@@ -379,21 +359,16 @@ export const make = Effect.fn("Notifications.make")(function* () {
               inWorkspace,
               inIds(notifications.id, unique),
               eq(notifications.recipientKind, byTurn ? "Agent" : "Contact"),
-              eq(notifications.state, "Pending"),
-            ),
-          ),
-      ).pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")));
-      if (
-        eligible.length !== unique.length ||
-        (byTurn && new Set(eligible.map((row) => row.memberId)).size !== 1)
-      )
+              eq(notifications.state, "Pending")
+            )
+          )
+      ).pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")))
+      if (eligible.length !== unique.length || (byTurn && new Set(eligible.map((row) => row.memberId)).size !== 1))
         return yield* StoreError.rejected(
           "NotificationStore",
           "accept",
-          byTurn
-            ? "Expected pending notifications of one agent"
-            : "Expected pending notifications of contacts",
-        );
+          byTurn ? "Expected pending notifications of one agent" : "Expected pending notifications of contacts"
+        )
       yield* guard(
         db
           .update(notifications)
@@ -402,60 +377,56 @@ export const make = Effect.fn("Notifications.make")(function* () {
             acceptedByKind: by._tag,
             acceptedTurnId: byTurn ? by.turnId : null,
             acceptedDeliveryId: byTurn ? null : by.deliveryId,
-            acceptedAt: DateTime.toDate(acceptedAt),
+            acceptedAt: DateTime.toDate(acceptedAt)
           })
           .where(and(inWorkspace, inIds(notifications.id, unique))),
-        true,
-      ).pipe(Effect.mapError(storeError("NotificationStore", "accept")));
+        true
+      ).pipe(Effect.mapError(storeError("NotificationStore", "accept")))
     }),
-    discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(
-      function* (id) {
+    discardPendingForParticipation: Effect.fn("Notifications.discardPendingForParticipation")(function* (id) {
+      yield* guard(
+        db
+          .update(notifications)
+          .set({ state: "Discarded", discardReason: "participation-ended" })
+          .where(
+            and(
+              inWorkspace,
+              eq(notifications.participationId, id),
+              eq(notifications.recipientKind, "Agent"),
+              eq(notifications.state, "Pending")
+            )
+          ),
+        true
+      ).pipe(Effect.mapError(storeError("NotificationStore", "discardPendingForParticipation")))
+    }),
+    discardPendingForGroup: Effect.fn("Notifications.discardPendingForGroup")(function* (memberId, groupId) {
+      // The same predicate as the pending counts, so pending_notifications_by_group finds them.
+      const settlements = [
+        { kind: "Human", reason: "access-lost" },
+        { kind: "Agent", reason: "participation-ended" }
+      ] as const
+      for (const { kind, reason } of settlements)
         yield* guard(
           db
             .update(notifications)
-            .set({ state: "Discarded", discardReason: "participation-ended" })
+            .set({ state: "Discarded", discardReason: reason })
             .where(
               and(
                 inWorkspace,
-                eq(notifications.participationId, id),
-                eq(notifications.recipientKind, "Agent"),
-                eq(notifications.state, "Pending"),
-              ),
+                eq(notifications.recipientKind, kind),
+                eq(inbox, memberId),
+                pendingOnly,
+                eq(notifications.threadGroupId, groupId)
+              )
             ),
-          true,
-        ).pipe(Effect.mapError(storeError("NotificationStore", "discardPendingForParticipation")));
-      },
-    ),
-    discardPendingForGroup: Effect.fn("Notifications.discardPendingForGroup")(
-      function* (memberId, groupId) {
-        // The same predicate as the pending counts, so pending_notifications_by_group finds them.
-        const settlements = [
-          { kind: "Human", reason: "access-lost" },
-          { kind: "Agent", reason: "participation-ended" },
-        ] as const;
-        for (const { kind, reason } of settlements)
-          yield* guard(
-            db
-              .update(notifications)
-              .set({ state: "Discarded", discardReason: reason })
-              .where(
-                and(
-                  inWorkspace,
-                  eq(notifications.recipientKind, kind),
-                  eq(inbox, memberId),
-                  pendingOnly,
-                  eq(notifications.threadGroupId, groupId),
-                ),
-              ),
-            true,
-          ).pipe(Effect.mapError(storeError("NotificationStore", "discardPendingForGroup")));
-      },
-    ),
+          true
+        ).pipe(Effect.mapError(storeError("NotificationStore", "discardPendingForGroup")))
+    }),
     insert: Effect.fn("Notifications.insert")((input) => insert([input], "insert")),
-    insertMany: Effect.fn("Notifications.insertMany")((input) => insert(input, "insertMany")),
-  };
-  return NotificationStore.make(workspaceId, driver);
-});
+    insertMany: Effect.fn("Notifications.insertMany")((input) => insert(input, "insertMany"))
+  }
+  return NotificationStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `NotificationStore.NotificationStore` over the caller's `Binding.Binding`.
@@ -463,4 +434,4 @@ export const make = Effect.fn("Notifications.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(NotificationStore.NotificationStore, make());
+export const layer = Layer.effect(NotificationStore.NotificationStore, make())

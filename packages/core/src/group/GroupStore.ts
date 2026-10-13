@@ -5,20 +5,21 @@
  *
  * @since 0.1.0
  */
-import * as Array from "effect/Array";
-import * as Context from "effect/Context";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Store from "../journal/Store.ts";
-import type * as MemberId from "../workspace/MemberId.ts";
-import * as Group from "./Group.ts";
-import * as StoreInput from "../journal/StoreInput.ts";
-import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import * as StoreError from "../journal/StoreError.ts";
+
+import * as Array from "effect/Array"
+import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
+import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
+import * as StoreInput from "../journal/StoreInput.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as Group from "./Group.ts"
 
 /**
  * The group store, bound to one workspace by the host.
@@ -36,53 +37,41 @@ export class GroupStore extends Context.Service<
   GroupStore,
   {
     /** The group, if stored. */
-    readonly get: (
-      id: Group.Id,
-    ) => Effect.Effect<Option.Option<Group.Group>, StoreError.StoreError>;
+    readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Group>, StoreError.StoreError>
     /**
      * Find several groups in one read. Absent IDs are omitted and each found record appears once;
      * order is unspecified, so callers index results by ID. An empty request reads nothing.
      */
-    readonly getMany: (
-      ids: ReadonlyArray<Group.Id>,
-    ) => Effect.Effect<ReadonlyArray<Group.Group>, StoreError.StoreError>;
+    readonly getMany: (ids: ReadonlyArray<Group.Id>) => Effect.Effect<ReadonlyArray<Group.Group>, StoreError.StoreError>
     /** A page of the workspace's public team groups in binary group-ID order, after the cursor. */
-    readonly pagePublic: (
-      options: Group.ListOptions,
-    ) => Effect.Effect<ReadonlyArray<Group.Team>, StoreError.StoreError>;
+    readonly pagePublic: (options: Group.ListOptions) => Effect.Effect<ReadonlyArray<Group.Team>, StoreError.StoreError>
     /** The direct group with exactly these members, in any order. */
     readonly findDirect: (
-      memberIds: ReadonlyArray<MemberId.Id>,
-    ) => Effect.Effect<Option.Option<Group.Direct>, StoreError.StoreError>;
+      memberIds: ReadonlyArray<MemberId.Id>
+    ) => Effect.Effect<Option.Option<Group.Direct>, StoreError.StoreError>
     /**
      * Reject reused IDs and a second direct group for the same member set.
      * The creator is recorded as given: references to other read models are checked when facts are
      * published, so this one rebuilds alone. Never upsert.
      */
-    readonly insert: (
-      record: Group.Group,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly insert: (record: Group.Group) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
     /**
      * Projection write that sets a team group's name. A missing or direct group is rejected;
      * the same name again changes nothing.
      */
-    readonly rename: (
-      renamed: Group.Renamed,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly rename: (renamed: Group.Renamed) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
     /**
      * Latest content activity of several groups in one read. Groups without any, and absent IDs,
      * are omitted; order is unspecified.
      */
     readonly getLatest: (
-      ids: ReadonlyArray<Group.Id>,
-    ) => Effect.Effect<ReadonlyArray<Group.Latest>, StoreError.StoreError>;
+      ids: ReadonlyArray<Group.Id>
+    ) => Effect.Effect<ReadonlyArray<Group.Latest>, StoreError.StoreError>
     /**
      * Projection write that advances a group's latest activity time. A time at or before the
      * recorded one changes nothing; a missing group is rejected.
      */
-    readonly recordLatest: (
-      latest: Group.Latest,
-    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+    readonly recordLatest: (latest: Group.Latest) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/group/GroupStore") {}
 
@@ -93,145 +82,121 @@ export class GroupStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (
-  workspaceId: WorkspaceId.Id,
-  driver: GroupStore["Service"],
-): GroupStore["Service"] => {
-  const read = StoreInput.read("GroupStore");
-  const write = StoreInput.write("GroupStore", workspaceId);
+export const make = (workspaceId: WorkspaceId.Id, driver: GroupStore["Service"]): GroupStore["Service"] => {
+  const read = StoreInput.read("GroupStore")
+  const write = StoreInput.write("GroupStore", workspaceId)
   return {
     get: (id) => Effect.flatMap(read("get", Group.Id, id), driver.get),
     getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Group.Id), ids), driver.getMany),
-    pagePublic: (options) =>
-      Effect.flatMap(read("pagePublic", Group.ListOptions, options), driver.pagePublic),
+    pagePublic: (options) => Effect.flatMap(read("pagePublic", Group.ListOptions, options), driver.pagePublic),
     findDirect: (memberIds) =>
-      Effect.flatMap(
-        read("findDirect", Group.DirectMembers, Group.directMembers(memberIds)),
-        driver.findDirect,
-      ),
+      Effect.flatMap(read("findDirect", Group.DirectMembers, Group.directMembers(memberIds)), driver.findDirect),
     insert: (record) => Effect.flatMap(write("insert", Group.Group, record), driver.insert),
     rename: (renamed) => Effect.flatMap(write("rename", Group.Renamed, renamed), driver.rename),
-    getLatest: (ids) =>
-      Effect.flatMap(read("getLatest", Schema.Array(Group.Id), ids), driver.getLatest),
-    recordLatest: (latest) =>
-      Effect.flatMap(write("recordLatest", Group.Latest, latest), driver.recordLatest),
-  };
-};
+    getLatest: (ids) => Effect.flatMap(read("getLatest", Schema.Array(Group.Id), ids), driver.getLatest),
+    recordLatest: (latest) => Effect.flatMap(write("recordLatest", Group.Latest, latest), driver.recordLatest)
+  }
+}
 
-const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Group.Group));
-const latestRows = MemoryDatabase.makeRows(Schema.fromJsonString(Group.Latest));
+const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Group.Group))
+const latestRows = MemoryDatabase.makeRows(Schema.fromJsonString(Group.Latest))
 /** Only a direct group has a member-set key. */
-const directKeyOf = (record: Group.Group) =>
-  record.kind === "Direct" ? Group.directKey(record.memberIds) : undefined;
+const directKeyOf = (record: Group.Group) => (record.kind === "Direct" ? Group.directKey(record.memberIds) : undefined)
 
 /**
  * Group records over the current workspace transaction.
  */
 const makeMemory = Effect.fn("GroupStore.makeMemory")(function* () {
-  const { workspaceId, read, write } = yield* Store.MemoryBinding;
+  const { workspaceId, read, write } = yield* Store.MemoryBinding
   const driver: GroupStore["Service"] = {
     get: Effect.fn("GroupStore.memory.get")(
       function* (id) {
-        return yield* rows.get((yield* read).records.of("groups"), id);
+        return yield* rows.get((yield* read).records.of("groups"), id)
       },
-      Effect.mapError(StoreError.failed("GroupStore", "get")),
+      Effect.mapError(StoreError.failed("GroupStore", "get"))
     ),
     getMany: Effect.fn("GroupStore.memory.getMany")(
       function* (ids) {
-        return yield* rows.getMany((yield* read).records.of("groups"), ids);
+        return yield* rows.getMany((yield* read).records.of("groups"), ids)
       },
-      Effect.mapError(StoreError.failed("GroupStore", "getMany")),
+      Effect.mapError(StoreError.failed("GroupStore", "getMany"))
     ),
     pagePublic: Effect.fn("GroupStore.memory.pagePublic")(
       function* (options) {
-        const after = options.after;
+        const after = options.after
         return (yield* rows.all((yield* read).records.of("groups")))
           .flatMap((group) =>
             group.kind === "Team" &&
             group.visibility === "Public" &&
             (after === undefined || MemoryDatabase.compareBinary(group.id, after) > 0)
               ? [group]
-              : [],
+              : []
           )
           .toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id))
-          .slice(0, options.limit);
+          .slice(0, options.limit)
       },
-      Effect.mapError(StoreError.failed("GroupStore", "pagePublic")),
+      Effect.mapError(StoreError.failed("GroupStore", "pagePublic"))
     ),
     findDirect: Effect.fn("GroupStore.memory.findDirect")(
       function* (memberIds) {
-        const key = Group.directKey(memberIds);
-        const groups = yield* rows.all((yield* read).records.of("groups"));
+        const key = Group.directKey(memberIds)
+        const groups = yield* rows.all((yield* read).records.of("groups"))
         return Array.findFirst(groups, (group) =>
-          group.kind === "Direct" && directKeyOf(group) === key
-            ? Option.some(group)
-            : Option.none(),
-        );
+          group.kind === "Direct" && directKeyOf(group) === key ? Option.some(group) : Option.none()
+        )
       },
-      Effect.mapError(StoreError.failed("GroupStore", "findDirect")),
+      Effect.mapError(StoreError.failed("GroupStore", "findDirect"))
     ),
     getLatest: Effect.fn("GroupStore.memory.getLatest")(
       function* (ids) {
-        return yield* latestRows.getMany((yield* read).records.of("groupLatest"), ids);
+        return yield* latestRows.getMany((yield* read).records.of("groupLatest"), ids)
       },
-      Effect.mapError(StoreError.failed("GroupStore", "getLatest")),
+      Effect.mapError(StoreError.failed("GroupStore", "getLatest"))
     ),
     rename: Effect.fn("GroupStore.memory.rename")(function* (renamed) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")));
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")))
       const found = yield* rows
         .get(space.records.of("groups"), renamed.groupId)
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")));
+        .pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")))
       if (Option.isNone(found) || found.value.kind !== "Team")
-        return yield* StoreError.rejected("GroupStore", "rename", "Expected a team group");
+        return yield* StoreError.rejected("GroupStore", "rename", "Expected a team group")
       const row = yield* rows
         .encode({ ...found.value, name: renamed.name })
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")));
-      space.records.of("groups").set(renamed.groupId, row);
+        .pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")))
+      space.records.of("groups").set(renamed.groupId, row)
     }),
     recordLatest: Effect.fn("GroupStore.memory.recordLatest")(function* (latest) {
-      const space = yield* write.pipe(
-        Effect.mapError(StoreError.failed("GroupStore", "recordLatest")),
-      );
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")))
       if (!space.records.of("groups").has(latest.groupId))
-        return yield* StoreError.rejected("GroupStore", "recordLatest", "Group is missing");
+        return yield* StoreError.rejected("GroupStore", "recordLatest", "Group is missing")
       const current = yield* latestRows
         .get(space.records.of("groupLatest"), latest.groupId)
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")));
+        .pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")))
       // Only a later time advances; an earlier one changes nothing.
-      if (
-        Option.isSome(current) &&
-        !DateTime.isGreaterThan(latest.occurredAt, current.value.occurredAt)
-      )
-        return;
+      if (Option.isSome(current) && !DateTime.isGreaterThan(latest.occurredAt, current.value.occurredAt)) return
       const row = yield* latestRows
         .encode(latest)
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")));
-      space.records.of("groupLatest").set(latest.groupId, row);
+        .pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")))
+      space.records.of("groupLatest").set(latest.groupId, row)
     }),
     insert: Effect.fn("GroupStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")));
+      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")))
       if (space.records.of("groups").has(record.id))
-        return yield* StoreError.rejected("GroupStore", "insert", "Group ID already exists");
-      const key = directKeyOf(record);
+        return yield* StoreError.rejected("GroupStore", "insert", "Group ID already exists")
+      const key = directKeyOf(record)
       if (key !== undefined) {
         const groups = yield* rows
           .all(space.records.of("groups"))
-          .pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")));
+          .pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")))
         if (groups.some((group) => directKeyOf(group) === key))
-          return yield* StoreError.rejected(
-            "GroupStore",
-            "insert",
-            "A direct group already exists for these members",
-          );
+          return yield* StoreError.rejected("GroupStore", "insert", "A direct group already exists for these members")
       }
-      const row = yield* rows
-        .encode(record)
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")));
-      space.records.of("groups").set(record.id, row);
-    }),
-  };
-  return make(workspaceId, driver);
-});
+      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")))
+      space.records.of("groups").set(record.id, row)
+    })
+  }
+  return make(workspaceId, driver)
+})
 
 /**
  * Provide `GroupStore` in process memory, over the workspace's `Store.MemoryBinding`: group
@@ -244,4 +209,4 @@ const makeMemory = Effect.fn("GroupStore.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = Layer.effect(GroupStore, makeMemory());
+export const layerMemory = Layer.effect(GroupStore, makeMemory())

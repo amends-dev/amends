@@ -6,15 +6,16 @@
  *
  * @since 0.1.0
  */
-import * as Audience from "../journal/Audience.ts";
-import * as Fact from "../journal/Fact.ts";
-import * as Subject from "../journal/Subject.ts";
-import * as Group from "../group/Group.ts";
-import * as Channel from "./Channel.ts";
-import * as ChannelBinding from "./ChannelBinding.ts";
-import * as Contact from "./Contact.ts";
 
-const workspace = () => [Audience.workspace];
+import * as Group from "../group/Group.ts"
+import * as Audience from "../journal/Audience.ts"
+import * as Fact from "../journal/Fact.ts"
+import * as Subject from "../journal/Subject.ts"
+import * as Channel from "./Channel.ts"
+import * as ChannelBinding from "./ChannelBinding.ts"
+import * as Contact from "./Contact.ts"
+
+const workspace = () => [Audience.workspace]
 
 /**
  * A channel was created, as its record says.
@@ -27,8 +28,8 @@ export const Created = Fact.make("channel.created", {
   subject: (payload) => Subject.make("channel", payload.id),
   occurrence: (payload) => [payload.id],
   audience: workspace,
-  payload: Channel.Channel,
-});
+  payload: Channel.Channel
+})
 
 /**
  * A channel's destination changed; conversations to come open in the new group.
@@ -40,8 +41,8 @@ export const Redirected = Fact.make("channel.redirected", {
   version: 1,
   subject: (payload) => Subject.make("channel", payload.channelId),
   audience: workspace,
-  payload: Channel.Redirected,
-});
+  payload: Channel.Redirected
+})
 
 /**
  * A channel was removed from use; its record and its threads' bindings remain.
@@ -54,8 +55,8 @@ export const Removed = Fact.make("channel.removed", {
   subject: (payload) => Subject.make("channel", payload.channelId),
   occurrence: (payload) => [payload.channelId],
   audience: workspace,
-  payload: Channel.Reference,
-});
+  payload: Channel.Reference
+})
 
 /**
  * A thread was bound to the external conversation it came from, once, as it was created.
@@ -68,8 +69,8 @@ export const Bound = Fact.make("channel.bound", {
   subject: (payload) => Subject.make("channel-binding", payload.threadId),
   occurrence: (payload) => [payload.threadId],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: ChannelBinding.ChannelBinding,
-});
+  payload: ChannelBinding.ChannelBinding
+})
 
 /**
  * A channel heard from someone for the first time.
@@ -82,8 +83,8 @@ export const ContactCreated = Fact.make("channel.contact.created", {
   subject: (payload) => Subject.make("contact", payload.id),
   occurrence: (payload) => [payload.id],
   audience: workspace,
-  payload: Contact.Contact,
-});
+  payload: Contact.Contact
+})
 
 /**
  * The external system calls a contact something else now.
@@ -95,5 +96,5 @@ export const ContactRenamed = Fact.make("channel.contact.renamed", {
   version: 1,
   subject: (payload) => Subject.make("contact", payload.contactId),
   audience: workspace,
-  payload: Contact.Renamed,
-});
+  payload: Contact.Renamed
+})

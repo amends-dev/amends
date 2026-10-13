@@ -1,15 +1,16 @@
-import { For, Match, Show, Switch, createUniqueId } from "solid-js";
-import { Button } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { EmptyState } from "../../components/empty-state/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { Input } from "../../components/input/index.ts";
-import { Notice } from "../../components/notice/index.ts";
-import { TurnActivity } from "../../components/turn-status/index.ts";
-import { calendarDate } from "../../internal/when.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import { SetupFields, type SetupFieldsProps } from "./setup-fields.tsx";
+import { For, Match, Show, Switch, createUniqueId } from "solid-js"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { EmptyState } from "../../components/empty-state/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { Input } from "../../components/input/index.ts"
+import { Notice } from "../../components/notice/index.ts"
+import { TurnActivity } from "../../components/turn-status/index.ts"
+import { calendarDate } from "../../internal/when.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import * as s from "./agents.css.ts"
+import { SetupFields, type SetupFieldsProps } from "./setup-fields.tsx"
 import {
   AgentsAlert,
   agentStatus,
@@ -19,42 +20,41 @@ import {
   type AgentSummary,
   type AgentTurn,
   type AgentsAction,
-  type AgentsFailure,
-} from "./wording.tsx";
-import * as s from "./agents.css.ts";
+  type AgentsFailure
+} from "./wording.tsx"
 
 export interface AgentPaneProps {
   /** Under the title on phones. */
-  readonly workspaceName: string;
+  readonly workspaceName: string
   /** The agent, once it has loaded. */
-  readonly agent?: AgentSummary;
+  readonly agent?: AgentSummary
   /** In place of the page, while it loads or when it cannot show. */
-  readonly status?: "loading" | "failed" | "unavailable";
-  readonly onRetry?: () => void;
+  readonly status?: "loading" | "failed" | "unavailable"
+  readonly onRetry?: () => void
   /** Opens the full list of agents, from one that is gone. */
-  readonly onBrowse?: () => void;
+  readonly onBrowse?: () => void
   /** The name being edited. */
-  readonly name: string;
-  readonly onNameChange: (name: string) => void;
+  readonly name: string
+  readonly onNameChange: (name: string) => void
   /** The name differs from the saved one and can be saved. */
-  readonly nameChanged: boolean;
-  readonly onSaveName: () => void;
+  readonly nameChanged: boolean
+  readonly onSaveName: () => void
   /** The setup being edited, with what each part may be. */
-  readonly setup: Omit<SetupFieldsProps, "problems" | "disabled">;
+  readonly setup: Omit<SetupFieldsProps, "problems" | "disabled">
   /** The setup differs from the saved one and can be saved. */
-  readonly setupChanged: boolean;
-  readonly onSaveSetup: () => void;
+  readonly setupChanged: boolean
+  readonly onSaveSetup: () => void
   /** Puts the saved setup back in place of the edits. */
-  readonly onDiscardSetup: () => void;
+  readonly onDiscardSetup: () => void
   /** Asks to remove the agent from the workspace. */
-  readonly onRemove?: () => void;
+  readonly onRemove?: () => void
   /** Its turns in progress, each where it works. */
-  readonly turns?: ReadonlyArray<AgentTurn>;
+  readonly turns?: ReadonlyArray<AgentTurn>
   /** The change running, if any. */
-  readonly pending?: AgentsAction | "refresh";
+  readonly pending?: AgentsAction | "refresh"
   /** A failed change made here, or a read that failed. */
-  readonly failure?: AgentsFailure;
-  readonly onRefresh?: () => void;
+  readonly failure?: AgentsFailure
+  readonly onRefresh?: () => void
 }
 
 /**
@@ -64,23 +64,18 @@ export interface AgentPaneProps {
  * values without the actions.
  */
 export function AgentPane(props: AgentPaneProps) {
-  const nameForm = `agent-name-${createUniqueId()}`;
-  const setupForm = `agent-setup-${createUniqueId()}`;
-  const configurable = () => props.agent?.configurable ?? false;
-  const busy = () => props.pending !== undefined;
+  const nameForm = `agent-name-${createUniqueId()}`
+  const setupForm = `agent-setup-${createUniqueId()}`
+  const configurable = () => props.agent?.configurable ?? false
+  const busy = () => props.pending !== undefined
   const alert = (action: AgentsAction | "refresh") => (
     <Show when={props.failure?.action === action && props.failure}>
       {(failure) => (
-        <AgentsAlert
-          failure={failure()}
-          onRefresh={props.onRefresh}
-          refreshing={props.pending === "refresh"}
-        />
+        <AgentsAlert failure={failure()} onRefresh={props.onRefresh} refreshing={props.pending === "refresh"} />
       )}
     </Show>
-  );
-  const problems = () =>
-    props.failure?.action === "configure" ? setupProblems(props.failure) : undefined;
+  )
+  const problems = () => (props.failure?.action === "configure" ? setupProblems(props.failure) : undefined)
   return (
     <Pane.Root class={s.pane}>
       <Pane.Header>
@@ -90,7 +85,7 @@ export function AgentPane(props: AgentPaneProps) {
             props.agent && {
               name: props.agent.name,
               initials: props.agent.name.trim().charAt(0).toUpperCase(),
-              tone: "lilac",
+              tone: "lilac"
             }
           }
           status={props.agent && agentStatus(props.agent.issues, props.agent.activity)}
@@ -118,14 +113,8 @@ export function AgentPane(props: AgentPaneProps) {
         </Match>
         <Match when={props.status === "failed"}>
           <Pane.Body>
-            <EmptyState
-              art="came-apart"
-              title="Couldn’t load agents"
-              lines={["Try again once the host is reachable."]}
-            >
-              <Show when={props.onRetry}>
-                {(retry) => <Button onClick={() => retry()()}>Retry</Button>}
-              </Show>
+            <EmptyState art="came-apart" title="Couldn’t load agents" lines={["Try again once the host is reachable."]}>
+              <Show when={props.onRetry}>{(retry) => <Button onClick={() => retry()()}>Retry</Button>}</Show>
             </EmptyState>
           </Pane.Body>
         </Match>
@@ -159,8 +148,8 @@ export function AgentPane(props: AgentPaneProps) {
                   id={nameForm}
                   class={s.form}
                   onSubmit={(event) => {
-                    event.preventDefault();
-                    if (props.nameChanged && !busy()) props.onSaveName();
+                    event.preventDefault()
+                    if (props.nameChanged && !busy()) props.onSaveName()
                   }}
                 >
                   <Field.Root>
@@ -185,24 +174,16 @@ export function AgentPane(props: AgentPaneProps) {
                   class={s.form}
                   aria-label="Setup"
                   onSubmit={(event) => {
-                    event.preventDefault();
-                    if (props.setupChanged && !busy()) props.onSaveSetup();
+                    event.preventDefault()
+                    if (props.setupChanged && !busy()) props.onSaveSetup()
                   }}
                 >
                   <Heading>Setup</Heading>
-                  <SetupFields
-                    {...props.setup}
-                    problems={problems()}
-                    disabled={!configurable() || busy()}
-                  />
+                  <SetupFields {...props.setup} problems={problems()} disabled={!configurable() || busy()} />
                   {alert("configure")}
                   <Show when={configurable()}>
                     <div class={s.actions}>
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        disabled={!props.setupChanged || busy()}
-                      >
+                      <Button type="submit" variant="primary" disabled={!props.setupChanged || busy()}>
                         Save setup
                       </Button>
                       <Show when={props.setupChanged}>
@@ -218,9 +199,7 @@ export function AgentPane(props: AgentPaneProps) {
                   <dl class={s.detailList}>
                     <div class={s.detail}>
                       <dt class={s.detailName}>Role</dt>
-                      <dd class={s.detailValue}>
-                        Changed in Settings › Members, as any member’s is.
-                      </dd>
+                      <dd class={s.detailValue}>Changed in Settings › Members, as any member’s is.</dd>
                     </div>
                     <div class={s.detail}>
                       <dt class={s.detailName}>Current activity</dt>
@@ -235,9 +214,7 @@ export function AgentPane(props: AgentPaneProps) {
                                     class={s.turn}
                                     aria-label={`${turnStateWord(turn.state)} in ${turn.place}: open its log`}
                                   >
-                                    <TurnActivity state={turn.state}>
-                                      {turnStateWord(turn.state)}
-                                    </TurnActivity>
+                                    <TurnActivity state={turn.state}>{turnStateWord(turn.state)}</TurnActivity>
                                     <span class={s.turnPlace}>{turn.place}</span>
                                   </a>
                                 </li>
@@ -249,9 +226,7 @@ export function AgentPane(props: AgentPaneProps) {
                     </div>
                     <div class={s.detail}>
                       <dt class={s.detailName}>Created by</dt>
-                      <dd class={s.detailValue}>
-                        {`${agent().createdBy} · ${calendarDate(agent().createdAt)}`}
-                      </dd>
+                      <dd class={s.detailValue}>{`${agent().createdBy} · ${calendarDate(agent().createdAt)}`}</dd>
                     </div>
                   </dl>
                 </section>
@@ -259,9 +234,7 @@ export function AgentPane(props: AgentPaneProps) {
                   {(remove) => (
                     <section class={s.section} aria-label="Removal">
                       <Heading>Removal</Heading>
-                      <p class={s.note}>
-                        Removing this agent ends its membership. Its messages stay in their threads.
-                      </p>
+                      <p class={s.note}>Removing this agent ends its membership. Its messages stay in their threads.</p>
                       <Button class={s.start} disabled={busy()} onClick={() => remove()()}>
                         Remove agent
                       </Button>
@@ -274,7 +247,7 @@ export function AgentPane(props: AgentPaneProps) {
         </Match>
       </Switch>
     </Pane.Root>
-  );
+  )
 }
 
 function Heading(props: { readonly children: string }) {
@@ -283,5 +256,5 @@ function Heading(props: { readonly children: string }) {
       <h4 class={s.headingText}>{props.children}</h4>
       <Divider class={s.headingStitch} />
     </div>
-  );
+  )
 }

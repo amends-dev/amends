@@ -1,88 +1,88 @@
-import { Match, Show, Switch, createMemo } from "solid-js";
-import { IconMarkMail, IconMessage } from "@amends-dev/icons";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Button } from "../../components/button/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { EmptyState } from "../../components/empty-state/index.ts";
-import type { MessageAuthor } from "../../components/message/index.ts";
-import { RichText, type RichTextMention } from "../../components/rich-text/index.ts";
-import { Tabs } from "../../components/tabs/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import { agoLabel, dayLabel, dayOf, fullTime } from "../../internal/when.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Shell } from "../../patterns/shell/index.ts";
-import * as s from "./inbox.css.ts";
+import { IconMarkMail, IconMessage } from "@amends-dev/icons"
+import { Match, Show, Switch, createMemo } from "solid-js"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { EmptyState } from "../../components/empty-state/index.ts"
+import { Field } from "../../components/field/index.ts"
+import type { MessageAuthor } from "../../components/message/index.ts"
+import { RichText, type RichTextMention } from "../../components/rich-text/index.ts"
+import { Tabs } from "../../components/tabs/index.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import { agoLabel, dayLabel, dayOf, fullTime } from "../../internal/when.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import * as s from "./inbox.css.ts"
 
 /** Why a notification came: the reader was mentioned, someone replied, or a thread started. */
-export type NotificationReason = "mention" | "reply" | "thread";
+export type NotificationReason = "mention" | "reply" | "thread"
 
 /** One notification in the inbox. */
 export interface InboxItem {
-  readonly id: string;
-  readonly at: Date;
+  readonly id: string
+  readonly at: Date
   /** Still unread for the reader. */
-  readonly unread: boolean;
+  readonly unread: boolean
   /** Why it came, while its thread is readable; otherwise it shows as unavailable. */
-  readonly reason?: NotificationReason;
-  readonly author?: MessageAuthor;
+  readonly reason?: NotificationReason
+  readonly author?: MessageAuthor
   /** The group: a team by name, or a direct conversation by its people. */
-  readonly place?: { readonly name: string; readonly direct: boolean };
+  readonly place?: { readonly name: string; readonly direct: boolean }
   /** What was said: markdown, shown as one run of words. */
-  readonly text?: string;
+  readonly text?: string
   /** The members its mentions name. */
-  readonly mentions?: ReadonlyArray<RichTextMention>;
+  readonly mentions?: ReadonlyArray<RichTextMention>
   /** Opens its thread beside the inbox; absent while it is unavailable. */
-  readonly href?: string;
+  readonly href?: string
 }
 
-export type InboxTab = "all" | "unread";
+export type InboxTab = "all" | "unread"
 
 export interface InboxPaneProps {
   /** Under the title on phones. */
-  readonly workspaceName: string;
-  readonly tab: InboxTab;
-  readonly tabHref: (tab: InboxTab) => string;
-  readonly onTabChange?: (tab: InboxTab) => void;
+  readonly workspaceName: string
+  readonly tab: InboxTab
+  readonly tabHref: (tab: InboxTab) => string
+  readonly onTabChange?: (tab: InboxTab) => void
   /** How many are unread, for the Unread tab and Mark all seen. */
-  readonly unreadCount?: number;
+  readonly unreadCount?: number
   /** The current tab's notifications, newest first. */
-  readonly items: ReadonlyArray<InboxItem>;
+  readonly items: ReadonlyArray<InboxItem>
   /** The notification whose thread is open beside the inbox. */
-  readonly selectedId?: string;
+  readonly selectedId?: string
   /** The reader opens a notification's thread, which marks it seen. */
-  readonly onOpen: (id: string) => void;
+  readonly onOpen: (id: string) => void
   /** Shows Mark all seen while anything is unread. */
-  readonly onMarkAllSeen?: () => void;
-  readonly markingAll?: boolean;
+  readonly onMarkAllSeen?: () => void
+  readonly markingAll?: boolean
   /** In place of the list, while it loads or when it cannot. */
-  readonly status?: "loading" | "failed";
-  readonly onRetry?: () => void;
+  readonly status?: "loading" | "failed"
+  readonly onRetry?: () => void
   /** Older notifications remain; the end of the list offers them. */
   readonly earlier?: {
-    readonly loading?: boolean;
+    readonly loading?: boolean
     /** The last older page failed; loading again tries it once more. */
-    readonly failed?: boolean;
-    readonly onLoad: () => void;
-  };
+    readonly failed?: boolean
+    readonly onLoad: () => void
+  }
 }
 
 const titles: Record<NotificationReason, string> = {
   mention: "mentioned you",
   reply: "replied",
-  thread: "started a thread",
-};
+  thread: "started a thread"
+}
 
 /** Items grouped under the local day they came. */
 function byDay(items: ReadonlyArray<InboxItem>) {
-  const days: Array<{ day: number; items: Array<InboxItem> }> = [];
+  const days: Array<{ day: number; items: Array<InboxItem> }> = []
   for (const item of items) {
-    const day = dayOf(item.at);
-    const last = days.at(-1);
-    if (last?.day === day) last.items.push(item);
-    else days.push({ day, items: [item] });
+    const day = dayOf(item.at)
+    const last = days.at(-1)
+    if (last?.day === day) last.items.push(item)
+    else days.push({ day, items: [item] })
   }
-  return days;
+  return days
 }
 
 /**
@@ -90,21 +90,21 @@ function byDay(items: ReadonlyArray<InboxItem>) {
  * notification opens its thread beside the list and marks it seen.
  */
 export function InboxPane(props: InboxPaneProps) {
-  const days = createMemo(() => byDay(props.items));
+  const days = createMemo(() => byDay(props.items))
   const tab = (id: InboxTab, label: string, count?: number) => (
     <Tabs.Tab
       href={props.tabHref(id)}
       current={props.tab === id}
       count={count}
       onClick={(event: MouseEvent) => {
-        if (!props.onTabChange) return;
-        event.preventDefault();
-        props.onTabChange(id);
+        if (!props.onTabChange) return
+        event.preventDefault()
+        props.onTabChange(id)
       }}
     >
       {label}
     </Tabs.Tab>
-  );
+  )
   return (
     <Pane.Root>
       <Pane.Header>
@@ -139,17 +139,11 @@ export function InboxPane(props: InboxPaneProps) {
               title="Can’t load your inbox"
               lines={["Try again once the host is reachable."]}
             >
-              <Show when={props.onRetry}>
-                {(retry) => <Button onClick={() => retry()()}>Try again</Button>}
-              </Show>
+              <Show when={props.onRetry}>{(retry) => <Button onClick={() => retry()()}>Try again</Button>}</Show>
             </EmptyState>
           </Match>
           <Match when={props.items.length === 0 && props.tab === "unread"}>
-            <EmptyState
-              art="rest"
-              title="You’re all caught up"
-              lines={["You’ve seen everything that came to you."]}
-            >
+            <EmptyState art="rest" title="You’re all caught up" lines={["You’ve seen everything that came to you."]}>
               <Button onClick={() => props.onTabChange?.("all")}>View all activity</Button>
             </EmptyState>
           </Match>
@@ -161,10 +155,7 @@ export function InboxPane(props: InboxPaneProps) {
             />
           </Match>
           <Match when={true}>
-            <ul
-              class={s.list}
-              aria-label={props.tab === "unread" ? "Unread notifications" : "Notifications"}
-            >
+            <ul class={s.list} aria-label={props.tab === "unread" ? "Unread notifications" : "Notifications"}>
               {/* Days are rebuilt on every change; keying them by day keeps their rows, and focus. */}
               <Keyed each={days()} by={(day) => String(day.day)}>
                 {(day) => (
@@ -191,11 +182,7 @@ export function InboxPane(props: InboxPaneProps) {
                   <Show when={earlier().failed && !earlier().loading}>
                     <Field.Alert>Couldn’t load older notifications.</Field.Alert>
                   </Show>
-                  <Button
-                    variant="quiet"
-                    disabled={earlier().loading}
-                    onClick={() => earlier().onLoad()}
-                  >
+                  <Button variant="quiet" disabled={earlier().loading} onClick={() => earlier().onLoad()}>
                     {earlier().loading ? "Loading…" : earlier().failed ? "Try again" : "Show older"}
                   </Button>
                 </div>
@@ -205,24 +192,20 @@ export function InboxPane(props: InboxPaneProps) {
         </Switch>
       </Pane.Body>
     </Pane.Root>
-  );
+  )
 }
 
-function Row(props: {
-  readonly item: InboxItem;
-  readonly selected: boolean;
-  readonly onOpen: () => void;
-}) {
+function Row(props: { readonly item: InboxItem; readonly selected: boolean; readonly onOpen: () => void }) {
   const title = () => {
-    const { reason, author } = props.item;
-    return reason && author ? `${author.name} ${titles[reason]}` : "Activity in a thread";
-  };
+    const { reason, author } = props.item
+    return reason && author ? `${author.name} ${titles[reason]}` : "Activity in a thread"
+  }
   const place = () => {
-    const where = props.item.place;
-    if (!props.item.href || !props.item.reason) return "Unavailable thread";
-    if (!where) return "";
-    return where.direct ? `${where.name} · Direct message` : `#${where.name}`;
-  };
+    const where = props.item.place
+    if (!props.item.href || !props.item.reason) return "Unavailable thread"
+    if (!where) return ""
+    return where.direct ? `${where.name} · Direct message` : `#${where.name}`
+  }
   return (
     <li
       class={s.row}
@@ -239,13 +222,7 @@ function Row(props: {
         }
       >
         {(author) => (
-          <Avatar
-            name={author().name}
-            initials={author().initials}
-            tone={author().tone}
-            size={32}
-            decorative
-          />
+          <Avatar name={author().name} initials={author().initials} tone={author().tone} size={32} decorative />
         )}
       </Show>
       <div class={s.text}>
@@ -275,14 +252,11 @@ function Row(props: {
           <span class={s.place}>{place()}</span>
         </Show>
         <p class={s.preview}>
-          <Show
-            when={props.item.href ? props.item.text : undefined}
-            fallback="You can no longer see this thread."
-          >
+          <Show when={props.item.href ? props.item.text : undefined} fallback="You can no longer see this thread.">
             {(text) => <RichText text={text()} mentions={props.item.mentions} inline />}
           </Show>
         </p>
       </div>
     </li>
-  );
+  )
 }

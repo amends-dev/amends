@@ -4,27 +4,26 @@
  * Sizes are rem at a 16px root so they follow the reader's text-size preference.
  */
 export const fontFamily =
-  '"Figtree", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  '"Figtree", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
 /**
  * Geist Mono, for code and values people copy exactly: code in messages, commands, environment
  * variables, and model IDs.
  */
-export const monoFamily =
-  '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+export const monoFamily = '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
 
-export const fontWeight = { regular: 400, medium: 500, semibold: 600 } as const;
-export type FontWeight = keyof typeof fontWeight;
+export const fontWeight = { regular: 400, medium: 500, semibold: 600 } as const
+export type FontWeight = keyof typeof fontWeight
 
 export interface TypeStep {
-  readonly fontSize: string;
-  readonly lineHeight: string;
+  readonly fontSize: string
+  readonly lineHeight: string
 }
 
 const step = (size: number, line: number): TypeStep => ({
   fontSize: `${size / 16}rem`,
-  lineHeight: `${line / 16}rem`,
-});
+  lineHeight: `${line / 16}rem`
+})
 
 export const typeScale = {
   /** 11/16: timestamps, counts, and uppercase section labels. */
@@ -46,6 +45,6 @@ export const typeScale = {
   /** 20/28: the modal title. */
   heading: step(20, 28),
   /** 28/36: the centered screen title. */
-  display: step(28, 36),
-} as const satisfies Record<string, TypeStep>;
-export type TypeRole = keyof typeof typeScale;
+  display: step(28, 36)
+} as const satisfies Record<string, TypeStep>
+export type TypeRole = keyof typeof typeScale

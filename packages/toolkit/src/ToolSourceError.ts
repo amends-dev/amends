@@ -14,10 +14,11 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /** The field every reason has: what happened, in the words of whoever reports it. */
-const described = { description: Schema.optional(Schema.String) };
+const described = { description: Schema.optional(Schema.String) }
 
 /**
  * Gives a reason its message, its description or `defaults.message` without one, what the model
@@ -25,30 +26,30 @@ const described = { description: Schema.optional(Schema.String) };
  */
 const withDefaults = <
   // A class a mixin extends must take `any[]`, as TypeScript requires.
-  Base extends new (...args: Array<any>) => { readonly description?: string | undefined },
+  Base extends new (...args: Array<any>) => { readonly description?: string | undefined }
 >(
   Base: Base,
   defaults: {
-    readonly message: string;
-    readonly isRetryable: boolean;
+    readonly message: string
+    readonly isRetryable: boolean
 
     /** Whether the description is written for the model to read, as for a failure it can act on. */
-    readonly readByModel?: boolean;
-  },
+    readonly readByModel?: boolean
+  }
 ) =>
   class extends Base {
     get isRetryable(): boolean {
-      return defaults.isRetryable;
+      return defaults.isRetryable
     }
 
     get message(): string {
-      return this.description ?? defaults.message;
+      return this.description ?? defaults.message
     }
 
     get modelMessage(): string {
-      return defaults.readByModel === true ? this.message : defaults.message;
+      return defaults.readByModel === true ? this.message : defaults.message
     }
-  };
+  }
 
 /**
  * The source's credentials are missing, invalid, or not allowed to do this.
@@ -57,13 +58,14 @@ const withDefaults = <
  * @since 0.1.0
  */
 export class AuthenticationError extends withDefaults(
-  Schema.TaggedError<AuthenticationError>(
-    "@amends-dev/toolkit/ToolSourceError/AuthenticationError",
-  )("AuthenticationError", described),
+  Schema.TaggedError<AuthenticationError>("@amends-dev/toolkit/ToolSourceError/AuthenticationError")(
+    "AuthenticationError",
+    described
+  ),
   {
     message: "The credentials for this tool are missing, invalid, or not authorized",
-    isRetryable: false,
-  },
+    isRetryable: false
+  }
 ) {}
 
 /**
@@ -73,11 +75,8 @@ export class AuthenticationError extends withDefaults(
  * @since 0.1.0
  */
 export class NotFoundError extends withDefaults(
-  Schema.TaggedError<NotFoundError>("@amends-dev/toolkit/ToolSourceError/NotFoundError")(
-    "NotFoundError",
-    described,
-  ),
-  { message: "The source has no tool of this name", isRetryable: false },
+  Schema.TaggedError<NotFoundError>("@amends-dev/toolkit/ToolSourceError/NotFoundError")("NotFoundError", described),
+  { message: "The source has no tool of this name", isRetryable: false }
 ) {}
 
 /**
@@ -89,13 +88,13 @@ export class NotFoundError extends withDefaults(
 export class InvalidInputError extends withDefaults(
   Schema.TaggedError<InvalidInputError>("@amends-dev/toolkit/ToolSourceError/InvalidInputError")(
     "InvalidInputError",
-    described,
+    described
   ),
   {
     message: "The input does not match the tool's parameters",
     isRetryable: false,
-    readByModel: true,
-  },
+    readByModel: true
+  }
 ) {}
 
 /**
@@ -107,9 +106,9 @@ export class InvalidInputError extends withDefaults(
 export class CallFailedError extends withDefaults(
   Schema.TaggedError<CallFailedError>("@amends-dev/toolkit/ToolSourceError/CallFailedError")(
     "CallFailedError",
-    described,
+    described
   ),
-  { message: "The tool reported a failure", isRetryable: false, readByModel: true },
+  { message: "The tool reported a failure", isRetryable: false, readByModel: true }
 ) {}
 
 // TODO: Say when to try again, which a rate limit gives, once a caller retries by it.
@@ -123,9 +122,9 @@ export class CallFailedError extends withDefaults(
 export class UnavailableError extends withDefaults(
   Schema.TaggedError<UnavailableError>("@amends-dev/toolkit/ToolSourceError/UnavailableError")(
     "UnavailableError",
-    described,
+    described
   ),
-  { message: "The source is temporarily unavailable", isRetryable: true },
+  { message: "The source is temporarily unavailable", isRetryable: true }
 ) {}
 
 /**
@@ -135,10 +134,11 @@ export class UnavailableError extends withDefaults(
  * @since 0.1.0
  */
 export class InvalidResponseError extends withDefaults(
-  Schema.TaggedError<InvalidResponseError>(
-    "@amends-dev/toolkit/ToolSourceError/InvalidResponseError",
-  )("InvalidResponseError", described),
-  { message: "The source answered in a way its protocol does not allow", isRetryable: false },
+  Schema.TaggedError<InvalidResponseError>("@amends-dev/toolkit/ToolSourceError/InvalidResponseError")(
+    "InvalidResponseError",
+    described
+  ),
+  { message: "The source answered in a way its protocol does not allow", isRetryable: false }
 ) {}
 
 /**
@@ -151,9 +151,9 @@ export class InvalidResponseError extends withDefaults(
 export class UnsupportedError extends withDefaults(
   Schema.TaggedError<UnsupportedError>("@amends-dev/toolkit/ToolSourceError/UnsupportedError")(
     "UnsupportedError",
-    described,
+    described
   ),
-  { message: "The source does not support this operation", isRetryable: false },
+  { message: "The source does not support this operation", isRetryable: false }
 ) {}
 
 /**
@@ -164,11 +164,8 @@ export class UnsupportedError extends withDefaults(
  * @since 0.1.0
  */
 export class UnknownError extends withDefaults(
-  Schema.TaggedError<UnknownError>("@amends-dev/toolkit/ToolSourceError/UnknownError")(
-    "UnknownError",
-    described,
-  ),
-  { message: "The source failed", isRetryable: false },
+  Schema.TaggedError<UnknownError>("@amends-dev/toolkit/ToolSourceError/UnknownError")("UnknownError", described),
+  { message: "The source failed", isRetryable: false }
 ) {}
 
 /**
@@ -185,14 +182,14 @@ export const ToolSourceErrorReason = Schema.Union([
   UnavailableError,
   InvalidResponseError,
   UnsupportedError,
-  UnknownError,
-]);
+  UnknownError
+])
 
 /**
  * @category errors
  * @since 0.1.0
  */
-export type ToolSourceErrorReason = typeof ToolSourceErrorReason.Type;
+export type ToolSourceErrorReason = typeof ToolSourceErrorReason.Type
 
 /**
  * What every operation of a tool source fails with: the source that failed, by its name, and the
@@ -201,23 +198,24 @@ export type ToolSourceErrorReason = typeof ToolSourceErrorReason.Type;
  * @category errors
  * @since 0.1.0
  */
-export class ToolSourceError extends Schema.TaggedError<ToolSourceError>(
-  "@amends-dev/toolkit/ToolSourceError",
-)("ToolSourceError", {
-  /** The source that failed, as its name gives it, such as `github`. */
-  source: Schema.String,
+export class ToolSourceError extends Schema.TaggedError<ToolSourceError>("@amends-dev/toolkit/ToolSourceError")(
+  "ToolSourceError",
+  {
+    /** The source that failed, as its name gives it, such as `github`. */
+    source: Schema.String,
 
-  /** Why the source failed. */
-  reason: ToolSourceErrorReason,
+    /** Why the source failed. */
+    reason: ToolSourceErrorReason,
 
-  /** The failure underneath, such as an HTTP client's error, which the model never reads. */
-  cause: Schema.optional(Schema.Defect()),
-}) {
+    /** The failure underneath, such as an HTTP client's error, which the model never reads. */
+    cause: Schema.optional(Schema.Defect())
+  }
+) {
   get isRetryable(): boolean {
-    return this.reason.isRetryable;
+    return this.reason.isRetryable
   }
 
   override get message(): string {
-    return `${this.source}: ${this.reason.message}`;
+    return `${this.source}: ${this.reason.message}`
   }
 }

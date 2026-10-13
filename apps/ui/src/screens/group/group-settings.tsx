@@ -1,134 +1,134 @@
-import { Match, Show, Switch, createEffect, createSignal, createUniqueId } from "solid-js";
-import { IconMarkNew } from "@amends-dev/icons";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Button } from "../../components/button/index.ts";
-import { Choice } from "../../components/choice/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { Input } from "../../components/input/index.ts";
-import { MemberPicker, type PickerPerson } from "../../components/member-picker/index.ts";
-import { Tabs } from "../../components/tabs/index.ts";
-import type { AvatarToneName } from "../../foundations/color/tokens.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { createMediaQuery } from "../../internal/media.ts";
-import { Modal } from "../../patterns/modal/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import * as s from "./settings.css.ts";
+import { IconMarkNew } from "@amends-dev/icons"
+import { Match, Show, Switch, createEffect, createSignal, createUniqueId } from "solid-js"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Button } from "../../components/button/index.ts"
+import { Choice } from "../../components/choice/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { Input } from "../../components/input/index.ts"
+import { MemberPicker, type PickerPerson } from "../../components/member-picker/index.ts"
+import { Tabs } from "../../components/tabs/index.ts"
+import type { AvatarToneName } from "../../foundations/color/tokens.ts"
+import { media } from "../../foundations/layout/tokens.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import { createMediaQuery } from "../../internal/media.ts"
+import { Modal } from "../../patterns/modal/index.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import * as s from "./settings.css.ts"
 
-export type GroupSettingsTab = "general" | "members";
-export type GroupVisibility = "public" | "private";
+export type GroupSettingsTab = "general" | "members"
+export type GroupVisibility = "public" | "private"
 
 /** Why a change to the group was not made. */
-export type GroupChangeError = "changed" | "denied" | "gone" | "invalid" | "failed";
+export type GroupChangeError = "changed" | "denied" | "gone" | "invalid" | "failed"
 
 const renameErrors: { readonly [Error in GroupChangeError]: string } = {
   changed: "Someone renamed this group meanwhile. Save again to replace their name.",
   denied: "You can no longer rename this group.",
   gone: "This group is no longer available to you.",
   invalid: "Use 1 to 80 characters, with no invisible ones.",
-  failed: "The name could not be saved. Try again when the host is available.",
-};
+  failed: "The name could not be saved. Try again when the host is available."
+}
 const memberErrors: { readonly [Error in GroupChangeError]: string } = {
   changed: "The members changed meanwhile. Check the list and try again.",
   denied: "You can no longer change this group’s members.",
   gone: "That person is no longer in the workspace or this group.",
   invalid: "That change isn’t possible here.",
-  failed: "The change could not be made. Try again when the host is available.",
-};
+  failed: "The change could not be made. Try again when the host is available."
+}
 
 export interface SettingsMember {
-  readonly id: string;
-  readonly name: string;
-  readonly initials?: string;
-  readonly tone?: AvatarToneName;
-  readonly agent?: boolean;
+  readonly id: string
+  readonly name: string
+  readonly initials?: string
+  readonly tone?: AvatarToneName
+  readonly agent?: boolean
   /** The reader, shown as "You". */
-  readonly you?: boolean;
+  readonly you?: boolean
   /** The reader may remove this member. */
-  readonly removable?: boolean;
+  readonly removable?: boolean
 }
 
 export interface GroupSettingsProps {
-  readonly open: boolean;
+  readonly open: boolean
   /** A direct conversation shows only its fixed members. Default "team". */
-  readonly kind?: "team" | "direct";
-  readonly onClose: () => void;
+  readonly kind?: "team" | "direct"
+  readonly onClose: () => void
   /** The saved name, shown as the dialog's context. */
-  readonly groupName: string;
-  readonly tab: GroupSettingsTab;
-  readonly onTabChange: (tab: GroupSettingsTab) => void;
+  readonly groupName: string
+  readonly tab: GroupSettingsTab
+  readonly onTabChange: (tab: GroupSettingsTab) => void
   /** The name being edited. */
-  readonly name: string;
-  readonly onNameChange: (name: string) => void;
-  readonly nameError?: string;
+  readonly name: string
+  readonly onNameChange: (name: string) => void
+  readonly nameError?: string
   /** The reader may rename the group. Default true. */
-  readonly renamable?: boolean;
+  readonly renamable?: boolean
   /** Opens with the name ready to edit, as when the reader asked to rename the group. */
-  readonly focusName?: boolean;
+  readonly focusName?: boolean
   /** Why the last save failed. */
-  readonly saveError?: GroupChangeError;
-  readonly visibility: GroupVisibility;
-  readonly onVisibilityChange: (visibility: GroupVisibility) => void;
+  readonly saveError?: GroupChangeError
+  readonly visibility: GroupVisibility
+  readonly onVisibilityChange: (visibility: GroupVisibility) => void
   /** Visibility is shown but cannot change. */
-  readonly visibilityLocked?: boolean;
+  readonly visibilityLocked?: boolean
   /** Name or visibility differs from what is saved. */
-  readonly changed: boolean;
-  readonly saving?: boolean;
-  readonly onSave: () => void;
+  readonly changed: boolean
+  readonly saving?: boolean
+  readonly onSave: () => void
   /** The reader belongs to the group. */
-  readonly member: boolean;
+  readonly member: boolean
   /** The workspace's general group: everyone belongs to it, and people never leave it. */
-  readonly general?: boolean;
+  readonly general?: boolean
   /** The reader may leave. Default true. */
-  readonly leavable?: boolean;
-  readonly leaving?: boolean;
-  readonly onLeave: () => void;
-  readonly onJoin?: () => void;
+  readonly leavable?: boolean
+  readonly leaving?: boolean
+  readonly onLeave: () => void
+  readonly onJoin?: () => void
   /** The reader may add members. Default true. */
-  readonly canAdd?: boolean;
+  readonly canAdd?: boolean
   /** The member being removed, if any. */
-  readonly removingId?: string;
+  readonly removingId?: string
   /** Why the last change to the members failed. */
-  readonly membersError?: GroupChangeError;
-  readonly members: ReadonlyArray<SettingsMember>;
-  readonly onRemove: (id: string) => void;
+  readonly membersError?: GroupChangeError
+  readonly members: ReadonlyArray<SettingsMember>
+  readonly onRemove: (id: string) => void
   /** Workspace members who are not in the group. */
-  readonly candidates: ReadonlyArray<PickerPerson>;
-  readonly selected: ReadonlyArray<string>;
-  readonly onSelectedChange: (ids: Array<string>) => void;
-  readonly onAdd: () => void;
-  readonly adding?: boolean;
+  readonly candidates: ReadonlyArray<PickerPerson>
+  readonly selected: ReadonlyArray<string>
+  readonly onSelectedChange: (ids: Array<string>) => void
+  readonly onAdd: () => void
+  readonly adding?: boolean
 }
 
 const visibilityHints: Record<GroupVisibility, string> = {
   public: "Anyone in the workspace can find this group and join it.",
-  private: "Only people added to this group can find it.",
-};
+  private: "Only people added to this group can find it."
+}
 
 /**
  * A group's settings in a modal: General (name, visibility, and your membership) and Members
  * (add and remove people). On phones it fills the screen and adding members opens its own view.
  */
 export function GroupSettings(props: GroupSettingsProps) {
-  const formId = `group-settings-${createUniqueId()}`;
-  const phone = createMediaQuery(media.mobile);
-  const [addView, setAddView] = createSignal(false);
+  const formId = `group-settings-${createUniqueId()}`
+  const phone = createMediaQuery(media.mobile)
+  const [addView, setAddView] = createSignal(false)
   // Asked to rename, the dialog opens with the name selected, ready to type over.
-  const [nameField, setNameField] = createSignal<HTMLInputElement>();
+  const [nameField, setNameField] = createSignal<HTMLInputElement>()
   createEffect(() => {
-    const field = nameField();
-    if (!props.open || !props.focusName || !field) return;
+    const field = nameField()
+    if (!props.open || !props.focusName || !field) return
     queueMicrotask(() => {
-      field.focus();
-      field.select();
-    });
-  });
-  const addLabel = () => (props.selected.length > 0 ? `Add ${props.selected.length}` : "Add");
+      field.focus()
+      field.select()
+    })
+  })
+  const addLabel = () => (props.selected.length > 0 ? `Add ${props.selected.length}` : "Add")
   const close = () => {
-    setAddView(false);
-    props.onClose();
-  };
+    setAddView(false)
+    props.onClose()
+  }
   return (
     <Modal.Root open={props.open} onClose={close} aria-label="Group settings">
       <Show
@@ -156,8 +156,8 @@ export function GroupSettings(props: GroupSettingsProps) {
                 wide
                 disabled={props.selected.length === 0 || props.adding}
                 onClick={() => {
-                  props.onAdd();
-                  setAddView(false);
+                  props.onAdd()
+                  setAddView(false)
                 }}
               >
                 {props.selected.length === 0
@@ -172,9 +172,7 @@ export function GroupSettings(props: GroupSettingsProps) {
       >
         <Pane.Root variant="modal">
           <Pane.Header>
-            <Pane.Title
-              context={props.kind === "direct" ? props.groupName : `# ${props.groupName}`}
-            >
+            <Pane.Title context={props.kind === "direct" ? props.groupName : `# ${props.groupName}`}>
               {props.kind === "direct" ? "Members" : "Group settings"}
             </Pane.Title>
             <Pane.Actions>
@@ -183,10 +181,7 @@ export function GroupSettings(props: GroupSettingsProps) {
             <Show when={props.kind !== "direct"}>
               <Pane.Tabs>
                 <Tabs.List aria-label="Group settings">
-                  <Tabs.Tab
-                    current={props.tab === "general"}
-                    onClick={() => props.onTabChange("general")}
-                  >
+                  <Tabs.Tab current={props.tab === "general"} onClick={() => props.onTabChange("general")}>
                     General
                   </Tabs.Tab>
                   <Tabs.Tab
@@ -207,8 +202,8 @@ export function GroupSettings(props: GroupSettingsProps) {
                   id={formId}
                   class={s.form}
                   onSubmit={(event) => {
-                    event.preventDefault();
-                    if (props.changed && !props.saving) props.onSave();
+                    event.preventDefault()
+                    if (props.changed && !props.saving) props.onSave()
                   }}
                 >
                   <Field.Root
@@ -217,10 +212,7 @@ export function GroupSettings(props: GroupSettingsProps) {
                         ? "Only people who manage this group can rename it."
                         : "Everyone in this group sees this name."
                     }
-                    error={
-                      props.nameError ??
-                      (props.saveError === "invalid" ? renameErrors.invalid : undefined)
-                    }
+                    error={props.nameError ?? (props.saveError === "invalid" ? renameErrors.invalid : undefined)}
                   >
                     <Field.Label>Group name</Field.Label>
                     <Input
@@ -289,12 +281,7 @@ export function GroupSettings(props: GroupSettingsProps) {
               </Pane.Body>
               <Modal.Actions>
                 <Button onClick={close}>Cancel</Button>
-                <Button
-                  type="submit"
-                  form={formId}
-                  variant="primary"
-                  disabled={!props.changed || props.saving}
-                >
+                <Button type="submit" form={formId} variant="primary" disabled={!props.changed || props.saving}>
                   Save changes
                 </Button>
               </Modal.Actions>
@@ -302,9 +289,7 @@ export function GroupSettings(props: GroupSettingsProps) {
             <Match when={props.tab === "members" || props.kind === "direct"}>
               <Pane.Body>
                 <div class={s.members}>
-                  <Show when={props.membersError}>
-                    {(error) => <Field.Alert>{memberErrors[error()]}</Field.Alert>}
-                  </Show>
+                  <Show when={props.membersError}>{(error) => <Field.Alert>{memberErrors[error()]}</Field.Alert>}</Show>
                   <Show when={props.canAdd !== false}>
                     <Show
                       when={!phone()}
@@ -385,5 +370,5 @@ export function GroupSettings(props: GroupSettingsProps) {
         </Pane.Root>
       </Show>
     </Modal.Root>
-  );
+  )
 }

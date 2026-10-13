@@ -5,10 +5,11 @@
  *
  * @since 0.1.0
  */
-import type * as Effect from "effect/Effect";
-import type * as Event from "./Event.ts";
-import type * as Store from "./Store.ts";
-import type * as StoreError from "./StoreError.ts";
+
+import type * as Effect from "effect/Effect"
+import type * as Event from "./Event.ts"
+import type * as Store from "./Store.ts"
+import type * as StoreError from "./StoreError.ts"
 
 /**
  * What a commit does, in that same commit, when it publishes a fact, such as requesting a job.
@@ -21,9 +22,7 @@ import type * as StoreError from "./StoreError.ts";
  */
 export interface Definition<R = never> {
   /** The name of the fact it reacts to, at any version. */
-  readonly fact: string;
+  readonly fact: string
   /** Does what the published event asks for, with the publishing commit's transaction. */
-  readonly react: (
-    event: Event.Event,
-  ) => Effect.Effect<void, StoreError.StoreError, R | Store.Transaction>;
+  readonly react: (event: Event.Event) => Effect.Effect<void, StoreError.StoreError, R | Store.Transaction>
 }

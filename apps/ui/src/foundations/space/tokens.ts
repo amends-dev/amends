@@ -2,7 +2,7 @@
  * A 4px grid with the half steps (2, 6, 10) that compact rows in the mocks use. Keys count
  * 4px units, so `space[6]` is 24px. Values are rem so spacing grows with text size.
  */
-const rem = (px: number) => `${px / 16}rem`;
+const rem = (px: number) => `${px / 16}rem`
 
 export const space = {
   0: "0",
@@ -18,6 +18,6 @@ export const space = {
   8: rem(32),
   10: rem(40),
   12: rem(48),
-  16: rem(64),
-} as const;
-export type Space = keyof typeof space;
+  16: rem(64)
+} as const
+export type Space = keyof typeof space

@@ -11,24 +11,23 @@
  *
  * @since 0.1.0
  */
-import { ReadState, ReadStateStore } from "@amends-dev/core/read-state";
-import { and, eq, sql } from "drizzle-orm";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { storeError } from "./internal/errors.ts";
-import { inIds } from "./internal/id-list.ts";
-import { groupReadTimes, notificationSeen, threadReadPositions } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
-const decodePositions = Schema.decodeUnknownEffect(Schema.Array(ReadState.ThreadPosition));
+import { StoreError } from "@amends-dev/core/journal"
+import { ReadState, ReadStateStore } from "@amends-dev/core/read-state"
+import { and, eq, sql } from "drizzle-orm"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { inIds } from "./internal/id-list.ts"
+import { groupReadTimes, notificationSeen, threadReadPositions } from "./internal/schema.ts"
+
+const decodePositions = Schema.decodeUnknownEffect(Schema.Array(ReadState.ThreadPosition))
 const decodeGroups = Schema.decodeUnknownEffect(
-  Schema.Array(
-    Schema.Struct({ ...ReadState.GroupRead.fields, readAt: Schema.DateTimeUtcFromDate }),
-  ),
-);
+  Schema.Array(Schema.Struct({ ...ReadState.GroupRead.fields, readAt: Schema.DateTimeUtcFromDate }))
+)
 
 /**
  * Private read state in plain columns. Writes are single upserts that keep the later value; they
@@ -39,12 +38,12 @@ const decodeGroups = Schema.decodeUnknownEffect(
  * @since 0.1.0
  */
 export const make = Effect.fn("ReadStates.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
   const driver: ReadStateStore.ReadStateStore["Service"] = {
     getThreadPositions: Effect.fn("ReadStates.getThreadPositions")(
       function* (memberId, threadIds) {
-        if (threadIds.length === 0) return [];
+        if (threadIds.length === 0) return []
         return yield* guard(
           db
             .select()
@@ -53,16 +52,16 @@ export const make = Effect.fn("ReadStates.make")(function* () {
               and(
                 eq(threadReadPositions.workspaceId, workspaceId),
                 eq(threadReadPositions.memberId, memberId),
-                inIds(threadReadPositions.threadId, threadIds),
-              ),
-            ),
-        ).pipe(Effect.flatMap(decodePositions));
+                inIds(threadReadPositions.threadId, threadIds)
+              )
+            )
+        ).pipe(Effect.flatMap(decodePositions))
       },
-      Effect.mapError(StoreError.failed("ReadStateStore", "getThreadPositions")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getThreadPositions"))
     ),
     markThreadRead: Effect.fn("ReadStates.markThreadRead")(function* (position, seenAt) {
-      const { memberId, threadId, readThrough } = position;
-      const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt);
+      const { memberId, threadId, readThrough } = position
+      const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt)
       // The member's pending notifications from the thread up to the position become Seen, and
       // notification_seen keeps the first time through rebuilds, as Notifications.markSeen does;
       // the position keeps the later value. Every part of one statement commits together.
@@ -83,12 +82,12 @@ export const make = Effect.fn("ReadStates.make")(function* () {
           INSERT INTO thread_read_positions (workspace_id, member_id, thread_id, read_through)
           VALUES (${workspaceId}, ${memberId}, ${threadId}, ${readThrough})
           ON CONFLICT (workspace_id, member_id, thread_id) DO UPDATE
-            SET read_through = greatest(thread_read_positions.read_through, excluded.read_through)`),
-      ).pipe(Effect.mapError(storeError("ReadStateStore", "markThreadRead")));
+            SET read_through = greatest(thread_read_positions.read_through, excluded.read_through)`)
+      ).pipe(Effect.mapError(storeError("ReadStateStore", "markThreadRead")))
     }),
     getGroupReads: Effect.fn("ReadStates.getGroupReads")(
       function* (memberId, groupIds) {
-        if (groupIds.length === 0) return [];
+        if (groupIds.length === 0) return []
         return yield* guard(
           db
             .select()
@@ -97,15 +96,15 @@ export const make = Effect.fn("ReadStates.make")(function* () {
               and(
                 eq(groupReadTimes.workspaceId, workspaceId),
                 eq(groupReadTimes.memberId, memberId),
-                inIds(groupReadTimes.groupId, groupIds),
-              ),
-            ),
-        ).pipe(Effect.flatMap(decodeGroups));
+                inIds(groupReadTimes.groupId, groupIds)
+              )
+            )
+        ).pipe(Effect.flatMap(decodeGroups))
       },
-      Effect.mapError(StoreError.failed("ReadStateStore", "getGroupReads")),
+      Effect.mapError(StoreError.failed("ReadStateStore", "getGroupReads"))
     ),
     advanceGroup: Effect.fn("ReadStates.advanceGroup")(function* (groupRead) {
-      const { readAt, ...fields } = groupRead;
+      const { readAt, ...fields } = groupRead
       yield* guard(
         db
           .insert(groupReadTimes)
@@ -113,14 +112,14 @@ export const make = Effect.fn("ReadStates.make")(function* () {
           .onConflictDoUpdate({
             target: [groupReadTimes.workspaceId, groupReadTimes.memberId, groupReadTimes.groupId],
             set: {
-              readAt: sql`greatest(${groupReadTimes.readAt}, excluded.read_at)`,
-            },
-          }),
-      ).pipe(Effect.mapError(storeError("ReadStateStore", "advanceGroup")));
-    }),
-  };
-  return ReadStateStore.make(workspaceId, driver);
-});
+              readAt: sql`greatest(${groupReadTimes.readAt}, excluded.read_at)`
+            }
+          })
+      ).pipe(Effect.mapError(storeError("ReadStateStore", "advanceGroup")))
+    })
+  }
+  return ReadStateStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `ReadStateStore.ReadStateStore` over the caller's `Binding.Binding`.
@@ -128,4 +127,4 @@ export const make = Effect.fn("ReadStates.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ReadStateStore.ReadStateStore, make());
+export const layer = Layer.effect(ReadStateStore.ReadStateStore, make())

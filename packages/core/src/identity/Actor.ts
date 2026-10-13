@@ -5,10 +5,11 @@
  *
  * @since 0.1.0
  */
-import * as Context from "effect/Context";
-import type * as Identity from "./Identity.ts";
-import type * as Member from "../workspace/Member.ts";
-import type * as Workspace from "../workspace/Workspace.ts";
+
+import * as Context from "effect/Context"
+import type * as Member from "../workspace/Member.ts"
+import type * as Workspace from "../workspace/Workspace.ts"
+import type * as Identity from "./Identity.ts"
 
 /**
  * The resolved workspace member performing the current application operation, which an operation
@@ -26,10 +27,10 @@ export class Actor extends Context.Service<
   Actor,
   {
     /** The workspace the member acts in. */
-    readonly workspaceId: Workspace.Id;
+    readonly workspaceId: Workspace.Id
     /** The acting member. */
-    readonly memberId: Member.Id;
+    readonly memberId: Member.Id
     /** The human or agent the member was resolved from. */
-    readonly identity: Identity.MemberReference;
+    readonly identity: Identity.MemberReference
   }
 >()("@amends-dev/core/identity/Actor") {}

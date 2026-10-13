@@ -1,6 +1,6 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../foundations/theme/vars.css.ts";
-import { monoFamily, typeScale } from "../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { vars } from "../foundations/theme/vars.css.ts"
+import { monoFamily, typeScale } from "../foundations/typography/tokens.ts"
 
 export const command = style({
   ...typeScale.control,
@@ -17,10 +17,10 @@ export const command = style({
   fontFamily: monoFamily,
   color: vars.color.text.primary,
   overflowX: "auto",
-  whiteSpace: "nowrap",
-});
+  whiteSpace: "nowrap"
+})
 
-export const prompt = style({ color: vars.color.text.muted, userSelect: "none" });
+export const prompt = style({ color: vars.color.text.muted, userSelect: "none" })
 
 // One click selects the whole command, ready to copy.
-export const text = style({ userSelect: "all" });
+export const text = style({ userSelect: "all" })

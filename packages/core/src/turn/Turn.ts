@@ -7,17 +7,18 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Struct from "effect/Struct";
-import * as Agent from "../agent/Agent.ts";
-import * as GroupId from "../group/GroupId.ts";
-import * as Identity from "../identity/Identity.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as ThreadMessageId from "../thread/ThreadMessageId.ts";
-import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as TurnId from "./TurnId.ts";
+
+import * as Schema from "effect/Schema"
+import * as Struct from "effect/Struct"
+import * as Agent from "../agent/Agent.ts"
+import * as GroupId from "../group/GroupId.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
+import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as TurnId from "./TurnId.ts"
 
 /**
  * The identity of a turn, from `TurnId`.
@@ -25,13 +26,13 @@ import * as TurnId from "./TurnId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = TurnId.Id;
+export const Id = TurnId.Id
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = TurnId.Id;
+export type Id = TurnId.Id
 
 /**
  * Where a turn stands. `queued` holds accepted work until its job starts it; `running` is
@@ -41,20 +42,13 @@ export type Id = TurnId.Id;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals([
-  "queued",
-  "running",
-  "cancelling",
-  "completed",
-  "failed",
-  "cancelled",
-]);
+export const Status = Schema.Literals(["queued", "running", "cancelling", "completed", "failed", "cancelled"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * Whether a turn in `status` is active: queued, running, or cancelling. An agent has at most one
@@ -63,10 +57,9 @@ export type Status = typeof Status.Type;
  * @category utils
  * @since 0.1.0
  */
-export const active = (status: Status) =>
-  status === "queued" || status === "running" || status === "cancelling";
+export const active = (status: Status) => status === "queued" || status === "running" || status === "cancelling"
 
-const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
 /**
  * Why a turn was asked to stop: someone asked, its agent stopped taking part in the thread, or the
@@ -75,13 +68,13 @@ const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
  * @category schemas
  * @since 0.1.0
  */
-export const CancelReason = Schema.Literals(["requested", "participation-ended", "task-changed"]);
+export const CancelReason = Schema.Literals(["requested", "participation-ended", "task-changed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type CancelReason = typeof CancelReason.Type;
+export type CancelReason = typeof CancelReason.Type
 
 /**
  * How a turn ended: its final status.
@@ -89,13 +82,13 @@ export type CancelReason = typeof CancelReason.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Outcome = Schema.Literals(["completed", "failed", "cancelled"]);
+export const Outcome = Schema.Literals(["completed", "failed", "cancelled"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Outcome = typeof Outcome.Type;
+export type Outcome = typeof Outcome.Type
 
 /**
  * A failed or stopped turn that a turn runs again, and the member who asked.
@@ -103,7 +96,7 @@ export type Outcome = typeof Outcome.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Retry = Schema.Struct({ of: Id, by: MemberId.Id });
+export const Retry = Schema.Struct({ of: Id, by: MemberId.Id })
 
 /**
  * @category schemas
@@ -149,8 +142,8 @@ export const Turn = Schema.Struct({
   cancelReason: Schema.NullOr(CancelReason),
   createdAt: Schema.DateTimeUtcFromString,
   startedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
-  finishedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
-});
+  finishedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
+})
 
 /**
  * @category schemas
@@ -164,8 +157,7 @@ export interface Turn extends Schema.Schema.Type<typeof Turn> {}
  * @category utils
  * @since 0.1.0
  */
-export const change = (record: Turn, changes: Partial<Turn>): Turn =>
-  Object.assign({}, record, changes);
+export const change = (record: Turn, changes: Partial<Turn>): Turn => Object.assign({}, record, changes)
 
 /**
  * A new turn, queued until its job starts it, which has run nothing and posted nothing yet.
@@ -174,10 +166,7 @@ export const change = (record: Turn, changes: Partial<Turn>): Turn =>
  * @since 0.1.0
  */
 export const queued = (
-  turn: Omit<
-    Turn,
-    "status" | "selection" | "messageIds" | "failure" | "cancelReason" | "startedAt" | "finishedAt"
-  >,
+  turn: Omit<Turn, "status" | "selection" | "messageIds" | "failure" | "cancelReason" | "startedAt" | "finishedAt">
 ): Turn => ({
   ...turn,
   status: "queued",
@@ -186,8 +175,8 @@ export const queued = (
   failure: null,
   cancelReason: null,
   startedAt: null,
-  finishedAt: null,
-});
+  finishedAt: null
+})
 
 /**
  * Why a turn cannot be retried: it has not ended, it replied, a later one followed, or its agent
@@ -196,18 +185,13 @@ export const queued = (
  * @category schemas
  * @since 0.1.0
  */
-export const NotRetryableReason = Schema.Literals([
-  "active",
-  "completed",
-  "superseded",
-  "departed",
-]);
+export const NotRetryableReason = Schema.Literals(["active", "completed", "superseded", "departed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type NotRetryableReason = typeof NotRetryableReason.Type;
+export type NotRetryableReason = typeof NotRetryableReason.Type
 
 /**
  * A turn as a reader of its thread sees it, with what they may do with it now: ask it to stop,
@@ -220,8 +204,8 @@ export type NotRetryableReason = typeof NotRetryableReason.Type;
 export const View = Schema.Struct({
   ...Struct.omit(Turn.fields, ["logAfter"]),
   stoppable: Schema.Boolean,
-  retryable: Schema.Boolean,
-});
+  retryable: Schema.Boolean
+})
 
 /**
  * @category schemas
@@ -242,8 +226,8 @@ export const Draft = Schema.Struct({
   /** The part's position among the step's parts, as the session log records the step. */
   part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  text: Schema.String,
-});
+  text: Schema.String
+})
 
 /**
  * @category schemas
@@ -269,20 +253,20 @@ export const LogItem = Schema.TaggedUnion({
     /** The step's parts the text holds, by position. */
     parts: Schema.Array(Schema.Int),
     /** The step answered the prompt: the turn posts its text as the reply when it closes. */
-    reply: Schema.Boolean,
+    reply: Schema.Boolean
   },
   Interrupted: {
     at: Schema.DateTimeUtcFromString,
     reason: Schema.String,
-    retryable: Schema.Boolean,
-  },
-});
+    retryable: Schema.Boolean
+  }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type LogItem = typeof LogItem.Type;
+export type LogItem = typeof LogItem.Type
 
 /**
  * An item of a turn's log at its place among the items: new there, or replacing what was.
@@ -292,8 +276,8 @@ export type LogItem = typeof LogItem.Type;
  */
 export const LogChange = Schema.Struct({
   index: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  item: LogItem,
-});
+  item: LogItem
+})
 
 /**
  * @category schemas
@@ -315,11 +299,11 @@ export const LogMessage = Schema.TaggedUnion({
   Opened: { items: Schema.Array(LogItem) },
   Changed: { changes: Schema.Array(LogChange) },
   Drafted: Draft.fields,
-  Ended: {},
-}).annotate({ identifier: "TurnLogMessage" });
+  Ended: {}
+}).annotate({ identifier: "TurnLogMessage" })
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type LogMessage = typeof LogMessage.Type;
+export type LogMessage = typeof LogMessage.Type

@@ -24,33 +24,33 @@ it once `Sandbox.layerServices` provides the sandbox's services. The sandbox out
 stopping it keeps its files, and the provider resumes it later by its id.
 
 ```ts
-import { Network, Sandbox, SandboxProvider } from "@amends-dev/sandbox";
-import { Effect, FileSystem, Layer, Path } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { Network, Sandbox, SandboxProvider } from "@amends-dev/sandbox"
+import { Effect, FileSystem, Layer, Path } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 
 // From a provider, such as @amends-dev/sandbox-local for this machine or
 // @amends-dev/sandbox-daytona.
-declare const sandboxes: Layer.Layer<SandboxProvider.SandboxProvider>;
+declare const sandboxes: Layer.Layer<SandboxProvider.SandboxProvider>
 
 const program = Effect.gen(function* () {
-  const sandboxProvider = yield* SandboxProvider.SandboxProvider;
-  const sandbox = yield* sandboxProvider.create({ ports: [Network.Port.make(3000)] });
+  const sandboxProvider = yield* SandboxProvider.SandboxProvider
+  const sandbox = yield* sandboxProvider.create({ ports: [Network.Port.make(3000)] })
 
   // Commands start in the working directory; file paths are absolute.
   const greeting = yield* Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]));
-    return yield* fs.readFileString(path.join(sandbox.workingDirectory, "greeting.txt"));
-  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]))
+    return yield* fs.readFileString(path.join(sandbox.workingDirectory, "greeting.txt"))
+  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)))
 
   // The sandbox outlives this program: stop it now, and resume it by its id later.
-  yield* sandbox.stop;
-  const resumed = yield* sandboxProvider.resume(sandbox.id);
-  const endpoint = yield* resumed.endpoint(Network.Port.make(3000), "http");
-  return { greeting, url: endpoint.url };
-}).pipe(Effect.provide(sandboxes));
+  yield* sandbox.stop
+  const resumed = yield* sandboxProvider.resume(sandbox.id)
+  const endpoint = yield* resumed.endpoint(Network.Port.make(3000), "http")
+  return { greeting, url: endpoint.url }
+}).pipe(Effect.provide(sandboxes))
 ```
 
 ## The modules

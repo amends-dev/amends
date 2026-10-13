@@ -6,15 +6,16 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { Actor } from "@amends-dev/core/identity";
-import * as Authentication from "./Authentication.ts";
-import { TurnService } from "@amends-dev/core/turn";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
-import * as Streams from "./Streams.ts";
-import { CoreError } from "@amends-dev/core/error";
+
+import { CoreError } from "@amends-dev/core/error"
+import { Actor } from "@amends-dev/core/identity"
+import { TurnService } from "@amends-dev/core/turn"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Layer from "effect/Layer"
+import * as Api from "./Api.ts"
+import * as Authentication from "./Authentication.ts"
+import * as Streams from "./Streams.ts"
 
 /**
  * Register turn handlers, reading the principal per request. Following a turn's log is a stream
@@ -28,24 +29,20 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "turns",
   Effect.fn(function* (handlers) {
-    const streams = yield* Streams.Streams;
-    const unavailable = () => new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() });
+    const streams = yield* Streams.Streams
+    const unavailable = () => new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() })
     return handlers.handleAll({
-      listActive: ({ query }) =>
-        TurnService.TurnService.use((turnService) => turnService.listActive(query.limit)),
-      get: ({ params }) =>
-        TurnService.TurnService.use((turnService) => turnService.get(params.turnId)),
+      listActive: ({ query }) => TurnService.TurnService.use((turnService) => turnService.listActive(query.limit)),
+      get: ({ params }) => TurnService.TurnService.use((turnService) => turnService.get(params.turnId)),
       watchLog: ({ params }) =>
         Effect.gen(function* () {
-          const { workspaceId } = yield* Actor.Actor;
-          yield* streams.hold(workspaceId, yield* Authentication.Principal);
-          const turnService = yield* TurnService.TurnService;
-          return streams.serve(yield* turnService.watchLog(params.turnId), unavailable);
+          const { workspaceId } = yield* Actor.Actor
+          yield* streams.hold(workspaceId, yield* Authentication.Principal)
+          const turnService = yield* TurnService.TurnService
+          return streams.serve(yield* turnService.watchLog(params.turnId), unavailable)
         }).pipe(Streams.withHeartbeats),
-      cancel: ({ params }) =>
-        TurnService.TurnService.use((turnService) => turnService.cancel(params.turnId)),
-      retry: ({ params }) =>
-        TurnService.TurnService.use((turnService) => turnService.retry(params.turnId)),
-    });
-  }),
-).pipe(Layer.provide(Streams.layer));
+      cancel: ({ params }) => TurnService.TurnService.use((turnService) => turnService.cancel(params.turnId)),
+      retry: ({ params }) => TurnService.TurnService.use((turnService) => turnService.retry(params.turnId))
+    })
+  })
+).pipe(Layer.provide(Streams.layer))

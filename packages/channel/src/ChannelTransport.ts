@@ -12,8 +12,9 @@
  *
  * @since 0.1.0
  */
-import type * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
+
+import type * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
 
 /**
  * An identifier of the external system's own: of a conversation, a message, or a user there.
@@ -21,13 +22,13 @@ import * as Schema from "effect/Schema";
  * @category schemas
  * @since 0.1.0
  */
-export const ExternalId = Schema.NonEmptyString;
+export const ExternalId = Schema.NonEmptyString
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type ExternalId = typeof ExternalId.Type;
+export type ExternalId = typeof ExternalId.Type
 
 /**
  * An external conversation: its id, and what the transport needs to post there besides it, such
@@ -38,8 +39,8 @@ export type ExternalId = typeof ExternalId.Type;
  */
 export const Conversation = Schema.Struct({
   id: ExternalId,
-  details: Schema.Record(Schema.String, Schema.Json),
-});
+  details: Schema.Record(Schema.String, Schema.Json)
+})
 
 /**
  * @category schemas
@@ -53,7 +54,7 @@ export interface Conversation extends Schema.Schema.Type<typeof Conversation> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Sender = Schema.Struct({ id: ExternalId, name: Schema.NonEmptyString });
+export const Sender = Schema.Struct({ id: ExternalId, name: Schema.NonEmptyString })
 
 /**
  * @category schemas
@@ -76,28 +77,28 @@ export const Event = Schema.TaggedUnion({
     sender: Sender,
     text: Schema.String,
     title: Schema.optionalKey(Schema.String),
-    receivedAt: Schema.DateTimeUtcFromString,
+    receivedAt: Schema.DateTimeUtcFromString
   },
   MessageEdited: {
     conversation: Conversation,
     messageId: ExternalId,
     sender: Sender,
     text: Schema.String,
-    editedAt: Schema.DateTimeUtcFromString,
+    editedAt: Schema.DateTimeUtcFromString
   },
   MessageDeleted: {
     conversation: Conversation,
     messageId: ExternalId,
     sender: Sender,
-    deletedAt: Schema.DateTimeUtcFromString,
-  },
-});
+    deletedAt: Schema.DateTimeUtcFromString
+  }
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Event = typeof Event.Type;
+export type Event = typeof Event.Type
 
 /**
  * What the external system sent a host, as the host received it: the request's headers and body.
@@ -107,8 +108,8 @@ export type Event = typeof Event.Type;
  */
 export const Inbound = Schema.Struct({
   headers: Schema.Record(Schema.String, Schema.String),
-  body: Schema.String,
-});
+  body: Schema.String
+})
 
 /**
  * @category schemas
@@ -126,8 +127,8 @@ export interface Inbound extends Schema.Schema.Type<typeof Inbound> {}
  */
 export const Received = Schema.Struct({
   events: Schema.Array(Event),
-  answer: Schema.optionalKey(Schema.String),
-});
+  answer: Schema.optionalKey(Schema.String)
+})
 
 /**
  * @category schemas
@@ -141,7 +142,7 @@ export interface Received extends Schema.Schema.Type<typeof Received> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Outgoing = Schema.Struct({ text: Schema.String, author: Schema.NonEmptyString });
+export const Outgoing = Schema.Struct({ text: Schema.String, author: Schema.NonEmptyString })
 
 /**
  * @category schemas
@@ -155,7 +156,7 @@ export interface Outgoing extends Schema.Schema.Type<typeof Outgoing> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Posted = Schema.Struct({ messageId: ExternalId });
+export const Posted = Schema.Struct({ messageId: ExternalId })
 
 /**
  * @category schemas
@@ -171,13 +172,13 @@ export interface Posted extends Schema.Schema.Type<typeof Posted> {}
  * @category schemas
  * @since 0.1.0
  */
-export const TransportErrorReason = Schema.Literals(["rejected", "refused", "unavailable"]);
+export const TransportErrorReason = Schema.Literals(["rejected", "refused", "unavailable"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type TransportErrorReason = typeof TransportErrorReason.Type;
+export type TransportErrorReason = typeof TransportErrorReason.Type
 
 /**
  * The error a transport fails with: its `reason`, and what went wrong in words. Only an
@@ -187,18 +188,18 @@ export type TransportErrorReason = typeof TransportErrorReason.Type;
  * @since 0.1.0
  */
 export class TransportError extends Schema.TaggedError<TransportError>(
-  "@amends-dev/channel/ChannelTransport/TransportError",
+  "@amends-dev/channel/ChannelTransport/TransportError"
 )("TransportError", {
   reason: TransportErrorReason,
   description: Schema.String,
-  cause: Schema.optional(Schema.Defect()),
+  cause: Schema.optional(Schema.Defect())
 }) {
   get isRetryable(): boolean {
-    return this.reason === "unavailable";
+    return this.reason === "unavailable"
   }
 
   override get message(): string {
-    return this.description;
+    return this.description
   }
 }
 
@@ -213,27 +214,21 @@ export interface ChannelTransport {
    * The transport's own identity in the system, such as a bot user's id, when it has one. What
    * this identity sends is the transport's own post, received back, not a message to take in.
    */
-  readonly self: ExternalId | undefined;
+  readonly self: ExternalId | undefined
 
   /** The events in a request the system sent, after checking that it is the system's. */
-  readonly receive: (inbound: Inbound) => Effect.Effect<Received, TransportError>;
+  readonly receive: (inbound: Inbound) => Effect.Effect<Received, TransportError>
 
   /** Post `outgoing` as a reply in `conversation`. */
-  readonly post: (
-    conversation: Conversation,
-    outgoing: Outgoing,
-  ) => Effect.Effect<Posted, TransportError>;
+  readonly post: (conversation: Conversation, outgoing: Outgoing) => Effect.Effect<Posted, TransportError>
 
   /** Replace the text of the message `messageId` it posted in `conversation`, when the system can. */
   readonly edit?: (
     conversation: Conversation,
     messageId: ExternalId,
-    outgoing: Outgoing,
-  ) => Effect.Effect<void, TransportError>;
+    outgoing: Outgoing
+  ) => Effect.Effect<void, TransportError>
 
   /** Delete the message `messageId` it posted in `conversation`, when the system can. */
-  readonly delete?: (
-    conversation: Conversation,
-    messageId: ExternalId,
-  ) => Effect.Effect<void, TransportError>;
+  readonly delete?: (conversation: Conversation, messageId: ExternalId) => Effect.Effect<void, TransportError>
 }

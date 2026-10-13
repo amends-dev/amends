@@ -1,7 +1,7 @@
-import { Show, splitProps, type JSX } from "solid-js";
-import { classes } from "../../internal/props.ts";
-import * as s from "./divider.css.ts";
-import { stitch } from "../../internal/stitch.ts";
+import { Show, splitProps, type JSX } from "solid-js"
+import { classes } from "../../internal/props.ts"
+import { stitch } from "../../internal/stitch.ts"
+import * as s from "./divider.css.ts"
 
 function Stitch() {
   return (
@@ -17,27 +17,23 @@ function Stitch() {
         stroke-linecap="round"
       />
     </svg>
-  );
+  )
 }
 
 export type DividerProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "children"> & {
   /** Shown in capitals, such as "Today" or "4 replies". */
-  label?: string;
+  label?: string
   /** Center the label between two stitches, or lead with it. Default center. */
-  align?: "center" | "start";
+  align?: "center" | "start"
   /** "caps" is a small uppercase label; "text" reads as a word, such as "or". Default caps. */
-  labelStyle?: "caps" | "text";
-};
+  labelStyle?: "caps" | "text"
+}
 
 /** A stitched line that separates content, optionally labelled. */
 export function Divider(props: DividerProps) {
-  const [local, native] = splitProps(props, ["label", "align", "labelStyle", "class"]);
+  const [local, native] = splitProps(props, ["label", "align", "labelStyle", "class"])
   return (
-    <div
-      {...native}
-      role={local.label ? undefined : "separator"}
-      class={classes(s.divider, local.class)}
-    >
+    <div {...native} role={local.label ? undefined : "separator"} class={classes(s.divider, local.class)}>
       <Show when={local.label && local.align !== "start"}>
         <Stitch />
       </Show>
@@ -48,5 +44,5 @@ export function Divider(props: DividerProps) {
       </Show>
       <Stitch />
     </div>
-  );
+  )
 }

@@ -89,13 +89,7 @@
         },
         "overrides": [
           {
-            "include": [
-              "**/test/**/*.ts",
-              "**/test/**/*.tsx",
-              "**/*.test.ts",
-              "**/*.test.tsx",
-              "**/scripts/**/*.ts"
-            ],
+            "include": ["**/test/**/*.ts", "**/test/**/*.tsx", "**/*.test.ts", "**/*.test.tsx", "**/scripts/**/*.ts"],
             "options": {
               "diagnosticSeverity": {
                 "deterministicKeys": "off",

@@ -4,14 +4,14 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Subject from "../journal/Subject.ts";
-import * as ThreadActivityKind from "./ThreadActivityKind.ts";
-import * as ThreadMessage from "./ThreadMessage.ts";
-import * as ThreadMessageId from "./ThreadMessageId.ts";
 
-const subject = ({ messageId }: { readonly messageId: ThreadMessageId.Id }) =>
-  Subject.make("message", messageId);
+import * as Schema from "effect/Schema"
+import * as Subject from "../journal/Subject.ts"
+import * as ThreadActivityKind from "./ThreadActivityKind.ts"
+import * as ThreadMessage from "./ThreadMessage.ts"
+import * as ThreadMessageId from "./ThreadMessageId.ts"
+
+const subject = ({ messageId }: { readonly messageId: ThreadMessageId.Id }) => Subject.make("message", messageId)
 
 /**
  * A message was published to the thread. It is the thread's latest activity for its readers, and
@@ -24,14 +24,14 @@ export const Published = ThreadActivityKind.make("message.published", {
   version: 1,
   details: Schema.Struct({ messageId: ThreadMessageId.Id }),
   subject,
-  newActivity: true,
-});
+  newActivity: true
+})
 
 /**
  * @category kinds
  * @since 0.1.0
  */
-export type Published = ThreadActivityKind.Activity<typeof Published>;
+export type Published = ThreadActivityKind.Activity<typeof Published>
 
 /**
  * A message's text was replaced, at the revision recorded. A revision is edited once, so the
@@ -45,14 +45,14 @@ export const Edited = ThreadActivityKind.make("message.edited", {
   details: Schema.Struct({ messageId: ThreadMessageId.Id, revision: ThreadMessage.Revision }),
   subject,
   occurrence: ({ messageId, revision }) => [subject({ messageId }), String(revision)],
-  newActivity: false,
-});
+  newActivity: false
+})
 
 /**
  * @category kinds
  * @since 0.1.0
  */
-export type Edited = ThreadActivityKind.Activity<typeof Edited>;
+export type Edited = ThreadActivityKind.Activity<typeof Edited>
 
 /**
  * A message was deleted. It is deleted once, so its subject is its occurrence.
@@ -64,11 +64,11 @@ export const Deleted = ThreadActivityKind.make("message.deleted", {
   version: 1,
   details: Schema.Struct({ messageId: ThreadMessageId.Id }),
   subject,
-  newActivity: false,
-});
+  newActivity: false
+})
 
 /**
  * @category kinds
  * @since 0.1.0
  */
-export type Deleted = ThreadActivityKind.Activity<typeof Deleted>;
+export type Deleted = ThreadActivityKind.Activity<typeof Deleted>

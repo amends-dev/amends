@@ -8,10 +8,11 @@
  *
  * @since 0.1.0
  */
-import type * as Effect from "effect/Effect";
-import type * as PlatformError from "effect/PlatformError";
-import * as Schema from "effect/Schema";
-import * as Sandbox from "./Sandbox.ts";
+
+import type * as Effect from "effect/Effect"
+import type * as PlatformError from "effect/PlatformError"
+import * as Schema from "effect/Schema"
+import * as Sandbox from "./Sandbox.ts"
 
 /**
  * Names a template across its versions, as `Sandbox.isName` checks, in at most 30 characters, so
@@ -22,14 +23,14 @@ import * as Sandbox from "./Sandbox.ts";
  * @since 0.1.0
  */
 export const TemplateName = Schema.String.check(Sandbox.isName, Schema.isMaxLength(30)).pipe(
-  Schema.brand("TemplateName"),
-);
+  Schema.brand("TemplateName")
+)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type TemplateName = typeof TemplateName.Type;
+export type TemplateName = typeof TemplateName.Type
 
 /**
  * What prepares a sandbox, and how a provider tells versions of it apart. `E` is what `prepare`
@@ -38,22 +39,20 @@ export type TemplateName = typeof TemplateName.Type;
  * **Example** (A template that installs a tool)
  *
  * ```ts
- * import { Template } from "@amends-dev/sandbox";
- * import { Effect } from "effect";
- * import { ChildProcess, ChildProcessSpawner } from "effect/process";
+ * import { Template } from "@amends-dev/sandbox"
+ * import { Effect } from "effect"
+ * import { ChildProcess, ChildProcessSpawner } from "effect/process"
  *
- * const version = "3.6.2";
+ * const version = "3.6.2"
  *
  * const prettier: Template.Template = {
  *   name: Template.TemplateName.make("prettier"),
  *   identity: `prettier-${version}`,
  *   prepare: Effect.gen(function* () {
- *     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
- *     yield* spawner.exitCode(
- *       ChildProcess.make("npm", ["install", "--global", `prettier@${version}`]),
- *     );
- *   }),
- * };
+ *     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+ *     yield* spawner.exitCode(ChildProcess.make("npm", ["install", "--global", `prettier@${version}`]))
+ *   })
+ * }
  * ```
  *
  * @category models
@@ -64,13 +63,13 @@ export interface Template<E = PlatformError.PlatformError> {
    * Names the template across its versions, such as the agent it installs. Templates with the same
    * name and another identity are older or newer versions of it.
    */
-  readonly name: TemplateName;
+  readonly name: TemplateName
 
   /**
    * Names what `prepare` produces: templates with the same identity must prepare the same
    * contents. A provider combines it with its own base image or runtime when it names a snapshot.
    */
-  readonly identity: string;
+  readonly identity: string
 
   /**
    * Runs inside the sandbox, where `FileSystem`, `Path`, and `ChildProcessSpawner` are the
@@ -79,5 +78,5 @@ export interface Template<E = PlatformError.PlatformError> {
    * another. It leaves such a sandbox ready without redoing what is there. Anything it needs from
    * the host is read beforehand and captured.
    */
-  readonly prepare: Effect.Effect<void, E, Sandbox.SandboxServices>;
+  readonly prepare: Effect.Effect<void, E, Sandbox.SandboxServices>
 }

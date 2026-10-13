@@ -1,54 +1,49 @@
-import { Show, createUniqueId } from "solid-js";
-import { Button } from "../../components/button/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { Input } from "../../components/input/index.ts";
-import { Modal } from "../../patterns/modal/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import * as s from "./workspaces.css.ts";
+import { Show, createUniqueId } from "solid-js"
+import { Button } from "../../components/button/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { Input } from "../../components/input/index.ts"
+import { Modal } from "../../patterns/modal/index.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import * as s from "./workspaces.css.ts"
 
 /** Why a workspace was not created. */
-export type CreateWorkspaceError =
-  | "invalid-name"
-  | "invalid-member-name"
-  | "denied"
-  | "request-failed";
+export type CreateWorkspaceError = "invalid-name" | "invalid-member-name" | "denied" | "request-failed"
 
 const errors: { readonly [Error in CreateWorkspaceError]: string } = {
   "invalid-name": "Use 1 to 80 characters, with no invisible ones.",
   "invalid-member-name": "Use 1 to 80 characters, with no invisible ones.",
   denied: "This identity can’t create workspaces.",
-  "request-failed":
-    "We couldn’t confirm creation. Try again with this name to safely check the same request.",
-};
+  "request-failed": "We couldn’t confirm creation. Try again with this name to safely check the same request."
+}
 
 export interface CreateWorkspaceProps {
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly name: string;
-  readonly onNameChange: (name: string) => void;
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly name: string
+  readonly onNameChange: (name: string) => void
   /** What people there will call the reader; empty shows their identity. */
-  readonly memberName: string;
-  readonly onMemberNameChange: (name: string) => void;
-  readonly pending?: boolean;
-  readonly error?: CreateWorkspaceError;
-  readonly onCreate: () => void;
+  readonly memberName: string
+  readonly onMemberNameChange: (name: string) => void
+  readonly pending?: boolean
+  readonly error?: CreateWorkspaceError
+  readonly onCreate: () => void
   /** The workspace exists and the list is reloading before it opens. */
   readonly created?: {
-    readonly name: string;
-    readonly pending: boolean;
-    readonly refreshFailed: boolean;
-  };
+    readonly name: string
+    readonly pending: boolean
+    readonly refreshFailed: boolean
+  }
   /** Reload the list after `created.refreshFailed`. */
-  readonly onRetry?: () => void;
+  readonly onRetry?: () => void
 }
 
 /** Naming a new workspace and what people there call the reader; the reader becomes its owner. */
 export function CreateWorkspace(props: CreateWorkspaceProps) {
-  const formId = `create-workspace-${createUniqueId()}`;
-  const busy = () => props.pending || props.created?.pending;
+  const formId = `create-workspace-${createUniqueId()}`
+  const busy = () => props.pending || props.created?.pending
   const close = () => {
-    if (!busy()) props.onClose();
-  };
+    if (!busy()) props.onClose()
+  }
   return (
     <Modal.Root open={props.open} onClose={close} aria-label="Create workspace" size="compact">
       <Pane.Root variant="modal">
@@ -68,8 +63,8 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
                   id={formId}
                   class={s.form}
                   onSubmit={(event) => {
-                    event.preventDefault();
-                    if (props.name.trim() && !props.pending) props.onCreate();
+                    event.preventDefault()
+                    if (props.name.trim() && !props.pending) props.onCreate()
                   }}
                 >
                   <Field.Root
@@ -89,11 +84,7 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
                   </Field.Root>
                   <Field.Root
                     hint="What people there will call you. You can change it later."
-                    error={
-                      props.error === "invalid-member-name"
-                        ? errors["invalid-member-name"]
-                        : undefined
-                    }
+                    error={props.error === "invalid-member-name" ? errors["invalid-member-name"] : undefined}
                   >
                     <Field.Label>Your name</Field.Label>
                     <Input
@@ -121,12 +112,7 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
                 <Button onClick={close} disabled={props.pending}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  form={formId}
-                  variant="primary"
-                  disabled={!props.name.trim() || props.pending}
-                >
+                <Button type="submit" form={formId} variant="primary" disabled={!props.name.trim() || props.pending}>
                   Create workspace
                 </Button>
               </Modal.Actions>
@@ -148,8 +134,7 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
                 </p>
                 <Show when={created().refreshFailed}>
                   <Field.Alert>
-                    Your workspace was created, but we couldn’t refresh the list. Try again to open
-                    it.
+                    Your workspace was created, but we couldn’t refresh the list. Try again to open it.
                   </Field.Alert>
                 </Show>
               </Pane.Body>
@@ -158,11 +143,7 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
                   Close
                 </Button>
                 <Show when={created().refreshFailed}>
-                  <Button
-                    variant="primary"
-                    disabled={created().pending}
-                    onClick={() => props.onRetry?.()}
-                  >
+                  <Button variant="primary" disabled={created().pending} onClick={() => props.onRetry?.()}>
                     Try again
                   </Button>
                 </Show>
@@ -172,5 +153,5 @@ export function CreateWorkspace(props: CreateWorkspaceProps) {
         </Show>
       </Pane.Root>
     </Modal.Root>
-  );
+  )
 }

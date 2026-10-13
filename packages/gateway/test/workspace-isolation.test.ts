@@ -1,31 +1,31 @@
-import { Agent } from "@amends-dev/core/agent";
-import { BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization";
-import { Channel, Delivery } from "@amends-dev/core/channel";
-import { Connection } from "@amends-dev/core/connection";
-import { Group } from "@amends-dev/core/group";
-import { Identity } from "@amends-dev/core/identity";
+import { Agent } from "@amends-dev/core/agent"
+import { BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization"
+import { Channel, Delivery } from "@amends-dev/core/channel"
+import { Connection } from "@amends-dev/core/connection"
+import { Group } from "@amends-dev/core/group"
+import { Identity } from "@amends-dev/core/identity"
+import type { Store } from "@amends-dev/core/journal"
 import {
   Thread,
   ThreadActivity,
   ThreadActivityKind,
   ThreadMessage,
   ThreadMessageActivity,
-  ThreadParticipation,
-} from "@amends-dev/core/thread";
-import { Turn } from "@amends-dev/core/turn";
-import { Invitation, Member } from "@amends-dev/core/workspace";
-import { describe, expect, it } from "@effect/vitest";
-import { DateTime, Effect, Option } from "effect";
-import type { Store } from "@amends-dev/core/journal";
-import * as Support from "./support.ts";
-import { type Bound, forWorkspace, otherWorkspaceId, workspaceId } from "./support.ts";
-import { withStorage } from "./fixture.ts";
+  ThreadParticipation
+} from "@amends-dev/core/thread"
+import { Turn } from "@amends-dev/core/turn"
+import { Invitation, Member } from "@amends-dev/core/workspace"
+import { describe, expect, it } from "@effect/vitest"
+import { DateTime, Effect, Option } from "effect"
+import { withStorage } from "./fixture.ts"
+import * as Support from "./support.ts"
+import { type Bound, forWorkspace, otherWorkspaceId, workspaceId } from "./support.ts"
 
 /** One store's write of a record that names another workspace, and how to look for it after. */
 interface Attempt {
-  readonly store: string;
-  readonly write: Effect.Effect<void, unknown, Store.Transaction>;
-  readonly kept: (on: Bound) => Effect.Effect<Option.Option<unknown>, unknown>;
+  readonly store: string
+  readonly write: Effect.Effect<void, unknown, Store.Transaction>
+  readonly kept: (on: Bound) => Effect.Effect<Option.Option<unknown>, unknown>
 }
 
 /**
@@ -34,31 +34,29 @@ interface Attempt {
  * rather than checking each fact's workspace again as it applies it.
  */
 describe("workspace isolation", () => {
-  const { initialized } = Support;
+  const { initialized } = Support
   it.effect("every store refuses a record that names another workspace and keeps none of it", () =>
     withStorage((storage) =>
       Effect.gen(function* () {
-        const host = yield* storage.connect();
-        const bound = yield* forWorkspace(host, workspaceId);
-        const workspace = yield* initialized(bound);
-        const other = yield* forWorkspace(host, otherWorkspaceId);
-        const elsewhere = { workspaceId: otherWorkspaceId };
-        const now = yield* DateTime.now;
-        const memberId = workspace.ownerMemberId;
-        const [assignment] = yield* bound.assignments.listActiveByMember(memberId);
-        const role = yield* bound.roles.get(BuiltinRoles.MemberId);
+        const host = yield* storage.connect()
+        const bound = yield* forWorkspace(host, workspaceId)
+        const workspace = yield* initialized(bound)
+        const other = yield* forWorkspace(host, otherWorkspaceId)
+        const elsewhere = { workspaceId: otherWorkspaceId }
+        const now = yield* DateTime.now
+        const memberId = workspace.ownerMemberId
+        const [assignment] = yield* bound.assignments.listActiveByMember(memberId)
+        const role = yield* bound.roles.get(BuiltinRoles.MemberId)
         if (assignment === undefined || Option.isNone(role))
-          return yield* Effect.die("An initialized workspace has its owner and roles");
-        const threadId = Thread.Id.make("foreign-thread");
-        const messageId = ThreadMessage.Id.make("foreign-message");
+          return yield* Effect.die("An initialized workspace has its owner and roles")
+        const threadId = Thread.Id.make("foreign-thread")
+        const messageId = ThreadMessage.Id.make("foreign-message")
 
         const attempts: ReadonlyArray<Attempt> = [
           {
             store: "RoleStore",
-            write: bound.roles.insert(
-              Object.assign({}, role.value, { id: Role.Id.make("foreign-role") }, elsewhere),
-            ),
-            kept: (on) => on.roles.get(Role.Id.make("foreign-role")),
+            write: bound.roles.insert(Object.assign({}, role.value, { id: Role.Id.make("foreign-role") }, elsewhere)),
+            kept: (on) => on.roles.get(Role.Id.make("foreign-role"))
           },
           {
             store: "AssignmentStore",
@@ -67,13 +65,12 @@ describe("workspace isolation", () => {
                 id: assignment.id.replace(/^/, "foreign-") as typeof assignment.id,
                 source: Assignment.Source.isAnyOf(["Role"])(assignment.source)
                   ? Object.assign({}, assignment.source, {
-                      scope: { _tag: "Workspace" as const, workspaceId: otherWorkspaceId },
+                      scope: { _tag: "Workspace" as const, workspaceId: otherWorkspaceId }
                     })
-                  : assignment.source,
-              }),
+                  : assignment.source
+              })
             ),
-            kept: (on) =>
-              on.assignments.get(assignment.id.replace(/^/, "foreign-") as typeof assignment.id),
+            kept: (on) => on.assignments.get(assignment.id.replace(/^/, "foreign-") as typeof assignment.id)
           },
           {
             store: "InvitationStore",
@@ -85,11 +82,11 @@ describe("workspace isolation", () => {
                 issuedAt: now,
                 expiresAt: DateTime.add(now, { hours: 1 }),
                 recipientId: Identity.HumanId.make("someone"),
-                roleId: BuiltinRoles.MemberId,
+                roleId: BuiltinRoles.MemberId
               },
-              state: { _tag: "Pending" },
+              state: { _tag: "Pending" }
             }),
-            kept: (on) => on.invitations.get(Invitation.Id.make("foreign-invitation")),
+            kept: (on) => on.invitations.get(Invitation.Id.make("foreign-invitation"))
           },
           {
             store: "ConnectionStore",
@@ -102,9 +99,9 @@ describe("workspace isolation", () => {
               auth: "none",
               status: "active",
               createdBy: memberId,
-              createdAt: now,
+              createdAt: now
             }),
-            kept: (on) => on.connections.get(Connection.Id.make("foreign-connection")),
+            kept: (on) => on.connections.get(Connection.Id.make("foreign-connection"))
           },
           {
             store: "AgentStore",
@@ -117,9 +114,9 @@ describe("workspace isolation", () => {
               model: { connectionId: Connection.Id.make("foreign-connection"), id: "model" },
               sandbox: null,
               createdBy: memberId,
-              createdAt: now,
+              createdAt: now
             }),
-            kept: (on) => on.agents.get(Agent.Id.make("foreign-agent")),
+            kept: (on) => on.agents.get(Agent.Id.make("foreign-agent"))
           },
           {
             store: "TurnStore",
@@ -141,9 +138,9 @@ describe("workspace isolation", () => {
               cancelReason: null,
               createdAt: now,
               startedAt: null,
-              finishedAt: null,
+              finishedAt: null
             }),
-            kept: (on) => on.turns.get(Turn.Id.make("foreign-turn")),
+            kept: (on) => on.turns.get(Turn.Id.make("foreign-turn"))
           },
           {
             store: "TaskStore",
@@ -155,9 +152,9 @@ describe("workspace isolation", () => {
               priority: "none",
               assignee: null,
               createdBy: { _tag: "Member", memberId },
-              createdAt: now,
+              createdAt: now
             }),
-            kept: (on) => on.tasks.get(threadId),
+            kept: (on) => on.tasks.get(threadId)
           },
           {
             store: "ChannelStore",
@@ -170,9 +167,9 @@ describe("workspace isolation", () => {
               opensTasks: true,
               status: "active",
               createdBy: memberId,
-              createdAt: now,
+              createdAt: now
             }),
-            kept: (on) => on.channels.get(Channel.Id.make("foreign-channel")),
+            kept: (on) => on.channels.get(Channel.Id.make("foreign-channel"))
           },
           {
             store: "ChannelBindingStore",
@@ -182,9 +179,9 @@ describe("workspace isolation", () => {
               channelId: Channel.Id.make("channel"),
               groupId: Group.GeneralId,
               conversation: { id: "conversation", details: {} },
-              boundAt: now,
+              boundAt: now
             }),
-            kept: (on) => on.channelBindings.get(threadId),
+            kept: (on) => on.channelBindings.get(threadId)
           },
           {
             store: "ContactStore",
@@ -194,9 +191,9 @@ describe("workspace isolation", () => {
               channelId: Channel.Id.make("channel"),
               externalId: "someone",
               name: "Someone",
-              createdAt: now,
+              createdAt: now
             }),
-            kept: (on) => on.contacts.get(Identity.ContactId.make("foreign-contact")),
+            kept: (on) => on.contacts.get(Identity.ContactId.make("foreign-contact"))
           },
           {
             store: "DeliveryStore",
@@ -210,10 +207,10 @@ describe("workspace isolation", () => {
                 conversationId: "conversation",
                 messageId,
                 sequence: 1,
-                requestedAt: now,
-              }),
+                requestedAt: now
+              })
             ),
-            kept: (on) => on.deliveries.get(Delivery.Id.make("foreign-delivery")),
+            kept: (on) => on.deliveries.get(Delivery.Id.make("foreign-delivery"))
           },
           {
             store: "ThreadMessageStore",
@@ -224,9 +221,9 @@ describe("workspace isolation", () => {
               author: { _tag: "Member", memberId },
               via: null,
               publishedAt: now,
-              content: ThreadMessage.published("Hello", []),
+              content: ThreadMessage.published("Hello", [])
             }),
-            kept: (on) => on.messages.get(messageId),
+            kept: (on) => on.messages.get(messageId)
           },
           {
             store: "ThreadActivityStore",
@@ -238,23 +235,23 @@ describe("workspace isolation", () => {
                   workspaceId: otherWorkspaceId,
                   threadId,
                   sequence: 1,
-                  occurredAt: now,
+                  occurredAt: now
                 },
-                { messageId },
-              ),
+                { messageId }
+              )
             ),
-            kept: (on) => on.activities.get(ThreadActivity.Id.make("foreign-activity")),
-          },
-        ];
+            kept: (on) => on.activities.get(ThreadActivity.Id.make("foreign-activity"))
+          }
+        ]
         for (const attempt of attempts) {
           expect(yield* Effect.flip(bound.store.transaction(attempt.write))).toMatchObject({
             _tag: "StoreError",
             store: attempt.store,
-            reason: { _tag: "Rejected", description: expect.stringMatching(/workspace/i) },
-          });
-          for (const on of [bound, other]) expect(yield* attempt.kept(on)).toEqual(Option.none());
+            reason: { _tag: "Rejected", description: expect.stringMatching(/workspace/i) }
+          })
+          for (const on of [bound, other]) expect(yield* attempt.kept(on)).toEqual(Option.none())
         }
-      }),
-    ),
-  );
-});
+      })
+    )
+  )
+})

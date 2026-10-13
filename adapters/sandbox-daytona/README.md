@@ -26,40 +26,38 @@ organization's API key. A program then creates sandboxes, works inside them with
 would on any provider.
 
 ```ts
-import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
-import { Network, Sandbox, SandboxProvider } from "@amends-dev/sandbox";
-import { BunCrypto } from "@effect/platform-bun";
-import { Config, Effect, FileSystem, Layer } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona"
+import { Network, Sandbox, SandboxProvider } from "@amends-dev/sandbox"
+import { BunCrypto } from "@effect/platform-bun"
+import { Config, Effect, FileSystem, Layer } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 
 const sandboxes = Layer.unwrap(
-  Effect.map(Config.Redacted("DAYTONA_API_KEY"), (apiKey) =>
-    DaytonaSandboxProvider.layer({ apiKey }),
-  ),
-).pipe(Layer.provide(BunCrypto.layer));
+  Effect.map(Config.Redacted("DAYTONA_API_KEY"), (apiKey) => DaytonaSandboxProvider.layer({ apiKey }))
+).pipe(Layer.provide(BunCrypto.layer))
 
-const port = Network.Port.make(3000);
+const port = Network.Port.make(3000)
 
 const program = Effect.gen(function* () {
-  const sandboxProvider = yield* SandboxProvider.SandboxProvider;
-  const sandbox = yield* sandboxProvider.create({ ports: [port] });
+  const sandboxProvider = yield* SandboxProvider.SandboxProvider
+  const sandbox = yield* sandboxProvider.create({ ports: [port] })
 
   // Commands start in the working directory, /home/daytona on Daytona's image.
   const greeting = yield* Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]));
-    return yield* fs.readFileString(`${sandbox.workingDirectory}/greeting.txt`);
-  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+    const fs = yield* FileSystem.FileSystem
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]))
+    return yield* fs.readFileString(`${sandbox.workingDirectory}/greeting.txt`)
+  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)))
 
   // A server on the port, listening on every interface, is reached at Daytona's preview URL
   // with the headers the endpoint gives.
-  const endpoint = yield* sandbox.endpoint(port, "http");
+  const endpoint = yield* sandbox.endpoint(port, "http")
 
   // The sandbox runs until it is stopped, keeps its files stopped, and is resumed by its id.
-  yield* sandbox.stop;
-  return { greeting, url: endpoint.url, sandboxId: sandbox.id };
-}).pipe(Effect.provide(sandboxes));
+  yield* sandbox.stop
+  return { greeting, url: endpoint.url, sandboxId: sandbox.id }
+}).pipe(Effect.provide(sandboxes))
 ```
 
 `DaytonaSandboxProvider.make` makes the provider in a scope, for code that composes it itself.

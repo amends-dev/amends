@@ -5,7 +5,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Adding people to a team group the actor belongs to, and removing them from a private one.
@@ -16,8 +17,8 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Manage = Permission.make("group.membership.manage", {
   targetKind: "Group",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})
 
 /**
  * Joining a public team group as oneself; private and direct groups cannot be joined.
@@ -27,5 +28,5 @@ export const Manage = Permission.make("group.membership.manage", {
  */
 export const Join = Permission.make("group.join", {
   targetKind: "Group",
-  builtinTier: "member",
-});
+  builtinTier: "member"
+})

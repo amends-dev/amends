@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import * as Permission from "../authorization/Permission.ts";
+
+import * as Permission from "../authorization/Permission.ts"
 
 /**
  * Transfer ownership of the workspace to another active human member.
@@ -14,5 +15,5 @@ import * as Permission from "../authorization/Permission.ts";
  */
 export const Transfer = Permission.make("workspace.transfer-ownership", {
   targetKind: "Workspace",
-  builtinTier: "owner",
-});
+  builtinTier: "owner"
+})

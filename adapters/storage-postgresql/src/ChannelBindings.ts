@@ -10,34 +10,33 @@
  *
  * @since 0.1.0
  */
-import { ChannelBinding, ChannelBindingStore } from "@amends-dev/core/channel";
-import { and, eq } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { storeError } from "./internal/errors.ts";
-import { channelBindings } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(ChannelBinding.ChannelBinding));
+import { ChannelBinding, ChannelBindingStore } from "@amends-dev/core/channel"
+import { StoreError } from "@amends-dev/core/journal"
+import { and, eq } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { channelBindings } from "./internal/schema.ts"
+
+const validateRecord = Schema.decodeEffect(Schema.toType(ChannelBinding.ChannelBinding))
 const decode = Schema.decodeUnknownEffect(
-  Schema.Array(
-    Schema.Struct({ ...ChannelBinding.ChannelBinding.fields, boundAt: Schema.DateTimeUtcFromDate }),
-  ),
-);
-type Row = typeof channelBindings.$inferSelect;
+  Schema.Array(Schema.Struct({ ...ChannelBinding.ChannelBinding.fields, boundAt: Schema.DateTimeUtcFromDate }))
+)
+type Row = typeof channelBindings.$inferSelect
 /** The conversation's id and details read back as the one value the transport gave. */
 const toRecord = ({ conversationId, conversationDetails, ...row }: Row) => ({
   ...row,
-  conversation: { id: conversationId, details: conversationDetails },
-});
+  conversation: { id: conversationId, details: conversationDetails }
+})
 const decodeRows = (rows: ReadonlyArray<Row>) =>
   decode(rows.map(toRecord)).pipe(
-    Effect.flatMap((values) => Effect.forEach(values, (record) => validateRecord(record))),
-  );
+    Effect.flatMap((values) => Effect.forEach(values, (record) => validateRecord(record)))
+  )
 
 /**
  * Builds the channel binding store for the binding's workspace: this module's driver inside
@@ -47,9 +46,9 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
  * @since 0.1.0
  */
 export const make = Effect.fn("ChannelBindings.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(channelBindings.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(channelBindings.workspaceId, workspaceId)
   const driver: ChannelBindingStore.ChannelBindingStore["Service"] = {
     get: Effect.fn("ChannelBindings.get")(
       function* (threadId) {
@@ -57,10 +56,10 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
           db
             .select()
             .from(channelBindings)
-            .where(and(inWorkspace, eq(channelBindings.threadId, threadId))),
-        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
+            .where(and(inWorkspace, eq(channelBindings.threadId, threadId)))
+        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("ChannelBindingStore", "get")),
+      Effect.mapError(StoreError.failed("ChannelBindingStore", "get"))
     ),
     findByConversation: Effect.fn("ChannelBindings.findByConversation")(
       function* (channelId, conversationId) {
@@ -72,12 +71,12 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
               and(
                 inWorkspace,
                 eq(channelBindings.channelId, channelId),
-                eq(channelBindings.conversationId, conversationId),
-              ),
-            ),
-        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
+                eq(channelBindings.conversationId, conversationId)
+              )
+            )
+        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("ChannelBindingStore", "findByConversation")),
+      Effect.mapError(StoreError.failed("ChannelBindingStore", "findByConversation"))
     ),
     insert: Effect.fn("ChannelBindings.insert")(function* (record) {
       yield* guard(
@@ -88,14 +87,14 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
           groupId: record.groupId,
           conversationId: record.conversation.id,
           conversationDetails: record.conversation.details,
-          boundAt: DateTime.toDate(record.boundAt),
+          boundAt: DateTime.toDate(record.boundAt)
         }),
-        true,
-      ).pipe(Effect.mapError(storeError("ChannelBindingStore", "insert")));
-    }),
-  };
-  return ChannelBindingStore.make(workspaceId, driver);
-});
+        true
+      ).pipe(Effect.mapError(storeError("ChannelBindingStore", "insert")))
+    })
+  }
+  return ChannelBindingStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `ChannelBindingStore.ChannelBindingStore` over the caller's `Binding.Binding`.
@@ -103,4 +102,4 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ChannelBindingStore.ChannelBindingStore, make());
+export const layer = Layer.effect(ChannelBindingStore.ChannelBindingStore, make())

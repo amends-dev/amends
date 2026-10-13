@@ -6,14 +6,15 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as ThreadId from "./ThreadId.ts";
-import * as ThreadParticipationId from "./ThreadParticipationId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as GroupMembership from "../group/GroupMembership.ts";
-import * as Identity from "../identity/Identity.ts";
-import * as Notification from "../notification/Notification.ts";
+
+import * as Schema from "effect/Schema"
+import * as GroupMembership from "../group/GroupMembership.ts"
+import * as Identity from "../identity/Identity.ts"
+import * as Notification from "../notification/Notification.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as ThreadId from "./ThreadId.ts"
+import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 
 /**
  * Names a participation; `ThreadParticipationId.Id`, where models that only refer to
@@ -22,13 +23,13 @@ import * as Notification from "../notification/Notification.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = ThreadParticipationId.Id;
+export const Id = ThreadParticipationId.Id
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = ThreadParticipationId.Id;
+export type Id = ThreadParticipationId.Id
 
 /**
  * Who takes part. Members participate through their current group admission, and carry the
@@ -41,17 +42,17 @@ export const Participant = Schema.TaggedUnion({
   Member: {
     memberId: MemberId.Id,
     groupMembershipId: GroupMembership.Id,
-    identity: Identity.MemberReference,
+    identity: Identity.MemberReference
   },
   Contact: { contactId: Identity.ContactId },
-  Triage: {},
-});
+  Triage: {}
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Participant = typeof Participant.Type;
+export type Participant = typeof Participant.Type
 
 /**
  * The notification recipient that a participant routes to.
@@ -61,11 +62,10 @@ export type Participant = typeof Participant.Type;
  */
 export const recipientOf = (participant: Participant): Notification.Recipient =>
   Participant.match(participant, {
-    Member: ({ memberId, identity }): Notification.Recipient =>
-      Notification.ofMember(memberId, identity),
+    Member: ({ memberId, identity }): Notification.Recipient => Notification.ofMember(memberId, identity),
     Contact: ({ contactId }): Notification.Recipient => ({ _tag: "Contact", id: contactId }),
-    Triage: (): Notification.Recipient => ({ _tag: "Triage" }),
-  });
+    Triage: (): Notification.Recipient => ({ _tag: "Triage" })
+  })
 
 /**
  * The key under which a participant is unique in a thread: a member, a contact, or the thread's
@@ -79,7 +79,7 @@ export const keyOf = (participant: Participant | Reference): string =>
     ? `Member:${participant.memberId}`
     : Reference.isAnyOf(["Contact"])(participant)
       ? `Contact:${participant.contactId}`
-      : "Triage";
+      : "Triage"
 
 /**
  * One participant's spell of taking part in a thread: from the position they joined at, which
@@ -96,14 +96,14 @@ export const ThreadParticipation = Schema.Struct({
   joinedAt: Schema.DateTimeUtcFromString,
   joinedAtSequence: Schema.Int.check(Schema.isGreaterThan(0)),
   status: Schema.Literals(["active", "ended"]),
-  endedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  endedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
 }).check(
   Schema.makeFilter(
     (record) =>
       (record.status === "active" ? record.endedAt === null : record.endedAt !== null) ||
-      "Participation status and departure time must agree",
-  ),
-);
+      "Participation status and departure time must agree"
+  )
+)
 
 /**
  * @category schemas
@@ -121,8 +121,8 @@ export interface ThreadParticipation extends Schema.Schema.Type<typeof ThreadPar
 export const Admission = Schema.Struct({
   ...ThreadParticipation.fields,
   status: Schema.Literal("active"),
-  endedAt: Schema.Null,
-});
+  endedAt: Schema.Null
+})
 
 /**
  * A participant without routing identities or admission linkage: the public view of who takes
@@ -134,14 +134,14 @@ export const Admission = Schema.Struct({
 export const Reference = Schema.TaggedUnion({
   Member: { memberId: MemberId.Id },
   Contact: { contactId: Identity.ContactId },
-  Triage: {},
-});
+  Triage: {}
+})
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Reference = typeof Reference.Type;
+export type Reference = typeof Reference.Type
 
 /**
  * The member behind a participant or its reference, when it is one.
@@ -150,7 +150,7 @@ export type Reference = typeof Reference.Type;
  * @since 0.1.0
  */
 export const memberOf = (participant: Participant | Reference): MemberId.Id | undefined =>
-  Reference.isAnyOf(["Member"])(participant) ? participant.memberId : undefined;
+  Reference.isAnyOf(["Member"])(participant) ? participant.memberId : undefined
 
 /**
  * A participant's public reference.
@@ -162,8 +162,8 @@ export const referenceOf = (participant: Participant): Reference =>
   Participant.match(participant, {
     Member: ({ memberId }): Reference => ({ _tag: "Member", memberId }),
     Contact: ({ contactId }): Reference => ({ _tag: "Contact", contactId }),
-    Triage: (): Reference => ({ _tag: "Triage" }),
-  });
+    Triage: (): Reference => ({ _tag: "Triage" })
+  })
 
 /**
  * One page of current participants in binary participation-ID order: at most `limit`, after the
@@ -174,8 +174,8 @@ export const referenceOf = (participant: Participant): Reference =>
  */
 export const ListOptions = Schema.Struct({
   after: Schema.optionalKey(Id),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -196,8 +196,8 @@ export const Summary = Schema.Struct({
   threadId: ThreadId.Id,
   participant: Reference,
   joinedAt: ThreadParticipation.fields.joinedAt,
-  joinedAtSequence: ThreadParticipation.fields.joinedAtSequence,
-});
+  joinedAtSequence: ThreadParticipation.fields.joinedAtSequence
+})
 
 /**
  * @category schemas
@@ -217,8 +217,8 @@ export const toSummary = (record: ThreadParticipation): Summary => ({
   threadId: record.threadId,
   participant: referenceOf(record.participant),
   joinedAt: record.joinedAt,
-  joinedAtSequence: record.joinedAtSequence,
-});
+  joinedAtSequence: record.joinedAtSequence
+})
 
 /**
  * The participation to end: the actor's own, in the thread named.
@@ -226,7 +226,7 @@ export const toSummary = (record: ThreadParticipation): Summary => ({
  * @category options
  * @since 0.1.0
  */
-export const UnfollowInput = Schema.Struct({ threadId: ThreadId.Id, participationId: Id });
+export const UnfollowInput = Schema.Struct({ threadId: ThreadId.Id, participationId: Id })
 
 /**
  * @category options
@@ -243,8 +243,8 @@ export interface UnfollowInput extends Schema.Schema.Type<typeof UnfollowInput> 
  */
 export const Departure = Schema.Struct({
   workspaceId: WorkspaceId.Id,
-  ...UnfollowInput.fields,
-});
+  ...UnfollowInput.fields
+})
 
 /**
  * @category schemas
@@ -259,15 +259,10 @@ export interface Departure extends Schema.Schema.Type<typeof Departure> {}
  * @category schemas
  * @since 0.1.0
  */
-export const EndReason = Schema.Literals([
-  "unfollowed",
-  "group-left",
-  "group-removed",
-  "workspace-removed",
-]);
+export const EndReason = Schema.Literals(["unfollowed", "group-left", "group-removed", "workspace-removed"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type EndReason = typeof EndReason.Type;
+export type EndReason = typeof EndReason.Type

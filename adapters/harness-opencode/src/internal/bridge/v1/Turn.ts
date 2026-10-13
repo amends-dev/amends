@@ -16,9 +16,10 @@
  * reports the turn's tokens, and the reason its last step ended, or `error` for a turn that failed
  * or took no step.
  */
-import type { StreamPart } from "@amends-dev/harness";
-import type * as Response from "effect/ai/Response";
-import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts";
+
+import type { StreamPart } from "@amends-dev/harness"
+import type * as Response from "effect/ai/Response"
+import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts"
 import {
   type AssistantMessage,
   type Failure,
@@ -27,81 +28,81 @@ import {
   isToolPart,
   type Part,
   type SessionEvent,
-  type ToolPart,
-} from "./Event.ts";
+  type ToolPart
+} from "./Event.ts"
 
 /** A step of the turn: an assistant message that started during it. */
 interface Step {
   /** Whether the step summarizes the conversation, rather than answering. */
-  readonly summary: boolean;
+  readonly summary: boolean
 
-  readonly completed: boolean;
+  readonly completed: boolean
 
   /** The texts of a summary, by part, which its compaction holds once it completes. */
-  readonly summaryTexts: ReadonlyMap<string, string>;
+  readonly summaryTexts: ReadonlyMap<string, string>
 }
 
 /** A text or a reasoning the turn is streaming. */
 interface Writing {
-  readonly kind: "text" | "reasoning";
-  readonly messageID: string;
+  readonly kind: "text" | "reasoning"
+  readonly messageID: string
 
   /** What the turn has streamed of it. */
-  readonly written: string;
-  readonly ended: boolean;
+  readonly written: string
+  readonly ended: boolean
 }
 
 /** A call of one of opencode's own tools, and how much of it the turn has streamed. */
 interface Call {
-  readonly name: string;
-  readonly called: boolean;
-  readonly answered: boolean;
+  readonly name: string
+  readonly called: boolean
+  readonly answered: boolean
 }
 
 /** What a turn has done so far, as its events told. */
 export interface Turn {
   /** The opencode session the turn runs in. */
-  readonly sessionID: string;
+  readonly sessionID: string
 
   /** The directory the session works in, which the paths of the files it changes are within. */
-  readonly directory: string;
+  readonly directory: string
 
   /** The names opencode gives the host's tools, whose calls the relay streams instead. */
-  readonly hostTools: ReadonlySet<string>;
+  readonly hostTools: ReadonlySet<string>
 
   /** Whether opencode started working on the turn. */
-  readonly started: boolean;
+  readonly started: boolean
 
   /** The turn's steps, by message id. */
-  readonly steps: ReadonlyMap<string, Step>;
+  readonly steps: ReadonlyMap<string, Step>
 
   /** The texts and reasonings of the turn's steps, by part id. */
-  readonly writing: ReadonlyMap<string, Writing>;
+  readonly writing: ReadonlyMap<string, Writing>
 
   /** The calls of opencode's own tools, by call id. */
-  readonly calls: ReadonlyMap<string, Call>;
+  readonly calls: ReadonlyMap<string, Call>
 
   /** The tokens of the turn's completed steps, together. */
-  readonly tokens: Tokens;
+  readonly tokens: Tokens
 
   /** Why the turn's last completed step ended, before any step has. */
-  readonly reason: Response.FinishReason | undefined;
+  readonly reason: Response.FinishReason | undefined
 
   /** Whether a step streamed an `error` part. */
-  readonly failedStep: boolean;
+  readonly failedStep: boolean
 
   /** What opencode reported when the turn failed, apart from any step. */
-  readonly failure: Failure | undefined;
+  readonly failure: Failure | undefined
 
   /** Whether the turn streamed its `finish` part. Events after it stream nothing. */
-  readonly finished: boolean;
+  readonly finished: boolean
 }
 
 /** A turn in the session `sessionID`, working in `directory`, before any of its events. */
 export const initial = (options: {
-  readonly sessionID: string;
-  readonly directory: string;
-  readonly hostTools: ReadonlySet<string>;
+  readonly sessionID: string
+  readonly directory: string
+  readonly hostTools: ReadonlySet<string>
 }): Turn => ({
   ...options,
   started: false,
@@ -112,85 +113,78 @@ export const initial = (options: {
   reason: undefined,
   failedStep: false,
   failure: undefined,
-  finished: false,
-});
+  finished: false
+})
 
 /** The tools opencode answers in JSON and asks questions with, which no turn streams. */
-const hiddenTools = new Set(["StructuredOutput", "question"]);
+const hiddenTools = new Set(["StructuredOutput", "question"])
 
 /** The failure opencode reports when a turn is aborted, which ends the turn without an error. */
-const aborted = "MessageAbortedError";
+const aborted = "MessageAbortedError"
 
-type Translated = readonly [Turn, ReadonlyArray<StreamPart.StreamPart>];
+type Translated = readonly [Turn, ReadonlyArray<StreamPart.StreamPart>]
 
 /** The turn after the next event of its directory, and the parts that event streams. */
 export const translate = (turn: Turn, event: SessionEvent): Translated => {
-  if (turn.finished) return [turn, []];
+  if (turn.finished) return [turn, []]
   switch (event.type) {
     case "message.updated": {
-      const { info } = event.properties;
-      if (info.sessionID !== turn.sessionID || info.role !== "assistant") return [turn, []];
-      return messageUpdated(turn, info);
+      const { info } = event.properties
+      if (info.sessionID !== turn.sessionID || info.role !== "assistant") return [turn, []]
+      return messageUpdated(turn, info)
     }
 
     case "message.part.updated": {
-      const { part } = event.properties;
-      const step = turn.steps.get(part.messageID);
-      if (part.sessionID !== turn.sessionID || step === undefined) return [turn, []];
-      return step.summary ? [summaryPartUpdated(turn, step, part), []] : partUpdated(turn, part);
+      const { part } = event.properties
+      const step = turn.steps.get(part.messageID)
+      if (part.sessionID !== turn.sessionID || step === undefined) return [turn, []]
+      return step.summary ? [summaryPartUpdated(turn, step, part), []] : partUpdated(turn, part)
     }
 
     case "message.part.delta": {
-      const { sessionID, partID, field, delta } = event.properties;
-      const writing = turn.writing.get(partID);
+      const { sessionID, partID, field, delta } = event.properties
+      const writing = turn.writing.get(partID)
       if (sessionID !== turn.sessionID || field !== "text" || writing === undefined) {
-        return [turn, []];
+        return [turn, []]
       }
-      if (writing.ended) return [turn, []];
+      if (writing.ended) return [turn, []]
       return [
         {
           ...turn,
           writing: withEntry(turn.writing, partID, {
             ...writing,
-            written: writing.written + delta,
-          }),
+            written: writing.written + delta
+          })
         },
-        [{ type: `${writing.kind}-delta`, id: partID, delta }],
-      ];
+        [{ type: `${writing.kind}-delta`, id: partID, delta }]
+      ]
     }
 
     case "session.status": {
-      const { sessionID, status } = event.properties;
-      return sessionID === turn.sessionID && status.type !== "idle"
-        ? [{ ...turn, started: true }, []]
-        : [turn, []];
+      const { sessionID, status } = event.properties
+      return sessionID === turn.sessionID && status.type !== "idle" ? [{ ...turn, started: true }, []] : [turn, []]
     }
 
     case "session.error": {
-      const { sessionID, error } = event.properties;
+      const { sessionID, error } = event.properties
       if (sessionID !== turn.sessionID || error === undefined || error.name === aborted) {
-        return [turn, []];
+        return [turn, []]
       }
-      return [{ ...turn, failure: turn.failure ?? error }, []];
+      return [{ ...turn, failure: turn.failure ?? error }, []]
     }
 
     case "session.idle":
-      return event.properties.sessionID === turn.sessionID && turn.started
-        ? finish(turn)
-        : [turn, []];
+      return event.properties.sessionID === turn.sessionID && turn.started ? finish(turn) : [turn, []]
 
     case "permission.asked": {
-      const { id, tool } = event.properties;
-      return [
-        turn,
-        [{ type: "tool-approval-request", approvalId: id, toolCallId: tool?.callID ?? id }],
-      ];
+      const { id, tool } = event.properties
+      return [turn, [{ type: "tool-approval-request", approvalId: id, toolCallId: tool?.callID ?? id }]]
     }
 
     case "question.asked":
-      return [turn, []];
+      return [turn, []]
   }
-};
+}
 
 /**
  * A step starting, as a message that starts during the turn, or completing: it ends the step with
@@ -198,17 +192,17 @@ export const translate = (turn: Turn, event: SessionEvent): Translated => {
  * the `compaction` it made.
  */
 const messageUpdated = (turn: Turn, info: AssistantMessage): Translated => {
-  const step = turn.steps.get(info.id);
-  const completed = info.time.completed !== undefined;
+  const step = turn.steps.get(info.id)
+  const completed = info.time.completed !== undefined
   if (step === undefined) {
     // A message completed when the turn first sees it is an earlier turn's.
-    if (completed) return [turn, []];
+    if (completed) return [turn, []]
     const started: Step = {
       summary: info.summary === true,
       completed: false,
-      summaryTexts: new Map(),
-    };
-    const steps = withEntry(turn.steps, info.id, started);
+      summaryTexts: new Map()
+    }
+    const steps = withEntry(turn.steps, info.id, started)
     return [
       { ...turn, steps },
       started.summary
@@ -218,13 +212,13 @@ const messageUpdated = (turn: Turn, info: AssistantMessage): Translated => {
               type: "response-metadata",
               id: info.id,
               modelId: `${info.providerID}/${info.modelID}`,
-              timestamp: new Date(info.time.created).toISOString(),
-            },
-          ],
-    ];
+              timestamp: new Date(info.time.created).toISOString()
+            }
+          ]
+    ]
   }
-  if (!completed || step.completed) return [turn, []];
-  const steps = withEntry(turn.steps, info.id, { ...step, completed: true });
+  if (!completed || step.completed) return [turn, []]
+  const steps = withEntry(turn.steps, info.id, { ...step, completed: true })
   if (step.summary) {
     return [
       { ...turn, steps },
@@ -233,38 +227,38 @@ const messageUpdated = (turn: Turn, info: AssistantMessage): Translated => {
             {
               type: "compaction",
               trigger: "auto",
-              summary: [...step.summaryTexts.values()].join("\n"),
-            },
+              summary: [...step.summaryTexts.values()].join("\n")
+            }
           ]
-        : [],
-    ];
+        : []
+    ]
   }
 
-  const parts: Array<StreamPart.StreamPart> = [];
-  const writing = new Map(turn.writing);
+  const parts: Array<StreamPart.StreamPart> = []
+  const writing = new Map(turn.writing)
   for (const [id, open] of turn.writing) {
     if (open.messageID === info.id && !open.ended) {
-      parts.push({ type: `${open.kind}-end`, id });
-      writing.set(id, { ...open, ended: true });
+      parts.push({ type: `${open.kind}-end`, id })
+      writing.set(id, { ...open, ended: true })
     }
   }
   if (info.structured !== undefined) {
-    const id = `${info.id}-answer`;
+    const id = `${info.id}-answer`
     parts.push(
       { type: "text-start", id },
       { type: "text-delta", id, delta: JSON.stringify(info.structured) },
-      { type: "text-end", id },
-    );
+      { type: "text-end", id }
+    )
   }
-  const failed = info.error !== undefined && info.error.name !== aborted;
-  if (failed) parts.push({ type: "error", error: info.error });
+  const failed = info.error !== undefined && info.error.name !== aborted
+  if (failed) parts.push({ type: "error", error: info.error })
   const reason: Response.FinishReason = failed
     ? "error"
     : info.structured !== undefined
       ? "stop"
-      : finishReasonOf(info.finish ?? "other");
-  const tokens = info.tokens ?? noTokens;
-  parts.push({ type: "finish-step", reason, usage: usageOf(tokens) });
+      : finishReasonOf(info.finish ?? "other")
+  const tokens = info.tokens ?? noTokens
+  parts.push({ type: "finish-step", reason, usage: usageOf(tokens) })
   return [
     {
       ...turn,
@@ -272,11 +266,11 @@ const messageUpdated = (turn: Turn, info: AssistantMessage): Translated => {
       writing,
       tokens: addTokens(turn.tokens, tokens),
       reason,
-      failedStep: turn.failedStep || failed,
+      failedStep: turn.failedStep || failed
     },
-    parts,
-  ];
-};
+    parts
+  ]
+}
 
 /** A part of a summary changing: the summary keeps its texts, which no part streams. */
 const summaryPartUpdated = (turn: Turn, step: Step, part: Part): Turn =>
@@ -285,19 +279,19 @@ const summaryPartUpdated = (turn: Turn, step: Step, part: Part): Turn =>
         ...turn,
         steps: withEntry(turn.steps, part.messageID, {
           ...step,
-          summaryTexts: withEntry(step.summaryTexts, part.id, part.text),
-        }),
+          summaryTexts: withEntry(step.summaryTexts, part.id, part.text)
+        })
       }
-    : turn;
+    : turn
 
 /** A part of a step changing: a text or a reasoning written on, or a call of a tool going on. */
 const partUpdated = (turn: Turn, part: Part): Translated => {
-  if (isTextPart(part) || isReasoningPart(part)) return writingUpdated(turn, part.type, part);
+  if (isTextPart(part) || isReasoningPart(part)) return writingUpdated(turn, part.type, part)
   if (isToolPart(part) && !turn.hostTools.has(part.tool) && !hiddenTools.has(part.tool)) {
-    return callUpdated(turn, part);
+    return callUpdated(turn, part)
   }
-  return [turn, []];
-};
+  return [turn, []]
+}
 
 /**
  * A text or a reasoning written on: started the first time the turn sees it, then written on with
@@ -307,31 +301,31 @@ const writingUpdated = (
   turn: Turn,
   kind: Writing["kind"],
   part: {
-    readonly id: string;
-    readonly messageID: string;
-    readonly text: string;
-    readonly time?: { readonly end?: number | undefined } | undefined;
-  },
+    readonly id: string
+    readonly messageID: string
+    readonly text: string
+    readonly time?: { readonly end?: number | undefined } | undefined
+  }
 ): Translated => {
-  const parts: Array<StreamPart.StreamPart> = [];
-  const known = turn.writing.get(part.id);
-  if (known?.ended === true) return [turn, []];
-  if (known === undefined) parts.push({ type: `${kind}-start`, id: part.id });
-  const written = known?.written ?? "";
+  const parts: Array<StreamPart.StreamPart> = []
+  const known = turn.writing.get(part.id)
+  if (known?.ended === true) return [turn, []]
+  if (known === undefined) parts.push({ type: `${kind}-start`, id: part.id })
+  const written = known?.written ?? ""
   // A part's whole text follows the deltas streamed of it; what they missed streams now.
   if (part.text.length > written.length && part.text.startsWith(written)) {
-    parts.push({ type: `${kind}-delta`, id: part.id, delta: part.text.slice(written.length) });
+    parts.push({ type: `${kind}-delta`, id: part.id, delta: part.text.slice(written.length) })
   }
-  const ended = part.time?.end !== undefined;
-  if (ended) parts.push({ type: `${kind}-end`, id: part.id });
+  const ended = part.time?.end !== undefined
+  if (ended) parts.push({ type: `${kind}-end`, id: part.id })
   const writing: Writing = {
     kind,
     messageID: part.messageID,
     written: part.text.startsWith(written) ? part.text : written,
-    ended,
-  };
-  return [{ ...turn, writing: withEntry(turn.writing, part.id, writing) }, parts];
-};
+    ended
+  }
+  return [{ ...turn, writing: withEntry(turn.writing, part.id, writing) }, parts]
+}
 
 /**
  * A call of one of opencode's own tools going on: its input starts once the model writes it, and
@@ -339,23 +333,23 @@ const writingUpdated = (
  * with the file a write or an edit changed.
  */
 const callUpdated = (turn: Turn, part: ToolPart): Translated => {
-  const { callID, tool: name, state } = part;
-  const parts: Array<StreamPart.StreamPart> = [];
-  const call = turn.calls.get(callID) ?? { name, called: false, answered: false };
+  const { callID, tool: name, state } = part
+  const parts: Array<StreamPart.StreamPart> = []
+  const call = turn.calls.get(callID) ?? { name, called: false, answered: false }
   if (!turn.calls.has(callID)) {
-    parts.push({ type: "tool-params-start", id: callID, name, providerExecuted: true });
+    parts.push({ type: "tool-params-start", id: callID, name, providerExecuted: true })
   }
   if (state.status === "pending") {
-    return [{ ...turn, calls: withEntry(turn.calls, callID, call) }, parts];
+    return [{ ...turn, calls: withEntry(turn.calls, callID, call) }, parts]
   }
   if (!call.called) {
     parts.push(
       { type: "tool-params-delta", id: callID, delta: JSON.stringify(state.input) },
       { type: "tool-params-end", id: callID },
-      { type: "tool-call", id: callID, name, params: state.input, providerExecuted: true },
-    );
+      { type: "tool-call", id: callID, name, params: state.input, providerExecuted: true }
+    )
   }
-  const answered = state.status === "completed" || state.status === "error";
+  const answered = state.status === "completed" || state.status === "error"
   if (answered && !call.answered) {
     parts.push({
       type: "tool-result",
@@ -364,15 +358,12 @@ const callUpdated = (turn: Turn, part: ToolPart): Translated => {
       ...(state.status === "completed"
         ? { result: state.output, isFailure: false }
         : { result: state.error, isFailure: true }),
-      providerExecuted: true,
-    });
-    if (state.status === "completed") parts.push(...fileChangesOf(turn.directory, name, state));
+      providerExecuted: true
+    })
+    if (state.status === "completed") parts.push(...fileChangesOf(turn.directory, name, state))
   }
-  return [
-    { ...turn, calls: withEntry(turn.calls, callID, { name, called: true, answered }) },
-    parts,
-  ];
-};
+  return [{ ...turn, calls: withEntry(turn.calls, callID, { name, called: true, answered }) }, parts]
+}
 
 /**
  * The file a completed call of `write` or `edit` changed, by its path within `directory`, or as it
@@ -383,48 +374,47 @@ const fileChangesOf = (
   directory: string,
   tool: string,
   state: {
-    readonly input: Readonly<Record<string, unknown>>;
-    readonly metadata?: Readonly<Record<string, unknown>> | undefined;
-  },
+    readonly input: Readonly<Record<string, unknown>>
+    readonly metadata?: Readonly<Record<string, unknown>> | undefined
+  }
 ): ReadonlyArray<StreamPart.StreamPart> => {
-  const file = state.metadata?.["filepath"] ?? state.input["filePath"];
-  if (typeof file !== "string") return [];
-  const path = file.startsWith(`${directory}/`) ? file.slice(directory.length + 1) : file;
+  const file = state.metadata?.["filepath"] ?? state.input["filePath"]
+  if (typeof file !== "string") return []
+  const path = file.startsWith(`${directory}/`) ? file.slice(directory.length + 1) : file
   switch (tool) {
     case "write":
       return [
         {
           type: "file-change",
           event: state.metadata?.["exists"] === false ? "create" : "modify",
-          path,
-        },
-      ];
+          path
+        }
+      ]
     case "edit":
-      return [{ type: "file-change", event: "modify", path }];
+      return [{ type: "file-change", event: "modify", path }]
     default:
-      return [];
+      return []
   }
-};
+}
 
 /**
  * Finishes the turn: with what opencode reported when it failed apart from any step, or for a turn
  * that took no step, then `finish`.
  */
 const finish = (turn: Turn): Translated => {
-  const parts: Array<StreamPart.StreamPart> = [];
+  const parts: Array<StreamPart.StreamPart> = []
   const failure =
     turn.failure ??
     (turn.reason === undefined
       ? { name: "UnknownError", data: { message: "opencode ended the turn without a step" } }
-      : undefined);
-  if (failure !== undefined && !turn.failedStep) parts.push({ type: "error", error: failure });
+      : undefined)
+  if (failure !== undefined && !turn.failedStep) parts.push({ type: "error", error: failure })
   parts.push({
     type: "finish",
     reason: failure !== undefined || turn.failedStep ? "error" : (turn.reason ?? "other"),
-    usage: usageOf(turn.tokens),
-  });
-  return [{ ...turn, finished: true }, parts];
-};
+    usage: usageOf(turn.tokens)
+  })
+  return [{ ...turn, finished: true }, parts]
+}
 
-const withEntry = <K, V>(map: ReadonlyMap<K, V>, key: K, value: V): ReadonlyMap<K, V> =>
-  new Map(map).set(key, value);
+const withEntry = <K, V>(map: ReadonlyMap<K, V>, key: K, value: V): ReadonlyMap<K, V> => new Map(map).set(key, value)

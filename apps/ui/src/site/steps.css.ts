@@ -1,6 +1,6 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../foundations/theme/vars.css.ts";
-import { fontWeight, monoFamily, typeScale } from "../foundations/typography/tokens.ts";
+import { style } from "@vanilla-extract/css"
+import { vars } from "../foundations/theme/vars.css.ts"
+import { fontWeight, monoFamily, typeScale } from "../foundations/typography/tokens.ts"
 
 export const steps = style({
   display: "grid",
@@ -8,8 +8,8 @@ export const steps = style({
   margin: 0,
   padding: 0,
   listStyle: "none",
-  counterReset: "step",
-});
+  counterReset: "step"
+})
 
 export const step = style({
   display: "grid",
@@ -29,15 +29,15 @@ export const step = style({
     border: `1px solid ${vars.color.border.default}`,
     backgroundColor: vars.color.surface.panel,
     fontFamily: monoFamily,
-    color: vars.color.text.primary,
-  },
-});
+    color: vars.color.text.primary
+  }
+})
 
 export const title = style({
   ...typeScale.title,
   margin: 0,
   fontWeight: fontWeight.semibold,
-  color: vars.color.text.primary,
-});
+  color: vars.color.text.primary
+})
 
-export const text = style({ ...typeScale.body, margin: 0, color: vars.color.text.secondary });
+export const text = style({ ...typeScale.body, margin: 0, color: vars.color.text.secondary })

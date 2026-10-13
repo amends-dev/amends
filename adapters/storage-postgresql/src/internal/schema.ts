@@ -8,7 +8,8 @@
  * order, and core checks references when it publishes the facts they come from. The log's own
  * tables keep theirs.
  */
-import { sql } from "drizzle-orm";
+
+import { sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
   boolean,
@@ -23,44 +24,31 @@ import {
   primaryKey,
   text,
   timestamp,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+  uniqueIndex
+} from "drizzle-orm/pg-core"
 
 /** Drizzle types bytea as Buffer; core keeps payloads as Uint8Array and the client encodes them as such. */
 const bytes = customType<{ data: Uint8Array; driverData: Uint8Array }>({
-  dataType: () => "bytea",
-});
-const instant = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+  dataType: () => "bytea"
+})
+const instant = (name: string) => timestamp(name, { withTimezone: true, mode: "date" })
 
-export const memberIdentityKinds = ["Human", "Agent"] as const;
-export const identityKinds = [...memberIdentityKinds, "Contact"] as const;
-export const recipientKinds = [...identityKinds, "Triage"] as const;
-export const memberStatuses = ["active", "removed"] as const;
-export const groupKinds = ["Team", "Direct"] as const;
-export const participantKinds = ["Member", "Contact", "Triage"] as const;
-export const taskStatuses = ["triage", "todo", "doing", "held", "done", "dismissed"] as const;
-export const taskPriorities = ["none", "low", "medium", "high", "urgent"] as const;
-export const assignmentStatuses = ["active", "revoked"] as const;
-export const sourceKinds = ["Role", "Direct"] as const;
-export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = [
-  "Workspace",
-  "Member",
-  "Thread",
-  "Group",
-  "Connection",
-  "Channel",
-] as const;
-export const deliveryStatuses = ["requested", "sent", "failed"] as const;
-export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
+export const memberIdentityKinds = ["Human", "Agent"] as const
+export const identityKinds = [...memberIdentityKinds, "Contact"] as const
+export const recipientKinds = [...identityKinds, "Triage"] as const
+export const memberStatuses = ["active", "removed"] as const
+export const groupKinds = ["Team", "Direct"] as const
+export const participantKinds = ["Member", "Contact", "Triage"] as const
+export const taskStatuses = ["triage", "todo", "doing", "held", "done", "dismissed"] as const
+export const taskPriorities = ["none", "low", "medium", "high", "urgent"] as const
+export const assignmentStatuses = ["active", "revoked"] as const
+export const sourceKinds = ["Role", "Direct"] as const
+export const scopeKinds = ["Workspace", "Target"] as const
+export const targetKinds = ["Workspace", "Member", "Thread", "Group", "Connection", "Channel"] as const
+export const deliveryStatuses = ["requested", "sent", "failed"] as const
+export const invitationStates = ["Pending", "Accepted", "Revoked"] as const
 /** A notification's state; a human recipient's Seen is also kept in notification_seen. */
-export const notificationStates = [
-  "Pending",
-  "Seen",
-  "Accepted",
-  "Discarded",
-  "Informational",
-] as const;
+export const notificationStates = ["Pending", "Seen", "Accepted", "Discarded", "Informational"] as const
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
 const scopeColumns = {
@@ -70,43 +58,42 @@ const scopeColumns = {
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
   targetConnectionId: text("target_connection_id"),
-  targetChannelId: text("target_channel_id"),
-};
+  targetChannelId: text("target_channel_id")
+}
 /** The column holding each kind of target's ID; a workspace target needs none. */
 const targetIds = {
   Member: "targetMemberId",
   Thread: "targetThreadId",
   Group: "targetGroupId",
   Connection: "targetConnectionId",
-  Channel: "targetChannelId",
-} as const;
+  Channel: "targetChannelId"
+} as const
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
   /** Only the named target ID column is set, or none. */
   const only = (kept?: (typeof targetIds)[keyof typeof targetIds]) =>
     sql.join(
       Object.values(targetIds).map((column) =>
-        column === kept ? sql`${columns[column]} IS NOT NULL` : sql`${columns[column]} IS NULL`,
+        column === kept ? sql`${columns[column]} IS NOT NULL` : sql`${columns[column]} IS NULL`
       ),
-      sql` AND `,
-    );
+      sql` AND `
+    )
   return check(
     name,
     sql`(${columns.scopeKind} = 'Workspace' AND ${columns.targetKind} IS NULL AND ${only()}) OR (${columns.scopeKind} = 'Target' AND ${columns.targetKind} IS NOT NULL AND ((${columns.targetKind} = 'Workspace' AND ${only()}) OR ${sql.join(
       Object.entries(targetIds).map(
-        ([kind, column]) =>
-          sql`(${columns.targetKind} = ${sql.raw(`'${kind}'`)} AND ${only(column)})`,
+        ([kind, column]) => sql`(${columns.targetKind} = ${sql.raw(`'${kind}'`)} AND ${only(column)})`
       ),
-      sql` OR `,
-    )}))`,
-  );
-};
+      sql` OR `
+    )}))`
+  )
+}
 
 export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
   workspaceId: text("workspace_id").primaryKey(),
   createdBy: text("created_by").notNull(),
-  ownerMemberId: text("owner_member_id").notNull(),
-});
+  ownerMemberId: text("owner_member_id").notNull()
+})
 
 export const members = pgTable(
   "members",
@@ -117,7 +104,7 @@ export const members = pgTable(
     identityId: text("identity_id").notNull(),
     // What the member is called in this workspace.
     name: text("name").notNull(),
-    status: text("status", { enum: memberStatuses }).notNull(),
+    status: text("status", { enum: memberStatuses }).notNull()
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
@@ -126,14 +113,9 @@ export const members = pgTable(
       .on(table.workspaceId, table.identityKind, table.identityId)
       .where(sql`${table.status} = 'active'`),
     // Directory reads cross workspaces, so this leads with the identity rather than the workspace.
-    index("members_by_identity").on(
-      table.identityKind,
-      table.identityId,
-      table.workspaceId,
-      table.id,
-    ),
-  ],
-);
+    index("members_by_identity").on(table.identityKind, table.identityId, table.workspaceId, table.id)
+  ]
+)
 
 export const groups = pgTable(
   "groups",
@@ -149,13 +131,13 @@ export const groups = pgTable(
     createdBy: text("created_by").notNull(),
     createdAt: instant("created_at").notNull(),
     // When any of the group's threads last had content activity.
-    latestActivityAt: instant("latest_activity_at"),
+    latestActivityAt: instant("latest_activity_at")
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
     check(
       "groups_kind",
-      sql`(${table.kind} = 'Team' AND ${table.visibility} IN ('Private', 'Public') AND ${table.name} IS NOT NULL AND ${table.memberIds} IS NULL AND ${table.directKey} IS NULL) OR (${table.kind} = 'Direct' AND ${table.visibility} IS NULL AND ${table.name} IS NULL AND cardinality(${table.memberIds}) >= 2 AND ${table.directKey} IS NOT NULL)`,
+      sql`(${table.kind} = 'Team' AND ${table.visibility} IN ('Private', 'Public') AND ${table.name} IS NOT NULL AND ${table.memberIds} IS NULL AND ${table.directKey} IS NULL) OR (${table.kind} = 'Direct' AND ${table.visibility} IS NULL AND ${table.name} IS NULL AND cardinality(${table.memberIds}) >= 2 AND ${table.directKey} IS NOT NULL)`
     ),
     // The workspace's public groups, paged in group-ID order for browsing.
     index("public_groups")
@@ -164,9 +146,9 @@ export const groups = pgTable(
     // One direct group per exact member set.
     uniqueIndex("direct_groups_by_members")
       .on(table.workspaceId, table.directKey)
-      .where(sql`${table.directKey} IS NOT NULL`),
-  ],
-);
+      .where(sql`${table.directKey} IS NOT NULL`)
+  ]
+)
 
 export const groupMemberships = pgTable(
   "group_memberships",
@@ -176,7 +158,7 @@ export const groupMemberships = pgTable(
     groupId: text("group_id").notNull(),
     memberId: text("member_id").notNull(),
     admittedAt: instant("admitted_at").notNull(),
-    status: text("status", { enum: memberStatuses }).notNull(),
+    status: text("status", { enum: memberStatuses }).notNull()
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
@@ -184,22 +166,14 @@ export const groupMemberships = pgTable(
     uniqueIndex("active_group_membership")
       .on(table.workspaceId, table.groupId, table.memberId)
       .where(sql`${table.status} = 'active'`),
-    index("group_memberships_by_group").on(
-      table.workspaceId,
-      table.groupId,
-      sql`${table.id} COLLATE "C"`,
-    ),
-    index("group_memberships_by_member").on(
-      table.workspaceId,
-      table.memberId,
-      sql`${table.id} COLLATE "C"`,
-    ),
+    index("group_memberships_by_group").on(table.workspaceId, table.groupId, sql`${table.id} COLLATE "C"`),
+    index("group_memberships_by_member").on(table.workspaceId, table.memberId, sql`${table.id} COLLATE "C"`),
     // A member's current groups, paged in group-ID order.
     index("active_group_memberships_by_member")
       .on(table.workspaceId, table.memberId, sql`${table.groupId} COLLATE "C"`)
-      .where(sql`${table.status} = 'active'`),
-  ],
-);
+      .where(sql`${table.status} = 'active'`)
+  ]
+)
 
 /** A follow belongs to one admission; each admission follows its group at most once at a time. */
 export const groupFollows = pgTable(
@@ -212,7 +186,7 @@ export const groupFollows = pgTable(
     groupMembershipId: text("group_membership_id").notNull(),
     followedAt: instant("followed_at").notNull(),
     status: text("status", { enum: ["active", "ended"] }).notNull(),
-    endedAt: instant("ended_at"),
+    endedAt: instant("ended_at")
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
@@ -222,10 +196,10 @@ export const groupFollows = pgTable(
     index("group_follows_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
     check(
       "group_follow_state",
-      sql`(${t.status} = 'active' AND ${t.endedAt} IS NULL) OR (${t.status} = 'ended' AND ${t.endedAt} IS NOT NULL)`,
-    ),
-  ],
-);
+      sql`(${t.status} = 'active' AND ${t.endedAt} IS NULL) OR (${t.status} = 'ended' AND ${t.endedAt} IS NOT NULL)`
+    )
+  ]
+)
 
 export const roles = pgTable(
   "roles",
@@ -233,20 +207,20 @@ export const roles = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     name: text("name").notNull(),
-    permissions: text("permissions").array().notNull(),
+    permissions: text("permissions").array().notNull()
   },
-  (table) => [primaryKey({ columns: [table.workspaceId, table.id] })],
-);
+  (table) => [primaryKey({ columns: [table.workspaceId, table.id] })]
+)
 
 /** The built-in bundle revision a workspace's roles hold, which only moves forward. */
 export const builtinRoleRevisions = pgTable(
   "builtin_role_revisions",
   {
     workspaceId: text("workspace_id").primaryKey(),
-    revision: integer("revision").notNull(),
+    revision: integer("revision").notNull()
   },
-  (table) => [check("builtin_role_revision_positive", sql`${table.revision} > 0`)],
-);
+  (table) => [check("builtin_role_revision_positive", sql`${table.revision} > 0`)]
+)
 
 export const assignments = pgTable(
   "assignments",
@@ -258,19 +232,19 @@ export const assignments = pgTable(
     sourceKind: text("source_kind", { enum: sourceKinds }).notNull(),
     roleId: text("role_id"),
     permission: text("permission"),
-    ...scopeColumns,
+    ...scopeColumns
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
     check(
       "assignments_source_agrees",
-      sql`(${table.sourceKind} = 'Role' AND ${table.roleId} IS NOT NULL AND ${table.permission} IS NULL) OR (${table.sourceKind} = 'Direct' AND ${table.permission} IS NOT NULL AND ${table.roleId} IS NULL)`,
+      sql`(${table.sourceKind} = 'Role' AND ${table.roleId} IS NOT NULL AND ${table.permission} IS NULL) OR (${table.sourceKind} = 'Direct' AND ${table.permission} IS NOT NULL AND ${table.roleId} IS NULL)`
     ),
     scopeAgrees("assignments_scope_agrees", table),
     index("assignments_by_member").on(table.workspaceId, table.memberId, table.status),
-    index("assignments_by_role").on(table.workspaceId, table.roleId, table.status),
-  ],
-);
+    index("assignments_by_role").on(table.workspaceId, table.roleId, table.status)
+  ]
+)
 
 export const invitations = pgTable(
   "invitations",
@@ -286,20 +260,20 @@ export const invitations = pgTable(
     acceptedMemberId: text("accepted_member_id"),
     acceptedAt: instant("accepted_at"),
     revokedByMemberId: text("revoked_by_member_id"),
-    revokedAt: instant("revoked_at"),
+    revokedAt: instant("revoked_at")
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
     check(
       "invitations_state_agrees",
-      sql`(${table.state} = 'Pending' AND ${table.acceptedMemberId} IS NULL AND ${table.acceptedAt} IS NULL AND ${table.revokedByMemberId} IS NULL AND ${table.revokedAt} IS NULL) OR (${table.state} = 'Accepted' AND ${table.acceptedMemberId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL AND ${table.revokedByMemberId} IS NULL AND ${table.revokedAt} IS NULL) OR (${table.state} = 'Revoked' AND ${table.revokedByMemberId} IS NOT NULL AND ${table.revokedAt} IS NOT NULL AND ${table.acceptedMemberId} IS NULL AND ${table.acceptedAt} IS NULL)`,
+      sql`(${table.state} = 'Pending' AND ${table.acceptedMemberId} IS NULL AND ${table.acceptedAt} IS NULL AND ${table.revokedByMemberId} IS NULL AND ${table.revokedAt} IS NULL) OR (${table.state} = 'Accepted' AND ${table.acceptedMemberId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL AND ${table.revokedByMemberId} IS NULL AND ${table.revokedAt} IS NULL) OR (${table.state} = 'Revoked' AND ${table.revokedByMemberId} IS NOT NULL AND ${table.revokedAt} IS NOT NULL AND ${table.acceptedMemberId} IS NULL AND ${table.acceptedAt} IS NULL)`
     ),
     index("invitations_by_recipient").on(table.workspaceId, table.recipientId, table.state),
     index("pending_invitations_by_recipient")
       .on(table.recipientId)
-      .where(sql`${table.state} = 'Pending'`),
-  ],
-);
+      .where(sql`${table.state} = 'Pending'`)
+  ]
+)
 
 export const notifications = pgTable(
   "notifications",
@@ -326,18 +300,18 @@ export const notifications = pgTable(
     // The thread, its group, and the timeline position of thread-activity notifications.
     threadId: text("thread_id"),
     threadGroupId: text("thread_group_id"),
-    threadSequence: integer("thread_sequence"),
+    threadSequence: integer("thread_sequence")
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
     // Each state holds its own columns and no other's.
     check(
       "notification_state",
-      sql`(${table.discardReason} IS NOT NULL) = (${table.state} = 'Discarded') AND (${table.acceptedByKind} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL) = (${table.state} = 'Accepted') AND (${table.acceptedByKind} IS NULL) = (${table.acceptedAt} IS NULL) AND (${table.acceptedTurnId} IS NOT NULL) = (${table.acceptedByKind} IS NOT DISTINCT FROM 'Turn') AND (${table.acceptedDeliveryId} IS NOT NULL) = (${table.acceptedByKind} IS NOT DISTINCT FROM 'Delivery') AND (${table.acceptedByKind} IS DISTINCT FROM 'Turn' OR ${table.recipientKind} = 'Agent') AND (${table.acceptedByKind} IS DISTINCT FROM 'Delivery' OR ${table.recipientKind} = 'Contact') AND (${table.seenAt} IS NOT NULL) = (${table.state} = 'Seen') AND (${table.state} <> 'Seen' OR ${table.recipientKind} = 'Human')`,
+      sql`(${table.discardReason} IS NOT NULL) = (${table.state} = 'Discarded') AND (${table.acceptedByKind} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL) = (${table.state} = 'Accepted') AND (${table.acceptedByKind} IS NULL) = (${table.acceptedAt} IS NULL) AND (${table.acceptedTurnId} IS NOT NULL) = (${table.acceptedByKind} IS NOT DISTINCT FROM 'Turn') AND (${table.acceptedDeliveryId} IS NOT NULL) = (${table.acceptedByKind} IS NOT DISTINCT FROM 'Delivery') AND (${table.acceptedByKind} IS DISTINCT FROM 'Turn' OR ${table.recipientKind} = 'Agent') AND (${table.acceptedByKind} IS DISTINCT FROM 'Delivery' OR ${table.recipientKind} = 'Contact') AND (${table.seenAt} IS NOT NULL) = (${table.state} = 'Seen') AND (${table.state} <> 'Seen' OR ${table.recipientKind} = 'Human')`
     ),
     check(
       "notification_recipient",
-      sql`CASE ${table.recipientKind} WHEN 'Triage' THEN ${table.recipientId} IS NULL AND ${table.recipientMemberId} IS NULL WHEN 'Contact' THEN ${table.recipientId} IS NOT NULL AND ${table.recipientMemberId} IS NULL ELSE ${table.recipientId} IS NOT NULL AND ${table.recipientMemberId} IS NOT NULL END`,
+      sql`CASE ${table.recipientKind} WHEN 'Triage' THEN ${table.recipientId} IS NULL AND ${table.recipientMemberId} IS NULL WHEN 'Contact' THEN ${table.recipientId} IS NOT NULL AND ${table.recipientMemberId} IS NULL ELSE ${table.recipientId} IS NOT NULL AND ${table.recipientMemberId} IS NOT NULL END`
     ),
     // Source existence and recipient selection belong to notification generation.
     uniqueIndex("notifications_by_source_recipient").on(
@@ -345,7 +319,7 @@ export const notifications = pgTable(
       table.sourceLogId,
       table.sourceEntryId,
       table.recipientKind,
-      sql`coalesce(${table.recipientId}, '')`,
+      sql`coalesce(${table.recipientId}, '')`
     ),
     // Inboxes: a membership's for people and agents, a contact's, or triage's.
     index("notifications_by_recipient").on(
@@ -353,7 +327,7 @@ export const notifications = pgTable(
       table.recipientKind,
       sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
       table.recordedAt,
-      sql`${table.id} COLLATE "C"`,
+      sql`${table.id} COLLATE "C"`
     ),
     index("pending_notifications_by_recipient")
       .on(
@@ -361,12 +335,12 @@ export const notifications = pgTable(
         table.recipientKind,
         sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
         table.recordedAt,
-        sql`${table.id} COLLATE "C"`,
+        sql`${table.id} COLLATE "C"`
       )
       .where(sql`${table.state} = 'Pending'`),
     check(
       "notification_thread",
-      sql`(${table.threadId} IS NULL AND ${table.threadGroupId} IS NULL AND ${table.threadSequence} IS NULL) OR (${table.threadId} IS NOT NULL AND ${table.threadGroupId} IS NOT NULL AND ${table.threadSequence} > 0)`,
+      sql`(${table.threadId} IS NULL AND ${table.threadGroupId} IS NULL AND ${table.threadSequence} IS NULL) OR (${table.threadId} IS NOT NULL AND ${table.threadGroupId} IS NOT NULL AND ${table.threadSequence} > 0)`
     ),
     // A reader's pending notifications per group, counted for their sidebar.
     index("pending_notifications_by_group")
@@ -374,7 +348,7 @@ export const notifications = pgTable(
         table.workspaceId,
         table.recipientKind,
         sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
-        table.threadGroupId,
+        table.threadGroupId
       )
       .where(sql`${table.state} = 'Pending'`),
     // A reader's notifications from one thread by position: what they were told there, and the
@@ -385,7 +359,7 @@ export const notifications = pgTable(
       sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
       table.threadId,
       table.threadSequence,
-      sql`${table.id} COLLATE "C"`,
+      sql`${table.id} COLLATE "C"`
     ),
     // An ended participation's pending agent input, settled in the commit that ends it.
     index("pending_agent_notifications_by_participation")
@@ -393,10 +367,10 @@ export const notifications = pgTable(
       .where(sql`${table.state} = 'Pending' AND ${table.recipientKind} = 'Agent'`),
     check(
       "notifications_recipient_kind",
-      sql`(${table.recipientKind} = 'Triage' AND ${table.recipientId} IS NULL) OR (${table.recipientKind} IN ('Human', 'Agent', 'Contact') AND ${table.recipientId} IS NOT NULL AND ${table.recipientId} <> '')`,
-    ),
-  ],
-);
+      sql`(${table.recipientKind} = 'Triage' AND ${table.recipientId} IS NULL) OR (${table.recipientKind} IN ('Human', 'Agent', 'Contact') AND ${table.recipientId} IS NOT NULL AND ${table.recipientId} <> '')`
+    )
+  ]
+)
 
 export const commits = pgTable(
   "commits",
@@ -404,10 +378,10 @@ export const commits = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     recordedAt: instant("recorded_at").notNull(),
-    entryCount: integer("entry_count").notNull(),
+    entryCount: integer("entry_count").notNull()
   },
-  (table) => [primaryKey({ columns: [table.workspaceId, table.id] })],
-);
+  (table) => [primaryKey({ columns: [table.workspaceId, table.id] })]
+)
 
 export const logBatches = pgTable(
   "log_batches",
@@ -415,7 +389,7 @@ export const logBatches = pgTable(
     workspaceId: text("workspace_id").notNull(),
     logId: text("log_id").notNull(),
     position: integer("position").notNull(),
-    commitId: text("commit_id").notNull(),
+    commitId: text("commit_id").notNull()
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.logId, table.position] }),
@@ -423,10 +397,10 @@ export const logBatches = pgTable(
     foreignKey({
       columns: [table.workspaceId, table.commitId],
       foreignColumns: [commits.workspaceId, commits.id],
-      name: "log_batches_commit",
-    }),
-  ],
-);
+      name: "log_batches_commit"
+    })
+  ]
+)
 
 export const logEntries = pgTable(
   "log_entries",
@@ -451,56 +425,34 @@ export const logEntries = pgTable(
     causeCommitId: text("cause_commit_id"),
     causeEntryId: text("cause_entry_id"),
     correlationId: text("correlation_id"),
-    occurredAt: instant("occurred_at"),
+    occurredAt: instant("occurred_at")
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    uniqueIndex("log_entries_by_position").on(
-      table.workspaceId,
-      table.logId,
-      table.position,
-      table.entryIndex,
-    ),
+    uniqueIndex("log_entries_by_position").on(table.workspaceId, table.logId, table.position, table.entryIndex),
     // Appends and keyed receipts address an open or committed batch by its commit.
-    index("log_entries_by_commit").on(
-      table.workspaceId,
-      table.logId,
-      table.commitId,
-      table.entryIndex,
-    ),
-    index("log_entries_by_subject").on(
-      table.workspaceId,
-      table.logId,
-      table.subject,
-      table.position,
-      table.entryIndex,
-    ),
-    index("log_entries_by_fact").on(
-      table.workspaceId,
-      table.logId,
-      table.factName,
-      table.position,
-      table.entryIndex,
-    ),
+    index("log_entries_by_commit").on(table.workspaceId, table.logId, table.commitId, table.entryIndex),
+    index("log_entries_by_subject").on(table.workspaceId, table.logId, table.subject, table.position, table.entryIndex),
+    index("log_entries_by_fact").on(table.workspaceId, table.logId, table.factName, table.position, table.entryIndex),
     check(
       "log_entries_fact_header",
-      sql`(${table.subject} IS NULL AND ${table.factName} IS NULL AND ${table.factVersion} IS NULL AND ${table.performerKind} IS NULL) OR (${table.subject} IS NOT NULL AND ${table.factName} IS NOT NULL AND ${table.factVersion} IS NOT NULL AND ${table.performerKind} IS NOT NULL)`,
+      sql`(${table.subject} IS NULL AND ${table.factName} IS NULL AND ${table.factVersion} IS NULL AND ${table.performerKind} IS NULL) OR (${table.subject} IS NOT NULL AND ${table.factName} IS NOT NULL AND ${table.factVersion} IS NOT NULL AND ${table.performerKind} IS NOT NULL)`
     ),
     check(
       "log_entries_provenance",
-      sql`(${table.performerKind} IS NULL AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NULL AND ${table.correlationId} IS NULL AND ${table.occurredAt} IS NULL AND ${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.performerKind} IS NOT NULL AND ${table.correlationId} IS NOT NULL AND ${table.occurredAt} IS NOT NULL AND ((${table.performerKind} = 'Member' AND ${table.performerMemberId} IS NOT NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'Identity' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent', 'Contact') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'System' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NOT NULL)))`,
+      sql`(${table.performerKind} IS NULL AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NULL AND ${table.correlationId} IS NULL AND ${table.occurredAt} IS NULL AND ${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.performerKind} IS NOT NULL AND ${table.correlationId} IS NOT NULL AND ${table.occurredAt} IS NOT NULL AND ((${table.performerKind} = 'Member' AND ${table.performerMemberId} IS NOT NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'Identity' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IN ('Human', 'Agent', 'Contact') AND ${table.performerIdentityKind} IS NOT NULL AND ${table.performerIdentityId} IS NOT NULL AND ${table.performerSystemId} IS NULL) OR (${table.performerKind} = 'System' AND ${table.performerMemberId} IS NULL AND ${table.performerIdentityKind} IS NULL AND ${table.performerIdentityId} IS NULL AND ${table.performerSystemId} IS NOT NULL)))`
     ),
     check(
       "log_entries_cause",
-      sql`(${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.causeLogId} IS NOT NULL AND ${table.causeCommitId} IS NOT NULL AND ${table.causeEntryId} IS NOT NULL)`,
+      sql`(${table.causeLogId} IS NULL AND ${table.causeCommitId} IS NULL AND ${table.causeEntryId} IS NULL) OR (${table.causeLogId} IS NOT NULL AND ${table.causeCommitId} IS NOT NULL AND ${table.causeEntryId} IS NOT NULL)`
     ),
     foreignKey({
       columns: [table.workspaceId, table.logId, table.position],
       foreignColumns: [logBatches.workspaceId, logBatches.logId, logBatches.position],
-      name: "log_entries_batch",
-    }),
-  ],
-);
+      name: "log_entries_batch"
+    })
+  ]
+)
 
 export const logAppendKeys = pgTable(
   "log_append_keys",
@@ -510,7 +462,7 @@ export const logAppendKeys = pgTable(
     key: text("idempotency_key").notNull(),
     commitId: text("commit_id").notNull(),
     firstIndex: integer("first_index").notNull(),
-    entryCount: integer("entry_count").notNull(),
+    entryCount: integer("entry_count").notNull()
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.logId, table.key] }),
@@ -519,10 +471,10 @@ export const logAppendKeys = pgTable(
     foreignKey({
       columns: [table.workspaceId, table.logId, table.commitId],
       foreignColumns: [logBatches.workspaceId, logBatches.logId, logBatches.commitId],
-      name: "log_append_keys_batch",
-    }),
-  ],
-);
+      name: "log_append_keys_batch"
+    })
+  ]
+)
 
 export const checkpoints = pgTable(
   "checkpoints",
@@ -534,10 +486,10 @@ export const checkpoints = pgTable(
     position: integer("position").notNull(),
     commitId: text("commit_id").notNull(),
     entryIndex: integer("entry_index").notNull(),
-    entryId: text("entry_id").notNull(),
+    entryId: text("entry_id").notNull()
   },
-  (table) => [primaryKey({ columns: [table.workspaceId, table.logId, table.name, table.version] })],
-);
+  (table) => [primaryKey({ columns: [table.workspaceId, table.logId, table.name, table.version] })]
+)
 
 /** The projection versions every commit to a log applies: at most one version per name. */
 export const liveProjections = pgTable(
@@ -546,10 +498,10 @@ export const liveProjections = pgTable(
     workspaceId: text("workspace_id").notNull(),
     logId: text("log_id").notNull(),
     name: text("name").notNull(),
-    version: doublePrecision("version").notNull(),
+    version: doublePrecision("version").notNull()
   },
-  (table) => [primaryKey({ columns: [table.workspaceId, table.logId, table.name] })],
-);
+  (table) => [primaryKey({ columns: [table.workspaceId, table.logId, table.name] })]
+)
 
 export const threads = pgTable(
   "threads",
@@ -567,30 +519,25 @@ export const threads = pgTable(
     createdAt: instant("created_at").notNull(),
     // The thread's latest content activity, maintained from its timeline.
     latestSequence: integer("latest_sequence"),
-    latestActivityAt: instant("latest_activity_at"),
+    latestActivityAt: instant("latest_activity_at")
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
     check(
       "thread_creator",
-      sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
+      sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`
     ),
     index("threads_by_group").on(t.workspaceId, t.groupId, sql`${t.id} COLLATE "C"`),
     // A group's threads by when they started, newest first.
     index("threads_by_start").on(t.workspaceId, t.groupId, t.createdAt, sql`${t.id} COLLATE "C"`),
     // A group's threads by latest activity, newest first.
-    index("threads_by_latest").on(
-      t.workspaceId,
-      t.groupId,
-      t.latestActivityAt,
-      sql`${t.id} COLLATE "C"`,
-    ),
+    index("threads_by_latest").on(t.workspaceId, t.groupId, t.latestActivityAt, sql`${t.id} COLLATE "C"`),
     check(
       "thread_latest",
-      sql`(${t.latestSequence} IS NULL AND ${t.latestActivityAt} IS NULL) OR (${t.latestSequence} > 0 AND ${t.latestActivityAt} IS NOT NULL)`,
-    ),
-  ],
-);
+      sql`(${t.latestSequence} IS NULL AND ${t.latestActivityAt} IS NULL) OR (${t.latestSequence} > 0 AND ${t.latestActivityAt} IS NOT NULL)`
+    )
+  ]
+)
 /**
  * Private read state, outside the journal. It references no projection tables, so rebuilding
  * projections from the journal leaves it intact.
@@ -601,13 +548,13 @@ export const threadReadPositions = pgTable(
     workspaceId: text("workspace_id").notNull(),
     memberId: text("member_id").notNull(),
     threadId: text("thread_id").notNull(),
-    readThrough: integer("read_through").notNull(),
+    readThrough: integer("read_through").notNull()
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.memberId, t.threadId] }),
-    check("thread_read_position", sql`${t.readThrough} > 0`),
-  ],
-);
+    check("thread_read_position", sql`${t.readThrough} > 0`)
+  ]
+)
 /**
  * When a human recipient first saw each notification: private state outside the journal, kept
  * when projections are rebuilt, so it references notifications by ID without a foreign key.
@@ -617,20 +564,20 @@ export const notificationSeen = pgTable(
   {
     workspaceId: text("workspace_id").notNull(),
     notificationId: text("notification_id").notNull(),
-    seenAt: instant("seen_at").notNull(),
+    seenAt: instant("seen_at").notNull()
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.notificationId] })],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.notificationId] })]
+)
 export const groupReadTimes = pgTable(
   "group_read_times",
   {
     workspaceId: text("workspace_id").notNull(),
     memberId: text("member_id").notNull(),
     groupId: text("group_id").notNull(),
-    readAt: instant("read_at").notNull(),
+    readAt: instant("read_at").notNull()
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.memberId, t.groupId] })],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.memberId, t.groupId] })]
+)
 export const threadParticipations = pgTable(
   "thread_participations",
   {
@@ -646,39 +593,30 @@ export const threadParticipations = pgTable(
     joinedAt: instant("joined_at").notNull(),
     joinedAtSequence: integer("joined_at_sequence").notNull(),
     status: text("status", { enum: ["active", "ended"] }).notNull(),
-    endedAt: instant("ended_at"),
+    endedAt: instant("ended_at")
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
     uniqueIndex("active_thread_participation")
-      .on(
-        t.workspaceId,
-        t.threadId,
-        t.participantKind,
-        sql`coalesce(${t.memberId}, ${t.identityId}, '')`,
-      )
+      .on(t.workspaceId, t.threadId, t.participantKind, sql`coalesce(${t.memberId}, ${t.identityId}, '')`)
       .where(sql`${t.status} = 'active'`),
     check(
       "participation_participant",
-      sql`(${t.participantKind} = 'Member' AND ${t.memberId} IS NOT NULL AND ${t.groupMembershipId} IS NOT NULL AND ${t.identityKind} IN ('Human', 'Agent') AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Contact' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} = 'Contact' AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Triage' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} IS NULL AND ${t.identityId} IS NULL)`,
+      sql`(${t.participantKind} = 'Member' AND ${t.memberId} IS NOT NULL AND ${t.groupMembershipId} IS NOT NULL AND ${t.identityKind} IN ('Human', 'Agent') AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Contact' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} = 'Contact' AND ${t.identityId} IS NOT NULL) OR (${t.participantKind} = 'Triage' AND ${t.memberId} IS NULL AND ${t.groupMembershipId} IS NULL AND ${t.identityKind} IS NULL AND ${t.identityId} IS NULL)`
     ),
     index("participations_by_thread").on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`),
     // A thread's current participants, paged in participation-ID order.
     index("active_participations_by_thread")
       .on(t.workspaceId, t.threadId, sql`${t.id} COLLATE "C"`)
       .where(sql`${t.status} = 'active'`),
-    index("participations_by_admission").on(
-      t.workspaceId,
-      t.groupMembershipId,
-      sql`${t.id} COLLATE "C"`,
-    ),
+    index("participations_by_admission").on(t.workspaceId, t.groupMembershipId, sql`${t.id} COLLATE "C"`),
     check(
       "participation_state",
-      sql`(${t.status} = 'active' AND ${t.endedAt} IS NULL) OR (${t.status} = 'ended' AND ${t.endedAt} IS NOT NULL)`,
+      sql`(${t.status} = 'active' AND ${t.endedAt} IS NULL) OR (${t.status} = 'ended' AND ${t.endedAt} IS NOT NULL)`
     ),
-    check("participation_sequence", sql`${t.joinedAtSequence} > 0`),
-  ],
-);
+    check("participation_sequence", sql`${t.joinedAtSequence} > 0`)
+  ]
+)
 export const threadMessages = pgTable(
   "thread_messages",
   {
@@ -701,28 +639,28 @@ export const threadMessages = pgTable(
     mentions: text("mentions").array(),
     revision: integer("revision"),
     editedAt: instant("edited_at"),
-    deletedAt: instant("deleted_at"),
+    deletedAt: instant("deleted_at")
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
     check(
       "thread_message_author",
-      sql`(${t.authorKind} = 'Member' AND ${t.authorMemberId} IS NOT NULL AND ${t.authorContactId} IS NULL) OR (${t.authorKind} = 'Contact' AND ${t.authorMemberId} IS NULL AND ${t.authorContactId} IS NOT NULL)`,
+      sql`(${t.authorKind} = 'Member' AND ${t.authorMemberId} IS NOT NULL AND ${t.authorContactId} IS NULL) OR (${t.authorKind} = 'Contact' AND ${t.authorMemberId} IS NULL AND ${t.authorContactId} IS NOT NULL)`
     ),
     check(
       "thread_message_via",
-      sql`(${t.viaKind} IS NULL AND ${t.turnId} IS NULL AND ${t.channelId} IS NULL AND ${t.externalMessageId} IS NULL) OR (${t.viaKind} = 'Turn' AND ${t.turnId} IS NOT NULL AND ${t.channelId} IS NULL AND ${t.externalMessageId} IS NULL) OR (${t.viaKind} = 'Channel' AND ${t.turnId} IS NULL AND ${t.channelId} IS NOT NULL AND ${t.externalMessageId} IS NOT NULL)`,
+      sql`(${t.viaKind} IS NULL AND ${t.turnId} IS NULL AND ${t.channelId} IS NULL AND ${t.externalMessageId} IS NULL) OR (${t.viaKind} = 'Turn' AND ${t.turnId} IS NOT NULL AND ${t.channelId} IS NULL AND ${t.externalMessageId} IS NULL) OR (${t.viaKind} = 'Channel' AND ${t.turnId} IS NULL AND ${t.channelId} IS NOT NULL AND ${t.externalMessageId} IS NOT NULL)`
     ),
     check(
       "thread_message_content",
-      sql`(${t.contentKind} = 'Text' AND ${t.text} IS NOT NULL AND ${t.mentions} IS NOT NULL AND ${t.revision} > 0 AND ${t.deletedAt} IS NULL) OR (${t.contentKind} = 'Deleted' AND ${t.text} IS NULL AND ${t.mentions} IS NULL AND ${t.revision} IS NULL AND ${t.editedAt} IS NULL AND ${t.deletedAt} IS NOT NULL)`,
+      sql`(${t.contentKind} = 'Text' AND ${t.text} IS NOT NULL AND ${t.mentions} IS NOT NULL AND ${t.revision} > 0 AND ${t.deletedAt} IS NULL) OR (${t.contentKind} = 'Deleted' AND ${t.text} IS NULL AND ${t.mentions} IS NULL AND ${t.revision} IS NULL AND ${t.editedAt} IS NULL AND ${t.deletedAt} IS NOT NULL)`
     ),
     // A thread's messages that still have text, counted per thread for reply counts.
     index("thread_messages_by_thread")
       .on(t.workspaceId, t.threadId)
-      .where(sql`${t.contentKind} = 'Text'`),
-  ],
-);
+      .where(sql`${t.contentKind} = 'Text'`)
+  ]
+)
 /** A thread's task: its current status, priority, and assignee. A thread has at most one, keyed by it. */
 export const tasks = pgTable(
   "tasks",
@@ -737,23 +675,18 @@ export const tasks = pgTable(
     createdByKind: text("created_by_kind", { enum: ["Member", "Contact"] }).notNull(),
     createdByMemberId: text("created_by_member_id"),
     createdByContactId: text("created_by_contact_id"),
-    createdAt: instant("created_at").notNull(),
+    createdAt: instant("created_at").notNull()
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.threadId] }),
     check(
       "task_creator",
-      sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
+      sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`
     ),
     // A group's tasks by when they were created, newest first.
-    index("tasks_by_group").on(
-      t.workspaceId,
-      t.groupId,
-      t.createdAt,
-      sql`${t.threadId} COLLATE "C"`,
-    ),
-  ],
-);
+    index("tasks_by_group").on(t.workspaceId, t.groupId, t.createdAt, sql`${t.threadId} COLLATE "C"`)
+  ]
+)
 /**
  * Core validates each activity kind. The table keeps typed references with their keys and
  * uniqueness, so a new kind adds nullable reference columns rather than rewriting a constraint.
@@ -773,7 +706,7 @@ export const threadActivities = pgTable(
     occurrence: text("occurrence"),
     newActivity: boolean("new_activity").notNull(),
     details: jsonb("details").$type<unknown>().notNull(),
-    occurredAt: instant("occurred_at").notNull(),
+    occurredAt: instant("occurred_at").notNull()
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
@@ -781,9 +714,9 @@ export const threadActivities = pgTable(
     // At most one activity per occurrence key; activities without one are repeatable.
     uniqueIndex("thread_activity_occurrence").on(t.workspaceId, t.occurrence),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
-    check("thread_activity_positive_version", sql`${t.version} > 0`),
-  ],
-);
+    check("thread_activity_positive_version", sql`${t.version} > 0`)
+  ]
+)
 
 /**
  * Workspaces' connections to the integrations their host installs. An integration declares its own
@@ -801,10 +734,10 @@ export const connections = pgTable(
     auth: text("auth", { enum: ["apiKey", "none"] }).notNull(),
     status: text("status", { enum: memberStatuses }).notNull(),
     createdBy: text("created_by").notNull(),
-    createdAt: instant("created_at").notNull(),
+    createdAt: instant("created_at").notNull()
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })]
+)
 
 /** A channel: one connection's conversations, which become threads in one group. */
 export const channels = pgTable(
@@ -819,10 +752,10 @@ export const channels = pgTable(
     opensTasks: boolean("opens_tasks").notNull(),
     status: text("status", { enum: memberStatuses }).notNull(),
     createdBy: text("created_by").notNull(),
-    createdAt: instant("created_at").notNull(),
+    createdAt: instant("created_at").notNull()
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })]
+)
 
 /**
  * A thread's external conversation: which channel it came through, and the conversation as the
@@ -838,17 +771,13 @@ export const channelBindings = pgTable(
     groupId: text("group_id").notNull(),
     conversationId: text("conversation_id").notNull(),
     conversationDetails: jsonb("conversation_details").$type<Record<string, unknown>>().notNull(),
-    boundAt: instant("bound_at").notNull(),
+    boundAt: instant("bound_at").notNull()
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.threadId] }),
-    uniqueIndex("channel_bindings_by_conversation").on(
-      t.workspaceId,
-      t.channelId,
-      t.conversationId,
-    ),
-  ],
-);
+    uniqueIndex("channel_bindings_by_conversation").on(t.workspaceId, t.channelId, t.conversationId)
+  ]
+)
 
 /** A person outside the workspace who writes through a channel, named as the channel knows them. */
 export const contacts = pgTable(
@@ -859,10 +788,10 @@ export const contacts = pgTable(
     channelId: text("channel_id").notNull(),
     externalId: text("external_id").notNull(),
     name: text("name").notNull(),
-    createdAt: instant("created_at").notNull(),
+    createdAt: instant("created_at").notNull()
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })]
+)
 
 /**
  * A message's delivery to a bound thread's conversation: requested when the delivery job accepts
@@ -884,14 +813,14 @@ export const channelDeliveries = pgTable(
     attempts: integer("attempts").notNull(),
     failure: text("failure"),
     requestedAt: instant("requested_at").notNull(),
-    finishedAt: instant("finished_at"),
+    finishedAt: instant("finished_at")
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
     // Each status holds its own columns: sent has the external id, failed the reason, and both are finished.
     check(
       "channel_delivery_status",
-      sql`(${t.status} = 'requested') = (${t.finishedAt} IS NULL) AND (${t.status} = 'sent') = (${t.externalMessageId} IS NOT NULL) AND (${t.status} = 'failed') = (${t.failure} IS NOT NULL) AND ${t.sequence} > 0 AND ${t.attempts} >= 0`,
+      sql`(${t.status} = 'requested') = (${t.finishedAt} IS NULL) AND (${t.status} = 'sent') = (${t.externalMessageId} IS NOT NULL) AND (${t.status} = 'failed') = (${t.failure} IS NOT NULL) AND ${t.sequence} > 0 AND ${t.attempts} >= 0`
     ),
     // A thread's deliveries still to send, in the order their messages were published.
     index("channel_deliveries_requested_by_thread")
@@ -902,10 +831,10 @@ export const channelDeliveries = pgTable(
       t.workspaceId,
       t.channelId,
       t.conversationId,
-      t.externalMessageId,
-    ),
-  ],
-);
+      t.externalMessageId
+    )
+  ]
+)
 
 /**
  * Each connection's credential, outside the journal and its read models: rebuilding projections
@@ -916,10 +845,10 @@ export const connectionCredentials = pgTable(
   {
     workspaceId: text("workspace_id").notNull(),
     connectionId: text("connection_id").notNull(),
-    sealed: text("sealed").notNull(),
+    sealed: text("sealed").notNull()
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.connectionId] })],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.connectionId] })]
+)
 
 /**
  * Agents, each one workspace membership, which names it and holds its role. Its harness is a
@@ -940,22 +869,12 @@ export const agents = pgTable(
     modelEffort: text("model_effort"),
     sandboxConnectionId: text("sandbox_connection_id"),
     createdBy: text("created_by").notNull(),
-    createdAt: instant("created_at").notNull(),
+    createdAt: instant("created_at").notNull()
   },
-  (t) => [
-    primaryKey({ columns: [t.workspaceId, t.id] }),
-    uniqueIndex("agents_by_member").on(t.workspaceId, t.memberId),
-  ],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] }), uniqueIndex("agents_by_member").on(t.workspaceId, t.memberId)]
+)
 
-export const turnStatuses = [
-  "queued",
-  "running",
-  "cancelling",
-  "completed",
-  "failed",
-  "cancelled",
-] as const;
+export const turnStatuses = ["queued", "running", "cancelling", "completed", "failed", "cancelled"] as const
 
 /**
  * Agents' turns on threads, with how far into its thread each one's input reaches, and what it
@@ -986,11 +905,11 @@ export const turns = pgTable(
     messageIds: text("message_ids").array().notNull(),
     failure: text("failure"),
     cancelReason: text("cancel_reason", {
-      enum: ["requested", "participation-ended", "task-changed"],
+      enum: ["requested", "participation-ended", "task-changed"]
     }),
     createdAt: instant("created_at").notNull(),
     startedAt: instant("started_at"),
-    finishedAt: instant("finished_at"),
+    finishedAt: instant("finished_at")
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
@@ -1004,10 +923,10 @@ export const turns = pgTable(
     check("turn_retry_complete", sql`(${t.retryOf} IS NULL) = (${t.retriedBy} IS NULL)`),
     check(
       "turn_selection_complete",
-      sql`(${t.harnessConnectionId} IS NULL AND ${t.modelConnectionId} IS NULL AND ${t.modelId} IS NULL AND ${t.modelEffort} IS NULL AND ${t.sandboxConnectionId} IS NULL) OR (${t.harnessConnectionId} IS NOT NULL AND ${t.modelConnectionId} IS NOT NULL AND ${t.modelId} IS NOT NULL)`,
-    ),
-  ],
-);
+      sql`(${t.harnessConnectionId} IS NULL AND ${t.modelConnectionId} IS NULL AND ${t.modelId} IS NULL AND ${t.modelEffort} IS NULL AND ${t.sandboxConnectionId} IS NULL) OR (${t.harnessConnectionId} IS NOT NULL AND ${t.modelConnectionId} IS NOT NULL AND ${t.modelId} IS NOT NULL)`
+    )
+  ]
+)
 
 /**
  * Each participation's harness session as its last turn left it, beside its conversation, which
@@ -1027,10 +946,10 @@ export const sessionStates = pgTable(
     modelConnectionId: text("model_connection_id").notNull(),
     modelId: text("model_id").notNull(),
     modelEffort: text("model_effort"),
-    sandboxConnectionId: text("sandbox_connection_id"),
+    sandboxConnectionId: text("sandbox_connection_id")
   },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.participationId] })],
-);
+  (t) => [primaryKey({ columns: [t.workspaceId, t.participationId] })]
+)
 
 /**
  * Each participation's session log, outside the journal and its commits: an append is a statement
@@ -1046,17 +965,17 @@ export const sessionLogEntries = pgTable(
     position: integer("position").notNull(),
     recordedAt: instant("recorded_at").notNull(),
     kind: text("kind", {
-      enum: ["Joined", "Prompted", "Started", "Step", "Interrupted"],
+      enum: ["Joined", "Prompted", "Started", "Step", "Interrupted"]
     }).notNull(),
     turnId: text("turn_id"),
-    details: jsonb("details").$type<unknown>().notNull(),
+    details: jsonb("details").$type<unknown>().notNull()
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.participationId, t.position] }),
     check("session_log_positive_position", sql`${t.position} > 0`),
-    check("session_log_entry_turn", sql`(${t.kind} = 'Joined') = (${t.turnId} IS NULL)`),
-  ],
-);
+    check("session_log_entry_turn", sql`(${t.kind} = 'Joined') = (${t.turnId} IS NULL)`)
+  ]
+)
 
 /**
  * The people this host knows, across its workspaces: the one table not kept per workspace. An
@@ -1064,8 +983,8 @@ export const sessionLogEntries = pgTable(
  */
 export const accounts = pgTable("accounts", {
   humanId: text("human_id").primaryKey(),
-  email: text("email").notNull().unique(),
-});
+  email: text("email").notNull().unique()
+})
 
 /**
  * Each address's pending sign-in code, as its digest, with the sends counted against the address;
@@ -1078,8 +997,8 @@ export const signInCodes = pgTable("sign_in_codes", {
   failedAttempts: integer("failed_attempts").notNull(),
   sentAt: instant("sent_at").notNull(),
   windowStartedAt: instant("window_started_at").notNull(),
-  sendsInWindow: integer("sends_in_window").notNull(),
-});
+  sendsInWindow: integer("sends_in_window").notNull()
+})
 
 /** Signed-in sessions by their token's digest; outside every workspace, like the accounts. */
 export const signInSessions = pgTable(
@@ -1088,7 +1007,7 @@ export const signInSessions = pgTable(
     digest: text("digest").primaryKey(),
     humanId: text("human_id").notNull(),
     createdAt: instant("created_at").notNull(),
-    expiresAt: instant("expires_at").notNull(),
+    expiresAt: instant("expires_at").notNull()
   },
-  (table) => [index("sign_in_sessions_by_human").on(table.humanId)],
-);
+  (table) => [index("sign_in_sessions_by_human").on(table.humanId)]
+)

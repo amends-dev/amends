@@ -1,45 +1,45 @@
-import { Show, createUniqueId } from "solid-js";
-import { Button } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { Input } from "../../components/input/index.ts";
-import { Select } from "../../components/select/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import { Modal } from "../../patterns/modal/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { invitationDetail, type SettingsInvitation } from "./member-settings.tsx";
-import { SettingsAlert, type SettingsError, type SettingsRole } from "./wording.tsx";
-import * as s from "./settings.css.ts";
+import { Show, createUniqueId } from "solid-js"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { Input } from "../../components/input/index.ts"
+import { Select } from "../../components/select/index.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import { Modal } from "../../patterns/modal/index.ts"
+import { Pane } from "../../patterns/pane/index.ts"
+import { invitationDetail, type SettingsInvitation } from "./member-settings.tsx"
+import * as s from "./settings.css.ts"
+import { SettingsAlert, type SettingsError, type SettingsRole } from "./wording.tsx"
 
 export interface InviteMemberProps {
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly workspaceName: string;
-  readonly recipient: string;
-  readonly onRecipientChange: (recipient: string) => void;
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly workspaceName: string
+  readonly recipient: string
+  readonly onRecipientChange: (recipient: string) => void
   /** The roles an invitation may give. */
-  readonly roles: ReadonlyArray<SettingsRole>;
-  readonly role?: string;
-  readonly onRoleChange: (roleId: string) => void;
-  readonly onCreate: () => void;
-  readonly pending?: boolean;
+  readonly roles: ReadonlyArray<SettingsRole>
+  readonly role?: string
+  readonly onRoleChange: (roleId: string) => void
+  readonly onCreate: () => void
+  readonly pending?: boolean
   /**
    * Why creation failed; the draft stays. After `refresh-failed` the invitation exists, so the
    * primary action reloads it instead of creating another.
    */
-  readonly error?: SettingsError;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly error?: SettingsError
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 /** Inviting one sign-in email with a role; nothing is sent to them. Full screen on phones. */
 export function InviteMember(props: InviteMemberProps) {
-  const formId = `invite-member-${createUniqueId()}`;
-  const busy = () => props.pending || props.refreshing;
+  const formId = `invite-member-${createUniqueId()}`
+  const busy = () => props.pending || props.refreshing
   const close = () => {
-    if (!busy()) props.onClose();
-  };
-  const created = () => props.error === "refresh-failed";
+    if (!busy()) props.onClose()
+  }
+  const created = () => props.error === "refresh-failed"
   return (
     <Modal.Root open={props.open} onClose={close} aria-label="Invite member" size="compact">
       <Pane.Root variant="modal">
@@ -55,9 +55,9 @@ export function InviteMember(props: InviteMemberProps) {
             id={formId}
             class={s.form}
             onSubmit={(event) => {
-              event.preventDefault();
-              if (created()) props.onRefresh?.();
-              else if (props.recipient.trim() && props.role && !busy()) props.onCreate();
+              event.preventDefault()
+              if (created()) props.onRefresh?.()
+              else if (props.recipient.trim() && props.role && !busy()) props.onCreate()
             }}
           >
             <Field.Root
@@ -114,27 +114,27 @@ export function InviteMember(props: InviteMemberProps) {
         </Modal.Actions>
       </Pane.Root>
     </Modal.Root>
-  );
+  )
 }
 
 export interface InvitationHistoryProps {
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly workspaceName: string;
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly workspaceName: string
   /** Every invitation, newest first. */
-  readonly invitations: ReadonlyArray<SettingsInvitation>;
+  readonly invitations: ReadonlyArray<SettingsInvitation>
   /** Asks to revoke a pending invitation. */
-  readonly onRevoke?: (id: string) => void;
+  readonly onRevoke?: (id: string) => void
   /** Opens InviteMember; shown to a reader who may invite. */
-  readonly onInvite?: () => void;
+  readonly onInvite?: () => void
 }
 
 const statuses = {
   pending: "Pending",
   accepted: "Accepted",
   expired: "Expired",
-  revoked: "Revoked",
-} as const;
+  revoked: "Revoked"
+} as const
 
 /** Every invitation and where it stands; pending ones may be revoked. Full screen on phones. */
 export function InvitationHistory(props: InvitationHistoryProps) {
@@ -158,10 +158,7 @@ export function InvitationHistory(props: InvitationHistoryProps) {
             </div>
             <Divider />
           </div>
-          <Show
-            when={props.invitations.length > 0}
-            fallback={<p class={s.note}>No invitations yet.</p>}
-          >
+          <Show when={props.invitations.length > 0} fallback={<p class={s.note}>No invitations yet.</p>}>
             <ul class={s.list} aria-label="Invitation history">
               <Keyed each={props.invitations} by={(invitation) => invitation.id}>
                 {(invitation) => (
@@ -169,13 +166,7 @@ export function InvitationHistory(props: InvitationHistoryProps) {
                     <span class={s.historyAddress}>{invitation().recipient}</span>
                     <span class={s.historyDetail}>{invitationDetail(invitation())}</span>
                     <span class={s.historyStatus}>{statuses[invitation().status]}</span>
-                    <Show
-                      when={
-                        invitation().status === "pending" &&
-                        invitation().revocable &&
-                        props.onRevoke
-                      }
-                    >
+                    <Show when={invitation().status === "pending" && invitation().revocable && props.onRevoke}>
                       {(revoke) => (
                         <Button
                           variant="quiet"
@@ -201,34 +192,31 @@ export function InvitationHistory(props: InvitationHistoryProps) {
               </Button>
             )}
           </Show>
-          <Button
-            class={props.onInvite ? s.phoneHidden : undefined}
-            onClick={() => props.onClose()}
-          >
+          <Button class={props.onInvite ? s.phoneHidden : undefined} onClick={() => props.onClose()}>
             Done
           </Button>
         </Modal.Actions>
       </Pane.Root>
     </Modal.Root>
-  );
+  )
 }
 
 export interface ConfirmRevokeInvitationProps {
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly recipient: string;
-  readonly onConfirm: () => void;
-  readonly pending?: boolean;
-  readonly error?: SettingsError;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
+  readonly open: boolean
+  readonly onClose: () => void
+  readonly recipient: string
+  readonly onConfirm: () => void
+  readonly pending?: boolean
+  readonly error?: SettingsError
+  readonly onRefresh?: () => void
+  readonly refreshing?: boolean
 }
 
 /** Confirms revoking a pending invitation. */
 export function ConfirmRevokeInvitation(props: ConfirmRevokeInvitationProps) {
   const close = () => {
-    if (!props.pending) props.onClose();
-  };
+    if (!props.pending) props.onClose()
+  }
   return (
     <Modal.Root open={props.open} onClose={close} aria-label="Revoke invitation" size="compact">
       <Pane.Root variant="modal">
@@ -241,9 +229,7 @@ export function ConfirmRevokeInvitation(props: ConfirmRevokeInvitationProps) {
         </Pane.Header>
         <Pane.Body>
           <div class={s.stack}>
-            <p class={s.confirm}>
-              This person will no longer be able to join using this invitation.
-            </p>
+            <p class={s.confirm}>This person will no longer be able to join using this invitation.</p>
             <Show when={props.error}>
               {(error) => (
                 <SettingsAlert
@@ -266,5 +252,5 @@ export function ConfirmRevokeInvitation(props: ConfirmRevokeInvitationProps) {
         </Modal.Actions>
       </Pane.Root>
     </Modal.Root>
-  );
+  )
 }

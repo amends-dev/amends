@@ -1,7 +1,7 @@
-import { style, styleVariants } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
+import { style, styleVariants } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
 
 export const button = style({
   ...typeScale.control,
@@ -23,10 +23,10 @@ export const button = style({
   cursor: "pointer",
   selectors: {
     "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
-    "&:disabled, &[aria-disabled=true]": { cursor: "default" },
+    "&:disabled, &[aria-disabled=true]": { cursor: "default" }
   },
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
 // Hover and pressed shades are proposals; the mocks show resting and disabled states.
 export const variant = styleVariants({
@@ -35,8 +35,8 @@ export const variant = styleVariants({
     color: vars.color.text.onPrimary,
     selectors: {
       "&:hover:not(:disabled)": { opacity: 0.88 },
-      "&:disabled": { backgroundColor: vars.color.surface.subtle, color: vars.color.text.disabled },
-    },
+      "&:disabled": { backgroundColor: vars.color.surface.subtle, color: vars.color.text.disabled }
+    }
   },
   secondary: {
     backgroundColor: vars.color.action.secondary,
@@ -48,9 +48,9 @@ export const variant = styleVariants({
       "&:disabled": {
         backgroundColor: vars.color.surface.subtle,
         borderColor: "transparent",
-        color: vars.color.text.disabled,
-      },
-    },
+        color: vars.color.text.disabled
+      }
+    }
   },
   /** Text-only, for row actions such as Remove and for pickers inside panels. */
   quiet: {
@@ -63,31 +63,31 @@ export const variant = styleVariants({
     selectors: {
       "&:hover:not(:disabled)": {
         backgroundColor: vars.color.surface.subtle,
-        color: vars.color.text.primary,
+        color: vars.color.text.primary
       },
       "&[aria-expanded=true]": { backgroundColor: vars.color.surface.subtle },
-      "&:disabled": { color: vars.color.text.disabled },
-    },
-  },
-});
+      "&:disabled": { color: vars.color.text.disabled }
+    }
+  }
+})
 
 /** 44px with item text, for centered screens such as sign-in. */
-export const large = style({ ...typeScale.item, minHeight: "2.75rem", paddingInline: "1.25rem" });
+export const large = style({ ...typeScale.item, minHeight: "2.75rem", paddingInline: "1.25rem" })
 
 /** Fills its container, as in phone action bars. */
-export const wide = style({ width: "100%" });
+export const wide = style({ width: "100%" })
 
 /** A menu trigger with a chevron uses tighter padding. */
-export const withChevron = style({ paddingInline: "0.75rem" });
+export const withChevron = style({ paddingInline: "0.75rem" })
 
-export const icon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+export const icon = style({ flex: "none", width: "0.875rem", height: "0.875rem" })
 
 export const chevron = style({
   flex: "none",
   width: "0.75rem",
   height: "0.75rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
 // A link drawn as a button keeps the button's look, not a link's underline.
-export const link = style({ textDecoration: "none", boxSizing: "border-box" });
+export const link = style({ textDecoration: "none", boxSizing: "border-box" })

@@ -7,21 +7,22 @@
  * with sessions that older servers speak, which starts with `initialize`. It finds out which when it
  * first needs the server, and again when the server ends a session.
  */
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Ref from "effect/Ref";
-import * as Schema from "effect/Schema";
-import * as Semaphore from "effect/Semaphore";
-import * as Stream from "effect/Stream";
-import * as McpSchema from "effect/ai/McpSchema";
-import * as Sse from "effect/encoding/Sse";
-import type * as HttpClient from "effect/http/HttpClient";
-import type * as HttpClientError from "effect/http/HttpClientError";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import type * as HttpClientResponse from "effect/http/HttpClientResponse";
-import * as ToolSourceError from "../ToolSourceError.ts";
-import { encodeHeaderValue } from "./mcp-headers.ts";
+
+import * as McpSchema from "effect/ai/McpSchema"
+import * as Data from "effect/Data"
+import * as Effect from "effect/Effect"
+import * as Sse from "effect/encoding/Sse"
+import type * as HttpClient from "effect/http/HttpClient"
+import type * as HttpClientError from "effect/http/HttpClientError"
+import * as HttpClientRequest from "effect/http/HttpClientRequest"
+import type * as HttpClientResponse from "effect/http/HttpClientResponse"
+import * as Option from "effect/Option"
+import * as Ref from "effect/Ref"
+import * as Schema from "effect/Schema"
+import * as Semaphore from "effect/Semaphore"
+import * as Stream from "effect/Stream"
+import * as ToolSourceError from "../ToolSourceError.ts"
+import { encodeHeaderValue } from "./mcp-headers.ts"
 
 /**
  * What `streamableHttp` and `Mcp.http` take: the source's name, the server's address, the client
@@ -29,16 +30,16 @@ import { encodeHeaderValue } from "./mcp-headers.ts";
  */
 export interface Options {
   /** Names the source, as `ToolSource.name` says. */
-  readonly name: string;
+  readonly name: string
 
   /** The address of the server's MCP endpoint, which every request is posted to. */
-  readonly url: string;
+  readonly url: string
 
   /** Sends the requests, with the credentials the server asks for set on every one of them. */
-  readonly client: HttpClient.HttpClient;
+  readonly client: HttpClient.HttpClient
 
   /** Tells the server who is asking. */
-  readonly clientInfo?: { readonly name: string; readonly version: string };
+  readonly clientInfo?: { readonly name: string; readonly version: string }
 }
 
 /**
@@ -56,35 +57,35 @@ export interface Transport {
     method: string,
     params: Readonly<Record<string, Schema.Json>>,
     options?: {
-      readonly toolName?: string;
-      readonly headers?: Readonly<Record<string, string>>;
-    },
-  ) => Effect.Effect<A, ToolSourceError.ToolSourceError>;
+      readonly toolName?: string
+      readonly headers?: Readonly<Record<string, string>>
+    }
+  ) => Effect.Effect<A, ToolSourceError.ToolSourceError>
 
   /** Whether the server is spoken to statelessly, as the protocols with headers that mirror parameters are. */
-  readonly mirrorsParameters: Effect.Effect<boolean, ToolSourceError.ToolSourceError>;
+  readonly mirrorsParameters: Effect.Effect<boolean, ToolSourceError.ToolSourceError>
 }
 
-const statelessVersion = "2026-07-28";
+const statelessVersion = "2026-07-28"
 
 /** The protocols with sessions this source speaks, newest first. */
-const newestSessionVersion = "2025-11-25";
-const sessionVersions = [newestSessionVersion, "2025-06-18", "2025-03-26", "2024-11-05"];
+const newestSessionVersion = "2025-11-25"
+const sessionVersions = [newestSessionVersion, "2025-06-18", "2025-03-26", "2024-11-05"]
 
 /** How the server is spoken to, which the first request settles. */
 type Connection =
   | { readonly _tag: "Stateless" }
   | {
-      readonly _tag: "Session";
-      readonly protocolVersion: string;
+      readonly _tag: "Session"
+      readonly protocolVersion: string
 
       /** A server may not give one. */
-      readonly sessionId: string | undefined;
-    };
+      readonly sessionId: string | undefined
+    }
 
 /** The server has ended the session a request belonged to, so the next request starts another. */
 class SessionEnded extends Data.TaggedError("SessionEnded")<{
-  readonly connection: Connection;
+  readonly connection: Connection
 }> {}
 
 /**
@@ -97,21 +98,20 @@ class HeaderMismatch extends Data.TaggedError("HeaderMismatch") {}
  * Whether a request failed because the server found its headers did not match its body, which
  * `Mcp.http` answers by listing the tools again.
  */
-export const isHeaderMismatch = (error: ToolSourceError.ToolSourceError) =>
-  error.cause instanceof HeaderMismatch;
+export const isHeaderMismatch = (error: ToolSourceError.ToolSourceError) => error.cause instanceof HeaderMismatch
 
 /** What a server answers a request with, as JSON-RPC defines it. */
 const Reply = Schema.Struct({
   id: Schema.Union([Schema.String, Schema.Finite, Schema.Null]),
   result: Schema.optionalKey(Schema.Json),
-  error: Schema.optionalKey(Schema.Struct({ code: Schema.Finite, message: Schema.String })),
-});
+  error: Schema.optionalKey(Schema.Struct({ code: Schema.Finite, message: Schema.String }))
+})
 
-const decodeReply = Schema.decodeUnknownEffect(Schema.fromJsonString(Reply));
+const decodeReply = Schema.decodeUnknownEffect(Schema.fromJsonString(Reply))
 
-const Discovered = Schema.Struct({ supportedVersions: Schema.Array(Schema.String) });
+const Discovered = Schema.Struct({ supportedVersions: Schema.Array(Schema.String) })
 
-const Initialized = Schema.Struct({ protocolVersion: Schema.String });
+const Initialized = Schema.Struct({ protocolVersion: Schema.String })
 
 // TODO: End a session with a DELETE when the source is released, and give a request that never
 // answers a limit. Both need the source to have a lifetime, which it does not have yet.
@@ -119,51 +119,48 @@ const Initialized = Schema.Struct({ protocolVersion: Schema.String });
  * Makes the transport to the MCP server at `options.url`. Making it contacts nothing: the server
  * is first reached by the first request.
  */
-export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function* (
-  options: Options,
-) {
-  const { name, url, client } = options;
-  const clientInfo = options.clientInfo ?? { name: "amends", version: "0.0.0" };
-  const requestCount = yield* Ref.make(0);
-  const settledConnection = yield* Ref.make(Option.none<Connection>());
-  const settling = yield* Semaphore.make(1);
+export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function* (options: Options) {
+  const { name, url, client } = options
+  const clientInfo = options.clientInfo ?? { name: "amends", version: "0.0.0" }
+  const requestCount = yield* Ref.make(0)
+  const settledConnection = yield* Ref.make(Option.none<Connection>())
+  const settling = yield* Semaphore.make(1)
 
   const fail = (reason: ToolSourceError.ToolSourceErrorReason, cause?: unknown) =>
-    new ToolSourceError.ToolSourceError({ source: name, reason, cause });
+    new ToolSourceError.ToolSourceError({ source: name, reason, cause })
 
   const failToReach = (error: HttpClientError.HttpClientError) =>
     fail(
       error.reason._tag === "TransportError"
         ? new ToolSourceError.UnavailableError({})
         : new ToolSourceError.UnknownError({ description: error.message }),
-      error,
-    );
+      error
+    )
 
   const failWithStatus = (status: number) => {
-    const description = `The server answered ${status}`;
-    if (status === 401 || status === 403)
-      return fail(new ToolSourceError.AuthenticationError({ description }));
+    const description = `The server answered ${status}`
+    if (status === 401 || status === 403) return fail(new ToolSourceError.AuthenticationError({ description }))
     if (status === 408 || status === 429 || status >= 500) {
-      return fail(new ToolSourceError.UnavailableError({ description }));
+      return fail(new ToolSourceError.UnavailableError({ description }))
     }
-    return fail(new ToolSourceError.UnsupportedError({ description }));
-  };
+    return fail(new ToolSourceError.UnsupportedError({ description }))
+  }
 
   const failWithReply = (error: { readonly code: number; readonly message: string }) => {
-    const description = error.message;
+    const description = error.message
     switch (error.code) {
       case McpSchema.INVALID_PARAMS_ERROR_CODE:
-        return fail(new ToolSourceError.InvalidInputError({ description }));
+        return fail(new ToolSourceError.InvalidInputError({ description }))
       case McpSchema.HEADER_MISMATCH_ERROR_CODE:
-        return fail(new ToolSourceError.UnsupportedError({ description }), new HeaderMismatch());
+        return fail(new ToolSourceError.UnsupportedError({ description }), new HeaderMismatch())
       case McpSchema.METHOD_NOT_FOUND_ERROR_CODE:
       case McpSchema.INVALID_REQUEST_ERROR_CODE:
       case McpSchema.PARSE_ERROR_CODE:
-        return fail(new ToolSourceError.UnsupportedError({ description }));
+        return fail(new ToolSourceError.UnsupportedError({ description }))
       default:
-        return fail(new ToolSourceError.UnknownError({ description }));
+        return fail(new ToolSourceError.UnknownError({ description }))
     }
-  };
+  }
 
   /**
    * Sends a JSON-RPC request, or a notification, and returns the response whatever its status,
@@ -174,12 +171,12 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
     method: string,
     params: Readonly<Record<string, Schema.Json>>,
     options?: {
-      readonly id?: number;
-      readonly toolName?: string;
-      readonly headers?: Readonly<Record<string, string>>;
-    },
+      readonly id?: number
+      readonly toolName?: string
+      readonly headers?: Readonly<Record<string, string>>
+    }
   ) {
-    const version = connection._tag === "Stateless" ? statelessVersion : connection.protocolVersion;
+    const version = connection._tag === "Stateless" ? statelessVersion : connection.protocolVersion
     const request = HttpClientRequest.post(url).pipe(
       HttpClientRequest.setHeaders({
         accept: "application/json, text/event-stream",
@@ -187,14 +184,12 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
         ...(connection._tag === "Stateless"
           ? {
               "mcp-method": method,
-              ...(options?.toolName === undefined
-                ? {}
-                : { "mcp-name": encodeHeaderValue(options.toolName) }),
-              ...options?.headers,
+              ...(options?.toolName === undefined ? {} : { "mcp-name": encodeHeaderValue(options.toolName) }),
+              ...options?.headers
             }
           : connection.sessionId === undefined
             ? {}
-            : { "mcp-session-id": connection.sessionId }),
+            : { "mcp-session-id": connection.sessionId })
       }),
       HttpClientRequest.bodyJsonUnsafe({
         jsonrpc: "2.0",
@@ -207,23 +202,21 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
                 _meta: {
                   "io.modelcontextprotocol/protocolVersion": statelessVersion,
                   "io.modelcontextprotocol/clientCapabilities": {},
-                  "io.modelcontextprotocol/clientInfo": clientInfo,
-                },
+                  "io.modelcontextprotocol/clientInfo": clientInfo
+                }
               }
-            : params,
-      }),
-    );
+            : params
+      })
+    )
     return yield* client.execute(request).pipe(
-      Effect.catchReason("HttpClientError", "StatusCodeError", (reason) =>
-        Effect.succeed(reason.response),
-      ),
-      Effect.mapError(failToReach),
-    );
-  });
+      Effect.catchReason("HttpClientError", "StatusCodeError", (reason) => Effect.succeed(reason.response)),
+      Effect.mapError(failToReach)
+    )
+  })
 
   /** Reads the reply to request `id` from a response, which is JSON or a stream of events. */
   const readReply = (response: HttpClientResponse.HttpClientResponse, id: number) => {
-    const isStream = (response.headers["content-type"] ?? "").includes("text/event-stream");
+    const isStream = (response.headers["content-type"] ?? "").includes("text/event-stream")
     // Whatever fails to be read is reported as one failure, so the errors are not told apart.
     const replies: Stream.Stream<typeof Reply.Type, unknown> = isStream
       ? response.stream.pipe(
@@ -233,58 +226,52 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
           Stream.filter((data) => data.length > 0),
           Stream.mapEffect((data) => Effect.option(decodeReply(data))),
           Stream.filter(Option.isSome),
-          Stream.map((reply) => reply.value),
+          Stream.map((reply) => reply.value)
         )
-      : Stream.fromEffect(Effect.flatMap(response.text, decodeReply));
+      : Stream.fromEffect(Effect.flatMap(response.text, decodeReply))
     return replies.pipe(
       // A message that is no reply to this request, such as a notification, is not for the source.
       // A server that cannot tell which request failed gives the failure no id, as JSON-RPC says.
       Stream.filter(
         (reply) =>
           (reply.id === id && (reply.result !== undefined || reply.error !== undefined)) ||
-          (reply.id === null && reply.error !== undefined),
+          (reply.id === null && reply.error !== undefined)
       ),
       Stream.runHead,
       Effect.flatMap(
         Option.match({
-          onNone: () =>
-            Effect.fail(
-              fail(new ToolSourceError.InvalidResponseError({ description: "No reply" })),
-            ),
-          onSome: Effect.succeed,
-        }),
+          onNone: () => Effect.fail(fail(new ToolSourceError.InvalidResponseError({ description: "No reply" }))),
+          onSome: Effect.succeed
+        })
       ),
       Effect.mapError((error) =>
         error instanceof ToolSourceError.ToolSourceError
           ? error
           : fail(
               new ToolSourceError.InvalidResponseError({
-                description: "The reply is not JSON-RPC",
+                description: "The reply is not JSON-RPC"
               }),
-              error,
-            ),
-      ),
-    );
-  };
+              error
+            )
+      )
+    )
+  }
 
   /** Reads what the response to request `id` says: its result, or the failure it reports. */
-  const readResult = Effect.fnUntraced(function* (
-    response: HttpClientResponse.HttpClientResponse,
-    id: number,
-  ) {
+  const readResult = Effect.fnUntraced(function* (response: HttpClientResponse.HttpClientResponse, id: number) {
     if (response.status === 401 || response.status === 403) {
-      return yield* failWithStatus(response.status);
+      return yield* failWithStatus(response.status)
     }
     const reply = yield* readReply(response, id).pipe(
       // A server that fails a request without a reply, or an HTTP error, is read by its status.
       Effect.catchIf(
         () => response.status >= 400,
-        () => Effect.fail(failWithStatus(response.status)),
-      ),
-    );
-    if (reply.error !== undefined) return yield* failWithReply(reply.error);
-    return reply.result ?? null;
-  });
+        () => Effect.fail(failWithStatus(response.status))
+      )
+    )
+    if (reply.error !== undefined) return yield* failWithReply(reply.error)
+    return reply.result ?? null
+  })
 
   /** Sends a request and decodes its result, as the server's reply to it has it. */
   const exchange = Effect.fnUntraced(function* <A, I>(
@@ -293,38 +280,38 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
     method: string,
     params: Readonly<Record<string, Schema.Json>>,
     options?: {
-      readonly toolName?: string;
-      readonly headers?: Readonly<Record<string, string>>;
-    },
-  ) {
-    const id = yield* Ref.updateAndGet(requestCount, (count) => count + 1);
-    const response = yield* post(connection, method, params, { ...options, id });
-    if (response.status === 404 && connection._tag === "Session" && connection.sessionId) {
-      return yield* new SessionEnded({ connection });
+      readonly toolName?: string
+      readonly headers?: Readonly<Record<string, string>>
     }
-    const result = yield* readResult(response, id);
+  ) {
+    const id = yield* Ref.updateAndGet(requestCount, (count) => count + 1)
+    const response = yield* post(connection, method, params, { ...options, id })
+    if (response.status === 404 && connection._tag === "Session" && connection.sessionId) {
+      return yield* new SessionEnded({ connection })
+    }
+    const result = yield* readResult(response, id)
     return yield* Schema.decodeUnknownEffect(schema)(result).pipe(
       Effect.mapError((error) =>
         fail(
           new ToolSourceError.InvalidResponseError({
-            description: `The result of ${method} is not as expected`,
+            description: `The result of ${method} is not as expected`
           }),
-          error,
-        ),
-      ),
-    );
-  });
+          error
+        )
+      )
+    )
+  })
 
   /** Starts a session with a server that has them. */
   const initialize = Effect.gen(function* () {
     const unstarted: Connection = {
       _tag: "Session",
       protocolVersion: newestSessionVersion,
-      sessionId: undefined,
-    };
-    const params = { protocolVersion: newestSessionVersion, capabilities: {}, clientInfo };
-    const id = yield* Ref.updateAndGet(requestCount, (count) => count + 1);
-    const response = yield* post(unstarted, "initialize", params, { id });
+      sessionId: undefined
+    }
+    const params = { protocolVersion: newestSessionVersion, capabilities: {}, clientInfo }
+    const id = yield* Ref.updateAndGet(requestCount, (count) => count + 1)
+    const response = yield* post(unstarted, "initialize", params, { id })
     const answer = yield* readResult(response, id).pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(Initialized)),
       Effect.mapError((error) =>
@@ -332,32 +319,32 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
           ? error
           : fail(
               new ToolSourceError.InvalidResponseError({
-                description: "The result of initialize is not as expected",
+                description: "The result of initialize is not as expected"
               }),
-              error,
-            ),
-      ),
-    );
+              error
+            )
+      )
+    )
     if (!sessionVersions.includes(answer.protocolVersion)) {
       return yield* fail(
         new ToolSourceError.UnsupportedError({
-          description: `The server speaks ${answer.protocolVersion}, which is not supported`,
-        }),
-      );
+          description: `The server speaks ${answer.protocolVersion}, which is not supported`
+        })
+      )
     }
     const connection: Connection = {
       _tag: "Session",
       protocolVersion: answer.protocolVersion,
-      sessionId: response.headers["mcp-session-id"],
-    };
-    const acknowledged = yield* post(connection, "notifications/initialized", {});
-    if (acknowledged.status >= 400) return yield* failWithStatus(acknowledged.status);
-    return connection;
-  });
+      sessionId: response.headers["mcp-session-id"]
+    }
+    const acknowledged = yield* post(connection, "notifications/initialized", {})
+    if (acknowledged.status >= 400) return yield* failWithStatus(acknowledged.status)
+    return connection
+  })
 
   /** Finds out how the server is spoken to: statelessly if it says it can be, or else with sessions. */
   const settleConnection = Effect.gen(function* () {
-    const stateless: Connection = { _tag: "Stateless" };
+    const stateless: Connection = { _tag: "Stateless" }
     const isStateless = yield* exchange(Discovered, stateless, "server/discover", {}).pipe(
       Effect.map((discovered) => discovered.supportedVersions.includes(statelessVersion)),
       // A stateless request carries no session, so none can have ended.
@@ -365,39 +352,33 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
       // A server that is not reached, or does not let the source in, would not answer `initialize`
       // either. Any other failure is one an older server gives to a method it does not know.
       Effect.catchIf(
-        (error) =>
-          error.reason._tag !== "AuthenticationError" && error.reason._tag !== "UnavailableError",
-        () => Effect.succeed(false),
-      ),
-    );
-    return isStateless ? stateless : yield* initialize;
-  });
+        (error) => error.reason._tag !== "AuthenticationError" && error.reason._tag !== "UnavailableError",
+        () => Effect.succeed(false)
+      )
+    )
+    return isStateless ? stateless : yield* initialize
+  })
 
   const connection = settling.withPermit(
     Ref.get(settledConnection).pipe(
       Effect.flatMap(
         Option.match({
           onSome: Effect.succeed,
-          onNone: () =>
-            settleConnection.pipe(
-              Effect.tap((settled) => Ref.set(settledConnection, Option.some(settled))),
-            ),
-        }),
-      ),
-    ),
-  );
+          onNone: () => settleConnection.pipe(Effect.tap((settled) => Ref.set(settledConnection, Option.some(settled))))
+        })
+      )
+    )
+  )
 
   /** Forgets `ended`, unless another request has already settled a new connection. */
   const forgetConnection = (ended: Connection) =>
     Ref.update(
       settledConnection,
-      Option.filter((current) => current !== ended),
-    );
+      Option.filter((current) => current !== ended)
+    )
 
   const request: Transport["request"] = (schema, method, params, options) => {
-    const attempt = connection.pipe(
-      Effect.flatMap((settled) => exchange(schema, settled, method, params, options)),
-    );
+    const attempt = connection.pipe(Effect.flatMap((settled) => exchange(schema, settled, method, params, options)))
     return attempt.pipe(
       Effect.catchTag("SessionEnded", (ended) =>
         forgetConnection(ended.connection).pipe(
@@ -406,19 +387,19 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
             Effect.fail(
               fail(
                 new ToolSourceError.UnavailableError({
-                  description: "The server keeps ending the session",
-                }),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  };
+                  description: "The server keeps ending the session"
+                })
+              )
+            )
+          )
+        )
+      )
+    )
+  }
 
   const transport: Transport = {
     request,
-    mirrorsParameters: Effect.map(connection, (settled) => settled._tag === "Stateless"),
-  };
-  return transport;
-});
+    mirrorsParameters: Effect.map(connection, (settled) => settled._tag === "Stateless")
+  }
+  return transport
+})

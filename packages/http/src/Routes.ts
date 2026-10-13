@@ -9,29 +9,30 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import * as Layer from "effect/Layer";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
-import * as HttpApiScalar from "effect/http-api/HttpApiScalar";
-import * as AccountsHandlers from "./AccountsHandlers.ts";
-import * as BearerAuthentication from "./BearerAuthentication.ts";
-import * as WorkspaceMember from "./internal/workspace-member.ts";
-import * as InvitationsHandlers from "./InvitationsHandlers.ts";
-import * as AssignmentsHandlers from "./AssignmentsHandlers.ts";
-import * as MeHandlers from "./MeHandlers.ts";
-import * as MembersHandlers from "./MembersHandlers.ts";
-import * as NotificationsHandlers from "./NotificationsHandlers.ts";
-import * as SessionHandlers from "./SessionHandlers.ts";
-import * as WorkspacesHandlers from "./WorkspacesHandlers.ts";
-import * as SettingsHandlers from "./SettingsHandlers.ts";
-import * as ChangeFeedHandlers from "./ChangeFeedHandlers.ts";
-import * as ConnectionsHandlers from "./ConnectionsHandlers.ts";
-import * as AgentsHandlers from "./AgentsHandlers.ts";
-import * as ChannelsHandlers from "./ChannelsHandlers.ts";
-import * as GroupsHandlers from "./GroupsHandlers.ts";
-import * as TasksHandlers from "./TasksHandlers.ts";
-import * as ThreadsHandlers from "./ThreadsHandlers.ts";
-import * as TurnsHandlers from "./TurnsHandlers.ts";
+
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as HttpApiScalar from "effect/http-api/HttpApiScalar"
+import * as Layer from "effect/Layer"
+import * as AccountsHandlers from "./AccountsHandlers.ts"
+import * as AgentsHandlers from "./AgentsHandlers.ts"
+import * as Api from "./Api.ts"
+import * as AssignmentsHandlers from "./AssignmentsHandlers.ts"
+import * as BearerAuthentication from "./BearerAuthentication.ts"
+import * as ChangeFeedHandlers from "./ChangeFeedHandlers.ts"
+import * as ChannelsHandlers from "./ChannelsHandlers.ts"
+import * as ConnectionsHandlers from "./ConnectionsHandlers.ts"
+import * as GroupsHandlers from "./GroupsHandlers.ts"
+import * as WorkspaceMember from "./internal/workspace-member.ts"
+import * as InvitationsHandlers from "./InvitationsHandlers.ts"
+import * as MeHandlers from "./MeHandlers.ts"
+import * as MembersHandlers from "./MembersHandlers.ts"
+import * as NotificationsHandlers from "./NotificationsHandlers.ts"
+import * as SessionHandlers from "./SessionHandlers.ts"
+import * as SettingsHandlers from "./SettingsHandlers.ts"
+import * as TasksHandlers from "./TasksHandlers.ts"
+import * as ThreadsHandlers from "./ThreadsHandlers.ts"
+import * as TurnsHandlers from "./TurnsHandlers.ts"
+import * as WorkspacesHandlers from "./WorkspacesHandlers.ts"
 
 /**
  * Provide every group's handlers, authentication, and workspace entry over the required host
@@ -57,8 +58,8 @@ export const layerHandlers = Layer.mergeAll(
   AgentsHandlers.layer,
   TurnsHandlers.layer,
   ChannelsHandlers.layer,
-  ChangeFeedHandlers.layer,
-).pipe(Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMember.layer)));
+  ChangeFeedHandlers.layer
+).pipe(Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMember.layer)))
 
 /**
  * The API routes and its OpenAPI document. Hosts provide `Gateway.Gateway`, `Accounts.Accounts`,
@@ -69,9 +70,7 @@ export const layerHandlers = Layer.mergeAll(
  * @category layers
  * @since 0.1.0
  */
-export const layer = HttpApiBuilder.layer(Api.Api, { openapiPath: "/openapi.json" }).pipe(
-  Layer.provide(layerHandlers),
-);
+export const layer = HttpApiBuilder.layer(Api.Api, { openapiPath: "/openapi.json" }).pipe(Layer.provide(layerHandlers))
 
 /**
  * Register interactive documentation of the API at `/docs`, for local development.
@@ -79,4 +78,4 @@ export const layer = HttpApiBuilder.layer(Api.Api, { openapiPath: "/openapi.json
  * @category layers
  * @since 0.1.0
  */
-export const layerDocs = HttpApiScalar.layer(Api.Api, { path: "/docs" });
+export const layerDocs = HttpApiScalar.layer(Api.Api, { path: "/docs" })

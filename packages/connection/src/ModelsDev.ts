@@ -9,15 +9,14 @@
  *
  * @since 0.1.0
  */
-import type { ModelEndpoint } from "@amends-dev/harness";
-import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-import type * as ModelCatalog from "./ModelCatalog.ts";
+
+import type { ModelEndpoint } from "@amends-dev/harness"
+import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
+import type * as ModelCatalog from "./ModelCatalog.ts"
 
 /** A level of reasoning effort, where `null` and `default` leave the level to the provider. */
-const Effort = Schema.NullOr(
-  Schema.Literals(["none", "minimal", "low", "medium", "high", "xhigh", "max", "default"]),
-);
+const Effort = Schema.NullOr(Schema.Literals(["none", "minimal", "low", "medium", "high", "xhigh", "max", "default"]))
 
 /** A way a request controls a model's reasoning. */
 const ReasoningOption = Schema.Union([
@@ -26,11 +25,11 @@ const ReasoningOption = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("budget_tokens"),
     min: Schema.optionalKey(Schema.Int),
-    max: Schema.optionalKey(Schema.Int),
-  }),
-]);
+    max: Schema.optionalKey(Schema.Int)
+  })
+])
 
-const Modality = Schema.Literals(["text", "image", "audio", "video", "pdf"]);
+const Modality = Schema.Literals(["text", "image", "audio", "video", "pdf"])
 
 /** A model as a provider serves it, with only the fields a catalog keeps. */
 const Model = Schema.Struct({
@@ -41,7 +40,7 @@ const Model = Schema.Struct({
   limit: Schema.Struct({
     context: Schema.Int,
     input: Schema.optionalKey(Schema.Int),
-    output: Schema.Int,
+    output: Schema.Int
   }),
   modalities: Schema.Struct({ input: Schema.Array(Modality), output: Schema.Array(Modality) }),
   tool_call: Schema.Boolean,
@@ -53,8 +52,8 @@ const Model = Schema.Struct({
       output: Schema.Finite,
       cache_read: Schema.optionalKey(Schema.Finite),
       cache_write: Schema.optionalKey(Schema.Finite),
-      reasoning: Schema.optionalKey(Schema.Finite),
-    }),
+      reasoning: Schema.optionalKey(Schema.Finite)
+    })
   ),
 
   /** Where the model is reached, when not as its provider is. */
@@ -62,12 +61,12 @@ const Model = Schema.Struct({
     Schema.Struct({
       npm: Schema.optionalKey(Schema.String),
       api: Schema.optionalKey(Schema.String),
-      shape: Schema.optionalKey(Schema.Literals(["responses", "completions"])),
-    }),
-  ),
-});
+      shape: Schema.optionalKey(Schema.Literals(["responses", "completions"]))
+    })
+  )
+})
 
-type Model = typeof Model.Type;
+type Model = typeof Model.Type
 
 const Provider = Schema.Struct({
   id: Schema.String,
@@ -80,10 +79,10 @@ const Provider = Schema.Struct({
   /** The base URL of the provider's API, where its package has none of its own. */
   api: Schema.optionalKey(Schema.String),
 
-  models: Schema.Record(Schema.String, Model),
-});
+  models: Schema.Record(Schema.String, Model)
+})
 
-type Provider = typeof Provider.Type;
+type Provider = typeof Provider.Type
 
 /**
  * What `api.json` holds: the providers, keyed by id, with only the fields a catalog keeps.
@@ -91,13 +90,13 @@ type Provider = typeof Provider.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Document = Schema.Record(Schema.String, Provider);
+export const Document = Schema.Record(Schema.String, Provider)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Document = typeof Document.Type;
+export type Document = typeof Document.Type
 
 /**
  * The catalog of what `document` holds, from models.dev's `api.json`. It fails when a field the
@@ -107,14 +106,14 @@ export type Document = typeof Document.Type;
  * @since 0.1.0
  */
 export const toCatalog = Effect.fn("ModelsDev.toCatalog")(function* (document: unknown) {
-  const providers = yield* Schema.decodeUnknownEffect(Document)(document);
+  const providers = yield* Schema.decodeUnknownEffect(Document)(document)
   return {
     providers: Object.values(providers)
       .map(providerOf)
       .filter((provider) => provider.models.length > 0)
-      .toSorted(byId),
-  } satisfies ModelCatalog.Catalog;
-});
+      .toSorted(byId)
+  } satisfies ModelCatalog.Catalog
+})
 
 /**
  * The packages whose API amends speaks, with the base URL each uses when given none. OpenRouter's
@@ -124,25 +123,25 @@ const packages: Record<string, { readonly url?: string }> = {
   "@ai-sdk/anthropic": { url: "https://api.anthropic.com/v1" },
   "@ai-sdk/openai": { url: "https://api.openai.com/v1" },
   "@ai-sdk/openai-compatible": {},
-  "@openrouter/ai-sdk-provider": {},
-};
+  "@openrouter/ai-sdk-provider": {}
+}
 
 /** The provider as the catalog keeps it, with the models it serves through a protocol amends speaks. */
 const providerOf = (provider: Provider): ModelCatalog.Provider => {
   const models = Object.values(provider.models)
     .flatMap((model) => {
-      const reached = reachOf(provider, model);
-      return reached === undefined ? [] : [modelOf(model, reached)];
+      const reached = reachOf(provider, model)
+      return reached === undefined ? [] : [modelOf(model, reached)]
     })
-    .toSorted(byId);
+    .toSorted(byId)
   return {
     id: provider.id,
     name: provider.name,
     docs: provider.doc,
     settings: [...new Set(models.flatMap((model) => settingsIn(model.url)))].toSorted(),
-    models,
-  };
-};
+    models
+  }
+}
 
 /**
  * How `model` is reached: its protocol and the base URL of its API, with each `${NAME}` written as
@@ -150,30 +149,30 @@ const providerOf = (provider: Provider): ModelCatalog.Provider => {
  */
 const reachOf = (
   provider: Provider,
-  model: Model,
+  model: Model
 ): { readonly protocol: ModelEndpoint.Protocol; readonly url: string } | undefined => {
   // A provider's package decides how a request authenticates, so a provider whose package amends
   // does not speak is left out, even where its models name one that it does.
-  if (!Object.hasOwn(packages, provider.npm)) return undefined;
-  const npm = model.provider?.npm ?? provider.npm;
-  const url = model.provider?.api ?? provider.api ?? packages[npm]?.url;
-  if (!Object.hasOwn(packages, npm) || url === undefined) return undefined;
-  const shape = model.provider?.shape;
+  if (!Object.hasOwn(packages, provider.npm)) return undefined
+  const npm = model.provider?.npm ?? provider.npm
+  const url = model.provider?.api ?? provider.api ?? packages[npm]?.url
+  if (!Object.hasOwn(packages, npm) || url === undefined) return undefined
+  const shape = model.provider?.shape
   const protocol =
     npm === "@ai-sdk/anthropic"
       ? "anthropic-messages"
       : (npm === "@ai-sdk/openai" && shape !== "completions") ||
           (npm === "@ai-sdk/openai-compatible" && shape === "responses")
         ? "openai-responses"
-        : "openai-chat";
-  return { protocol, url: url.replaceAll(/\$\{(\w+)\}/g, "{$1}") };
-};
+        : "openai-chat"
+  return { protocol, url: url.replaceAll(/\$\{(\w+)\}/g, "{$1}") }
+}
 
 const modelOf = (
   model: Model,
-  reached: { readonly protocol: ModelEndpoint.Protocol; readonly url: string },
+  reached: { readonly protocol: ModelEndpoint.Protocol; readonly url: string }
 ): ModelCatalog.Model => {
-  const reasoning = model.reasoning ? reasoningOf(model.reasoning_options ?? []) : undefined;
+  const reasoning = model.reasoning ? reasoningOf(model.reasoning_options ?? []) : undefined
   return {
     id: model.id,
     name: model.name,
@@ -185,28 +184,16 @@ const modelOf = (
     modalities: model.modalities,
     tools: model.tool_call,
     ...(reasoning === undefined ? {} : { reasoning }),
-    ...(model.cost === undefined ? {} : { cost: costOf(model.cost) }),
-  };
-};
+    ...(model.cost === undefined ? {} : { cost: costOf(model.cost) })
+  }
+}
 
-const efforts: ReadonlyArray<ModelEndpoint.Effort> = [
-  "none",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-];
+const efforts: ReadonlyArray<ModelEndpoint.Effort> = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 /** How a request controls the reasoning of a model that reasons, from models.dev's options. */
-const reasoningOf = (
-  options: ReadonlyArray<typeof ReasoningOption.Type>,
-): ModelCatalog.Reasoning => {
-  const offered = new Set(
-    options.flatMap((option) => (option.type === "effort" ? option.values : [])),
-  );
-  const budget = options.find((option) => option.type === "budget_tokens");
+const reasoningOf = (options: ReadonlyArray<typeof ReasoningOption.Type>): ModelCatalog.Reasoning => {
+  const offered = new Set(options.flatMap((option) => (option.type === "effort" ? option.values : [])))
+  const budget = options.find((option) => option.type === "budget_tokens")
   return {
     toggle: options.some((option) => option.type === "toggle"),
     efforts: efforts.filter((effort) => offered.has(effort)),
@@ -215,23 +202,22 @@ const reasoningOf = (
       : {
           budget: {
             ...(budget.min === undefined ? {} : { min: budget.min }),
-            ...(budget.max === undefined ? {} : { max: budget.max }),
-          },
-        }),
-  };
-};
+            ...(budget.max === undefined ? {} : { max: budget.max })
+          }
+        })
+  }
+}
 
 const costOf = (cost: NonNullable<Model["cost"]>): ModelCatalog.Cost => ({
   input: cost.input,
   output: cost.output,
   ...(cost.cache_read === undefined ? {} : { cacheRead: cost.cache_read }),
   ...(cost.cache_write === undefined ? {} : { cacheWrite: cost.cache_write }),
-  ...(cost.reasoning === undefined ? {} : { reasoning: cost.reasoning }),
-});
+  ...(cost.reasoning === undefined ? {} : { reasoning: cost.reasoning })
+})
 
 /** The settings a model's URL names, as `{NAME}`. */
 const settingsIn = (url: string): ReadonlyArray<string> =>
-  Array.from(url.matchAll(/\{(\w+)\}/g), (match) => match[1] ?? "");
+  Array.from(url.matchAll(/\{(\w+)\}/g), (match) => match[1] ?? "")
 
-const byId = (a: { readonly id: string }, b: { readonly id: string }) =>
-  a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+const byId = (a: { readonly id: string }, b: { readonly id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)

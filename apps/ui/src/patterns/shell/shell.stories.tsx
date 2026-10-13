@@ -1,6 +1,3 @@
-import { For, Show, createSignal } from "solid-js";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { expect, userEvent, waitFor, within } from "storybook/test";
 import {
   IconBell,
   IconCircleFrame,
@@ -15,33 +12,36 @@ import {
   IconMarkSettings,
   IconMarkTasks,
   IconMarkTriage,
-  IconMessage,
-} from "@amends-dev/icons";
-import { AvatarStack } from "../../components/avatar/index.ts";
-import { IconButton } from "../../components/icon-button/index.ts";
-import { Tabs } from "../../components/tabs/index.ts";
-import { Pane } from "../pane/index.ts";
-import { Rail } from "../rail/index.ts";
-import { Sidebar } from "../sidebar/index.ts";
-import { Shell } from "./index.ts";
-import * as s from "./shell.stories.css.ts";
+  IconMessage
+} from "@amends-dev/icons"
+import { For, Show, createSignal } from "solid-js"
+import type { Meta, StoryObj } from "storybook-solidjs-vite"
+import { expect, userEvent, waitFor, within } from "storybook/test"
+import { AvatarStack } from "../../components/avatar/index.ts"
+import { IconButton } from "../../components/icon-button/index.ts"
+import { Tabs } from "../../components/tabs/index.ts"
+import { Pane } from "../pane/index.ts"
+import { Rail } from "../rail/index.ts"
+import { Sidebar } from "../sidebar/index.ts"
+import { Shell } from "./index.ts"
+import * as s from "./shell.stories.css.ts"
 
-const groups = ["general", "design", "engineering", "product"];
+const groups = ["general", "design", "engineering", "product"]
 const messages = [
   ["Alex", "The preview is ready for another look. I’ve linked the latest notes in the task."],
   ["Sara", "Looks good. I’ll keep an eye on the release this morning."],
   ["Oliver", "morning all! ☕"],
   ["Sara", "deploy went out clean last night! 🎉"],
   ["AJ", "found a bug. composer crashes when I paste an image from clipboard lol"],
-  ["Graeme", "@Caleb Let’s grab some coffee"],
-] as const;
+  ["Graeme", "@Caleb Let’s grab some coffee"]
+] as const
 const replies = [
   ["AJ", "found a bug. composer crashes when I paste an image from clipboard lol"],
   ["Alex", "uh oh — repro on mac or everywhere?"],
   ["Yumi", "Reproduced on both — images over 5 MB hit the crash."],
   ["AJ", "Thanks! I’ll attach the image to the task."],
-  ["Sara", "I can pick this up after the release check."],
-] as const;
+  ["Sara", "I can pick this up after the release check."]
+] as const
 
 function Entries(props: { items: ReadonlyArray<readonly [string, string]> }) {
   return (
@@ -55,11 +55,11 @@ function Entries(props: { items: ReadonlyArray<readonly [string, string]> }) {
         )}
       </For>
     </div>
-  );
+  )
 }
 
 function Workspace(props: { thread: boolean }) {
-  const [threadOpen, setThreadOpen] = createSignal(props.thread);
+  const [threadOpen, setThreadOpen] = createSignal(props.thread)
   return (
     <Shell.Root>
       <Shell.Navigation>
@@ -103,11 +103,7 @@ function Workspace(props: { thread: boolean }) {
                 <For each={groups}>
                   {(group) => (
                     <>
-                      <Sidebar.Item
-                        href={`#${group}`}
-                        icon={IconMarkChannel}
-                        current={group === "general"}
-                      >
+                      <Sidebar.Item href={`#${group}`} icon={IconMarkChannel} current={group === "general"}>
                         {group}
                       </Sidebar.Item>
                       <Show when={group === "general"}>
@@ -116,8 +112,8 @@ function Workspace(props: { thread: boolean }) {
                           icon={IconCircleFrame}
                           current={threadOpen()}
                           onClick={(event) => {
-                            event.preventDefault();
-                            setThreadOpen(true);
+                            event.preventDefault()
+                            setThreadOpen(true)
                           }}
                         >
                           Composer paste crash
@@ -157,7 +153,7 @@ function Workspace(props: { thread: boolean }) {
                 people={[
                   { name: "Alex", tone: "sand" },
                   { name: "Yumi", tone: "lilac" },
-                  { name: "Sara", tone: "clay" },
+                  { name: "Sara", tone: "clay" }
                 ]}
               />
               <IconButton icon={IconBell} label="Notifications" />
@@ -204,38 +200,34 @@ function Workspace(props: { thread: boolean }) {
         </Shell.Aside>
       </Show>
     </Shell.Root>
-  );
+  )
 }
 
 const meta = {
   title: "Patterns/Shell",
-  parameters: { layout: "fullscreen" as const },
-} satisfies Meta;
-export default meta;
-type Story = StoryObj;
+  parameters: { layout: "fullscreen" as const }
+} satisfies Meta
+export default meta
+type Story = StoryObj
 
 /** Rail, sidebar, and a group's threads. Resize to see each layout. */
 export const Group = {
-  render: () => <Workspace thread={false} />,
-} satisfies Story;
+  render: () => <Workspace thread={false} />
+} satisfies Story
 
 /** The same group with a thread open in the side panel. */
 export const GroupWithThread = {
-  render: () => <Workspace thread />,
-} satisfies Story;
+  render: () => <Workspace thread />
+} satisfies Story
 
 /** Closing the thread returns to the group alone. */
 export const CloseThread = {
   render: () => <Workspace thread />,
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { level: 1, name: "general" })).toBeVisible();
-    await expect(
-      canvas.getByRole("heading", { level: 2, name: "Composer paste crash" }),
-    ).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: "Close thread" }));
-    await waitFor(() =>
-      expect(canvas.queryByRole("heading", { name: "Composer paste crash" })).toBeNull(),
-    );
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("heading", { level: 1, name: "general" })).toBeVisible()
+    await expect(canvas.getByRole("heading", { level: 2, name: "Composer paste crash" })).toBeVisible()
+    await userEvent.click(canvas.getByRole("button", { name: "Close thread" }))
+    await waitFor(() => expect(canvas.queryByRole("heading", { name: "Composer paste crash" })).toBeNull())
+  }
+} satisfies Story

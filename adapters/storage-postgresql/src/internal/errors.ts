@@ -1,32 +1,30 @@
-import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
-import * as Cause from "effect/Cause";
-import * as Option from "effect/Option";
-import * as SqlError from "effect/sql/SqlError";
-import { StoreError } from "@amends-dev/core/journal";
+import { StoreError } from "@amends-dev/core/journal"
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core"
+import * as Cause from "effect/Cause"
+import * as Option from "effect/Option"
+import * as SqlError from "effect/sql/SqlError"
 
 /** The client's classification of a failed statement, whether Drizzle or the client raised it. */
 export const sqlError = (error: unknown): SqlError.SqlError | undefined => {
-  if (error instanceof SqlError.SqlError) return error;
+  if (error instanceof SqlError.SqlError) return error
   if (error instanceof EffectDrizzleQueryError) {
-    const failure = Cause.isCause(error.cause) ? Cause.findErrorOption(error.cause) : Option.none();
-    return Option.isSome(failure) ? sqlError(failure.value) : undefined;
+    const failure = Cause.isCause(error.cause) ? Cause.findErrorOption(error.cause) : Option.none()
+    return Option.isSome(failure) ? sqlError(failure.value) : undefined
   }
-  return undefined;
-};
+  return undefined
+}
 
 /** A row the database refused: a duplicate key, a foreign key, or a check. */
 export const isConstraintViolation = (error: unknown): boolean => {
-  const reason = sqlError(error)?.reason._tag;
-  return reason === "UniqueViolation" || reason === "ConstraintError";
-};
+  const reason = sqlError(error)?.reason._tag
+  return reason === "UniqueViolation" || reason === "ConstraintError"
+}
 
 /** Another writer holds what this transaction needs; the operation did not apply. */
 export const isContention = (error: unknown): boolean => {
-  const reason = sqlError(error)?.reason._tag;
-  return (
-    reason === "LockTimeoutError" || reason === "SerializationError" || reason === "DeadlockError"
-  );
-};
+  const reason = sqlError(error)?.reason._tag
+  return reason === "LockTimeoutError" || reason === "SerializationError" || reason === "DeadlockError"
+}
 
 /**
  * Report a write's failure as the store's: a row the database refused is rejected, anything else
@@ -36,12 +34,8 @@ export const storeError =
   (store: string, operation: string) =>
   (cause: unknown): StoreError.StoreError =>
     isConstraintViolation(cause)
-      ? StoreError.rejected(
-          store,
-          operation,
-          cause instanceof Error ? cause.message : String(cause),
-        )
-      : StoreError.failed(store, operation)(cause);
+      ? StoreError.rejected(store, operation, cause instanceof Error ? cause.message : String(cause))
+      : StoreError.failed(store, operation)(cause)
 
 /**
  * Report a write's failure where a row the database refused is one another writer stored first, as
@@ -52,9 +46,5 @@ export const raceError =
   (store: string, operation: string) =>
   (cause: unknown): StoreError.StoreError =>
     isConstraintViolation(cause)
-      ? StoreError.contended(
-          store,
-          operation,
-          cause instanceof Error ? cause.message : String(cause),
-        )
-      : StoreError.failed(store, operation)(cause);
+      ? StoreError.contended(store, operation, cause instanceof Error ? cause.message : String(cause))
+      : StoreError.failed(store, operation)(cause)

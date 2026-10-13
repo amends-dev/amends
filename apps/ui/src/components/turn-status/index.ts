@@ -5,5 +5,5 @@ export {
   turnStateLabels,
   type TurnActivityProps,
   type TurnState,
-  type TurnStatusProps,
-} from "./turn-status.tsx";
+  type TurnStatusProps
+} from "./turn-status.tsx"

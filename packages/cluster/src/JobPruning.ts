@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import * as Cron from "effect/Cron";
-import * as DateTime from "effect/DateTime";
-import * as Duration from "effect/Duration";
-import * as Effect from "effect/Effect";
-import * as ClusterCron from "effect/cluster/ClusterCron";
+
+import * as ClusterCron from "effect/cluster/ClusterCron"
+import * as Cron from "effect/Cron"
+import * as DateTime from "effect/DateTime"
+import * as Duration from "effect/Duration"
+import * as Effect from "effect/Effect"
 
 /**
  * The name of the job that prunes handled requests, under which `ClusterCron` stores its own runs,
@@ -19,7 +20,7 @@ import * as ClusterCron from "effect/cluster/ClusterCron";
  * @category utils
  * @since 0.1.0
  */
-export const jobName = "amends/prune-handled-requests";
+export const jobName = "amends/prune-handled-requests"
 
 /**
  * Remove the handled messages of these entity types stored before `before`, with anything
@@ -29,10 +30,7 @@ export const jobName = "amends/prune-handled-requests";
  * @category models
  * @since 0.1.0
  */
-export type Prune<E, R> = (
-  entityTypes: ReadonlyArray<string>,
-  before: DateTime.Utc,
-) => Effect.Effect<number, E, R>;
+export type Prune<E, R> = (entityTypes: ReadonlyArray<string>, before: DateTime.Utc) => Effect.Effect<number, E, R>
 
 /**
  * Prune the handled requests of `entityTypes`, and the job's own past runs, once they are older
@@ -44,19 +42,19 @@ export type Prune<E, R> = (
  * @since 0.1.0
  */
 export const layer = <E, R>(options: {
-  readonly prune: Prune<E, R>;
-  readonly entityTypes: ReadonlyArray<string>;
-  readonly keep?: Duration.Input | undefined;
+  readonly prune: Prune<E, R>
+  readonly entityTypes: ReadonlyArray<string>
+  readonly keep?: Duration.Input | undefined
 }) => {
-  const keep = Duration.fromInputUnsafe(options.keep ?? "7 days");
-  const entityTypes = [...options.entityTypes, `ClusterCron/${jobName}`];
+  const keep = Duration.fromInputUnsafe(options.keep ?? "7 days")
+  const entityTypes = [...options.entityTypes, `ClusterCron/${jobName}`]
   return ClusterCron.make({
     name: jobName,
     cron: Cron.parseUnsafe("0 * * * *"),
     execute: Effect.gen(function* () {
-      const before = DateTime.subtractDuration(yield* DateTime.now, keep);
-      const removed = yield* options.prune(entityTypes, before);
-      if (removed > 0) yield* Effect.logInfo("Pruned handled Cluster requests", { removed });
-    }),
-  });
-};
+      const before = DateTime.subtractDuration(yield* DateTime.now, keep)
+      const removed = yield* options.prune(entityTypes, before)
+      if (removed > 0) yield* Effect.logInfo("Pruned handled Cluster requests", { removed })
+    })
+  })
+}

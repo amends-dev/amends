@@ -7,32 +7,33 @@
  *
  * @since 0.1.0
  */
-import * as Core from "@amends-dev/core";
-import { Actor, type Identity } from "@amends-dev/core/identity";
-import { Checkpoint, Store } from "@amends-dev/core/journal";
-import { Operation } from "@amends-dev/core/operation";
+
+import * as Core from "@amends-dev/core"
+import type { DeliveryJobs } from "@amends-dev/core/channel"
+import { CoreError } from "@amends-dev/core/error"
+import { Actor, type Identity } from "@amends-dev/core/identity"
+import { Checkpoint, Store } from "@amends-dev/core/journal"
+import { Operation } from "@amends-dev/core/operation"
+import { Request } from "@amends-dev/core/request"
+import type { TurnJobs } from "@amends-dev/core/turn"
 import {
   type Member,
   MemberStore,
   Workspace,
   WorkspaceInitialization,
-  WorkspaceStore,
-} from "@amends-dev/core/workspace";
-import { Request } from "@amends-dev/core/request";
-import type { DeliveryJobs } from "@amends-dev/core/channel";
-import type { TurnJobs } from "@amends-dev/core/turn";
-import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Cause from "effect/Cause";
-import type * as Scope from "effect/Scope";
-import * as WorkspaceStorage from "./WorkspaceStorage.ts";
-import * as WorkspaceRuntime from "./internal/workspace-runtime.ts";
-import { CoreError } from "@amends-dev/core/error";
+  WorkspaceStore
+} from "@amends-dev/core/workspace"
+import * as Cause from "effect/Cause"
+import * as Context from "effect/Context"
+import * as Crypto from "effect/Crypto"
+import * as Data from "effect/Data"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import * as Schema from "effect/Schema"
+import type * as Scope from "effect/Scope"
+import * as WorkspaceRuntime from "./internal/workspace-runtime.ts"
+import * as WorkspaceStorage from "./WorkspaceStorage.ts"
 
 /**
  * The gateway a host builds once, with `make` or `layer`: it creates workspaces and runs programs
@@ -52,11 +53,8 @@ export class Gateway extends Context.Service<
     readonly createWorkspace: (
       creator: Identity.HumanId,
       input: Workspace.CreateInput,
-      options?: Request.Options,
-    ) => Effect.Effect<
-      Workspace.Workspace,
-      CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain
-    >;
+      options?: Request.Options
+    ) => Effect.Effect<Workspace.Workspace, CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain>
     /**
      * Run core operations as the identity's active membership, keeping the workspace prepared for
      * the caller's scope, so a stream the program returns keeps it too. Membership is resolved
@@ -67,8 +65,8 @@ export class Gateway extends Context.Service<
     readonly asMember: <A, E, R extends Core.Operations | Actor.Actor | Scope.Scope>(
       workspaceId: Workspace.Id,
       identity: Identity.MemberReference,
-      program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, E | CoreError.Denied, Scope.Scope>;
+      program: Effect.Effect<A, E, R>
+    ) => Effect.Effect<A, E | CoreError.Denied, Scope.Scope>
     /**
      * Run a program in a workspace without an actor, keeping the workspace prepared for the
      * caller's scope: invitation acceptance, where the recipient is not yet a member, and a host's
@@ -78,12 +76,12 @@ export class Gateway extends Context.Service<
      */
     readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
       workspaceId: Workspace.Id,
-      program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, E | CoreError.NotFound, Scope.Scope>;
+      program: Effect.Effect<A, E, R>
+    ) => Effect.Effect<A, E | CoreError.NotFound, Scope.Scope>
   }
 >()("@amends-dev/gateway/Gateway") {}
 
-const isUnavailable = Schema.is(CoreError.Unavailable);
+const isUnavailable = Schema.is(CoreError.Unavailable)
 
 /**
  * Whether the program stopped because another host changed which projection versions are live, so
@@ -91,11 +89,8 @@ const isUnavailable = Schema.is(CoreError.Unavailable);
  */
 const isStaleCause = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
-    (reason) =>
-      Cause.isFailReason(reason) &&
-      isUnavailable(reason.error) &&
-      reason.error.reason._tag === "Reloading",
-  );
+    (reason) => Cause.isFailReason(reason) && isUnavailable(reason.error) && reason.error.reason._tag === "Reloading"
+  )
 
 /**
  * What `make` and `layer` take: the integrations the host installs, and how long an unused
@@ -104,15 +99,15 @@ const isStaleCause = (cause: Cause.Cause<unknown>) =>
  * @category options
  * @since 0.1.0
  */
-export type Options = WorkspaceRuntime.Options;
+export type Options = WorkspaceRuntime.Options
 
 /** Whether membership is known, refused, or must be resolved after preparation. */
 type Admission = Data.TaggedEnum<{
-  Member: { readonly member: Member.Member };
-  Refused: {};
-  Prepare: {};
-}>;
-const Admission = Data.taggedEnum<Admission>();
+  Member: { readonly member: Member.Member }
+  Refused: {}
+  Prepare: {}
+}>
+const Admission = Data.taggedEnum<Admission>()
 
 /**
  * Construct one gateway and its workspace runtimes in the host scope. Identities come
@@ -122,31 +117,23 @@ const Admission = Data.taggedEnum<Admission>();
  * @since 0.1.0
  */
 export const make = Effect.fn("Gateway.make")(function* (
-  options: Options = {},
+  options: Options = {}
 ): Effect.fn.Return<
   Gateway["Service"],
   never,
-  | WorkspaceStorage.WorkspaceStorage
-  | TurnJobs.TurnJobs
-  | DeliveryJobs.DeliveryJobs
-  | Crypto.Crypto
-  | Scope.Scope
+  WorkspaceStorage.WorkspaceStorage | TurnJobs.TurnJobs | DeliveryJobs.DeliveryJobs | Crypto.Crypto | Scope.Scope
 > {
-  const runtimes = yield* WorkspaceRuntime.make(options);
+  const runtimes = yield* WorkspaceRuntime.make(options)
   /**
    * When another host changed the live projection versions, prepare the workspace again, which
    * replays it, for the next request; the failed one did not commit.
    */
   const reloadWhenStale = <A, E, R>(workspaceId: Workspace.Id, effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(
-      Effect.tapCause((cause) =>
-        isStaleCause(cause) ? runtimes.invalidate(workspaceId) : Effect.void,
-      ),
-    );
-  const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage;
+    effect.pipe(Effect.tapCause((cause) => (isStaleCause(cause) ? runtimes.invalidate(workspaceId) : Effect.void)))
+  const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage
   // Admission reads storage as the host, never inside a request's actor or transaction.
-  const hostContext = yield* Effect.context<never>();
-  const crypto = yield* Crypto.Crypto;
+  const hostContext = yield* Effect.context<never>()
+  const crypto = yield* Crypto.Crypto
 
   /**
    * Run a program in the workspace's prepared runtime, preparing it first if this host has not.
@@ -154,29 +141,25 @@ export const make = Effect.fn("Gateway.make")(function* (
    */
   const runInWorkspace = Effect.fn("Gateway.runInWorkspace")(function* <A, E>(
     workspaceId: Workspace.Id,
-    program: Effect.Effect<A, E, WorkspaceRuntime.Services | Scope.Scope>,
+    program: Effect.Effect<A, E, WorkspaceRuntime.Services | Scope.Scope>
   ) {
-    const context = yield* runtimes.lease(workspaceId);
-    return yield* program.pipe(Effect.provide(context));
-  });
+    const context = yield* runtimes.lease(workspaceId)
+    return yield* program.pipe(Effect.provide(context))
+  })
 
   /** The admission check's reads, from a view of the workspace's stores. */
   const findMembershipInStorage = Effect.fnUntraced(function* (
     workspaceId: Workspace.Id,
-    identity: Identity.MemberReference,
+    identity: Identity.MemberReference
   ) {
-    const bindings = yield* workspaceStorage.forWorkspace(workspaceId);
-    const membership = yield* Effect.orDie(
-      Context.get(bindings, MemberStore.MemberStore).findActive(identity),
-    );
-    if (Option.isSome(membership)) return Admission.Member({ member: membership.value });
-    const live = yield* Effect.orDie(
-      Context.get(bindings, Checkpoint.Checkpoint).listLive(Core.journalLog),
-    );
-    if (live.length > 0) return Admission.Refused();
-    const head = yield* Effect.orDie(Context.get(bindings, Store.Store).head(Core.journalLog));
-    return Option.isNone(head) ? Admission.Refused() : Admission.Prepare();
-  });
+    const bindings = yield* workspaceStorage.forWorkspace(workspaceId)
+    const membership = yield* Effect.orDie(Context.get(bindings, MemberStore.MemberStore).findActive(identity))
+    if (Option.isSome(membership)) return Admission.Member({ member: membership.value })
+    const live = yield* Effect.orDie(Context.get(bindings, Checkpoint.Checkpoint).listLive(Core.journalLog))
+    if (live.length > 0) return Admission.Refused()
+    const head = yield* Effect.orDie(Context.get(bindings, Store.Store).head(Core.journalLog))
+    return Option.isNone(head) ? Admission.Refused() : Admission.Prepare()
+  })
 
   /**
    * Whether an identity may enter a workspace. A prepared workspace resolves membership inside
@@ -188,42 +171,40 @@ export const make = Effect.fn("Gateway.make")(function* (
    */
   const checkAdmission = Effect.fn("Gateway.checkAdmission")(function* (
     workspaceId: Workspace.Id,
-    identity: Identity.MemberReference,
+    identity: Identity.MemberReference
   ) {
-    if (yield* runtimes.isPrepared(workspaceId)) return Admission.Prepare();
-    return yield* findMembershipInStorage(workspaceId, identity).pipe(
-      Effect.setContext(hostContext),
-    );
-  });
+    if (yield* runtimes.isPrepared(workspaceId)) return Admission.Prepare()
+    return yield* findMembershipInStorage(workspaceId, identity).pipe(Effect.setContext(hostContext))
+  })
   /** Whether the workspace has history, read as the host. */
   const hasHistory = (workspaceId: Workspace.Id) =>
     workspaceStorage.forWorkspace(workspaceId).pipe(
       Effect.flatMap((bindings) => Context.get(bindings, Store.Store).head(Core.journalLog)),
       Effect.map(Option.isSome),
       Effect.orDie,
-      Effect.setContext(hostContext),
-    );
+      Effect.setContext(hostContext)
+    )
   /** A workspace that was never created has no history, and is refused before it is prepared. */
   const requireCreated = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
     if (!(yield* runtimes.isPrepared(workspaceId)) && !(yield* hasHistory(workspaceId)))
-      return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId });
-  });
+      return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId })
+  })
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
     workspaceId: Workspace.Id,
     identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
-    admittedMember: Option.Option<Member.Member>,
+    admittedMember: Option.Option<Member.Member>
   ) {
     // Without an answer from the admission check, the prepared workspace's read models decide.
     const membership = Option.isSome(admittedMember)
       ? admittedMember
-      : yield* Effect.orDie((yield* MemberStore.MemberStore).findActive(identity));
+      : yield* Effect.orDie((yield* MemberStore.MemberStore).findActive(identity))
     if (Option.isNone(membership))
-      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) });
-    const actor = Actor.Actor.of({ workspaceId, memberId: membership.value.id, identity });
-    return yield* reloadWhenStale(workspaceId, Effect.provideService(program, Actor.Actor, actor));
-  });
+      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) })
+    const actor = Actor.Actor.of({ workspaceId, memberId: membership.value.id, identity })
+    return yield* reloadWhenStale(workspaceId, Effect.provideService(program, Actor.Actor, actor))
+  })
 
   /**
    * A keyed creation's workspace ID, derived from its creator and key: a retry names the same
@@ -233,28 +214,26 @@ export const make = Effect.fn("Gateway.make")(function* (
     Request.derivedId(["workspace.create", creator, key]).pipe(
       Effect.map((id) => Workspace.Id.make(id)),
       Effect.provideService(Crypto.Crypto, crypto),
-      Effect.orDie,
-    );
-  const createWorkspace: Gateway["Service"]["createWorkspace"] = Effect.fn(
-    "Gateway.createWorkspace",
-  )(function* (
+      Effect.orDie
+    )
+  const createWorkspace: Gateway["Service"]["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(function* (
     creator: Identity.HumanId,
     input: Workspace.CreateInput,
-    options: Request.Options = {},
+    options: Request.Options = {}
   ) {
-    const key = options.requestKey;
+    const key = options.requestKey
     const id =
       key === undefined
         ? Workspace.Id.make(yield* Effect.orDie(crypto.randomUUIDv4))
-        : yield* workspaceIdForKey(creator, key);
+        : yield* workspaceIdForKey(creator, key)
     if (key !== undefined) {
       // A completed first attempt answers its retry without preparing the workspace.
       const recorded = yield* workspaceStorage.forWorkspace(id).pipe(
         Effect.flatMap((bindings) => Context.get(bindings, WorkspaceStore.WorkspaceStore).get),
         Effect.orDie,
-        Effect.setContext(hostContext),
-      );
-      if (Option.isSome(recorded)) return recorded.value;
+        Effect.setContext(hostContext)
+      )
+      if (Option.isSome(recorded)) return recorded.value
     }
     const initialized = WorkspaceInitialization.initialize(creator, input).pipe(
       // A concurrent attempt with the same key initialized it first.
@@ -264,52 +243,43 @@ export const make = Effect.fn("Gateway.make")(function* (
           Effect.flatMap(
             Option.match({
               onNone: () => Effect.die("An initialized workspace has no record"),
-              onSome: Effect.succeed,
-            }),
-          ),
-        ),
+              onSome: Effect.succeed
+            })
+          )
+        )
       ),
-      Operation.report,
-    );
-    return yield* Effect.scoped(runInWorkspace(id, reloadWhenStale(id, initialized)));
-  });
+      Operation.report
+    )
+    return yield* Effect.scoped(runInWorkspace(id, reloadWhenStale(id, initialized)))
+  })
 
   const asMember: Gateway["Service"]["asMember"] = Effect.fn("Gateway.asMember")(function* <
     A,
     E,
-    R extends Core.Operations | Actor.Actor | Scope.Scope,
-  >(
-    workspaceId: Workspace.Id,
-    identity: Identity.MemberReference,
-    program: Effect.Effect<A, E, R>,
-  ) {
-    const operation: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope> = program;
-    const admission = yield* checkAdmission(workspaceId, identity);
+    R extends Core.Operations | Actor.Actor | Scope.Scope
+  >(workspaceId: Workspace.Id, identity: Identity.MemberReference, program: Effect.Effect<A, E, R>) {
+    const operation: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope> = program
+    const admission = yield* checkAdmission(workspaceId, identity)
     if (Admission.$is("Refused")(admission))
-      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) });
+      return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) })
     const admittedMember = Admission.$is("Member")(admission)
       ? Option.some(admission.member)
-      : Option.none<Member.Member>();
-    return yield* runInWorkspace(
-      workspaceId,
-      withActor(workspaceId, identity, operation, admittedMember),
-    );
-  });
+      : Option.none<Member.Member>()
+    return yield* runInWorkspace(workspaceId, withActor(workspaceId, identity, operation, admittedMember))
+  })
 
-  const inWorkspace: Gateway["Service"]["inWorkspace"] = Effect.fn("Gateway.inWorkspace")(
-    function* <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
-      workspaceId: Workspace.Id,
-      program: Effect.Effect<A, E, R>,
-    ) {
-      const operation: Effect.Effect<A, E, Core.Operations | Core.JobServices | Scope.Scope> =
-        program;
-      yield* requireCreated(workspaceId);
-      return yield* runInWorkspace(workspaceId, reloadWhenStale(workspaceId, operation));
-    },
-  );
+  const inWorkspace: Gateway["Service"]["inWorkspace"] = Effect.fn("Gateway.inWorkspace")(function* <
+    A,
+    E,
+    R extends Core.Operations | Core.JobServices | Scope.Scope
+  >(workspaceId: Workspace.Id, program: Effect.Effect<A, E, R>) {
+    const operation: Effect.Effect<A, E, Core.Operations | Core.JobServices | Scope.Scope> = program
+    yield* requireCreated(workspaceId)
+    return yield* runInWorkspace(workspaceId, reloadWhenStale(workspaceId, operation))
+  })
 
-  return Gateway.of({ createWorkspace, asMember, inWorkspace });
-});
+  return Gateway.of({ createWorkspace, asMember, inWorkspace })
+})
 
 /**
  * Provide one gateway and its workspace runtimes for the host layer's lifetime.
@@ -317,4 +287,4 @@ export const make = Effect.fn("Gateway.make")(function* (
  * @category layers
  * @since 0.1.0
  */
-export const layer = (options?: Options) => Layer.effect(Gateway, make(options));
+export const layer = (options?: Options) => Layer.effect(Gateway, make(options))

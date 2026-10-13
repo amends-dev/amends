@@ -1,35 +1,28 @@
-import { For, splitProps, type JSX } from "solid-js";
-import { useField } from "../field/index.ts";
-import { classes } from "../../internal/props.ts";
-import * as s from "./code-input.css.ts";
+import { For, splitProps, type JSX } from "solid-js"
+import { classes } from "../../internal/props.ts"
+import { useField } from "../field/index.ts"
+import * as s from "./code-input.css.ts"
 
 export type CodeInputProps = Omit<
   JSX.InputHTMLAttributes<HTMLInputElement>,
   "type" | "value" | "onInput" | "maxLength" | "pattern" | "children"
 > & {
-  value: string;
+  value: string
   /** Called with digits only, at most six. */
-  onValueChange: (value: string) => void;
+  onValueChange: (value: string) => void
   /** Called once six digits are in, such as to verify right away. */
-  onComplete?: (value: string) => void;
-  invalid?: boolean;
-};
+  onComplete?: (value: string) => void
+  invalid?: boolean
+}
 
 /**
  * A six-digit code in one native field, drawn as six cells: typing, pasting, deleting, and the
  * platform's one-time-code autofill all work as in a text field. Place it in a Field.
  */
 export function CodeInput(props: CodeInputProps) {
-  const field = useField();
-  const [local, native] = splitProps(props, [
-    "value",
-    "onValueChange",
-    "onComplete",
-    "invalid",
-    "disabled",
-    "class",
-  ]);
-  const digits = () => local.value.slice(0, 6).split("");
+  const field = useField()
+  const [local, native] = splitProps(props, ["value", "onValueChange", "onComplete", "invalid", "disabled", "class"])
+  const digits = () => local.value.slice(0, 6).split("")
   return (
     <div
       class={classes(s.root, local.class)}
@@ -38,11 +31,7 @@ export function CodeInput(props: CodeInputProps) {
     >
       <For each={[0, 1, 2, 3, 4, 5]}>
         {(index) => (
-          <span
-            class={s.cell}
-            aria-hidden="true"
-            data-next={index === Math.min(digits().length, 5) ? "" : undefined}
-          >
+          <span class={s.cell} aria-hidden="true" data-next={index === Math.min(digits().length, 5) ? "" : undefined}>
             {digits()[index] ?? ""}
           </span>
         )}
@@ -62,13 +51,13 @@ export function CodeInput(props: CodeInputProps) {
         value={local.value}
         class={s.input}
         onInput={(event) => {
-          const next = event.currentTarget.value.replaceAll(/\D/g, "").slice(0, 6);
+          const next = event.currentTarget.value.replaceAll(/\D/g, "").slice(0, 6)
           // Keep the field in step when non-digits were dropped.
-          if (event.currentTarget.value !== next) event.currentTarget.value = next;
-          local.onValueChange(next);
-          if (next.length === 6) local.onComplete?.(next);
+          if (event.currentTarget.value !== next) event.currentTarget.value = next
+          local.onValueChange(next)
+          if (next.length === 6) local.onComplete?.(next)
         }}
       />
     </div>
-  );
+  )
 }

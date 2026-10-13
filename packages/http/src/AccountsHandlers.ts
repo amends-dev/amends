@@ -7,17 +7,13 @@
  *
  * @since 0.1.0
  */
-import * as Api from "./Api.ts";
-import { Identity } from "@amends-dev/core/identity";
-import {
-  type Invitation,
-  InvitationService,
-  type Member,
-  MemberService,
-} from "@amends-dev/core/workspace";
-import { Accounts } from "@amends-dev/gateway";
-import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+
+import { Identity } from "@amends-dev/core/identity"
+import { type Invitation, InvitationService, type Member, MemberService } from "@amends-dev/core/workspace"
+import { Accounts } from "@amends-dev/gateway"
+import * as Effect from "effect/Effect"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Api from "./Api.ts"
 
 /**
  * Register the workspace accounts handler over the gateway and the host's accounts. Listing the
@@ -30,31 +26,24 @@ export const layer = HttpApiBuilder.group(
   Api.Api,
   "accounts",
   Effect.fn(function* (handlers) {
-    const accounts = yield* Accounts.Accounts;
+    const accounts = yield* Accounts.Accounts
     return handlers.handleAll({
       list: () =>
         Effect.gen(function* () {
           const invitations = yield* InvitationService.InvitationService.use(
-            (invitationService) => invitationService.list,
-          );
-          const members = yield* MemberService.MemberService.use(
-            (memberService) => memberService.list,
-          );
-          return yield* accounts.findByIds(humanIdsOf(members, invitations));
-        }),
-    });
-  }),
-);
+            (invitationService) => invitationService.list
+          )
+          const members = yield* MemberService.MemberService.use((memberService) => memberService.list)
+          return yield* accounts.findByIds(humanIdsOf(members, invitations))
+        })
+    })
+  })
+)
 
 /** The people a workspace names: its human members and its invitations' recipients, once each. */
-const humanIdsOf = (
-  members: ReadonlyArray<Member.Member>,
-  invitations: ReadonlyArray<Invitation.Invitation>,
-) => [
+const humanIdsOf = (members: ReadonlyArray<Member.Member>, invitations: ReadonlyArray<Invitation.Invitation>) => [
   ...new Set([
-    ...members.flatMap(({ identity }) =>
-      Identity.MemberReference.isAnyOf(["Human"])(identity) ? [identity.id] : [],
-    ),
-    ...invitations.map((invitation) => invitation.details.recipientId),
-  ]),
-];
+    ...members.flatMap(({ identity }) => (Identity.MemberReference.isAnyOf(["Human"])(identity) ? [identity.id] : [])),
+    ...invitations.map((invitation) => invitation.details.recipientId)
+  ])
+]

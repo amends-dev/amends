@@ -1,4 +1,4 @@
-export * as Composer from "./composer.tsx";
+export * as Composer from "./composer.tsx"
 export type {
   AlertProps as ComposerAlertProps,
   ComposerCommand,
@@ -6,5 +6,5 @@ export type {
   MentionCandidate,
   RootProps as ComposerRootProps,
   SendProps as ComposerSendProps,
-  ToolbarProps as ComposerToolbarProps,
-} from "./composer.tsx";
+  ToolbarProps as ComposerToolbarProps
+} from "./composer.tsx"

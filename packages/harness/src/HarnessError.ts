@@ -15,7 +15,8 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
+
+import * as Schema from "effect/Schema"
 
 /**
  * The agent cannot do what it was asked, such as answer in JSON, compact on request, or work
@@ -25,14 +26,14 @@ import * as Schema from "effect/Schema";
  * @since 0.1.0
  */
 export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends-dev/harness/HarnessError/UnsupportedError",
+  "@amends-dev/harness/HarnessError/UnsupportedError"
 )("UnsupportedError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The harness does not support this operation";
+    return this.description ?? "The harness does not support this operation"
   }
 }
 
@@ -42,15 +43,16 @@ export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
  * @category errors
  * @since 0.1.0
  */
-export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends-dev/harness/HarnessError/NotFoundError",
-)("NotFoundError", { description: Schema.optional(Schema.String) }) {
+export class NotFoundError extends Schema.TaggedError<NotFoundError>("@amends-dev/harness/HarnessError/NotFoundError")(
+  "NotFoundError",
+  { description: Schema.optional(Schema.String) }
+) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The agent has no such session";
+    return this.description ?? "The agent has no such session"
   }
 }
 
@@ -62,14 +64,14 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>(
  * @since 0.1.0
  */
 export class SessionReleasedError extends Schema.TaggedError<SessionReleasedError>(
-  "@amends-dev/harness/HarnessError/SessionReleasedError",
+  "@amends-dev/harness/HarnessError/SessionReleasedError"
 )("SessionReleasedError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The session was suspended, detached, stopped, or destroyed";
+    return this.description ?? "The session was suspended, detached, stopped, or destroyed"
   }
 }
 
@@ -81,14 +83,14 @@ export class SessionReleasedError extends Schema.TaggedError<SessionReleasedErro
  * @since 0.1.0
  */
 export class TurnInProgressError extends Schema.TaggedError<TurnInProgressError>(
-  "@amends-dev/harness/HarnessError/TurnInProgressError",
+  "@amends-dev/harness/HarnessError/TurnInProgressError"
 )("TurnInProgressError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The session is already running a turn";
+    return this.description ?? "The session is already running a turn"
   }
 }
 
@@ -98,15 +100,16 @@ export class TurnInProgressError extends Schema.TaggedError<TurnInProgressError>
  * @category errors
  * @since 0.1.0
  */
-export class NoTurnError extends Schema.TaggedError<NoTurnError>(
-  "@amends-dev/harness/HarnessError/NoTurnError",
-)("NoTurnError", { description: Schema.optional(Schema.String) }) {
+export class NoTurnError extends Schema.TaggedError<NoTurnError>("@amends-dev/harness/HarnessError/NoTurnError")(
+  "NoTurnError",
+  { description: Schema.optional(Schema.String) }
+) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The session has no turn for this";
+    return this.description ?? "The session has no turn for this"
   }
 }
 
@@ -117,14 +120,14 @@ export class NoTurnError extends Schema.TaggedError<NoTurnError>(
  * @since 0.1.0
  */
 export class TurnFailedError extends Schema.TaggedError<TurnFailedError>(
-  "@amends-dev/harness/HarnessError/TurnFailedError",
+  "@amends-dev/harness/HarnessError/TurnFailedError"
 )("TurnFailedError", { description: Schema.optional(Schema.String), error: Schema.Unknown }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The agent reported that the turn failed";
+    return this.description ?? "The agent reported that the turn failed"
   }
 }
 
@@ -136,14 +139,14 @@ export class TurnFailedError extends Schema.TaggedError<TurnFailedError>(
  * @since 0.1.0
  */
 export class AgentContractError extends Schema.TaggedError<AgentContractError>(
-  "@amends-dev/harness/HarnessError/AgentContractError",
+  "@amends-dev/harness/HarnessError/AgentContractError"
 )("AgentContractError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The agent sent the harness something it cannot read";
+    return this.description ?? "The agent sent the harness something it cannot read"
   }
 }
 
@@ -155,14 +158,14 @@ export class AgentContractError extends Schema.TaggedError<AgentContractError>(
  * @since 0.1.0
  */
 export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends-dev/harness/HarnessError/UnavailableError",
+  "@amends-dev/harness/HarnessError/UnavailableError"
 )("UnavailableError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
-    return true;
+    return true
   }
 
   override get message(): string {
-    return this.description ?? "The agent cannot be reached right now";
+    return this.description ?? "The agent cannot be reached right now"
   }
 }
 
@@ -173,15 +176,16 @@ export class UnavailableError extends Schema.TaggedError<UnavailableError>(
  * @category errors
  * @since 0.1.0
  */
-export class UnknownError extends Schema.TaggedError<UnknownError>(
-  "@amends-dev/harness/HarnessError/UnknownError",
-)("UnknownError", { description: Schema.optional(Schema.String) }) {
+export class UnknownError extends Schema.TaggedError<UnknownError>("@amends-dev/harness/HarnessError/UnknownError")(
+  "UnknownError",
+  { description: Schema.optional(Schema.String) }
+) {
   get isRetryable(): boolean {
-    return false;
+    return false
   }
 
   override get message(): string {
-    return this.description ?? "The harness failed";
+    return this.description ?? "The harness failed"
   }
 }
 
@@ -200,14 +204,14 @@ export const HarnessErrorReason = Schema.Union([
   TurnFailedError,
   AgentContractError,
   UnavailableError,
-  UnknownError,
-]);
+  UnknownError
+])
 
 /**
  * @category errors
  * @since 0.1.0
  */
-export type HarnessErrorReason = typeof HarnessErrorReason.Type;
+export type HarnessErrorReason = typeof HarnessErrorReason.Type
 
 /**
  * The error every harness operation fails with: which agent failed, and why.
@@ -215,35 +219,33 @@ export type HarnessErrorReason = typeof HarnessErrorReason.Type;
  * **Example** (Recovering from one reason)
  *
  * ```ts
- * import { Session } from "@amends-dev/harness";
- * import { Effect } from "effect";
+ * import { Session } from "@amends-dev/harness"
+ * import { Effect } from "effect"
  *
- * declare const session: Session.Session;
+ * declare const session: Session.Session
  *
  * const answer = session.generate({ prompt: "Hello" }).pipe(
  *   Effect.map((result) => result.text),
  *   Effect.catchReason("HarnessError", "UnavailableError", (error) =>
- *     Effect.succeed(`The agent is away: ${error.message}`),
- *   ),
- * );
+ *     Effect.succeed(`The agent is away: ${error.message}`)
+ *   )
+ * )
  * ```
  *
  * @category errors
  * @since 0.1.0
  */
-export class HarnessError extends Schema.TaggedError<HarnessError>(
-  "@amends-dev/harness/HarnessError",
-)("HarnessError", {
+export class HarnessError extends Schema.TaggedError<HarnessError>("@amends-dev/harness/HarnessError")("HarnessError", {
   /** The agent that failed, as `Agent.id` names it. */
   agent: Schema.String,
   reason: HarnessErrorReason,
-  cause: Schema.optional(Schema.Defect()),
+  cause: Schema.optional(Schema.Defect())
 }) {
   get isRetryable(): boolean {
-    return this.reason.isRetryable;
+    return this.reason.isRetryable
   }
 
   override get message(): string {
-    return `${this.agent}: ${this.reason.message}`;
+    return `${this.agent}: ${this.reason.message}`
   }
 }

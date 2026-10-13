@@ -4,11 +4,11 @@
  *
  * @since 0.1.0
  */
-import * as Effect from "effect/Effect";
-import * as Projection from "../journal/Projection.ts";
 
-import * as RoleFacts from "./RoleFacts.ts";
-import * as RoleStore from "./RoleStore.ts";
+import * as Effect from "effect/Effect"
+import * as Projection from "../journal/Projection.ts"
+import * as RoleFacts from "./RoleFacts.ts"
+import * as RoleStore from "./RoleStore.ts"
 
 /**
  * Inserts each created role, renames it and replaces its permissions as recorded, and records
@@ -21,33 +21,33 @@ export const definition = Projection.make("workspace.roles", { version: 1 })
   .on(
     RoleFacts.Created,
     Effect.fn("RoleProjection.created")(function* ({ payload }) {
-      const roleStore = yield* RoleStore.RoleStore;
+      const roleStore = yield* RoleStore.RoleStore
       yield* roleStore.insert({
         id: payload.roleId,
         workspaceId: payload.workspaceId,
         name: payload.name,
-        permissions: payload.permissions,
-      });
-    }),
+        permissions: payload.permissions
+      })
+    })
   )
   .on(
     RoleFacts.Renamed,
     Effect.fn("RoleProjection.renamed")(function* ({ payload }) {
-      const roleStore = yield* RoleStore.RoleStore;
-      yield* roleStore.rename(payload.roleId, payload.name);
-    }),
+      const roleStore = yield* RoleStore.RoleStore
+      yield* roleStore.rename(payload.roleId, payload.name)
+    })
   )
   .on(
     RoleFacts.PermissionsChanged,
     Effect.fn("RoleProjection.permissionsChanged")(function* ({ payload }) {
-      const roleStore = yield* RoleStore.RoleStore;
-      yield* roleStore.setPermissions(payload.roleId, payload.permissions);
-    }),
+      const roleStore = yield* RoleStore.RoleStore
+      yield* roleStore.setPermissions(payload.roleId, payload.permissions)
+    })
   )
   .on(
     RoleFacts.BuiltinsRevised,
     Effect.fn("RoleProjection.builtinsRevised")(function* ({ payload }) {
-      const roleStore = yield* RoleStore.RoleStore;
-      yield* roleStore.recordBuiltinRevision(payload.revision);
-    }),
-  );
+      const roleStore = yield* RoleStore.RoleStore
+      yield* roleStore.recordBuiltinRevision(payload.revision)
+    })
+  )

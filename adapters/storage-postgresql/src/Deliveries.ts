@@ -10,27 +10,28 @@
  *
  * @since 0.1.0
  */
-import { Delivery, DeliveryStore } from "@amends-dev/core/channel";
-import { and, asc, eq, sql } from "drizzle-orm";
-import * as Array from "effect/Array";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import * as Binding from "./Binding.ts";
-import { storeError } from "./internal/errors.ts";
-import { channelDeliveries } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { Delivery, DeliveryStore } from "@amends-dev/core/channel"
+import { StoreError } from "@amends-dev/core/journal"
+import { and, asc, eq, sql } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { channelDeliveries } from "./internal/schema.ts"
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       ...Delivery.Delivery.fields,
       requestedAt: Schema.DateTimeUtcFromDate,
-      finishedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
-    }),
-  ),
-);
+      finishedAt: Schema.NullOr(Schema.DateTimeUtcFromDate)
+    })
+  )
+)
 const toRow = (record: Delivery.Delivery): typeof channelDeliveries.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
@@ -45,8 +46,8 @@ const toRow = (record: Delivery.Delivery): typeof channelDeliveries.$inferInsert
   attempts: record.attempts,
   failure: record.failure,
   requestedAt: DateTime.toDate(record.requestedAt),
-  finishedAt: record.finishedAt === null ? null : DateTime.toDate(record.finishedAt),
-});
+  finishedAt: record.finishedAt === null ? null : DateTime.toDate(record.finishedAt)
+})
 
 /**
  * Builds the delivery store for the binding's workspace: this module's driver inside
@@ -56,9 +57,9 @@ const toRow = (record: Delivery.Delivery): typeof channelDeliveries.$inferInsert
  * @since 0.1.0
  */
 export const make = Effect.fn("Deliveries.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(channelDeliveries.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(channelDeliveries.workspaceId, workspaceId)
   const driver: DeliveryStore.DeliveryStore["Service"] = {
     get: Effect.fn("Deliveries.get")(
       function* (id) {
@@ -66,10 +67,10 @@ export const make = Effect.fn("Deliveries.make")(function* () {
           db
             .select()
             .from(channelDeliveries)
-            .where(and(inWorkspace, eq(channelDeliveries.id, id))),
-        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
+            .where(and(inWorkspace, eq(channelDeliveries.id, id)))
+        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("DeliveryStore", "get")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "get"))
     ),
     listRequestedByThread: Effect.fn("Deliveries.listRequestedByThread")(
       function* (threadId) {
@@ -78,19 +79,12 @@ export const make = Effect.fn("Deliveries.make")(function* () {
             .select()
             .from(channelDeliveries)
             .where(
-              and(
-                inWorkspace,
-                eq(channelDeliveries.threadId, threadId),
-                eq(channelDeliveries.status, "requested"),
-              ),
+              and(inWorkspace, eq(channelDeliveries.threadId, threadId), eq(channelDeliveries.status, "requested"))
             )
-            .orderBy(
-              asc(channelDeliveries.sequence),
-              asc(sql`${channelDeliveries.id} COLLATE "C"`),
-            ),
-        ).pipe(Effect.flatMap(decodeRows));
+            .orderBy(asc(channelDeliveries.sequence), asc(sql`${channelDeliveries.id} COLLATE "C"`))
+        ).pipe(Effect.flatMap(decodeRows))
       },
-      Effect.mapError(StoreError.failed("DeliveryStore", "listRequestedByThread")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "listRequestedByThread"))
     ),
     findByExternalMessage: Effect.fn("Deliveries.findByExternalMessage")(
       function* (channelId, conversationId, externalMessageId) {
@@ -103,17 +97,17 @@ export const make = Effect.fn("Deliveries.make")(function* () {
                 inWorkspace,
                 eq(channelDeliveries.channelId, channelId),
                 eq(channelDeliveries.conversationId, conversationId),
-                eq(channelDeliveries.externalMessageId, externalMessageId),
-              ),
-            ),
-        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head));
+                eq(channelDeliveries.externalMessageId, externalMessageId)
+              )
+            )
+        ).pipe(Effect.flatMap(decodeRows), Effect.map(Array.head))
       },
-      Effect.mapError(StoreError.failed("DeliveryStore", "findByExternalMessage")),
+      Effect.mapError(StoreError.failed("DeliveryStore", "findByExternalMessage"))
     ),
     insert: Effect.fn("Deliveries.insert")(function* (record) {
       yield* guard(db.insert(channelDeliveries).values(toRow(record)), true).pipe(
-        Effect.mapError(storeError("DeliveryStore", "insert")),
-      );
+        Effect.mapError(storeError("DeliveryStore", "insert"))
+      )
     }),
     update: Effect.fn("Deliveries.update")(function* (record) {
       const updated = yield* guard(
@@ -122,14 +116,14 @@ export const make = Effect.fn("Deliveries.make")(function* () {
           .set(toRow(record))
           .where(and(inWorkspace, eq(channelDeliveries.id, record.id)))
           .returning({ id: channelDeliveries.id }),
-        true,
-      ).pipe(Effect.mapError(storeError("DeliveryStore", "update")));
+        true
+      ).pipe(Effect.mapError(storeError("DeliveryStore", "update")))
       if (updated.length === 0)
-        return yield* StoreError.rejected("DeliveryStore", "update", "Expected a stored delivery");
-    }),
-  };
-  return DeliveryStore.make(workspaceId, driver);
-});
+        return yield* StoreError.rejected("DeliveryStore", "update", "Expected a stored delivery")
+    })
+  }
+  return DeliveryStore.make(workspaceId, driver)
+})
 
 /**
  * Provides `DeliveryStore.DeliveryStore` over the caller's `Binding.Binding`.
@@ -137,4 +131,4 @@ export const make = Effect.fn("Deliveries.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(DeliveryStore.DeliveryStore, make());
+export const layer = Layer.effect(DeliveryStore.DeliveryStore, make())

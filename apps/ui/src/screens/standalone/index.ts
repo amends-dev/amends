@@ -7,5 +7,5 @@ export {
   WorkspaceUnavailableScreen,
   type StandaloneAccount,
   type StandaloneScreenProps,
-  type WorkspaceAccess,
-} from "./standalone.tsx";
+  type WorkspaceAccess
+} from "./standalone.tsx"

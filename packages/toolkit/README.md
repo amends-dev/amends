@@ -13,15 +13,15 @@ given the credentials its system asks for, so what a source sends is never decid
 what authorizes it is never seen here.
 
 ```ts
-const { operations } = yield * OpenApi.readOperations(spec);
-const github = yield * Http.make({ name: "github", baseUrl, client, operations });
+const { operations } = yield * OpenApi.readOperations(spec)
+const github = yield * Http.make({ name: "github", baseUrl, client, operations })
 
 const toolkit =
   yield *
   Assembly.toolkit(
     [{ source: github, definitions: operations.map((operation) => operation.definition) }],
-    (source, definition) => policy.decide(source, definition.name), // what the host stored
-  );
+    (source, definition) => policy.decide(source, definition.name) // what the host stored
+  )
 ```
 
 ## Definitions
@@ -167,8 +167,8 @@ one for each, which suits a large set of tools, or one that changes from turn to
 toolkit of an assembly, or any other, and gives another.
 
 ```ts
-const assembled = yield * Assembly.toolkit(members, decide);
-const toolkit = yield * ToolSearch.toolkit(assembled);
+const assembled = yield * Assembly.toolkit(members, decide)
+const toolkit = yield * ToolSearch.toolkit(assembled)
 ```
 
 - `tool_search({ query, limit? })` finds tools by what they do, and returns for each its `name`,
@@ -204,8 +204,8 @@ does in one run what takes it many calls otherwise: it calls a tool, reads the r
 filters it or goes on with the next call, and only what the code returns comes back to it.
 
 ```ts
-const assembled = yield * Assembly.toolkit(members, decide);
-const toolkit = yield * CodeMode.toolkit(assembled, runtime);
+const assembled = yield * Assembly.toolkit(members, decide)
+const toolkit = yield * CodeMode.toolkit(assembled, runtime)
 ```
 
 - `execute({ code })` takes the body of an async function. The code calls a tool as

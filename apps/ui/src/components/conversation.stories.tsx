@@ -1,23 +1,23 @@
-import { For, createSignal } from "solid-js";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { expect, userEvent, waitFor, within } from "storybook/test";
-import { IconMarkAttach, IconMarkMention, IconMarkResources } from "@amends-dev/icons";
-import { Composer } from "./composer/index.ts";
-import { Divider } from "./divider/index.ts";
-import { IconButton } from "./icon-button/index.ts";
-import { Message } from "./message/index.ts";
-import { Profiles, type Profile } from "./profile-card/index.ts";
-import { RichText } from "./rich-text/index.ts";
-import { TaskStatus, taskStateLabel } from "./task-status/index.ts";
-import * as s from "./components.stories.css.ts";
+import { IconMarkAttach, IconMarkMention, IconMarkResources } from "@amends-dev/icons"
+import { For, createSignal } from "solid-js"
+import type { Meta, StoryObj } from "storybook-solidjs-vite"
+import { expect, userEvent, waitFor, within } from "storybook/test"
+import * as s from "./components.stories.css.ts"
+import { Composer } from "./composer/index.ts"
+import { Divider } from "./divider/index.ts"
+import { IconButton } from "./icon-button/index.ts"
+import { Message } from "./message/index.ts"
+import { Profiles, type Profile } from "./profile-card/index.ts"
+import { RichText } from "./rich-text/index.ts"
+import { TaskStatus, taskStateLabel } from "./task-status/index.ts"
 
-const meta = { title: "Components/Conversation" } satisfies Meta;
-export default meta;
-type Story = StoryObj;
+const meta = { title: "Components/Conversation" } satisfies Meta
+export default meta
+type Story = StoryObj
 
-const alex = { name: "Alex", initials: "AM", tone: "sand" } as const;
-const yumi = { name: "Yumi", tone: "lilac", agent: true } as const;
-const sara = { name: "Sara", tone: "clay" } as const;
+const alex = { name: "Alex", initials: "AM", tone: "sand" } as const
+const yumi = { name: "Yumi", tone: "lilac", agent: true } as const
+const sara = { name: "Sara", tone: "clay" } as const
 
 export const Messages = {
   render: () => (
@@ -25,8 +25,8 @@ export const Messages = {
       <section class={s.section}>
         <h2 class={s.heading}>Message</h2>
         <p class={s.note}>
-          An avatar beside the byline and text, with optional reactions, an agent's activity, a task
-          reference, and a reply summary. The open thread's message is highlighted.
+          An avatar beside the byline and text, with optional reactions, an agent's activity, a task reference, and a
+          reply summary. The open thread's message is highlighted.
         </p>
         <div class={s.stack}>
           <Divider label="Today" />
@@ -38,17 +38,14 @@ export const Messages = {
             </Message.Reactions>
           </Message.Root>
           <Message.Root author={{ name: "AJ", tone: "ink" }} time="10:02 AM" active>
-            <Message.Text>
-              found a bug. composer crashes when I paste an image from clipboard lol
-            </Message.Text>
+            <Message.Text>found a bug. composer crashes when I paste an image from clipboard lol</Message.Text>
             <Message.Replies count={4} people={[alex, yumi, sara]} />
           </Message.Root>
           <Divider label="4 replies" align="start" />
           <Message.Root author={yumi}>
             <Message.Activity icon={IconMarkResources}>Checked codebase</Message.Activity>
             <Message.Text>
-              Reproduced on both — images over 5 MB hit the crash. Filed it and tagged the composer
-              team.
+              Reproduced on both — images over 5 MB hit the crash. Filed it and tagged the composer team.
             </Message.Text>
             <Message.TaskReference href="#AND-214" taskKey="AND-214" state="open">
               Composer paste crash
@@ -65,10 +62,10 @@ export const Messages = {
         </div>
       </section>
     </div>
-  ),
-} satisfies Story;
+  )
+} satisfies Story
 
-const caleb = { id: "caleb", name: "Caleb" };
+const caleb = { id: "caleb", name: "Caleb" }
 const formatted = `Reproduced it on **both platforms**. [@Caleb](member:caleb), the crash comes from \`readImage\`:
 
 1. Paste an image over _5 MB_
@@ -90,7 +87,7 @@ const image = await readImage(clipboard);
 - [x] Reproduced
 - [ ] Fixed
 
-Details in [the report](https://example.com/report). <b>Raw HTML</b> shows as written.`;
+Details in [the report](https://example.com/report). <b>Raw HTML</b> shows as written.`
 
 export const FormattedText = {
   render: () => (
@@ -98,8 +95,8 @@ export const FormattedText = {
       <section class={s.section}>
         <h2 class={s.heading}>Formatted text</h2>
         <p class={s.note}>
-          Messages are markdown: emphasis, code, lists, quotes, tables, and links, with mentions
-          naming members by id. Raw HTML shows as written, and only web and email links link.
+          Messages are markdown: emphasis, code, lists, quotes, tables, and links, with mentions naming members by id.
+          Raw HTML shows as written, and only web and email links link.
         </p>
         <div class={s.stack}>
           <Message.Root author={yumi} time="10:04 AM">
@@ -124,19 +121,16 @@ export const FormattedText = {
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.getByText("both platforms").tagName).toBe("STRONG");
-    await expect(canvas.getAllByText("@Caleb")).toHaveLength(2);
-    await expect(canvas.getByRole("table")).toBeInTheDocument();
-    await expect(canvas.getByRole("link", { name: "the report" })).toHaveAttribute(
-      "href",
-      "https://example.com/report",
-    );
-    await expect(canvas.getByText(/<b>Raw HTML<\/b> shows as written/u)).toBeInTheDocument();
-    await expect(canvas.getByText("the paste han").tagName).toBe("STRONG");
-    await expect(canvas.getByText("the crash: comes from paste readImage")).toBeInTheDocument();
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText("both platforms").tagName).toBe("STRONG")
+    await expect(canvas.getAllByText("@Caleb")).toHaveLength(2)
+    await expect(canvas.getByRole("table")).toBeInTheDocument()
+    await expect(canvas.getByRole("link", { name: "the report" })).toHaveAttribute("href", "https://example.com/report")
+    await expect(canvas.getByText(/<b>Raw HTML<\/b> shows as written/u)).toBeInTheDocument()
+    await expect(canvas.getByText("the paste han").tagName).toBe("STRONG")
+    await expect(canvas.getByText("the crash: comes from paste readImage")).toBeInTheDocument()
+  }
+} satisfies Story
 
 export const TaskStates = {
   render: () => (
@@ -155,20 +149,20 @@ export const TaskStates = {
         </div>
       </section>
     </div>
-  ),
-} satisfies Story;
+  )
+} satisfies Story
 
 function ComposerExample() {
-  const [draft, setDraft] = createSignal("");
-  const [sent, setSent] = createSignal<Array<string>>([]);
+  const [draft, setDraft] = createSignal("")
+  const [sent, setSent] = createSignal<Array<string>>([])
   return (
     <div class={s.stack}>
       <Composer.Root
         value={draft()}
         onValueChange={setDraft}
         onSend={(text) => {
-          setSent([...sent(), text]);
-          setDraft("");
+          setSent([...sent(), text])
+          setDraft("")
         }}
       >
         <Composer.Formatting />
@@ -182,7 +176,7 @@ function ComposerExample() {
       </Composer.Root>
       <output aria-label="Sent">{sent().join(" | ")}</output>
     </div>
-  );
+  )
 }
 
 export const Composing = {
@@ -191,29 +185,26 @@ export const Composing = {
       <section class={s.section}>
         <h2 class={s.heading}>Composer</h2>
         <p class={s.note}>
-          The draft is formatted as it is written, from the toolbar, shortcuts, or markdown typed
-          such as **bold** or "- " at the start of a line, and sent as markdown. Enter sends and
-          Shift+Enter starts a new line. The field grows with its text, and Send waits for something
-          to send.
+          The draft is formatted as it is written, from the toolbar, shortcuts, or markdown typed such as **bold** or "-
+          " at the start of a line, and sent as markdown. Enter sends and Shift+Enter starts a new line. The field grows
+          with its text, and Send waits for something to send.
         </p>
         <ComposerExample />
       </section>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const input = await canvas.findByRole("textbox", { name: "Message #general" });
-    const send = canvas.getByRole("button", { name: "Send" });
-    await expect(send).toBeDisabled();
-    await userEvent.type(input, "   ");
-    await expect(send).toBeDisabled();
-    await userEvent.type(input, "first **bold**{Shift>}{Enter}{/Shift}second{Enter}");
-    await expect(canvas.getByRole("status", { name: "Sent" })).toHaveTextContent(
-      "first **bold** second",
-    );
-    await waitFor(() => expect(input).toHaveTextContent(""));
-  },
-} satisfies Story;
+    const canvas = within(canvasElement)
+    const input = await canvas.findByRole("textbox", { name: "Message #general" })
+    const send = canvas.getByRole("button", { name: "Send" })
+    await expect(send).toBeDisabled()
+    await userEvent.type(input, "   ")
+    await expect(send).toBeDisabled()
+    await userEvent.type(input, "first **bold**{Shift>}{Enter}{/Shift}second{Enter}")
+    await expect(canvas.getByRole("status", { name: "Sent" })).toHaveTextContent("first **bold** second")
+    await waitFor(() => expect(input).toHaveTextContent(""))
+  }
+} satisfies Story
 
 const members: Readonly<Record<string, Profile>> = {
   alex: { id: "alex", name: "Alex Morgan", kind: "person", initials: "AM", tone: "sand" },
@@ -224,20 +215,20 @@ const members: Readonly<Record<string, Profile>> = {
     kind: "person",
     you: true,
     initials: "JM",
-    tone: "sage",
+    tone: "sage"
   },
   bartholomew: {
     id: "bartholomew",
     name: "Bartholomew Fitzgerald-Ashworth",
     kind: "person",
-    tone: "olive",
+    tone: "olive"
   },
-  caleb: { id: "caleb", name: "Caleb", kind: "person", former: true },
-};
+  caleb: { id: "caleb", name: "Caleb", kind: "person", former: true }
+}
 
 function ProfilesExample() {
-  const [done, setDone] = createSignal("");
-  const name = (id: string) => members[id]?.name ?? id;
+  const [done, setDone] = createSignal("")
+  const name = (id: string) => members[id]?.name ?? id
   return (
     <Profiles.Root
       profile={(id) => members[id]}
@@ -262,7 +253,7 @@ function ProfilesExample() {
         {done()}
       </p>
     </Profiles.Root>
-  );
+  )
 }
 
 export const ProfileCards = {
@@ -271,59 +262,52 @@ export const ProfileCards = {
       <section class={s.section}>
         <h2 class={s.heading}>Profile cards</h2>
         <p class={s.note}>
-          A member's name, avatar, or mention opens their card after a moment's hover, or at once
-          from the keyboard; a click, tap, Enter, or Space keeps it open until Escape or a click
-          outside. The card says whether they are a person or an agent and offers Message, Open
-          agent, or, on the reader's own card, Change name. A former member keeps their name with
-          nothing to do, and a member who cannot be shown says so.
+          A member's name, avatar, or mention opens their card after a moment's hover, or at once from the keyboard; a
+          click, tap, Enter, or Space keeps it open until Escape or a click outside. The card says whether they are a
+          person or an agent and offers Message, Open agent, or, on the reader's own card, Change name. A former member
+          keeps their name with nothing to do, and a member who cannot be shown says so.
         </p>
         <ProfilesExample />
       </section>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const chosen = canvas.getByRole("status", { name: "Chosen" });
-    const mention = canvas.getByRole("button", { name: "@Yumi" });
-    mention.focus();
-    await userEvent.keyboard("{Enter}");
-    const yumi = within(await canvas.findByRole("dialog", { name: "Yumi" }));
-    await expect(yumi.getByText("Agent")).toBeInTheDocument();
-    await userEvent.tab();
-    await expect(yumi.getByRole("button", { name: "Message" })).toHaveFocus();
-    await userEvent.tab();
-    await userEvent.keyboard("{Enter}");
-    await expect(chosen).toHaveTextContent("Open Yumi");
-    await expect(canvas.queryByRole("dialog")).toBeNull();
+    const canvas = within(canvasElement)
+    const chosen = canvas.getByRole("status", { name: "Chosen" })
+    const mention = canvas.getByRole("button", { name: "@Yumi" })
+    mention.focus()
+    await userEvent.keyboard("{Enter}")
+    const yumi = within(await canvas.findByRole("dialog", { name: "Yumi" }))
+    await expect(yumi.getByText("Agent")).toBeInTheDocument()
+    await userEvent.tab()
+    await expect(yumi.getByRole("button", { name: "Message" })).toHaveFocus()
+    await userEvent.tab()
+    await userEvent.keyboard("{Enter}")
+    await expect(chosen).toHaveTextContent("Open Yumi")
+    await expect(canvas.queryByRole("dialog")).toBeNull()
 
-    canvas.getByRole("button", { name: "Alex Morgan" }).focus();
-    await userEvent.keyboard("{Enter}");
-    await expect(await canvas.findByRole("dialog", { name: "Alex Morgan" })).toHaveTextContent(
-      "Person",
-    );
-    await userEvent.keyboard("{Escape}");
-    await expect(canvas.queryByRole("dialog")).toBeNull();
-    await expect(canvas.getByRole("button", { name: "Alex Morgan" })).toHaveFocus();
+    canvas.getByRole("button", { name: "Alex Morgan" }).focus()
+    await userEvent.keyboard("{Enter}")
+    await expect(await canvas.findByRole("dialog", { name: "Alex Morgan" })).toHaveTextContent("Person")
+    await userEvent.keyboard("{Escape}")
+    await expect(canvas.queryByRole("dialog")).toBeNull()
+    await expect(canvas.getByRole("button", { name: "Alex Morgan" })).toHaveFocus()
 
-    canvas.getByRole("button", { name: "@Jordan Mercier" }).focus();
-    await userEvent.keyboard("{Enter}");
-    const you = within(await canvas.findByRole("dialog", { name: "Jordan Mercier" }));
-    await expect(you.getByText("Person · You")).toBeInTheDocument();
-    await expect(you.queryByRole("button", { name: "Message" })).toBeNull();
-    await userEvent.tab();
-    await userEvent.keyboard("{Enter}");
-    await expect(chosen).toHaveTextContent("Change your name");
+    canvas.getByRole("button", { name: "@Jordan Mercier" }).focus()
+    await userEvent.keyboard("{Enter}")
+    const you = within(await canvas.findByRole("dialog", { name: "Jordan Mercier" }))
+    await expect(you.getByText("Person · You")).toBeInTheDocument()
+    await expect(you.queryByRole("button", { name: "Message" })).toBeNull()
+    await userEvent.tab()
+    await userEvent.keyboard("{Enter}")
+    await expect(chosen).toHaveTextContent("Change your name")
 
-    canvas.getByRole("button", { name: "@Caleb" }).focus();
-    await userEvent.keyboard("{Enter}");
-    await expect(await canvas.findByRole("dialog", { name: "Caleb" })).toHaveTextContent(
-      "No longer in this workspace.",
-    );
-    canvas.getByRole("button", { name: "@Robin" }).focus();
-    await userEvent.keyboard("{Enter}");
-    await expect(
-      await canvas.findByRole("dialog", { name: "Profile unavailable" }),
-    ).toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
-  },
-} satisfies Story;
+    canvas.getByRole("button", { name: "@Caleb" }).focus()
+    await userEvent.keyboard("{Enter}")
+    await expect(await canvas.findByRole("dialog", { name: "Caleb" })).toHaveTextContent("No longer in this workspace.")
+    canvas.getByRole("button", { name: "@Robin" }).focus()
+    await userEvent.keyboard("{Enter}")
+    await expect(await canvas.findByRole("dialog", { name: "Profile unavailable" })).toBeInTheDocument()
+    await userEvent.keyboard("{Escape}")
+  }
+} satisfies Story

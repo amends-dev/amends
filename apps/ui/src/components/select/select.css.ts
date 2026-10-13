@@ -1,8 +1,8 @@
-import { style } from "@vanilla-extract/css";
-import { vars } from "../../foundations/theme/vars.css.ts";
-import { media } from "../../foundations/layout/tokens.ts";
-import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts";
-import { knockoutVar } from "../status-mark/status-mark.css.ts";
+import { style } from "@vanilla-extract/css"
+import { media } from "../../foundations/layout/tokens.ts"
+import { vars } from "../../foundations/theme/vars.css.ts"
+import { fontWeight, typeScale } from "../../foundations/typography/tokens.ts"
+import { knockoutVar } from "../status-mark/status-mark.css.ts"
 
 // Shaped like the Input: 42px, bordered, reading-size text; 44px on touch, 16px text on phones.
 export const trigger = style({
@@ -30,14 +30,14 @@ export const trigger = style({
     "&[data-disabled]": {
       backgroundColor: vars.color.surface.subtle,
       color: vars.color.text.disabled,
-      cursor: "default",
-    },
+      cursor: "default"
+    }
   },
   "@media": {
     [media.touch]: { minHeight: "2.75rem" },
-    [media.mobile]: typeScale.bodyTouch,
-  },
-});
+    [media.mobile]: typeScale.bodyTouch
+  }
+})
 
 export const value = style({
   flex: 1,
@@ -45,12 +45,12 @@ export const value = style({
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
-  selectors: { "&[data-placeholder-shown]": { color: vars.color.text.muted } },
-});
+  selectors: { "&[data-placeholder-shown]": { color: vars.color.text.muted } }
+})
 
-export const icon = style({ display: "grid", flex: "none", color: vars.color.text.secondary });
+export const icon = style({ display: "grid", flex: "none", color: vars.color.text.secondary })
 
-export const chevron = style({ width: "0.875rem", height: "0.875rem" });
+export const chevron = style({ width: "0.875rem", height: "0.875rem" })
 
 // The list follows the menus' surface, as wide as the field.
 export const content = style({
@@ -64,10 +64,10 @@ export const content = style({
   boxShadow: vars.shadow.popover,
   outline: "none",
   color: vars.color.text.primary,
-  vars: { [knockoutVar]: vars.color.surface.popover },
-});
+  vars: { [knockoutVar]: vars.color.surface.popover }
+})
 
-export const listbox = style({ margin: 0, padding: 0, listStyle: "none", outline: "none" });
+export const listbox = style({ margin: 0, padding: 0, listStyle: "none", outline: "none" })
 
 export const item = style({
   ...typeScale.control,
@@ -81,12 +81,12 @@ export const item = style({
   outline: "none",
   selectors: {
     "&[data-highlighted]": { backgroundColor: vars.color.surface.subtle },
-    "&[data-disabled]": { color: vars.color.text.disabled, cursor: "default" },
+    "&[data-disabled]": { color: vars.color.text.disabled, cursor: "default" }
   },
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
-export const itemLabel = style({ flex: 1, minWidth: 0 });
+export const itemLabel = style({ flex: 1, minWidth: 0 })
 
 // An option with a second line: the label over its description.
 export const itemText = style({
@@ -95,21 +95,21 @@ export const itemText = style({
   flexDirection: "column",
   gap: "0.25rem",
   minWidth: 0,
-  paddingBlock: "0.5rem",
-});
+  paddingBlock: "0.5rem"
+})
 
 export const itemDescription = style({
   ...typeScale.hint,
   display: "flex",
   flexDirection: "column",
   gap: "0.25rem",
-  color: vars.color.text.secondary,
-});
+  color: vars.color.text.secondary
+})
 
-export const itemDetail = style({ display: "block" });
+export const itemDetail = style({ display: "block" })
 
 // A state at the option's end, on its first line: a status mark, such as whether it works.
-export const status = style({ alignSelf: "flex-start", marginBlockStart: "0.8125rem" });
+export const status = style({ alignSelf: "flex-start", marginBlockStart: "0.8125rem" })
 
 // A label naming the options, above them.
 export const heading = style({
@@ -118,8 +118,8 @@ export const heading = style({
   padding: "0.5rem 0.5rem 0.375rem",
   color: vars.color.text.secondary,
   fontWeight: fontWeight.medium,
-  textTransform: "uppercase",
-});
+  textTransform: "uppercase"
+})
 
 // The action after the options, set off by a divider.
 export const action = style({
@@ -140,9 +140,9 @@ export const action = style({
   cursor: "pointer",
   selectors: {
     "&:hover": { backgroundColor: vars.color.surface.subtle, color: vars.color.text.primary },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" }
   },
-  "@media": { [media.touch]: { minHeight: "2.75rem" } },
-});
+  "@media": { [media.touch]: { minHeight: "2.75rem" } }
+})
 
-export const indicator = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
+export const indicator = style({ flex: "none", width: "0.875rem", height: "0.875rem" })

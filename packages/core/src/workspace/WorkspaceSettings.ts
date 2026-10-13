@@ -5,10 +5,11 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as Assignment from "../authorization/Assignment.ts";
-import * as Member from "./Member.ts";
-import * as Workspace from "./Workspace.ts";
+
+import * as Schema from "effect/Schema"
+import * as Assignment from "../authorization/Assignment.ts"
+import * as Member from "./Member.ts"
+import * as Workspace from "./Workspace.ts"
 
 /**
  * A new name for the workspace, and the name the renamer last saw, which
@@ -19,8 +20,8 @@ import * as Workspace from "./Workspace.ts";
  */
 export const RenameInput = Schema.Struct({
   name: Workspace.NewName,
-  expectedName: Workspace.Name,
-}).annotate({ identifier: "WorkspaceRenameInput" });
+  expectedName: Workspace.Name
+}).annotate({ identifier: "WorkspaceRenameInput" })
 
 /**
  * @category options
@@ -38,8 +39,8 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
 export const NameChange = Schema.Struct({
   workspaceId: Workspace.Id,
   previousName: Workspace.Name,
-  name: Workspace.Name,
-});
+  name: Workspace.Name
+})
 
 /**
  * @category schemas
@@ -63,8 +64,8 @@ export const View = Schema.Struct({
   /** Whether the actor may issue an invitation: manage them, and have a role to delegate. */
   canInvite: Schema.Boolean,
   /** The built-in roles, each with whether the actor may assign it. */
-  roles: Schema.Array(Assignment.RoleChoice),
-}).annotate({ identifier: "WorkspaceSettingsView" });
+  roles: Schema.Array(Assignment.RoleChoice)
+}).annotate({ identifier: "WorkspaceSettingsView" })
 
 /**
  * @category schemas
@@ -87,8 +88,8 @@ export const MemberEntry = Schema.Struct({
    */
   access: Schema.NullOr(Assignment.Access),
   /** Whether the actor may remove the member, by the delegation rule removal itself enforces. */
-  canRemove: Schema.Boolean,
-}).annotate({ identifier: "WorkspaceMemberManagementEntry" });
+  canRemove: Schema.Boolean
+}).annotate({ identifier: "WorkspaceMemberManagementEntry" })
 
 /**
  * @category schemas

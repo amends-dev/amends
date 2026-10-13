@@ -6,16 +6,17 @@
  *
  * @since 0.1.0
  */
-import * as DateTime from "effect/DateTime";
-import * as Schema from "effect/Schema";
-import * as GroupId from "../group/GroupId.ts";
-import * as Text from "../text/Text.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as ThreadId from "./ThreadId.ts";
-import * as ThreadMessage from "./ThreadMessage.ts";
-import type * as ThreadActivityKind from "./ThreadActivityKind.ts";
-import * as Task from "../task/Task.ts";
+
+import * as DateTime from "effect/DateTime"
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as Task from "../task/Task.ts"
+import * as Text from "../text/Text.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import type * as ThreadActivityKind from "./ThreadActivityKind.ts"
+import * as ThreadId from "./ThreadId.ts"
+import * as ThreadMessage from "./ThreadMessage.ts"
 
 /**
  * Names a thread; `ThreadId.Id`, where models that only refer to threads import it from.
@@ -23,13 +24,13 @@ import * as Task from "../task/Task.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = ThreadId.Id;
+export const Id = ThreadId.Id
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = ThreadId.Id;
+export type Id = ThreadId.Id
 
 /**
  * A thread's title: a trimmed line of 1 to 200 characters without hidden ones. It is the thread's
@@ -38,17 +39,13 @@ export type Id = ThreadId.Id;
  * @category schemas
  * @since 0.1.0
  */
-export const Title = Schema.Trimmed.check(
-  Schema.isMinLength(1),
-  Schema.isMaxLength(200),
-  Text.isName,
-);
+export const Title = Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(200), Text.isName)
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Title = typeof Title.Type;
+export type Title = typeof Title.Type
 
 /**
  * A thread as created and since renamed. Its group, which never changes, is whose members may
@@ -70,8 +67,8 @@ export const Thread = Schema.Struct({
   origin: Schema.NullOr(Id),
   /** Who started the conversation: a member, or the contact whose message a channel received. */
   createdBy: ThreadMessage.Author,
-  createdAt: Schema.DateTimeUtcFromString,
-});
+  createdAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -89,8 +86,8 @@ export interface Thread extends Schema.Schema.Type<typeof Thread> {}
 export const Latest = Schema.Struct({
   threadId: ThreadId.Id,
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
-  occurredAt: Schema.DateTimeUtcFromString,
-});
+  occurredAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -107,8 +104,8 @@ export interface Latest extends Schema.Schema.Type<typeof Latest> {}
  */
 export const ListCursor = Schema.Struct({
   latestActivityAt: Latest.fields.occurredAt,
-  threadId: ThreadId.Id,
-});
+  threadId: ThreadId.Id
+})
 
 /**
  * @category schemas
@@ -125,8 +122,8 @@ export interface ListCursor extends Schema.Schema.Type<typeof ListCursor> {}
  */
 export const ListOptions = Schema.Struct({
   before: Schema.optionalKey(ListCursor),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -148,8 +145,8 @@ export const ListItem = Schema.Struct({
   task: Schema.NullOr(Task.Task),
   latest: Latest,
   readThrough: Schema.NullOr(Latest.fields.sequence),
-  unread: Schema.Boolean,
-});
+  unread: Schema.Boolean
+})
 
 /**
  * @category schemas
@@ -165,14 +162,8 @@ export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
  * @category utils
  * @since 0.1.0
  */
-export const isUnread = (
-  latest: Latest,
-  readThrough: number | null,
-  admittedAt: DateTime.Utc,
-): boolean =>
-  readThrough === null
-    ? DateTime.isGreaterThan(latest.occurredAt, admittedAt)
-    : latest.sequence > readThrough;
+export const isUnread = (latest: Latest, readThrough: number | null, admittedAt: DateTime.Utc): boolean =>
+  readThrough === null ? DateTime.isGreaterThan(latest.occurredAt, admittedAt) : latest.sequence > readThrough
 
 /**
  * `thread` as a reader lists it, who read through `readThrough` and joined at `admittedAt`.
@@ -185,14 +176,14 @@ export const listItem = (
   task: Task.Task | null,
   latest: Latest,
   readThrough: number | null,
-  admittedAt: DateTime.Utc,
+  admittedAt: DateTime.Utc
 ): ListItem => ({
   thread,
   task,
   latest,
   readThrough,
-  unread: isUnread(latest, readThrough, admittedAt),
-});
+  unread: isUnread(latest, readThrough, admittedAt)
+})
 
 /**
  * Exclusive boundary for paging a group's threads by when they started, newest first: the last
@@ -203,8 +194,8 @@ export const listItem = (
  */
 export const OpeningCursor = Schema.Struct({
   createdAt: Thread.fields.createdAt,
-  threadId: ThreadId.Id,
-});
+  threadId: ThreadId.Id
+})
 
 /**
  * @category schemas
@@ -221,8 +212,8 @@ export interface OpeningCursor extends Schema.Schema.Type<typeof OpeningCursor> 
  */
 export const OpeningOptions = Schema.Struct({
   before: Schema.optionalKey(OpeningCursor),
-  limit: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  limit: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category options
@@ -245,8 +236,8 @@ export const Opening = Schema.Struct({
   replies: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   latest: Latest,
   readThrough: ListItem.fields.readThrough,
-  unread: Schema.Boolean,
-});
+  unread: Schema.Boolean
+})
 
 /**
  * @category schemas
@@ -260,19 +251,15 @@ export interface Opening extends Schema.Schema.Type<typeof Opening> {}
  * @category utils
  * @since 0.1.0
  */
-export const opening = (
-  item: ListItem,
-  message: ThreadMessage.ThreadMessage,
-  replies: number,
-): Opening => ({
+export const opening = (item: ListItem, message: ThreadMessage.ThreadMessage, replies: number): Opening => ({
   thread: item.thread,
   task: item.task,
   message,
   replies,
   latest: item.latest,
   readThrough: item.readThrough,
-  unread: item.unread,
-});
+  unread: item.unread
+})
 
 /**
  * A thread's new title, and the title the renamer last saw, so a rename made meanwhile is not
@@ -284,8 +271,8 @@ export const opening = (
 export const RenameInput = Schema.Struct({
   threadId: Id,
   title: Title,
-  expectedTitle: Schema.NullOr(Title),
-});
+  expectedTitle: Schema.NullOr(Title)
+})
 
 /**
  * @category options
@@ -303,8 +290,8 @@ export const Renamed = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   threadId: Id,
   groupId: GroupId.Id,
-  title: Title,
-});
+  title: Title
+})
 
 /**
  * @category schemas
@@ -327,8 +314,8 @@ export const StartInGroupInput = Schema.Struct({
   /** The thread this one splits work out of, which the author can read. */
   origin: Schema.optionalKey(Id),
   /** Create the thread as a task, with these options, at its second position. */
-  task: Schema.optionalKey(Task.Options),
-});
+  task: Schema.optionalKey(Task.Options)
+})
 
 /**
  * @category options
@@ -347,8 +334,8 @@ export const StartDirectInput = Schema.Struct({
   memberIds: Schema.UniqueArray(MemberId.Id).check(Schema.isMinLength(1)),
   text: ThreadMessage.Text,
   mentions: Schema.UniqueArray(MemberId.Id),
-  title: Schema.optionalKey(Title),
-});
+  title: Schema.optionalKey(Title)
+})
 
 /**
  * @category options
@@ -365,8 +352,8 @@ export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectI
 export const Started = Schema.Struct({
   thread: Thread,
   message: ThreadMessage.ThreadMessage,
-  task: Schema.NullOr(Task.Task),
-});
+  task: Schema.NullOr(Task.Task)
+})
 
 /**
  * @category schemas
@@ -382,4 +369,4 @@ export interface Started extends Schema.Schema.Type<typeof Started> {}
  * @category models
  * @since 0.1.0
  */
-export type TimelineItem = ThreadActivityKind.Item;
+export type TimelineItem = ThreadActivityKind.Item

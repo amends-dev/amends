@@ -8,13 +8,14 @@
  *
  * @since 0.1.0
  */
-import * as Accounts from "@amends-dev/gateway/Accounts";
-import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory";
-import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import * as Authentication from "./Authentication.ts";
-import * as ApiErrors from "./ApiErrors.ts";
+
+import * as Accounts from "@amends-dev/gateway/Accounts"
+import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
 
 /**
  * The authenticated identity: who they are, what they can reach across workspaces, and signing
@@ -27,10 +28,10 @@ export class MeGroup extends HttpApiGroup.make("me")
   .add(
     HttpApiEndpoint.get("account", "/", {
       success: Accounts.Account,
-      error: [ApiErrors.Denied, Authentication.Unauthorized],
+      error: [ApiErrors.Denied, Authentication.Unauthorized]
     }),
     HttpApiEndpoint.get("workspaces", "/workspaces", { success: WorkspaceDirectory.Listing }),
-    HttpApiEndpoint.delete("signOut", "/session", { success: HttpApiSchema.NoContent }),
+    HttpApiEndpoint.delete("signOut", "/session", { success: HttpApiSchema.NoContent })
   )
   .middleware(Authentication.Authentication)
   .prefix("/me") {}

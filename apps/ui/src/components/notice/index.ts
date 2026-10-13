@@ -1,1 +1,1 @@
-export { Notice, type NoticeProps } from "./notice.tsx";
+export { Notice, type NoticeProps } from "./notice.tsx"

@@ -1,39 +1,39 @@
-import { describe, expect, it } from "@effect/vitest";
-import { DateTime } from "effect";
-import type { Prompt } from "effect/ai";
-import * as Identity from "../../src/identity/Identity.ts";
-import * as Group from "../../src/group/Group.ts";
-import type * as Task from "../../src/task/Task.ts";
-import * as Thread from "../../src/thread/Thread.ts";
-import * as ThreadActivity from "../../src/thread/ThreadActivity.ts";
-import * as ThreadMessage from "../../src/thread/ThreadMessage.ts";
-import * as ThreadParticipation from "../../src/thread/ThreadParticipation.ts";
-import * as TurnPrompt from "../../src/turn/TurnPrompt.ts";
-import * as Member from "../../src/workspace/Member.ts";
-import * as Workspace from "../../src/workspace/Workspace.ts";
+import { describe, expect, it } from "@effect/vitest"
+import { DateTime } from "effect"
+import type { Prompt } from "effect/ai"
+import * as Group from "../../src/group/Group.ts"
+import * as Identity from "../../src/identity/Identity.ts"
+import type * as Task from "../../src/task/Task.ts"
+import * as Thread from "../../src/thread/Thread.ts"
+import * as ThreadActivity from "../../src/thread/ThreadActivity.ts"
+import * as ThreadMessage from "../../src/thread/ThreadMessage.ts"
+import * as ThreadParticipation from "../../src/thread/ThreadParticipation.ts"
+import * as TurnPrompt from "../../src/turn/TurnPrompt.ts"
+import * as Member from "../../src/workspace/Member.ts"
+import * as Workspace from "../../src/workspace/Workspace.ts"
 
-const workspaceId = Workspace.Id.make("workspace");
-const threadId = Thread.Id.make("thread");
-const at = DateTime.makeUnsafe("2026-10-10T12:00:00Z");
-const reviewer = Member.Id.make("reviewer");
-const adaId = Member.Id.make("ada");
-const kaiId = Member.Id.make("kai");
-const danaId = Identity.ContactId.make("dana");
-const ada: ThreadMessage.Author = { _tag: "Member", memberId: adaId };
-const dana: ThreadMessage.Author = { _tag: "Contact", contactId: danaId };
+const workspaceId = Workspace.Id.make("workspace")
+const threadId = Thread.Id.make("thread")
+const at = DateTime.makeUnsafe("2026-10-10T12:00:00Z")
+const reviewer = Member.Id.make("reviewer")
+const adaId = Member.Id.make("ada")
+const kaiId = Member.Id.make("kai")
+const danaId = Identity.ContactId.make("dana")
+const ada: ThreadMessage.Author = { _tag: "Member", memberId: adaId }
+const dana: ThreadMessage.Author = { _tag: "Contact", contactId: danaId }
 const memberNames: Record<string, string> = {
   [adaId]: "Ada",
   [kaiId]: "Kai",
-  [reviewer]: "Reviewer",
-};
+  [reviewer]: "Reviewer"
+}
 const names: TurnPrompt.Names = {
   member: (memberId) => memberNames[memberId]!,
-  contact: () => "Dana",
-};
-const options: TurnPrompt.Options = { self: reviewer, names, retriedBy: undefined };
-const none: TurnPrompt.Context = { title: null, task: undefined };
+  contact: () => "Dana"
+}
+const options: TurnPrompt.Options = { self: reviewer, names, retriedBy: undefined }
+const none: TurnPrompt.Context = { title: null, task: undefined }
 
-let sequence = 0;
+let sequence = 0
 /** An activity of `kind` at the next position, with `details`. */
 const activity = (kind: string, details: unknown) =>
   ({
@@ -47,12 +47,12 @@ const activity = (kind: string, details: unknown) =>
     occurrence: null,
     newActivity: false,
     recordedAt: at,
-    details,
-  }) as never;
+    details
+  }) as never
 const message = (
   id: string,
   author: ThreadMessage.Author,
-  content: ThreadMessage.Content,
+  content: ThreadMessage.Content
 ): ThreadMessage.ThreadMessage => ({
   id: ThreadMessage.Id.make(id),
   workspaceId,
@@ -60,43 +60,43 @@ const message = (
   author,
   via: null,
   publishedAt: at,
-  content,
-});
-const text = (text: string): ThreadMessage.Content => ThreadMessage.published(text, []);
+  content
+})
+const text = (text: string): ThreadMessage.Content => ThreadMessage.published(text, [])
 const published = (id: string, author: ThreadMessage.Author, body: string): Thread.TimelineItem =>
   ({
     activity: activity("message.published", { messageId: id }),
-    message: message(id, author, text(body)),
-  }) as never;
+    message: message(id, author, text(body))
+  }) as never
 const edited = (id: string, author: ThreadMessage.Author, body: string): Thread.TimelineItem =>
   ({
     activity: activity("message.edited", { messageId: id }),
-    message: message(id, author, text(body)),
-  }) as never;
+    message: message(id, author, text(body))
+  }) as never
 const deleted = (id: string, author: ThreadMessage.Author): Thread.TimelineItem =>
   ({
     activity: activity("message.deleted", { messageId: id }),
-    message: message(id, author, { _tag: "Deleted", deletedAt: at }),
-  }) as never;
+    message: message(id, author, { _tag: "Deleted", deletedAt: at })
+  }) as never
 const renamed = (title: string): Thread.TimelineItem =>
-  ({ activity: activity("thread.renamed", { title, previous: null }) }) as never;
+  ({ activity: activity("thread.renamed", { title, previous: null }) }) as never
 const followed = (participant: ThreadParticipation.Reference): Thread.TimelineItem =>
   ({
     activity: activity("participation.followed", { participationId: "p" }),
-    participant: { id: ThreadParticipation.Id.make("p"), participant, status: "active" },
-  }) as never;
+    participant: { id: ThreadParticipation.Id.make("p"), participant, status: "active" }
+  }) as never
 const taskCreated = (details: {
-  status: Task.Status;
-  priority: Task.Priority;
-  assignee: Member.Id | null;
-  createdBy: ThreadMessage.Author;
-}): Thread.TimelineItem => ({ activity: activity("task.created", details) }) as never;
+  status: Task.Status
+  priority: Task.Priority
+  assignee: Member.Id | null
+  createdBy: ThreadMessage.Author
+}): Thread.TimelineItem => ({ activity: activity("task.created", details) }) as never
 const taskUpdated = (change: Task.Change): Thread.TimelineItem =>
-  ({ activity: activity("task.updated", change) }) as never;
+  ({ activity: activity("task.updated", change) }) as never
 const turnCreated = (): Thread.TimelineItem =>
   ({
-    activity: activity("turn.created", { turnId: "t", memberId: reviewer, retryOf: null }),
-  }) as never;
+    activity: activity("turn.created", { turnId: "t", memberId: reviewer, retryOf: null })
+  }) as never
 const task = (fields: Partial<Task.Task> = {}): Task.Task => ({
   threadId,
   workspaceId,
@@ -106,14 +106,14 @@ const task = (fields: Partial<Task.Task> = {}): Task.Task => ({
   assignee: reviewer,
   createdBy: ada,
   createdAt: at,
-  ...fields,
-});
+  ...fields
+})
 
 /** The texts of a prompt's parts. */
 const textsOf = (message: Prompt.Message | undefined) =>
   message === undefined || typeof message.content === "string"
     ? message
-    : message.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
+    : message.content.flatMap((part) => (part.type === "text" ? [part.text] : []))
 
 describe("a turn's prompt", () => {
   it("tells each item in its kind's words, naming people and the agent as you", () => {
@@ -130,10 +130,10 @@ describe("a turn's prompt", () => {
         taskUpdated({ _tag: "Assignee", from: reviewer, to: kaiId }),
         taskUpdated({ _tag: "Assignee", from: kaiId, to: null }),
         taskUpdated({ _tag: "Priority", from: "high", to: "none" }),
-        turnCreated(),
+        turnCreated()
       ],
-      options,
-    );
+      options
+    )
     expect(textsOf(prompt)).toEqual([
       "Ada: Can you review this?",
       "Dana: Please hurry.",
@@ -144,9 +144,9 @@ describe("a turn's prompt", () => {
       "The task's status is now doing.",
       "The task was assigned to Kai.",
       "The task was unassigned.",
-      "The task's priority was cleared.",
-    ]);
-  });
+      "The task's priority was cleared."
+    ])
+  })
 
   it("tells an edit by its new text unless the message is told in the same prompt, and a deletion as such", () => {
     expect(
@@ -159,71 +159,64 @@ describe("a turn's prompt", () => {
             edited("m2", ada, "Mind the risks too."),
             deleted("m3", dana),
             published("m4", ada, "Gone"),
-            deleted("m4", ada),
+            deleted("m4", ada)
           ],
-          options,
-        ),
-      ),
+          options
+        )
+      )
     ).toEqual([
       "Ada: Review this, pleas.",
       "Ada edited their message: Mind the risks too.",
       "Dana deleted their message.",
       "Ada: Gone",
-      "Ada deleted their message.",
-    ]);
-    expect(TurnPrompt.countMessages([published("m1", ada, "x"), deleted("m2", ada)])).toBe(1);
-  });
+      "Ada deleted their message."
+    ])
+    expect(TurnPrompt.countMessages([published("m1", ada, "x"), deleted("m2", ada)])).toBe(1)
+  })
 
   it("starts with the thread as it stands when it has a title or is a task", () => {
-    const items = [published("m1", ada, "Hello.")];
+    const items = [published("m1", ada, "Hello.")]
     expect(
-      textsOf(
-        TurnPrompt.promptOf(
-          { title: Thread.Title.make("Launch"), task: undefined },
-          items,
-          options,
-        ),
-      ),
-    ).toEqual(["The thread is titled “Launch”.", "Ada: Hello."]);
+      textsOf(TurnPrompt.promptOf({ title: Thread.Title.make("Launch"), task: undefined }, items, options))
+    ).toEqual(["The thread is titled “Launch”.", "Ada: Hello."])
     expect(
       textsOf(
         TurnPrompt.promptOf(
           {
             title: Thread.Title.make("Launch"),
-            task: task({ status: "doing", priority: "urgent" }),
+            task: task({ status: "doing", priority: "urgent" })
           },
           items,
-          options,
-        ),
-      ),
+          options
+        )
+      )
     ).toEqual([
       "The thread is titled “Launch”. It is a task: status doing, priority urgent, assigned to you.",
-      "Ada: Hello.",
-    ]);
-    expect(
-      textsOf(TurnPrompt.promptOf({ title: null, task: task({ assignee: null }) }, items, options)),
-    ).toEqual(["This thread is a task: status to do, unassigned.", "Ada: Hello."]);
-  });
+      "Ada: Hello."
+    ])
+    expect(textsOf(TurnPrompt.promptOf({ title: null, task: task({ assignee: null }) }, items, options))).toEqual([
+      "This thread is a task: status to do, unassigned.",
+      "Ada: Hello."
+    ])
+  })
 
   it("tells the agent who asked it to try again, and is nothing when there is nothing to say", () => {
     expect(
       textsOf(
         TurnPrompt.promptOf(none, [published("m1", ada, "Review this.")], {
           ...options,
-          retriedBy: "Kai",
-        }),
-      ),
-    ).toEqual(["Ada: Review this.", "Kai asked you to try that again."]);
+          retriedBy: "Kai"
+        })
+      )
+    ).toEqual(["Ada: Review this.", "Kai asked you to try that again."])
     expect(textsOf(TurnPrompt.promptOf(none, [], { ...options, retriedBy: "Kai" }))).toEqual([
-      "Kai asked you to try that again.",
-    ]);
-    expect(TurnPrompt.promptOf(none, [], options)).toBeUndefined();
-    expect(TurnPrompt.promptOf(none, [turnCreated()], options)).toBeUndefined();
+      "Kai asked you to try that again."
+    ])
+    expect(TurnPrompt.promptOf(none, [], options)).toBeUndefined()
+    expect(TurnPrompt.promptOf(none, [turnCreated()], options)).toBeUndefined()
     // The context alone says nothing.
-    expect(
-      TurnPrompt.promptOf({ title: Thread.Title.make("Launch"), task: undefined }, [], options),
-    ).toBeUndefined();
-  });
+    expect(TurnPrompt.promptOf({ title: Thread.Title.make("Launch"), task: undefined }, [], options)).toBeUndefined()
+  })
 
   it("names everyone the items and the task mention, for the caller to look up", () => {
     expect(
@@ -231,37 +224,31 @@ describe("a turn's prompt", () => {
         published("m1", dana, "Hi"),
         followed({ _tag: "Member", memberId: adaId }),
         taskCreated({ status: "triage", priority: "none", assignee: null, createdBy: dana }),
-        taskUpdated({ _tag: "Assignee", from: null, to: reviewer }),
-      ]),
-    ).toEqual([
-      { _tag: "Member", memberId: kaiId },
-      dana,
-      ada,
-      dana,
-      { _tag: "Member", memberId: reviewer },
-    ]);
-  });
-});
+        taskUpdated({ _tag: "Assignee", from: null, to: reviewer })
+      ])
+    ).toEqual([{ _tag: "Member", memberId: kaiId }, dana, ada, dana, { _tag: "Member", memberId: reviewer }])
+  })
+})
 
 describe("the conversation an agent joins", () => {
   const input = (author: string, own: boolean, text: string): TurnPrompt.Input => ({
     author,
     own,
-    text,
-  });
+    text
+  })
   it("has others' messages as the user's and the agent's own as its answers, sides alternating", () => {
     const conversation = TurnPrompt.conversationOf([
       input("Ada", false, "Hello."),
       input("Kai", false, "Hi all."),
       input("Reviewer", true, "Hello, both."),
       input("Reviewer", true, "What do you need?"),
-      input("Ada", false, "A review."),
-    ]);
+      input("Ada", false, "A review.")
+    ])
     expect(conversation.map((message) => [message.role, textsOf(message)])).toEqual([
       ["user", ["Ada: Hello.", "Kai: Hi all."]],
       ["assistant", ["Hello, both.", "What do you need?"]],
-      ["user", ["Ada: A review."]],
-    ]);
-    expect(TurnPrompt.conversationOf([])).toEqual([]);
-  });
-});
+      ["user", ["Ada: A review."]]
+    ])
+    expect(TurnPrompt.conversationOf([])).toEqual([])
+  })
+})

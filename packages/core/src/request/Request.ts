@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import * as Crypto from "effect/Crypto";
-import * as Effect from "effect/Effect";
-import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
-import * as Hex from "effect/encoding/Hex";
+
+import * as Crypto from "effect/Crypto"
+import * as Effect from "effect/Effect"
+import * as Hex from "effect/encoding/Hex"
+import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
 
 /**
  * A key the client chooses once for one logical request, such as a UUID, and repeats on every
@@ -21,13 +22,13 @@ import * as Hex from "effect/encoding/Hex";
  * @since 0.1.0
  */
 export const Key = Schema.NonEmptyString.check(Schema.isTrimmed(), Schema.isMaxLength(200)).pipe(
-  Schema.brand("RequestKey"),
-);
+  Schema.brand("RequestKey")
+)
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Key = typeof Key.Type;
+export type Key = typeof Key.Type
 
 /**
  * What a creating operation accepts besides its input.
@@ -37,11 +38,11 @@ export type Key = typeof Key.Type;
  */
 export interface Options {
   /** Without a key, every call creates anew; with one, a retry returns the first call's result. */
-  readonly requestKey?: Key | undefined;
+  readonly requestKey?: Key | undefined
 }
 
 /** A string's UTF-8 bytes; hex encoding reads strings as UTF-8, and valid hex always decodes. */
-const utf8 = (text: string) => Result.getOrThrow(Hex.decode(Hex.encode(text)));
+const utf8 = (text: string) => Result.getOrThrow(Hex.decode(Hex.encode(text)))
 
 /**
  * The ID a keyed request gives the record it creates, derived from parts naming the operation,
@@ -52,19 +53,13 @@ const utf8 = (text: string) => Result.getOrThrow(Hex.decode(Hex.encode(text)));
  * @since 0.1.0
  */
 export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<string>) {
-  const crypto = yield* Crypto.Crypto;
-  const bytes = (yield* crypto.digest("SHA-256", utf8(JSON.stringify(parts)))).slice(0, 16);
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = Hex.encode(bytes);
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20),
-  ].join("-");
-});
+  const crypto = yield* Crypto.Crypto
+  const bytes = (yield* crypto.digest("SHA-256", utf8(JSON.stringify(parts)))).slice(0, 16)
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80
+  const hex = Hex.encode(bytes)
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-")
+})
 
 /**
  * The ID a creating request gives its record: new each time without a key, or derived from the
@@ -74,10 +69,7 @@ export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<strin
  * @category utils
  * @since 0.1.0
  */
-export const idFor = Effect.fnUntraced(function* (
-  key: Key | undefined,
-  parts: ReadonlyArray<string>,
-) {
-  if (key === undefined) return yield* (yield* Crypto.Crypto).randomUUIDv4;
-  return yield* derivedId([...parts, key]);
-});
+export const idFor = Effect.fnUntraced(function* (key: Key | undefined, parts: ReadonlyArray<string>) {
+  if (key === undefined) return yield* (yield* Crypto.Crypto).randomUUIDv4
+  return yield* derivedId([...parts, key])
+})

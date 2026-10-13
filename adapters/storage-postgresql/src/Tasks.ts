@@ -10,56 +10,55 @@
  *
  * @since 0.1.0
  */
-import { Task, TaskStore } from "@amends-dev/core/task";
-import { ThreadMessage } from "@amends-dev/core/thread";
-import * as Array from "effect/Array";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
-import { tasks } from "./internal/schema.ts";
-import * as Binding from "./Binding.ts";
-import { inIds } from "./internal/id-list.ts";
-import { storeError } from "./internal/errors.ts";
-import { StoreError } from "@amends-dev/core/journal";
+
+import { StoreError } from "@amends-dev/core/journal"
+import { Task, TaskStore } from "@amends-dev/core/task"
+import { ThreadMessage } from "@amends-dev/core/thread"
+import { and, desc, eq, isNull, sql } from "drizzle-orm"
+import type { SQL } from "drizzle-orm"
+import * as Array from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import * as Binding from "./Binding.ts"
+import { storeError } from "./internal/errors.ts"
+import { inIds } from "./internal/id-list.ts"
+import { tasks } from "./internal/schema.ts"
 const decodeRows = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Task.Task.fields, createdAt: Schema.DateTimeUtcFromDate })),
-);
-type Row = typeof tasks.$inferSelect;
-type Insert = typeof tasks.$inferInsert;
+  Schema.Array(Schema.Struct({ ...Task.Task.fields, createdAt: Schema.DateTimeUtcFromDate }))
+)
+type Row = typeof tasks.$inferSelect
+type Insert = typeof tasks.$inferInsert
 /** Each creator kind reads only its own column; the table constraint rejects mixed rows. */
 const toRecord = ({ createdByKind, createdByMemberId, createdByContactId, ...row }: Row) => ({
   ...row,
   createdBy:
     createdByKind === "Member"
       ? { _tag: createdByKind, memberId: createdByMemberId }
-      : { _tag: createdByKind, contactId: createdByContactId },
-});
+      : { _tag: createdByKind, contactId: createdByContactId }
+})
 const creatorColumns = (
-  creator: Task.Task["createdBy"],
+  creator: Task.Task["createdBy"]
 ): Pick<Insert, "createdByKind" | "createdByMemberId" | "createdByContactId"> =>
   ThreadMessage.Author.isAnyOf(["Member"])(creator)
     ? { createdByKind: "Member", createdByMemberId: creator.memberId, createdByContactId: null }
-    : { createdByKind: "Contact", createdByMemberId: null, createdByContactId: creator.contactId };
-const toRecords = (rows: ReadonlyArray<Row>) => decodeRows(rows.map(toRecord));
+    : { createdByKind: "Contact", createdByMemberId: null, createdByContactId: creator.contactId }
+const toRecords = (rows: ReadonlyArray<Row>) => decodeRows(rows.map(toRecord))
 /** The column a change writes, what it writes there, and the row it expects to find. */
-const changeColumns = (
-  change: Task.Change,
-): { readonly set: Partial<Insert>; readonly where: SQL } => {
+const changeColumns = (change: Task.Change): { readonly set: Partial<Insert>; readonly where: SQL } => {
   switch (change._tag) {
     case "Status":
-      return { set: { status: change.to }, where: eq(tasks.status, change.from) };
+      return { set: { status: change.to }, where: eq(tasks.status, change.from) }
     case "Priority":
-      return { set: { priority: change.to }, where: eq(tasks.priority, change.from) };
+      return { set: { priority: change.to }, where: eq(tasks.priority, change.from) }
     case "Assignee":
       return {
         set: { assignee: change.to },
-        where: change.from === null ? isNull(tasks.assignee) : eq(tasks.assignee, change.from),
-      };
+        where: change.from === null ? isNull(tasks.assignee) : eq(tasks.assignee, change.from)
+      }
   }
-};
+}
 /**
  * Builds the task store for the binding's workspace: this module's driver inside
  * `TaskStore.make`, which checks every input first.
@@ -68,21 +67,17 @@ const changeColumns = (
  * @since 0.1.0
  */
 export const make = Effect.fn("Tasks.make")(function* () {
-  const { workspaceId, database, guard } = yield* Binding.Binding;
-  const { db } = database;
-  const inWorkspace = eq(tasks.workspaceId, workspaceId);
+  const { workspaceId, database, guard } = yield* Binding.Binding
+  const { db } = database
+  const inWorkspace = eq(tasks.workspaceId, workspaceId)
   const driver: TaskStore.TaskStore["Service"] = {
     get: (threadId) =>
       guard(
         db
           .select()
           .from(tasks)
-          .where(and(inWorkspace, eq(tasks.threadId, threadId))),
-      ).pipe(
-        Effect.flatMap(toRecords),
-        Effect.map(Array.head),
-        Effect.mapError(StoreError.failed("TaskStore", "get")),
-      ),
+          .where(and(inWorkspace, eq(tasks.threadId, threadId)))
+      ).pipe(Effect.flatMap(toRecords), Effect.map(Array.head), Effect.mapError(StoreError.failed("TaskStore", "get"))),
     getMany: (threadIds) =>
       threadIds.length === 0
         ? Effect.succeed([])
@@ -90,13 +85,10 @@ export const make = Effect.fn("Tasks.make")(function* () {
             db
               .select()
               .from(tasks)
-              .where(and(inWorkspace, inIds(tasks.threadId, threadIds))),
-          ).pipe(
-            Effect.flatMap(toRecords),
-            Effect.mapError(StoreError.failed("TaskStore", "getMany")),
-          ),
+              .where(and(inWorkspace, inIds(tasks.threadId, threadIds)))
+          ).pipe(Effect.flatMap(toRecords), Effect.mapError(StoreError.failed("TaskStore", "getMany"))),
     listByGroup: (groupId, options) => {
-      const orderedId = sql`${tasks.threadId} COLLATE "C"`;
+      const orderedId = sql`${tasks.threadId} COLLATE "C"`
       return guard(
         db
           .select()
@@ -108,15 +100,12 @@ export const make = Effect.fn("Tasks.make")(function* () {
               options.status === undefined ? undefined : eq(tasks.status, options.status),
               options.before === undefined
                 ? undefined
-                : sql`(${tasks.createdAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.createdAt), tasks.createdAt)}, ${options.before.threadId})`,
-            ),
+                : sql`(${tasks.createdAt}, ${orderedId}) < (${sql.param(DateTime.toDate(options.before.createdAt), tasks.createdAt)}, ${options.before.threadId})`
+            )
           )
           .orderBy(desc(tasks.createdAt), desc(orderedId))
-          .limit(options.limit),
-      ).pipe(
-        Effect.flatMap(toRecords),
-        Effect.mapError(StoreError.failed("TaskStore", "listByGroup")),
-      );
+          .limit(options.limit)
+      ).pipe(Effect.flatMap(toRecords), Effect.mapError(StoreError.failed("TaskStore", "listByGroup")))
     },
     insert: (record) =>
       guard(
@@ -128,34 +117,30 @@ export const make = Effect.fn("Tasks.make")(function* () {
           priority: record.priority,
           assignee: record.assignee,
           ...creatorColumns(record.createdBy),
-          createdAt: DateTime.toDate(record.createdAt),
+          createdAt: DateTime.toDate(record.createdAt)
         }),
-        true,
+        true
       ).pipe(Effect.asVoid, Effect.mapError(storeError("TaskStore", "insert"))),
     apply: Effect.fn("Tasks.apply")(function* (threadId, change) {
-      const columns = changeColumns(change);
+      const columns = changeColumns(change)
       const updated = yield* guard(
         db
           .update(tasks)
           .set(columns.set)
           .where(and(inWorkspace, eq(tasks.threadId, threadId), columns.where))
           .returning({ threadId: tasks.threadId }),
-        true,
-      ).pipe(Effect.mapError(storeError("TaskStore", "apply")));
+        true
+      ).pipe(Effect.mapError(storeError("TaskStore", "apply")))
       if (updated.length === 0)
-        return yield* StoreError.rejected(
-          "TaskStore",
-          "apply",
-          "Expected a task holding the value the change replaces",
-        );
-    }),
-  };
-  return TaskStore.make(workspaceId, driver);
-});
+        return yield* StoreError.rejected("TaskStore", "apply", "Expected a task holding the value the change replaces")
+    })
+  }
+  return TaskStore.make(workspaceId, driver)
+})
 /**
  * Provides `TaskStore.TaskStore` over the caller's `Binding.Binding`.
  *
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(TaskStore.TaskStore, make());
+export const layer = Layer.effect(TaskStore.TaskStore, make())

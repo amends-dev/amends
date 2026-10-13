@@ -7,13 +7,14 @@
  *
  * @since 0.1.0
  */
-import { Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/workspace";
-import * as Schema from "effect/Schema";
-import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
-import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import * as Authentication from "./Authentication.ts";
-import * as WorkspaceMember from "./WorkspaceMember.ts";
-import * as ApiErrors from "./ApiErrors.ts";
+
+import { Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/workspace"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as Schema from "effect/Schema"
+import * as ApiErrors from "./ApiErrors.ts"
+import * as Authentication from "./Authentication.ts"
+import * as WorkspaceMember from "./WorkspaceMember.ts"
 
 /**
  * The workspace's settings and renaming, the member-management view, and ownership.
@@ -25,26 +26,26 @@ export class SettingsGroup extends HttpApiGroup.make("settings")
   .add(
     HttpApiEndpoint.get("get", "/", {
       success: WorkspaceSettings.View,
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation]
     }),
     HttpApiEndpoint.put("rename", "/name", {
       payload: WorkspaceSettings.RenameInput,
       success: Workspace.Workspace,
-      error: [...ApiErrors.workspace, ApiErrors.Changed],
+      error: [...ApiErrors.workspace, ApiErrors.Changed]
     }),
     HttpApiEndpoint.get("members", "/members", {
       success: Schema.Array(WorkspaceSettings.MemberEntry),
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation]
     }),
     HttpApiEndpoint.get("ownership", "/ownership", {
       success: Ownership.View,
-      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
+      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation]
     }),
     HttpApiEndpoint.post("transferOwnership", "/ownership", {
       payload: Ownership.TransferInput,
       success: Workspace.Workspace,
-      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
-    }),
+      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation]
+    })
   )
   .middleware(WorkspaceMember.WorkspaceMember)
   .middleware(Authentication.Authentication)

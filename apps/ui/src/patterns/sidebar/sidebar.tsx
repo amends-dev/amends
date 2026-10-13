@@ -1,51 +1,46 @@
-import { Show, splitProps, type JSX } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import { IconChevronDown, IconMarkSearch } from "@amends-dev/icons";
-import { Avatar } from "../../components/avatar/index.ts";
-import { Count } from "../../components/count/index.ts";
-import { StatusMark, markTone, type Status } from "../../components/status-mark/index.ts";
-import { Tooltip } from "../../components/tooltip/index.ts";
-import { TurnMark, turnStateLabels } from "../../components/turn-status/index.ts";
-import { TaskStatus, type TaskState } from "../../components/task-status/index.ts";
-import type { AvatarToneName } from "../../foundations/color/tokens.ts";
-import { classes, type IconComponent } from "../../internal/props.ts";
-import * as s from "./sidebar.css.ts";
-import { stitch } from "../../internal/stitch.ts";
+import { IconChevronDown, IconMarkSearch } from "@amends-dev/icons"
+import { Show, splitProps, type JSX } from "solid-js"
+import { Dynamic } from "solid-js/web"
+import { Avatar } from "../../components/avatar/index.ts"
+import { Count } from "../../components/count/index.ts"
+import { StatusMark, markTone, type Status } from "../../components/status-mark/index.ts"
+import { TaskStatus, type TaskState } from "../../components/task-status/index.ts"
+import { Tooltip } from "../../components/tooltip/index.ts"
+import { TurnMark, turnStateLabels } from "../../components/turn-status/index.ts"
+import type { AvatarToneName } from "../../foundations/color/tokens.ts"
+import { classes, type IconComponent } from "../../internal/props.ts"
+import { stitch } from "../../internal/stitch.ts"
+import * as s from "./sidebar.css.ts"
 
 export type RootProps = JSX.HTMLAttributes<HTMLElement> & {
   /** Names the navigation, such as "Workspace". */
-  "aria-label": string;
-};
+  "aria-label": string
+}
 
 /** The destination's items beside the rail. Place it after Rail.Root in Shell.Navigation. */
 export function Root(props: RootProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <nav {...native} data-shell-part="sidebar" class={classes(s.sidebar, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <nav {...native} data-shell-part="sidebar" class={classes(s.sidebar, local.class)} />
 }
 
-export type HeaderProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type HeaderProps = JSX.HTMLAttributes<HTMLDivElement>
 
 /** The workspace switcher and search, above a divider aligned with the pane headers. */
 export function Header(props: HeaderProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.header, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <div {...native} class={classes(s.header, local.class)} />
 }
 
 export type WorkspaceProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
-  name: string;
-  initials?: string;
-};
+  name: string
+  initials?: string
+}
 
 /** The current workspace; opens the workspace switcher. */
 export function Workspace(props: WorkspaceProps) {
-  const [local, native] = splitProps(props, ["name", "initials", "class"]);
+  const [local, native] = splitProps(props, ["name", "initials", "class"])
   return (
-    <button
-      {...native}
-      type="button"
-      aria-haspopup="menu"
-      class={classes(s.workspace, local.class)}
-    >
+    <button {...native} type="button" aria-haspopup="menu" class={classes(s.workspace, local.class)}>
       <Avatar
         name={local.name}
         initials={local.initials ?? local.name.charAt(0).toUpperCase()}
@@ -56,19 +51,19 @@ export function Workspace(props: WorkspaceProps) {
       <span class={s.workspaceName}>{local.name}</span>
       <IconChevronDown class={s.chevron} />
     </button>
-  );
+  )
 }
 
 export type SearchProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   /** The prompt, such as "Find anything…". */
-  children: string;
+  children: string
   /** The keyboard shortcut, shown on desktop, such as "⌘ K". */
-  shortcut?: string;
-};
+  shortcut?: string
+}
 
 /** Opens search. */
 export function Search(props: SearchProps) {
-  const [local, native] = splitProps(props, ["children", "shortcut", "class"]);
+  const [local, native] = splitProps(props, ["children", "shortcut", "class"])
   return (
     <button {...native} type="button" class={classes(s.search, local.class)}>
       <IconMarkSearch class={s.searchIcon} />
@@ -77,54 +72,54 @@ export function Search(props: SearchProps) {
         <kbd class={s.shortcut}>{local.shortcut}</kbd>
       </Show>
     </button>
-  );
+  )
 }
 
-export type BodyProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type BodyProps = JSX.HTMLAttributes<HTMLDivElement>
 
 /** The scrolling list of items and sections. */
 export function Body(props: BodyProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.body, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <div {...native} class={classes(s.body, local.class)} />
 }
 
-export type ListProps = JSX.HTMLAttributes<HTMLUListElement>;
+export type ListProps = JSX.HTMLAttributes<HTMLUListElement>
 
 /** Items, 4px apart. */
 export function List(props: ListProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <ul {...native} class={classes(s.list, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <ul {...native} class={classes(s.list, local.class)} />
 }
 
 export interface ItemPerson {
-  readonly name: string;
-  readonly initials?: string;
-  readonly tone?: AvatarToneName;
+  readonly name: string
+  readonly initials?: string
+  readonly tone?: AvatarToneName
 }
 
 export type ItemProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
-  href: string;
+  href: string
   /** The label. */
-  children: string;
+  children: string
   /** An icon before the label. */
-  icon?: IconComponent;
+  icon?: IconComponent
   /** A person's avatar before the label, for direct messages. */
-  person?: ItemPerson;
+  person?: ItemPerson
   /** A badge after the label, such as unread items. */
-  count?: number;
+  count?: number
   /** Names the count for assistive technology, such as "5 unread". */
-  countLabel?: string;
+  countLabel?: string
   /** A dot for activity the reader has not seen, when there is no count. */
-  unread?: boolean;
-  current?: boolean;
+  unread?: boolean
+  current?: boolean
   /** Agents at work there: the most pressing turn state, as the logo moving before any count. */
-  activity?: "queued" | "working" | "stopping";
+  activity?: "queued" | "working" | "stopping"
   /**
    * Its state: a patch on the person's avatar, or a mark at the row's end for an item without
    * one. Its words show on hovering the mark and follow the label for assistive technology.
    */
-  status?: Status;
-};
+  status?: Status
+}
 
 /** A destination in a List. */
 export function Item(props: ItemProps) {
@@ -138,22 +133,20 @@ export function Item(props: ItemProps) {
     "current",
     "activity",
     "status",
-    "class",
-  ]);
+    "class"
+  ])
   // Its state follows the label for assistive technology, which the marks only show.
   const name = () => {
-    const state = local.status?.label ?? (local.activity && turnStateLabels[local.activity]);
-    if (!state) return undefined;
-    const count = local.count ? (local.countLabel ?? String(local.count)) : undefined;
-    return [local.children, state, count ?? (local.unread ? "new activity" : undefined)]
-      .filter(Boolean)
-      .join(", ");
-  };
+    const state = local.status?.label ?? (local.activity && turnStateLabels[local.activity])
+    if (!state) return undefined
+    const count = local.count ? (local.countLabel ?? String(local.count)) : undefined
+    return [local.children, state, count ?? (local.unread ? "new activity" : undefined)].filter(Boolean).join(", ")
+  }
   const tip = (status: Status, mark: JSX.Element) => (
     <Tooltip title={status.label} detail={status.detail} tone={markTone(status.mark)}>
       {mark}
     </Tooltip>
-  );
+  )
   return (
     <li>
       <a
@@ -176,12 +169,12 @@ export function Item(props: ItemProps) {
                 class={s.itemAvatar}
                 decorative
               />
-            );
+            )
             return (
               <Show when={local.status} fallback={avatar()}>
                 {(status) => tip(status(), avatar())}
               </Show>
-            );
+            )
           }}
         </Show>
         <span class={s.itemLabel}>{local.children}</span>
@@ -207,29 +200,25 @@ export function Item(props: ItemProps) {
         </Show>
       </a>
     </li>
-  );
+  )
 }
 
 export type SubItemProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
-  href: string;
-  children: string;
+  href: string
+  children: string
   /** An icon before the label. */
-  icon?: IconComponent;
+  icon?: IconComponent
   /** For a task, its state, shown instead of an icon. */
-  state?: TaskState;
-  current?: boolean;
-};
+  state?: TaskState
+  current?: boolean
+}
 
 /** A thread or task shown under the Item before it, joined by a stitch. */
 export function SubItem(props: SubItemProps) {
-  const [local, native] = splitProps(props, ["children", "icon", "state", "current", "class"]);
+  const [local, native] = splitProps(props, ["children", "icon", "state", "current", "class"])
   return (
     <li>
-      <a
-        {...native}
-        aria-current={local.current ? "page" : undefined}
-        class={classes(s.subItem, local.class)}
-      >
+      <a {...native} aria-current={local.current ? "page" : undefined} class={classes(s.subItem, local.class)}>
         <svg
           class={s.connector}
           viewBox="0 0 18 41"
@@ -246,51 +235,45 @@ export function SubItem(props: SubItemProps) {
           />
         </svg>
         <Show when={local.state}>{(state) => <TaskStatus state={state()} />}</Show>
-        <Show when={!local.state && local.icon}>
-          {(icon) => <Dynamic component={icon()} class={s.subItemIcon} />}
-        </Show>
+        <Show when={!local.state && local.icon}>{(icon) => <Dynamic component={icon()} class={s.subItemIcon} />}</Show>
         <span class={s.itemLabel}>{local.children}</span>
       </a>
     </li>
-  );
+  )
 }
 
-export type SectionProps = JSX.HTMLAttributes<HTMLDivElement>;
+export type SectionProps = JSX.HTMLAttributes<HTMLDivElement>
 
 /** A titled group of items, such as Groups or Direct messages. */
 export function Section(props: SectionProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <div {...native} class={classes(s.section, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <div {...native} class={classes(s.section, local.class)} />
 }
 
-export type EmptyProps = JSX.HTMLAttributes<HTMLParagraphElement>;
+export type EmptyProps = JSX.HTMLAttributes<HTMLParagraphElement>
 
 /** A quiet line where a section has no items yet, such as "No groups yet". */
 export function Empty(props: EmptyProps) {
-  const [local, native] = splitProps(props, ["class"]);
-  return <p {...native} class={classes(s.empty, local.class)} />;
+  const [local, native] = splitProps(props, ["class"])
+  return <p {...native} class={classes(s.empty, local.class)} />
 }
 
 export type SectionHeaderProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "title"> & {
   /** Shown in capitals. */
-  title: string;
+  title: string
   /** Makes the title a link, such as to the full list of groups. */
-  href?: string;
+  href?: string
   /** The title's page is showing. */
-  current?: boolean;
+  current?: boolean
   /** Section actions, such as IconButtons with size="compact". */
-  children?: JSX.Element;
-};
+  children?: JSX.Element
+}
 
 /** The section's title and its actions. */
 export function SectionHeader(props: SectionHeaderProps) {
-  const [local, native] = splitProps(props, ["title", "href", "current", "children", "class"]);
+  const [local, native] = splitProps(props, ["title", "href", "current", "children", "class"])
   return (
-    <div
-      {...native}
-      class={classes(s.sectionHeader, local.class)}
-      data-current={local.current ? "" : undefined}
-    >
+    <div {...native} class={classes(s.sectionHeader, local.class)} data-current={local.current ? "" : undefined}>
       <Show when={local.href} fallback={<span class={s.sectionTitle}>{local.title}</span>}>
         {(href) => (
           <a href={href()} class={s.sectionTitle} aria-current={local.current ? "page" : undefined}>
@@ -302,5 +285,5 @@ export function SectionHeader(props: SectionHeaderProps) {
         <div class={s.sectionActions}>{local.children}</div>
       </Show>
     </div>
-  );
+  )
 }

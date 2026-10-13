@@ -7,14 +7,15 @@
  *
  * @since 0.1.0
  */
-import { Performer } from "@amends-dev/core/identity";
-import { Event, Store } from "@amends-dev/core/journal";
-import type { Workspace } from "@amends-dev/core/workspace";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Schema from "effect/Schema";
-import * as Predicate from "effect/Predicate";
-import { logEntries } from "./internal/schema.ts";
+
+import { Performer } from "@amends-dev/core/identity"
+import { Event, Store } from "@amends-dev/core/journal"
+import type { Workspace } from "@amends-dev/core/workspace"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
+import { logEntries } from "./internal/schema.ts"
 
 /**
  * The `log_entries` columns a read selects, named as `decodeRows` expects them.
@@ -42,8 +43,8 @@ export const columns = {
   causeCommitId: logEntries.causeCommitId,
   causeEntryId: logEntries.causeEntryId,
   correlationId: logEntries.correlationId,
-  occurredAt: logEntries.occurredAt,
-};
+  occurredAt: logEntries.occurredAt
+}
 
 const headerFields = {
   subject: Schema.NullOr(Event.Header.fields.subject),
@@ -58,23 +59,22 @@ const headerFields = {
   causeCommitId: Schema.NullOr(Schema.String),
   causeEntryId: Schema.NullOr(Schema.String),
   correlationId: Schema.NullOr(Schema.String),
-  occurredAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
-};
+  occurredAt: Schema.NullOr(Schema.DateTimeUtcFromDate)
+}
 const Row = Schema.Struct({
   ...Store.Entry.fields,
   recordedAt: Schema.DateTimeUtcFromDate,
-  ...headerFields,
+  ...headerFields
 }).check(
   Schema.makeFilter((row) => {
-    if ((row.factName === null) !== (row.subject === null)) return "Incomplete fact subject";
-    if ((row.factName === null) !== (row.factVersion === null)) return "Incomplete fact metadata";
-    if ((row.factName === null) !== (row.performerKind === null))
-      return "Fact attribution is required";
+    if ((row.factName === null) !== (row.subject === null)) return "Incomplete fact subject"
+    if ((row.factName === null) !== (row.factVersion === null)) return "Incomplete fact metadata"
+    if ((row.factName === null) !== (row.performerKind === null)) return "Fact attribution is required"
     const empty =
       row.performerMemberId === null &&
       row.performerIdentityKind === null &&
       row.performerIdentityId === null &&
-      row.performerSystemId === null;
+      row.performerSystemId === null
     if (row.performerKind === null)
       return empty &&
         row.correlationId === null &&
@@ -83,31 +83,28 @@ const Row = Schema.Struct({
         row.causeCommitId === null &&
         row.causeEntryId === null
         ? undefined
-        : "Incomplete provenance";
-    if (row.factName === null || row.correlationId === null || row.occurredAt === null)
-      return "Incomplete provenance";
+        : "Incomplete provenance"
+    if (row.factName === null || row.correlationId === null || row.occurredAt === null) return "Incomplete provenance"
     if (
       (row.causeLogId === null) !== (row.causeCommitId === null) ||
       (row.causeLogId === null) !== (row.causeEntryId === null)
     )
-      return "Incomplete cause";
+      return "Incomplete cause"
     if (row.performerKind === "System")
       return row.performerSystemId !== null &&
         row.performerMemberId === null &&
         row.performerIdentityKind === null &&
         row.performerIdentityId === null
         ? undefined
-        : "Invalid system performer";
+        : "Invalid system performer"
     return row.performerIdentityKind !== null &&
       row.performerIdentityId !== null &&
       row.performerSystemId === null &&
-      (row.performerKind === "Member"
-        ? row.performerMemberId !== null
-        : row.performerMemberId === null)
+      (row.performerKind === "Member" ? row.performerMemberId !== null : row.performerMemberId === null)
       ? undefined
-      : "Invalid identity performer";
-  }),
-);
+      : "Invalid identity performer"
+  })
+)
 
 /**
  * Decode rows selected with `columns` as `Store.Entry` values of `workspaceId`, failing on a row
@@ -116,13 +113,10 @@ const Row = Schema.Struct({
  * @category utils
  * @since 0.1.0
  */
-export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
-  workspaceId: Workspace.Id,
-  input: unknown,
-) {
-  const rows = yield* Schema.decodeUnknownEffect(Schema.Array(Row))(input);
+export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (workspaceId: Workspace.Id, input: unknown) {
+  const rows = yield* Schema.decodeUnknownEffect(Schema.Array(Row))(input)
   return yield* Effect.forEach(rows, (row) => {
-    const identity = { _tag: row.performerIdentityKind, id: row.performerIdentityId };
+    const identity = { _tag: row.performerIdentityKind, id: row.performerIdentityId }
     return Schema.decodeUnknownEffect(Schema.toType(Store.Entry))({
       id: row.id,
       logId: row.logId,
@@ -155,14 +149,14 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
                         workspaceId,
                         logId: row.causeLogId,
                         commitId: row.causeCommitId,
-                        id: row.causeEntryId,
-                      },
-              },
-            },
-          }),
-    });
-  });
-});
+                        id: row.causeEntryId
+                      }
+              }
+            }
+          })
+    })
+  })
+})
 
 /**
  * The header columns of an entry's content: its fact's subject, name, version, and provenance, or
@@ -173,8 +167,8 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
  * @since 0.1.0
  */
 export const toColumns = (entry: Store.Content) => {
-  const provenance = entry.fact?.provenance;
-  const performer = provenance?.performedBy;
+  const provenance = entry.fact?.provenance
+  const performer = provenance?.performedBy
   return {
     subject: entry.fact?.subject ?? null,
     factName: entry.fact?.name ?? null,
@@ -182,18 +176,14 @@ export const toColumns = (entry: Store.Content) => {
     performerKind: performer?._tag ?? null,
     performerMemberId: Predicate.isTagged(performer, "Member") ? performer.memberId : null,
     performerIdentityKind:
-      performer !== undefined && !Performer.Reference.isAnyOf(["System"])(performer)
-        ? performer.identity._tag
-        : null,
+      performer !== undefined && !Performer.Reference.isAnyOf(["System"])(performer) ? performer.identity._tag : null,
     performerIdentityId:
-      performer !== undefined && !Performer.Reference.isAnyOf(["System"])(performer)
-        ? performer.identity.id
-        : null,
+      performer !== undefined && !Performer.Reference.isAnyOf(["System"])(performer) ? performer.identity.id : null,
     performerSystemId: Predicate.isTagged(performer, "System") ? performer.id : null,
     causeLogId: provenance?.causedBy?.logId ?? null,
     causeCommitId: provenance?.causedBy?.commitId ?? null,
     causeEntryId: provenance?.causedBy?.id ?? null,
     correlationId: provenance?.correlationId ?? null,
-    occurredAt: provenance === undefined ? null : DateTime.toDate(provenance.occurredAt),
-  };
-};
+    occurredAt: provenance === undefined ? null : DateTime.toDate(provenance.occurredAt)
+  }
+}

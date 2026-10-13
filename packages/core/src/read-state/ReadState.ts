@@ -6,11 +6,12 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as GroupId from "../group/GroupId.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as MemberId from "../workspace/MemberId.ts";
+
+import * as Schema from "effect/Schema"
+import * as GroupId from "../group/GroupId.ts"
+import * as ThreadId from "../thread/ThreadId.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * How far a human member has read a thread, by timeline sequence. Private to that member.
@@ -22,8 +23,8 @@ export const ThreadPosition = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   memberId: MemberId.Id,
   threadId: ThreadId.Id,
-  readThrough: Schema.Int.check(Schema.isGreaterThan(0)),
-});
+  readThrough: Schema.Int.check(Schema.isGreaterThan(0))
+})
 
 /**
  * @category schemas
@@ -41,8 +42,8 @@ export const GroupRead = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   memberId: MemberId.Id,
   groupId: GroupId.Id,
-  readAt: Schema.DateTimeUtcFromString,
-});
+  readAt: Schema.DateTimeUtcFromString
+})
 
 /**
  * @category schemas
@@ -59,8 +60,8 @@ export interface GroupRead extends Schema.Schema.Type<typeof GroupRead> {}
  */
 export const MarkThreadReadInput = Schema.Struct({
   threadId: ThreadId.Id,
-  throughSequence: ThreadPosition.fields.readThrough,
-});
+  throughSequence: ThreadPosition.fields.readThrough
+})
 
 /**
  * @category options
@@ -74,7 +75,7 @@ export interface MarkThreadReadInput extends Schema.Schema.Type<typeof MarkThrea
  * @category options
  * @since 0.1.0
  */
-export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.Id });
+export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.Id })
 
 /**
  * @category options

@@ -1,14 +1,14 @@
-import { fileURLToPath } from "node:url";
+import { fileURLToPath } from "node:url"
 
 interface Options {
-  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly env?: Readonly<Record<string, string | undefined>>
   /**
    * The line the process writes once it is ready, whose first group says where it serves:
    * `Listening on` and its URL, by default.
    */
-  readonly ready?: RegExp;
-  readonly command?: ReadonlyArray<string>;
-  readonly startupTimeoutMs?: number;
+  readonly ready?: RegExp
+  readonly command?: ReadonlyArray<string>
+  readonly startupTimeoutMs?: number
 }
 
 /**
@@ -18,7 +18,7 @@ interface Options {
 export const withServer = async <A>(
   databaseUrl: string,
   run: (call: Call, base: string, stop: Stop) => Promise<A>,
-  options: Options = {},
+  options: Options = {}
 ): Promise<A> => {
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -26,89 +26,86 @@ export const withServer = async <A>(
     AMENDS_SIGN_IN: "development",
     ...options.env,
     AMENDS_DATABASE_URL: databaseUrl,
-    AMENDS_PORT: "0",
-  };
-  const child = Bun.spawn(
-    [...(options.command ?? [process.execPath, "--no-env-file", "hosts/local/src/index.ts"])],
-    {
-      cwd: fileURLToPath(new URL("../../../", import.meta.url)),
-      env,
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  );
-  const ready = Promise.withResolvers<string>();
-  let output = "";
+    AMENDS_PORT: "0"
+  }
+  const child = Bun.spawn([...(options.command ?? [process.execPath, "--no-env-file", "hosts/local/src/index.ts"])], {
+    cwd: fileURLToPath(new URL("../../../", import.meta.url)),
+    env,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe"
+  })
+  const ready = Promise.withResolvers<string>()
+  let output = ""
   const drain = async (stream: ReadableStream<Uint8Array>) => {
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let tail = "";
+    const reader = stream.getReader()
+    const decoder = new TextDecoder()
+    let tail = ""
     try {
       while (true) {
-        const chunk = await reader.read();
-        if (chunk.done) break;
-        const text = decoder.decode(chunk.value, { stream: true });
-        output = (output + text).slice(-16_384);
-        tail = (tail + text).slice(-16_384);
-        const base = (options.ready ?? /Listening on (http:\/\/[^\s]+)(?=\s)/).exec(tail)?.[1];
-        if (base !== undefined) ready.resolve(base);
+        const chunk = await reader.read()
+        if (chunk.done) break
+        const text = decoder.decode(chunk.value, { stream: true })
+        output = (output + text).slice(-16_384)
+        tail = (tail + text).slice(-16_384)
+        const base = (options.ready ?? /Listening on (http:\/\/[^\s]+)(?=\s)/).exec(tail)?.[1]
+        if (base !== undefined) ready.resolve(base)
       }
     } finally {
-      reader.releaseLock();
+      reader.releaseLock()
     }
-  };
-  const drains = [drain(child.stdout), drain(child.stderr)];
-  for (const draining of drains) void draining.catch(ready.reject);
+  }
+  const drains = [drain(child.stdout), drain(child.stderr)]
+  for (const draining of drains) void draining.catch(ready.reject)
   const timeout = setTimeout(() => {
-    ready.reject(new Error(`Timed out waiting for the server to be ready: ${output}`));
-  }, options.startupTimeoutMs ?? 10_000);
+    ready.reject(new Error(`Timed out waiting for the server to be ready: ${output}`))
+  }, options.startupTimeoutMs ?? 10_000)
   try {
     const base = await Promise.race([
       ready.promise,
       child.exited.then(async (code) => {
-        await Promise.allSettled(drains);
-        throw new Error(`The server exited before it was ready (exit ${code}): ${output}`);
-      }),
-    ]);
-    clearTimeout(timeout);
+        await Promise.allSettled(drains)
+        throw new Error(`The server exited before it was ready (exit ${code}): ${output}`)
+      })
+    ])
+    clearTimeout(timeout)
     const call: Call = async (token, method, path, body, workspaceId) => {
-      const headers = new Headers({ authorization: `Bearer ${token}` });
-      if (workspaceId !== undefined) headers.set("amends-workspace", workspaceId);
-      const request: RequestInit = { method, headers };
+      const headers = new Headers({ authorization: `Bearer ${token}` })
+      if (workspaceId !== undefined) headers.set("amends-workspace", workspaceId)
+      const request: RequestInit = { method, headers }
       if (body !== undefined) {
-        headers.set("content-type", "application/json");
-        request.body = JSON.stringify(body);
+        headers.set("content-type", "application/json")
+        request.body = JSON.stringify(body)
       }
-      const response = await fetch(`${base}${path}`, request);
-      const text = await response.text();
-      return { status: response.status, body: text === "" ? undefined : JSON.parse(text) };
-    };
+      const response = await fetch(`${base}${path}`, request)
+      const text = await response.text()
+      return { status: response.status, body: text === "" ? undefined : JSON.parse(text) }
+    }
     const stop: Stop = async (signal = "SIGTERM") => {
-      const started = performance.now();
-      child.kill(signal);
-      await child.exited;
-      return performance.now() - started;
-    };
-    return await run(call, base, stop);
+      const started = performance.now()
+      child.kill(signal)
+      await child.exited
+      return performance.now() - started
+    }
+    return await run(call, base, stop)
   } finally {
-    clearTimeout(timeout);
-    child.kill();
-    const forceStop = setTimeout(() => child.kill("SIGKILL"), 1_000);
+    clearTimeout(timeout)
+    child.kill()
+    const forceStop = setTimeout(() => child.kill("SIGKILL"), 1_000)
     try {
-      await child.exited;
-      await Promise.allSettled(drains);
+      await child.exited
+      await Promise.allSettled(drains)
     } finally {
-      clearTimeout(forceStop);
+      clearTimeout(forceStop)
     }
   }
-};
+}
 
 /**
  * Stop the server as its process manager would, or as a crash does with `SIGKILL`, and say how long
  * it took, in milliseconds.
  */
-export type Stop = (signal?: "SIGTERM" | "SIGKILL") => Promise<number>;
+export type Stop = (signal?: "SIGTERM" | "SIGKILL") => Promise<number>
 
 /**
  * Send a request as the bearer of `token`; one to an endpoint a member calls names the workspace
@@ -119,5 +116,5 @@ export type Call = (
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
-  workspaceId?: string,
-) => Promise<{ status: number; body: unknown }>;
+  workspaceId?: string
+) => Promise<{ status: number; body: unknown }>

@@ -1,53 +1,53 @@
-import { For, Show } from "solid-js";
-import { IconMarkChannel, IconMarkOpen, IconUsers } from "@amends-dev/icons";
-import { Badge } from "../../components/badge/index.ts";
-import { Button } from "../../components/button/index.ts";
-import { Divider } from "../../components/divider/index.ts";
-import { Field } from "../../components/field/index.ts";
-import { SearchField } from "../../components/input/index.ts";
-import { Tabs } from "../../components/tabs/index.ts";
-import { Pane } from "../../patterns/pane/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
-import { Shell } from "../../patterns/shell/index.ts";
-import * as s from "./directory.css.ts";
+import { IconMarkChannel, IconMarkOpen, IconUsers } from "@amends-dev/icons"
+import { For, Show } from "solid-js"
+import { Badge } from "../../components/badge/index.ts"
+import { Button } from "../../components/button/index.ts"
+import { Divider } from "../../components/divider/index.ts"
+import { Field } from "../../components/field/index.ts"
+import { SearchField } from "../../components/input/index.ts"
+import { Tabs } from "../../components/tabs/index.ts"
+import { Keyed } from "../../internal/keyed.tsx"
+import { Pane } from "../../patterns/pane/index.ts"
+import { Shell } from "../../patterns/shell/index.ts"
+import * as s from "./directory.css.ts"
 
-export type DirectoryTab = "joined" | "discover";
+export type DirectoryTab = "joined" | "discover"
 
 export interface DirectoryGroup {
-  readonly id: string;
-  readonly name: string;
-  readonly visibility: "public" | "private";
+  readonly id: string
+  readonly name: string
+  readonly visibility: "public" | "private"
   /** Unknown for private groups the reader belongs to. */
-  readonly memberCount?: number;
+  readonly memberCount?: number
   /** The group, or its preview when the reader has not joined. None when it cannot be read yet. */
-  readonly href?: string;
+  readonly href?: string
 }
 
 export interface GroupDirectoryProps {
-  readonly tab: DirectoryTab;
-  readonly tabHref: (tab: DirectoryTab) => string;
+  readonly tab: DirectoryTab
+  readonly tabHref: (tab: DirectoryTab) => string
   /** Switches tabs in place of following their links. */
-  readonly onTabChange?: (tab: DirectoryTab) => void;
-  readonly joinedCount: number;
-  readonly discoverCount: number;
-  readonly query: string;
-  readonly onQueryChange: (query: string) => void;
+  readonly onTabChange?: (tab: DirectoryTab) => void
+  readonly joinedCount: number
+  readonly discoverCount: number
+  readonly query: string
+  readonly onQueryChange: (query: string) => void
   /** The current tab's groups, after searching. */
-  readonly groups: ReadonlyArray<DirectoryGroup>;
+  readonly groups: ReadonlyArray<DirectoryGroup>
   /** Opens a group in place of following its link, such as into a preview. */
-  readonly onOpenGroup?: (id: string) => void;
-  readonly onJoin: (id: string) => void;
+  readonly onOpenGroup?: (id: string) => void
+  readonly onJoin: (id: string) => void
   /** The group being joined, if any. */
-  readonly joiningId?: string;
+  readonly joiningId?: string
   /** Why the last join failed. */
-  readonly joinError?: "changed" | "denied" | "gone" | "invalid" | "failed";
+  readonly joinError?: "changed" | "denied" | "gone" | "invalid" | "failed"
   /** Groups the reader has not joined can be read before joining. Default true. */
-  readonly previews?: boolean;
+  readonly previews?: boolean
   /** Shows Create group, for readers who may create groups. */
-  readonly onCreateGroup?: () => void;
+  readonly onCreateGroup?: () => void
   /** In place of the list, while it loads or when it cannot. */
-  readonly status?: "loading" | "failed";
-  readonly onRetry?: () => void;
+  readonly status?: "loading" | "failed"
+  readonly onRetry?: () => void
 }
 
 const joinErrors = {
@@ -55,30 +55,28 @@ const joinErrors = {
   denied: "You can no longer join groups here.",
   gone: "That group is no longer public, or no longer exists.",
   invalid: "That group can’t be joined.",
-  failed: "Couldn’t join. Try again when the host is available.",
-} as const;
+  failed: "Couldn’t join. Try again when the host is available."
+} as const
 
 const tabs = [
   { id: "joined", label: "Your groups" },
-  { id: "discover", label: "Discover" },
-] as const;
+  { id: "discover", label: "Discover" }
+] as const
 
 /**
  * The Groups page: the groups the reader belongs to, and public groups to discover, read before
  * joining, and join.
  */
 export function GroupDirectory(props: GroupDirectoryProps) {
-  const discover = () => props.tab === "discover";
-  const count = (n: number) => (n === 1 ? "1 group" : `${n} groups`);
+  const discover = () => props.tab === "discover"
+  const count = (n: number) => (n === 1 ? "1 group" : `${n} groups`)
   return (
     <Pane.Root>
       <Pane.Header>
         <Shell.NavigationToggle />
         <Pane.Title icon={IconUsers}>Groups</Pane.Title>
         <Pane.Actions>
-          <Show when={props.onCreateGroup}>
-            {(create) => <Button onClick={() => create()()}>Create group</Button>}
-          </Show>
+          <Show when={props.onCreateGroup}>{(create) => <Button onClick={() => create()()}>Create group</Button>}</Show>
         </Pane.Actions>
         <Pane.Tabs>
           <Tabs.List aria-label="Groups">
@@ -89,9 +87,9 @@ export function GroupDirectory(props: GroupDirectoryProps) {
                   current={props.tab === tab.id}
                   count={tab.id === "joined" ? props.joinedCount : props.discoverCount}
                   onClick={(event: MouseEvent) => {
-                    if (!props.onTabChange) return;
-                    event.preventDefault();
-                    props.onTabChange(tab.id);
+                    if (!props.onTabChange) return
+                    event.preventDefault()
+                    props.onTabChange(tab.id)
                   }}
                 >
                   {tab.label}
@@ -170,9 +168,9 @@ export function GroupDirectory(props: GroupDirectoryProps) {
                         href={href()}
                         class={s.name}
                         onClick={(event) => {
-                          if (!props.onOpenGroup) return;
-                          event.preventDefault();
-                          props.onOpenGroup(group().id);
+                          if (!props.onOpenGroup) return
+                          event.preventDefault()
+                          props.onOpenGroup(group().id)
                         }}
                       >
                         {group().name}
@@ -213,5 +211,5 @@ export function GroupDirectory(props: GroupDirectoryProps) {
         </Show>
       </Pane.Body>
     </Pane.Root>
-  );
+  )
 }

@@ -7,11 +7,12 @@
  *
  * @since 0.1.0
  */
-import * as Schema from "effect/Schema";
-import * as GroupId from "./GroupId.ts";
-import * as GroupMembership from "./GroupMembership.ts";
-import * as MemberId from "../workspace/MemberId.ts";
-import * as WorkspaceId from "../workspace/WorkspaceId.ts";
+
+import * as Schema from "effect/Schema"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
+import * as GroupId from "./GroupId.ts"
+import * as GroupMembership from "./GroupMembership.ts"
 
 /**
  * Identifies one period of following; following again after unfollowing uses a fresh ID.
@@ -19,13 +20,13 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupFollowId"));
+export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupFollowId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type;
+export type Id = typeof Id.Type
 
 /**
  * Whether the follow is current or has ended.
@@ -33,13 +34,13 @@ export type Id = typeof Id.Type;
  * @category schemas
  * @since 0.1.0
  */
-export const Status = Schema.Literals(["active", "ended"]);
+export const Status = Schema.Literals(["active", "ended"])
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Status = typeof Status.Type;
+export type Status = typeof Status.Type
 
 /**
  * A member following a team group, so that threads started there afterwards admit them. It
@@ -58,8 +59,8 @@ export const GroupFollow = Schema.Struct({
   groupMembershipId: GroupMembership.Id,
   followedAt: Schema.DateTimeUtcFromString,
   status: Status,
-  endedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
-});
+  endedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
+})
 
 /**
  * @category schemas
@@ -75,8 +76,8 @@ export interface GroupFollow extends Schema.Schema.Type<typeof GroupFollow> {}
  */
 export const Input = Schema.Struct({
   groupId: GroupId.Id,
-  memberId: MemberId.Id,
-});
+  memberId: MemberId.Id
+})
 
 /**
  * @category options
@@ -95,8 +96,8 @@ export const Ending = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   groupId: GroupId.Id,
   followId: Id,
-  memberId: MemberId.Id,
-});
+  memberId: MemberId.Id
+})
 
 /**
  * @category schemas

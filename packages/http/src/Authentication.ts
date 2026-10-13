@@ -9,12 +9,13 @@
  *
  * @since 0.1.0
  */
-import type { Identity } from "@amends-dev/core/identity";
-import * as Context from "effect/Context";
-import * as Schema from "effect/Schema";
-import type * as Redacted from "effect/Redacted";
-import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
-import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity";
+
+import type { Identity } from "@amends-dev/core/identity"
+import * as Context from "effect/Context"
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
+import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity"
+import type * as Redacted from "effect/Redacted"
+import * as Schema from "effect/Schema"
 
 /**
  * The authenticated human or agent, supplied by middleware for each request.
@@ -23,7 +24,7 @@ import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity";
  * @since 0.1.0
  */
 export class Principal extends Context.Service<Principal, Identity.MemberReference>()(
-  "@amends-dev/http/Authentication/Principal",
+  "@amends-dev/http/Authentication/Principal"
 ) {}
 
 /**
@@ -34,7 +35,7 @@ export class Principal extends Context.Service<Principal, Identity.MemberReferen
  * @since 0.1.0
  */
 export class Credential extends Context.Service<Credential, Redacted.Redacted<string>>()(
-  "@amends-dev/http/Authentication/Credential",
+  "@amends-dev/http/Authentication/Credential"
 ) {}
 
 /**
@@ -47,7 +48,7 @@ export class Credential extends Context.Service<Credential, Redacted.Redacted<st
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Authentication.Unauthorized",
   { message: Schema.String },
-  { httpApiStatus: 401 },
+  { httpApiStatus: 401 }
 ) {}
 
 /**
@@ -58,11 +59,11 @@ export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
  * @category services
  * @since 0.1.0
  */
-export class Authentication extends HttpApiMiddleware.Service<
-  Authentication,
-  { provides: Principal | Credential }
->()("@amends-dev/http/Authentication", {
-  requiredForClient: true,
-  security: { bearer: HttpApiSecurity.bearer },
-  error: Unauthorized,
-}) {}
+export class Authentication extends HttpApiMiddleware.Service<Authentication, { provides: Principal | Credential }>()(
+  "@amends-dev/http/Authentication",
+  {
+    requiredForClient: true,
+    security: { bearer: HttpApiSecurity.bearer },
+    error: Unauthorized
+  }
+) {}
