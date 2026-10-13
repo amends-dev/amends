@@ -45,8 +45,6 @@ export interface Resolver {
 /**
  * The resolvers of every registered kind, which `ThreadQuery` reads timelines through.
  *
- * The registered resolvers as one.
- *
  * @category services
  * @since 0.1.0
  */

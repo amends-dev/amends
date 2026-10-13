@@ -49,8 +49,6 @@ export type Error =
 /**
  * The participation operations, one of `Core.Operations`.
  *
- * The participation operations.
- *
  * @category services
  * @since 0.1.0
  */

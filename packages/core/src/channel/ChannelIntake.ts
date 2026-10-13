@@ -109,8 +109,6 @@ export type ReceiveError = CoreError.NotFound | CoreError.Invalid | CoreError.Un
 /**
  * Intake, one of `Core.JobServices`: a host calls it for what its channels receive, as no actor.
  *
- * Intake, as a host calls it.
- *
  * @category services
  * @since 0.1.0
  */

@@ -126,8 +126,6 @@ export type RecordError = CoreError.Invalid | CoreError.Unavailable | CoreError.
 /**
  * What the job asks of the workspace, one of `Core.JobServices`.
  *
- * What the job asks.
- *
  * @category services
  * @since 0.1.0
  */

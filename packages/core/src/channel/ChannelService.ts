@@ -110,8 +110,6 @@ export type BindingError = CoreError.NotFound | CoreError.Denied | CoreError.Inv
 /**
  * The channel operations, one of `Core.Operations`.
  *
- * The channel operations.
- *
  * @category services
  * @since 0.1.0
  */

@@ -22,17 +22,16 @@ import * as MemberId from "./MemberId.ts"
 import type * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
- * The membership store, bound to one workspace by the host.
+ * The membership store, bound to one workspace by the host: what a storage adapter implements for
+ * memberships. Reads use the current transaction when there is one, including its staged writes,
+ * and committed state otherwise, and return records isolated from the caller's mutation. Projection
+ * writes enlist in the same native transaction as journal entries and checkpoints, enforce their
+ * constraints atomically across concurrent writers, reject expired or foreign transaction handles,
+ * and never retry internally.
  *
- * What a storage adapter implements for memberships. Reads use the current transaction when there
- * is one, including its staged writes, and committed state otherwise, and return records isolated
- * from the caller's mutation. Projection writes enlist in the same native transaction as journal
- * entries and checkpoints, enforce their constraints atomically across concurrent writers, reject
- * expired or foreign transaction handles, and never retry internally.
- *
- * `make` builds the store over a driver of the same shape. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
+ * `make` builds the store over a driver of the same shape. It checks every input against its
+ * schema, and a record against the workspace, before the driver sees it, so a driver keeps only
+ * what storage keeps.
  *
  * @category services
  * @since 0.1.0

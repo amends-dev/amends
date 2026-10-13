@@ -22,13 +22,12 @@ import * as Thread from "./Thread.ts"
 import * as ThreadId from "./ThreadId.ts"
 
 /**
- * The thread store, bound to one workspace by the host.
+ * The thread store, bound to one workspace by the host: what a storage adapter implements for
+ * threads.
  *
- * What a storage adapter implements for threads.
- *
- * `make` builds the store over a driver of the same shape. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
+ * `make` builds the store over a driver of the same shape. It checks every input against its
+ * schema, and a record against the workspace, before the driver sees it, so a driver keeps only
+ * what storage keeps.
  *
  * @category services
  * @since 0.1.0

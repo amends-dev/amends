@@ -94,8 +94,6 @@ export type TypingError = CoreError.NotFound | CoreError.Denied | CoreError.Inva
 /**
  * The message operations, one of `Core.Operations`.
  *
- * The message operations.
- *
  * @category services
  * @since 0.1.0
  */

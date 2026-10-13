@@ -22,11 +22,9 @@ import * as BuiltinRoles from "./BuiltinRoles.ts"
 import * as Role from "./Role.ts"
 
 /**
- * The role store, bound to one workspace by the host.
- *
- * Host-owned role read model for one workspace. Reads use the current host
- * transaction when present, including its staged writes; otherwise committed
- * state. Isolate stored inputs and returned records from caller mutation.
+ * The role store, bound to one workspace by the host: what a storage adapter implements for roles.
+ * Reads use the current host transaction when present, including its staged writes; otherwise
+ * committed state. Isolate stored inputs and returned records from caller mutation.
  *
  * Projection writes enlist in the same native transaction as journal entries and
  * checkpoints. Enforce constraints atomically across concurrent writers. Reject

@@ -38,13 +38,12 @@ export const Count = Schema.Struct({
 export interface Count extends Schema.Schema.Type<typeof Count> {}
 
 /**
- * The message store, bound to one workspace by the host.
+ * The message store, bound to one workspace by the host: what a storage adapter implements for
+ * messages.
  *
- * What a storage adapter implements for messages.
- *
- * `make` builds the store over a driver of the same shape. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
+ * `make` builds the store over a driver of the same shape. It checks every input against its
+ * schema, and a record against the workspace, before the driver sees it, so a driver keeps only
+ * what storage keeps.
  *
  * @category services
  * @since 0.1.0

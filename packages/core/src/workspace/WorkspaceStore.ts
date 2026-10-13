@@ -22,14 +22,12 @@ import type * as WorkspaceId from "./WorkspaceId.ts"
 import * as WorkspaceSettings from "./WorkspaceSettings.ts"
 
 /**
- * The workspace store, bound to one workspace by the host.
+ * The workspace store, bound to one workspace by the host: what a storage adapter implements for
+ * the workspace's own record. Its writes share the native transaction journal projections run in.
  *
- * What a storage adapter implements for the workspace's own record. Its writes share the native
- * transaction journal projections run in.
- *
- * `make` builds the store over a driver of the same shape. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
+ * `make` builds the store over a driver of the same shape. It checks every input against its
+ * schema, and a record against the workspace, before the driver sees it, so a driver keeps only
+ * what storage keeps.
  *
  * @category services
  * @since 0.1.0

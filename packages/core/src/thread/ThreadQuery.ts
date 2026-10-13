@@ -97,8 +97,6 @@ export interface ListOptions<R, Cursor, E> {
 /**
  * The shared reads of threads. Internal: not among `Core.Operations`.
  *
- * The shared reads.
- *
  * @category services
  * @since 0.1.0
  */

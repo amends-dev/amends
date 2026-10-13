@@ -23,12 +23,10 @@ import * as Assignment from "./Assignment.ts"
 import * as Role from "./Role.ts"
 
 /**
- * The assignment store, bound to one workspace by the host.
- *
- * Host-owned assignment read model for one workspace. Reads use the current host
- * transaction when present, including its staged writes; otherwise committed
- * state. Isolate stored inputs and returned arrays and records from caller mutation.
- * List reads return every match exactly once, with unspecified ordering.
+ * The assignment store, bound to one workspace by the host: what a storage adapter implements for
+ * assignments. Reads use the current host transaction when present, including its staged writes;
+ * otherwise committed state. Isolate stored inputs and returned arrays and records from caller
+ * mutation. List reads return every match exactly once, with unspecified ordering.
  *
  * Projection writes enlist in the same native transaction as journal entries and
  * checkpoints. List reads participate in its serializable view, including concurrent

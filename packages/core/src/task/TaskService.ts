@@ -78,8 +78,6 @@ export type ReadError = CoreError.NotFound | CoreError.Denied | CoreError.Invali
 /**
  * The task operations, one of `Core.Operations`.
  *
- * The task operations.
- *
  * @category services
  * @since 0.1.0
  */

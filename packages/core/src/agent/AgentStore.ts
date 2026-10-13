@@ -20,14 +20,12 @@ import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Agent from "./Agent.ts"
 
 /**
- * The agent store, bound to one workspace by the host.
+ * The agent store, bound to one workspace by the host: what a storage adapter implements for
+ * agents: `AgentProjection` writes it, and `AgentService` and `AgentQuery` read it.
  *
- * What a storage adapter implements for agents: `AgentProjection` writes it, and `AgentService`
- * and `AgentQuery` read it.
- *
- * `make` builds the store over a driver of the same shape. It checks every input
- * against its schema, and a record against the workspace, before the driver sees it, so a driver
- * keeps only what storage keeps.
+ * `make` builds the store over a driver of the same shape. It checks every input against its
+ * schema, and a record against the workspace, before the driver sees it, so a driver keeps only
+ * what storage keeps.
  *
  * @category services
  * @since 0.1.0
