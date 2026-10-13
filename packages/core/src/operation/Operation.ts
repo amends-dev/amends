@@ -50,7 +50,6 @@ export type Failure<E> =
   | (E extends Schema.SchemaError ? CoreError.Invalid : never)
 
 const isCoreError = Schema.is(CoreError.CoreError)
-const isStoreError = Schema.is(StoreError.StoreError)
 const isCommitUncertain = Schema.is(Store.CommitUncertain)
 const isBehind = Schema.is(Projection.Behind)
 const isUnregistered = Schema.is(Projection.Unregistered)
@@ -67,7 +66,7 @@ const isUnregistered = Schema.is(Projection.Unregistered)
  */
 export const classify = (error: unknown): CoreError.CoreError | undefined => {
   if (isCoreError(error)) return error
-  if (isStoreError(error) && error.reason._tag === "Contended")
+  if (StoreError.isStoreError(error) && error.reason._tag === "Contended")
     return new CoreError.Unavailable({
       reason: new CoreError.Contention({
         operation: error.operation,

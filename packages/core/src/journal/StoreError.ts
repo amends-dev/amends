@@ -15,13 +15,13 @@ import * as Schema from "effect/Schema"
 /**
  * Storage failed while reading or writing, for the `cause` given.
  *
- * @category reasons
+ * @category errors
  * @since 0.1.0
  */
-export class Failed extends Schema.TaggedClass<Failed>()("Failed", {
+export class Failed extends Schema.TaggedError<Failed>()("Failed", {
   cause: Schema.Defect()
 }) {
-  get message(): string {
+  override get message(): string {
     return this.cause instanceof Error ? this.cause.message : String(this.cause)
   }
 }
@@ -31,13 +31,13 @@ export class Failed extends Schema.TaggedClass<Failed>()("Failed", {
  * malformed or foreign input, a reused ID, a missing record, or an idempotency key recorded with
  * other content. Nothing was written.
  *
- * @category reasons
+ * @category errors
  * @since 0.1.0
  */
-export class Rejected extends Schema.TaggedClass<Rejected>()("Rejected", {
+export class Rejected extends Schema.TaggedError<Rejected>()("Rejected", {
   description: Schema.String
 }) {
-  get message(): string {
+  override get message(): string {
     return this.description
   }
 }
@@ -46,13 +46,13 @@ export class Rejected extends Schema.TaggedClass<Rejected>()("Rejected", {
  * Another writer held storage, or changed what the write expected, meanwhile, as `description`
  * says. Nothing was written, and asking again may get past it.
  *
- * @category reasons
+ * @category errors
  * @since 0.1.0
  */
-export class Contended extends Schema.TaggedClass<Contended>()("Contended", {
+export class Contended extends Schema.TaggedError<Contended>()("Contended", {
   description: Schema.String
 }) {
-  get message(): string {
+  override get message(): string {
     return this.description
   }
 }
@@ -63,7 +63,7 @@ export class Contended extends Schema.TaggedClass<Contended>()("Contended", {
  * @category schemas
  * @since 0.1.0
  */
-export const Reason = Schema.Union([Failed, Rejected, Contended])
+export const Reason = Schema.Union([Failed, Rejected, Contended]).pipe(Schema.toTaggedUnion("_tag"))
 
 /**
  * @category schemas
@@ -89,6 +89,14 @@ export class StoreError extends Schema.TaggedError<StoreError>()("StoreError", {
 }
 
 /**
+ * Whether `u` is a store's error.
+ *
+ * @category guards
+ * @since 0.1.0
+ */
+export const isStoreError: (u: unknown) => u is StoreError = Schema.is(StoreError)
+
+/**
  * Report a cause as the store's failed operation, for `Effect.mapError`. A cause that is already a
  * store's error, such as the workspace binding's, keeps its reason, so contention stays contention.
  *
@@ -101,7 +109,7 @@ export const failed =
     new StoreError({
       store,
       operation,
-      reason: cause instanceof StoreError ? cause.reason : new Failed({ cause })
+      reason: isStoreError(cause) ? cause.reason : new Failed({ cause })
     })
 
 /**
