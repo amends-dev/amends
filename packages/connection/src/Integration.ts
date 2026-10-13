@@ -134,14 +134,14 @@ export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
   readonly name: string;
 
   /** Where the system's documentation is. */
-  readonly docs?: string;
+  readonly docs?: string | undefined;
 
   /**
    * The settings a connection gives, besides its credential, such as a URL: no more and no fewer.
    * They make a form, of fields whose `title` and `description` annotations the form shows. Left
    * out, a connection gives none. An empty struct is not none, as it takes any value.
    */
-  readonly settings?: Schema.Decoder<Settings>;
+  readonly settings?: Schema.Decoder<Settings> | undefined;
 
   /** The ways a connection can authenticate, in the order to offer them. */
   readonly auth: Array.NonEmptyReadonlyArray<Auth>;

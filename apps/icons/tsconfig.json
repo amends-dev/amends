@@ -4,6 +4,7 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
+    "exactOptionalPropertyTypes": false,
     "types": ["vite/client"]
   },
   "include": ["src", "test/**/*.tsx", "test/fixtures", "../../scripts/testing/jest-dom.ts"],

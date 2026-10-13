@@ -54,7 +54,10 @@ const scripted = (script: (call: Call) => Answer) => {
       const answer = script(call);
       return HttpClientResponse.fromWeb(
         request,
-        new Response(answer.body ?? "", { status: answer.status ?? 200, headers: answer.headers }),
+        new Response(answer.body ?? "", {
+          status: answer.status ?? 200,
+          headers: answer.headers ?? {},
+        }),
       );
     }),
   );

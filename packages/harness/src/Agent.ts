@@ -78,7 +78,7 @@ export interface CreateSessionOptions {
   readonly id: SessionId;
 
   /** Where the agent works. Absent only for an agent that does not require a sandbox. */
-  readonly workspace?: Workspace;
+  readonly workspace?: Workspace | undefined;
 
   /**
    * The conversation so far, empty for a new session. An agent that last ran this session, and is
@@ -88,14 +88,14 @@ export interface CreateSessionOptions {
   readonly history: Prompt.Prompt;
 
   /** What this agent's `detach` or `stop` returned when the session last ran on this agent. */
-  readonly agentState?: Schema.Json;
+  readonly agentState?: Schema.Json | undefined;
 
   /**
    * What this agent's `suspendTurn` returned when the session's last turn was cut short on this
    * agent. The session starts ready for `continueTurn` instead of a new turn, if the agent still
    * has the turn.
    */
-  readonly unfinishedTurn?: Schema.Json;
+  readonly unfinishedTurn?: Schema.Json | undefined;
 }
 
 /**
@@ -110,10 +110,10 @@ export interface TurnOptions {
   readonly prompt: Prompt.UserMessage;
 
   /** Instructions for this turn, as system or developer instructions where the agent has them. */
-  readonly instructions?: string;
+  readonly instructions?: string | undefined;
 
   /** The model for this turn, as the agent names models. The agent's default when omitted. */
-  readonly model?: string;
+  readonly model?: string | undefined;
 
   /**
    * Tools the host runs. When the agent calls one, the turn streams a `tool-call` part that is not
@@ -267,7 +267,7 @@ export interface Agent {
    * The longest name of a host tool the agent takes, for an agent that adds to the names it is
    * given and so leaves a model API's 64 characters too few. A host names its tools to fit.
    */
-  readonly maxToolNameLength?: number;
+  readonly maxToolNameLength?: number | undefined;
 
   /** Creates a session: a new one, or one picked up again from what an earlier session returned. */
   readonly createSession: (

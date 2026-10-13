@@ -38,7 +38,12 @@ import { type FileChangePart, type Step, type StreamPart, stepsOf } from "./Stre
  * @since 0.1.0
  */
 export class GenerateResult {
-  constructor(readonly parts: ReadonlyArray<StreamPart>) {}
+  /** Every part the turn streamed, in order. */
+  readonly parts: ReadonlyArray<StreamPart>;
+
+  constructor(parts: ReadonlyArray<StreamPart>) {
+    this.parts = parts;
+  }
 
   /** The turn's steps, each with the parts it streamed added up and how it finished. */
   get steps(): ReadonlyArray<Step> {
@@ -91,10 +96,11 @@ export class GenerateResult {
  * @since 0.1.0
  */
 export class GenerateObjectResult<A> extends GenerateResult {
-  constructor(
-    readonly value: A,
-    parts: ReadonlyArray<StreamPart>,
-  ) {
+  /** The object the turn's answer decoded to. */
+  readonly value: A;
+
+  constructor(value: A, parts: ReadonlyArray<StreamPart>) {
     super(parts);
+    this.value = value;
   }
 }

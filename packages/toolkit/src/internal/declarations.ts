@@ -15,7 +15,7 @@ import type { Schema } from "effect";
  */
 export interface Declared {
   readonly name: string;
-  readonly description?: string;
+  readonly description?: string | undefined;
 
   /** The tool's input, as a JSON Schema with an object root. */
   readonly inputSchema: Schema.JsonObject;

@@ -110,7 +110,7 @@ export interface CreateSessionOptions {
   readonly history: Prompt.Prompt;
 
   /** What the session's `state` returned when it last ran on this agent. */
-  readonly agentState?: Schema.Json;
+  readonly agentState?: Schema.Json | undefined;
 }
 
 /**

@@ -265,7 +265,13 @@ export const factMetadata = (fixture: Fixture) => {
                     expect(page.map((entry) => entry.id)).toEqual([event.id]);
                     after = event;
                   }
-                  expect(yield* journal.read({ subject: target, limit: 1, after })).toEqual([]);
+                  expect(
+                    yield* journal.read({
+                      subject: target,
+                      limit: 1,
+                      ...(after === undefined ? {} : { after }),
+                    }),
+                  ).toEqual([]);
                   expect(
                     (yield* journal.read({ subject: target, name: Activity.name, limit: 10 })).map(
                       (entry) => entry.id,

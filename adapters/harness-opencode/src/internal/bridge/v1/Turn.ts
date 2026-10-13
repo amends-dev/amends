@@ -310,7 +310,7 @@ const writingUpdated = (
     readonly id: string;
     readonly messageID: string;
     readonly text: string;
-    readonly time?: { readonly end?: number } | undefined;
+    readonly time?: { readonly end?: number | undefined } | undefined;
   },
 ): Translated => {
   const parts: Array<StreamPart.StreamPart> = [];

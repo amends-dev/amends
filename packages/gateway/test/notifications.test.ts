@@ -275,7 +275,9 @@ describe("notifications", () => {
             ).toEqual([next]);
             after = { recordedAt: next.recordedAt, id: next.id };
           }
-          expect(yield* read(human, { limit: 1, after })).toEqual([]);
+          expect(
+            yield* read(human, { limit: 1, ...(after === undefined ? {} : { after }) }),
+          ).toEqual([]);
         }),
       ),
     ),
@@ -317,7 +319,9 @@ describe("notifications", () => {
                 ).toEqual([next]);
                 before = { recordedAt: next.recordedAt, id: next.id };
               }
-              expect(yield* read(human, { limit: 1, before })).toEqual([]);
+              expect(
+                yield* read(human, { limit: 1, ...(before === undefined ? {} : { before }) }),
+              ).toEqual([]);
               // The boundary need not be a stored notification.
               expect(
                 yield* read(human, {

@@ -106,6 +106,10 @@ currently run through TypeScript. Check compatibility before changing this setup
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no
 runtime-specific global types; hosts and apps opt into their own environments.
+`tsconfig.base.json` takes Effect's strict flags: `exactOptionalPropertyTypes`, so an optional
+field that may be given `undefined` says so as `readonly x?: X | undefined`; unused locals and
+parameters; and erasable syntax only. The apps turn `exactOptionalPropertyTypes` off until their
+UI props are written for it.
 Root `tsconfig.json` checks repository scripts, shared-package tests, and the Vitest
 configuration; `bun run typecheck` checks these and every workspace. Use declared
 package names for cross-workspace imports, not relative paths into another workspace.
