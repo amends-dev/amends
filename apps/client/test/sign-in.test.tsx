@@ -3,7 +3,8 @@ import { cleanup, render, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { createSignal, Show } from "solid-js"
-import { ClientProvider, Session, useSignIn, type SessionStore, type SignInController } from "../src/index.ts"
+import { SignIn } from "../src/api/contracts.ts"
+import { ClientProvider, useSignIn, type SessionStore, type SignInController } from "../src/index.ts"
 
 afterEach(cleanup)
 const json = (body: unknown, status = 200) =>
@@ -13,7 +14,7 @@ const json = (body: unknown, status = 200) =>
   })
 const accepted = () => new Response(null, { status: 202 })
 const session = (token: string) =>
-  Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } })
+  Schema.decodeSync(SignIn.Session)({ token, account: { id: token, email: `${token}@example.com` } })
 
 function network() {
   const calls: Array<{
@@ -41,10 +42,10 @@ function network() {
     }
   }
 }
-function mount(fetch: typeof globalThis.fetch, options: { initial?: Session; instances?: number } = {}) {
+function mount(fetch: typeof globalThis.fetch, options: { initial?: SignIn.Session; instances?: number } = {}) {
   let stored = options.initial
   const listeners = new Set<() => void>()
-  const writes = vi.fn((next?: Session) => {
+  const writes = vi.fn((next?: SignIn.Session) => {
     stored = next
   })
   const store: SessionStore = {
@@ -85,7 +86,7 @@ function mount(fetch: typeof globalThis.fetch, options: { initial?: Session; ins
     },
     show: () => setShown(true),
     hide: () => setShown(false),
-    changeSession: (next?: Session) => {
+    changeSession: (next?: SignIn.Session) => {
       stored = next
       listeners.forEach((listener) => listener())
     }

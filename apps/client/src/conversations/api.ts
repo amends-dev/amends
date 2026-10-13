@@ -22,7 +22,7 @@ import * as Schema from "effect/Schema"
 import type { ApiClient, WorkspaceApi } from "../api/client.ts"
 import { command } from "../api/failures.ts"
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "../api/keys.ts"
-import { newWorkspaceRequestKey } from "../workspaces/api.ts"
+import type { RequestKey } from "../api/mutation.ts"
 
 export {
   Group,
@@ -407,7 +407,7 @@ export interface NewGroup {
   readonly name: string
   readonly memberIds: ReadonlyArray<string>
   readonly visibility: Group.Visibility
-  readonly key: ReturnType<typeof newWorkspaceRequestKey>
+  readonly key: RequestKey
 }
 /** Whether a name can name a group: it has something besides surrounding whitespace. */
 export const isGroupName = (name: string) => Schema.is(Group.NewName)(name.trim())
@@ -523,12 +523,11 @@ export const changeMembership = (workspace: string) => (api: WorkspaceApi, chang
 
 /** Whether text can be sent as a message: it has something besides whitespace. */
 export const isMessageText = Schema.is(ThreadMessage.Text)
-export const newPostKey = newWorkspaceRequestKey
 interface Message {
   readonly text: string
   /** The members the message addresses. */
   readonly mentions: ReadonlyArray<string>
-  readonly key: ReturnType<typeof newPostKey>
+  readonly key: RequestKey
 }
 /**
  * A message to post: the first of a new thread in a group, the first to some people in their

@@ -22,6 +22,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult"
 import { createEffect, createMemo, createSignal, getOwner, on, runWithOwner, type Accessor } from "solid-js"
 import { useChanges } from "../api/changes.ts"
 import { workspaceFailure } from "../api/failures.ts"
+import { newRequestKey, type RequestKey } from "../api/mutation.ts"
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts"
 import { toDate } from "../conversations/time.ts"
 import { memberName } from "../conversations/views.ts"
@@ -32,7 +33,6 @@ import {
   agentsReads,
   changeAgent,
   issueOf,
-  newAgentRequestKey,
   reloadAgents,
   Agent,
   type AgentCommand,
@@ -370,7 +370,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
     readonly roleId: string | undefined
     readonly setup: SetupDraft
   }>()
-  let intent: { readonly body: string; readonly key: ReturnType<typeof newAgentRequestKey> } | undefined
+  let intent: { readonly body: string; readonly key: RequestKey } | undefined
   const createRole = () => {
     const chosen = roles().find((role) => role.id === creating()?.roleId && role.assignable)
     return (chosen ?? roles().find((role) => role.id === memberRole && role.assignable))?.id
@@ -506,7 +506,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
         if (!current || !roleId || !setup) return
         const body = { name: current.name.trim(), roleId, setup }
         const serialized = JSON.stringify(body)
-        if (intent?.body !== serialized) intent = { body: serialized, key: newAgentRequestKey() }
+        if (intent?.body !== serialized) intent = { body: serialized, key: newRequestKey() }
         send({ kind: "create", ...body, key: intent.key }, { subject: body.name })
       },
       cancel: () => {

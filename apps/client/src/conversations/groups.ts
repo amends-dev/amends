@@ -2,9 +2,8 @@ import type { GroupChangeError } from "@amends-dev/ui/screens/group"
 import * as Exit from "effect/Exit"
 import { createSignal, type Accessor } from "solid-js"
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts"
-import { useWorkspaceMutation } from "../api/mutation.ts"
+import { useWorkspaceMutation, newRequestKey } from "../api/mutation.ts"
 import { useWorkspace } from "../session/directory.tsx"
-import { newWorkspaceRequestKey } from "../workspaces/api.ts"
 import { createGroup, isGroupName, joinGroup, type Group, type NewGroup } from "./api.ts"
 
 export interface CreateGroupController {
@@ -45,7 +44,7 @@ export function useCreateGroup(workspaceId: string, created: (groupId: string) =
     if (!ready() || self === undefined) return
     const memberIds = [...new Set([self, ...members()])]
     const body = JSON.stringify([name().trim(), memberIds, visibility()])
-    if (attempt?.body !== body) attempt = { body, key: newWorkspaceRequestKey() }
+    if (attempt?.body !== body) attempt = { body, key: newRequestKey() }
     setError(undefined)
     const exit = await request.run({
       name: name(),

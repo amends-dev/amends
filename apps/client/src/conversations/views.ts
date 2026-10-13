@@ -24,7 +24,7 @@ import {
   ThreadParticipation,
   Identity
 } from "./api.ts"
-import { useMarkGroupRead, useMarkThreadRead } from "./read.ts"
+import { useMarkGroupRead, useMarkThreadRead } from "./mark-read.ts"
 import { useGroupRoster, useGroupStream, useGroups, useMembers, useThreadTimeline } from "./reads.ts"
 import { toDate } from "./time.ts"
 import { useTyping } from "./typing.ts"

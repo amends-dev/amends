@@ -3,7 +3,7 @@ import * as Data from "effect/Data"
 import * as Exit from "effect/Exit"
 import { createSignal, type Accessor } from "solid-js"
 import { directoryQuery } from "../api/directory.ts"
-import { useMutation } from "../api/mutation.ts"
+import { useMutation, newRequestKey } from "../api/mutation.ts"
 import { refreshResult } from "../api/refresh.ts"
 import { useApiClient, useSession } from "../provider.tsx"
 import {
@@ -11,7 +11,6 @@ import {
   isMemberName,
   isWorkspaceName,
   suggestedName,
-  newWorkspaceRequestKey,
   workspaceRejection,
   type CreatedWorkspace,
   type NewWorkspace
@@ -71,8 +70,7 @@ export function useCreateWorkspace(): CreateWorkspaceController {
       setState(CreateWorkspaceState.Form({ ...value, name, error: "invalid-member-name" }))
       return
     }
-    if (intent?.name !== name || intent.memberName !== memberName)
-      intent = { name, memberName, key: newWorkspaceRequestKey() }
+    if (intent?.name !== name || intent.memberName !== memberName) intent = { name, memberName, key: newRequestKey() }
     const submitting = CreateWorkspaceState.Form({
       ...value,
       name,

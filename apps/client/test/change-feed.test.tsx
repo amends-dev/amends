@@ -3,10 +3,10 @@ import { cleanup, render, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { createSignal, Show } from "solid-js"
+import { SignIn } from "../src/api/contracts.ts"
 import {
   ClientProvider,
   DirectoryProvider,
-  Session,
   useGroups,
   useMarkThreadRead,
   useWorkspaceSettings,
@@ -119,7 +119,7 @@ function fixture(
       )
     return Promise.resolve(json({}, 404))
   })
-  let session: Session | undefined = Schema.decodeSync(Session)({
+  let session: SignIn.Session | undefined = Schema.decodeSync(SignIn.Session)({
     token: "alice",
     account: { id: "alice", email: "alice@example.com" }
   })
@@ -171,7 +171,7 @@ function fixture(
     },
     hide: () => setShown(false),
     replace: () => {
-      session = Schema.decodeSync(Session)({
+      session = Schema.decodeSync(SignIn.Session)({
         token: "bob",
         account: { id: "bob", email: "bob@example.com" }
       })

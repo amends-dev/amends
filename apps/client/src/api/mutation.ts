@@ -1,14 +1,23 @@
+import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import { useAtomSet } from "@effect/atom-solid/Hooks"
 import * as Effect from "effect/Effect"
 import type * as Exit from "effect/Exit"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import type * as Reactivity from "effect/reactivity/Reactivity"
+import * as Schema from "effect/Schema"
 import { createSignal, onCleanup, type Accessor } from "solid-js"
 import { useApiClient, useWorkspaceClient } from "../provider.tsx"
 import type { Api, ApiClient, WorkspaceApi } from "./client.ts"
 
 type Services = AtomRegistry.AtomRegistry | Reactivity.Reactivity
+
+/**
+ * A new idempotency key for a request that creates something: sending the request again with the
+ * same key, as a retry does, creates it once.
+ */
+export const newRequestKey = () => Schema.decodeSync(ApiErrors.requestKey["idempotency-key"])(crypto.randomUUID())
+export type RequestKey = ReturnType<typeof newRequestKey>
 
 export interface Mutation<I, A, E> {
   /** An operation is running. */

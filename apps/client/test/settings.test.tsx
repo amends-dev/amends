@@ -3,10 +3,10 @@ import { cleanup, render, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { createSignal, Show } from "solid-js"
+import { SignIn } from "../src/api/contracts.ts"
 import {
   ClientProvider,
   DirectoryProvider,
-  Session,
   useWorkspaceSettings,
   type WorkspaceSettingsView,
   type SessionStore
@@ -24,7 +24,7 @@ const owner = {
 for (const replacement of [false, true])
   it(`cancels pending settings when ${replacement ? "credentials change" : "the feature unmounts"}`, async () => {
     const [shown, setShown] = createSignal(true)
-    let session = Schema.decodeSync(Session)({
+    let session = Schema.decodeSync(SignIn.Session)({
         token: "alice",
         account: { id: "alice", email: "alice@example.com" }
       }),
@@ -92,7 +92,7 @@ for (const replacement of [false, true])
     expect(await mutation!.clone().json()).toEqual({ name: "Updated", expectedName: "Studio" })
     expect(fetch.mock.calls.filter(([input, init]) => new Request(input, init).method === "PUT")).toHaveLength(1)
     if (replacement) {
-      session = Schema.decodeSync(Session)({
+      session = Schema.decodeSync(SignIn.Session)({
         token: "bob",
         account: { id: "bob", email: "bob@example.com" }
       })
@@ -107,7 +107,7 @@ for (const replacement of [false, true])
   })
 
 it("retries at once after a failed request or invalid input, and waits for a refresh after a conflict", async () => {
-  const session = Schema.decodeSync(Session)({
+  const session = Schema.decodeSync(SignIn.Session)({
     token: "alice",
     account: { id: "alice", email: "alice@example.com" }
   })

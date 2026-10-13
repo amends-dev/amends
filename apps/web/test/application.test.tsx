@@ -1,4 +1,4 @@
-import { Session, type SessionStore } from "@amends-dev/client"
+import { SignIn, type SessionStore } from "@amends-dev/client"
 import { afterEach, expect, it, vi } from "@effect/vitest"
 import { createMemoryHistory, MemoryRouter } from "@solidjs/router"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library"
@@ -10,8 +10,8 @@ import { ApplicationRoutes } from "../src/routes.tsx"
 import { committed, notificationsSeen, withChangeFeed, type Sidebar } from "./change-feed.ts"
 
 const session = (token: string) =>
-  Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } })
-function memoryStore(initial?: Session) {
+  Schema.decodeSync(SignIn.Session)({ token, account: { id: token, email: `${token}@example.com` } })
+function memoryStore(initial?: SignIn.Session) {
   let value = initial
   const listeners = new Set<() => void>()
   const store: SessionStore = {
@@ -26,7 +26,7 @@ function memoryStore(initial?: Session) {
   }
   return {
     store,
-    change: (next?: Session) => {
+    change: (next?: SignIn.Session) => {
       value = next
       listeners.forEach((changed) => changed())
     }

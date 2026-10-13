@@ -2,23 +2,23 @@ import { afterEach, expect, it, vi } from "@effect/vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
+import { SignIn } from "../src/api/contracts.ts"
 import {
   ClientProvider,
   DirectoryProvider,
-  Session,
   useDirectory,
   useSession,
   useWorkspace,
   type SessionStore
 } from "../src/index.ts"
 
-const alice = Schema.decodeSync(Session)({
+const alice = Schema.decodeSync(SignIn.Session)({
   token: "alice",
   account: { id: "alice", email: "alice@example.com" }
 })
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
-function mount(credential: Session | undefined, fetch: typeof globalThis.fetch) {
+function mount(credential: SignIn.Session | undefined, fetch: typeof globalThis.fetch) {
   let stored = credential
   const store: SessionStore = {
     read: () => stored,

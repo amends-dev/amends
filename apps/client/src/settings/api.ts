@@ -13,8 +13,8 @@ import { Accounts } from "../api/contracts.ts"
 import { directoryQuery } from "../api/directory.ts"
 import { command } from "../api/failures.ts"
 import { workspaceKey } from "../api/keys.ts"
+import { newRequestKey, type RequestKey } from "../api/mutation.ts"
 import { refreshResult } from "../api/refresh.ts"
-import { newWorkspaceRequestKey } from "../workspaces/api.ts"
 
 export { Assignment, Scope, Invitation, Identity }
 
@@ -40,7 +40,7 @@ export type SettingsCommand =
       email: string
       roleId: string
       expiresAt: DateTime.Utc
-      key: ReturnType<typeof newWorkspaceRequestKey>
+      key: RequestKey
     }
   | { kind: "revoke"; invitationId: string }
 export const invitationIntent = (email: string, roleId: string) => ({
@@ -48,7 +48,7 @@ export const invitationIntent = (email: string, roleId: string) => ({
   email: email.trim(),
   roleId,
   expiresAt: DateTime.add(DateTime.makeUnsafe(Date.now()), { days: 7 }),
-  key: newWorkspaceRequestKey()
+  key: newRequestKey()
 })
 /** A read left unmounted: it reports nothing and makes no request. */
 const idle = <A>(atom: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>) =>

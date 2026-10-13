@@ -6,7 +6,7 @@ export {
   type AppearanceScope,
   type SystemAppearance
 } from "./appearance/provider.tsx"
-export { Session } from "./api/contracts.ts"
+export { SignIn } from "./api/contracts.ts"
 export {
   DirectoryProvider,
   useDirectory,
@@ -84,7 +84,7 @@ export {
 } from "./conversations/views.ts"
 export { useInboxView } from "./conversations/inbox.ts"
 export { useNewThread, useDirectMessage, useReply, type ComposerController } from "./conversations/compose.ts"
-export { usePageVisible, useMarkThreadRead, useMarkGroupRead } from "./conversations/read.ts"
+export { usePageVisible, useMarkThreadRead, useMarkGroupRead } from "./conversations/mark-read.ts"
 export { useTyping } from "./conversations/typing.ts"
 export { useThreadFollow, useGroupFollow, type FollowController, type FollowEvents } from "./conversations/follow.ts"
 export { useMarkSeen, useMarkAllSeen, type SeenController, type SeenAllController } from "./conversations/seen.ts"

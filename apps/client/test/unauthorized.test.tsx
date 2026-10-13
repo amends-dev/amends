@@ -2,10 +2,10 @@ import { afterEach, expect, it, vi } from "@effect/vitest"
 import { cleanup, render, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
+import { SignIn } from "../src/api/contracts.ts"
 import {
   ClientProvider,
   DirectoryProvider,
-  Session,
   useSession,
   useWorkspaceSettings,
   type SessionScope,
@@ -17,10 +17,10 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 const rejected = () => json({ _tag: "Authentication.Unauthorized", message: "Unauthorized" }, 401)
 const session = (token: string) =>
-  Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } })
+  Schema.decodeSync(SignIn.Session)({ token, account: { id: token, email: `${token}@example.com` } })
 const listing = { memberships: [], invitations: [] }
 
-function mount(fetch: typeof globalThis.fetch, stored: { value: Session | undefined }) {
+function mount(fetch: typeof globalThis.fetch, stored: { value: SignIn.Session | undefined }) {
   const store: SessionStore = {
     read: () => stored.value,
     write: (next) => {
@@ -53,7 +53,7 @@ function mount(fetch: typeof globalThis.fetch, stored: { value: Session | undefi
 }
 
 it("signs out when any request is rejected, without the operation handling it", async () => {
-  const stored = { value: session("alice") as Session | undefined }
+  const stored = { value: session("alice") as SignIn.Session | undefined }
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const path = new URL(new Request(input, init).url).pathname
     return Promise.resolve(path.endsWith("/settings") ? rejected() : json(listing))
@@ -64,7 +64,7 @@ it("signs out when any request is rejected, without the operation handling it", 
 })
 
 it("keeps a newer credential another window stored when an older one is rejected", async () => {
-  const stored = { value: session("alice") as Session | undefined }
+  const stored = { value: session("alice") as SignIn.Session | undefined }
   const held = Promise.withResolvers<Response>()
   let first = true
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {

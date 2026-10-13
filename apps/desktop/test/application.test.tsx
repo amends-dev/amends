@@ -1,4 +1,4 @@
-import { Session, type SessionStore } from "@amends-dev/client"
+import { SignIn, type SessionStore } from "@amends-dev/client"
 import { afterEach, expect, it, vi } from "@effect/vitest"
 import { HashRouter } from "@solidjs/router"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library"
@@ -16,7 +16,7 @@ let feed: ReturnType<typeof withChangeFeed>
 function mount(path: string, token: string | undefined, fetch: typeof globalThis.fetch, sidebar?: Sidebar) {
   window.history.replaceState(null, "", `/#${path}`)
   let stored = token
-    ? Schema.decodeSync(Session)({ token, account: { id: token, email: `${token}@example.com` } })
+    ? Schema.decodeSync(SignIn.Session)({ token, account: { id: token, email: `${token}@example.com` } })
     : undefined
   const store: SessionStore = {
     read: () => stored,

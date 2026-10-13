@@ -2,10 +2,10 @@ import { afterEach, expect, it, vi } from "@effect/vitest"
 import { cleanup, render, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
+import { SignIn } from "../src/api/contracts.ts"
 import {
   ClientProvider,
   DirectoryProvider,
-  Session,
   useAgentList,
   useAgents,
   type AgentsDone,
@@ -16,7 +16,7 @@ import { affectedKeys } from "../src/live/api.ts"
 afterEach(cleanup)
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
-const session = Schema.decodeSync(Session)({
+const session = Schema.decodeSync(SignIn.Session)({
   token: "alice",
   account: { id: "alice", email: "alice@example.com" }
 })

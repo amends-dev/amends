@@ -1,4 +1,4 @@
-import { DirectoryProvider, Session, useDirectory, ChangeFeedProvider, type DirectoryScope } from "@amends-dev/client"
+import { DirectoryProvider, SignIn, useDirectory, ChangeFeedProvider, type DirectoryScope } from "@amends-dev/client"
 import { afterEach, expect, it, vi } from "@effect/vitest"
 import { createMemoryHistory, MemoryRouter, Route } from "@solidjs/router"
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library"
@@ -51,7 +51,7 @@ it("retains the shell and an open account menu through directory refresh and rec
       apiBaseUrl="https://host.test"
       sessionStore={{
         read: () =>
-          Schema.decodeSync(Session)({
+          Schema.decodeSync(SignIn.Session)({
             token: "alice",
             account: { id: "alice", email: "alice@example.com" }
           }),

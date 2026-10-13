@@ -12,8 +12,8 @@ import * as Schema from "effect/Schema"
 import type { ApiClient, WorkspaceApi } from "../api/client.ts"
 import { command, workspaceFailure } from "../api/failures.ts"
 import { workspaceKey } from "../api/keys.ts"
+import type { RequestKey } from "../api/mutation.ts"
 import { refreshResult } from "../api/refresh.ts"
-import { newWorkspaceRequestKey } from "../workspaces/api.ts"
 import type { Settings } from "./settings.ts"
 
 export { Connection }
@@ -45,7 +45,7 @@ export type ConnectionCommand =
       readonly settings: Settings
       readonly auth: Connection.View["auth"]
       readonly apiKey?: string
-      readonly key: ReturnType<typeof newWorkspaceRequestKey>
+      readonly key: RequestKey
     }
   | {
       readonly kind: "rename"
@@ -58,7 +58,6 @@ export type ConnectionCommand =
   | { readonly kind: "remove"; readonly connectionId: string }
 
 /** A new creation attempt; retrying the same body reuses its key so it is not created twice. */
-export const newConnectionRequestKey = newWorkspaceRequestKey
 
 const apiKeyOf = command(Schema.toType(Connection.ApiKey))
 

@@ -4,10 +4,10 @@ import { cleanup, render, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { createSignal } from "solid-js"
+import { SignIn } from "../src/api/contracts.ts"
 import {
   ClientProvider,
   DirectoryProvider,
-  Session,
   useWorkspaceAccess,
   useWorkspacePicker,
   type WorkspacePickerController,
@@ -68,7 +68,7 @@ function fixture() {
     calls.push({ request: new Request(input, init), resolve: deferred.resolve })
     return deferred.promise
   })
-  const stored = Schema.decodeSync(Session)({
+  const stored = Schema.decodeSync(SignIn.Session)({
     token: "ada",
     account: { id: "ada.lovelace@example.com", email: "ada.lovelace@example.com" }
   })

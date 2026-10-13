@@ -17,7 +17,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult"
 import { createEffect, createMemo, createSignal, on } from "solid-js"
 import { useChanges } from "../api/changes.ts"
 import { workspaceFailure } from "../api/failures.ts"
-import { useWorkspaceMutation } from "../api/mutation.ts"
+import { useWorkspaceMutation, newRequestKey, type RequestKey } from "../api/mutation.ts"
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts"
 import { toDate } from "../conversations/time.ts"
 import { memberName } from "../conversations/views.ts"
@@ -27,7 +27,6 @@ import {
   checkConnection,
   connectionsFailure,
   connectionsReads,
-  newConnectionRequestKey,
   reloadConnections,
   Connection,
   type ConnectionCommand,
@@ -203,7 +202,7 @@ export function useConnections(workspaceId: string, options: { readonly done?: (
     readonly auth: AuthMethod
   }>()
   const [newKey, setNewKey] = createSignal("")
-  let intent: { readonly body: string; readonly key: ReturnType<typeof newConnectionRequestKey> } | undefined
+  let intent: { readonly body: string; readonly key: RequestKey } | undefined
   const draftIntegration = () => {
     const current = draft()
     return current && integrationById().get(current.integrationId)
@@ -338,7 +337,7 @@ export function useConnections(workspaceId: string, options: { readonly done?: (
           auth: current.auth
         }
         const serialized = JSON.stringify(body)
-        if (intent?.body !== serialized) intent = { body: serialized, key: newConnectionRequestKey() }
+        if (intent?.body !== serialized) intent = { body: serialized, key: newRequestKey() }
         send(
           {
             kind: "create",

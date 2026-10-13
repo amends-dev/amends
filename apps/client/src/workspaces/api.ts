@@ -8,6 +8,7 @@ import type { Api, WorkspaceApi } from "../api/client.ts"
 import type { WorkspaceDirectory } from "../api/contracts.ts"
 import { command } from "../api/failures.ts"
 import { directoryKey, workspaceKey } from "../api/keys.ts"
+import type { RequestKey } from "../api/mutation.ts"
 
 export type CreatedWorkspace = WorkspaceDirectory.Membership["workspace"]
 export const isWorkspaceName = Schema.is(Workspace.NewName)
@@ -26,13 +27,11 @@ export const suggestedName = (email: string | undefined) => {
   const name = words.map((word) => word.charAt(0).toLocaleUpperCase() + word.slice(1)).join(" ")
   return isMemberName(name) ? name : ""
 }
-export const newWorkspaceRequestKey = () =>
-  Schema.decodeSync(ApiErrors.requestKey["idempotency-key"])(crypto.randomUUID())
 export interface NewWorkspace {
   readonly name: string
   /** What the creator is called there. */
   readonly memberName: string
-  readonly key: ReturnType<typeof newWorkspaceRequestKey>
+  readonly key: RequestKey
 }
 
 export function workspaceRejection(cause: Cause.Cause<unknown>): "invalid-name" | "denied" | "request-failed" {

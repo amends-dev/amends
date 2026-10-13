@@ -3,10 +3,10 @@ import { cleanup, render, waitFor } from "@solidjs/testing-library"
 import { Layer, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { createSignal, Show } from "solid-js"
+import { SignIn } from "../src/api/contracts.ts"
 import {
   ClientProvider,
   DirectoryProvider,
-  Session,
   useGroupFollow,
   useThreadFollow,
   type FollowController,
@@ -44,7 +44,7 @@ import { Signal, affectedKeys, signalKeys } from "../src/live/api.ts"
 
 afterEach(cleanup)
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })
-const session = Schema.decodeSync(Session)({
+const session = Schema.decodeSync(SignIn.Session)({
   token: "alice",
   account: { id: "alice", email: "alice@example.com" }
 })

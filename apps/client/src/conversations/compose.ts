@@ -4,8 +4,8 @@ import * as Exit from "effect/Exit"
 import * as Atom from "effect/reactivity/Atom"
 import { createSignal, type Accessor } from "solid-js"
 import { workspaceFailure } from "../api/failures.ts"
-import { useWorkspaceMutation } from "../api/mutation.ts"
-import { ThreadMessage, isMessageText, newPostKey, postMessage, sendTyping, type Post } from "./api.ts"
+import { useWorkspaceMutation, newRequestKey, type RequestKey } from "../api/mutation.ts"
+import { ThreadMessage, isMessageText, postMessage, sendTyping, type Post } from "./api.ts"
 
 interface Draft {
   /** Markdown, whose mentions link to members. */
@@ -16,7 +16,7 @@ interface Draft {
    * remounted, such as when a send was cut off by closing the thread, reuses the key and cannot
    * post it twice.
    */
-  readonly attempt?: { readonly body: string; readonly key: ReturnType<typeof newPostKey> }
+  readonly attempt?: { readonly body: string; readonly key: RequestKey }
 }
 const empty: Draft = { text: "" }
 /** How often a reply being written tells the thread's readers again; its signal lasts longer. */
@@ -72,7 +72,7 @@ function compose(workspaceId: string, target: Target, posted?: (groupId: string)
       addressed = mentions()
     const body = JSON.stringify([text, addressed])
     // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.
-    const attempt = draft().attempt?.body === body ? draft().attempt! : { body, key: newPostKey() }
+    const attempt = draft().attempt?.body === body ? draft().attempt! : { body, key: newRequestKey() }
     write({ ...draft(), attempt })
     setError(undefined)
     const exit = await request.run({

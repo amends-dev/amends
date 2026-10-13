@@ -13,9 +13,9 @@ import * as Schema from "effect/Schema"
 import type { ApiClient, WorkspaceApi } from "../api/client.ts"
 import { command, workspaceFailure } from "../api/failures.ts"
 import { workspaceKey } from "../api/keys.ts"
+import type { RequestKey } from "../api/mutation.ts"
 import { refreshResult } from "../api/refresh.ts"
 import { connectionsReads } from "../connections/api.ts"
-import { newWorkspaceRequestKey } from "../workspaces/api.ts"
 
 export { Agent, Connection, ConnectionContract }
 
@@ -71,7 +71,7 @@ export type AgentCommand =
       readonly name: string
       readonly roleId: string
       readonly setup: SetupInput
-      readonly key: ReturnType<typeof newWorkspaceRequestKey>
+      readonly key: RequestKey
     }
   | { readonly kind: "configure"; readonly agentId: string; readonly setup: SetupInput }
   | {
@@ -83,7 +83,6 @@ export type AgentCommand =
   | { readonly kind: "remove"; readonly agentId: string; readonly memberId: string }
 
 /** A new creation attempt; retrying the same body reuses its key so it is not created twice. */
-export const newAgentRequestKey = newWorkspaceRequestKey
 
 /** The setup as the contract takes it. */
 const configurationOf = (setup: SetupInput) => ({
