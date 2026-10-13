@@ -24,13 +24,8 @@ import * as Schema from "effect/Schema";
 import * as SchemaRepresentation from "effect/SchemaRepresentation";
 import * as Tool from "effect/ai/Tool";
 import * as Toolkit from "effect/ai/Toolkit";
-import type { Annotations, ToolDefinition } from "./ToolDefinition.ts";
-import {
-  InvalidInputError,
-  ToolSourceError,
-  UnknownError,
-  type ToolSourceError as ToolSourceErrorType,
-} from "./ToolSourceError.ts";
+import type * as ToolDefinition from "./ToolDefinition.ts";
+import * as ToolSourceError from "./ToolSourceError.ts";
 
 /**
  * What every kind of tool source implements: its name, the tools it has now, and how to run one.
@@ -47,7 +42,10 @@ export interface ToolSource {
   readonly name: string;
 
   /** Asks the source which tools it has now. */
-  readonly discover: Effect.Effect<ReadonlyArray<ToolDefinition>, ToolSourceErrorType>;
+  readonly discover: Effect.Effect<
+    ReadonlyArray<ToolDefinition.ToolDefinition>,
+    ToolSourceError.ToolSourceError
+  >;
 
   /**
    * Runs the tool of this name, as `discover` names it, with `input`, an object that matches the
@@ -56,7 +54,7 @@ export interface ToolSource {
   readonly call: (
     tool: string,
     input: Schema.JsonObject,
-  ) => Effect.Effect<Schema.Json, ToolSourceErrorType>;
+  ) => Effect.Effect<Schema.Json, ToolSourceError.ToolSourceError>;
 }
 
 /**
@@ -96,8 +94,8 @@ export interface Failure extends Schema.Schema.Type<typeof Failure> {}
  */
 export const toolkit = Effect.fn("ToolSource.toolkit")(function* (
   source: ToolSource,
-  definitions: ReadonlyArray<ToolDefinition>,
-  options?: { readonly needsApproval?: (definition: ToolDefinition) => boolean },
+  definitions: ReadonlyArray<ToolDefinition.ToolDefinition>,
+  options?: { readonly needsApproval?: (definition: ToolDefinition.ToolDefinition) => boolean },
 ) {
   const names = new Set(definitions.map((definition) => definition.name));
   if (names.size !== definitions.length) {
@@ -115,7 +113,7 @@ export const toolkit = Effect.fn("ToolSource.toolkit")(function* (
 });
 
 /** The dynamic tool for `definition`, without a handler, with the hints its source gave. */
-const toolOf = (definition: ToolDefinition, needsApproval: boolean) => {
+const toolOf = (definition: ToolDefinition.ToolDefinition, needsApproval: boolean) => {
   const tool = Tool.dynamic(definition.name, {
     description: definition.description,
     parameters: definition.inputSchema,
@@ -128,7 +126,7 @@ const toolOf = (definition: ToolDefinition, needsApproval: boolean) => {
 };
 
 /** The annotations of the hints a source gave, so a hint it left out keeps Effect AI's default. */
-const annotationsOf = (hints: Annotations) =>
+const annotationsOf = (hints: ToolDefinition.Annotations) =>
   Context.empty().pipe(
     Context.addOrOmit(Tool.Title, Option.fromUndefinedOr(hints.title)),
     Context.addOrOmit(Tool.Readonly, Option.fromUndefinedOr(hints.readOnly)),
@@ -138,7 +136,7 @@ const annotationsOf = (hints: Annotations) =>
   );
 
 /** Runs the tool `definition` describes when the model calls it, as the source does. */
-const handlerOf = (source: ToolSource, definition: ToolDefinition) => {
+const handlerOf = (source: ToolSource, definition: ToolDefinition.ToolDefinition) => {
   const validate = inputValidatorOf(source.name, definition);
   return (input: unknown) =>
     validate(input).pipe(
@@ -151,7 +149,7 @@ const handlerOf = (source: ToolSource, definition: ToolDefinition) => {
 };
 
 /** What the model reads of `error`. */
-const failureOf = (error: ToolSourceErrorType): Failure => ({
+const failureOf = (error: ToolSourceError.ToolSourceError): Failure => ({
   code: error.reason._tag,
   message: error.reason.modelMessage,
   retryable: error.reason.isRetryable,
@@ -162,7 +160,14 @@ const failedWith = (source: string, defect: unknown) => {
   const cause = Cause.die(defect);
   return Effect.logError(cause).pipe(
     Effect.andThen(ErrorReporter.report(cause)),
-    Effect.andThen(Effect.fail(new ToolSourceError({ source, reason: new UnknownError({}) }))),
+    Effect.andThen(
+      Effect.fail(
+        new ToolSourceError.ToolSourceError({
+          source,
+          reason: new ToolSourceError.UnknownError({}),
+        }),
+      ),
+    ),
   );
 };
 
@@ -173,16 +178,16 @@ const failedWith = (source: string, defect: unknown) => {
  * rest. `format` and `pattern` are not checked, as the source checks them too, and a pattern a source
  * names is not run here.
  */
-const inputValidatorOf = (source: string, definition: ToolDefinition) => {
+const inputValidatorOf = (source: string, definition: ToolDefinition.ToolDefinition) => {
   const parameters = checkOfParameters(definition);
   return (input: unknown) =>
     Schema.decodeUnknownEffect(Schema.JsonObject)(input).pipe(
       Effect.tap(parameters),
       Effect.mapError(
         (cause) =>
-          new ToolSourceError({
+          new ToolSourceError.ToolSourceError({
             source,
-            reason: new InvalidInputError({ description: describe(cause.message) }),
+            reason: new ToolSourceError.InvalidInputError({ description: describe(cause.message) }),
             cause,
           }),
       ),
@@ -190,7 +195,7 @@ const inputValidatorOf = (source: string, definition: ToolDefinition) => {
 };
 
 /** The check of the definition's parameters, which accepts any input when there is none. */
-const checkOfParameters = (definition: ToolDefinition) => {
+const checkOfParameters = (definition: ToolDefinition.ToolDefinition) => {
   try {
     // A schema made from JSON Schema keywords decodes with no services, which its type, `Top`,
     // cannot say.

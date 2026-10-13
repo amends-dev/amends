@@ -8,19 +8,18 @@ import {
   MemberService,
   OwnershipService,
 } from "@amends-dev/core/workspace";
-import { Gateway } from "../../index.ts";
+import * as Gateway from "../../Gateway.ts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import type { Fixture } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import { alice, boundTo, forWorkspace } from "../Support.ts";
 
 /** Reads outside transactions, which never wait for writers. */
-export const reads = (fixture: Fixture) => {
+export const reads = (fixture: Fixture.Fixture) => {
   const { gateway } = Support;
   describe.skipIf(!fixture.available)(`${fixture.name}: reads`, () => {
     it.effect(
@@ -32,13 +31,13 @@ export const reads = (fixture: Fixture) => {
             yield* Effect.gen(function* () {
               const gateway = yield* Gateway.Gateway;
               // Creating the workspace also completes boot; this test exercises warm requests.
-              const workspace = yield* gateway.createWorkspace(alice.id, {
+              const workspace = yield* gateway.createWorkspace(Support.alice.id, {
                 name: "Read concurrency",
                 memberName: "alice",
               });
-              const bound = yield* boundTo(workspace.id);
+              const bound = yield* Support.boundTo(workspace.id);
               const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 });
-              const writer = yield* forWorkspace(yield* storage.connect(), workspace.id);
+              const writer = yield* Support.forWorkspace(yield* storage.connect(), workspace.id);
               const entered = yield* Deferred.make<void>();
               const release = yield* Deferred.make<void>();
               const writing = yield* writer.store
@@ -57,14 +56,14 @@ export const reads = (fixture: Fixture) => {
               yield* Effect.gen(function* () {
                 yield* gateway.asMember(
                   workspace.id,
-                  alice,
+                  Support.alice,
                   Effect.gen(function* () {
                     expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(
                       true,
                     );
                     const memberService = yield* MemberService.MemberService;
                     expect((yield* memberService.get(workspace.ownerMemberId)).identity).toEqual(
-                      alice,
+                      Support.alice,
                     );
                     expect(yield* memberService.list).toHaveLength(1);
                     expect(yield* (yield* InvitationService.InvitationService).list).toEqual([]);
@@ -98,7 +97,7 @@ export const reads = (fixture: Fixture) => {
                   yield* Effect.flip(
                     gateway.asMember(
                       workspace.id,
-                      alice,
+                      Support.alice,
                       Effect.flatMap(MemberService.MemberService, (memberService) =>
                         memberService.remove(Member.Id.make("missing")),
                       ),

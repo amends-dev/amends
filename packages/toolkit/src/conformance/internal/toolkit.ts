@@ -3,10 +3,10 @@ import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Assembly from "../../Assembly.ts";
 import * as ToolSource from "../../ToolSource.ts";
-import type { Condition, Fixture } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 
 /** What a model reads of a source, through the toolkit that is made of it. */
-export const toolkit = (fixture: Fixture) =>
+export const toolkit = (fixture: Fixture.Fixture) =>
   describe("the toolkit of a source", () => {
     const { echo, failing } = fixture.tools;
 
@@ -15,7 +15,7 @@ export const toolkit = (fixture: Fixture) =>
      * toolkit is made of definitions that a catalog stored while the system worked, and the call
      * is made over the system in `condition`.
      */
-    const callTool = (condition: Condition, name: string, input: unknown) =>
+    const callTool = (condition: Fixture.Condition, name: string, input: unknown) =>
       Effect.gen(function* () {
         const stored = yield* (yield* fixture.make("working")).source.discover;
         const { source } = yield* fixture.make(condition);

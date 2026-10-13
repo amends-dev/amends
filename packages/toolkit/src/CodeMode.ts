@@ -24,7 +24,7 @@ import * as Schema from "effect/Schema";
 import * as Tool from "effect/ai/Tool";
 import * as Toolkit from "effect/ai/Toolkit";
 import * as Presentation from "./Presentation.ts";
-import { Failure } from "./ToolSource.ts";
+import * as ToolSource from "./ToolSource.ts";
 import { declare } from "./internal/declarations.ts";
 
 /**
@@ -65,7 +65,10 @@ export interface Execution {
    * Calls a tool with an input object, which the code gave or left empty, and answers with what the
    * tool gave, or fails as the tool failed. The code reads a failure as an error it can catch.
    */
-  readonly call: (tool: string, input: Schema.JsonObject) => Effect.Effect<Schema.Json, Failure>;
+  readonly call: (
+    tool: string,
+    input: Schema.JsonObject,
+  ) => Effect.Effect<Schema.Json, ToolSource.Failure>;
 }
 
 /**
@@ -154,7 +157,7 @@ export const toolkit = Effect.fn("CodeMode.toolkit")(function* <
       code: Schema.String.annotate({ description: "The body of an async function" }),
     }),
     success: Outcome,
-    failure: Failure,
+    failure: ToolSource.Failure,
     // Code that fails is told so, and the model writes it again.
     failureMode: "return",
   });
@@ -219,7 +222,7 @@ const describeExecute = (callable: ReadonlyArray<Tool.Any>, hasDirect: boolean) 
   ].join("\n\n");
 
 /** What the model reads of code that failed: what it said, and what it logged before. */
-const failureOfCodeError = (error: CodeError): Failure =>
+const failureOfCodeError = (error: CodeError): ToolSource.Failure =>
   Presentation.failure(
     "CodeError",
     error.logs.length === 0

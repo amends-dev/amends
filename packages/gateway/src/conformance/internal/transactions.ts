@@ -13,20 +13,11 @@ import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 
-import type { Fixture } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import {
-  alice,
-  bob,
-  failingLate,
-  forWorkspace,
-  journalLog,
-  otherWorkspaceId,
-  workspaceId,
-} from "../Support.ts";
 
 /** Atomic commits: concurrent writers, rollback, interruption, foreign handles, and work after a commit. */
-export const transactions = (fixture: Fixture) => {
+export const transactions = (fixture: Fixture.Fixture) => {
   const { core, initialized } = Support;
   describe.skipIf(!fixture.available)(`${fixture.name}: transactions`, () => {
     it.effect(
@@ -34,21 +25,24 @@ export const transactions = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             const results = yield* Effect.forEach(
-              [alice.id, bob.id],
+              [Support.alice.id, Support.bob.id],
               (creator) => initialized(bound, creator).pipe(Effect.result),
               { concurrency: "unbounded" },
             );
             expect(results.filter((result) => Result.isSuccess(result))).toHaveLength(1);
             expect(results.filter((result) => Result.isFailure(result))).toHaveLength(1);
             const before = yield* bound.workspace.get;
-            const log = yield* bound.store.read(journalLog, { limit: 10 });
-            expect(yield* Effect.flip(initialized(bound, bob.id))).toMatchObject({
+            const log = yield* bound.store.read(Support.journalLog, { limit: 10 });
+            expect(yield* Effect.flip(initialized(bound, Support.bob.id))).toMatchObject({
               _tag: "WorkspaceInitialization.AlreadyInitialized",
             });
             expect(yield* bound.workspace.get).toEqual(before);
-            expect(yield* bound.store.read(journalLog, { limit: 10 })).toEqual(log);
+            expect(yield* bound.store.read(Support.journalLog, { limit: 10 })).toEqual(log);
           }),
         ),
     );
@@ -58,18 +52,21 @@ export const transactions = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             const failure = StoreError.failed("Store", "commit")("injected late failure");
-            const broken = failingLate(bound, failure);
+            const broken = Support.failingLate(bound, failure);
             const footprint = yield* storage.footprint;
             expect(yield* Effect.flip(initialized(broken))).toBe(failure);
             expect(yield* bound.workspace.get).toEqual(Option.none());
-            expect(yield* bound.members.findActive(alice)).toEqual(Option.none());
+            expect(yield* bound.members.findActive(Support.alice)).toEqual(Option.none());
             expect(yield* bound.roles.get(BuiltinRoles.OwnerId)).toEqual(Option.none());
-            expect(yield* bound.store.read(journalLog, { limit: 10 })).toEqual([]);
+            expect(yield* bound.store.read(Support.journalLog, { limit: 10 })).toEqual([]);
             expect(yield* storage.footprint).toBe(footprint);
             const workspace = yield* initialized(bound);
-            expect(workspace.createdBy).toBe(alice.id);
+            expect(workspace.createdBy).toBe(Support.alice.id);
           }),
         ),
     );
@@ -77,13 +74,13 @@ export const transactions = (fixture: Fixture) => {
     it.effect("interruption rolls back initialization and leaves the host usable", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
           const ready = yield* Deferred.make<void>();
           const program = Effect.gen(function* () {
             const journal = yield* Journal.Journal;
             return yield* journal.commit(
               Effect.gen(function* () {
-                yield* WorkspaceInitialization.initialize(alice.id, {
+                yield* WorkspaceInitialization.initialize(Support.alice.id, {
                   name: "Test workspace",
                   memberName: "alice",
                 });
@@ -96,8 +93,8 @@ export const transactions = (fixture: Fixture) => {
           yield* Deferred.await(ready);
           yield* Fiber.interrupt(fiber);
           expect(yield* bound.workspace.get).toEqual(Option.none());
-          expect(yield* bound.members.findActive(alice)).toEqual(Option.none());
-          expect(yield* bound.store.read(journalLog, { limit: 10 })).toEqual([]);
+          expect(yield* bound.members.findActive(Support.alice)).toEqual(Option.none());
+          expect(yield* bound.store.read(Support.journalLog, { limit: 10 })).toEqual([]);
           yield* initialized(bound);
         }),
       ),
@@ -108,7 +105,10 @@ export const transactions = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             const ran: Array<string> = [];
             const note = (name: string) =>
               Effect.sync(() => {
@@ -164,11 +164,11 @@ export const transactions = (fixture: Fixture) => {
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect();
-            const a = yield* forWorkspace(host, workspaceId);
-            const b = yield* forWorkspace(host, otherWorkspaceId);
+            const a = yield* Support.forWorkspace(host, Support.workspaceId);
+            const b = yield* Support.forWorkspace(host, Support.otherWorkspaceId);
             const expired = yield* a.store.transaction(Effect.context<Store.Transaction>());
             expect(
-              yield* Effect.flip(a.members.findActive(alice).pipe(Effect.provide(expired))),
+              yield* Effect.flip(a.members.findActive(Support.alice).pipe(Effect.provide(expired))),
             ).toMatchObject({
               _tag: "StoreError",
               store: "MemberStore",
@@ -180,17 +180,22 @@ export const transactions = (fixture: Fixture) => {
               reason: { _tag: "Failed" },
             });
             expect(
-              yield* Effect.flip(a.store.transaction(b.store.read(journalLog, { limit: 1 }))),
+              yield* Effect.flip(
+                a.store.transaction(b.store.read(Support.journalLog, { limit: 1 })),
+              ),
             ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
             const native = Context.get(expired, Store.Transaction);
             expect(
               yield* Effect.flip(
                 a.store.transaction(
-                  native.append({ logId: journalLog, entries: [{ payload: new Uint8Array([1]) }] }),
+                  native.append({
+                    logId: Support.journalLog,
+                    entries: [{ payload: new Uint8Array([1]) }],
+                  }),
                 ),
               ),
             ).toMatchObject({ _tag: "StoreError", store: "Store", reason: { _tag: "Failed" } });
-            expect(yield* a.store.read(journalLog, { limit: 1 })).toEqual([]);
+            expect(yield* a.store.read(Support.journalLog, { limit: 1 })).toEqual([]);
           }),
         ),
     );
@@ -200,15 +205,18 @@ export const transactions = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const a = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const b = yield* forWorkspace(yield* storage.connect({ failFast: true }), workspaceId);
+            const a = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
+            const b = yield* Support.forWorkspace(
+              yield* storage.connect({ failFast: true }),
+              Support.workspaceId,
+            );
             const ready = yield* Deferred.make<void>();
             const release = yield* Deferred.make<void>();
             const owner = yield* Effect.gen(function* () {
               const journal = yield* Journal.Journal;
               return yield* journal.commit(
                 Effect.gen(function* () {
-                  const record = yield* WorkspaceInitialization.initialize(alice.id, {
+                  const record = yield* WorkspaceInitialization.initialize(Support.alice.id, {
                     name: "Test workspace",
                     memberName: "alice",
                   });
@@ -219,14 +227,14 @@ export const transactions = (fixture: Fixture) => {
               );
             }).pipe(Effect.provide(core(a)), Effect.forkChild);
             yield* Deferred.await(ready);
-            expect(yield* Effect.flip(initialized(b, bob.id))).toMatchObject({
+            expect(yield* Effect.flip(initialized(b, Support.bob.id))).toMatchObject({
               _tag: "StoreError",
               store: "Store",
               reason: { _tag: "Contended" },
             });
             yield* Deferred.succeed(release, undefined);
             const workspace = yield* Fiber.join(owner);
-            expect(yield* Effect.flip(initialized(b, bob.id))).toMatchObject({
+            expect(yield* Effect.flip(initialized(b, Support.bob.id))).toMatchObject({
               _tag: "WorkspaceInitialization.AlreadyInitialized",
             });
             expect(yield* b.workspace.get).toEqual(Option.some(workspace));

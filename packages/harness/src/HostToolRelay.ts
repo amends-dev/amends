@@ -39,10 +39,10 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as NetAddress from "effect/net/NetAddress";
-import type { AgentSession, SessionId } from "./Agent.ts";
-import type { ToolDefinition } from "./Bridge.ts";
+import type * as Agent from "./Agent.ts";
+import type * as Bridge from "./Bridge.ts";
 import { isPresented } from "./internal/bearer.ts";
-import type { StreamPart } from "./StreamPart.ts";
+import type * as StreamPart from "./StreamPart.ts";
 
 /**
  * How long the relay keeps a call alive, and how long it waits for the host.
@@ -78,14 +78,14 @@ export interface RelaySession {
    * no turn runs, or of a tool the turn did not offer, fails. The tools stay listed after the turn.
    */
   readonly offerTools: (
-    tools: ReadonlyArray<ToolDefinition>,
-  ) => Effect.Effect<Stream.Stream<StreamPart>, never, Scope.Scope>;
+    tools: ReadonlyArray<Bridge.ToolDefinition>,
+  ) => Effect.Effect<Stream.Stream<StreamPart.StreamPart>, never, Scope.Scope>;
 
   /**
    * Gives the agent the result of a call it made. A result for a call the agent has given up on, or
    * that the end of the turn ended, is dropped, since nothing waits for it.
    */
-  readonly submitToolResult: AgentSession["submitToolResult"];
+  readonly submitToolResult: Agent.AgentSession["submitToolResult"];
 }
 
 /**
@@ -122,7 +122,7 @@ export const Answer = Data.taggedEnum<Answer>();
  */
 export interface Relay {
   /** Starts a session, which lasts until the scope given closes. */
-  readonly open: (id: SessionId) => Effect.Effect<RelaySession, never, Scope.Scope>;
+  readonly open: (id: Agent.SessionId) => Effect.Effect<RelaySession, never, Scope.Scope>;
 
   /**
    * Answers an MCP message, as the HTTP request that carried it, with its `Authorization` header
@@ -258,10 +258,10 @@ interface Entry {
   readonly token: string;
 
   /** The tools of the last turn, which the agent lists. */
-  readonly tools: Ref.Ref<ReadonlyArray<ToolDefinition>>;
+  readonly tools: Ref.Ref<ReadonlyArray<Bridge.ToolDefinition>>;
 
   /** Where the calls of the running turn go: absent when no turn runs. */
-  readonly calls: Ref.Ref<Option.Option<Queue.Queue<StreamPart, Cause.Done>>>;
+  readonly calls: Ref.Ref<Option.Option<Queue.Queue<StreamPart.StreamPart, Cause.Done>>>;
 
   /** The calls the agent waits on, by the id the host knows each by. */
   readonly pending: Ref.Ref<HashMap.HashMap<string, PendingCall>>;
@@ -284,8 +284,8 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
     const token = Hex.encode(yield* Effect.orDie(crypto.randomBytes(32)));
     const entry: Entry = {
       token,
-      tools: yield* Ref.make<ReadonlyArray<ToolDefinition>>([]),
-      calls: yield* Ref.make(Option.none<Queue.Queue<StreamPart, Cause.Done>>()),
+      tools: yield* Ref.make<ReadonlyArray<Bridge.ToolDefinition>>([]),
+      calls: yield* Ref.make(Option.none<Queue.Queue<StreamPart.StreamPart, Cause.Done>>()),
       pending: yield* Ref.make(HashMap.empty<string, PendingCall>()),
     };
     yield* Effect.acquireRelease(
@@ -427,11 +427,11 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
 
   const offerTools = Effect.fnUntraced(function* (
     entry: Entry,
-    tools: ReadonlyArray<ToolDefinition>,
+    tools: ReadonlyArray<Bridge.ToolDefinition>,
   ) {
     const queue = yield* Effect.acquireRelease(
       Effect.gen(function* () {
-        const calls = yield* Queue.unbounded<StreamPart, Cause.Done>();
+        const calls = yield* Queue.unbounded<StreamPart.StreamPart, Cause.Done>();
         yield* Ref.set(entry.tools, tools);
         yield* Ref.set(entry.calls, Option.some(calls));
         return calls;

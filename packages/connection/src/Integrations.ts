@@ -7,8 +7,8 @@
  */
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import { ConnectionError, NotFoundError } from "./Connection.ts";
-import type { Integration } from "./Integration.ts";
+import * as Connection from "./Connection.ts";
+import type * as Integration from "./Integration.ts";
 
 /**
  * The service through which a connection finds its integration among those the host installs.
@@ -21,10 +21,12 @@ export class Integrations extends Context.Service<
   Integrations,
   {
     /** Every installed integration, in the order the host gave them. */
-    readonly all: ReadonlyArray<Integration>;
+    readonly all: ReadonlyArray<Integration.Integration>;
 
     /** The integration of the id `id`, failing with `NotFoundError` for one the host has not. */
-    readonly find: (id: string) => Effect.Effect<Integration, ConnectionError>;
+    readonly find: (
+      id: string,
+    ) => Effect.Effect<Integration.Integration, Connection.ConnectionError>;
   }
 >()("@amends-dev/connection/Integrations") {}
 
@@ -35,7 +37,7 @@ export class Integrations extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (integrations: ReadonlyArray<Integration>) => {
+export const make = (integrations: ReadonlyArray<Integration.Integration>) => {
   const byId = new Map(integrations.map((integration) => [integration.id, integration]));
   if (byId.size !== integrations.length) {
     return Effect.die(new Error("More than one integration has the same id"));
@@ -48,7 +50,10 @@ export const make = (integrations: ReadonlyArray<Integration>) => {
         if (integration !== undefined) return Effect.succeed(integration);
         const description = `No integration is installed as ${id}`;
         return Effect.fail(
-          new ConnectionError({ integration: id, reason: new NotFoundError({ description }) }),
+          new Connection.ConnectionError({
+            integration: id,
+            reason: new Connection.NotFoundError({ description }),
+          }),
         );
       },
     }),

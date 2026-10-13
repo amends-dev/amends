@@ -15,7 +15,7 @@ import * as Schema from "effect/Schema";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import { Authentication } from "./Authentication.ts";
+import * as Authentication from "./Authentication.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -43,5 +43,5 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
   )
-  .middleware(Authentication)
+  .middleware(Authentication.Authentication)
   .prefix("/workspaces") {}

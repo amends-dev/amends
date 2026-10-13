@@ -20,16 +20,7 @@ import type * as HttpClient from "effect/http/HttpClient";
 import type * as HttpClientError from "effect/http/HttpClientError";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import type * as HttpClientResponse from "effect/http/HttpClientResponse";
-import {
-  AuthenticationError,
-  InvalidInputError,
-  InvalidResponseError,
-  ToolSourceError,
-  UnavailableError,
-  UnknownError,
-  UnsupportedError,
-  type ToolSourceErrorReason,
-} from "../ToolSourceError.ts";
+import * as ToolSourceError from "../ToolSourceError.ts";
 import { encodeHeaderValue } from "./mcp-headers.ts";
 
 /**
@@ -68,10 +59,10 @@ export interface Transport {
       readonly toolName?: string;
       readonly headers?: Readonly<Record<string, string>>;
     },
-  ) => Effect.Effect<A, ToolSourceError>;
+  ) => Effect.Effect<A, ToolSourceError.ToolSourceError>;
 
   /** Whether the server is spoken to statelessly, as the protocols with headers that mirror parameters are. */
-  readonly mirrorsParameters: Effect.Effect<boolean, ToolSourceError>;
+  readonly mirrorsParameters: Effect.Effect<boolean, ToolSourceError.ToolSourceError>;
 }
 
 const statelessVersion = "2026-07-28";
@@ -106,7 +97,8 @@ class HeaderMismatch extends Data.TaggedError("HeaderMismatch") {}
  * Whether a request failed because the server found its headers did not match its body, which
  * `Mcp.http` answers by listing the tools again.
  */
-export const isHeaderMismatch = (error: ToolSourceError) => error.cause instanceof HeaderMismatch;
+export const isHeaderMismatch = (error: ToolSourceError.ToolSourceError) =>
+  error.cause instanceof HeaderMismatch;
 
 /** What a server answers a request with, as JSON-RPC defines it. */
 const Reply = Schema.Struct({
@@ -136,39 +128,40 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
   const settledConnection = yield* Ref.make(Option.none<Connection>());
   const settling = yield* Semaphore.make(1);
 
-  const fail = (reason: ToolSourceErrorReason, cause?: unknown) =>
-    new ToolSourceError({ source: name, reason, cause });
+  const fail = (reason: ToolSourceError.ToolSourceErrorReason, cause?: unknown) =>
+    new ToolSourceError.ToolSourceError({ source: name, reason, cause });
 
   const failToReach = (error: HttpClientError.HttpClientError) =>
     fail(
       error.reason._tag === "TransportError"
-        ? new UnavailableError({})
-        : new UnknownError({ description: error.message }),
+        ? new ToolSourceError.UnavailableError({})
+        : new ToolSourceError.UnknownError({ description: error.message }),
       error,
     );
 
   const failWithStatus = (status: number) => {
     const description = `The server answered ${status}`;
-    if (status === 401 || status === 403) return fail(new AuthenticationError({ description }));
+    if (status === 401 || status === 403)
+      return fail(new ToolSourceError.AuthenticationError({ description }));
     if (status === 408 || status === 429 || status >= 500) {
-      return fail(new UnavailableError({ description }));
+      return fail(new ToolSourceError.UnavailableError({ description }));
     }
-    return fail(new UnsupportedError({ description }));
+    return fail(new ToolSourceError.UnsupportedError({ description }));
   };
 
   const failWithReply = (error: { readonly code: number; readonly message: string }) => {
     const description = error.message;
     switch (error.code) {
       case McpSchema.INVALID_PARAMS_ERROR_CODE:
-        return fail(new InvalidInputError({ description }));
+        return fail(new ToolSourceError.InvalidInputError({ description }));
       case McpSchema.HEADER_MISMATCH_ERROR_CODE:
-        return fail(new UnsupportedError({ description }), new HeaderMismatch());
+        return fail(new ToolSourceError.UnsupportedError({ description }), new HeaderMismatch());
       case McpSchema.METHOD_NOT_FOUND_ERROR_CODE:
       case McpSchema.INVALID_REQUEST_ERROR_CODE:
       case McpSchema.PARSE_ERROR_CODE:
-        return fail(new UnsupportedError({ description }));
+        return fail(new ToolSourceError.UnsupportedError({ description }));
       default:
-        return fail(new UnknownError({ description }));
+        return fail(new ToolSourceError.UnknownError({ description }));
     }
   };
 
@@ -254,14 +247,22 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
       Stream.runHead,
       Effect.flatMap(
         Option.match({
-          onNone: () => Effect.fail(fail(new InvalidResponseError({ description: "No reply" }))),
+          onNone: () =>
+            Effect.fail(
+              fail(new ToolSourceError.InvalidResponseError({ description: "No reply" })),
+            ),
           onSome: Effect.succeed,
         }),
       ),
       Effect.mapError((error) =>
-        error instanceof ToolSourceError
+        error instanceof ToolSourceError.ToolSourceError
           ? error
-          : fail(new InvalidResponseError({ description: "The reply is not JSON-RPC" }), error),
+          : fail(
+              new ToolSourceError.InvalidResponseError({
+                description: "The reply is not JSON-RPC",
+              }),
+              error,
+            ),
       ),
     );
   };
@@ -305,7 +306,9 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
     return yield* Schema.decodeUnknownEffect(schema)(result).pipe(
       Effect.mapError((error) =>
         fail(
-          new InvalidResponseError({ description: `The result of ${method} is not as expected` }),
+          new ToolSourceError.InvalidResponseError({
+            description: `The result of ${method} is not as expected`,
+          }),
           error,
         ),
       ),
@@ -325,10 +328,10 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
     const answer = yield* readResult(response, id).pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(Initialized)),
       Effect.mapError((error) =>
-        error instanceof ToolSourceError
+        error instanceof ToolSourceError.ToolSourceError
           ? error
           : fail(
-              new InvalidResponseError({
+              new ToolSourceError.InvalidResponseError({
                 description: "The result of initialize is not as expected",
               }),
               error,
@@ -337,7 +340,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
     );
     if (!sessionVersions.includes(answer.protocolVersion)) {
       return yield* fail(
-        new UnsupportedError({
+        new ToolSourceError.UnsupportedError({
           description: `The server speaks ${answer.protocolVersion}, which is not supported`,
         }),
       );
@@ -401,7 +404,11 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
           Effect.andThen(attempt),
           Effect.catchTag("SessionEnded", () =>
             Effect.fail(
-              fail(new UnavailableError({ description: "The server keeps ending the session" })),
+              fail(
+                new ToolSourceError.UnavailableError({
+                  description: "The server keeps ending the session",
+                }),
+              ),
             ),
           ),
         ),

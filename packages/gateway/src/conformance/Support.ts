@@ -75,7 +75,8 @@ import {
   TurnStore,
   TurnTimeline,
 } from "@amends-dev/core/turn";
-import { Gateway, WorkspaceStorage } from "../index.ts";
+import * as Gateway from "../Gateway.ts";
+import * as WorkspaceStorage from "../WorkspaceStorage.ts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -84,7 +85,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { Host, Storage } from "./Fixture.ts";
+import type * as Fixture from "./Fixture.ts";
 
 /**
  * The human who creates the suites' workspaces, unless a test names another creator.
@@ -225,7 +226,7 @@ const withHostServices = (
  * @category utils
  * @since 0.1.0
  */
-export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
+export const forWorkspace = (host: Context.Context<Fixture.Host>, id: Workspace.Id) =>
   Effect.flatMap(Context.get(host, WorkspaceStorage.WorkspaceStorage).forWorkspace(id), (context) =>
     withHostServices(context, Context.get(host, Crypto.Crypto)),
   );
@@ -269,7 +270,7 @@ export const failingLate = (bound: Bound, failure: StoreError.StoreError): Bound
  * @category utils
  * @since 0.1.0
  */
-export const runHost = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
+export const runHost = <A, E, R>(storage: Fixture.Storage, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(storage.connect(), (host) => Effect.provide(program, host));
 
 /**
@@ -287,7 +288,7 @@ export const core = (bound: Bound) =>
  * @category utils
  * @since 0.1.0
  */
-export const gateway = (host: Context.Context<Host>, options: Gateway.Options = {}) =>
+export const gateway = (host: Context.Context<Fixture.Host>, options: Gateway.Options = {}) =>
   Gateway.layer(options).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -356,7 +357,7 @@ export const seed = (
  * @category utils
  * @since 0.1.0
  */
-export const runGateway = <A, E, R>(storage: Storage, program: Effect.Effect<A, E, R>) =>
+export const runGateway = <A, E, R>(storage: Fixture.Storage, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(storage.connect(), (host) => program.pipe(Effect.provide(gateway(host))));
 
 /**

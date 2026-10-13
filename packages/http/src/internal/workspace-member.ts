@@ -15,35 +15,38 @@ import * as Schema from "effect/Schema";
 import * as Headers from "effect/http/Headers";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import { Principal } from "../Authentication.ts";
-import { header, WorkspaceMember } from "../WorkspaceMember.ts";
+import * as Authentication from "../Authentication.ts";
+import * as WorkspaceMember from "../WorkspaceMember.ts";
 
 const decodeWorkspaceId = Schema.decodeUnknownOption(Workspace.Id);
 
 /** A member's request that names no workspace, or no valid one. */
 const unnamed = new CoreError.Invalid({
   reason: new CoreError.Malformed({
-    description: `A member's request names its workspace in the ${header} header`,
+    description: `A member's request names its workspace in the ${WorkspaceMember.header} header`,
   }),
 });
 
 /** Enter the request's workspace as its principal, through the host's gateway. */
 export const layer = Layer.effect(
-  WorkspaceMember,
+  WorkspaceMember.WorkspaceMember,
   Gateway.Gateway.useSync((gateway) =>
-    WorkspaceMember.of((httpEffect) =>
+    WorkspaceMember.WorkspaceMember.of((httpEffect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
-        const workspaceId = Option.flatMap(Headers.get(request.headers, header), decodeWorkspaceId);
+        const workspaceId = Option.flatMap(
+          Headers.get(request.headers, WorkspaceMember.header),
+          decodeWorkspaceId,
+        );
         if (Option.isNone(workspaceId)) return yield* unnamed;
-        const principal = yield* Principal;
+        const principal = yield* Authentication.Principal;
         const response = yield* gateway
           .asMember(workspaceId.value, principal, httpEffect)
           .pipe(
             Effect.annotateLogs("workspaceId", workspaceId.value),
             Effect.annotateSpans("workspaceId", workspaceId.value),
           );
-        return HttpServerResponse.setHeader(response, "vary", header);
+        return HttpServerResponse.setHeader(response, "vary", WorkspaceMember.header);
       }),
     ),
   ),

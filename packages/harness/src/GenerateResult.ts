@@ -8,7 +8,7 @@
  * @since 0.1.0
  */
 import type * as Response from "effect/ai/Response";
-import { type FileChangePart, type Step, type StreamPart, stepsOf } from "./StreamPart.ts";
+import * as StreamPart from "./StreamPart.ts";
 
 /**
  * A whole turn, as `Session.generate` returns it.
@@ -39,15 +39,15 @@ import { type FileChangePart, type Step, type StreamPart, stepsOf } from "./Stre
  */
 export class GenerateResult {
   /** Every part the turn streamed, in order. */
-  readonly parts: ReadonlyArray<StreamPart>;
+  readonly parts: ReadonlyArray<StreamPart.StreamPart>;
 
-  constructor(parts: ReadonlyArray<StreamPart>) {
+  constructor(parts: ReadonlyArray<StreamPart.StreamPart>) {
     this.parts = parts;
   }
 
   /** The turn's steps, each with the parts it streamed added up and how it finished. */
-  get steps(): ReadonlyArray<Step> {
-    return stepsOf(this.parts);
+  get steps(): ReadonlyArray<StreamPart.Step> {
+    return StreamPart.stepsOf(this.parts);
   }
 
   /** The text of the turn's last step: its answer, without what the agent said while it worked. */
@@ -69,7 +69,7 @@ export class GenerateResult {
   }
 
   /** The files the agent reported creating, modifying, or deleting. */
-  get fileChanges(): ReadonlyArray<FileChangePart> {
+  get fileChanges(): ReadonlyArray<StreamPart.FileChangePart> {
     return this.parts.filter((part) => part.type === "file-change");
   }
 
@@ -99,7 +99,7 @@ export class GenerateObjectResult<A> extends GenerateResult {
   /** The object the turn's answer decoded to. */
   readonly value: A;
 
-  constructor(value: A, parts: ReadonlyArray<StreamPart>) {
+  constructor(value: A, parts: ReadonlyArray<StreamPart.StreamPart>) {
     super(parts);
     this.value = value;
   }

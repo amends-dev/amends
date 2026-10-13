@@ -21,10 +21,10 @@ import type * as AiError from "effect/ai/AiError";
 import type * as Toolkit from "effect/ai/Toolkit";
 import * as Prompt from "effect/ai/Prompt";
 import type * as Tool from "effect/ai/Tool";
-import { type AgentSession, SessionId } from "./Agent.ts";
-import type { GenerateObjectResult, GenerateResult } from "./GenerateResult.ts";
-import type { HarnessError } from "./HarnessError.ts";
-import { type CompactionPart, Step, type StepPart, type StreamPart } from "./StreamPart.ts";
+import * as Agent from "./Agent.ts";
+import type * as GenerateResult from "./GenerateResult.ts";
+import type * as HarnessError from "./HarnessError.ts";
+import * as StreamPart from "./StreamPart.ts";
 
 /**
  * A turn that `suspendTurn` cut short, kept so that the session can finish it later.
@@ -49,7 +49,7 @@ export const UnfinishedTurn = Schema.Struct({
    * The steps the turn finished before `suspendTurn`, their parts added up. The agent that cut the
    * turn short continues it after them; any other runs the turn again without them.
    */
-  steps: Schema.Array(Step),
+  steps: Schema.Array(StreamPart.Step),
 
   /**
    * What the agent's `suspendTurn` returned. Without it, the next agent runs the turn again from
@@ -73,7 +73,7 @@ export interface UnfinishedTurn extends Schema.Schema.Type<typeof UnfinishedTurn
  * @since 0.1.0
  */
 export const SessionState = Schema.Struct({
-  id: SessionId,
+  id: Agent.SessionId,
 
   /** The agent that last ran the session, whose `agentState` only it can read. */
   agent: Schema.String,
@@ -183,7 +183,7 @@ export interface ContinueObjectOptions<
  * @since 0.1.0
  */
 export type TurnError<Tools extends Record<string, Tool.Any>> =
-  | HarnessError
+  | HarnessError.HarnessError
   | AiError.AiError
   | Tool.HandlerError<Tools[keyof Tools]>;
 
@@ -241,7 +241,7 @@ export type TurnServices<Tools extends Record<string, Tool.Any>> = Tool.HandlerS
  * @since 0.1.0
  */
 export interface Session {
-  readonly id: SessionId;
+  readonly id: Agent.SessionId;
 
   /**
    * Whether the agent has the unfinished turn the session resumed with, which the continue
@@ -257,7 +257,7 @@ export interface Session {
    */
   readonly stream: <Tools extends Record<string, Tool.Any> = {}>(
     options: StreamOptions<Tools>,
-  ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
+  ) => Stream.Stream<StreamPart.StreamPart, TurnError<Tools>, TurnServices<Tools>>;
 
   /**
    * Runs a turn and returns it whole. Fails with `TurnFailedError` when the agent reports a
@@ -266,7 +266,7 @@ export interface Session {
    */
   readonly generate: <Tools extends Record<string, Tool.Any> = {}>(
     options: StreamOptions<Tools>,
-  ) => Effect.Effect<GenerateResult, TurnError<Tools>, TurnServices<Tools>>;
+  ) => Effect.Effect<GenerateResult.GenerateResult, TurnError<Tools>, TurnServices<Tools>>;
 
   /**
    * Runs a turn that answers in JSON and decodes the answer with `schema`. An answer that does not
@@ -277,7 +277,7 @@ export interface Session {
   readonly generateObject: <S extends Schema.Top, Tools extends Record<string, Tool.Any> = {}>(
     options: GenerateObjectOptions<S, Tools>,
   ) => Effect.Effect<
-    GenerateObjectResult<S["Type"]>,
+    GenerateResult.GenerateObjectResult<S["Type"]>,
     TurnError<Tools>,
     TurnServices<Tools> | S["DecodingServices"]
   >;
@@ -292,7 +292,7 @@ export interface Session {
    */
   readonly continueStream: <Tools extends Record<string, Tool.Any> = {}>(
     options: ContinueOptions<Tools>,
-  ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
+  ) => Stream.Stream<StreamPart.StreamPart, TurnError<Tools>, TurnServices<Tools>>;
 
   /**
    * Finishes the unfinished turn and returns what `continueStream` would stream whole, like
@@ -302,7 +302,7 @@ export interface Session {
    */
   readonly continueGenerate: <Tools extends Record<string, Tool.Any> = {}>(
     options: ContinueOptions<Tools>,
-  ) => Effect.Effect<GenerateResult, TurnError<Tools>, TurnServices<Tools>>;
+  ) => Effect.Effect<GenerateResult.GenerateResult, TurnError<Tools>, TurnServices<Tools>>;
 
   /**
    * Finishes the unfinished turn that answers in JSON, like `continueGenerate`, and decodes the
@@ -315,7 +315,7 @@ export interface Session {
   >(
     options: ContinueObjectOptions<S, Tools>,
   ) => Effect.Effect<
-    GenerateObjectResult<S["Type"]>,
+    GenerateResult.GenerateObjectResult<S["Type"]>,
     TurnError<Tools>,
     TurnServices<Tools> | S["DecodingServices"]
   >;
@@ -325,36 +325,36 @@ export interface Session {
    * that needs approval, which `approved` allows or refuses, or else one from the agent for its own
    * tools. A request the session made is answered once, and ends with the stream that made it.
    */
-  readonly approve: AgentSession["approve"];
+  readonly approve: Agent.AgentSession["approve"];
 
   /**
    * Asks the agent to replace the conversation so far with a summary, guided by `instructions`, and
    * returns the compaction, which the conversation then starts from. It runs between turns, and no
    * turn starts meanwhile. Fails with `UnsupportedError` when the agent compacts only by itself.
    */
-  readonly compact: AgentSession["compact"];
+  readonly compact: Agent.AgentSession["compact"];
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns the
    * session with the turn unfinished, for `continueStream`, `continueGenerate`, or
    * `continueGenerateObject` to finish once `Harness.createSession` resumes it.
    */
-  readonly suspendTurn: Effect.Effect<SessionState, HarnessError>;
+  readonly suspendTurn: Effect.Effect<SessionState, HarnessError.HarnessError>;
 
   /** Releases the session between turns while the agent keeps running. */
-  readonly detach: Effect.Effect<SessionState, HarnessError>;
+  readonly detach: Effect.Effect<SessionState, HarnessError.HarnessError>;
 
   /**
    * Stops the agent, aborting a running turn, whose stream ends with an error and which the
    * conversation keeps as far as it got, and returns the session to start again later.
    */
-  readonly stop: Effect.Effect<SessionState, HarnessError>;
+  readonly stop: Effect.Effect<SessionState, HarnessError.HarnessError>;
 
   /**
    * Stops the agent for good, aborting a running turn. It also destroys a session already released,
    * and destroying it again succeeds.
    */
-  readonly destroy: Effect.Effect<void, HarnessError>;
+  readonly destroy: Effect.Effect<void, HarnessError.HarnessError>;
 }
 
 /**
@@ -382,7 +382,7 @@ export interface Session {
  * @category utils
  * @since 0.1.0
  */
-export const recordStep = (conversation: Prompt.Prompt, step: Step): Prompt.Prompt => {
+export const recordStep = (conversation: Prompt.Prompt, step: StreamPart.Step): Prompt.Prompt => {
   const compactedAt = step.parts.findLastIndex((part) => part.type === "compaction");
   const compaction = step.parts[compactedAt];
   return compaction?.type === "compaction"
@@ -402,7 +402,7 @@ export const recordStep = (conversation: Prompt.Prompt, step: Step): Prompt.Prom
  * @since 0.1.0
  */
 export const conversationAfter = (
-  compaction: Pick<CompactionPart, "summary" | "kept">,
+  compaction: Pick<StreamPart.CompactionPart, "summary" | "kept">,
 ): Prompt.Prompt =>
   Prompt.concat(
     Prompt.make(
@@ -422,7 +422,7 @@ export const conversationAfter = (
  * result is answered as interrupted, as Effect AI answers the calls of a response cut short, since
  * models refuse a conversation with a call no result answers.
  */
-const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> => {
+const messagesOfParts = (parts: StreamPart.Step["parts"]): ReadonlyArray<Prompt.Message> => {
   const assistantParts: Array<
     Prompt.TextPart | Prompt.ReasoningPart | Prompt.FilePart | Prompt.ToolCallPart
   > = [];
@@ -492,7 +492,7 @@ const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> =>
 };
 
 /** What a part's provider said of it, as the options of the part that records it. */
-const optionsOf = (metadata: StepPart["metadata"]) =>
+const optionsOf = (metadata: StreamPart.StepPart["metadata"]) =>
   metadata === undefined ? {} : { options: metadata };
 
 /** The result of a call its turn ended before answering, as Effect AI writes one. */

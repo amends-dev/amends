@@ -13,7 +13,7 @@ import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import { Authentication, Unauthorized } from "./Authentication.ts";
+import * as Authentication from "./Authentication.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -27,10 +27,10 @@ export class MeGroup extends HttpApiGroup.make("me")
   .add(
     HttpApiEndpoint.get("account", "/", {
       success: Accounts.Account,
-      error: [ApiErrors.Denied, Unauthorized],
+      error: [ApiErrors.Denied, Authentication.Unauthorized],
     }),
     HttpApiEndpoint.get("workspaces", "/workspaces", { success: WorkspaceDirectory.Listing }),
     HttpApiEndpoint.delete("signOut", "/session", { success: HttpApiSchema.NoContent }),
   )
-  .middleware(Authentication)
+  .middleware(Authentication.Authentication)
   .prefix("/me") {}

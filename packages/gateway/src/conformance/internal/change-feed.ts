@@ -9,10 +9,9 @@ import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import type * as Scope from "effect/Scope";
-import { Gateway } from "../../index.ts";
-import type { Fixture } from "../Fixture.ts";
+import * as Gateway from "../../Gateway.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import { alice, bob } from "../Support.ts";
 import type { CoreError } from "@amends-dev/core/error";
 
 const issue = (recipient: Identity.HumanId) =>
@@ -51,7 +50,7 @@ const watch = (options?: ChangeFeed.WatchOptions) =>
 const human = (name: string) => Identity.HumanId.make(name);
 
 /** The change feed read from the journal: delivery across hosts, and resumption on another. */
-export const changeFeed = (fixture: Fixture) => {
+export const changeFeed = (fixture: Fixture.Fixture) => {
   const { gateway } = Support;
   describe.skipIf(!fixture.available)(`${fixture.name}: change feed`, () => {
     it.live("a subscriber receives commits made through its own host and through another", () =>
@@ -67,13 +66,13 @@ export const changeFeed = (fixture: Fixture) => {
           const workspace = yield* on(
             first,
             Effect.flatMap(Gateway.Gateway, (gateway) =>
-              gateway.createWorkspace(alice.id, { name: "Feed", memberName: "alice" }),
+              gateway.createWorkspace(Support.alice.id, { name: "Feed", memberName: "alice" }),
             ),
           );
           const next = yield* on(
             first,
             Effect.flatMap(Gateway.Gateway, (gateway) =>
-              listen(gateway.asMember(workspace.id, alice, watch())),
+              listen(gateway.asMember(workspace.id, Support.alice, watch())),
             ),
           );
           const ready = yield* next;
@@ -81,7 +80,7 @@ export const changeFeed = (fixture: Fixture) => {
           yield* on(
             second,
             Effect.flatMap(Gateway.Gateway, (gateway) =>
-              gateway.asMember(workspace.id, alice, issue(bob.id)),
+              gateway.asMember(workspace.id, Support.alice, issue(Support.bob.id)),
             ),
           );
           const fromOther = committed(yield* next);
@@ -89,7 +88,7 @@ export const changeFeed = (fixture: Fixture) => {
           yield* on(
             first,
             Effect.flatMap(Gateway.Gateway, (gateway) =>
-              gateway.asMember(workspace.id, alice, issue(human("carol"))),
+              gateway.asMember(workspace.id, Support.alice, issue(human("carol"))),
             ),
           );
           const fromOwn = committed(yield* next);
@@ -107,26 +106,26 @@ export const changeFeed = (fixture: Fixture) => {
           const first = yield* storage.connect();
           const second = yield* storage.connect();
           const workspace = yield* Effect.flatMap(Gateway.Gateway, (gateway) =>
-            gateway.createWorkspace(alice.id, { name: "Resume", memberName: "alice" }),
+            gateway.createWorkspace(Support.alice.id, { name: "Resume", memberName: "alice" }),
           ).pipe(Effect.provide(gateway(first)));
           const cursor = yield* Effect.scoped(
             Effect.gen(function* () {
               const gateway = yield* Gateway.Gateway;
-              const next = yield* listen(gateway.asMember(workspace.id, alice, watch()));
+              const next = yield* listen(gateway.asMember(workspace.id, Support.alice, watch()));
               yield* next;
-              yield* gateway.asMember(workspace.id, alice, issue(bob.id));
+              yield* gateway.asMember(workspace.id, Support.alice, issue(Support.bob.id));
               return committed(yield* next).cursor;
             }).pipe(Effect.provide(gateway(first))),
           );
           const missed = yield* Effect.flatMap(Gateway.Gateway, (gateway) =>
             Effect.forEach(["carol", "dave"], (name) =>
-              gateway.asMember(workspace.id, alice, issue(human(name))),
+              gateway.asMember(workspace.id, Support.alice, issue(human(name))),
             ),
           ).pipe(Effect.provide(gateway(first)));
           yield* Effect.gen(function* () {
             const gateway = yield* Gateway.Gateway;
             const next = yield* listen(
-              gateway.asMember(workspace.id, alice, watch({ after: cursor })),
+              gateway.asMember(workspace.id, Support.alice, watch({ after: cursor })),
             );
             expect(yield* next).toEqual({
               _tag: "Ready",

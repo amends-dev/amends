@@ -13,26 +13,11 @@ import * as AiError from "effect/ai/AiError";
 import * as Prompt from "effect/ai/Prompt";
 import type * as Tool from "effect/ai/Tool";
 import type * as Response from "effect/ai/Response";
-import type { AgentSession, SessionId, TurnOptions } from "../Agent.ts";
-import { GenerateObjectResult, GenerateResult } from "../GenerateResult.ts";
-import {
-  HarnessError,
-  type HarnessErrorReason,
-  NoTurnError,
-  SessionReleasedError,
-  TurnFailedError,
-  TurnInProgressError,
-} from "../HarnessError.ts";
-import {
-  type ContinueObjectOptions,
-  type ContinueOptions,
-  recordStep,
-  type Session,
-  type SessionState,
-  type StreamOptions,
-  type UnfinishedTurn,
-} from "../Session.ts";
-import { type Step, type StreamPart, stepsOf } from "../StreamPart.ts";
+import type * as Agent from "../Agent.ts";
+import * as GenerateResult from "../GenerateResult.ts";
+import * as HarnessError from "../HarnessError.ts";
+import * as Session from "../Session.ts";
+import * as StreamPart from "../StreamPart.ts";
 import { type ApprovalResponse, makeHostTools } from "./host-tools.ts";
 
 /**
@@ -57,7 +42,7 @@ interface State {
  */
 type Status = Data.TaggedEnum<{
   Idle: {};
-  Unfinished: { readonly turn: UnfinishedTurn };
+  Unfinished: { readonly turn: Session.UnfinishedTurn };
   Running: { readonly turn: RunningTurn };
   Compacting: {};
   Released: {
@@ -73,13 +58,13 @@ interface RunningTurn {
   readonly prompt: Prompt.UserMessage;
 
   /** How the turn answers, as the unfinished turn records it. */
-  readonly responseFormat: UnfinishedTurn["responseFormat"];
+  readonly responseFormat: Session.UnfinishedTurn["responseFormat"];
 
   /** The steps the turn finished, their parts added up, with those before `suspendTurn`. */
-  readonly steps: ReadonlyArray<Step>;
+  readonly steps: ReadonlyArray<StreamPart.Step>;
 
   /** The parts delivered of the step the turn is taking. */
-  readonly stepParts: ReadonlyArray<StreamPart>;
+  readonly stepParts: ReadonlyArray<StreamPart.StreamPart>;
 }
 
 /** The operations that release a session. */
@@ -94,12 +79,12 @@ type Operation = "stream" | "approve" | "compact" | Continue | Release;
 const refusal = (
   { status, releasing }: State,
   operation: Operation,
-): HarnessErrorReason | undefined => {
+): HarnessError.HarnessErrorReason | undefined => {
   // A session can be destroyed at any time, also once released, or while it is.
   if (operation === "destroy") return undefined;
-  if (status._tag === "Released") return new SessionReleasedError({});
+  if (status._tag === "Released") return new HarnessError.SessionReleasedError({});
   if (releasing !== undefined) {
-    return new SessionReleasedError({
+    return new HarnessError.SessionReleasedError({
       description: `The session is being released by ${releasing}`,
     });
   }
@@ -107,24 +92,24 @@ const refusal = (
     case "stream":
     case "compact":
       if (status._tag === "Unfinished") {
-        return new TurnInProgressError({
+        return new HarnessError.TurnInProgressError({
           description: "The session has an unfinished turn, which a continue operation finishes",
         });
       }
       if (status._tag === "Compacting") return compactingError();
-      return status._tag === "Running" ? new TurnInProgressError({}) : undefined;
+      return status._tag === "Running" ? new HarnessError.TurnInProgressError({}) : undefined;
     case "continueStream":
     case "continueGenerate":
     case "continueGenerateObject": {
-      if (status._tag === "Running") return new TurnInProgressError({});
+      if (status._tag === "Running") return new HarnessError.TurnInProgressError({});
       if (status._tag !== "Unfinished") {
-        return new NoTurnError({ description: "The session has no unfinished turn" });
+        return new HarnessError.NoTurnError({ description: "The session has no unfinished turn" });
       }
       // A turn is finished the way it answers: whole and decoded for JSON, otherwise as text.
       const answersIn = status.turn.responseFormat.type;
       const finishes = operation === "continueGenerateObject" ? "json" : "text";
       if (answersIn === finishes) return undefined;
-      return new NoTurnError({
+      return new HarnessError.NoTurnError({
         description:
           answersIn === "json"
             ? "The unfinished turn answers in JSON, which `continueGenerateObject` finishes"
@@ -134,11 +119,11 @@ const refusal = (
     case "suspendTurn":
       return status._tag === "Running"
         ? undefined
-        : new NoTurnError({ description: "The session is not running a turn" });
+        : new HarnessError.NoTurnError({ description: "The session is not running a turn" });
     case "detach":
       if (status._tag === "Compacting") return compactingError();
       return status._tag === "Running"
-        ? new TurnInProgressError({
+        ? new HarnessError.TurnInProgressError({
             description: "A running turn must be suspended before the session detaches",
           })
         : undefined;
@@ -149,14 +134,16 @@ const refusal = (
 };
 
 const compactingError = () =>
-  new TurnInProgressError({ description: "The session is compacting its conversation" });
+  new HarnessError.TurnInProgressError({
+    description: "The session is compacting its conversation",
+  });
 
 /**
  * Whether a session in `state` delivers `part` of its running turn, and the session after it does.
  * A session that no longer runs the turn delivers nothing more. A `finish-step` adds the step it
  * ends to the turn's steps, and the turn's `finish` adds the turn to the conversation.
  */
-const deliver = (state: State, part: StreamPart): [boolean, State] => {
+const deliver = (state: State, part: StreamPart.StreamPart): [boolean, State] => {
   if (state.status._tag !== "Running") return [false, state];
   const { turn } = state.status;
   if (part.type === "finish") {
@@ -164,7 +151,7 @@ const deliver = (state: State, part: StreamPart): [boolean, State] => {
     return [true, { ...state, status: Status.Idle(), history }];
   }
   if (part.type === "finish-step") {
-    const steps = [...turn.steps, ...stepsOf([...turn.stepParts, part])];
+    const steps = [...turn.steps, ...StreamPart.stepsOf([...turn.stepParts, part])];
     const next = { ...turn, steps, stepParts: [] };
     return [true, { ...state, status: Status.Running({ turn: next }) }];
   }
@@ -178,14 +165,17 @@ const wasAborted = ({ status, releasing }: State) =>
   (status._tag === "Released" && status.abortedTurn);
 
 /** How the stream of a turn `stop` or `destroy` aborted ends: as a turn that failed. */
-const abortedEnding: ReadonlyArray<StreamPart> = [
+const abortedEnding: ReadonlyArray<StreamPart.StreamPart> = [
   { type: "error", error: { type: "aborted", message: "The session was stopped during the turn" } },
   { type: "finish", reason: "error", usage: { inputTokens: {}, outputTokens: {} } },
 ];
 
 /** The conversation with a turn after `history`: the turn's prompt, then each of its `steps`. */
-const withTurn = (history: Prompt.Prompt, prompt: Prompt.UserMessage, steps: ReadonlyArray<Step>) =>
-  steps.reduce(recordStep, Prompt.concat(history, Prompt.fromMessages([prompt])));
+const withTurn = (
+  history: Prompt.Prompt,
+  prompt: Prompt.UserMessage,
+  steps: ReadonlyArray<StreamPart.Step>,
+) => steps.reduce(Session.recordStep, Prompt.concat(history, Prompt.fromMessages([prompt])));
 
 /**
  * The conversation with a turn that ended without its `finish`, other than by `suspendTurn`, as far
@@ -198,7 +188,7 @@ const withEndedTurn = (history: Prompt.Prompt, turn: RunningTurn) =>
     : withTurn(history, turn.prompt, stepsSoFar(turn));
 
 /** The steps of a turn as far as the session delivered them, the one it is taking last. */
-const stepsSoFar = (turn: RunningTurn) => [...turn.steps, ...stepsOf(turn.stepParts)];
+const stepsSoFar = (turn: RunningTurn) => [...turn.steps, ...StreamPart.stepsOf(turn.stepParts)];
 
 /**
  * The conversation as the session has recorded it: the turns before, and the running turn's prompt
@@ -211,11 +201,11 @@ const recordedConversation = ({ status, history }: State): ReadonlyArray<Prompt.
 
 /** Makes the session `Harness.createSession` hands out, over an agent session it started. */
 export const makeSession = Effect.fn("Session.make")(function* (options: {
-  readonly id: SessionId;
+  readonly id: Agent.SessionId;
   readonly agent: string;
-  readonly agentSession: AgentSession;
+  readonly agentSession: Agent.AgentSession;
   readonly history: Prompt.Prompt;
-  readonly unfinishedTurn: UnfinishedTurn | undefined;
+  readonly unfinishedTurn: Session.UnfinishedTurn | undefined;
 }) {
   const { agentSession } = options;
   // An agent that does not have the unfinished turn runs it again from its prompt, so the steps
@@ -235,8 +225,8 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     releasing: undefined,
   });
 
-  const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
-    new HarnessError({ agent: options.agent, reason, cause });
+  const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
+    new HarnessError.HarnessError({ agent: options.agent, reason, cause });
 
   const hostTools = yield* makeHostTools({
     agent: options.agent,
@@ -254,7 +244,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   /** Marks the session as running a new turn, failing when it cannot start one now. */
   const startTurn = (prompt: Prompt.UserMessage, responseFormat: RunningTurn["responseFormat"]) =>
     Effect.flatten(
-      Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
+      Ref.modify(state, (current): [Effect.Effect<void, HarnessError.HarnessError>, State] => {
         const reason = refusal(current, "stream");
         if (reason !== undefined) return [Effect.fail(harnessError(reason)), current];
         const turn = { prompt, responseFormat, steps: [], stepParts: [] };
@@ -270,8 +260,8 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
    * turn's `finish` ends the turn as far as it got.
    */
   const runTurn = <Tools extends Record<string, Tool.Any>>(
-    agentTurn: Stream.Stream<StreamPart, HarnessError>,
-    toolkit: StreamOptions<Tools>["toolkit"],
+    agentTurn: Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>,
+    toolkit: Session.StreamOptions<Tools>["toolkit"],
   ) =>
     hostTools.answerCalls(agentTurn, toolkit).pipe(
       Stream.takeWhileEffect((part) => Ref.modify(state, (current) => deliver(current, part))),
@@ -297,8 +287,8 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
 
   /** Runs a new turn with the caller's prompt, once the session can start one. */
   const promptTurn = <Tools extends Record<string, Tool.Any>>(
-    options: StreamOptions<Tools>,
-    responseFormat: TurnOptions["responseFormat"],
+    options: Session.StreamOptions<Tools>,
+    responseFormat: Agent.TurnOptions["responseFormat"],
   ) => {
     const prompt = userMessageOf(options.prompt);
     return Stream.unwrap(
@@ -313,11 +303,11 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   };
 
   /** The whole turn, failing with `TurnFailedError` when the agent reported a failure. */
-  const resultOf = (parts: ReadonlyArray<StreamPart>) => {
+  const resultOf = (parts: ReadonlyArray<StreamPart.StreamPart>) => {
     const error = parts.find((part) => part.type === "error");
     return error === undefined
-      ? Effect.succeed(new GenerateResult(parts))
-      : Effect.fail(harnessError(new TurnFailedError({ error: error.error })));
+      ? Effect.succeed(new GenerateResult.GenerateResult(parts))
+      : Effect.fail(harnessError(new HarnessError.TurnFailedError({ error: error.error })));
   };
 
   /**
@@ -326,7 +316,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
    */
   const objectResultOf = Effect.fnUntraced(function* <S extends Schema.Top>(
     schema: S,
-    parts: ReadonlyArray<StreamPart>,
+    parts: ReadonlyArray<StreamPart.StreamPart>,
   ) {
     const result = yield* resultOf(parts);
     const value = yield* Schema.decodeEffect(Schema.fromJsonString(schema))(result.text).pipe(
@@ -342,7 +332,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         }),
       ),
     );
-    return new GenerateObjectResult(value, parts);
+    return new GenerateResult.GenerateObjectResult(value, parts);
   });
 
   /**
@@ -359,7 +349,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
    * Collects a turn that is returned whole. Nothing can answer its approval requests before it
    * ends, so it denies each, and its tools that need approval do not run.
    */
-  const collectDenyingApprovals = <E, R>(turn: Stream.Stream<StreamPart, E, R>) =>
+  const collectDenyingApprovals = <E, R>(turn: Stream.Stream<StreamPart.StreamPart, E, R>) =>
     Stream.runCollect(
       Stream.tap(turn, (part) =>
         part.type === "tool-approval-request"
@@ -378,21 +368,24 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
    */
   const resumeTurn = (operation: Continue) =>
     Effect.flatten(
-      Ref.modify(state, (current): [Effect.Effect<UnfinishedTurn, HarnessError>, State] => {
-        const { status } = current;
-        const reason = refusal(current, operation);
-        // `refusal` lets the session continue only an unfinished turn.
-        if (reason !== undefined || status._tag !== "Unfinished") {
-          return [Effect.fail(harnessError(reason ?? new NoTurnError({}))), current];
-        }
-        const turn = {
-          prompt: status.turn.prompt,
-          responseFormat: status.turn.responseFormat,
-          steps: status.turn.steps,
-          stepParts: [],
-        };
-        return [Effect.succeed(status.turn), { ...current, status: Status.Running({ turn }) }];
-      }),
+      Ref.modify(
+        state,
+        (current): [Effect.Effect<Session.UnfinishedTurn, HarnessError.HarnessError>, State] => {
+          const { status } = current;
+          const reason = refusal(current, operation);
+          // `refusal` lets the session continue only an unfinished turn.
+          if (reason !== undefined || status._tag !== "Unfinished") {
+            return [Effect.fail(harnessError(reason ?? new HarnessError.NoTurnError({}))), current];
+          }
+          const turn = {
+            prompt: status.turn.prompt,
+            responseFormat: status.turn.responseFormat,
+            steps: status.turn.steps,
+            stepParts: [],
+          };
+          return [Effect.succeed(status.turn), { ...current, status: Status.Running({ turn }) }];
+        },
+      ),
     );
 
   /**
@@ -402,7 +395,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
    */
   const continueTurn = <Tools extends Record<string, Tool.Any>>(
     operation: Continue,
-    options: ContinueOptions<Tools>,
+    options: Session.ContinueOptions<Tools>,
     schema?: Schema.Top,
   ) =>
     Stream.unwrap(
@@ -425,7 +418,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
    */
   const compact = Effect.fn("Session.compact")(function* (instructions?: string) {
     yield* Effect.flatten(
-      Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
+      Ref.modify(state, (current): [Effect.Effect<void, HarnessError.HarnessError>, State] => {
         const reason = refusal(current, "compact");
         if (reason !== undefined) return [Effect.fail(harnessError(reason)), current];
         return [Effect.void, { ...current, status: Status.Compacting() }];
@@ -442,7 +435,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         ? {
             ...current,
             status: Status.Idle(),
-            history: recordStep(current.history, { parts: [compaction] }),
+            history: Session.recordStep(current.history, { parts: [compaction] }),
           }
         : current,
     );
@@ -457,10 +450,10 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
    */
   const release = Effect.fnUntraced(function* <A>(
     operation: Release,
-    agentCall: Effect.Effect<A, HarnessError>,
-  ): Effect.fn.Return<readonly [A, State], HarnessError> {
+    agentCall: Effect.Effect<A, HarnessError.HarnessError>,
+  ): Effect.fn.Return<readonly [A, State], HarnessError.HarnessError> {
     yield* Effect.flatten(
-      Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
+      Ref.modify(state, (current): [Effect.Effect<void, HarnessError.HarnessError>, State] => {
         const reason = refusal(current, operation);
         if (reason !== undefined) return [Effect.fail(harnessError(reason)), current];
         // `destroy` also runs once the session is released, or while it is.
@@ -488,8 +481,8 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   const savedState = (
     history: Prompt.Prompt,
     agentState: Schema.Json | undefined,
-    unfinishedTurn: UnfinishedTurn | undefined,
-  ): SessionState => ({
+    unfinishedTurn: Session.UnfinishedTurn | undefined,
+  ): Session.SessionState => ({
     id: options.id,
     agent: options.agent,
     history,
@@ -497,7 +490,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     unfinishedTurn,
   });
 
-  const session: Session = {
+  const session: Session.Session = {
     id: options.id,
 
     hasUnfinishedTurn: unfinishedTurn !== undefined && agentSession.hasUnfinishedTurn,
@@ -532,7 +525,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     continueGenerateObject: Effect.fn("Session.continueGenerateObject")(function* <
       S extends Schema.Top,
       Tools extends Record<string, Tool.Any>,
-    >(objectOptions: ContinueObjectOptions<S, Tools>) {
+    >(objectOptions: Session.ContinueObjectOptions<S, Tools>) {
       const parts = yield* collectDenyingApprovals(
         continueTurn("continueGenerateObject", objectOptions, objectOptions.schema),
       );
@@ -591,7 +584,7 @@ const userMessageOf = (prompt: string | Prompt.UserMessage): Prompt.UserMessage 
 
 /** The agent's settings for a turn, with the host's tools as the toolkit declares them. */
 const turnOptionsOf = <Tools extends Record<string, Tool.Any>>(
-  options: ContinueOptions<Tools>,
+  options: Session.ContinueOptions<Tools>,
 ) => ({
   instructions: options.instructions,
   model: options.model,
@@ -600,7 +593,7 @@ const turnOptionsOf = <Tools extends Record<string, Tool.Any>>(
 
 /** How a turn answers, as the unfinished turn records it: without the schema, which is not data. */
 const recordedFormatOf = (
-  responseFormat: TurnOptions["responseFormat"],
+  responseFormat: Agent.TurnOptions["responseFormat"],
 ): RunningTurn["responseFormat"] =>
   responseFormat.type === "json"
     ? { type: "json", objectName: responseFormat.objectName }
@@ -613,7 +606,7 @@ const recordedFormatOf = (
 const answerFormatOf = (
   recorded: RunningTurn["responseFormat"],
   schema: Schema.Top | undefined,
-): TurnOptions["responseFormat"] =>
+): Agent.TurnOptions["responseFormat"] =>
   recorded.type === "json" && schema !== undefined ? { ...recorded, schema } : { type: "text" };
 
 /** A turn's usage as `AiError` reports it: the prompt's tokens and the completion's. */

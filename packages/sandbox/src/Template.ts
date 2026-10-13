@@ -11,7 +11,7 @@
 import type * as Effect from "effect/Effect";
 import type * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
-import { isName, type SandboxServices } from "./Sandbox.ts";
+import * as Sandbox from "./Sandbox.ts";
 
 /**
  * Names a template across its versions, as `Sandbox.isName` checks, in at most 30 characters, so
@@ -21,7 +21,7 @@ import { isName, type SandboxServices } from "./Sandbox.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const TemplateName = Schema.String.check(isName, Schema.isMaxLength(30)).pipe(
+export const TemplateName = Schema.String.check(Sandbox.isName, Schema.isMaxLength(30)).pipe(
   Schema.brand("TemplateName"),
 );
 
@@ -79,5 +79,5 @@ export interface Template<E = PlatformError.PlatformError> {
    * another. It leaves such a sandbox ready without redoing what is there. Anything it needs from
    * the host is read beforehand and captured.
    */
-  readonly prepare: Effect.Effect<void, E, SandboxServices>;
+  readonly prepare: Effect.Effect<void, E, Sandbox.SandboxServices>;
 }

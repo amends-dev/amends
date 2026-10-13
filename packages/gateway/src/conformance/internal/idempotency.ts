@@ -5,22 +5,21 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Result from "effect/Result";
-import type { Fixture } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import { forWorkspace, otherWorkspaceId, testProvenance, workspaceId } from "../Support.ts";
 
 const key = Occurrence.Key.make("occurrence/one");
 const executionId = Entry.LogId.make("execution");
 const options = { idempotencyKey: key };
 
 /** Keyed appends: durable identity, validation, rollback, and concurrent attempts. */
-export const idempotency = (fixture: Fixture) => {
+export const idempotency = (fixture: Fixture.Fixture) => {
   const { core, initialized } = Support;
   describe.skipIf(!fixture.available)(`${fixture.name}: idempotency`, () => {
     it.effect("one commit keeps every keyed append past the parameters a statement can bind", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
           yield* initialized(bound);
           yield* Effect.gen(function* () {
             const journal = yield* Journal.Journal;
@@ -50,12 +49,15 @@ export const idempotency = (fixture: Fixture) => {
           Effect.gen(function* () {
             const original = yield* Effect.scoped(
               Effect.gen(function* () {
-                const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+                const bound = yield* Support.forWorkspace(
+                  yield* storage.connect(),
+                  Support.workspaceId,
+                );
                 yield* initialized(bound);
                 return yield* Effect.gen(function* () {
                   const journal = yield* Journal.Journal;
                   const payload = {
-                    workspaceId,
+                    workspaceId: Support.workspaceId,
                     roleId: Role.Id.make("keyed-role"),
                     name: "Keyed",
                     permissions: [],
@@ -86,13 +88,16 @@ export const idempotency = (fixture: Fixture) => {
                   expect(batch.map((entry) => entry.index)).toEqual([1, 2]);
                   return { first, batch, payload };
                 }).pipe(
-                  Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+                  Effect.provideService(
+                    Publication.Publication,
+                    Support.testProvenance(Support.workspaceId),
+                  ),
                   Effect.provide(core(bound)),
                 );
               }),
             );
             const host = yield* storage.connect();
-            const bound = yield* forWorkspace(host, workspaceId);
+            const bound = yield* Support.forWorkspace(host, Support.workspaceId);
             yield* Effect.gen(function* () {
               const journal = yield* Journal.Journal;
               expect(yield* journal.publish(RoleFacts.Created, original.payload)).toEqual(
@@ -117,10 +122,13 @@ export const idempotency = (fixture: Fixture) => {
                 ),
               ).toMatchObject({ _tag: "StoreError", reason: { _tag: "Rejected" } });
             }).pipe(
-              Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+              Effect.provideService(
+                Publication.Publication,
+                Support.testProvenance(Support.workspaceId),
+              ),
               Effect.provide(core(bound)),
             );
-            const other = yield* forWorkspace(host, otherWorkspaceId);
+            const other = yield* Support.forWorkspace(host, Support.otherWorkspaceId);
             yield* Effect.gen(function* () {
               const log = (yield* Log.Log).open({ id: executionId, schema: Schema.String });
               expect(yield* log.getAppend(key)).toEqual(Option.none());
@@ -135,7 +143,10 @@ export const idempotency = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             const append = (payloads: ReadonlyArray<Uint8Array>, idempotencyKey = key) =>
               Effect.flatMap(Store.Transaction, (storeTransaction) =>
                 storeTransaction.append({
@@ -196,8 +207,8 @@ export const idempotency = (fixture: Fixture) => {
     it.effect("independent hosts converge concurrent keyed attempts on one durable append", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const a = yield* forWorkspace(yield* storage.connect(), workspaceId);
-          const b = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const a = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
+          const b = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
           const append = Effect.flatMap(Store.Transaction, (storeTransaction) =>
             storeTransaction.append({
               logId: executionId,

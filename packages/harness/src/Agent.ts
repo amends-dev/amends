@@ -25,9 +25,9 @@ import type * as Stream from "effect/Stream";
 import type * as LanguageModel from "effect/ai/LanguageModel";
 import type * as Prompt from "effect/ai/Prompt";
 import type * as Tool from "effect/ai/Tool";
-import type { HarnessError } from "./HarnessError.ts";
-import type { ModelEndpoint } from "./ModelEndpoint.ts";
-import type { CompactionPart, StreamPart } from "./StreamPart.ts";
+import type * as HarnessError from "./HarnessError.ts";
+import type * as ModelEndpoint from "./ModelEndpoint.ts";
+import type * as StreamPart from "./StreamPart.ts";
 
 /**
  * What every agent is made with: the model a turn runs on when it names none, and the models a turn
@@ -38,8 +38,8 @@ import type { CompactionPart, StreamPart } from "./StreamPart.ts";
  * @since 0.1.0
  */
 export interface Options {
-  readonly model: ModelEndpoint;
-  readonly models?: Readonly<Record<string, ModelEndpoint>>;
+  readonly model: ModelEndpoint.ModelEndpoint;
+  readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>>;
 }
 
 /**
@@ -149,7 +149,9 @@ export interface AgentSession {
   readonly hasUnfinishedTurn: boolean;
 
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
-  readonly promptTurn: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
+  readonly promptTurn: (
+    options: TurnOptions,
+  ) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>;
 
   /**
    * Streams the turn `suspendTurn` cut short from the step after its first `finishedSteps`, which
@@ -160,12 +162,12 @@ export interface AgentSession {
   readonly continueTurn: (
     options: TurnOptions,
     finishedSteps: number,
-  ) => Stream.Stream<StreamPart, HarnessError>;
+  ) => Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>;
 
   /** Gives the running turn the result of a host tool it called. */
   readonly submitToolResult: (
     result: Pick<Prompt.ToolResultPart, "id" | "name" | "result" | "isFailure">,
-  ) => Effect.Effect<void, HarnessError>;
+  ) => Effect.Effect<void, HarnessError.HarnessError>;
 
   /**
    * Answers a `tool-approval-request` of the running turn. Fails with `UnsupportedError` for an
@@ -173,39 +175,41 @@ export interface AgentSession {
    */
   readonly approve: (
     response: Pick<Prompt.ToolApprovalResponsePart, "approvalId" | "approved" | "reason">,
-  ) => Effect.Effect<void, HarnessError>;
+  ) => Effect.Effect<void, HarnessError.HarnessError>;
 
   /**
    * Replaces the conversation so far with a summary, guided by `instructions`, and returns the
    * compaction. The session asks only between turns. Fails with `UnsupportedError` when the agent
    * compacts only by itself.
    */
-  readonly compact: (instructions?: string) => Effect.Effect<CompactionPart, HarnessError>;
+  readonly compact: (
+    instructions?: string,
+  ) => Effect.Effect<StreamPart.CompactionPart, HarnessError.HarnessError>;
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns what
    * `createSession` takes as `unfinishedTurn` to continue the turn after any step whose
    * `finish-step` it delivered.
    */
-  readonly suspendTurn: Effect.Effect<Schema.Json, HarnessError>;
+  readonly suspendTurn: Effect.Effect<Schema.Json, HarnessError.HarnessError>;
 
   /**
    * Releases the session between turns while the agent keeps running, returning what
    * `createSession` takes as `agentState`.
    */
-  readonly detach: Effect.Effect<Schema.Json, HarnessError>;
+  readonly detach: Effect.Effect<Schema.Json, HarnessError.HarnessError>;
 
   /**
    * Stops the agent, returning what `createSession` takes as `agentState` to start it again with
    * its conversation.
    */
-  readonly stop: Effect.Effect<Schema.Json, HarnessError>;
+  readonly stop: Effect.Effect<Schema.Json, HarnessError.HarnessError>;
 
   /**
    * Stops the agent for good, deleting what it keeps of the session. It also destroys a session
    * `suspendTurn`, `detach`, or `stop` released, and destroying it again succeeds.
    */
-  readonly destroy: Effect.Effect<void, HarnessError>;
+  readonly destroy: Effect.Effect<void, HarnessError.HarnessError>;
 }
 
 /**
@@ -276,5 +280,5 @@ export interface Agent {
   /** Creates a session: a new one, or one picked up again from what an earlier session returned. */
   readonly createSession: (
     options: CreateSessionOptions,
-  ) => Effect.Effect<AgentSession, HarnessError>;
+  ) => Effect.Effect<AgentSession, HarnessError.HarnessError>;
 }

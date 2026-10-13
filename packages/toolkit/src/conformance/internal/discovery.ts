@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { ToolDefinition } from "../../ToolDefinition.ts";
-import type { Fixture } from "../Fixture.ts";
+import * as ToolDefinition from "../../ToolDefinition.ts";
+import type * as Fixture from "../Fixture.ts";
 
 /** What a source says of the tools it has. */
-export const discovery = (fixture: Fixture) =>
+export const discovery = (fixture: Fixture.Fixture) =>
   describe("tool discovery", () => {
     const { echo, failing, blocking } = fixture.tools;
 
@@ -14,7 +14,7 @@ export const discovery = (fixture: Fixture) =>
       () =>
         Effect.gen(function* () {
           const { source } = yield* fixture.make("working");
-          const json = Schema.toCodecJson(Schema.Array(ToolDefinition));
+          const json = Schema.toCodecJson(Schema.Array(ToolDefinition.ToolDefinition));
 
           const definitions = yield* source.discover;
           const stored = JSON.stringify(yield* Schema.encodeEffect(json)(definitions));

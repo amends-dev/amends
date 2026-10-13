@@ -18,8 +18,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Prompt from "effect/ai/Prompt";
-import type { Agent, SessionId, Workspace } from "./Agent.ts";
-import { HarnessError, UnknownError, UnsupportedError } from "./HarnessError.ts";
+import type * as Agent from "./Agent.ts";
+import * as HarnessError from "./HarnessError.ts";
 import { makeSession } from "./internal/session.ts";
 import type * as Session from "./Session.ts";
 
@@ -40,7 +40,7 @@ export type CreateSessionOptions = {
 } & (
   | {
       /** Names a new session. */
-      readonly id: SessionId;
+      readonly id: Agent.SessionId;
       /**
        * The conversation the session starts with, as when the agent joins one already under way.
        * Empty when omitted.
@@ -71,7 +71,7 @@ export class Harness extends Context.Service<
      * the names of tools it takes. Only the harness starts its sessions. Starting one fails with
      * `UnsupportedError` without a sandbox when the agent `requiresSandbox`.
      */
-    readonly agent: Omit<Agent, "createSession">;
+    readonly agent: Omit<Agent.Agent, "createSession">;
 
     /**
      * Creates a session: a new one, which loads the `history` it is given, or one that goes on
@@ -80,7 +80,7 @@ export class Harness extends Context.Service<
      */
     readonly createSession: (
       options: CreateSessionOptions,
-    ) => Effect.Effect<Session.Session, HarnessError>;
+    ) => Effect.Effect<Session.Session, HarnessError.HarnessError>;
   }
 >()("@amends-dev/harness/Harness") {}
 
@@ -126,33 +126,35 @@ export class Harness extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (agent: Agent): Harness["Service"] => {
+export const make = (agent: Agent.Agent): Harness["Service"] => {
   /** Fails with `UnsupportedError` when the agent requires a sandbox and has none. */
   const checkSandbox = (sandbox: Sandbox.Sandbox["Service"] | undefined) =>
     sandbox === undefined && agent.requiresSandbox
       ? Effect.fail(
-          new HarnessError({
+          new HarnessError.HarnessError({
             agent: agent.id,
-            reason: new UnsupportedError({ description: `${agent.id} works in a sandbox` }),
+            reason: new HarnessError.UnsupportedError({
+              description: `${agent.id} works in a sandbox`,
+            }),
           }),
         )
       : Effect.void;
 
   /** The session's workspace in `sandbox`, creating its directory if it does not exist yet. */
   const makeWorkspace = Effect.fnUntraced(
-    function* (sandbox: Sandbox.Sandbox["Service"], id: SessionId) {
+    function* (sandbox: Sandbox.Sandbox["Service"], id: Agent.SessionId) {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const directory = path.join(sandbox.workingDirectory, id);
       yield* fs.makeDirectory(directory, { recursive: true });
-      return { sandbox, directory } satisfies Workspace;
+      return { sandbox, directory } satisfies Agent.Workspace;
     },
     (effect, sandbox) => Effect.provide(effect, Sandbox.layerServices(sandbox)),
     Effect.mapError(
       (cause) =>
-        new HarnessError({
+        new HarnessError.HarnessError({
           agent: agent.id,
-          reason: new UnknownError({ description: cause.message }),
+          reason: new HarnessError.UnknownError({ description: cause.message }),
           cause,
         }),
     ),
@@ -211,4 +213,5 @@ export const make = (agent: Agent): Harness["Service"] => {
  * @category layers
  * @since 0.1.0
  */
-export const layer = (agent: Agent): Layer.Layer<Harness> => Layer.succeed(Harness, make(agent));
+export const layer = (agent: Agent.Agent): Layer.Layer<Harness> =>
+  Layer.succeed(Harness, make(agent));

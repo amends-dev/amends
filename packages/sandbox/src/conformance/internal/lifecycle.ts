@@ -7,42 +7,42 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import { layerServices, type Sandbox } from "../../Sandbox.ts";
-import { TemplateName } from "../../Template.ts";
-import type { Fixture } from "../Fixture.ts";
+import * as Sandbox from "../../Sandbox.ts";
+import * as Template from "../../Template.ts";
+import type * as Fixture from "../Fixture.ts";
 import { newIdentity, newSandboxId, providerForTest } from "./fixture.ts";
 
 class PrepareFailed extends Data.TaggedError("PrepareFailed") {}
 
-const writeFile = (sandbox: Sandbox["Service"], name: string, content: string) =>
+const writeFile = (sandbox: Sandbox.Sandbox["Service"], name: string, content: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     yield* fs.writeFileString(path.join(sandbox.workingDirectory, name), content);
-  }).pipe(Effect.provide(layerServices(sandbox)));
+  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
-const readFile = (sandbox: Sandbox["Service"], name: string) =>
+const readFile = (sandbox: Sandbox.Sandbox["Service"], name: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     return yield* fs.readFileString(path.join(sandbox.workingDirectory, name));
-  }).pipe(Effect.provide(layerServices(sandbox)));
+  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
 /**
  * Spawns a long command and unreferences its handle, so that the process outlives the scope it
  * spawned in.
  */
-const spawnOutliving = (sandbox: Sandbox["Service"]) =>
+const spawnOutliving = (sandbox: Sandbox.Sandbox["Service"]) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const handle = yield* spawner.spawn(ChildProcess.make("sleep", ["60"]));
     // `unref` returns the effect that would reference the process again; nothing here runs it.
     yield* Effect.asVoid(handle.unref);
     return handle;
-  }).pipe(Effect.scoped, Effect.provide(layerServices(sandbox)));
+  }).pipe(Effect.scoped, Effect.provide(Sandbox.layerServices(sandbox)));
 
 /** Creating, resuming, stopping, and destroying sandboxes, and preparing them with templates. */
-export const lifecycle = <R>(fixture: Fixture<R>) =>
+export const lifecycle = <R>(fixture: Fixture.Fixture<R>) =>
   layer(fixture.layer, { excludeTestServices: true })("sandbox lifecycle", (it) => {
     it.effect(
       "resumes a sandbox with the id, working directory, and ports it was created with",
@@ -177,7 +177,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
           const read = yield* Effect.gen(function* () {
             const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
             return yield* spawner.string(ChildProcess.make("cat", ["kept.txt"]));
-          }).pipe(Effect.provide(layerServices(resumed)));
+          }).pipe(Effect.provide(Sandbox.layerServices(resumed)));
 
           expect(yield* readFile(resumed, "kept.txt")).toBe("kept");
           expect(read).toBe("kept");
@@ -194,7 +194,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
           const handle = yield* Effect.gen(function* () {
             const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
             return yield* spawner.spawn(ChildProcess.make("sleep", ["60"]));
-          }).pipe(Effect.provide(layerServices(sandbox)));
+          }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
           yield* sandbox.stop;
 
@@ -243,7 +243,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
 
           const sandbox = yield* sandboxProvider.create({
             template: {
-              name: TemplateName.make("conformance-prepared"),
+              name: Template.TemplateName.make("conformance-prepared"),
               identity: yield* newIdentity("prepared"),
               prepare: Effect.gen(function* () {
                 const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -270,7 +270,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             sandboxProvider.create({
               id,
               template: {
-                name: TemplateName.make("conformance-failing"),
+                name: Template.TemplateName.make("conformance-failing"),
                 identity: yield* newIdentity("failing"),
                 prepare: Effect.fail(new PrepareFailed()),
               },
@@ -297,7 +297,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             sandboxProvider.create({
               id,
               template: {
-                name: TemplateName.make("conformance-endless"),
+                name: Template.TemplateName.make("conformance-endless"),
                 identity: yield* newIdentity("endless"),
                 prepare: Deferred.succeed(preparing, undefined).pipe(Effect.andThen(Effect.never)),
               },

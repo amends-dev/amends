@@ -30,29 +30,14 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import type { Fixture } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import {
-  alice,
-  bob,
-  type Bound,
-  charlie,
-  forWorkspace,
-  future,
-  journalLog,
-  listOldestFirst,
-  otherWorkspaceId,
-  publishedMessage,
-  request,
-  testProvenance,
-  workspaceId,
-} from "../Support.ts";
 
 const byName = (live: ReadonlyArray<Checkpoint.LiveVersion>) =>
   live.toSorted((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
 
 /** Logs across hosts and workspaces, live projections, and rebuilding them from the journal. */
-export const journal = (fixture: Fixture) => {
+export const journal = (fixture: Fixture.Fixture) => {
   const { core, initialized, seed } = Support;
   describe.skipIf(!fixture.available)(`${fixture.name}: journal`, () => {
     it.live(
@@ -61,10 +46,13 @@ export const journal = (fixture: Fixture) => {
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect();
-            const a = yield* forWorkspace(host, workspaceId);
-            const b = yield* forWorkspace(host, otherWorkspaceId);
-            const otherA = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const open = (bound: Bound) =>
+            const a = yield* Support.forWorkspace(host, Support.workspaceId);
+            const b = yield* Support.forWorkspace(host, Support.otherWorkspaceId);
+            const otherA = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
+            const open = (bound: Support.Bound) =>
               Log.Log.pipe(
                 Effect.map((logs) =>
                   logs.open({ id: Entry.LogId.make("execution"), schema: Schema.String }),
@@ -119,8 +107,8 @@ export const journal = (fixture: Fixture) => {
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
             const host = yield* storage.connect();
-            const a = yield* forWorkspace(host, workspaceId);
-            const b = yield* forWorkspace(host, otherWorkspaceId);
+            const a = yield* Support.forWorkspace(host, Support.workspaceId);
+            const b = yield* Support.forWorkspace(host, Support.otherWorkspaceId);
             const execution = Entry.LogId.make("execution");
             const logs = yield* Log.Log.pipe(Effect.provide(core(a)));
             const log = logs.open({ id: execution, schema: Schema.String });
@@ -130,7 +118,7 @@ export const journal = (fixture: Fixture) => {
             expect(second.position).toBeGreaterThan(first.position);
             expect(yield* a.store.head(execution)).toEqual(Option.some(second.position));
             expect(yield* log.head).toEqual(Option.some(second.position));
-            expect(yield* a.store.head(journalLog)).toEqual(Option.none());
+            expect(yield* a.store.head(Support.journalLog)).toEqual(Option.none());
             expect(yield* b.store.head(execution)).toEqual(Option.none());
             // A transaction's own append is visible to it before commit, and rolls back with it.
             const staged = yield* Effect.flip(
@@ -153,17 +141,25 @@ export const journal = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             const workspace = yield* initialized(bound);
             // A recorded policy change must survive replay even when the current template differs.
             yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(RoleFacts.PermissionsChanged, {
-                  workspaceId,
+                  workspaceId: Support.workspaceId,
                   roleId: BuiltinRoles.OwnerId,
                   permissions: [MemberPermissions.Read.name],
                 })
-                .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId))),
+                .pipe(
+                  Effect.provideService(
+                    Publication.Publication,
+                    Support.testProvenance(Support.workspaceId),
+                  ),
+                ),
             ).pipe(Effect.provide(core(bound)));
             const roleIds = [
               BuiltinRoles.MemberId,
@@ -183,14 +179,14 @@ export const journal = (fixture: Fixture) => {
             expect(yield* bound.workspace.get).toEqual(Option.some(workspace));
             expect(yield* bound.members.get(workspace.ownerMemberId)).toMatchObject({
               _tag: "Some",
-              value: { identity: alice, status: "active" },
+              value: { identity: Support.alice, status: "active" },
             });
             expect(yield* Effect.forEach(roleIds, (id) => bound.roles.get(id))).toEqual(roles);
             expect(assignments).toHaveLength(1);
             expect(yield* bound.assignments.listActiveByMember(workspace.ownerMemberId)).toEqual(
               assignments,
             );
-            expect(yield* bound.store.read(journalLog, { limit: 10 })).toHaveLength(2);
+            expect(yield* bound.store.read(Support.journalLog, { limit: 10 })).toHaveLength(2);
           }),
         ),
     );
@@ -200,20 +196,23 @@ export const journal = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             const workspace = yield* initialized(bound);
             const owner = Actor.Actor.of({
-              workspaceId,
+              workspaceId: Support.workspaceId,
               memberId: workspace.ownerMemberId,
-              identity: alice,
+              identity: Support.alice,
             });
             const human = Actor.Actor.of({
-              workspaceId,
+              workspaceId: Support.workspaceId,
               memberId: Member.Id.make("human"),
-              identity: bob,
+              identity: Support.bob,
             });
             const agent = Actor.Actor.of({
-              workspaceId,
+              workspaceId: Support.workspaceId,
               memberId: Member.Id.make("agent"),
               identity: { _tag: "Agent", id: Identity.AgentId.make("agent") },
             });
@@ -269,11 +268,11 @@ export const journal = (fixture: Fixture) => {
                   groupMembershipService.leave({ groupId: group.id, membershipId: admission.id }),
               ),
             );
-            const expiresAt = yield* future;
+            const expiresAt = yield* Support.future;
             yield* as(
               owner,
               Effect.flatMap(InvitationService.InvitationService, (invitationService) =>
-                invitationService.issue(request(expiresAt, charlie.id)),
+                invitationService.issue(Support.request(expiresAt, Support.charlie.id)),
               ),
             );
             const byId = <A extends { readonly id: string }>(values: ReadonlyArray<A>) =>
@@ -309,12 +308,14 @@ export const journal = (fixture: Fixture) => {
                 ),
                 messages: byId(
                   yield* bound.messages.getMany(
-                    activities.flat().flatMap((activity) => publishedMessage(activity) ?? []),
+                    activities
+                      .flat()
+                      .flatMap((activity) => Support.publishedMessage(activity) ?? []),
                   ),
                 ),
                 activities,
                 notifications: yield* Effect.forEach(actors, (actor) =>
-                  listOldestFirst(
+                  Support.listOldestFirst(
                     bound.notifications,
                     Notification.ofMember(actor.memberId, actor.identity),
                     { limit: 100 },
@@ -348,7 +349,7 @@ export const journal = (fixture: Fixture) => {
                 yield* storage.discardProjections;
                 yield* Effect.flatMap(Journal.Journal, (journal) => journal.replay).pipe(
                   Effect.provide(
-                    Journal.layer({ logId: journalLog, projections }).pipe(
+                    Journal.layer({ logId: Support.journalLog, projections }).pipe(
                       Layer.provideMerge(Log.layer),
                       Layer.provide(Layer.succeedContext(bound.context)),
                     ),
@@ -371,17 +372,20 @@ export const journal = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            expect(yield* bound.checkpoints.listLive(journalLog)).toEqual([]);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
+            expect(yield* bound.checkpoints.listLive(Support.journalLog)).toEqual([]);
             yield* initialized(bound);
-            const live = yield* bound.checkpoints.listLive(journalLog);
+            const live = yield* bound.checkpoints.listLive(Support.journalLog);
             expect(live.length).toBeGreaterThan(0);
             // Live versions read in binary name order, however they were written.
             const names = live.map(({ name }) => name);
             expect(names).toEqual(names.toSorted((left, right) => (left < right ? -1 : 1)));
             for (const version of live)
               expect(
-                yield* bound.checkpoints.get(Object.assign({ logId: journalLog }, version)),
+                yield* bound.checkpoints.get(Object.assign({ logId: Support.journalLog }, version)),
               ).toEqual(Option.none());
           }),
         ),
@@ -392,18 +396,24 @@ export const journal = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             yield* initialized(bound);
             const withCore = <A, E, R>(program: Effect.Effect<A, E, R>) =>
               program.pipe(
-                Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+                Effect.provideService(
+                  Publication.Publication,
+                  Support.testProvenance(Support.workspaceId),
+                ),
                 Effect.provide(core(bound)),
               );
             const role = (id: string) =>
               withCore(
                 Effect.flatMap(Journal.Journal, (journal) =>
                   journal.publish(RoleFacts.Created, {
-                    workspaceId,
+                    workspaceId: Support.workspaceId,
                     roleId: Role.Id.make(id),
                     name: id,
                     permissions: [],
@@ -411,17 +421,20 @@ export const journal = (fixture: Fixture) => {
                 ),
               );
             const replay = withCore(Effect.flatMap(Journal.Journal, (journal) => journal.replay));
-            const live = byName(yield* bound.checkpoints.listLive(journalLog));
+            const live = byName(yield* bound.checkpoints.listLive(Support.journalLog));
             // A version live here that this host does not run would miss this host's commits.
             yield* bound.store.transaction(
-              bound.checkpoints.setLive(journalLog, [...live, { name: "elsewhere", version: 1 }]),
+              bound.checkpoints.setLive(Support.journalLog, [
+                ...live,
+                { name: "elsewhere", version: 1 },
+              ]),
             );
             expect(yield* Effect.flip(role("blocked"))).toMatchObject({
               _tag: "Projection.Unregistered",
-              key: { logId: journalLog, name: "elsewhere", version: 1 },
+              key: { logId: Support.journalLog, name: "elsewhere", version: 1 },
             });
             yield* replay;
-            expect(byName(yield* bound.checkpoints.listLive(journalLog))).toEqual(live);
+            expect(byName(yield* bound.checkpoints.listLive(Support.journalLog))).toEqual(live);
             yield* role("allowed");
             // Discarded projections are not live, so commits wait for them to be rebuilt.
             yield* storage.discardProjections;
@@ -429,7 +442,7 @@ export const journal = (fixture: Fixture) => {
               _tag: "Projection.Behind",
             });
             yield* replay;
-            expect(byName(yield* bound.checkpoints.listLive(journalLog))).toEqual(live);
+            expect(byName(yield* bound.checkpoints.listLive(Support.journalLog))).toEqual(live);
             expect(yield* bound.roles.get(Role.Id.make("allowed"))).toMatchObject({ _tag: "Some" });
             expect(yield* bound.roles.get(Role.Id.make("blocked"))).toEqual(Option.none());
             yield* role("rebuilt");
@@ -441,7 +454,7 @@ export const journal = (fixture: Fixture) => {
     it.effect("a projection registered later rebuilds from the log's history, then goes live", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
           const logId = Entry.LogId.make("rebuild-conformance");
           const Counted = Fact.make("conformance.counted", {
             subject: () => Subject.make("test", "counted"),
@@ -485,7 +498,10 @@ export const journal = (fixture: Fixture) => {
               key: { logId, name: "second", version: 1 },
             });
           }).pipe(
-            Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+            Effect.provideService(
+              Publication.Publication,
+              Support.testProvenance(Support.workspaceId),
+            ),
             Effect.provide(core(bound)),
           );
         }),
@@ -495,8 +511,14 @@ export const journal = (fixture: Fixture) => {
     it.effect("a projection another host retires rebuilds only the commits it missed", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const newerHost = yield* forWorkspace(yield* storage.connect(), workspaceId);
-          const olderHost = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const newerHost = yield* Support.forWorkspace(
+            yield* storage.connect(),
+            Support.workspaceId,
+          );
+          const olderHost = yield* Support.forWorkspace(
+            yield* storage.connect(),
+            Support.workspaceId,
+          );
           const logId = Entry.LogId.make("retire-conformance");
           const Counted = Fact.make("conformance.counted", {
             subject: () => Subject.make("test", "counted"),
@@ -508,10 +530,13 @@ export const journal = (fixture: Fixture) => {
             Effect.sync(() => applied.push(event.payload)),
           );
           const on =
-            (bound: Bound) =>
+            (bound: Support.Bound) =>
             <A, E, R>(program: Effect.Effect<A, E, R>) =>
               program.pipe(
-                Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+                Effect.provideService(
+                  Publication.Publication,
+                  Support.testProvenance(Support.workspaceId),
+                ),
                 Effect.provide(core(bound)),
               );
           const newer = yield* on(newerHost)(Journal.make({ logId, projections: [recording] }));

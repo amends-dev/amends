@@ -9,7 +9,7 @@
 import type * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
 import type * as Schema from "effect/Schema";
-import type { ToolSource } from "../ToolSource.ts";
+import type * as ToolSource from "../ToolSource.ts";
 
 /**
  * How the system the source reaches is for a test: it works, it refuses the credentials the source
@@ -27,7 +27,7 @@ export type Condition = "working" | "unauthorized" | "unavailable" | "unreachabl
  * @since 0.1.0
  */
 export interface Subject {
-  readonly source: ToolSource;
+  readonly source: ToolSource.ToolSource;
 
   /** Completes once the system has been asked to run the blocking tool. */
   readonly blockedCallStarted: Effect.Effect<void>;

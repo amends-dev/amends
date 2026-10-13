@@ -14,8 +14,8 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Struct from "effect/Struct";
-import type { Method, Operation, Parameter } from "./Http.ts";
-import type { Annotations } from "./ToolDefinition.ts";
+import type * as Http from "./Http.ts";
+import type * as ToolDefinition from "./ToolDefinition.ts";
 
 /**
  * An operation that was left out of the tools, and why.
@@ -40,7 +40,7 @@ export interface Skipped {
  */
 export interface Imported {
   /** The operations that are tools, whose names are distinct. */
-  readonly operations: ReadonlyArray<Operation>;
+  readonly operations: ReadonlyArray<Http.Operation>;
 
   /** The addresses the document gives for the API, which the host may offer as its base URL. */
   readonly servers: ReadonlyArray<string>;
@@ -80,7 +80,15 @@ const stringAt = (object: Schema.JsonObject, key: string) => {
   return typeof value === "string" ? value : undefined;
 };
 
-const methods: ReadonlyArray<Method> = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH"];
+const methods: ReadonlyArray<Http.Method> = [
+  "GET",
+  "PUT",
+  "POST",
+  "DELETE",
+  "OPTIONS",
+  "HEAD",
+  "PATCH",
+];
 
 /**
  * Reads the operations of the API that `document` specifies, which is JSON already read. Nothing
@@ -104,7 +112,7 @@ const readDocument = (document: Json): Result.Result<Imported, InvalidSpecError>
   const paths = document["paths"] ?? {};
   if (!isObject(paths)) return invalid("The paths of the document are not an object");
 
-  const operations: Array<Operation> = [];
+  const operations: Array<Http.Operation> = [];
   const skipped: Array<Skipped> = [];
   const namesTaken = new Map<string, string>();
   for (const [path, pathItem] of Object.entries(paths)) {
@@ -140,11 +148,11 @@ const invalid = (description: string) => Result.fail(new InvalidSpecError({ desc
 const readOperation = (
   document: Schema.JsonObject,
   version: string,
-  method: Method,
+  method: Http.Method,
   path: string,
   pathItem: Schema.JsonObject,
   operation: Schema.JsonObject,
-): Result.Result<Operation, string> =>
+): Result.Result<Http.Operation, string> =>
   Result.gen(function* () {
     const schemas = schemaConverter(document, version.startsWith("3.0"));
     const parameters = yield* readParameters(document, schemas, pathItem, operation);
@@ -190,7 +198,7 @@ const readOperation = (
   });
 
 interface ParameterRead {
-  readonly in: Parameter["in"];
+  readonly in: Http.Parameter["in"];
   readonly name: string;
   readonly schema: Schema.JsonObject;
   readonly isRequired: boolean;
@@ -362,7 +370,7 @@ const nameProperties = (
 };
 
 /** The name of an operation that has none: its method, and the words of its path. */
-const nameOf = (method: Method, path: string) =>
+const nameOf = (method: Http.Method, path: string) =>
   [method.toLowerCase(), path.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "")]
     .filter((word) => word !== "")
     .join("_");
@@ -379,7 +387,10 @@ const describe = (summary: string | undefined, description: string | undefined) 
  * What HTTP says of a method, which is all the document says of what an operation does: a safe method
  * changes nothing, and some are safe to repeat. A hint left out means Effect AI's default for it.
  */
-const annotationsOf = (method: Method, title: string | undefined): Annotations => ({
+const annotationsOf = (
+  method: Http.Method,
+  title: string | undefined,
+): ToolDefinition.Annotations => ({
   ...(title === undefined ? {} : { title }),
   readOnly: method === "GET" || method === "HEAD" || method === "OPTIONS",
   idempotent: method !== "POST" && method !== "PATCH",

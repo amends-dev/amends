@@ -4,11 +4,11 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Schema from "effect/Schema";
-import { ToolSourceError } from "../../ToolSourceError.ts";
-import type { Fixture } from "../Fixture.ts";
+import * as ToolSourceError from "../../ToolSourceError.ts";
+import type * as Fixture from "../Fixture.ts";
 
 /** Running tools. */
-export const calls = (fixture: Fixture) =>
+export const calls = (fixture: Fixture.Fixture) =>
   describe("tool calls", () => {
     const { echo, failing, blocking } = fixture.tools;
 
@@ -57,7 +57,7 @@ export const calls = (fixture: Fixture) =>
 
           const error = yield* Effect.flip(source.call(failing.tool, failing.input));
 
-          expect(error).toBeInstanceOf(ToolSourceError);
+          expect(error).toBeInstanceOf(ToolSourceError.ToolSourceError);
           expect(error.source).toBe(source.name);
           expect(error.reason._tag).toBe("CallFailedError");
           expect(error.reason.message).not.toBe("");
@@ -73,7 +73,7 @@ export const calls = (fixture: Fixture) =>
 
           const error = yield* Effect.flip(source.call("a-tool-no-source-has", {}));
 
-          expect(error).toBeInstanceOf(ToolSourceError);
+          expect(error).toBeInstanceOf(ToolSourceError.ToolSourceError);
           expect(error.source).toBe(source.name);
         }),
       fixture.timeout,

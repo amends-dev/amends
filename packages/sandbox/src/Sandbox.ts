@@ -19,14 +19,8 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import type {
-  Endpoint,
-  EndpointProtocol,
-  NetworkPolicy,
-  Port,
-  RequestTransformation,
-} from "./Network.ts";
-import type { SandboxError } from "./SandboxError.ts";
+import type * as Network from "./Network.ts";
+import type * as SandboxError from "./SandboxError.ts";
 
 /**
  * Checks a name of letters, digits, `-`, and `_`, starting with a letter or digit and at most 63
@@ -121,34 +115,38 @@ export class Sandbox extends Context.Service<
      * for the rest of the sandbox's life. Exposing a port again succeeds. Fails with
      * `UnsupportedError` when the provider cannot expose a port once the sandbox exists.
      */
-    readonly exposePorts: (ports: ReadonlyArray<Port>) => Effect.Effect<void, SandboxError>;
+    readonly exposePorts: (
+      ports: ReadonlyArray<Network.Port>,
+    ) => Effect.Effect<void, SandboxError.SandboxError>;
 
     /**
      * How to reach `port` from outside the sandbox; fails with `NotFoundError` for a port the
      * sandbox does not expose.
      */
     readonly endpoint: (
-      port: Port,
-      protocol: EndpointProtocol,
-    ) => Effect.Effect<Endpoint, SandboxError>;
+      port: Network.Port,
+      protocol: Network.EndpointProtocol,
+    ) => Effect.Effect<Network.Endpoint, SandboxError.SandboxError>;
 
     /**
      * Stops the sandbox, ending every process in it, so that it can be resumed later. Stopping a
      * stopped sandbox succeeds.
      */
-    readonly stop: Effect.Effect<void, SandboxError>;
+    readonly stop: Effect.Effect<void, SandboxError.SandboxError>;
 
     /**
      * Stops the sandbox and deletes it; it cannot be resumed afterwards. Destroying a destroyed
      * sandbox succeeds.
      */
-    readonly destroy: Effect.Effect<void, SandboxError>;
+    readonly destroy: Effect.Effect<void, SandboxError.SandboxError>;
 
     /**
      * Replaces the outbound network policy; fails with `UnsupportedError` when the provider cannot
      * enforce one.
      */
-    readonly setNetworkPolicy: (policy: NetworkPolicy) => Effect.Effect<void, SandboxError>;
+    readonly setNetworkPolicy: (
+      policy: Network.NetworkPolicy,
+    ) => Effect.Effect<void, SandboxError.SandboxError>;
 
     /**
      * Replaces the request transformations with `transformations`, for the rest of the sandbox's
@@ -157,8 +155,8 @@ export class Sandbox extends Context.Service<
      * sandbox.
      */
     readonly setRequestTransformations: (
-      transformations: ReadonlyArray<RequestTransformation>,
-    ) => Effect.Effect<void, SandboxError>;
+      transformations: ReadonlyArray<Network.RequestTransformation>,
+    ) => Effect.Effect<void, SandboxError.SandboxError>;
   }
 >()("@amends-dev/sandbox/Sandbox") {}
 

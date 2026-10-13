@@ -1,11 +1,12 @@
-import { Accounts, SignInStorage } from "../../index.ts";
+import * as Accounts from "../../Accounts.ts";
+import * as SignInStorage from "../../SignInStorage.ts";
 import { Identity } from "@amends-dev/core/identity";
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import type { Fixture } from "../Fixture.ts";
-import { runHost } from "../Support.ts";
+import type * as Fixture from "../Fixture.ts";
+import * as Support from "../Support.ts";
 
 const email = Accounts.Email.make("ada@example.com");
 const at = (seconds: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, 11) + seconds * 1000);
@@ -37,20 +38,20 @@ const withSignInStorage = <A, E, R>(
 ) => Effect.flatMap(SignInStorage.SignInStorage, use);
 
 /** Sign-in codes changed one at a time from every host, and sessions found, extended, and ended. */
-export const signInStorage = (fixture: Fixture) => {
+export const signInStorage = (fixture: Fixture.Fixture) => {
   describe.skipIf(!fixture.available)(`${fixture.name}: sign-in storage`, () => {
     it.effect("keeps an address's pending code until a change replaces or removes it", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          expect(yield* runHost(storage, readCode)).toEqual(Option.none());
-          yield* runHost(storage, writeCode(Option.some(pending)));
-          expect(yield* runHost(storage, readCode)).toEqual(Option.some(pending));
+          expect(yield* Support.runHost(storage, readCode)).toEqual(Option.none());
+          yield* Support.runHost(storage, writeCode(Option.some(pending)));
+          expect(yield* Support.runHost(storage, readCode)).toEqual(Option.some(pending));
           const replaced = { ...pending, digest: "digest-2", failedAttempts: 2, sendsInWindow: 3 };
-          yield* runHost(storage, writeCode(Option.some(replaced)));
-          expect(yield* runHost(storage, readCode)).toEqual(Option.some(replaced));
-          yield* runHost(storage, writeCode(Option.none()));
-          expect(yield* runHost(storage, readCode)).toEqual(Option.none());
-          yield* runHost(storage, writeCode(Option.none()));
+          yield* Support.runHost(storage, writeCode(Option.some(replaced)));
+          expect(yield* Support.runHost(storage, readCode)).toEqual(Option.some(replaced));
+          yield* Support.runHost(storage, writeCode(Option.none()));
+          expect(yield* Support.runHost(storage, readCode)).toEqual(Option.none());
+          yield* Support.runHost(storage, writeCode(Option.none()));
         }),
       ),
     );
@@ -58,12 +59,12 @@ export const signInStorage = (fixture: Fixture) => {
     it.effect("applies changes to one address one at a time, from every host", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          yield* runHost(storage, writeCode(Option.some(pending)));
+          yield* Support.runHost(storage, writeCode(Option.some(pending)));
           const count = (current: Option.Option<SignInStorage.PendingCode>) =>
             Option.map(current, (code) => ({ ...code, failedAttempts: code.failedAttempts + 1 }));
           yield* Effect.all(
             Array.from({ length: 8 }, () =>
-              runHost(
+              Support.runHost(
                 storage,
                 withSignInStorage((signInStorage) =>
                   signInStorage.modifyCode(
@@ -75,7 +76,7 @@ export const signInStorage = (fixture: Fixture) => {
             ),
             { concurrency: "unbounded" },
           );
-          expect(yield* runHost(storage, readCode)).toEqual(
+          expect(yield* Support.runHost(storage, readCode)).toEqual(
             Option.some({ ...pending, failedAttempts: 8 }),
           );
         }),
@@ -85,33 +86,33 @@ export const signInStorage = (fixture: Fixture) => {
     it.effect("finds a session by digest from any host, extends it, and ends it", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          yield* runHost(
+          yield* Support.runHost(
             storage,
             withSignInStorage((signInStorage) => signInStorage.insertSession("token-1", session)),
           );
           const find = (digest: string) =>
-            runHost(
+            Support.runHost(
               storage,
               withSignInStorage((signInStorage) => signInStorage.findSession(digest)),
             );
           expect(yield* find("token-1")).toEqual(Option.some(session));
           expect(yield* find("token-2")).toEqual(Option.none());
-          yield* runHost(
+          yield* Support.runHost(
             storage,
             withSignInStorage((signInStorage) => signInStorage.extendSession("token-1", at(7200))),
           );
           expect(yield* find("token-1")).toEqual(Option.some({ ...session, expiresAt: at(7200) }));
-          yield* runHost(
+          yield* Support.runHost(
             storage,
             withSignInStorage((signInStorage) => signInStorage.extendSession("token-2", at(7200))),
           );
           expect(yield* find("token-2")).toEqual(Option.none());
-          yield* runHost(
+          yield* Support.runHost(
             storage,
             withSignInStorage((signInStorage) => signInStorage.deleteSession("token-1")),
           );
           expect(yield* find("token-1")).toEqual(Option.none());
-          yield* runHost(
+          yield* Support.runHost(
             storage,
             withSignInStorage((signInStorage) => signInStorage.deleteSession("token-1")),
           );

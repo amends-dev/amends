@@ -14,14 +14,13 @@ import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import type { Fixture, Host, Storage } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import { alice, type Bound, forWorkspace, otherWorkspaceId, workspaceId } from "../Support.ts";
 import { CoreError } from "@amends-dev/core/error";
 
 const memberActor = (name: string) =>
   Actor.Actor.of({
-    workspaceId,
+    workspaceId: Support.workspaceId,
     memberId: Member.Id.make(name),
     identity: { _tag: "Human", id: Identity.HumanId.make(name) },
   });
@@ -62,17 +61,19 @@ const signalsOf = <E>(next: Effect.Effect<ChangeFeed.Message, E>) =>
 /** A marker only the member receives: their own read time for a group nobody reads. */
 const markerFor = (memberId: Member.Id) =>
   Signal.Signal.cases.GroupRead.make({
-    workspaceId,
+    workspaceId: Support.workspaceId,
     memberId,
     groupId: Group.Id.make("marker"),
     readAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
   });
 /** A workspace's signal hub on a host, as storage binds it. */
-const hubOf = (host: Context.Context<Host>, id = workspaceId) =>
-  Effect.map(forWorkspace(host, id), (bound) => Context.get(bound.context, SignalHub.SignalHub));
+const hubOf = (host: Context.Context<Fixture.Host>, id = Support.workspaceId) =>
+  Effect.map(Support.forWorkspace(host, id), (bound) =>
+    Context.get(bound.context, SignalHub.SignalHub),
+  );
 
 /** Ephemeral signals through the host's hub: delivery across hosts, by workspace and by reach. */
-export const signals = (fixture: Fixture) => {
+export const signals = (fixture: Fixture.Fixture) => {
   const { core, initialized, seed } = Support;
 
   /**
@@ -80,21 +81,21 @@ export const signals = (fixture: Fixture) => {
    * The owner, the reader, and an unpermitted member share a private group with a thread that
    * mentions the reader; the outsider is a viewer outside the group.
    */
-  const world = (storage: Storage) =>
+  const world = (storage: Fixture.Storage) =>
     Effect.gen(function* () {
       const first = yield* storage.connect();
       const second = yield* storage.connect();
-      const here: Bound = yield* forWorkspace(first, workspaceId);
+      const here: Support.Bound = yield* Support.forWorkspace(first, Support.workspaceId);
       const workspace = yield* initialized(here);
       const owner = Actor.Actor.of({
-        workspaceId,
+        workspaceId: Support.workspaceId,
         memberId: workspace.ownerMemberId,
-        identity: alice,
+        identity: Support.alice,
       });
       yield* seed(here, [reader, outsider, unpermitted], [reader, outsider]);
       const cores = {
         first: yield* Layer.build(core(here)),
-        second: yield* Layer.build(core(yield* forWorkspace(second, workspaceId))),
+        second: yield* Layer.build(core(yield* Support.forWorkspace(second, Support.workspaceId))),
       };
       const as =
         (host: keyof typeof cores) =>
@@ -153,28 +154,28 @@ export const signals = (fixture: Fixture) => {
             const second = yield* storage.connect();
             const signal = (n: number) =>
               Signal.Signal.cases.ThreadRead.make({
-                workspaceId,
+                workspaceId: Support.workspaceId,
                 memberId: reader.memberId,
                 threadId: Thread.Id.make("thread"),
                 readThrough: n,
               });
-            const subscribe = (host: Context.Context<Host>, id = workspaceId) =>
+            const subscribe = (host: Context.Context<Fixture.Host>, id = Support.workspaceId) =>
               hubOf(host, id).pipe(
                 Effect.flatMap((signalHub) => signalHub.subscribe),
                 Effect.flatMap(buffer),
               );
             const there = yield* subscribe(second);
             const alsoHere = yield* subscribe(first);
-            const elsewhere = yield* subscribe(second, otherWorkspaceId);
+            const elsewhere = yield* subscribe(second, Support.otherWorkspaceId);
             yield* (yield* hubOf(first)).publish(signal(1));
             yield* (yield* hubOf(second)).publish(signal(2));
             const marker = Signal.Signal.cases.GroupRead.make({
-              workspaceId: otherWorkspaceId,
+              workspaceId: Support.otherWorkspaceId,
               memberId: reader.memberId,
               groupId: Group.Id.make("marker"),
               readAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
             });
-            yield* (yield* hubOf(first, otherWorkspaceId)).publish(marker);
+            yield* (yield* hubOf(first, Support.otherWorkspaceId)).publish(marker);
             for (const next of [there, alsoHere])
               expect([yield* next, yield* next]).toEqual([signal(1), signal(2)]);
             // Another workspace's subscribers hear nothing of this one.
@@ -207,7 +208,7 @@ export const signals = (fixture: Fixture) => {
           const typing = yield* readerFeed;
           expect(typing).toMatchObject({
             _tag: "Typing",
-            workspaceId,
+            workspaceId: Support.workspaceId,
             groupId,
             threadId,
             memberId: owner.memberId,

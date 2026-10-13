@@ -50,16 +50,10 @@ import * as HttpServer from "effect/http/HttpServer";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as RpcServer from "effect/rpc/RpcServer";
-import type { SessionId } from "./Agent.ts";
+import type * as Agent from "./Agent.ts";
 import * as Bridge from "./Bridge.ts";
 import { isPresented } from "./internal/bearer.ts";
-import {
-  HarnessError,
-  type HarnessErrorReason,
-  NoTurnError,
-  NotFoundError,
-  UnknownError,
-} from "./HarnessError.ts";
+import * as HarnessError from "./HarnessError.ts";
 
 /**
  * What `serve` serves a driver with: the bridge's token, its id, its state directory, as the
@@ -229,7 +223,7 @@ export const readLaunchOptions = Effect.gen(function* () {
  */
 const TurnEnd = Schema.TaggedUnion({
   Finished: {},
-  Failed: { error: HarnessError },
+  Failed: { error: HarnessError.HarnessError },
   Aborted: {},
 });
 
@@ -304,28 +298,28 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
     );
   /** The handlers' scope, which every session's is forked from, so that sessions end with it. */
   const bridgeScope = yield* Effect.scope;
-  const sessions = new Map<SessionId, StartedSession>();
+  const sessions = new Map<Agent.SessionId, StartedSession>();
   /**
    * Held while a session starts or ends, and while it starts or aborts a turn, so that none of
    * these sees another half done.
    */
   const lock = yield* Semaphore.make(1);
 
-  const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
-    new HarnessError({ agent: driver.id, reason, cause });
+  const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
+    new HarnessError.HarnessError({ agent: driver.id, reason, cause });
 
   /** The error for a failure of the bridge itself, such as one writing a turn's file. */
   const bridgeFailure = (cause: unknown) =>
     harnessError(
-      new UnknownError({
+      new HarnessError.UnknownError({
         description: `The bridge failed: ${cause instanceof Error ? cause.message : "a defect"}`,
       }),
       cause,
     );
 
-  const sessionDirectory = (id: SessionId) => path.join(stateDirectory, id);
+  const sessionDirectory = (id: Agent.SessionId) => path.join(stateDirectory, id);
 
-  const turnFile = (id: SessionId, turn: Bridge.TurnId) =>
+  const turnFile = (id: Agent.SessionId, turn: Bridge.TurnId) =>
     path.join(sessionDirectory(id), `${turn}.jsonl`);
 
   const appendLine = (file: string, line: typeof TurnLine.Type) =>
@@ -334,13 +328,15 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
     );
 
   /** The session `id`, which the bridge must have started. */
-  const startedSession = (id: SessionId) =>
+  const startedSession = (id: Agent.SessionId) =>
     Effect.suspend(() => {
       const started = sessions.get(id);
       return started === undefined
         ? Effect.fail(
             harnessError(
-              new NotFoundError({ description: `The bridge has not started the session ${id}` }),
+              new HarnessError.NotFoundError({
+                description: `The bridge has not started the session ${id}`,
+              }),
             ),
           )
         : Effect.succeed(started);
@@ -359,7 +355,7 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
   });
 
   /** Ends a session the bridge started, interrupting its turn. */
-  const endSession = (id: SessionId, started: StartedSession) =>
+  const endSession = (id: Agent.SessionId, started: StartedSession) =>
     Effect.andThen(
       Scope.close(started.scope, Exit.void),
       Effect.sync(() => sessions.delete(id)),
@@ -432,7 +428,7 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
    * it runs when it exits or dies, continues in a conversation the agent kept, which holds it.
    */
   const turnStartOf = Effect.fnUntraced(function* (
-    session: SessionId,
+    session: Agent.SessionId,
     started: StartedSession,
     id: Bridge.TurnId,
   ) {
@@ -518,7 +514,9 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
           turn?.id === id
             ? readTurn(turn, after)
             : Stream.fail(
-                harnessError(new NoTurnError({ description: `The session has no turn ${id}` })),
+                harnessError(
+                  new HarnessError.NoTurnError({ description: `The session has no turn ${id}` }),
+                ),
               ),
         ),
       ),
@@ -581,7 +579,10 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
  * Streams `turn`'s parts numbered after `after`, then each new one, until its last. A turn that
  * failed fails the stream after its parts.
  */
-const readTurn = (turn: Turn, after: number): Stream.Stream<Bridge.NumberedPart, HarnessError> =>
+const readTurn = (
+  turn: Turn,
+  after: number,
+): Stream.Stream<Bridge.NumberedPart, HarnessError.HarnessError> =>
   SubscriptionRef.changes(turn.progress).pipe(
     Stream.takeUntil((progress) => progress.end !== undefined),
     Stream.mapAccum(
@@ -607,14 +608,14 @@ const finishedStepsOf = (parts: ReadonlyArray<Bridge.NumberedPart>) =>
  */
 const endOf = (
   exit: Exit.Exit<void, unknown>,
-  bridgeFailure: (cause: unknown) => HarnessError,
+  bridgeFailure: (cause: unknown) => HarnessError.HarnessError,
 ): TurnEnd => {
   if (Exit.isSuccess(exit)) return TurnEnd.cases.Finished.make({});
   if (Cause.hasInterruptsOnly(exit.cause)) return TurnEnd.cases.Aborted.make({});
   const error = Cause.findError(exit.cause);
   const cause = Result.isSuccess(error) ? error.success : Cause.squash(exit.cause);
   return TurnEnd.cases.Failed.make({
-    error: cause instanceof HarnessError ? cause : bridgeFailure(cause),
+    error: cause instanceof HarnessError.HarnessError ? cause : bridgeFailure(cause),
   });
 };
 

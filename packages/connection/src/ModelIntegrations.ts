@@ -25,7 +25,7 @@ import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import type * as HttpClientResponse from "effect/http/HttpClientResponse";
-import { type Health, healthOf, UnsupportedError } from "./Connection.ts";
+import * as Connection from "./Connection.ts";
 import * as Integration from "./Integration.ts";
 import * as ModelCatalog from "./ModelCatalog.ts";
 
@@ -101,7 +101,7 @@ const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient
         const model = provider.models.find((listed) => listed.id === options.model);
         if (model === undefined) {
           const description = `The catalog has no model ${options.model} of ${provider.name}`;
-          return Result.fail(new UnsupportedError({ description }));
+          return Result.fail(new Connection.UnsupportedError({ description }));
         }
         return Result.succeed({
           provider: provider.id,
@@ -198,11 +198,13 @@ const checkWith = (
   client: HttpClient.HttpClient,
   url: string,
   request: HttpClientRequest.HttpClientRequest,
-): Effect.Effect<Health> =>
+): Effect.Effect<Connection.Health> =>
   client.execute(request).pipe(
-    Effect.map((response: HttpClientResponse.HttpClientResponse) => healthOf(response.status, url)),
+    Effect.map((response: HttpClientResponse.HttpClientResponse) =>
+      Connection.healthOf(response.status, url),
+    ),
     Effect.timeout("15 seconds"),
-    Effect.orElseSucceed((): Health => ({
+    Effect.orElseSucceed((): Connection.Health => ({
       status: "unavailable",
       description: `Nothing answered at ${url}`,
     })),

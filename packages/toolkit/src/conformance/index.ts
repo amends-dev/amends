@@ -14,7 +14,7 @@
 import { calls } from "./internal/calls.ts";
 import { conditions } from "./internal/conditions.ts";
 import { discovery } from "./internal/discovery.ts";
-import type { Fixture } from "./Fixture.ts";
+import type * as Fixture from "./Fixture.ts";
 import { toolkit } from "./internal/toolkit.ts";
 
 export type {
@@ -90,7 +90,7 @@ export type {
  * @category testing
  * @since 0.1.0
  */
-export const run = (fixture: Fixture) => {
+export const run = (fixture: Fixture.Fixture) => {
   discovery(fixture);
   calls(fixture);
   conditions(fixture);

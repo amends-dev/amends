@@ -19,13 +19,13 @@ import type * as Prompt from "effect/ai/Prompt";
 import type * as Response from "effect/ai/Response";
 import type * as Tool from "effect/ai/Tool";
 import type * as Toolkit from "effect/ai/Toolkit";
-import type { AgentSession } from "../Agent.ts";
-import { AgentContractError, HarnessError, type HarnessErrorReason } from "../HarnessError.ts";
-import type { TurnError, TurnServices } from "../Session.ts";
-import type { StreamPart } from "../StreamPart.ts";
+import type * as Agent from "../Agent.ts";
+import * as HarnessError from "../HarnessError.ts";
+import type * as Session from "../Session.ts";
+import type * as StreamPart from "../StreamPart.ts";
 
 /** What `approve` answers a request with. */
-export type ApprovalResponse = Parameters<AgentSession["approve"]>[0];
+export type ApprovalResponse = Parameters<Agent.AgentSession["approve"]>[0];
 
 /** The host's tools of one session, which answer the calls the agent makes of them. */
 export interface HostTools {
@@ -36,9 +36,9 @@ export interface HostTools {
    * once. A step ends, as the turn does, only once the tools it called have answered.
    */
   readonly answerCalls: <Tools extends Record<string, Tool.Any>>(
-    agentTurn: Stream.Stream<StreamPart, HarnessError>,
+    agentTurn: Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>,
     toolkit: Toolkit.WithHandler<Tools> | undefined,
-  ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
+  ) => Stream.Stream<StreamPart.StreamPart, Session.TurnError<Tools>, Session.TurnServices<Tools>>;
 
   /**
    * Answers the request `response` names, if one of the host's tools waits on it, and says whether
@@ -52,7 +52,7 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
   readonly agent: string;
 
   /** Gives the agent a tool's final result. */
-  readonly submitToolResult: AgentSession["submitToolResult"];
+  readonly submitToolResult: Agent.AgentSession["submitToolResult"];
 
   /** The conversation as the session has recorded it, which a tool's `needsApproval` reads. */
   readonly conversation: Effect.Effect<ReadonlyArray<Prompt.Message>>;
@@ -66,18 +66,21 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
     HashMap.empty<string, Deferred.Deferred<ApprovalResponse>>(),
   );
 
-  const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
-    new HarnessError({ agent, reason, cause });
+  const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
+    new HarnessError.HarnessError({ agent, reason, cause });
 
   const answerCalls = <Tools extends Record<string, Tool.Any>>(
-    agentTurn: Stream.Stream<StreamPart, HarnessError>,
+    agentTurn: Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>,
     toolkit: Toolkit.WithHandler<Tools> | undefined,
-  ): Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>> =>
+  ): Stream.Stream<StreamPart.StreamPart, Session.TurnError<Tools>, Session.TurnServices<Tools>> =>
     Stream.unwrap(
       Effect.gen(function* () {
         const scope = yield* Effect.scope;
         /** The agent's parts and the tools' results, in the order they come. */
-        const parts = yield* Queue.unbounded<StreamPart, TurnError<Tools> | Cause.Done>();
+        const parts = yield* Queue.unbounded<
+          StreamPart.StreamPart,
+          Session.TurnError<Tools> | Cause.Done
+        >();
         /** How many tools the agent called have not answered yet. */
         const answering = yield* SubscriptionRef.make(0);
         const allAnswered = Stream.runDrain(
@@ -123,20 +126,24 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
   const runTool = <Tools extends Record<string, Tool.Any>>(
     toolkit: Toolkit.WithHandler<Tools> | undefined,
     call: Response.ToolCallPartEncoded,
-  ): Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>> => {
+  ): Stream.Stream<
+    StreamPart.StreamPart,
+    Session.TurnError<Tools>,
+    Session.TurnServices<Tools>
+  > => {
     const found = toolkit === undefined ? undefined : findTool(toolkit, call.name);
     if (toolkit === undefined || found === undefined) {
       const description = `The agent called ${call.name}, which is not one of the host's tools`;
-      return Stream.fail(harnessError(new AgentContractError({ description })));
+      return Stream.fail(harnessError(new HarnessError.AgentContractError({ description })));
     }
     const { name, tool } = found;
     // `handle` decodes the params with the tool's schema and fails on a mismatch, so they need no
     // type of their own here.
     const params = call.params as Tool.ParametersEncoded<Tools[typeof name]>;
     const callTool: Stream.Stream<
-      StreamPart,
-      TurnError<Tools>,
-      TurnServices<Tools>
+      StreamPart.StreamPart,
+      Session.TurnError<Tools>,
+      Session.TurnServices<Tools>
     > = Stream.unwrap(toolkit.handle(name, params, call.id)).pipe(
       Stream.mapEffect((handled) => {
         const part = {
@@ -165,8 +172,8 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
    */
   const askThenRun = <E, R>(
     call: Response.ToolCallPartEncoded,
-    ifApproved: Stream.Stream<StreamPart, E, R>,
-  ): Stream.Stream<StreamPart, E | HarnessError, R> =>
+    ifApproved: Stream.Stream<StreamPart.StreamPart, E, R>,
+  ): Stream.Stream<StreamPart.StreamPart, E | HarnessError.HarnessError, R> =>
     Stream.unwrap(
       Effect.gen(function* () {
         const approvalId = approvalIdOf(call);
@@ -176,7 +183,7 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
           ),
           () => Ref.update(pendingApprovals, HashMap.remove(approvalId)),
         );
-        const request: StreamPart = {
+        const request: StreamPart.StreamPart = {
           type: "tool-approval-request",
           approvalId,
           toolCallId: call.id,
@@ -184,7 +191,7 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
         const decided = Stream.unwrap(
           Effect.map(
             Deferred.await(answer),
-            (response): Stream.Stream<StreamPart, E | HarnessError, R> =>
+            (response): Stream.Stream<StreamPart.StreamPart, E | HarnessError.HarnessError, R> =>
               response.approved ? ifApproved : denyTool(call, response.reason),
           ),
         );
@@ -196,7 +203,7 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
   const denyTool = (
     call: Response.ToolCallPartEncoded,
     reason: string | undefined,
-  ): Stream.Stream<StreamPart, HarnessError> => {
+  ): Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError> => {
     const part = {
       type: "tool-result",
       id: call.id,
@@ -209,8 +216,9 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
   };
 
   /** Gives the agent `part`, a tool's final result, and returns it to stream. */
-  const submitResult = <Part extends Parameters<AgentSession["submitToolResult"]>[0]>(part: Part) =>
-    Effect.as(options.submitToolResult(part), part);
+  const submitResult = <Part extends Parameters<Agent.AgentSession["submitToolResult"]>[0]>(
+    part: Part,
+  ) => Effect.as(options.submitToolResult(part), part);
 
   const answerRequest = (response: ApprovalResponse) =>
     Effect.flatMap(

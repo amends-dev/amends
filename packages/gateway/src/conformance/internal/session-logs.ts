@@ -5,8 +5,8 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Result from "effect/Result";
 import * as Prompt from "effect/ai/Prompt";
-import type { Fixture } from "../Fixture.ts";
-import { forWorkspace, otherWorkspaceId, workspaceId } from "../Support.ts";
+import type * as Fixture from "../Fixture.ts";
+import * as Support from "../Support.ts";
 
 const participation = ThreadParticipation.Id.make("participation-1");
 const turnId = Turn.Id.make("turn-1");
@@ -76,14 +76,17 @@ const started: SessionLog.Entry = {
 const interrupted: SessionLog.Entry = { _tag: "Interrupted", turnId, reason: "The run stopped." };
 
 /** Each participation's session log: append-only, apart from every commit. */
-export const sessionLogs = (fixture: Fixture) => {
+export const sessionLogs = (fixture: Fixture.Fixture) => {
   describe.skipIf(!fixture.available)(`${fixture.name}: session logs`, () => {
     it.live(
       "appends entries after the latest, at the next positions, and reads them as recorded",
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const { sessionLogs } = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const { sessionLogs } = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             expect(yield* sessionLogs.head(participation)).toBe(0);
             expect(yield* sessionLogs.read(participation, { after: 0, limit: 10 })).toEqual([]);
 
@@ -118,8 +121,8 @@ export const sessionLogs = (fixture: Fixture) => {
     it.live("refuses an append after any position but the latest, taking none of it", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const one = yield* forWorkspace(yield* storage.connect(), workspaceId);
-          const other = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const one = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
+          const other = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
           yield* one.sessionLogs.append(participation, [prompted], 0);
           for (const after of [0, 2])
             expect(
@@ -151,8 +154,8 @@ export const sessionLogs = (fixture: Fixture) => {
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
           const host = yield* storage.connect();
-          const here = yield* forWorkspace(host, workspaceId);
-          const there = yield* forWorkspace(host, otherWorkspaceId);
+          const here = yield* Support.forWorkspace(host, Support.workspaceId);
+          const there = yield* Support.forWorkspace(host, Support.otherWorkspaceId);
           const another = ThreadParticipation.Id.make("participation-2");
           yield* here.sessionLogs.append(participation, [prompted, step], 0);
           yield* here.sessionLogs.append(another, [joined], 0);
@@ -172,7 +175,7 @@ export const sessionLogs = (fixture: Fixture) => {
     it.live("takes part in no commit: an append in a transaction that rolls back is kept", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
           const rolledBack = yield* Effect.flip(
             bound.store.transaction(
               Effect.andThen(
@@ -196,8 +199,14 @@ export const sessionLogs = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const writer = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const reader = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const writer = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
+            const reader = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             yield* writer.sessionLogs.append(participation, [prompted], 0);
             // An entry past the position is there already.
             yield* reader.sessionLogs.waitForAppend(participation, 0);

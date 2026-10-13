@@ -18,25 +18,12 @@ import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import type { Fixture } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import {
-  alice,
-  bob,
-  type Bound,
-  boundTo,
-  charlie,
-  core,
-  forWorkspace,
-  otherWorkspaceId,
-  placedIn,
-  runHost,
-  workspaceId,
-} from "../Support.ts";
 
 /** Direct store calls: rollback of a conflict, uniqueness, conditional writes, and the live register. */
 
-export const contracts = (fixture: Fixture) => {
+export const contracts = (fixture: Fixture.Fixture) => {
   const { initialized } = Support;
   describe.skipIf(!fixture.available)(`${fixture.name}: store contracts`, () => {
     const permission = MemberPermissions.Read.name;
@@ -68,12 +55,12 @@ export const contracts = (fixture: Fixture) => {
       kind === "Role"
         ? Assignment.Source.cases.Role.make({ roleId, scope })
         : Assignment.Source.cases.Direct.make({ grant: Grant.Grant.make({ permission, scope }) });
-    const seed = (bound: Bound) =>
+    const seed = (bound: Support.Bound) =>
       Effect.gen(function* () {
         const workspace = yield* initialized(bound);
         const role = Role.Role.make({
           id: roleId,
-          workspaceId,
+          workspaceId: Support.workspaceId,
           name: "Readers",
           permissions: [permission],
         });
@@ -82,19 +69,19 @@ export const contracts = (fixture: Fixture) => {
       });
     it.effect("a conflict that escapes the program rolls back its earlier store writes", () =>
       fixture.withStorage((storage) =>
-        runHost(
+        Support.runHost(
           storage,
           Effect.gen(function* () {
-            const bound = yield* boundTo(workspaceId);
+            const bound = yield* Support.boundTo(Support.workspaceId);
             const { workspace, role } = yield* seed(bound);
             const record: Assignment.Assignment = {
               id: Assignment.Id.make("rolled-back"),
-              workspaceId,
+              workspaceId: Support.workspaceId,
               memberId: workspace.ownerMemberId,
               status: "active",
               source: source(
                 "Direct",
-                localScope("Workspace", otherWorkspaceId, workspace.ownerMemberId),
+                localScope("Workspace", Support.otherWorkspaceId, workspace.ownerMemberId),
               ),
             };
             expect(
@@ -120,21 +107,21 @@ export const contracts = (fixture: Fixture) => {
 
     it.effect("ownership storage changes only the owner when the previous owner matches", () =>
       fixture.withStorage((storage) =>
-        runHost(
+        Support.runHost(
           storage,
           Effect.gen(function* () {
-            const bound = yield* boundTo(workspaceId);
+            const bound = yield* Support.boundTo(Support.workspaceId);
             const workspace = yield* initialized(bound);
             const next = Member.Id.make("next-owner");
             const change = {
-              workspaceId,
+              workspaceId: Support.workspaceId,
               previousOwnerMemberId: workspace.ownerMemberId,
               ownerMemberId: next,
             };
             yield* bound.store.transaction(
               Effect.gen(function* () {
                 for (const input of [
-                  { ...change, workspaceId: otherWorkspaceId },
+                  { ...change, workspaceId: Support.otherWorkspaceId },
                   { ...change, previousOwnerMemberId: next },
                   { ...change, ownerMemberId: workspace.ownerMemberId },
                 ]) {
@@ -170,13 +157,13 @@ export const contracts = (fixture: Fixture) => {
                 ownerMemberId: next,
               }),
             );
-            const missing = yield* boundTo(otherWorkspaceId);
+            const missing = yield* Support.boundTo(Support.otherWorkspaceId);
             expect(
               yield* Effect.flip(
                 missing.store.transaction(
                   missing.workspace.transferOwnership({
                     ...change,
-                    workspaceId: otherWorkspaceId,
+                    workspaceId: Support.otherWorkspaceId,
                   }),
                 ),
               ),
@@ -204,17 +191,17 @@ export const contracts = (fixture: Fixture) => {
       "member storage keeps one active membership per identity and never reuses a member ID",
       () =>
         fixture.withStorage((storage) =>
-          runHost(
+          Support.runHost(
             storage,
             Effect.gen(function* () {
-              const bound = yield* boundTo(workspaceId);
+              const bound = yield* Support.boundTo(Support.workspaceId);
               const workspace = yield* initialized(bound);
               const member = (
                 id: string,
-                identity: Identity.MemberReference = bob,
+                identity: Identity.MemberReference = Support.bob,
               ): Member.Member => ({
                 id: Member.Id.make(id),
-                workspaceId,
+                workspaceId: Support.workspaceId,
                 identity,
                 name: Member.Name.make(identity.id),
                 status: "active",
@@ -225,10 +212,14 @@ export const contracts = (fixture: Fixture) => {
               yield* bound.store.transaction(bound.members.insert(member("bob-first")));
               for (const record of [
                 member("bob-second"),
-                member("bob-first", charlie),
-                member(workspace.ownerMemberId, charlie),
-                Object.assign({}, member("foreign", charlie), { workspaceId: otherWorkspaceId }),
-                Object.assign({}, member("inactive", charlie), { status: "removed" as const }),
+                member("bob-first", Support.charlie),
+                member(workspace.ownerMemberId, Support.charlie),
+                Object.assign({}, member("foreign", Support.charlie), {
+                  workspaceId: Support.otherWorkspaceId,
+                }),
+                Object.assign({}, member("inactive", Support.charlie), {
+                  status: "removed" as const,
+                }),
               ])
                 expect(yield* refused(record)).toMatchObject({
                   _tag: "StoreError",
@@ -257,7 +248,7 @@ export const contracts = (fixture: Fixture) => {
                 reason: { _tag: "Rejected" },
               });
               yield* bound.store.transaction(bound.members.insert(member("bob-second")));
-              expect(yield* bound.members.findActive(bob)).toEqual(
+              expect(yield* bound.members.findActive(Support.bob)).toEqual(
                 Option.some(member("bob-second")),
               );
               expect(
@@ -278,10 +269,10 @@ export const contracts = (fixture: Fixture) => {
       "workspace, role, and assignment storage refuse reused IDs, including revoked ones",
       () =>
         fixture.withStorage((storage) =>
-          runHost(
+          Support.runHost(
             storage,
             Effect.gen(function* () {
-              const bound = yield* boundTo(workspaceId);
+              const bound = yield* Support.boundTo(Support.workspaceId);
               const { workspace, role } = yield* seed(bound);
               expect(
                 yield* Effect.flip(
@@ -319,12 +310,12 @@ export const contracts = (fixture: Fixture) => {
               });
               const assignment: Assignment.Assignment = {
                 id: Assignment.Id.make("reused"),
-                workspaceId,
+                workspaceId: Support.workspaceId,
                 memberId: workspace.ownerMemberId,
                 status: "active",
                 source: source(
                   "Role",
-                  localScope("Workspace", workspaceId, workspace.ownerMemberId),
+                  localScope("Workspace", Support.workspaceId, workspace.ownerMemberId),
                 ),
               };
               yield* bound.store.transaction(bound.assignments.insert(assignment));
@@ -351,11 +342,11 @@ export const contracts = (fixture: Fixture) => {
 
     it.effect("the live register keeps one version per projection name for each log", () =>
       fixture.withStorage((storage) =>
-        runHost(
+        Support.runHost(
           storage,
           Effect.gen(function* () {
-            const bound = yield* boundTo(workspaceId);
-            const other = yield* boundTo(otherWorkspaceId);
+            const bound = yield* Support.boundTo(Support.workspaceId);
+            const other = yield* Support.boundTo(Support.otherWorkspaceId);
             const logId = Entry.LogId.make("register-contract");
             const otherLog = Entry.LogId.make("register-other");
             const versions = [
@@ -436,21 +427,27 @@ export const contracts = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             const workspace = yield* initialized(bound);
             const owner = Actor.Actor.of({
-              workspaceId,
+              workspaceId: Support.workspaceId,
               memberId: workspace.ownerMemberId,
-              identity: alice,
+              identity: Support.alice,
             });
             const human = Actor.Actor.of({
-              workspaceId,
+              workspaceId: Support.workspaceId,
               memberId: Member.Id.make("human"),
-              identity: bob,
+              identity: Support.bob,
             });
             yield* Support.seed(bound, [human], [human]);
             const as = <A, E, R>(actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
-              program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)));
+              program.pipe(
+                Effect.provideService(Actor.Actor, actor),
+                Effect.provide(Support.core(bound)),
+              );
             const group = yield* as(
               owner,
               Effect.flatMap(GroupService.GroupService, (groupService) =>
@@ -469,7 +466,7 @@ export const contracts = (fixture: Fixture) => {
                   mentions: [human.memberId],
                 }),
               ),
-            ).pipe(Effect.flatMap(placedIn(bound)));
+            ).pipe(Effect.flatMap(Support.placedIn(bound)));
             const admission = Option.getOrThrow(
               yield* bound.groupMemberships.findActive(group.id, human.memberId),
             );
@@ -504,7 +501,7 @@ export const contracts = (fixture: Fixture) => {
             // Follows: a reused ID, and one active follow per admission.
             const follow = {
               id: GroupFollow.Id.make("follow"),
-              workspaceId,
+              workspaceId: Support.workspaceId,
               groupId: group.id,
               memberId: human.memberId,
               groupMembershipId: admission.id,
@@ -558,7 +555,7 @@ export const contracts = (fixture: Fixture) => {
                 ThreadMessageActivity.Published,
                 {
                   id: ThreadActivity.Id.make(id),
-                  workspaceId,
+                  workspaceId: Support.workspaceId,
                   threadId: started.thread.id,
                   sequence,
                   occurredAt: started.activity.occurredAt,
@@ -588,12 +585,12 @@ export const contracts = (fixture: Fixture) => {
     it.effect("turn storage keeps one active turn per agent and thread, inserted or updated", () =>
       fixture.withStorage((storage) =>
         Effect.gen(function* () {
-          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+          const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId);
           yield* initialized(bound);
           const createdAt = yield* DateTime.now;
           const turn = (id: string, status: Turn.Status, thread = "thread"): Turn.Turn => ({
             id: Turn.Id.make(id),
-            workspaceId,
+            workspaceId: Support.workspaceId,
             groupId: Group.GeneralId,
             threadId: ThreadId.Id.make(thread),
             agentId: Identity.AgentId.make("agent"),
@@ -652,10 +649,13 @@ export const contracts = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
             yield* initialized(bound);
             const recordedAt = yield* DateTime.now;
-            const reader = Notification.ofMember(Member.Id.make("reader"), bob);
+            const reader = Notification.ofMember(Member.Id.make("reader"), Support.bob);
             const threadId = ThreadId.Id.make("thread");
             const note = (
               id: string,
@@ -664,7 +664,7 @@ export const contracts = (fixture: Fixture) => {
               thread = threadId,
             ): Notification.Notification => ({
               id: Notification.Id.make(id),
-              workspaceId,
+              workspaceId: Support.workspaceId,
               source: { logId: Entry.LogId.make(`${thread}-log`), entryId: Entry.Id.make(id) },
               thread: { threadId: thread, groupId: Group.GeneralId, sequence },
               recipient,
@@ -677,11 +677,15 @@ export const contracts = (fixture: Fixture) => {
                 note("second", 2),
                 note("later", 3),
                 note("other-thread", 1, reader, ThreadId.Id.make("other-thread")),
-                note("other-member", 1, Notification.ofMember(Member.Id.make("other"), charlie)),
+                note(
+                  "other-member",
+                  1,
+                  Notification.ofMember(Member.Id.make("other"), Support.charlie),
+                ),
               ]),
             );
             const position = (readThrough: number) => ({
-              workspaceId,
+              workspaceId: Support.workspaceId,
               memberId: reader.memberId,
               threadId,
               readThrough,

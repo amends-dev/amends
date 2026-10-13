@@ -5,11 +5,11 @@
  */
 import type * as HttpApi from "effect/http-api/HttpApi";
 import type * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import { header, WorkspaceMember } from "../WorkspaceMember.ts";
+import * as WorkspaceMember from "../WorkspaceMember.ts";
 
 /** The header as an OpenAPI parameter. */
 const parameter = {
-  name: header,
+  name: WorkspaceMember.header,
   in: "header",
   required: true,
   description: "The ID of the workspace the request acts in, as its member.",
@@ -26,7 +26,7 @@ export const declareWorkspaceHeader = <Id extends string, Groups extends HttpApi
   const operationIds = new Set<string>();
   for (const group of Object.values(api.groups as unknown as Record<string, HttpApiGroup.Top>))
     for (const endpoint of Object.values(group.endpoints))
-      if (endpoint.middlewares.has(WorkspaceMember))
+      if (endpoint.middlewares.has(WorkspaceMember.WorkspaceMember))
         operationIds.add(`${group.identifier}.${endpoint.identifier}`);
   return (spec: Record<string, any>): Record<string, any> => {
     for (const item of Object.values(spec["paths"] ?? {}) as Array<Record<string, any>>)

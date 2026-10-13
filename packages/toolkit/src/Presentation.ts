@@ -14,7 +14,7 @@ import * as Stream from "effect/Stream";
 import * as AiError from "effect/ai/AiError";
 import * as Tool from "effect/ai/Tool";
 import type * as Toolkit from "effect/ai/Toolkit";
-import { Failure } from "./ToolSource.ts";
+import * as ToolSource from "./ToolSource.ts";
 
 /**
  * Whether `presented` has a tool named `name`, with the name as the type of one.
@@ -46,7 +46,7 @@ export const inputSchemaOf = (tool: Tool.Any): Schema.JsonObject =>
  * @category constructors
  * @since 0.1.0
  */
-export const failure = (code: string, message: string): Failure => ({
+export const failure = (code: string, message: string): ToolSource.Failure => ({
   code,
   message,
   retryable: false,
@@ -82,13 +82,13 @@ export const call = <Tools extends Record<string, Tool.Any>>(
   }).pipe(Effect.mapError(failureOfError));
 
 /** What the model reads of a failed result of a tool: its own `Failure`, or else its text. */
-const failureOfResult = (encoded: unknown): Failure =>
-  Option.getOrElse(Schema.decodeUnknownOption(Failure)(encoded), () =>
+const failureOfResult = (encoded: unknown): ToolSource.Failure =>
+  Option.getOrElse(Schema.decodeUnknownOption(ToolSource.Failure)(encoded), () =>
     failure("CallFailed", typeof encoded === "string" ? encoded : (JSON.stringify(encoded) ?? "")),
   );
 
-const failureOfError = (error: unknown): Failure =>
-  Option.getOrElse(Schema.decodeUnknownOption(Failure)(error), () =>
+const failureOfError = (error: unknown): ToolSource.Failure =>
+  Option.getOrElse(Schema.decodeUnknownOption(ToolSource.Failure)(error), () =>
     failure("CallFailed", messageOf(error) ?? "The tool failed"),
   );
 

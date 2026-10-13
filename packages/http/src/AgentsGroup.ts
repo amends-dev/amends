@@ -12,8 +12,8 @@ import * as Schema from "effect/Schema";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
+import * as Authentication from "./Authentication.ts";
+import * as WorkspaceMember from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 const agent = { agentId: Agent.Id };
@@ -64,6 +64,6 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
       error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Changed],
     }),
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication)
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication)
   .prefix("/agents") {}

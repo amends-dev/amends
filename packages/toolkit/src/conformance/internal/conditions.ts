@@ -2,15 +2,15 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { ToolSourceError } from "../../ToolSourceError.ts";
-import type { Condition, Fixture } from "../Fixture.ts";
+import * as ToolSourceError from "../../ToolSourceError.ts";
+import type * as Fixture from "../Fixture.ts";
 
 /** What a source reports of a system it cannot use, which is all the model reads of it. */
-export const conditions = (fixture: Fixture) =>
+export const conditions = (fixture: Fixture.Fixture) =>
   describe("a system that cannot be used", () => {
     const { echo, failing } = fixture.tools;
 
-    const failedCall = (condition: Condition) =>
+    const failedCall = (condition: Fixture.Condition) =>
       Effect.gen(function* () {
         const { source, secrets } = yield* fixture.make(condition);
         const error = yield* Effect.flip(source.call(echo.tool, echo.input("hello")));
@@ -23,7 +23,7 @@ export const conditions = (fixture: Fixture) =>
         Effect.gen(function* () {
           const { error, source } = yield* failedCall("unauthorized");
 
-          expect(error).toBeInstanceOf(ToolSourceError);
+          expect(error).toBeInstanceOf(ToolSourceError.ToolSourceError);
           expect(error.source).toBe(source.name);
           expect(error.reason._tag).toBe("AuthenticationError");
           expect(error.isRetryable).toBe(false);
@@ -59,15 +59,15 @@ export const conditions = (fixture: Fixture) =>
       "fails a request for what it has, when it asks the system, as the same reason",
       () =>
         Effect.gen(function* () {
-          const reasons: Array<readonly [Condition, string | undefined]> = [];
+          const reasons: Array<readonly [Fixture.Condition, string | undefined]> = [];
           for (const condition of ["unauthorized", "unavailable", "unreachable"] as const) {
             const { source } = yield* fixture.make(condition);
             // A source may know what it has without asking, and then it has nothing to report.
             const exit = yield* Effect.exit(source.discover);
             if (Exit.isSuccess(exit)) continue;
             const error = Cause.squash(exit.cause);
-            expect(error).toBeInstanceOf(ToolSourceError);
-            reasons.push([condition, (error as ToolSourceError).reason._tag]);
+            expect(error).toBeInstanceOf(ToolSourceError.ToolSourceError);
+            reasons.push([condition, (error as ToolSourceError.ToolSourceError).reason._tag]);
           }
 
           for (const [condition, reason] of reasons) {

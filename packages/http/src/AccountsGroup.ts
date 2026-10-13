@@ -12,8 +12,8 @@ import * as Accounts from "@amends-dev/gateway/Accounts";
 import * as Schema from "effect/Schema";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
+import * as Authentication from "./Authentication.ts";
+import * as WorkspaceMember from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -30,6 +30,6 @@ export class AccountsGroup extends HttpApiGroup.make("accounts")
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication)
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication)
   .prefix("/accounts") {}

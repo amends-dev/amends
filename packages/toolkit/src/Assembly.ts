@@ -14,9 +14,9 @@ import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Struct from "effect/Struct";
-import type { ToolDefinition } from "./ToolDefinition.ts";
-import { toolkit as toolkitOfSource, type ToolSource } from "./ToolSource.ts";
-import { NotFoundError, ToolSourceError } from "./ToolSourceError.ts";
+import type * as ToolDefinition from "./ToolDefinition.ts";
+import * as ToolSource from "./ToolSource.ts";
+import * as ToolSourceError from "./ToolSourceError.ts";
 
 /**
  * What the model may do with a tool: call it, call it once the person has approved the call, or not
@@ -41,10 +41,10 @@ export type Decision = typeof Decision.Type;
  * @since 0.1.0
  */
 export interface Member {
-  readonly source: ToolSource;
+  readonly source: ToolSource.ToolSource;
 
   /** The definitions of the source's tools that the host holds in its catalog. */
-  readonly definitions: ReadonlyArray<ToolDefinition>;
+  readonly definitions: ReadonlyArray<ToolDefinition.ToolDefinition>;
 }
 
 /**
@@ -120,7 +120,7 @@ export interface Options {
  */
 export const toolkit = Effect.fn("Assembly.toolkit")(function* (
   members: ReadonlyArray<Member>,
-  decide: (source: string, definition: ToolDefinition) => Decision,
+  decide: (source: string, definition: ToolDefinition.ToolDefinition) => Decision,
   options?: Options,
 ) {
   const maxNameLength = options?.maxNameLength ?? modelApiNameLength;
@@ -154,17 +154,22 @@ export const toolkit = Effect.fn("Assembly.toolkit")(function* (
   const approved = new Set(
     offered.filter((tool) => tool.decision === "approve").map((tool) => tool.name),
   );
-  const assembled: ToolSource = {
+  const assembled: ToolSource.ToolSource = {
     name: "assembly",
     discover: Effect.succeed(definitions),
     call: (name, input) => {
       const owner = ownerOf.get(name);
       return owner === undefined
-        ? Effect.fail(new ToolSourceError({ source: "assembly", reason: new NotFoundError({}) }))
+        ? Effect.fail(
+            new ToolSourceError.ToolSourceError({
+              source: "assembly",
+              reason: new ToolSourceError.NotFoundError({}),
+            }),
+          )
         : owner.source.call(owner.definition.name, input);
     },
   };
-  return yield* toolkitOfSource(assembled, definitions, {
+  return yield* ToolSource.toolkit(assembled, definitions, {
     needsApproval: (definition) => approved.has(definition.name),
   });
 });

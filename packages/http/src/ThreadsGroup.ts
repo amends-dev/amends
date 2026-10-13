@@ -22,8 +22,8 @@ import * as Schema from "effect/Schema";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
+import * as Authentication from "./Authentication.ts";
+import * as WorkspaceMember from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
 
@@ -182,5 +182,5 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
       error: [...ApiErrors.workspace, ...ApiErrors.readState],
     }),
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication) {}
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication) {}

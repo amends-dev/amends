@@ -11,8 +11,8 @@ import { Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/worksp
 import * as Schema from "effect/Schema";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
+import * as Authentication from "./Authentication.ts";
+import * as WorkspaceMember from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -46,6 +46,6 @@ export class SettingsGroup extends HttpApiGroup.make("settings")
       error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
     }),
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication)
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication)
   .prefix("/settings") {}

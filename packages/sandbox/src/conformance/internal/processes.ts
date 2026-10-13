@@ -8,8 +8,8 @@ import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import { layerServices, type Sandbox } from "../../Sandbox.ts";
-import type { Fixture } from "../Fixture.ts";
+import * as Sandbox from "../../Sandbox.ts";
+import type * as Fixture from "../Fixture.ts";
 import { providerForTest } from "./fixture.ts";
 
 /**
@@ -22,13 +22,15 @@ const echoTwoLines = ChildProcess.make("sh", [
 ]);
 
 /** Running commands in a sandbox, through its process spawner and beside its files. */
-export const processes = <R>(fixture: Fixture<R>) => {
+export const processes = <R>(fixture: Fixture.Fixture<R>) => {
   /** Runs `body` with a new sandbox's files, processes, and paths. */
-  const inSandbox = <A, E, R2>(body: (sandbox: Sandbox["Service"]) => Effect.Effect<A, E, R2>) =>
+  const inSandbox = <A, E, R2>(
+    body: (sandbox: Sandbox.Sandbox["Service"]) => Effect.Effect<A, E, R2>,
+  ) =>
     Effect.gen(function* () {
       const sandboxProvider = yield* providerForTest(fixture);
       const sandbox = yield* sandboxProvider.create();
-      return yield* body(sandbox).pipe(Effect.provide(layerServices(sandbox)));
+      return yield* body(sandbox).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
     });
 
   layer(fixture.layer, { excludeTestServices: true })("sandbox processes", (it) => {

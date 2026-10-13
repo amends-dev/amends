@@ -16,7 +16,7 @@ import * as Schema from "effect/Schema";
 import * as Tool from "effect/ai/Tool";
 import * as Toolkit from "effect/ai/Toolkit";
 import * as Presentation from "./Presentation.ts";
-import { Failure } from "./ToolSource.ts";
+import * as ToolSource from "./ToolSource.ts";
 
 /** The most tools a search may return, which a call can ask for fewer of. */
 const maxLimit = 20;
@@ -88,7 +88,7 @@ export const toolkit = Effect.fn("ToolSearch.toolkit")(function* <
       ),
     }),
     success: SearchResult,
-    failure: Failure,
+    failure: ToolSource.Failure,
     // A model that searches wrongly is told so, and tries again.
     failureMode: "return",
   });
@@ -102,7 +102,7 @@ export const toolkit = Effect.fn("ToolSearch.toolkit")(function* <
       input: Schema.JsonObject.annotate({ description: "The tool's input" }),
     }),
     success: Schema.Json,
-    failure: Failure,
+    failure: ToolSource.Failure,
     failureMode: "return",
     needsApproval: ({ name, input }, context) => {
       const needsApproval = presented.tools[name]?.needsApproval;

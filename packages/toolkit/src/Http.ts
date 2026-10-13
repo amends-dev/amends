@@ -17,20 +17,9 @@ import type * as HttpClient from "effect/http/HttpClient";
 import type * as HttpClientError from "effect/http/HttpClientError";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import type * as HttpClientResponse from "effect/http/HttpClientResponse";
-import { ToolDefinition } from "./ToolDefinition.ts";
-import type { ToolSource } from "./ToolSource.ts";
-import {
-  AuthenticationError,
-  CallFailedError,
-  InvalidInputError,
-  InvalidResponseError,
-  NotFoundError,
-  ToolSourceError,
-  UnavailableError,
-  UnknownError,
-  UnsupportedError,
-  type ToolSourceErrorReason,
-} from "./ToolSourceError.ts";
+import * as ToolDefinition from "./ToolDefinition.ts";
+import type * as ToolSource from "./ToolSource.ts";
+import * as ToolSourceError from "./ToolSourceError.ts";
 
 /**
  * The HTTP methods an operation's request may use.
@@ -105,7 +94,7 @@ export interface RequestTemplate extends Schema.Schema.Type<typeof RequestTempla
  */
 export const Operation = Schema.Struct({
   /** The tool as the model is shown it, whose name the source runs it by. */
-  definition: ToolDefinition,
+  definition: ToolDefinition.ToolDefinition,
 
   /** The request a call fills in with its input and sends. */
   request: RequestTemplate,
@@ -162,14 +151,14 @@ export const make = Effect.fn("Http.make")(function* (options: Options) {
     return yield* Effect.die(new Error(`${name} has more than one operation of the same name`));
   }
 
-  const fail = (reason: ToolSourceErrorReason, cause?: unknown) =>
-    new ToolSourceError({ source: name, reason, cause });
+  const fail = (reason: ToolSourceError.ToolSourceErrorReason, cause?: unknown) =>
+    new ToolSourceError.ToolSourceError({ source: name, reason, cause });
 
   const failToReach = (error: HttpClientError.HttpClientError) =>
     fail(
       error.reason._tag === "TransportError"
-        ? new UnavailableError({})
-        : new UnknownError({ description: error.message }),
+        ? new ToolSourceError.UnavailableError({})
+        : new ToolSourceError.UnknownError({ description: error.message }),
       error,
     );
 
@@ -192,16 +181,18 @@ export const make = Effect.fn("Http.make")(function* (options: Options) {
     const { status } = response;
     const description = `The API answered ${status}`;
     if (status === 401 || status === 403)
-      return yield* fail(new AuthenticationError({ description }));
+      return yield* fail(new ToolSourceError.AuthenticationError({ description }));
     if (status === 408 || status === 429 || status >= 500) {
-      return yield* fail(new UnavailableError({ description }));
+      return yield* fail(new ToolSourceError.UnavailableError({ description }));
     }
-    if (status < 400) return yield* fail(new InvalidResponseError({ description }));
+    if (status < 400) return yield* fail(new ToolSourceError.InvalidResponseError({ description }));
     // The API's own words for what is wrong with the request are what the model can act on.
     const said = (yield* readText(response).pipe(Effect.orElseSucceed(() => ""))).trim();
     const excerpt = said.length > maxFailureLength ? `${said.slice(0, maxFailureLength)}...` : said;
     return yield* fail(
-      new CallFailedError({ description: excerpt === "" ? description : `${status}: ${excerpt}` }),
+      new ToolSourceError.CallFailedError({
+        description: excerpt === "" ? description : `${status}: ${excerpt}`,
+      }),
     );
   });
 
@@ -215,25 +206,30 @@ export const make = Effect.fn("Http.make")(function* (options: Options) {
     if (mediaType === "application/json" || mediaType.endsWith("+json")) {
       return yield* decodeJson(text).pipe(
         Effect.mapError((error) =>
-          fail(new InvalidResponseError({ description: "The body is not JSON" }), error),
+          fail(
+            new ToolSourceError.InvalidResponseError({ description: "The body is not JSON" }),
+            error,
+          ),
         ),
       );
     }
     return yield* fail(
-      new UnsupportedError({
+      new ToolSourceError.UnsupportedError({
         description: `The API answered ${mediaType}, which a tool cannot return`,
       }),
     );
   });
 
-  const source: ToolSource = {
+  const source: ToolSource.ToolSource = {
     name,
     discover: Effect.succeed(options.operations.map((operation) => operation.definition)),
     call: Effect.fnUntraced(function* (tool, input) {
       const operation = operations.get(tool);
-      if (operation === undefined) return yield* fail(new NotFoundError({}));
+      if (operation === undefined) return yield* fail(new ToolSourceError.NotFoundError({}));
       const prepared = yield* Effect.fromResult(prepare(operation.request, input)).pipe(
-        Effect.mapError((description) => fail(new InvalidInputError({ description }))),
+        Effect.mapError((description) =>
+          fail(new ToolSourceError.InvalidInputError({ description })),
+        ),
       );
       const request = HttpClientRequest.make(operation.request.method)(
         baseUrl + prepared.path,

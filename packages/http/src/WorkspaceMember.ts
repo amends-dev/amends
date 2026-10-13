@@ -18,7 +18,7 @@ import * as Effect from "effect/Effect";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
 import * as ApiErrors from "./ApiErrors.ts";
-import type { Principal } from "./Authentication.ts";
+import type * as Authentication from "./Authentication.ts";
 
 /**
  * The header that names the workspace a member's request acts in.
@@ -38,7 +38,7 @@ export const header = "Amends-Workspace";
  */
 export class WorkspaceMember extends HttpApiMiddleware.Service<
   WorkspaceMember,
-  { provides: Core.Operations | Actor.Actor; requires: Principal }
+  { provides: Core.Operations | Actor.Actor; requires: Authentication.Principal }
 >()("@amends-dev/http/WorkspaceMember", {
   error: [ApiErrors.Denied, ApiErrors.Invalid],
   requiredForClient: true,

@@ -57,16 +57,8 @@ import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as Socket from "effect/socket/Socket";
 import type * as Agent from "./Agent.ts";
 import * as Bridge from "./Bridge.ts";
-import {
-  HarnessError,
-  type HarnessErrorReason,
-  AgentContractError,
-  NoTurnError,
-  UnavailableError,
-  UnknownError,
-  UnsupportedError,
-} from "./HarnessError.ts";
-import { afterSteps, type StreamPart } from "./StreamPart.ts";
+import * as HarnessError from "./HarnessError.ts";
+import * as StreamPart from "./StreamPart.ts";
 
 /**
  * What an adapter says of its bridge: how to install and launch it, and where to reach it.
@@ -164,12 +156,12 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   options: Options,
   sessionOptions: Agent.CreateSessionOptions,
 ) {
-  const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
-    new HarnessError({ agent: options.id, reason, cause });
+  const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
+    new HarnessError.HarnessError({ agent: options.id, reason, cause });
   const { workspace } = sessionOptions;
   if (workspace === undefined) {
     const description = `${options.id} works in a sandbox`;
-    return yield* harnessError(new UnsupportedError({ description }));
+    return yield* harnessError(new HarnessError.UnsupportedError({ description }));
   }
   const { sandbox, directory } = workspace;
   const session = sessionOptions.id;
@@ -182,7 +174,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   ).pipe(
     Effect.mapError((cause) =>
       harnessError(
-        new AgentContractError({
+        new HarnessError.AgentContractError({
           description: `${options.id} cannot read the state it was given: ${cause.message}`,
         }),
         cause,
@@ -251,12 +243,14 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   }).pipe(Scope.provide(yield* Scope.make()));
 
   /** Releases a connection that dropped, for the next request to open another. */
-  const forgetDropped = (error: HarnessError | RpcClientError.RpcClientError) =>
+  const forgetDropped = (error: HarnessError.HarnessError | RpcClientError.RpcClientError) =>
     error._tag === "RpcClientError" ? RcRef.invalidate(connection) : Effect.void;
 
   /** Sends a request over the connection, releasing the connection if it dropped. */
   const sendOver = <A>(
-    requestOf: (client: Client) => Effect.Effect<A, HarnessError | RpcClientError.RpcClientError>,
+    requestOf: (
+      client: Client,
+    ) => Effect.Effect<A, HarnessError.HarnessError | RpcClientError.RpcClientError>,
   ) =>
     Effect.tapError(Effect.scoped(Effect.flatMap(RcRef.get(connection), requestOf)), forgetDropped);
 
@@ -265,7 +259,9 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
    * seconds, reporting one it could not send as `UnavailableError`.
    */
   const send = <A>(
-    requestOf: (client: Client) => Effect.Effect<A, HarnessError | RpcClientError.RpcClientError>,
+    requestOf: (
+      client: Client,
+    ) => Effect.Effect<A, HarnessError.HarnessError | RpcClientError.RpcClientError>,
   ) =>
     sendOver(requestOf).pipe(
       Effect.retry(whileReconnecting),
@@ -274,7 +270,9 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 
   /** Sends a request the bridge must not receive twice, such as a tool's result, once. */
   const sendOnce = <A>(
-    requestOf: (client: Client) => Effect.Effect<A, HarnessError | RpcClientError.RpcClientError>,
+    requestOf: (
+      client: Client,
+    ) => Effect.Effect<A, HarnessError.HarnessError | RpcClientError.RpcClientError>,
   ) => Effect.mapError(sendOver(requestOf), (error) => fromRequestError(options.id, error));
 
   // Opening the connection starts the session in the bridge, which says whether it has the turn.
@@ -297,7 +295,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   const disconnectWith = (
     stateOf: (
       client: Client,
-    ) => Effect.Effect<Schema.Json, HarnessError | RpcClientError.RpcClientError>,
+    ) => Effect.Effect<Schema.Json, HarnessError.HarnessError | RpcClientError.RpcClientError>,
     unfinishedTurn?: Bridge.TurnId,
   ) =>
     Effect.gen(function* () {
@@ -385,7 +383,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
                   ),
                 ),
                 Stream.map(({ part }) => part),
-                afterSteps(skip),
+                StreamPart.afterSteps(skip),
               );
             }),
           );
@@ -453,7 +451,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
           const turn = yield* startTurn(id, turnOptions);
           if (turn === undefined) return Stream.empty;
           const agentState = yield* send((client) => client.ReadState({ session }));
-          const start: StreamPart = {
+          const start: StreamPart.StreamPart = {
             type: "turn-start",
             agentState: yield* stateWith(agentState, turn),
           };
@@ -468,7 +466,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
           const unfinished = yield* Ref.get(running);
           if (unfinished === undefined) {
             const description = `${options.id} has no unfinished turn`;
-            return Stream.fail(harnessError(new NoTurnError({ description })));
+            return Stream.fail(harnessError(new HarnessError.NoTurnError({ description })));
           }
           const turn = yield* startTurn(unfinished, turnOptions);
           return turn === undefined ? Stream.empty : readTurn(turn, turnOptions, finishedSteps);
@@ -479,7 +477,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
       Schema.decodeUnknownEffect(Schema.Json)(result).pipe(
         Effect.mapError((cause) =>
           harnessError(
-            new UnsupportedError({
+            new HarnessError.UnsupportedError({
               description: `The result of ${name} is not JSON, which the bridge takes`,
             }),
             cause,
@@ -606,12 +604,12 @@ const endpointOf = (agent: string, sandbox: Sandbox.Sandbox["Service"], port: Ne
     ),
     Effect.mapError(
       (error) =>
-        new HarnessError({
+        new HarnessError.HarnessError({
           agent,
           reason:
             error.reason._tag === "UnavailableError"
-              ? new UnavailableError({ description: error.message })
-              : new UnknownError({ description: error.message }),
+              ? new HarnessError.UnavailableError({ description: error.message })
+              : new HarnessError.UnknownError({ description: error.message }),
           cause: error,
         }),
     ),
@@ -659,11 +657,14 @@ const launch = Effect.fnUntraced(
     sandbox: Sandbox.Sandbox["Service"],
     token: Redacted.Redacted<string>,
     bridge: Bridge.BridgeId,
-    find: Effect.Effect<Client | undefined, HarnessError, Socket.WebSocketConstructor>,
+    find: Effect.Effect<Client | undefined, HarnessError.HarnessError, Socket.WebSocketConstructor>,
   ) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const unavailable = (description: string) =>
-      new HarnessError({ agent: options.id, reason: new UnavailableError({ description }) });
+      new HarnessError.HarnessError({
+        agent: options.id,
+        reason: new HarnessError.UnavailableError({ description }),
+      });
 
     const launchOptions = yield* Schema.encodeEffect(Schema.fromJsonString(Bridge.LaunchOptions))({
       token: Redacted.value(token),
@@ -707,9 +708,9 @@ const launch = Effect.fnUntraced(
   (effect, options) =>
     Effect.catchTag(effect, "PlatformError", (error) =>
       Effect.fail(
-        new HarnessError({
+        new HarnessError.HarnessError({
           agent: options.id,
-          reason: new UnknownError({ description: error.message }),
+          reason: new HarnessError.UnknownError({ description: error.message }),
           cause: error,
         }),
       ),
@@ -722,20 +723,23 @@ const launch = Effect.fnUntraced(
  */
 const whileReconnecting = Schedule.spaced("100 millis").pipe(
   Schedule.upTo({ duration: "30 seconds" }),
-  Schedule.setInputType<HarnessError | RpcClientError.RpcClientError>(),
+  Schedule.setInputType<HarnessError.HarnessError | RpcClientError.RpcClientError>(),
   Schedule.tap(({ input }) => (input._tag === "RpcClientError" ? Effect.void : Effect.fail(input))),
 );
 
 /** Whether a request failed because the bridge does not have the turn, as after it died. */
-const isLostTurn = (error: HarnessError | RpcClientError.RpcClientError) =>
+const isLostTurn = (error: HarnessError.HarnessError | RpcClientError.RpcClientError) =>
   error._tag === "HarnessError" && error.reason._tag === "NoTurnError";
 
-const fromRequestError = (agent: string, error: HarnessError | RpcClientError.RpcClientError) =>
+const fromRequestError = (
+  agent: string,
+  error: HarnessError.HarnessError | RpcClientError.RpcClientError,
+) =>
   error._tag === "HarnessError"
     ? error
-    : new HarnessError({
+    : new HarnessError.HarnessError({
         agent,
-        reason: new UnavailableError({
+        reason: new HarnessError.UnavailableError({
           description: `The bridge cannot be reached: ${error.message}`,
         }),
         cause: error,
@@ -750,9 +754,11 @@ const bridgeOptionsOf = (agent: string, turnOptions: Agent.TurnOptions) => {
     Schema.decodeUnknownEffect(Schema.Json)(jsonSchema).pipe(
       Effect.mapError(
         (cause) =>
-          new HarnessError({
+          new HarnessError.HarnessError({
             agent,
-            reason: new UnsupportedError({ description: "A JSON Schema the bridge cannot take" }),
+            reason: new HarnessError.UnsupportedError({
+              description: "A JSON Schema the bridge cannot take",
+            }),
             cause,
           }),
       ),

@@ -12,7 +12,7 @@ import { accounts } from "./internal/accounts.ts";
 import { changeFeed } from "./internal/change-feed.ts";
 import { contracts } from "./internal/contracts.ts";
 import { factMetadata } from "./internal/fact-metadata.ts";
-import type { Fixture } from "./Fixture.ts";
+import type * as Fixture from "./Fixture.ts";
 import { idempotency } from "./internal/idempotency.ts";
 import { journal } from "./internal/journal.ts";
 import { reads } from "./internal/reads.ts";
@@ -68,7 +68,7 @@ export * as Support from "./Support.ts";
  * @category testing
  * @since 0.1.0
  */
-export const run = (fixture: Fixture) => {
+export const run = (fixture: Fixture.Fixture) => {
   journal(fixture);
   transactions(fixture);
   changeFeed(fixture);

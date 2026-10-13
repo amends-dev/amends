@@ -5,18 +5,18 @@
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Random from "effect/Random";
-import { type Sandbox, SandboxId } from "../../Sandbox.ts";
-import { make } from "../../SandboxProvider.ts";
-import type { Fixture } from "../Fixture.ts";
+import * as Sandbox from "../../Sandbox.ts";
+import * as SandboxProvider from "../../SandboxProvider.ts";
+import type * as Fixture from "../Fixture.ts";
 
 /**
  * The fixture's provider for one test, which destroys every sandbox the test created with it when
  * the test ends.
  */
-export const providerForTest = <R>(fixture: Fixture<R>) =>
+export const providerForTest = <R>(fixture: Fixture.Fixture<R>) =>
   Effect.gen(function* () {
     const sandboxProvider = yield* fixture.makeProvider;
-    const created = new Set<Sandbox["Service"]["id"]>();
+    const created = new Set<Sandbox.Sandbox["Service"]["id"]>();
     yield* Effect.addFinalizer(() =>
       Effect.forEach(
         created,
@@ -28,7 +28,7 @@ export const providerForTest = <R>(fixture: Fixture<R>) =>
         { concurrency: "unbounded", discard: true },
       ),
     );
-    return make({
+    return SandboxProvider.make({
       create: (options) =>
         Effect.tap(sandboxProvider.create(options), (sandbox) =>
           Effect.sync(() => created.add(sandbox.id)),
@@ -46,7 +46,9 @@ const uniqueName = (prefix: string) =>
   });
 
 /** An id for a sandbox that no other test or run uses. */
-export const newSandboxId = Effect.map(uniqueName("conformance"), (name) => SandboxId.make(name));
+export const newSandboxId = Effect.map(uniqueName("conformance"), (name) =>
+  Sandbox.SandboxId.make(name),
+);
 
 /** An identity for a template that no other test or run prepares. */
 export const newIdentity = (name: string) => uniqueName(`conformance-${name}`);

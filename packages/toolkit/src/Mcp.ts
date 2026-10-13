@@ -14,15 +14,9 @@ import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as McpSchema from "effect/ai/McpSchema";
-import type { ToolDefinition } from "./ToolDefinition.ts";
-import type { ToolSource } from "./ToolSource.ts";
-import {
-  CallFailedError,
-  InvalidResponseError,
-  ToolSourceError,
-  UnsupportedError,
-  type ToolSourceErrorReason,
-} from "./ToolSourceError.ts";
+import type * as ToolDefinition from "./ToolDefinition.ts";
+import type * as ToolSource from "./ToolSource.ts";
+import * as ToolSourceError from "./ToolSourceError.ts";
 import { findBindings, headersOf, type Binding } from "./internal/mcp-headers.ts";
 import * as Transport from "./internal/mcp-transport.ts";
 import type { Options } from "./internal/mcp-transport.ts";
@@ -85,14 +79,14 @@ export const http = Effect.fn("Mcp.http")(function* (options: Options) {
   const { name } = options;
   const transport = yield* Transport.streamableHttp(options);
 
-  const fail = (reason: ToolSourceErrorReason, cause?: unknown) =>
-    new ToolSourceError({ source: name, reason, cause });
+  const fail = (reason: ToolSourceError.ToolSourceErrorReason, cause?: unknown) =>
+    new ToolSourceError.ToolSourceError({ source: name, reason, cause });
 
   const listPages = (
     cursor: string | undefined,
     listed: ReadonlyArray<typeof Tool.Type>,
     pagesLeft: number,
-  ): Effect.Effect<ReadonlyArray<typeof Tool.Type>, ToolSourceError> =>
+  ): Effect.Effect<ReadonlyArray<typeof Tool.Type>, ToolSourceError.ToolSourceError> =>
     transport.request(ToolList, "tools/list", cursor === undefined ? {} : { cursor }).pipe(
       Effect.flatMap((page) => {
         const tools = [...listed, ...page.tools];
@@ -100,7 +94,11 @@ export const http = Effect.fn("Mcp.http")(function* (options: Options) {
         return pagesLeft > 1
           ? listPages(page.nextCursor, tools, pagesLeft - 1)
           : Effect.fail(
-              fail(new InvalidResponseError({ description: "The tool list does not end" })),
+              fail(
+                new ToolSourceError.InvalidResponseError({
+                  description: "The tool list does not end",
+                }),
+              ),
             );
       }),
     );
@@ -164,7 +162,7 @@ export const http = Effect.fn("Mcp.http")(function* (options: Options) {
     );
   });
 
-  const source: ToolSource = {
+  const source: ToolSource.ToolSource = {
     name,
     discover: listTools,
     call: (tool, input) =>
@@ -174,7 +172,7 @@ export const http = Effect.fn("Mcp.http")(function* (options: Options) {
 });
 
 /** The definition of a tool as an MCP server lists it. */
-const definitionOf = (tool: typeof Tool.Type): ToolDefinition => {
+const definitionOf = (tool: typeof Tool.Type): ToolDefinition.ToolDefinition => {
   const hints = tool.annotations;
   const title = hints?.title ?? tool.title;
   return {
@@ -227,19 +225,25 @@ const sameHeaders = (
  */
 const resultOf = (
   result: typeof ToolResult.Type,
-  fail: (reason: ToolSourceErrorReason) => ToolSourceError,
+  fail: (reason: ToolSourceError.ToolSourceErrorReason) => ToolSourceError.ToolSourceError,
 ) => {
   if (result.resultType === "input_required") {
     return Effect.fail(
       fail(
-        new UnsupportedError({ description: "The tool asks for input, which is not supported" }),
+        new ToolSourceError.UnsupportedError({
+          description: "The tool asks for input, which is not supported",
+        }),
       ),
     );
   }
   if (result.isError === true) {
     const said = (result.content ?? []).filter(Schema.is(TextBlock)).map((block) => block.text);
     return Effect.fail(
-      fail(new CallFailedError(said.length === 0 ? {} : { description: said.join("\n") })),
+      fail(
+        new ToolSourceError.CallFailedError(
+          said.length === 0 ? {} : { description: said.join("\n") },
+        ),
+      ),
     );
   }
   return Effect.succeed(result.structuredContent ?? result.content ?? []);

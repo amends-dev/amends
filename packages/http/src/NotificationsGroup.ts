@@ -10,8 +10,8 @@ import { Notification, NotificationInbox, NotificationStore } from "@amends-dev/
 import * as Schema from "effect/Schema";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
-import { Authentication } from "./Authentication.ts";
-import { WorkspaceMember } from "./WorkspaceMember.ts";
+import * as Authentication from "./Authentication.ts";
+import * as WorkspaceMember from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 const record = Notification.Notification.annotate({ identifier: "Notification" });
@@ -56,6 +56,6 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
       error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Conflict],
     }),
   )
-  .middleware(WorkspaceMember)
-  .middleware(Authentication)
+  .middleware(WorkspaceMember.WorkspaceMember)
+  .middleware(Authentication.Authentication)
   .prefix("/notifications") {}

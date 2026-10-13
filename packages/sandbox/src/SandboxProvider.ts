@@ -10,10 +10,10 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type * as Scope from "effect/Scope";
-import type { NetworkPolicy, Port } from "./Network.ts";
-import type { Sandbox, SandboxId } from "./Sandbox.ts";
-import type { SandboxError } from "./SandboxError.ts";
-import type { Template } from "./Template.ts";
+import type * as Network from "./Network.ts";
+import type * as Sandbox from "./Sandbox.ts";
+import type * as SandboxError from "./SandboxError.ts";
+import type * as Template from "./Template.ts";
 
 /**
  * What only one platform takes on a create, keyed by the provider's id, as `SandboxError.provider`
@@ -58,13 +58,13 @@ export interface CreateOptions<E> {
    * Names the new sandbox. Creating never looks a sandbox up, so an id already in use fails with
    * `AlreadyExistsError`. When omitted, the provider picks one.
    */
-  readonly id?: SandboxId;
+  readonly id?: Sandbox.SandboxId;
 
   /** The ports to expose from the start; `Sandbox.exposePorts` exposes more later. */
-  readonly ports?: ReadonlyArray<Port>;
+  readonly ports?: ReadonlyArray<Network.Port>;
 
   /** Prepares the sandbox before `create` returns it. */
-  readonly template?: Template<E>;
+  readonly template?: Template.Template<E>;
 
   /**
    * The outbound network policy the sandbox starts under, `AllowAll` when omitted. It is in force
@@ -73,7 +73,7 @@ export interface CreateOptions<E> {
    * installs. Fails with `UnsupportedError`, creating nothing, when the provider cannot enforce the
    * policy, as `Sandbox.setNetworkPolicy` does.
    */
-  readonly networkPolicy?: NetworkPolicy;
+  readonly networkPolicy?: Network.NetworkPolicy;
 
   /** What only one platform takes, under its provider's id, as `ProviderOptions` describes. */
   readonly providerOptions?: ProviderOptions;
@@ -123,7 +123,7 @@ export class SandboxProvider extends Context.Service<
      */
     readonly create: <E = never>(
       options?: CreateOptions<E>,
-    ) => Effect.Effect<Sandbox["Service"], SandboxError | E>;
+    ) => Effect.Effect<Sandbox.Sandbox["Service"], SandboxError.SandboxError | E>;
 
     /**
      * Creates and starts a sandbox that is destroyed when the scope closes, however it closes, for
@@ -132,13 +132,15 @@ export class SandboxProvider extends Context.Service<
      */
     readonly createScoped: <E = never>(
       options?: CreateOptions<E>,
-    ) => Effect.Effect<Sandbox["Service"], SandboxError | E, Scope.Scope>;
+    ) => Effect.Effect<Sandbox.Sandbox["Service"], SandboxError.SandboxError | E, Scope.Scope>;
 
     /**
      * Reattaches to a sandbox this provider created, starting it again if it was stopped. It never
      * creates one: an unknown or destroyed id fails with `NotFoundError`.
      */
-    readonly resume: (id: SandboxId) => Effect.Effect<Sandbox["Service"], SandboxError>;
+    readonly resume: (
+      id: Sandbox.SandboxId,
+    ) => Effect.Effect<Sandbox.Sandbox["Service"], SandboxError.SandboxError>;
   }
 >()("@amends-dev/sandbox/SandboxProvider") {}
 

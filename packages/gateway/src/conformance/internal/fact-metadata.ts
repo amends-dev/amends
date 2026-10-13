@@ -15,15 +15,8 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { Fixture } from "../Fixture.ts";
+import type * as Fixture from "../Fixture.ts";
 import * as Support from "../Support.ts";
-import {
-  forWorkspace,
-  journalLog,
-  otherWorkspaceId,
-  testProvenance,
-  workspaceId,
-} from "../Support.ts";
 
 const testSubject = () => Subject.make("test", "entity");
 /** Facts the fact-metadata suites publish; adapters' own tests may inspect how they are stored. */
@@ -44,7 +37,7 @@ export const Other = Fact.make("storage.other", {
 });
 
 /** Fact headers: stored beside payloads, filtered in storage, and compared on retries. */
-export const factMetadata = (fixture: Fixture) => {
+export const factMetadata = (fixture: Fixture.Fixture) => {
   const { core } = Support;
   describe.skipIf(!fixture.available)(`${fixture.name}: fact metadata`, () => {
     it.effect(
@@ -55,7 +48,7 @@ export const factMetadata = (fixture: Fixture) => {
             const events = yield* Effect.scoped(
               Effect.gen(function* () {
                 const host = yield* storage.connect();
-                const bound = yield* forWorkspace(host, workspaceId);
+                const bound = yield* Support.forWorkspace(host, Support.workspaceId);
                 return yield* Effect.gen(function* () {
                   const journal = yield* Journal.Journal;
                   const events = yield* journal.commit(
@@ -67,9 +60,9 @@ export const factMetadata = (fixture: Fixture) => {
                     }),
                   );
                   const third = yield* journal.publish(Changed, "third");
-                  const stored = (yield* bound.store.read(journalLog, { limit: 10 })).flatMap(
-                    (batch) => batch.entries,
-                  );
+                  const stored = (yield* bound.store.read(Support.journalLog, {
+                    limit: 10,
+                  })).flatMap((batch) => batch.entries);
                   expect(stored.map((entry) => entry.fact?.name)).toEqual([
                     Changed.name,
                     Other.name,
@@ -97,9 +90,12 @@ export const factMetadata = (fixture: Fixture) => {
                   });
                   yield* other.publish(Changed, "other log");
                   expect(yield* journal.read({ name: Changed.name, limit: 10 })).toHaveLength(3);
-                  const foreign = yield* forWorkspace(host, otherWorkspaceId);
+                  const foreign = yield* Support.forWorkspace(host, Support.otherWorkspaceId);
                   expect(
-                    yield* foreign.store.readFacts(journalLog, { name: Changed.name, limit: 10 }),
+                    yield* foreign.store.readFacts(Support.journalLog, {
+                      name: Changed.name,
+                      limit: 10,
+                    }),
                   ).toEqual([]);
                   const execution = (yield* Log.Log).open({
                     id: Entry.LogId.make("execution"),
@@ -111,13 +107,19 @@ export const factMetadata = (fixture: Fixture) => {
                   ).toEqual([]);
                   return [...events, third] as const;
                 }).pipe(
-                  Effect.provideService(Publication.Publication, testProvenance(workspaceId)),
+                  Effect.provideService(
+                    Publication.Publication,
+                    Support.testProvenance(Support.workspaceId),
+                  ),
                   Effect.provide(core(bound)),
                 );
               }),
             );
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const stored = yield* bound.store.readFacts(journalLog, {
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
+            const stored = yield* bound.store.readFacts(Support.journalLog, {
               name: Changed.name,
               limit: 10,
             });
@@ -138,8 +140,11 @@ export const factMetadata = (fixture: Fixture) => {
       () =>
         fixture.withStorage((storage) =>
           Effect.gen(function* () {
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const provenance = testProvenance(workspaceId);
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
+            const provenance = Support.testProvenance(Support.workspaceId);
             const content = {
               fact: { subject: testSubject(), name: Changed.name, version: 1, provenance },
               payload: yield* Codec.make(Changed).encode("same"),
@@ -149,7 +154,7 @@ export const factMetadata = (fixture: Fixture) => {
               bound.store.transaction(
                 Effect.flatMap(Store.Transaction, (storeTransaction) =>
                   storeTransaction.append({
-                    logId: journalLog,
+                    logId: Support.journalLog,
                     entries: [entry],
                     idempotencyKey: key,
                   }),
@@ -177,7 +182,9 @@ export const factMetadata = (fixture: Fixture) => {
               ...content,
               fact: {
                 ...content.fact,
-                provenance: Object.assign({}, provenance, { workspaceId: otherWorkspaceId }),
+                provenance: Object.assign({}, provenance, {
+                  workspaceId: Support.otherWorkspaceId,
+                }),
               },
             };
             expect(yield* Effect.flip(append(foreign))).toMatchObject({
@@ -202,9 +209,9 @@ export const factMetadata = (fixture: Fixture) => {
               _tag: "StoreError",
               reason: { _tag: "Rejected" },
             });
-            expect(Option.isSome(yield* bound.store.getAppend(journalLog, key))).toBe(true);
+            expect(Option.isSome(yield* bound.store.getAppend(Support.journalLog, key))).toBe(true);
             expect(
-              yield* bound.store.readFacts(journalLog, { name: Changed.name, limit: 10 }),
+              yield* bound.store.readFacts(Support.journalLog, { name: Changed.name, limit: 10 }),
             ).toHaveLength(1);
           }),
         ),
@@ -231,7 +238,7 @@ export const factMetadata = (fixture: Fixture) => {
             const events = yield* Effect.scoped(
               Effect.gen(function* () {
                 const host = yield* storage.connect();
-                const bound = yield* forWorkspace(host, workspaceId);
+                const bound = yield* Support.forWorkspace(host, Support.workspaceId);
                 return yield* Effect.gen(function* () {
                   const journal = yield* Journal.Journal;
                   const saved = yield* journal.commit(
@@ -289,12 +296,15 @@ export const factMetadata = (fixture: Fixture) => {
                   });
                   yield* other.publish(Message, { threadId: "one", text: "other log" });
                   expect(yield* journal.read({ subject: target, limit: 10 })).toHaveLength(3);
-                  const foreign = yield* forWorkspace(host, otherWorkspaceId);
+                  const foreign = yield* Support.forWorkspace(host, Support.otherWorkspaceId);
                   expect(
-                    yield* foreign.store.readFacts(journalLog, { subject: target, limit: 10 }),
+                    yield* foreign.store.readFacts(Support.journalLog, {
+                      subject: target,
+                      limit: 10,
+                    }),
                   ).toEqual([]);
                   const plain = (yield* Log.Log).open({
-                    id: journalLog,
+                    id: Support.journalLog,
                     schema: Schema.String,
                   });
                   yield* plain.append("execution");
@@ -303,7 +313,7 @@ export const factMetadata = (fixture: Fixture) => {
                 }).pipe(
                   Effect.provideService(
                     Publication.Publication,
-                    Object.assign({}, testProvenance(workspaceId), {
+                    Object.assign({}, Support.testProvenance(Support.workspaceId), {
                       performedBy: { _tag: "Identity" as const, identity: contact },
                     }),
                   ),
@@ -311,8 +321,11 @@ export const factMetadata = (fixture: Fixture) => {
                 );
               }),
             );
-            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
-            const entries = yield* bound.store.readFacts(journalLog, {
+            const bound = yield* Support.forWorkspace(
+              yield* storage.connect(),
+              Support.workspaceId,
+            );
+            const entries = yield* bound.store.readFacts(Support.journalLog, {
               subject: target,
               limit: 10,
             });

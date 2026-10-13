@@ -6,14 +6,14 @@ import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import * as HttpClient from "effect/http/HttpClient";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
-import { NetworkPolicy, type Port } from "../../Network.ts";
-import { layerServices, type Sandbox } from "../../Sandbox.ts";
-import type { SandboxError } from "../../SandboxError.ts";
-import type { Fixture } from "../Fixture.ts";
+import * as Network from "../../Network.ts";
+import * as Sandbox from "../../Sandbox.ts";
+import type * as SandboxError from "../../SandboxError.ts";
+import type * as Fixture from "../Fixture.ts";
 import { newSandboxId, providerForTest } from "./fixture.ts";
 
 /** Whether `change` was applied, or the reason it failed with. */
-const outcomeOf = (change: Effect.Effect<void, SandboxError>) =>
+const outcomeOf = (change: Effect.Effect<void, SandboxError.SandboxError>) =>
   change.pipe(
     Effect.as("applied"),
     Effect.catch((error) => Effect.succeed(error.reason._tag)),
@@ -23,16 +23,19 @@ const outcomeOf = (change: Effect.Effect<void, SandboxError>) =>
 const requestHeaders = { authorization: "Bearer conformance", "x-conformance": "passed on" };
 
 /** Reaching a sandbox's ports from outside it, and what the sandbox reaches outside. */
-export const network = <R>(fixture: Fixture<R>) => {
+export const network = <R>(fixture: Fixture.Fixture<R>) => {
   /**
    * Serves HTTP on `port` in `sandbox` and returns the headers the server received with a request
    * through the port's endpoint.
    */
-  const headersThrough = Effect.fnUntraced(function* (sandbox: Sandbox["Service"], port: Port) {
+  const headersThrough = Effect.fnUntraced(function* (
+    sandbox: Sandbox.Sandbox["Service"],
+    port: Network.Port,
+  ) {
     yield* Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       yield* spawner.spawn(fixture.serveHeaders(port));
-    }).pipe(Effect.provide(layerServices(sandbox)));
+    }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
     const endpoint = yield* sandbox.endpoint(port, "http");
     const client = (yield* HttpClient.HttpClient).pipe(
@@ -122,7 +125,10 @@ export const network = <R>(fixture: Fixture<R>) => {
 
           const outcome = yield* outcomeOf(
             Effect.asVoid(
-              sandboxProvider.create({ id, networkPolicy: NetworkPolicy.cases.DenyAll.make({}) }),
+              sandboxProvider.create({
+                id,
+                networkPolicy: Network.NetworkPolicy.cases.DenyAll.make({}),
+              }),
             ),
           );
           const resumed = yield* Effect.exit(sandboxProvider.resume(id));
@@ -141,7 +147,7 @@ export const network = <R>(fixture: Fixture<R>) => {
           const sandbox = yield* sandboxProvider.create();
 
           const policy = yield* outcomeOf(
-            sandbox.setNetworkPolicy(NetworkPolicy.cases.DenyAll.make({})),
+            sandbox.setNetworkPolicy(Network.NetworkPolicy.cases.DenyAll.make({})),
           );
           const transformations = yield* outcomeOf(
             sandbox.setRequestTransformations([
