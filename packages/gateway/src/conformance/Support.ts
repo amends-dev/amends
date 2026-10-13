@@ -7,7 +7,7 @@
  */
 
 import { Integrations } from "@amends-dev/connection"
-import * as Core from "@amends-dev/core"
+import { Core } from "@amends-dev/core"
 import { AgentStore } from "@amends-dev/core/agent"
 import {
   Assignment,

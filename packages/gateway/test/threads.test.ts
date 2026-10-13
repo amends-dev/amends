@@ -1,4 +1,4 @@
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { AgentPermissions } from "@amends-dev/core/agent"
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant, RoleFacts } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"

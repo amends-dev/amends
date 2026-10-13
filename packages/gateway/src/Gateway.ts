@@ -8,7 +8,7 @@
  * @since 0.1.0
  */
 
-import * as Core from "@amends-dev/core"
+import { Core } from "@amends-dev/core"
 import type { DeliveryJobs } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
 import { Actor, type Identity } from "@amends-dev/core/identity"

@@ -1,4 +1,4 @@
-import * as Core from "@amends-dev/core"
+import { Core } from "@amends-dev/core"
 import { AgentPermissions } from "@amends-dev/core/agent"
 import { AssignmentPermissions, BuiltinRoles } from "@amends-dev/core/authorization"
 import { ChannelPermissions } from "@amends-dev/core/channel"

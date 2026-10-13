@@ -1,5 +1,5 @@
 import { Connection as ConnectionContract } from "@amends-dev/connection"
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { BuiltinRoles, Requirement, Target } from "@amends-dev/core/authorization"
 import { ChannelIntake, ChannelService, ChannelId } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"

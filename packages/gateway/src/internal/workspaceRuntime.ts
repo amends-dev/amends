@@ -7,7 +7,7 @@
  */
 
 import { type Integration, Integrations } from "@amends-dev/connection"
-import * as Core from "@amends-dev/core"
+import { Core } from "@amends-dev/core"
 import { BuiltinRoleUpgrade } from "@amends-dev/core/authorization"
 import { DeliveryJobs } from "@amends-dev/core/channel"
 import { Journal } from "@amends-dev/core/journal"

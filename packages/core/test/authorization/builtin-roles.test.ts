@@ -2,7 +2,7 @@ import { WorkspaceId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import * as BuiltinRoles from "../../src/authorization/BuiltinRoles.ts"
 import * as Permission from "../../src/authorization/Permission.ts"
-import * as Core from "../../src/index.ts"
+import * as Core from "../../src/Core.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const read = Permission.make("it.read", {

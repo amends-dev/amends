@@ -1,4 +1,4 @@
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { Channel, ChannelIntake, ChannelService, DeliveryExecution, ChannelId } from "@amends-dev/core/channel"
 import { ConnectionService } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"

@@ -1,4 +1,4 @@
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import {
   Assignment,
   AssignmentFacts,

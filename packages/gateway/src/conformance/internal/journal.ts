@@ -1,4 +1,4 @@
-import * as Core from "@amends-dev/core"
+import { Core } from "@amends-dev/core"
 import { BuiltinRoles, Role, RoleFacts } from "@amends-dev/core/authorization"
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"

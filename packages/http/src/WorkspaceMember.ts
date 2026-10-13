@@ -12,7 +12,7 @@
  * @since 0.1.0
  */
 
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import type { Actor } from "@amends-dev/core/identity"
 import type { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"

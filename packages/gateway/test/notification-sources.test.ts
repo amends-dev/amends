@@ -1,4 +1,4 @@
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { Assignment, AssignmentFacts, Grant, type Permission, type Target } from "@amends-dev/core/authorization"
 import { GroupService, GroupMembershipService, type GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"

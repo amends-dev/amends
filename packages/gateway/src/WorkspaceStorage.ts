@@ -9,7 +9,7 @@
  */
 
 import type { Integrations } from "@amends-dev/connection"
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { AgentStore } from "@amends-dev/core/agent"
 import { AssignmentStore, RoleStore } from "@amends-dev/core/authorization"
 import { ChannelBindingStore, ChannelStore, ContactStore, DeliveryStore } from "@amends-dev/core/channel"

@@ -1,5 +1,5 @@
 import { Integrations } from "@amends-dev/connection"
-import * as Core from "@amends-dev/core"
+import { Core } from "@amends-dev/core"
 import { AssignmentStore, RoleStore } from "@amends-dev/core/authorization"
 import { DeliveryJobs } from "@amends-dev/core/channel"
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group"

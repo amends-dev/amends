@@ -1,4 +1,4 @@
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { AgentService } from "@amends-dev/core/agent"
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel"

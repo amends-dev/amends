@@ -762,7 +762,7 @@ Actor identity and the active transaction are resolved during each operation, ne
 Contracts implemented elsewhere, such as stores, `SignalHub.SignalHub`, `Actor.Actor`,
 `Publication.Publication`, and `Store.Transaction`, have no `layer` here: a store contract's `make`
 checks an adapter's driver, and its `layerMemory` is the reference implementation in process memory.
-`index.ts` composes the layers and implements nothing itself.
+`Core.ts` composes the layers and implements nothing itself.
 
 ```ts
 import { Log, Transaction } from "@amends-dev/core/journal"

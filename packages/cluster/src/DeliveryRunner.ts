@@ -11,7 +11,7 @@
  */
 
 import { Integrations } from "@amends-dev/connection"
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { type Delivery, type DeliveryJobs, DeliveryExecution, type DeliveryId } from "@amends-dev/core/channel"
 import { Gateway } from "@amends-dev/gateway"
 import * as Data from "effect/Data"

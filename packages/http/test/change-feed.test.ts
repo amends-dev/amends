@@ -1,4 +1,4 @@
-import type * as Core from "@amends-dev/core"
+import type { Core } from "@amends-dev/core"
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
 import { CoreError } from "@amends-dev/core/error"
 import { Actor, Identity } from "@amends-dev/core/identity"
