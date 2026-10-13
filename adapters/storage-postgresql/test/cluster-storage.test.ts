@@ -1,6 +1,6 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, PrimaryKey, Schema, Scope } from "effect"
+import { DateTime, Duration, Effect, Exit, Layer, Option, PrimaryKey, Schema, Scope } from "effect"
 import { ClusterSchema, DeliverAt, Entity, RunnerAddress, SingleRunner } from "effect/cluster"
 import { Rpc } from "effect/rpc"
 import { SqlClient } from "effect/sql"
@@ -39,13 +39,18 @@ const cluster = (url: string, pollInterval: Duration.Input = "1 second") =>
     Layer.provideMerge(database(url))
   )
 
-/** Store a request, due at `at` or now, under `key`. */
-const request = (key: string, at?: DateTime.Utc) =>
+/** Store a request due now under `key`, and wait for its reply, which Cluster stores first. */
+const request = (key: string) =>
   Effect.gen(function* () {
     const client = yield* entity.client
-    yield* client("job-one").Ping(new Ping({ key, at: at ?? (yield* DateTime.now) }), {
-      discard: true
-    })
+    yield* client("job-one").Ping(new Ping({ key, at: yield* DateTime.now }))
+  })
+
+/** Store a request due at `at` under `key`, without waiting for it. */
+const requestAt = (key: string, at: DateTime.Utc) =>
+  Effect.gen(function* () {
+    const client = yield* entity.client
+    yield* client("job-one").Ping(new Ping({ key, at }), { discard: true })
   })
 
 const count = (query: string) =>
@@ -63,12 +68,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const context = yield* Layer.build(cluster(url))
           const handled = count("SELECT count(*)::int AS count FROM cluster_messages WHERE processed")
           yield* Effect.gen(function* () {
-            for (const commit of ["one", "two", "three", "four", "five"]) yield* request(commit)
+            yield* Effect.forEach(["one", "two", "three", "four", "five"], request, { concurrency: "unbounded" })
             // Not due for a day, so not handled, and kept however old it is.
-            yield* request("later", DateTime.add(yield* DateTime.now, { days: 1 }))
-            const deadline = (yield* Clock.currentTimeMillis) + 10_000
-            while ((yield* handled) < 5 && (yield* Clock.currentTimeMillis) < deadline)
-              yield* Effect.sleep("100 millis")
+            yield* requestAt("later", DateTime.add(yield* DateTime.now, { days: 1 }))
             expect(yield* handled).toBe(5)
             // Another entity type's handled message is not this pruning's to remove.
             yield* Effect.flatMap(
