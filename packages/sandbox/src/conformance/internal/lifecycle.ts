@@ -42,7 +42,7 @@ const spawnOutliving = (sandbox: Sandbox.Sandbox["Service"]) =>
   }).pipe(Effect.scoped, Effect.provide(Sandbox.layerServices(sandbox)))
 
 /** Creating, resuming, stopping, and destroying sandboxes, and preparing them with templates. */
-export const lifecycle = <R>(fixture: Fixture.Fixture<R>) =>
+export const lifecycle = <R, E>(fixture: Fixture.Fixture<R, E>) =>
   layer(fixture.layer, { excludeTestServices: true })("sandbox lifecycle", (it) => {
     it.effect(
       "resumes a sandbox with the id, working directory, and ports it was created with",

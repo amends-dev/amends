@@ -71,7 +71,7 @@ export type Authentication = Layer.Layer<
  * @category layers
  * @since 0.1.0
  */
-export const layer = (host: LocalHost.HostLayer, authentication: Authentication, port: number) =>
+export const layer = <E>(host: LocalHost.HostLayer<E>, authentication: Authentication, port: number) =>
   // Built after the server, the drain is released first as the host stops, ending open change
   // streams so the server's graceful stop waits only for ordinary requests.
   Draining.layerOnRelease.pipe(

@@ -218,6 +218,8 @@ const createSession = Effect.fn("AmendsAgent.createSession")(function* (
   const awaitHostResult = (_params: unknown, context: Toolkit.HandlerContext<HostTool>) => {
     // `LanguageModel` gives each handler the id of the call it answers.
     const id = context.toolCallId ?? ""
+    // A failed call's result is whatever the host's tool returned, which the model reads as it came.
+    // @effect-diagnostics-next-line anyUnknownInErrorContext:off
     return Effect.flatMap(hostResultOf(id), Deferred.await).pipe(
       Effect.ensuring(Effect.sync(() => hostResults.delete(id)))
     )

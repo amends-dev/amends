@@ -5,7 +5,7 @@ import * as ToolDefinition from "../../ToolDefinition.ts"
 import type * as Fixture from "../Fixture.ts"
 
 /** What a source says of the tools it has. */
-export const discovery = (fixture: Fixture.Fixture) =>
+export const discovery = <E>(fixture: Fixture.Fixture<E>) =>
   describe("tool discovery", () => {
     const { echo, failing, blocking } = fixture.tools
 

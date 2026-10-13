@@ -23,7 +23,7 @@ const outcomeOf = (change: Effect.Effect<void, SandboxError.SandboxError>) =>
 const requestHeaders = { authorization: "Bearer conformance", "x-conformance": "passed on" }
 
 /** Reaching a sandbox's ports from outside it, and what the sandbox reaches outside. */
-export const network = <R>(fixture: Fixture.Fixture<R>) => {
+export const network = <R, E>(fixture: Fixture.Fixture<R, E>) => {
   /**
    * Serves HTTP on `port` in `sandbox` and returns the headers the server received with a request
    * through the port's endpoint.

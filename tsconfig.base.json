@@ -26,6 +26,7 @@
         "diagnostics": true,
         "diagnosticSeverity": {
           "floatingEffect": "error",
+          "anyUnknownInErrorContext": "warning",
           "abortControllerInEffect": "warning",
           "acquireReleaseDisposable": "warning",
           "allOfMapToForEach": "warning",
@@ -95,7 +96,16 @@
                 "deterministicKeys": "off",
                 "unsafeEffectTypeAssertion": "off",
                 "globalFetch": "off",
-                "nestedEffectGenYield": "off"
+                "nestedEffectGenYield": "off",
+                "anyUnknownInErrorContext": "off"
+              }
+            }
+          },
+          {
+            "include": ["**/apps/**/*.ts", "**/apps/**/*.tsx"],
+            "options": {
+              "diagnosticSeverity": {
+                "anyUnknownInErrorContext": "off"
               }
             }
           }

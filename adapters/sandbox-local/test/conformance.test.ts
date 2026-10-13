@@ -25,8 +25,9 @@ Conformance.run({
     const fs = yield* FileSystem.FileSystem
     return yield* LocalSandboxProvider.make({ directory: yield* fs.makeTempDirectoryScoped() })
   }),
+  // A server that cannot listen on a free port is a fault of the machine the tests run on.
   freePort: Effect.scoped(
-    Effect.flatMap(BunHttpServer.make({ hostname: "127.0.0.1", port: 0 }), ({ address }) =>
+    Effect.flatMap(Effect.orDie(BunHttpServer.make({ hostname: "127.0.0.1", port: 0 })), ({ address }) =>
       NetAddress.isUnixPathAddress(address)
         ? Effect.die("The server listens on no port")
         : Effect.succeed(Network.Port.make(address.port))

@@ -12,6 +12,7 @@
 import { Store, type StoreError } from "@amends-dev/core/journal"
 import * as Sharding from "effect/cluster/Sharding"
 import * as Context from "effect/Context"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Predicate from "effect/Predicate"
@@ -87,9 +88,20 @@ export const isWorkspaceNotFound = (error: unknown) => {
 }
 
 /**
+ * A request's work died with `defect`, which its job tries again like any failure, rather than
+ * restart the entity.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class Died extends Data.TaggedError("JobRequests.Died")<{
+  readonly defect: unknown
+}> {}
+
+/**
  * Do `work` for a request of `job`, trying again after each failure, `times` more at most, as
- * long as its workspace exists. `named` is what a log says of the request. A failure that would
- * have been a defect is one to try again like any other, rather than one that restarts the entity.
+ * long as its workspace exists. `named` is what a log says of the request. Work that dies fails
+ * with `Died`, to be tried again like any other failure.
  *
  * @category utils
  * @since 0.1.0
@@ -99,9 +111,9 @@ export const retrying = <A, E, R>(
   named: Record<string, unknown>,
   work: Effect.Effect<A, E, R>,
   times?: number
-): Effect.Effect<A, unknown, R> =>
+): Effect.Effect<A, E | Died, R> =>
   work.pipe(
-    Effect.catchDefect((defect) => Effect.fail(defect)),
+    Effect.catchDefect((defect) => Effect.fail(new Died({ defect }))),
     Effect.tapError((error) =>
       Effect.gen(function* () {
         // Each try runs with the schedule's metadata: how many tries came before it.

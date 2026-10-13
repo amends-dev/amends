@@ -140,7 +140,7 @@ export const make = Effect.fn("Journal.make")(function* () {
   })
 
   /** Complete batches for the selected headers, each with its entries in index order. */
-  const batches = Effect.fnUntraced(function* (selection: Effect.Effect<ReadonlyArray<unknown>, unknown>) {
+  const batches = Effect.fnUntraced(function* <E>(selection: Effect.Effect<ReadonlyArray<unknown>, E>) {
     const selected = yield* selection.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(BatchHeaderRow))))
     if (!Array.isReadonlyArrayNonEmpty(selected)) return []
     const rows = yield* db

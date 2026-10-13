@@ -8,7 +8,7 @@ import * as ToolSourceError from "../../ToolSourceError.ts"
 import type * as Fixture from "../Fixture.ts"
 
 /** Running tools. */
-export const calls = (fixture: Fixture.Fixture) =>
+export const calls = <E>(fixture: Fixture.Fixture<E>) =>
   describe("tool calls", () => {
     const { echo, failing, blocking } = fixture.tools
 

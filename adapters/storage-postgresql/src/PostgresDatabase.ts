@@ -16,6 +16,7 @@ import { migrate } from "drizzle-orm/effect-postgres/migrator"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
 import * as SqlClient from "effect/sql/SqlClient"
 import * as PostgresNotices from "./PostgresNotices.ts"
 import * as PostgresReads from "./PostgresReads.ts"
@@ -63,6 +64,20 @@ export class PostgresDatabase extends Context.Service<
 >()("@amends-dev/storage-postgresql/PostgresDatabase") {}
 
 /**
+ * The schema could not be brought up to date; `cause` is what the migration failed with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class MigrationFailed extends Schema.TaggedError<MigrationFailed>()("PostgresDatabase.MigrationFailed", {
+  cause: Schema.Defect()
+}) {
+  override get message() {
+    return "The database schema could not be brought up to date"
+  }
+}
+
+/**
  * Construct the database service over the caller's PostgreSQL client, applying pending
  * migrations one process at a time. Its notice listener holds one of the pool's connections while
  * readers wait.
@@ -78,7 +93,9 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
   yield* sql.withTransaction(
     Effect.andThen(
       sql`SELECT pg_advisory_xact_lock(hashtextextended('amends:migrate', 0))`,
-      migrate(db, { migrationsFolder })
+      // Drizzle types its failure against a module Effect's release does not have, which reads as any.
+      // @effect-diagnostics-next-line anyUnknownInErrorContext:off
+      migrate(db, { migrationsFolder }).pipe(Effect.mapError((cause) => new MigrationFailed({ cause })))
     )
   )
   const notices = yield* PostgresNotices.make()

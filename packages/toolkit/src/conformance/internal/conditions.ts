@@ -6,7 +6,7 @@ import * as ToolSourceError from "../../ToolSourceError.ts"
 import type * as Fixture from "../Fixture.ts"
 
 /** What a source reports of a system it cannot use, which is all the model reads of it. */
-export const conditions = (fixture: Fixture.Fixture) =>
+export const conditions = <E>(fixture: Fixture.Fixture<E>) =>
   describe("a system that cannot be used", () => {
     const { echo, failing } = fixture.tools
 

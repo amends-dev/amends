@@ -27,12 +27,14 @@ import * as RunnerAddress from "effect/cluster/RunnerAddress"
 import type * as Runners from "effect/cluster/Runners"
 import type * as Sharding from "effect/cluster/Sharding"
 import * as SingleRunner from "effect/cluster/SingleRunner"
+import type * as Config from "effect/Config"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Redacted from "effect/Redacted"
+import type * as SocketServer from "effect/socket/SocketServer"
 import type * as SqlClient from "effect/sql/SqlClient"
 import * as HarnessIntegrations from "./HarnessIntegrations.ts"
 import * as LocalConfig from "./LocalConfig.ts"
@@ -40,14 +42,15 @@ import * as SandboxIntegrations from "./SandboxIntegrations.ts"
 
 /**
  * What `layer` provides for one host's lifetime: the gateway, the workspace directory, the
- * accounts, and sign-in's storage, which `LocalServer.layer` serves the HTTP API over.
+ * accounts, and sign-in's storage, which `LocalServer.layer` serves the HTTP API over. `E` is what
+ * the host fails to start with.
  *
  * @category models
  * @since 0.1.0
  */
-export type HostLayer = Layer.Layer<
+export type HostLayer<E> = Layer.Layer<
   Gateway.Gateway | WorkspaceDirectory.WorkspaceDirectory | Accounts.Accounts | SignInStorage.SignInStorage,
-  unknown
+  E
 >
 
 /**
@@ -155,13 +158,7 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
  * The cluster over the database's client, started one process at a time: a runner at this
  * process's address, or a client.
  */
-const layerCluster = (
-  options: Options
-): Layer.Layer<
-  Sharding.Sharding | Runners.Runners | MessageStorage.MessageStorage,
-  unknown,
-  SqlClient.SqlClient | PostgresDatabase.PostgresDatabase
-> => {
+const layerCluster = (options: Options) => {
   if (options.runJobs === false)
     return PostgresClusterStorage.layerOneAtATime(
       SingleRunner.layer({ shardingConfig: { runnerAddress: Option.none() } }).pipe(Layer.provide(BunCrypto.layer))
@@ -175,7 +172,7 @@ const layerCluster = (
   }
   const cluster: Layer.Layer<
     Sharding.Sharding | Runners.Runners | MessageStorage.MessageStorage,
-    unknown,
+    Config.ConfigError | SocketServer.SocketServerError,
     SqlClient.SqlClient
   > =
     options.runnerTransport === "socket"
@@ -197,7 +194,7 @@ const layerCluster = (
  * @category layers
  * @since 0.1.0
  */
-export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer => {
+export const layer = (url: Redacted.Redacted<string>, options: Options = {}) => {
   const sandboxDirectory = options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes")
   const jobs = Effect.map(makeIntegrations(sandboxDirectory, options.credentialKey), (integrations) => {
     const requests = Layer.merge(TurnJob.layerRequests, DeliveryJob.layerRequests).pipe(

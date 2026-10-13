@@ -61,12 +61,12 @@ export interface ToolCase {
  * @category testing
  * @since 0.1.0
  */
-export interface Fixture {
+export interface Fixture<E> {
   /**
    * Makes the source for one test, over a system in `condition`. What it starts ends with the
    * scope of the test.
    */
-  readonly make: (condition: Condition) => Effect.Effect<Subject, unknown, Scope.Scope>
+  readonly make: (condition: Condition) => Effect.Effect<Subject, E, Scope.Scope>
 
   /** The system's tools that the suites call, each by the name the source discovers it under. */
   readonly tools: {

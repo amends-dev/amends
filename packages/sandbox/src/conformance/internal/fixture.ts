@@ -14,7 +14,7 @@ import type * as Fixture from "../Fixture.ts"
  * The fixture's provider for one test, which destroys every sandbox the test created with it when
  * the test ends.
  */
-export const providerForTest = <R>(fixture: Fixture.Fixture<R>) =>
+export const providerForTest = <R, E>(fixture: Fixture.Fixture<R, E>) =>
   Effect.gen(function* () {
     const sandboxProvider = yield* fixture.makeProvider
     const created = new Set<Sandbox.Sandbox["Service"]["id"]>()

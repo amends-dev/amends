@@ -11,7 +11,7 @@ import { authenticatedClient, serveApi, serveMcp } from "./conformance-servers.t
 /** The MCP source, over Effect AI's own MCP server in this process, speaking `protocols`. */
 const mcpFixture = (
   protocols: readonly [McpProtocol.ProtocolAdapter, ...Array<McpProtocol.ProtocolAdapter>]
-): Fixture => ({
+): Fixture<unknown> => ({
   make: Effect.fnUntraced(function* (condition) {
     const { client, started, secrets } = yield* serveMcp(protocols, condition)
     const source = yield* Mcp.http({ name: "fixture", url: "http://localhost/mcp", client })
@@ -25,7 +25,7 @@ const mcpFixture = (
 })
 
 /** What an HTTP API's tools take: each is a request, and `echo` has its input in the body. */
-const httpTools: Fixture["tools"] = {
+const httpTools: Fixture<unknown>["tools"] = {
   echo: {
     tool: "echo",
     input: (text) => ({ body: { text } }),
@@ -36,7 +36,7 @@ const httpTools: Fixture["tools"] = {
 }
 
 /** The HTTP source over operations written by hand. */
-const httpFixture: Fixture = {
+const httpFixture: Fixture<unknown> = {
   make: Effect.fnUntraced(function* (condition) {
     const { baseUrl, started, secrets } = yield* serveApi(condition)
     const source = yield* Http.make({
@@ -87,7 +87,7 @@ const httpFixture: Fixture = {
 }
 
 /** The HTTP source over the operations that OpenAPI document of the same API gives. */
-const openApiFixture: Fixture = {
+const openApiFixture: Fixture<unknown> = {
   make: Effect.fnUntraced(function* (condition) {
     const { baseUrl, started, secrets } = yield* serveApi(condition)
     const { operations } = yield* OpenApi.readOperations({

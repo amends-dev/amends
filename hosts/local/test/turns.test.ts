@@ -18,7 +18,7 @@ import { type Call, withServer } from "./server.ts"
 const alice = Identity.HumanId.make("alice")
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))))
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server, over `host`. */
-const serve = (host: LocalHost.HostLayer) =>
+const serve = <E>(host: LocalHost.HostLayer<E>) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer), Layer.provideMerge(host))

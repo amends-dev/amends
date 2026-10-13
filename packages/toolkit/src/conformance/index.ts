@@ -91,7 +91,7 @@ export type {
  * @category testing
  * @since 0.1.0
  */
-export const run = (fixture: Fixture.Fixture) => {
+export const run = <E>(fixture: Fixture.Fixture<E>) => {
   discovery(fixture)
   calls(fixture)
   conditions(fixture)

@@ -22,7 +22,7 @@ const echoTwoLines = ChildProcess.make("sh", [
 ])
 
 /** Running commands in a sandbox, through its process spawner and beside its files. */
-export const processes = <R>(fixture: Fixture.Fixture<R>) => {
+export const processes = <R, E>(fixture: Fixture.Fixture<R, E>) => {
   /** Runs `body` with a new sandbox's files, processes, and paths. */
   const inSandbox = <A, E, R2>(body: (sandbox: Sandbox.Sandbox["Service"]) => Effect.Effect<A, E, R2>) =>
     Effect.gen(function* () {

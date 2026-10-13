@@ -65,7 +65,7 @@ export type {
  * @category testing
  * @since 0.1.0
  */
-export const run = <R>(fixture: Fixture<R>) => {
+export const run = <R, E>(fixture: Fixture<R, E>) => {
   lifecycle(fixture)
   processes(fixture)
   network(fixture)

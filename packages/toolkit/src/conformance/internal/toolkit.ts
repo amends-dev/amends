@@ -6,7 +6,7 @@ import * as ToolSource from "../../ToolSource.ts"
 import type * as Fixture from "../Fixture.ts"
 
 /** What a model reads of a source, through the toolkit that is made of it. */
-export const toolkit = (fixture: Fixture.Fixture) =>
+export const toolkit = <E>(fixture: Fixture.Fixture<E>) =>
   describe("the toolkit of a source", () => {
     const { echo, failing } = fixture.tools
 
