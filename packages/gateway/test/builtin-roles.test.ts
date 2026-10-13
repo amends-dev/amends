@@ -22,10 +22,11 @@ import {
 } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
-import { Clock, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect"
+import { DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect"
+import { TestClock } from "effect/testing"
 import { withStorage } from "./fixture.ts"
 import * as Support from "./support.ts"
-import { alice, type Bound, forWorkspace, testProvenance, workspaceId } from "./support.ts"
+import { alice, type Bound, forWorkspace, journalLog, testProvenance, workspaceId } from "./support.ts"
 
 const roleIds = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId]
 const current = BuiltinRoles.make(workspaceId, Core.permissions)
@@ -106,38 +107,38 @@ const recordedBeforeRevisions = (bound: Bound) =>
   ).pipe(Effect.provideService(Publication.Publication, testProvenance()), Effect.provide(core(bound)))
 
 describe("built-in roles", () => {
-  // Real time: the host tries again a second after the first attempt failed.
-  it.live(
-    "a host that cannot upgrade the roles as it loads the workspace upgrades them once it can",
-    () =>
-      withStorage((storage) =>
-        Effect.gen(function* () {
-          const bound = yield* forWorkspace(yield* storage.connect(), workspaceId)
-          yield* recordedBeforeRevisions(bound)
-          // Another host holds the workspace, so the upgrade cannot run as this host loads it.
-          const held = yield* Deferred.make<void>()
-          const release = yield* Deferred.make<void>()
-          const holder = yield* Effect.forkChild(
-            bound.store.transaction(Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))))
-          )
-          yield* Deferred.await(held)
-          const host = yield* Layer.build(gateway(yield* storage.connect({ failFast: true })))
-          // The workspace still loads and admits its members, with the roles it recorded.
-          yield* Effect.flatMap(Gateway.Gateway, (gateway) => gateway.asMember(workspaceId, alice, Effect.void)).pipe(
-            Effect.provide(host)
-          )
-          expect(yield* bound.roles.builtinRevision).toEqual(Option.none())
-          yield* Deferred.succeed(release, undefined)
-          yield* Fiber.join(holder)
-          // It tries again in the background while the workspace stays prepared.
-          const deadline = (yield* Clock.currentTimeMillis) + 10_000
-          while (Option.isNone(yield* bound.roles.builtinRevision) && (yield* Clock.currentTimeMillis) < deadline)
-            yield* Effect.sleep("100 millis")
-          expect(yield* bound.roles.builtinRevision).toEqual(Option.some(BuiltinRoles.revision))
-          expect(yield* roles(bound)).toEqual(current.map(Option.some))
-        }).pipe(Effect.scoped)
-      ),
-    20_000
+  it.effect("a host that cannot upgrade the roles as it loads the workspace upgrades them once it can", () =>
+    withStorage((storage) =>
+      Effect.gen(function* () {
+        const bound = yield* forWorkspace(yield* storage.connect(), workspaceId)
+        yield* recordedBeforeRevisions(bound)
+        // Another host holds the workspace, so the upgrade cannot run as this host loads it.
+        const held = yield* Deferred.make<void>()
+        const release = yield* Deferred.make<void>()
+        const holder = yield* Effect.forkChild(
+          bound.store.transaction(Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))))
+        )
+        yield* Deferred.await(held)
+        const host = yield* Layer.build(gateway(yield* storage.connect({ failFast: true })))
+        // The workspace still loads and admits its members, with the roles it recorded.
+        yield* Effect.flatMap(Gateway.Gateway, (gateway) => gateway.asMember(workspaceId, alice, Effect.void)).pipe(
+          Effect.provide(host)
+        )
+        // It tries again in the background, backing off, while the other host still holds it.
+        yield* TestClock.adjust("1 minute")
+        expect(yield* bound.roles.builtinRevision).toEqual(Option.none())
+        const upgraded = yield* Effect.forkChild(
+          bound.store.waitForAppend(journalLog, yield* bound.store.head(journalLog))
+        )
+        yield* Deferred.succeed(release, undefined)
+        yield* Fiber.join(holder)
+        // Its next try, at most a minute away, upgrades them.
+        yield* TestClock.adjust("1 minute")
+        yield* Fiber.join(upgraded)
+        expect(yield* bound.roles.builtinRevision).toEqual(Option.some(BuiltinRoles.revision))
+        expect(yield* roles(bound)).toEqual(current.map(Option.some))
+      }).pipe(Effect.scoped)
+    )
   )
 
   it.effect("a new workspace holds the current revision, and upgrading it records nothing", () =>
