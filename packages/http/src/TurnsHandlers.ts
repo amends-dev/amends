@@ -7,6 +7,7 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
+import { Actor } from "@amends-dev/core/identity";
 import * as Authentication from "./Authentication.ts";
 import { TurnService } from "@amends-dev/core/turn";
 import { Effect, Layer } from "effect";
@@ -35,7 +36,8 @@ export const layer = HttpApiBuilder.group(
         TurnService.TurnService.use((turnService) => turnService.get(params.turnId)),
       watchLog: ({ params }) =>
         Effect.gen(function* () {
-          yield* streams.hold(params.workspaceId, yield* Authentication.Principal);
+          const { workspaceId } = yield* Actor.Actor;
+          yield* streams.hold(workspaceId, yield* Authentication.Principal);
           const turnService = yield* TurnService.TurnService;
           return streams.serve(yield* turnService.watchLog(params.turnId), unavailable);
         }).pipe(Streams.withHeartbeats),

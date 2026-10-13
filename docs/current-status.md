@@ -207,7 +207,7 @@ Discover, the public groups the reader may join, with their member counts; joini
 Private groups show no member count there, since the groups list does not carry one.
 New public groups appear on it live, while renames and member counts of groups the reader is not
 in update when it next loads. The apps read what the reader may do from
-`GET /workspaces/:id/permissions`, which lists workspace-wide permissions only.
+`GET /permissions`, which lists workspace-wide permissions only.
 
 A group's header shows its member stack, which opens Group settings on Members: the reader first as
 "You", then everyone by name. Any member of a team group adds people and agents with the member

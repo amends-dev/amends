@@ -19,7 +19,7 @@ import { Option, Predicate } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
 import { agentsReads } from "../agents/api.ts";
-import { useApiClient } from "../provider.tsx";
+import { useWorkspaceClient } from "../provider.tsx";
 import {
   Group,
   type GroupMembership,
@@ -289,7 +289,7 @@ const shownContent = (
  * mounted. It shares the Agents page's read.
  */
 function useAgentAccess(workspaceId: string) {
-  const reads = agentsReads(useApiClient(), workspaceId);
+  const reads = agentsReads(useWorkspaceClient(workspaceId), workspaceId);
   const read = reads ? useAtomValue(() => reads.agents) : undefined;
   const byMember = createMemo(
     () =>

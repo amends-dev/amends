@@ -1,22 +1,17 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { describe, expect, it } from "@effect/vitest";
-import { Api, Authentication } from "@amends-dev/http";
 import { Identity } from "@amends-dev/core/identity";
 import { Member } from "@amends-dev/core/workspace";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer, Redacted } from "effect";
-import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
+import { HttpBody, HttpClient, HttpRouter } from "effect/http";
 import * as LocalHost from "../src/LocalHost.ts";
 import * as LocalServer from "../src/LocalServer.ts";
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
 import { setup } from "./database.ts";
+import { client } from "./client.ts";
 
 const alice = Identity.HumanId.make("alice");
-const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-    next(HttpClientRequest.bearerToken(request, token)),
-  );
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server; codes are captured. */
 const server = (url: string) => {
   const delivered = new Map<string, string>();
@@ -42,9 +37,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
     withDatabase((url) =>
       Effect.gen(function* () {
         const http = yield* HttpClient.HttpClient;
-        const post = (path: string, body: unknown, key: string) =>
+        const post = (path: string, body: unknown, key: string, workspaceId?: string) =>
           http.post(path, {
-            headers: { authorization: "Bearer alice", "idempotency-key": key },
+            headers: {
+              authorization: "Bearer alice",
+              "idempotency-key": key,
+              ...(workspaceId === undefined ? {} : { "amends-workspace": workspaceId }),
+            },
             body: HttpBody.jsonUnsafe(body),
           });
         const created = yield* post(
@@ -72,9 +71,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
           roleId: BuiltinRoles.MemberId,
           expiresAt: "2036-09-20T12:00:00.000Z",
         };
-        const path = `/workspaces/${workspace.id}/invitations`;
         const issue = (body: unknown, key: string) =>
-          Effect.flatMap(post(path, body, key), (response) => response.json).pipe(
+          Effect.flatMap(
+            post("/invitations", body, key, workspace.id),
+            (response) => response.json,
+          ).pipe(
             Effect.map((json) => json as { readonly details: { readonly recipientId: string } }),
           );
         const issued = yield* issue(invitation, "issue-1");
@@ -94,18 +95,15 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const fixture = server(url);
           const outcome = yield* Effect.gen(function* () {
-            const client = (token: string) =>
-              HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
-            const asAlice = yield* client(alice);
-            const workspace = yield* asAlice.workspaces.create({
+            const workspace = yield* (yield* client(alice)).workspaces.create({
               headers: {},
               payload: { name: "Test workspace", memberName: "alice" },
             });
-            const params = { workspaceId: workspace.id, memberId: workspace.ownerMemberId };
+            const asAlice = yield* client(alice, workspace.id);
+            const params = { memberId: workspace.ownerMemberId };
             const owner = yield* asAlice.members.get({ params });
             const invitation = yield* asAlice.invitations.issue({
               headers: {},
-              params: { workspaceId: workspace.id },
               payload: {
                 email: "bob@example.com",
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
@@ -113,29 +111,30 @@ describe.skipIf(!available)("PostgreSQL", () => {
               },
             });
             // Development tokens are human IDs: Bob's is his account's, which the invitation names.
-            const asBob = yield* client(invitation.details.recipientId);
+            const asBob = yield* client(invitation.details.recipientId, workspace.id);
             const outsider = yield* Effect.flip(asBob.members.get({ params }));
             const invitationParams = {
               workspaceId: workspace.id,
               invitationId: invitation.details.id,
             };
             const wrongRecipient = yield* Effect.flip(
-              asAlice.invitations.accept({ params: invitationParams, payload: { name: "alice" } }),
+              asAlice.workspaces.acceptInvitation({
+                params: invitationParams,
+                payload: { name: "alice" },
+              }),
             );
-            const joined = yield* asBob.invitations.accept({
+            const joined = yield* asBob.workspaces.acceptInvitation({
               params: invitationParams,
               payload: { name: Member.Name.make("Bob") },
             });
             // Bob chose his name on joining, and can change it; nobody else can.
             const renamed = yield* asBob.members.rename({
-              params: { workspaceId: workspace.id },
               payload: { name: Member.Name.make("Bob Chen") },
             });
             const readByBob = yield* asBob.members.get({ params });
             const cannotInvite = yield* Effect.flip(
               asBob.invitations.issue({
                 headers: {},
-                params: { workspaceId: workspace.id },
                 payload: {
                   email: "charlie@example.com",
                   expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
@@ -143,22 +142,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 },
               }),
             );
-            const members = yield* asAlice.members.list({ params: { workspaceId: workspace.id } });
-            const invitations = yield* asAlice.invitations.list({
-              params: { workspaceId: workspace.id },
-            });
-            const cannotList = yield* Effect.flip(
-              asBob.invitations.list({ params: { workspaceId: workspace.id } }),
-            );
+            const members = yield* asAlice.members.list();
+            const invitations = yield* asAlice.invitations.list();
+            const cannotList = yield* Effect.flip(asBob.invitations.list());
             const removed = yield* asAlice.members.remove({
-              params: { workspaceId: workspace.id, memberId: joined.id },
+              params: { memberId: joined.id },
             });
-            const afterRemovalList = yield* asAlice.members.list({
-              params: { workspaceId: workspace.id },
-            });
+            const afterRemovalList = yield* asAlice.members.list();
             const afterRemoval = yield* Effect.flip(asBob.members.get({ params }));
             const missing = yield* asAlice.members.get({
-              params: { workspaceId: workspace.id, memberId: Member.Id.make("nobody") },
+              params: { memberId: Member.Id.make("nobody") },
               responseMode: "response-only",
             });
             return {
@@ -236,7 +229,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const fixture = server(url);
           const outcome = yield* Effect.gen(function* () {
-            const anonymous = yield* HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken("")));
+            const anonymous = yield* client("");
             const methods = yield* anonymous.session.methods();
             const email = "jo@mercier.co";
             yield* anonymous.session.start({ payload: { email } });
@@ -261,43 +254,40 @@ describe.skipIf(!available)("PostgreSQL", () => {
               }),
               (response) => response.json,
             );
-            const client = yield* HttpApiClient.make(Api.Api).pipe(
-              Effect.provide(asToken(session.token)),
-            );
-            const account = yield* client.me.account();
-            const before = yield* client.me.workspaces();
-            const workspace = yield* client.workspaces.create({
+            const jo = yield* client(session.token);
+            const account = yield* jo.me.account();
+            const before = yield* jo.me.workspaces();
+            const workspace = yield* jo.workspaces.create({
               headers: {},
               payload: { name: "Test workspace", memberName: "Jo" },
             });
-            const inviter = yield* HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(alice)));
-            const other = yield* inviter.workspaces.create({
+            const other = yield* (yield* client(alice)).workspaces.create({
               headers: {},
               payload: { name: "Test workspace", memberName: "alice" },
             });
+            const inviter = yield* client(alice, other.id);
             const invitation = yield* inviter.invitations.issue({
               headers: {},
-              params: { workspaceId: other.id },
               payload: {
                 email,
                 expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
                 roleId: BuiltinRoles.MemberId,
               },
             });
-            const after = yield* client.me.workspaces();
+            const after = yield* jo.me.workspaces();
             // Alice, who manages invitations, reads her invitee's account; she has none herself.
-            const invitees = yield* inviter.accounts.list({ params: { workspaceId: other.id } });
+            const invitees = yield* inviter.accounts.list();
             const noAccount = yield* inviter.me.account({ responseMode: "response-only" });
-            yield* client.invitations.accept({
+            yield* jo.workspaces.acceptInvitation({
               params: { workspaceId: other.id, invitationId: invitation.details.id },
               payload: { name: "Jo" },
             });
-            const joined = yield* client.me.workspaces();
-            const members = yield* client.accounts.list({ params: { workspaceId: workspace.id } });
+            const joined = yield* jo.me.workspaces();
+            const members = yield* (yield* client(session.token, workspace.id)).accounts.list();
             const cannotList = yield* Effect.flip(
-              client.accounts.list({ params: { workspaceId: other.id } }),
+              (yield* client(session.token, other.id)).accounts.list(),
             );
-            const signedOut = yield* client.me.signOut({ responseMode: "response-only" });
+            const signedOut = yield* jo.me.signOut({ responseMode: "response-only" });
             return {
               methods,
               wrong,
@@ -380,7 +370,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 origin,
                 "access-control-request-method": "POST",
                 "access-control-request-headers":
-                  "authorization,content-type,idempotency-key,traceparent,b3",
+                  "authorization,content-type,idempotency-key,amends-workspace,traceparent,b3",
               },
             });
             expect(preflight.status).toBe(204);
@@ -393,6 +383,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
             expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain(
               "idempotency-key",
+            );
+            expect(preflight.headers["access-control-allow-headers"]?.toLowerCase()).toContain(
+              "amends-workspace",
             );
             const denied = yield* client.get("/me/workspaces", { headers: { origin } });
             expect(denied.status).toBe(401);

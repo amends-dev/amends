@@ -4,7 +4,7 @@ import { Identity } from "@amends-dev/core/identity";
 import { Invitation, Member, Ownership, Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Schema } from "effect";
 import { setup } from "./database.ts";
-import { withServer } from "./server.ts";
+import { type Call, withServer } from "./server.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
@@ -22,7 +22,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           (await call(alice.id, "POST", "/workspaces", { name: "Names", memberName: "alice" }))
             .body,
         );
-        const base = `/workspaces/${workspace.id}`;
+        const inWorkspace: Call = (token, method, path, body) =>
+          call(token, method, path, body, workspace.id);
         const statuses = [
           (await call(alice.id, "POST", "/workspaces", { name: "a\u0000b", memberName: "alice" }))
             .status,
@@ -32,13 +33,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
               memberName: "alice",
             })
           ).status,
-          (await call(alice.id, "POST", `${base}/groups`, { name: "a\u0000b", memberIds: [] }))
+          (await inWorkspace(alice.id, "POST", "/groups", { name: "a\u0000b", memberIds: [] }))
             .status,
-          (await call(alice.id, "POST", `${base}/groups`, { name: "a\u202Eb", memberIds: [] }))
+          (await inWorkspace(alice.id, "POST", "/groups", { name: "a\u202Eb", memberIds: [] }))
             .status,
-          (await call(alice.id, "PUT", `${base}/members/me/name`, { name: "a\u0000b" })).status,
+          (await inWorkspace(alice.id, "PUT", "/members/me/name", { name: "a\u0000b" })).status,
           (
-            await call(alice.id, "POST", `${base}/groups/general/threads`, {
+            await inWorkspace(alice.id, "POST", "/groups/general/threads", {
               text: "a\u0000b",
               mentions: [],
             })
@@ -63,8 +64,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
             // Streams hold the change feed's listener; the claim and shard locks hold two more.
             const streams = Array.from({ length: 2 }, () => new AbortController());
             for (const stream of streams) {
-              const response = await fetch(`${base}/workspaces/${workspace.id}/changes`, {
-                headers: { authorization: `Bearer ${alice.id}` },
+              const response = await fetch(`${base}/changes`, {
+                headers: { authorization: `Bearer ${alice.id}`, "amends-workspace": workspace.id },
                 signal: stream.signal,
               });
               expect(response.status).toBe(200);
@@ -73,12 +74,19 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 .read()
                 .catch(() => {});
             }
-            const path = `/workspaces/${workspace.id}/groups`;
             const results = await Promise.all([
               ...Array.from({ length: 10 }, (_, index) =>
-                call(alice.id, "POST", path, { name: `pool-${index}`, memberIds: [] }),
+                call(
+                  alice.id,
+                  "POST",
+                  "/groups",
+                  { name: `pool-${index}`, memberIds: [] },
+                  workspace.id,
+                ),
               ),
-              ...Array.from({ length: 20 }, () => call(alice.id, "GET", `${path}?limit=10`)),
+              ...Array.from({ length: 20 }, () =>
+                call(alice.id, "GET", "/groups?limit=10", undefined, workspace.id),
+              ),
             ]);
             for (const stream of streams) stream.abort();
             expect(results.map((result) => result.status).toSorted((a, b) => a - b)).toEqual([
@@ -105,16 +113,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
               })
             ).body,
           );
-          const base = `/workspaces/${workspace.id}`;
+          const inWorkspace: Call = (token, method, path, body) =>
+            call(token, method, path, body, workspace.id);
           const initial = Schema.decodeUnknownSync(Ownership.View)(
-            (await call(alice.id, "GET", `${base}/ownership`)).body,
+            (await inWorkspace(alice.id, "GET", "/settings/ownership")).body,
           );
           expect(initial.canTransfer).toBe(true);
           expect(initial.candidates).toEqual([]);
           const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
           const invitation = Schema.decodeUnknownSync(Invitation.Invitation)(
             (
-              await call(alice.id, "POST", `${base}/invitations`, {
+              await inWorkspace(alice.id, "POST", "/invitations", {
                 email: "bob@example.com",
                 expiresAt,
                 roleId: BuiltinRoles.MemberId,
@@ -125,29 +134,37 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const bobId = invitation.details.recipientId;
           const member = Schema.decodeUnknownSync(Member.Member)(
             (
-              await call(bobId, "POST", `${base}/invitations/${invitation.details.id}/accept`, {
-                name: "bob",
-              })
+              await call(
+                bobId,
+                "POST",
+                `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`,
+                {
+                  name: "bob",
+                },
+              )
             ).body,
           );
           const payload = {
             memberId: member.id,
             expectedOwnerAssignmentId: initial.ownerAssignmentId,
           };
-          expect((await call(charlie.id, "GET", `${base}/ownership`)).status).toBe(403);
-          expect((await call(bobId, "POST", `${base}/ownership`, payload)).status).toBe(403);
+          expect((await inWorkspace(charlie.id, "GET", "/settings/ownership")).status).toBe(403);
+          expect((await inWorkspace(bobId, "POST", "/settings/ownership", payload)).status).toBe(
+            403,
+          );
           expect(
-            (await call(alice.id, "POST", `${base}/ownership`, { memberId: member.id })).status,
+            (await inWorkspace(alice.id, "POST", "/settings/ownership", { memberId: member.id }))
+              .status,
           ).toBe(400);
           expect(
             (
-              await call(alice.id, "POST", `${base}/ownership`, {
+              await inWorkspace(alice.id, "POST", "/settings/ownership", {
                 ...payload,
                 memberId: workspace.ownerMemberId,
               })
             ).status,
           ).toBe(409);
-          const transferred = await call(alice.id, "POST", `${base}/ownership`, payload);
+          const transferred = await inWorkspace(alice.id, "POST", "/settings/ownership", payload);
           expect(transferred.status).toBe(200);
           expect(transferred.body).toEqual({
             id: workspace.id,
@@ -155,10 +172,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
             createdBy: alice.id,
             ownerMemberId: member.id,
           });
-          expect((await call(alice.id, "POST", `${base}/ownership`, payload)).status).toBe(403);
-          expect((await call(alice.id, "DELETE", `${base}/members/${member.id}`)).status).toBe(409);
+          expect((await inWorkspace(alice.id, "POST", "/settings/ownership", payload)).status).toBe(
+            403,
+          );
+          expect((await inWorkspace(alice.id, "DELETE", `/members/${member.id}`)).status).toBe(409);
           const current = Schema.decodeUnknownSync(Ownership.View)(
-            (await call(bobId, "GET", `${base}/ownership`)).body,
+            (await inWorkspace(bobId, "GET", "/settings/ownership")).body,
           );
           expect(current.owner.id).toBe(member.id);
           expect(current.canTransfer).toBe(true);
@@ -168,7 +187,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           expect(
             (
-              await call(bobId, "POST", `${base}/ownership`, {
+              await inWorkspace(bobId, "POST", "/settings/ownership", {
                 memberId: workspace.ownerMemberId,
                 expectedOwnerAssignmentId: initial.ownerAssignmentId,
               })
@@ -187,11 +206,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
             (await call(alice.id, "POST", "/workspaces", { name: "Roles", memberName: "alice" }))
               .body,
           );
-          const base = `/workspaces/${workspace.id}`;
+          const inWorkspace: Call = (token, method, path, body) =>
+            call(token, method, path, body, workspace.id);
           const expiresAt = DateTime.formatIso(DateTime.add(DateTime.nowUnsafe(), { hours: 1 }));
           expect(
             (
-              await call(alice.id, "POST", `${base}/invitations`, {
+              await inWorkspace(alice.id, "POST", "/invitations", {
                 email: "bob@example.com",
                 expiresAt,
               })
@@ -199,14 +219,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
           ).toBe(400);
           expect(
             (
-              await call(alice.id, "POST", `${base}/invitations`, {
+              await inWorkspace(alice.id, "POST", "/invitations", {
                 email: "bob@example.com",
                 expiresAt,
                 roleId: BuiltinRoles.OwnerId,
               })
             ).status,
           ).toBe(409);
-          const issued = await call(alice.id, "POST", `${base}/invitations`, {
+          const issued = await inWorkspace(alice.id, "POST", "/invitations", {
             email: "bob@example.com",
             expiresAt,
             roleId: BuiltinRoles.MemberId,
@@ -215,13 +235,18 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const bobId = invitation.details.recipientId;
           const joined = Schema.decodeUnknownSync(Member.Member)(
             (
-              await call(bobId, "POST", `${base}/invitations/${invitation.details.id}/accept`, {
-                name: "bob",
-              })
+              await call(
+                bobId,
+                "POST",
+                `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`,
+                {
+                  name: "bob",
+                },
+              )
             ).body,
           );
           const listing = Schema.decodeUnknownSync(Assignment.Access)(
-            (await call(alice.id, "GET", `${base}/members/${joined.id}/assignments`)).body,
+            (await inWorkspace(alice.id, "GET", `/members/${joined.id}/assignments`)).body,
           );
           expect(listing.canManage).toBe(true);
           const input = {
@@ -229,19 +254,19 @@ describe.skipIf(!available)("PostgreSQL", () => {
             roleId: BuiltinRoles.AdministratorId,
             expectedAssignmentIds: listing.assignments.map(({ id }) => id),
           };
-          const changed = await call(alice.id, "PUT", `${base}/assignments`, input);
+          const changed = await inWorkspace(alice.id, "PUT", "/assignments", input);
           expect(changed.status).toBe(200);
           const assignment = Schema.decodeUnknownSync(Assignment.Assignment)(changed.body);
-          expect((await call(alice.id, "PUT", `${base}/assignments`, input)).status).toBe(409);
+          expect((await inWorkspace(alice.id, "PUT", "/assignments", input)).status).toBe(409);
           const choices = Schema.decodeUnknownSync(Schema.Array(Assignment.RoleChoice))(
-            (await call(bobId, "GET", `${base}/roles`)).body,
+            (await inWorkspace(bobId, "GET", "/roles")).body,
           );
           expect(choices.filter(({ assignable }) => assignable).map(({ role }) => role.id)).toEqual(
             [BuiltinRoles.MemberId],
           );
           expect(
             (
-              await call(bobId, "POST", `${base}/invitations`, {
+              await inWorkspace(bobId, "POST", "/invitations", {
                 email: "charlie@example.com",
                 expiresAt,
                 roleId: BuiltinRoles.AdministratorId,
@@ -250,7 +275,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           ).toBe(403);
           expect(
             (
-              await call(bobId, "POST", `${base}/invitations`, {
+              await inWorkspace(bobId, "POST", "/invitations", {
                 email: "charlie@example.com",
                 expiresAt,
                 roleId: BuiltinRoles.MemberId,
@@ -259,7 +284,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           ).toBe(201);
           expect(
             (
-              await call(alice.id, "POST", `${base}/assignments`, {
+              await inWorkspace(alice.id, "POST", "/assignments", {
                 memberId: joined.id,
                 roleId: BuiltinRoles.AdministratorId,
               })
@@ -267,24 +292,24 @@ describe.skipIf(!available)("PostgreSQL", () => {
           ).toEqual(changed.body);
           expect(
             (
-              await call(
+              await inWorkspace(
                 alice.id,
                 "DELETE",
-                `${base}/members/${joined.id}/assignments/${assignment.id}`,
+                `/members/${joined.id}/assignments/${assignment.id}`,
               )
             ).status,
           ).toBe(200);
           expect(
             (
-              await call(
+              await inWorkspace(
                 alice.id,
                 "DELETE",
-                `${base}/members/${joined.id}/assignments/${assignment.id}`,
+                `/members/${joined.id}/assignments/${assignment.id}`,
               )
             ).status,
           ).toBe(200);
           expect(
-            (await call(bobId, "GET", `${base}/members/${joined.id}/assignments`)).status,
+            (await inWorkspace(bobId, "GET", `/members/${joined.id}/assignments`)).status,
           ).toBe(403);
         }),
       ),
@@ -338,11 +363,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         // A fresh server process reads what the previous one committed.
         await withServer(url, async (call) => {
-          const path = `/workspaces/${workspace.id}/members/${workspace.ownerMemberId}`;
-          const read = await call(alice.id, "GET", path);
+          const path = `/members/${workspace.ownerMemberId}`;
+          const read = await call(alice.id, "GET", path, undefined, workspace.id);
           expect(read.status).toBe(200);
           expect(Schema.decodeUnknownSync(Member.Member)(read.body).identity).toEqual(alice);
-          const denied = await call(bob.id, "GET", path);
+          const denied = await call(bob.id, "GET", path, undefined, workspace.id);
           expect(denied.status).toBe(403);
           expect(denied.body).toMatchObject({
             _tag: "CoreError.Denied",
@@ -362,11 +387,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         expect(created.status).toBe(201);
         const workspace = Schema.decodeUnknownSync(Workspace.Workspace)(created.body);
-        const issued = await call(alice.id, "POST", `/workspaces/${workspace.id}/invitations`, {
-          email: "bob@example.com",
-          expiresAt,
-          roleId: BuiltinRoles.MemberId,
-        });
+        const issued = await call(
+          alice.id,
+          "POST",
+          "/invitations",
+          { email: "bob@example.com", expiresAt, roleId: BuiltinRoles.MemberId },
+          workspace.id,
+        );
         expect(issued.status).toBe(201);
         const invitation = Schema.decodeUnknownSync(Invitation.Invitation)(issued.body);
         const bobId = invitation.details.recipientId;
@@ -385,25 +412,22 @@ describe.skipIf(!available)("PostgreSQL", () => {
       const bobId = invitation.details.recipientId;
       expect(member.identity).toEqual({ _tag: "Human", id: bobId });
       await withServer(url, async (call) => {
-        const owner = `/workspaces/${workspace.id}/members/${workspace.ownerMemberId}`;
+        const inWorkspace: Call = (token, method, path, body) =>
+          call(token, method, path, body, workspace.id);
+        const owner = `/members/${workspace.ownerMemberId}`;
         const accept = `/workspaces/${workspace.id}/invitations/${invitation.details.id}/accept`;
-        expect((await call(bobId, "GET", owner)).status).toBe(200);
+        expect((await inWorkspace(bobId, "GET", owner)).status).toBe(200);
         // Repeating acceptance returns the recorded membership.
         expect((await call(bobId, "POST", accept, { name: "bob" })).body).toEqual(first.member);
-        const issuedAgain = await call(
-          alice.id,
-          "POST",
-          `/workspaces/${workspace.id}/invitations`,
-          {
-            email: "charlie@example.com",
-            expiresAt,
-            roleId: BuiltinRoles.MemberId,
-          },
-        );
+        const issuedAgain = await inWorkspace(alice.id, "POST", "/invitations", {
+          email: "charlie@example.com",
+          expiresAt,
+          roleId: BuiltinRoles.MemberId,
+        });
         expect(issuedAgain.status).toBe(201);
         const second = Schema.decodeUnknownSync(Invitation.Invitation)(issuedAgain.body);
-        const revoke = `/workspaces/${workspace.id}/invitations/${second.details.id}/revoke`;
-        expect((await call(alice.id, "POST", revoke)).status).toBe(200);
+        const revoke = `/invitations/${second.details.id}/revoke`;
+        expect((await inWorkspace(alice.id, "POST", revoke)).status).toBe(200);
         const revoked = await call(
           second.details.recipientId,
           "POST",
@@ -415,24 +439,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
           _tag: "CoreError.Conflict",
           reason: { _tag: "InvitationClosed", reason: "revoked" },
         });
-        expect((await call(bobId, "DELETE", owner)).status).toBe(403);
-        expect((await call(alice.id, "DELETE", owner)).status).toBe(409);
-        const removed = await call(
-          alice.id,
-          "DELETE",
-          `/workspaces/${workspace.id}/members/${member.id}`,
-        );
+        expect((await inWorkspace(bobId, "DELETE", owner)).status).toBe(403);
+        expect((await inWorkspace(alice.id, "DELETE", owner)).status).toBe(409);
+        const removed = await inWorkspace(alice.id, "DELETE", `/members/${member.id}`);
         expect(removed.status).toBe(200);
         expect(removed.body).toMatchObject({ id: member.id, status: "removed" });
-        expect((await call(bobId, "GET", owner)).status).toBe(403);
-        expect(
-          (await call(alice.id, "GET", `/workspaces/${workspace.id}/members/${member.id}`)).body,
-        ).toEqual(removed.body);
+        expect((await inWorkspace(bobId, "GET", owner)).status).toBe(403);
+        expect((await inWorkspace(alice.id, "GET", `/members/${member.id}`)).body).toEqual(
+          removed.body,
+        );
         expect((await call(bobId, "POST", accept, { name: "bob" })).body).toEqual(removed.body);
-        expect(
-          (await call(alice.id, "DELETE", `/workspaces/${workspace.id}/members/${member.id}`))
-            .status,
-        ).toBe(409);
+        expect((await inWorkspace(alice.id, "DELETE", `/members/${member.id}`)).status).toBe(409);
       });
     }),
   );
@@ -464,8 +481,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           (await call(alice.id, "POST", "/workspaces", { name: "Streams", memberName: "alice" }))
             .body,
         );
-        const response = await fetch(`${base}/workspaces/${workspace.id}/changes`, {
-          headers: { authorization: `Bearer ${alice.id}` },
+        const response = await fetch(`${base}/changes`, {
+          headers: { authorization: `Bearer ${alice.id}`, "amends-workspace": workspace.id },
         });
         const reader = response.body?.getReader();
         if (reader === undefined) throw new Error("Expected a stream");

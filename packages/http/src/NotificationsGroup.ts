@@ -7,7 +7,6 @@
  * @since 0.1.0
  */
 import { Notification, NotificationInbox, NotificationStore } from "@amends-dev/core/notification";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
@@ -16,7 +15,7 @@ import * as ApiErrors from "./ApiErrors.ts";
 
 const record = Notification.Notification.annotate({ identifier: "Notification" });
 
-const params = { workspaceId: Workspace.Id, notificationId: Notification.Id };
+const params = { notificationId: Notification.Id };
 const cursor = Schema.fromJsonString(NotificationStore.Cursor);
 
 /**
@@ -31,7 +30,6 @@ const cursor = Schema.fromJsonString(NotificationStore.Cursor);
 export class NotificationsGroup extends HttpApiGroup.make("notifications")
   .add(
     HttpApiEndpoint.get("inbox", "/inbox", {
-      params: { workspaceId: Workspace.Id },
       query: {
         limit: NotificationStore.LatestOptions.fields.limit.check(Schema.isLessThanOrEqualTo(50)),
         before: Schema.optionalKey(cursor).annotate({
@@ -43,12 +41,10 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
       error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.get("count", "/count", {
-      params: { workspaceId: Workspace.Id },
       success: Schema.Struct({ pending: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
       error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.post("markSeenThrough", "/seen", {
-      params: { workspaceId: Workspace.Id },
       payload: Schema.Struct({ through: NotificationStore.Cursor }),
       success: Schema.Struct({ marked: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
       error: [...ApiErrors.workspace],
@@ -61,4 +57,4 @@ export class NotificationsGroup extends HttpApiGroup.make("notifications")
   )
   .middleware(WorkspaceMember)
   .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId/notifications") {}
+  .prefix("/notifications") {}

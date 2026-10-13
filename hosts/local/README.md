@@ -135,8 +135,8 @@ process stores is read by whichever process runs the job. Deploy them together.
 The web development server proxies `/api` to this host. Desktop connects directly to
 `http://127.0.0.1:8787`; it does not start a host process. The server's CORS layer allows
 `http://127.0.0.1:1420`, `tauri://localhost`, `http://tauri.localhost`, and
-`https://tauri.localhost`, with the authorization, content-type, idempotency-key, and tracing
-headers (`traceparent`, `tracestate`, and the Effect client's compact `b3` header). It applies to
+`https://tauri.localhost`, with the authorization, content-type, idempotency-key,
+`Amends-Workspace`, and tracing headers (`traceparent`, `tracestate`, and the Effect client's compact `b3` header). It applies to
 authentication failures too, so clients can handle a 401. Other origins receive no allow-origin
 header. Requests carry bearer tokens, not cookies, so a different web origin needs a same-origin
 proxy or a change to the host's CORS layer.
@@ -177,6 +177,8 @@ without signing in:
 AMENDS_SIGN_IN=development AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
   -d '{"name":"Design studio","memberName":"Alice"}' http://127.0.0.1:8787/workspaces
+curl -H 'Authorization: Bearer alice' -H 'Amends-Workspace: <workspace-id>' \
+  http://127.0.0.1:8787/members
 ```
 
 Nothing verifies control of the address. A new request replaces the previous pending code for that
@@ -184,7 +186,8 @@ address. A code becomes usable after delivery succeeds, can be used once, and ex
 ten-minute deadline. A failed or interrupted delivery removes its own attempt without deleting a
 newer one, and restarting the server discards pending codes.
 
-Requests without a token receive 401. Non-members receive 403 with `CoreError.Denied` (`NotMember`),
+Requests without a token receive 401. A member's request names its workspace in the
+`Amends-Workspace` header, and one without it receives 422. Non-members receive 403 with `CoreError.Denied` (`NotMember`),
 and core's outcomes keep their tags, such as `CoreError.NotFound` with 404.
 
 ## Modules

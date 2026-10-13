@@ -1,5 +1,11 @@
-import { Api, Authentication, BearerAuthentication, ChangeFeedHandlers } from "../src/index.ts";
-import * as WorkspaceMember from "../src/internal/workspace-member.ts";
+import {
+  Api,
+  Authentication,
+  BearerAuthentication,
+  ChangeFeedHandlers,
+  WorkspaceMember,
+} from "../src/index.ts";
+import * as WorkspaceMemberServer from "../src/internal/workspace-member.ts";
 import type * as Core from "@amends-dev/core";
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
 import { Actor, Identity } from "@amends-dev/core/identity";
@@ -61,13 +67,14 @@ const client = HttpApiTest.groups(Api.Api, ["changeFeed"]).pipe(
   Effect.provide(
     Layer.mergeAll(
       ChangeFeedHandlers.layer.pipe(
-        Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMember.layer)),
+        Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMemberServer.layer)),
         Layer.provide(Layer.mergeAll(gateway, credentials)),
       ),
       HttpServer.layerServices,
       HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
         next(HttpClientRequest.bearerToken(request, "alice")),
       ),
+      WorkspaceMember.layerClient(workspaceId),
     ),
   ),
 );
@@ -80,7 +87,7 @@ it.effect(
       const messages: Array<ChangeFeed.Message> = [];
       const exit = yield* Effect.gen(function* () {
         const api = yield* client;
-        const stream = yield* api.changeFeed.watch({ params: { workspaceId }, query: {} });
+        const stream = yield* api.changeFeed.watch({ query: {} });
         return yield* Stream.runForEach(stream, (message) =>
           Effect.sync(() => messages.push(message)),
         );

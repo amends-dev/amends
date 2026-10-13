@@ -10,7 +10,6 @@
  * @since 0.1.0
  */
 import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
@@ -18,7 +17,7 @@ import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
 
-const group = { workspaceId: Workspace.Id, groupId: Group.Id };
+const group = { groupId: Group.Id };
 const admission = { ...group, membershipId: GroupMembership.Id };
 const record = Group.Group.annotate({ identifier: "Group" });
 const membership = GroupMembership.GroupMembership.annotate({ identifier: "GroupMembership" });
@@ -35,7 +34,6 @@ const follower = Schema.Struct({ memberId: GroupFollow.Input.fields.memberId });
 export class GroupsGroup extends HttpApiGroup.make("groups")
   .add(
     HttpApiEndpoint.get("list", "/", {
-      params: { workspaceId: Workspace.Id },
       query: {
         limit,
         after: Schema.optionalKey(Group.Id).annotate({
@@ -46,7 +44,6 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       error: [...ApiErrors.workspace, ...ApiErrors.group],
     }),
     HttpApiEndpoint.get("listPublic", "/public", {
-      params: { workspaceId: Workspace.Id },
       query: {
         limit,
         after: Schema.optionalKey(Group.Id).annotate({
@@ -57,7 +54,6 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       error: [...ApiErrors.workspace, ...ApiErrors.group],
     }),
     HttpApiEndpoint.post("create", "/", {
-      params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
       payload: Group.CreateTeamInput,
       success: Group.Group.pipe(HttpApiSchema.status(201)).annotate({
@@ -133,4 +129,4 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
   )
   .middleware(WorkspaceMember)
   .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId/groups") {}
+  .prefix("/groups") {}

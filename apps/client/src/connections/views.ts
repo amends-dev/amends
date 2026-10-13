@@ -14,11 +14,11 @@ import { AsyncResult } from "effect/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useChanges } from "../api/changes.ts";
 import { workspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts";
 import { toDate } from "../conversations/time.ts";
 import { memberName } from "../conversations/views.ts";
-import { useApiClient } from "../provider.tsx";
+import { useWorkspaceClient } from "../provider.tsx";
 import {
   changeConnection,
   checkConnection,
@@ -72,7 +72,7 @@ export interface ConnectionListEntry {
  * shares the page's reads. `canCreate` says whether the reader may add one.
  */
 export function useConnectionList(workspaceId: string) {
-  const reads = connectionsReads(useApiClient(), workspaceId);
+  const reads = connectionsReads(useWorkspaceClient(workspaceId), workspaceId);
   const read = reads ? connect(reads) : undefined;
   const canCreate = useWorkspacePermission(workspaceId, "connection.create");
   const connections = createMemo((): readonly ConnectionListEntry[] | undefined => {
@@ -108,7 +108,7 @@ export function useConnections(
   workspaceId: string,
   options: { readonly done?: (done: ConnectionsDone) => void } = {},
 ) {
-  const reads = connectionsReads(useApiClient(), workspaceId);
+  const reads = connectionsReads(useWorkspaceClient(workspaceId), workspaceId);
   const canCreate = useWorkspacePermission(workspaceId, "connection.create");
   const members = useMembers(workspaceId);
   const read = reads ? connect(reads) : undefined;
@@ -142,7 +142,8 @@ export function useConnections(
   const loaded = () => read?.connections() !== undefined && read.integrations() !== undefined;
 
   const changes = useChanges({
-    write: changeConnection(workspaceId),
+    workspaceId,
+    write: changeConnection,
     reload: reads ? reloadConnections(reads) : Effect.void,
     failed: (cause) => {
       const failure = connectionsFailure(cause);
@@ -177,7 +178,7 @@ export function useConnections(
 
   // Checks run beside changes: each asks the connection's system, stores nothing, and keeps its
   // result, or why it could not run, with the connection it checked.
-  const checking = useMutation(checkConnection(workspaceId));
+  const checking = useWorkspaceMutation(workspaceId, checkConnection);
   const [checkingId, setCheckingId] = createSignal<string>();
   const [health, setHealth] = createSignal<Readonly<Record<string, ConnectionHealth>>>({});
   const [checkFailure, setCheckFailure] = createSignal<{

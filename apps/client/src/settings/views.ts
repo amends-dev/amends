@@ -31,7 +31,7 @@ import {
 } from "./api.ts";
 import { memberName, usePeople } from "../conversations/views.ts";
 import { toDate } from "../conversations/time.ts";
-import { useApiClient } from "../provider.tsx";
+import { useApiClient, useWorkspaceClient } from "../provider.tsx";
 import { useWorkspace } from "../session/directory.tsx";
 
 /** A change that completed and whose result is shown. */
@@ -86,11 +86,12 @@ export function useWorkspaceSettings(
   const people = usePeople(workspaceId);
   const selfId = () => membership()?.member.id as string | undefined;
   const client = useApiClient();
-  const reads = settingsReads(client, workspaceId);
+  const reads = settingsReads(useWorkspaceClient(workspaceId), workspaceId);
   const read = reads ? connect(reads, section) : undefined;
   const data = () => read?.data();
   const changes = useChanges({
-    write: changeSettings(workspaceId),
+    workspaceId,
+    write: changeSettings,
     reload: reads ? reloadSettings(client, reads, section) : Effect.void,
     done: (change: SettingsCommand, created, subject: string | undefined) => {
       if (change.kind === "rename") setName(undefined);

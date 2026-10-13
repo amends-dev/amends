@@ -2,8 +2,10 @@ import { useAtomSet } from "@effect/atom-solid";
 import { Effect, type Exit } from "effect";
 import { Atom, type AtomRegistry, type Reactivity } from "effect/reactivity";
 import { createSignal, onCleanup, type Accessor } from "solid-js";
-import { useApiClient } from "../provider.tsx";
-import type { Api } from "./client.ts";
+import { useApiClient, useWorkspaceClient } from "../provider.tsx";
+import type { Api, ApiClient, WorkspaceApi } from "./client.ts";
+
+type Services = AtomRegistry.AtomRegistry | Reactivity.Reactivity;
 
 export interface Mutation<I, A, E> {
   /** An operation is running. */
@@ -18,17 +20,29 @@ export interface Mutation<I, A, E> {
 }
 
 /**
- * Run an API operation for the mounted owner, one at a time; unmounting interrupts it. Signing in
- * or out remounts every owner, so an answer never reaches another credential's screens.
- * Rejected credentials need no handling here: the API client signs them out.
+ * Run an operation through the session's client, which acts in no workspace, for the mounted
+ * owner, one at a time; unmounting interrupts it. Signing in or out remounts every owner, so an
+ * answer never reaches another credential's screens. Rejected credentials need no handling here:
+ * the API client signs them out.
  */
 export function useMutation<A, E, I = void>(
-  operation: (
-    api: Api,
-    input: I,
-  ) => Effect.Effect<A, E, AtomRegistry.AtomRegistry | Reactivity.Reactivity>,
+  operation: (api: Api, input: I) => Effect.Effect<A, E, Services>,
 ): Mutation<I, A, E> {
-  const client = useApiClient();
+  return useMutationOn(useApiClient(), operation);
+}
+
+/** Run an operation through the client of the workspace `workspaceId`, as `useMutation` runs one. */
+export function useWorkspaceMutation<A, E, I = void>(
+  workspaceId: string,
+  operation: (api: WorkspaceApi, input: I) => Effect.Effect<A, E, Services>,
+): Mutation<I, A, E> {
+  return useMutationOn(useWorkspaceClient(workspaceId), operation);
+}
+
+function useMutationOn<A, E, I>(
+  client: ApiClient,
+  operation: (api: WorkspaceApi, input: I) => Effect.Effect<A, E, Services>,
+): Mutation<I, A, E> {
   const atom = client.runtime
     .fn<I>()((input) =>
       Effect.gen(function* () {

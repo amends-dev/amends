@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, type Accessor } from "solid-js";
 import { markRead, type ReadMark } from "./api.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 
 /** Whether the page is showing, so that what it shows can count as read. */
 export function usePageVisible(): Accessor<boolean> {
@@ -22,7 +22,7 @@ function useReadMarks(
 ) {
   const visible = usePageVisible();
   let attempted: number | undefined;
-  const request = useMutation(markRead(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, markRead);
   createEffect(() => {
     const value = due();
     if (value === undefined || !visible() || request.pending()) return;

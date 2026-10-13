@@ -10,9 +10,9 @@ import {
   ThreadParticipation,
 } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { refreshResult } from "../api/refresh.ts";
-import { useApiClient } from "../provider.tsx";
+import { useWorkspaceClient } from "../provider.tsx";
 import { useWorkspace } from "../session/directory.tsx";
 
 export interface FollowController {
@@ -52,8 +52,8 @@ function useFollow(
   const [expected, setExpected] = createSignal<boolean>(),
     [error, setError] = createSignal<WorkspaceFailure>();
   // A refresh that fails leaves the read as it was.
-  const request = useMutation((api, follow: Follow) =>
-    changeFollow(workspaceId)(api, follow).pipe(
+  const request = useWorkspaceMutation(workspaceId, (api, follow: Follow) =>
+    changeFollow(api, follow).pipe(
       Effect.andThen(shows ? Effect.ignore(refreshResult(shows)) : Effect.void),
     ),
   );
@@ -80,7 +80,7 @@ function useFollow(
 }
 /** The reader's entry for a group in their groups list, once read, and the read itself. */
 function useGroupItem(workspaceId: string, groupId: string) {
-  const read = groupsRead(useApiClient(), workspaceId);
+  const read = groupsRead(useWorkspaceClient(workspaceId), workspaceId);
   const groups = read ? useAtomValue(() => read) : () => AsyncResult.initial();
   const item = () =>
     Option.getOrUndefined(AsyncResult.value(groups()))?.find((entry) => entry.group.id === groupId);
@@ -97,7 +97,7 @@ export function useThreadFollow(
   events: FollowEvents = {},
 ): FollowController {
   const group = useGroupItem(workspaceId, groupId).item;
-  const read = participantsRead(useApiClient(), workspaceId, threadId);
+  const read = participantsRead(useWorkspaceClient(workspaceId), workspaceId, threadId);
   const participants = read ? useAtomValue(() => read) : () => AsyncResult.initial();
   const self = useWorkspace(() => workspaceId);
   const mine = () =>

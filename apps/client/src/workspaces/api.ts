@@ -2,7 +2,7 @@ import * as ApiErrors from "@amends-dev/http/ApiErrors";
 import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { Cause, Effect, Schema } from "effect";
 import { Reactivity } from "effect/reactivity";
-import type { Api } from "../api/client.ts";
+import type { Api, WorkspaceApi } from "../api/client.ts";
 import { WorkspaceDirectory } from "../api/contracts.ts";
 import { command } from "../api/failures.ts";
 import { directoryKey, workspaceKey } from "../api/keys.ts";
@@ -55,10 +55,9 @@ export const createWorkspace = (api: Api, workspace: NewWorkspace) =>
  * Choose what people in a workspace call the reader, then invalidate the reads that name members
  * and the directory, as the change feed would when the commit arrives.
  */
-export const renameSelf = (workspace: string) => (api: Api, name: string) =>
+export const renameSelf = (workspace: string) => (api: WorkspaceApi, name: string) =>
   Effect.gen(function* () {
     const renamed = yield* api.members.rename({
-      params: { workspaceId: yield* command(Workspace.Id)(workspace) },
       payload: { name: yield* command(Member.NewName)(name.trim()) },
     });
     yield* Reactivity.invalidate([workspaceKey(workspace, "members"), directoryKey]);
@@ -74,7 +73,7 @@ export interface Acceptance {
 /** Accept an invitation, joining its workspace. */
 export const acceptInvitation = (api: Api, acceptance: Acceptance) =>
   Effect.gen(function* () {
-    yield* api.invitations.accept({
+    yield* api.workspaces.acceptInvitation({
       params: {
         workspaceId: yield* command(Workspace.Id)(acceptance.workspaceId),
         invitationId: yield* command(Invitation.Id)(acceptance.invitationId),

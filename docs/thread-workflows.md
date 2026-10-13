@@ -6,8 +6,8 @@ them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadPartici
 `TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
 `Gateway.asMember`. Each reports the outcomes named below, and malformed input as
 `CoreError.Invalid` (`Malformed`); storage that fails otherwise is a defect. The [HTTP
-contract](../packages/http/README.md#conversations) exposes each operation under
-`/workspaces/:workspaceId`, with the status each outcome returns.
+contract](../packages/http/README.md#conversations) exposes each operation in the workspace its
+`Amends-Workspace` header names, with the status each outcome returns.
 
 ## Starting a conversation
 
@@ -190,8 +190,8 @@ as the transport needs it, and the channel's connection with its key; posts it t
 connection's integration; and records the id the system gave the message (`sent`), or why it gave
 up (`failed`). A message deleted before it was sent, a channel removed meanwhile, and a connection
 that can no longer be reached fail the delivery as it stands. Edits and deletions of a sent message
-are not carried yet. Over HTTP, channels sit under `/workspaces/:workspaceId/channels`, and systems'
-requests arrive at `POST …/channels/:channelId/events` without a session
+are not carried yet. Over HTTP, channels sit under `/channels`, and systems' requests arrive at
+`POST /workspaces/:workspaceId/channels/:channelId/events` without a session
 ([channels over HTTP](../packages/http/README.md#channels)).
 
 ## Participation and recipients
@@ -484,7 +484,7 @@ messages count as new activity, not quiet participation changes.
 
 ## Typing
 
-`ThreadMessageService.typing(threadId)`, and `POST /workspaces/:workspaceId/threads/:threadId/typing`
+`ThreadMessageService.typing(threadId)`, and `POST /threads/:threadId/typing`
 over HTTP, tells the thread's readers that the acting member is composing there. It needs the same
 current group access and `thread.publish` as publishing, and returns `CoreError.NotFound`
 for missing and inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals) reaches the group's

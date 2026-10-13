@@ -8,6 +8,7 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
+import { Actor } from "@amends-dev/core/identity";
 import * as Authentication from "./Authentication.ts";
 import { ChangeFeedService } from "@amends-dev/core/change-feed";
 import { Effect, Layer } from "effect";
@@ -31,9 +32,10 @@ export const layer = HttpApiBuilder.group(
     const unavailable = () =>
       new CoreError.Unavailable({ reason: new CoreError.ChangeFeedInterrupted() });
     return handlers.handleAll({
-      watch: ({ params, query }) =>
+      watch: ({ query }) =>
         Effect.gen(function* () {
-          yield* streams.hold(params.workspaceId, yield* Authentication.Principal);
+          const { workspaceId } = yield* Actor.Actor;
+          yield* streams.hold(workspaceId, yield* Authentication.Principal);
           const changeFeedService = yield* ChangeFeedService.ChangeFeedService;
           return streams.serve(yield* changeFeedService.watch(query), unavailable);
         }).pipe(Streams.withHeartbeats),

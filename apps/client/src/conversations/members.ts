@@ -3,7 +3,7 @@ import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { Group, changeMembership, type GroupMembership, type MembershipChange } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { useWorkspace } from "../session/directory.tsx";
 import { useGroupRoster, useGroups } from "./reads.ts";
 
@@ -51,7 +51,7 @@ export function useGroupMembers(
   const item = () => groups.value()?.find((entry) => entry.group.id === groupId);
   const own = () =>
     roster.value()?.find((admission) => admission.memberId === membership()?.member.id);
-  const request = useMutation(changeMembership(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, changeMembership(workspaceId));
   /** Make a change, showing `target` as the one changing until it answers. */
   async function applyChange(target: string, change: MembershipChange) {
     if (request.pending()) return;

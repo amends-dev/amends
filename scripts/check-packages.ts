@@ -160,7 +160,9 @@ for await (const path of new Bun.Glob(
     const contractImport =
       (path.startsWith("apps/client/src/api/") ||
         /^apps\/client\/src\/[^/]+\/api\.ts$/.test(path)) &&
-      (/^@amends-dev\/http\/(Api|ApiErrors|Authentication|\w+Group)$/.test(dependency) ||
+      (/^@amends-dev\/http\/(Api|ApiErrors|Authentication|WorkspaceMember|\w+Group)$/.test(
+        dependency,
+      ) ||
         /^@amends-dev\/core\/[a-z-]+$/.test(dependency) ||
         [
           "@amends-dev/gateway/Accounts",

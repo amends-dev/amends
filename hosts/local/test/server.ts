@@ -72,8 +72,9 @@ export const withServer = async <A>(
       }),
     ]);
     clearTimeout(timeout);
-    const call: Call = async (token, method, path, body) => {
+    const call: Call = async (token, method, path, body, workspaceId) => {
       const headers = new Headers({ authorization: `Bearer ${token}` });
+      if (workspaceId !== undefined) headers.set("amends-workspace", workspaceId);
       const request: RequestInit = { method, headers };
       if (body !== undefined) {
         headers.set("content-type", "application/json");
@@ -109,9 +110,14 @@ export const withServer = async <A>(
  */
 export type Stop = (signal?: "SIGTERM" | "SIGKILL") => Promise<number>;
 
+/**
+ * Send a request as the bearer of `token`; one to an endpoint a member calls names the workspace
+ * it acts in, `workspaceId`.
+ */
 export type Call = (
   token: string,
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
+  workspaceId?: string,
 ) => Promise<{ status: number; body: unknown }>;

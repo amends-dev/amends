@@ -7,14 +7,14 @@
  *
  * @since 0.1.0
  */
-import { Member, Workspace } from "@amends-dev/core/workspace";
+import { Member } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
 import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
-const params = { workspaceId: Workspace.Id, memberId: Member.Id };
+const params = { memberId: Member.Id };
 
 /**
  * Membership reads and removal, authorized by core for the principal's membership, and the
@@ -26,13 +26,11 @@ const params = { workspaceId: Workspace.Id, memberId: Member.Id };
 export class MembersGroup extends HttpApiGroup.make("members")
   .add(
     HttpApiEndpoint.put("rename", "/me/name", {
-      params: { workspaceId: Workspace.Id },
       payload: Schema.Struct({ name: Member.NewName }),
       success: Member.Member,
       error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.get("list", "/", {
-      params: { workspaceId: Workspace.Id },
       success: Schema.Array(Member.Member),
       error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
@@ -54,4 +52,4 @@ export class MembersGroup extends HttpApiGroup.make("members")
   )
   .middleware(WorkspaceMember)
   .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId/members") {}
+  .prefix("/members") {}

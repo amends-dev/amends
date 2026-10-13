@@ -1,4 +1,4 @@
-import { Api, Authentication, Streams } from "@amends-dev/http";
+import { Streams } from "@amends-dev/http";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { ChangeFeed } from "@amends-dev/core/change-feed";
 import { GroupFacts } from "@amends-dev/core/group";
@@ -20,18 +20,13 @@ import {
   Scope,
   Stream,
 } from "effect";
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
+import { HttpClient, HttpRouter } from "effect/http";
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
 import * as LocalHost from "../src/LocalHost.ts";
 import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
+import { client } from "./client.ts";
 
-const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-    next(HttpClientRequest.bearerToken(request, token)),
-  );
-const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 /**
  * The HTTP server over a host; the host's gateway stays available to seed what HTTP cannot. Limits
  * on open streams default to the server's own.
@@ -62,7 +57,6 @@ const listen = (
     const queue = yield* Queue.unbounded<ChangeFeed.Message>();
     yield* Stream.unwrap(
       api.changeFeed.watch({
-        params: { workspaceId },
         query: after === undefined ? {} : { after },
       }),
     ).pipe(
@@ -83,33 +77,35 @@ describe.skipIf(!available)("PostgreSQL", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const alice = yield* client("alice");
-          const workspace = yield* alice.workspaces.create({
+          const creator = yield* client("alice");
+          const workspace = yield* creator.workspaces.create({
             headers: {},
             payload: { name: "First", memberName: "alice" },
           });
-          const other = yield* alice.workspaces.create({
+          const other = yield* creator.workspaces.create({
             headers: {},
             payload: { name: "Other", memberName: "alice" },
           });
+          const alice = yield* client("alice", workspace.id);
           const first = yield* listen(alice, workspace.id);
           const second = yield* listen(alice, workspace.id);
-          const foreign = yield* listen(alice, other.id);
+          const foreign = yield* listen(yield* client("alice", other.id), other.id);
           const issue = (workspaceId: Workspace.Id, name = "bob") =>
-            alice.invitations.issue({
-              headers: {},
-              params: { workspaceId },
-              payload: {
-                email: `${name}@example.com`,
-                roleId: BuiltinRoles.MemberId,
-                expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), {
-                  days: 1,
-                }),
-              },
-            });
+            Effect.flatMap(client("alice", workspaceId), (inviter) =>
+              inviter.invitations.issue({
+                headers: {},
+                payload: {
+                  email: `${name}@example.com`,
+                  roleId: BuiltinRoles.MemberId,
+                  expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), {
+                    days: 1,
+                  }),
+                },
+              }),
+            );
           const invitation = yield* issue(workspace.id);
           // Development tokens are human IDs: each invitee's is their account's.
-          const bob = yield* client(invitation.details.recipientId);
+          const bob = yield* client(invitation.details.recipientId, workspace.id);
           const received = yield* first.next;
           expect(yield* second.next).toEqual(received);
           if (!ChangeFeed.Message.isAnyOf(["Committed"])(received))
@@ -126,7 +122,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(payload).toEqual(invitation.details);
           yield* issue(other.id, "carol");
           expect(yield* foreign.next).toMatchObject({ _tag: "Committed", workspaceId: other.id });
-          const member = yield* bob.invitations.accept({
+          const member = yield* bob.workspaces.acceptInvitation({
             params: { workspaceId: workspace.id, invitationId: invitation.details.id },
             payload: { name: "bob" },
           });
@@ -146,7 +142,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           // Projection state is readable by the time the commit is delivered.
           expect(
             yield* alice.members.get({
-              params: { workspaceId: workspace.id, memberId: member.id },
+              params: { memberId: member.id },
             }),
           ).toEqual(member);
           const asBob = yield* listen(bob, workspace.id);
@@ -175,8 +171,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* resumed.next).toEqual(afterEvent);
           // A viewer never sees invitations, which only invitation managers may list, but sees
           // the member an acceptance adds and their access.
-          const eve = yield* client(after.details.recipientId);
-          yield* eve.invitations.accept({
+          const eve = yield* client(after.details.recipientId, workspace.id);
+          yield* eve.workspaces.acceptInvitation({
             params: { workspaceId: workspace.id, invitationId: after.details.id },
             payload: { name: "eve" },
           });
@@ -196,7 +192,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           );
           // A member naming themselves reaches everyone who may read the members.
           yield* eve.members.rename({
-            params: { workspaceId: workspace.id },
             payload: { name: Member.Name.make("Eve Moss") },
           });
           const renamed = yield* second.next;
@@ -207,7 +202,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* asBob.next).toEqual(renamed);
           // A public group's creation reaches everyone who might join it, not only its members.
           const lobby = yield* alice.groups.create({
-            params: { workspaceId: workspace.id },
             headers: {},
             payload: { name: "Lobby", memberIds: [], visibility: "Public" },
           });
@@ -218,13 +212,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* second.next;
           yield* asBob.close;
           yield* alice.members.remove({
-            params: { workspaceId: workspace.id, memberId: member.id },
+            params: { memberId: member.id },
           });
-          expect(
-            yield* bob.changeFeed
-              .watch({ params: { workspaceId: workspace.id }, query: {} })
-              .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "NotMember" } });
+          expect(yield* bob.changeFeed.watch({ query: {} }).pipe(Effect.flip)).toMatchObject({
+            _tag: "CoreError.Denied",
+            reason: { _tag: "NotMember" },
+          });
           yield* Effect.all([second.close, foreign.close, reconnected.close, resumed.close]);
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
       ),
@@ -233,22 +226,21 @@ describe.skipIf(!available)("PostgreSQL", () => {
   it.live("typing over HTTP reaches the thread's other readers through their subscription", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
-        const alice = yield* client("alice");
-        const workspace = yield* alice.workspaces.create({
+        const workspace = yield* (yield* client("alice")).workspaces.create({
           headers: {},
           payload: { name: "Typing", memberName: "alice" },
         });
+        const alice = yield* client("alice", workspace.id);
         const invitation = yield* alice.invitations.issue({
           headers: {},
-          params: { workspaceId: workspace.id },
           payload: {
             email: "bob@example.com",
             roleId: BuiltinRoles.MemberId,
             expiresAt: DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"),
           },
         });
-        const bob = yield* client(invitation.details.recipientId);
-        const member = yield* bob.invitations.accept({
+        const bob = yield* client(invitation.details.recipientId, workspace.id);
+        const member = yield* bob.workspaces.acceptInvitation({
           params: { workspaceId: workspace.id, invitationId: invitation.details.id },
           payload: { name: "bob" },
         });
@@ -263,7 +255,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         );
         const threadId = started.thread.id;
         const watching = yield* listen(bob, workspace.id);
-        yield* alice.threads.typing({ params: { workspaceId: workspace.id, threadId } });
+        yield* alice.threads.typing({ params: { threadId } });
         const typing = yield* watching.next;
         expect(typing).toMatchObject({
           _tag: "Signal",
@@ -273,15 +265,18 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(
           yield* alice.threads
             .typing({
-              params: { workspaceId: workspace.id, threadId: Thread.Id.make("missing") },
+              params: { threadId: Thread.Id.make("missing") },
             })
             .pipe(Effect.flip),
         ).toMatchObject({ _tag: "CoreError.NotFound", resource: "Thread", id: "missing" });
         const http = yield* HttpClient.HttpClient;
-        const path = `/workspaces/${workspace.id}/threads/${threadId}/typing`;
-        expect((yield* http.post(path)).status).toBe(401);
+        const path = `/threads/${threadId}/typing`;
+        const inWorkspace = { "amends-workspace": workspace.id };
+        expect((yield* http.post(path, { headers: inWorkspace })).status).toBe(401);
         expect(
-          (yield* http.post(path, { headers: { authorization: "Bearer outsider" } })).status,
+          (yield* http.post(path, {
+            headers: { authorization: "Bearer outsider", ...inWorkspace },
+          })).status,
         ).toBe(403);
         yield* watching.close;
       }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
@@ -293,25 +288,27 @@ describe.skipIf(!available)("PostgreSQL", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const alice = yield* client("alice");
-          const workspace = yield* alice.workspaces.create({
+          const workspace = yield* (yield* client("alice")).workspaces.create({
             headers: {},
             payload: { name: "First", memberName: "alice" },
           });
           const http = yield* HttpClient.HttpClient;
-          const path = `/workspaces/${workspace.id}/changes`;
-          expect((yield* http.get(path)).status).toBe(401);
+          const path = "/changes";
+          const inWorkspace = { "amends-workspace": workspace.id };
+          expect((yield* http.get(path, { headers: inWorkspace })).status).toBe(401);
           expect(
-            (yield* http.get(path, { headers: { authorization: "Bearer outsider" } })).status,
+            (yield* http.get(path, {
+              headers: { authorization: "Bearer outsider", ...inWorkspace },
+            })).status,
           ).toBe(403);
           for (const after of ["-1", "x", "1.5"])
             expect(
               (yield* http.get(`${path}?after=${after}`, {
-                headers: { authorization: "Bearer alice" },
+                headers: { authorization: "Bearer alice", ...inWorkspace },
               })).status,
             ).toBe(400);
           const response = yield* http.get(path, {
-            headers: { authorization: "Bearer alice" },
+            headers: { authorization: "Bearer alice", ...inWorkspace },
           });
           expect(response.headers["content-type"]).toMatch(/^text\/event-stream/);
           expect(response.headers["cache-control"]).toBe("no-store");
@@ -326,7 +323,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const openapi = yield* (yield* http.get("/openapi.json")).json;
           expect(openapi).toMatchObject({
             paths: {
-              "/workspaces/{workspaceId}/changes": { get: { operationId: "changeFeed.watch" } },
+              "/changes": { get: { operationId: "changeFeed.watch" } },
             },
           });
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
@@ -336,23 +333,22 @@ describe.skipIf(!available)("PostgreSQL", () => {
   it.live("each workspace, and each member of it, may hold only so many open streams", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
-        const alice = yield* client("alice");
-        const workspace = yield* alice.workspaces.create({
+        const workspace = yield* (yield* client("alice")).workspaces.create({
           headers: {},
           payload: { name: "Busy", memberName: "alice" },
         });
+        const alice = yield* client("alice", workspace.id);
         const admitMember = Effect.fn(function* (name: string) {
           const invitation = yield* alice.invitations.issue({
             headers: {},
-            params: { workspaceId: workspace.id },
             payload: {
               email: `${name}@example.com`,
               roleId: BuiltinRoles.MemberId,
               expiresAt: DateTime.add(DateTime.makeUnsafe("2036-09-20T12:00:00.123Z"), { days: 1 }),
             },
           });
-          const api = yield* client(invitation.details.recipientId);
-          yield* api.invitations.accept({
+          const api = yield* client(invitation.details.recipientId, workspace.id);
+          yield* api.workspaces.acceptInvitation({
             params: { workspaceId: workspace.id, invitationId: invitation.details.id },
             payload: { name },
           });
@@ -361,11 +357,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const bob = yield* admitMember("bob");
         const carol = yield* admitMember("carol");
         const refused = (api: typeof alice) =>
-          Effect.flip(
-            Effect.scoped(
-              api.changeFeed.watch({ params: { workspaceId: workspace.id }, query: {} }),
-            ),
-          );
+          Effect.flip(Effect.scoped(api.changeFeed.watch({ query: {} })));
         const first = yield* listen(alice, workspace.id);
         yield* listen(alice, workspace.id);
         expect(yield* refused(alice)).toMatchObject({

@@ -2,7 +2,7 @@ import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { markSeen, markSeenThrough, type Notification } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 
 export interface SeenController {
   /** The reader marked it seen here; the inbox shows it once it refreshes. */
@@ -16,7 +16,7 @@ export interface SeenController {
 export function useMarkSeen(workspaceId: string, notificationId: string): SeenController {
   const [seen, setSeen] = createSignal(false),
     [error, setError] = createSignal<WorkspaceFailure>();
-  const request = useMutation(markSeen(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, markSeen);
   async function mark() {
     if (seen()) return;
     setError(undefined);
@@ -41,7 +41,7 @@ export function useMarkAllSeen(
   events: { readonly failed?: (failure: WorkspaceFailure) => void } = {},
 ): SeenAllController {
   const [error, setError] = createSignal<WorkspaceFailure>();
-  const request = useMutation(markSeenThrough(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, markSeenThrough);
   async function markAll(through: Pick<Notification.Notification, "recordedAt" | "id">) {
     setError(undefined);
     const exit = await request.run(through);

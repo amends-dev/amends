@@ -1,28 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Api, Authentication } from "@amends-dev/http";
 import { Accounts, SignIn } from "@amends-dev/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Effect, Layer, Logger, Redacted } from "effect";
 import { Base64 } from "effect/encoding";
-import { HttpClientRequest, HttpRouter } from "effect/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
+import { HttpRouter } from "effect/http";
 import * as EmailAuthentication from "../../src/EmailAuthentication.ts";
 import * as LocalConfig from "../../src/LocalConfig.ts";
 import * as LocalHost from "../../src/LocalHost.ts";
 import * as LocalServer from "../../src/LocalServer.ts";
+import { client } from "../client.ts";
 import { setup } from "../database.ts";
 
 const ada = Accounts.Email.make("ada@example.com");
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
-const client = (token: string) =>
-  HttpApiClient.make(Api.Api).pipe(
-    Effect.provide(
-      HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-        next(HttpClientRequest.bearerToken(request, token)),
-      ),
-    ),
-  );
-
 /** The real routes and host with email sign-in over PostgreSQL, and what the host logged. */
 const server = (url: string) => {
   const logged: Array<string> = [];

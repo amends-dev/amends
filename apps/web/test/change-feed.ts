@@ -51,8 +51,7 @@ export const notificationsSeen = (
  * The workspace sidebar's reads: the reader's groups, the members naming them, what the reader
  * may do there, and how many notifications are pending for them.
  */
-const sidebarRead =
-  /^\/workspaces\/[^/]+\/(groups|members|permissions|notifications\/count|active-turns)$/;
+const sidebarRead = /^\/(groups|members|permissions|notifications\/count|active-turns)$/;
 /**
  * What the sidebar's reads answer: nothing, unless a test grants permissions, lists groups, or
  * has notifications pending.
@@ -124,7 +123,7 @@ export function withChangeFeed(
         /* Already ended. */
       }
     });
-    const workspaceId = decodeURIComponent(path.split("/")[2] ?? "");
+    const workspaceId = request.headers.get("amends-workspace") ?? "";
     write("message", ready(workspaceId));
     streams.push({
       request,

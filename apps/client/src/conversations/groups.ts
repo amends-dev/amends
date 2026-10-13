@@ -3,7 +3,7 @@ import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { createGroup, isGroupName, joinGroup, type Group, type NewGroup } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { newWorkspaceRequestKey } from "../workspaces/api.ts";
 import { useWorkspace } from "../session/directory.tsx";
 
@@ -41,7 +41,7 @@ export function useCreateGroup(
     [visibility, setVisibility] = createSignal<Group.Visibility>("Private"),
     [error, setError] = createSignal<GroupChangeError>();
   let attempt: { readonly body: string; readonly key: NewGroup["key"] } | undefined;
-  const request = useMutation(createGroup(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, createGroup(workspaceId));
   const ready = () => isGroupName(name()) && membership() !== undefined && !request.pending();
   async function create() {
     const self = membership()?.member.id;
@@ -112,7 +112,7 @@ export function useJoinGroup(
 ): JoinGroupController {
   const [joining, setJoining] = createSignal<string>(),
     [error, setError] = createSignal<{ groupId: string; failure: WorkspaceFailure }>();
-  const request = useMutation(joinGroup(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, joinGroup(workspaceId));
   async function join(groupId: string) {
     if (request.pending()) return;
     setError(undefined);

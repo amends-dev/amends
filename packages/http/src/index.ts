@@ -171,6 +171,16 @@ export * as SessionHandlers from "./SessionHandlers.ts";
 /**
  * @since 0.1.0
  */
+export * as SettingsGroup from "./SettingsGroup.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as SettingsHandlers from "./SettingsHandlers.ts";
+
+/**
+ * @since 0.1.0
+ */
 export * as Streams from "./Streams.ts";
 
 /**

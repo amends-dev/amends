@@ -18,7 +18,6 @@ import {
   ThreadTimeline,
 } from "@amends-dev/core/thread";
 import { ReadState } from "@amends-dev/core/read-state";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
@@ -26,9 +25,9 @@ import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
 
-const thread = { workspaceId: Workspace.Id, threadId: Thread.Id };
-const message = { workspaceId: Workspace.Id, messageId: ThreadMessage.Id };
-const inGroup = { workspaceId: Workspace.Id, groupId: Group.Id };
+const thread = { threadId: Thread.Id };
+const message = { messageId: ThreadMessage.Id };
+const inGroup = { groupId: Group.Id };
 const reply = Schema.Struct({
   text: ThreadMessage.PublishInput.fields.text,
   mentions: ThreadMessage.PublishInput.fields.mentions,
@@ -91,7 +90,6 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
       error: [...ApiErrors.workspace, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.post("startDirect", "/threads", {
-      params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
       payload: Thread.StartDirectInput,
       success: started,
@@ -183,5 +181,4 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
     }),
   )
   .middleware(WorkspaceMember)
-  .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId") {}
+  .middleware(Authentication) {}

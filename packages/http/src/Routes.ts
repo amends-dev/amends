@@ -22,6 +22,7 @@ import * as MembersHandlers from "./MembersHandlers.ts";
 import * as NotificationsHandlers from "./NotificationsHandlers.ts";
 import * as SessionHandlers from "./SessionHandlers.ts";
 import * as WorkspacesHandlers from "./WorkspacesHandlers.ts";
+import * as SettingsHandlers from "./SettingsHandlers.ts";
 import * as ChangeFeedHandlers from "./ChangeFeedHandlers.ts";
 import * as ConnectionsHandlers from "./ConnectionsHandlers.ts";
 import * as AgentsHandlers from "./AgentsHandlers.ts";
@@ -43,6 +44,7 @@ export const layerHandlers = Layer.mergeAll(
   MeHandlers.layer,
   AccountsHandlers.layer,
   WorkspacesHandlers.layer,
+  SettingsHandlers.layer,
   MembersHandlers.layer,
   InvitationsHandlers.layer,
   AssignmentsHandlers.layer,

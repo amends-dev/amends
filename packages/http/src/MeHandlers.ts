@@ -9,11 +9,10 @@
  */
 import * as Api from "./Api.ts";
 import * as Authentication from "./Authentication.ts";
-import { Identity } from "@amends-dev/core/identity";
 import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway";
 import { Array, Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
-import { CoreError } from "@amends-dev/core/error";
+import { requireHuman } from "./internal/human.ts";
 
 /**
  * Register the principal's own handlers over the host's accounts, directory, and session tokens,
@@ -32,10 +31,8 @@ export const layer = HttpApiBuilder.group(
     return handlers.handleAll({
       account: () =>
         Effect.gen(function* () {
-          const principal = yield* Authentication.Principal;
-          if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
-            return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() });
-          const found = Array.head(yield* accounts.findByIds([principal.id]));
+          const person = yield* requireHuman;
+          const found = Array.head(yield* accounts.findByIds([person.id]));
           if (found._tag === "None")
             return yield* new Authentication.Unauthorized({
               message: "No account holds this session",

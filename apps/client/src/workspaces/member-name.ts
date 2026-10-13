@@ -2,7 +2,7 @@ import type { ChangeNameError } from "@amends-dev/ui/screens/account";
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { workspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { isMemberName, renameSelf, suggestedName } from "./api.ts";
 import { useSession } from "../provider.tsx";
 import { useWorkspace } from "../session/directory.tsx";
@@ -29,7 +29,7 @@ export function useMemberName(workspaceId: string, saved: () => void): MemberNam
   const current = () => membership()?.member.name;
   const [name, setName] = createSignal(""),
     [error, setError] = createSignal<ChangeNameError>();
-  const request = useMutation(renameSelf(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, renameSelf(workspaceId));
   const ready = () => isMemberName(name()) && name().trim() !== current() && !request.pending();
   async function save() {
     if (!ready()) return;

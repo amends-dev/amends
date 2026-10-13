@@ -18,9 +18,8 @@ import { Authentication } from "./Authentication.ts";
 import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
-const workspace = { workspaceId: Workspace.Id };
-const channel = { workspaceId: Workspace.Id, channelId: Channel.Id };
-const thread = { workspaceId: Workspace.Id, threadId: Thread.Id };
+const channel = { channelId: Channel.Id };
+const thread = { threadId: Thread.Id };
 const record = Channel.Channel.annotate({ identifier: "Channel" });
 /** The body an external system sends, and the answer it is given, as text: the transport reads it. */
 const text = Schema.String.pipe(HttpApiSchema.asText());
@@ -38,12 +37,10 @@ const text = Schema.String.pipe(HttpApiSchema.asText());
 export class ChannelsGroup extends HttpApiGroup.make("channels")
   .add(
     HttpApiEndpoint.get("list", "/channels", {
-      params: workspace,
       success: Schema.Array(record),
       error: [...ApiErrors.workspace, ...ApiErrors.channelRead],
     }),
     HttpApiEndpoint.post("create", "/channels", {
-      params: workspace,
       headers: ApiErrors.requestKey,
       payload: Channel.CreateInput,
       success: record.pipe(HttpApiSchema.status(201)),
@@ -72,8 +69,7 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
     }),
   )
   .middleware(WorkspaceMember)
-  .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId") {}
+  .middleware(Authentication) {}
 
 /**
  * What external systems send a channel. No session authenticates these requests: the channel's
@@ -85,7 +81,7 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
  */
 export class ChannelEventsGroup extends HttpApiGroup.make("channelEvents").add(
   HttpApiEndpoint.post("receive", "/workspaces/:workspaceId/channels/:channelId/events", {
-    params: channel,
+    params: { workspaceId: Workspace.Id, channelId: Channel.Id },
     payload: text,
     success: text,
     error: [...ApiErrors.workspace, ...ApiErrors.channelEvents],

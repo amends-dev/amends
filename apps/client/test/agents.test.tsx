@@ -203,18 +203,17 @@ function fixture() {
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    const base = "/workspaces/one/agents";
+    const base = "/agents";
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 1 }], invitations: [] });
-    if (path === "/workspaces/one/members") return json([owner]);
-    if (path === "/workspaces/one/permissions") return json(["agent.create"]);
-    if (path === "/workspaces/one/settings") return json(settings);
-    if (path === "/workspaces/one/groups") return json(groups);
-    if (path === "/workspaces/one/active-turns") return json(activeTurns);
-    if (path === "/workspaces/one/connections/integrations") return json(integrations);
-    if (path === "/workspaces/one/connections") return json(connections);
-    if (path === "/workspaces/one/connections/openrouter/models")
-      return json({ listed: [opus], unlisted: false });
+    if (path === "/members") return json([owner]);
+    if (path === "/permissions") return json(["agent.create"]);
+    if (path === "/settings") return json(settings);
+    if (path === "/groups") return json(groups);
+    if (path === "/active-turns") return json(activeTurns);
+    if (path === "/connections/integrations") return json(integrations);
+    if (path === "/connections") return json(connections);
+    if (path === "/connections/openrouter/models") return json({ listed: [opus], unlisted: false });
     if (path.endsWith("/models")) return json({ listed: [], unlisted: true });
     if (path === base && request.method === "GET")
       return json(
@@ -229,8 +228,8 @@ function fixture() {
     });
     const answer = server.answers.shift();
     if (answer) return answer;
-    if (path.startsWith("/workspaces/one/members/") && request.method === "DELETE") {
-      const memberId = path.split("/")[4];
+    if (path.startsWith("/members/") && request.method === "DELETE") {
+      const memberId = path.split("/")[2];
       const removed = server.agents.find((agent) => agent.memberId === memberId);
       server.agents = server.agents.filter((agent) => agent !== removed);
       return json({
@@ -256,7 +255,7 @@ function fixture() {
       server.agents.push(created);
       return json(viewOf(created), 201);
     }
-    const id = path.split("/")[4];
+    const id = path.split("/")[2];
     const stored = server.agents.find((agent) => agent.id === id);
     if (!stored) return json({ _tag: "CoreError.NotFound", resource: "Agent", id }, 404);
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
@@ -580,7 +579,7 @@ it("saves a setup as a whole once it differs, and discards edits", async () => {
   await waitFor(() => expect(f.done).toEqual([{ action: "configure", subject: "Reviewer" }]));
   expect(f.writes[0]).toMatchObject({
     method: "PUT",
-    path: "/workspaces/one/agents/reviewer/configuration",
+    path: "/agents/reviewer/configuration",
     body: {
       instructions: "Review each change.",
       harness: { _tag: "Connection", connectionId: "amends" },
@@ -615,7 +614,7 @@ it("keeps a rename draft through a conflict, and removes an agent by its members
   expect(f.done[1]).toEqual({ action: "remove", subject: "Critic" });
   expect(f.writes[2]).toMatchObject({
     method: "DELETE",
-    path: "/workspaces/one/members/member-reviewer",
+    path: "/members/member-reviewer",
   });
   expect(f.view.agent("reviewer")).toBeUndefined();
 });

@@ -10,7 +10,7 @@ import {
 } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
-import type { Api, ApiClient } from "../api/client.ts";
+import type { ApiClient, WorkspaceApi } from "../api/client.ts";
 import { Accounts } from "../api/contracts.ts";
 import { directoryQuery } from "../api/directory.ts";
 import { command } from "../api/failures.ts";
@@ -56,18 +56,14 @@ export const invitationIntent = (email: string, roleId: string) => ({
 const idle = <A>(atom: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>) =>
   Atom.make(AsyncResult.success([])) as unknown as typeof atom;
 const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
-  const params = { workspaceId };
-  const members = client.query("workspaces", "members", {
-    params,
+  const members = client.query("settings", "members", {
     reactivityKeys: [workspaceKey(workspaceId, "members")],
   });
   const invitations = client.query("invitations", "list", {
-    params,
     reactivityKeys: [workspaceKey(workspaceId, "invitations")],
   });
   // Whom the roster and the invitations name changes with either.
   const accounts = client.query("accounts", "list", {
-    params,
     reactivityKeys: [
       workspaceKey(workspaceId, "members"),
       workspaceKey(workspaceId, "invitations"),
@@ -77,12 +73,10 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
     idleInvitations = idle(invitations),
     idleAccounts = idle(accounts);
   return {
-    settings: client.query("workspaces", "settings", {
-      params,
+    settings: client.query("settings", "get", {
       reactivityKeys: [workspaceKey(workspaceId, "settings")],
     }),
-    ownership: client.query("workspaces", "ownership", {
-      params,
+    ownership: client.query("settings", "ownership", {
       reactivityKeys: [workspaceKey(workspaceId, "ownership")],
     }),
     members: (enabled: boolean) => (enabled ? members : idleMembers),
@@ -91,9 +85,9 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
   };
 };
 /**
- * The credential-scoped reads behind the settings sections. Each registers its invalidation key,
- * so the workspace change feed and writes refresh whichever are mounted. Undefined for an
- * invalid workspace ID.
+ * The reads behind the settings sections, through the workspace's client. Each registers its
+ * invalidation key, so the workspace change feed and writes refresh whichever are mounted.
+ * Undefined for an invalid workspace ID.
  */
 export const settingsReads = (client: ApiClient, workspaceId: string) =>
   Option.getOrUndefined(
@@ -102,36 +96,31 @@ export const settingsReads = (client: ApiClient, workspaceId: string) =>
 export type SettingsReads = ReturnType<typeof reads>;
 
 /** Make one change to the workspace's settings, answering with the invitation it issued, if any. */
-export const changeSettings = (workspace: string) => (api: Api, change: SettingsCommand) =>
+export const changeSettings = (api: WorkspaceApi, change: SettingsCommand) =>
   Effect.gen(function* () {
-    const params = { workspaceId: yield* command(Workspace.Id)(workspace) };
     switch (change.kind) {
       case "rename":
-        yield* api.workspaces.rename({
-          params,
+        yield* api.settings.rename({
           payload: yield* command(WorkspaceSettings.RenameInput)(change),
         });
         return undefined;
       case "transfer":
-        yield* api.workspaces.transferOwnership({
-          params,
+        yield* api.settings.transferOwnership({
           payload: yield* command(Ownership.TransferInput)(change),
         });
         return undefined;
       case "role":
         yield* api.assignments.change({
-          params,
           payload: yield* command(Assignment.ChangeInput)(change),
         });
         return undefined;
       case "remove":
         yield* api.members.remove({
-          params: { ...params, memberId: yield* command(Member.Id)(change.memberId) },
+          params: { memberId: yield* command(Member.Id)(change.memberId) },
         });
         return undefined;
       case "invite": {
         const issued = yield* api.invitations.issue({
-          params,
           payload: {
             email: yield* command(Accounts.Email)(change.email),
             roleId: yield* command(Invitation.IssueInput.fields.roleId)(change.roleId),
@@ -143,12 +132,15 @@ export const changeSettings = (workspace: string) => (api: Api, change: Settings
       }
       case "revoke":
         yield* api.invitations.revoke({
-          params: { ...params, invitationId: yield* command(Invitation.Id)(change.invitationId) },
+          params: { invitationId: yield* command(Invitation.Id)(change.invitationId) },
         });
         return undefined;
     }
   });
-/** Reload a section and the directory, which names the workspace, as a change's result shows. */
+/**
+ * Reload a section and the directory, which names the workspace, as a change's result shows; the
+ * directory is the session `client`'s read.
+ */
 export const reloadSettings = (client: ApiClient, reads: SettingsReads, section: SettingsTab) =>
   Effect.gen(function* () {
     const [settings] = yield* Effect.all(

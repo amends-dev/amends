@@ -9,7 +9,6 @@
  * @since 0.1.0
  */
 import { Turn } from "@amends-dev/core/turn";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
@@ -18,7 +17,7 @@ import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
 import { CoreError } from "@amends-dev/core/error";
 
-const turn = { workspaceId: Workspace.Id, turnId: Turn.Id };
+const turn = { turnId: Turn.Id };
 const view = Turn.View.annotate({ identifier: "Turn" });
 
 /**
@@ -34,7 +33,6 @@ const view = Turn.View.annotate({ identifier: "Turn" });
 export class TurnsGroup extends HttpApiGroup.make("turns")
   .add(
     HttpApiEndpoint.get("listActive", "/active-turns", {
-      params: { workspaceId: Workspace.Id },
       query: { limit },
       success: Schema.Array(view),
       error: ApiErrors.workspace,
@@ -61,5 +59,4 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
     }),
   )
   .middleware(WorkspaceMember)
-  .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId") {}
+  .middleware(Authentication) {}

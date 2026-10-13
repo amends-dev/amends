@@ -10,7 +10,6 @@
  * @since 0.1.0
  */
 import { ChangeFeed } from "@amends-dev/core/change-feed";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
@@ -28,8 +27,7 @@ import { CoreError } from "@amends-dev/core/error";
  */
 export class ChangeFeedGroup extends HttpApiGroup.make("changeFeed")
   .add(
-    HttpApiEndpoint.get("watch", "/workspaces/:workspaceId/changes", {
-      params: { workspaceId: Workspace.Id },
+    HttpApiEndpoint.get("watch", "/changes", {
       query: {
         after: Schema.optionalKey(ChangeFeed.Cursor).annotate({
           description: "Resume after the commit that carried this cursor.",

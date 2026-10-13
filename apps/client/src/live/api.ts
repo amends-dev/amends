@@ -379,7 +379,6 @@ const run = Effect.fnUntraced(function* (
     yield* Queue.clear(wake);
     const connection = api.changeFeed
       .watch({
-        params: { workspaceId: id.value },
         query: cursor === undefined ? {} : { after: cursor },
       })
       .pipe(Effect.flatMap(Stream.runForEach(receive)));
@@ -428,7 +427,7 @@ const makeFamily = (client: ApiClient) =>
     ),
   );
 const families = new WeakMap<ApiClient, ReturnType<typeof makeFamily>>();
-/** One shared stream per workspace in a credential scope, open while any consumer is mounted. */
+/** One shared stream per workspace, through its client, open while any consumer is mounted. */
 export const changeFeed = (client: ApiClient, workspaceId: string) => {
   let family = families.get(client);
   if (!family) {

@@ -1,9 +1,9 @@
 import { Cause, Exit, type Effect } from "effect";
 import type { AtomRegistry, Reactivity } from "effect/reactivity";
 import { createSignal, type Accessor } from "solid-js";
-import type { Api } from "./client.ts";
+import type { WorkspaceApi } from "./client.ts";
 import { isStale, workspaceFailure, type WorkspaceFailure } from "./failures.ts";
-import { useMutation } from "./mutation.ts";
+import { useWorkspaceMutation } from "./mutation.ts";
 
 type Services = AtomRegistry.AtomRegistry | Reactivity.Reactivity;
 
@@ -21,8 +21,13 @@ export type ChangeFailure<K extends string, E extends string, P> = ChangeError<E
 };
 
 export interface ChangesOptions<C extends { readonly kind: string }, D, E extends string, P> {
+  /** The workspace the page's changes are made in. */
+  readonly workspaceId: string;
   /** Write one change, answering with the ID of what it created, if anything. */
-  readonly write: (api: Api, change: C) => Effect.Effect<string | undefined, unknown, Services>;
+  readonly write: (
+    api: WorkspaceApi,
+    change: C,
+  ) => Effect.Effect<string | undefined, unknown, Services>;
   /** Reload what the page shows; a change is done once its result shows. */
   readonly reload: Effect.Effect<unknown, unknown, Services>;
   /** How a failed write shows; by default, as its workspace failure. */
@@ -45,8 +50,8 @@ export function useChanges<
   E extends string = never,
   P = never,
 >(options: ChangesOptions<C, D, E, P>) {
-  const write = useMutation(options.write);
-  const reload = useMutation(() => options.reload);
+  const write = useWorkspaceMutation(options.workspaceId, options.write);
+  const reload = useWorkspaceMutation(options.workspaceId, () => options.reload);
   // The change running or last run, with what it was sent with, until it is done or set aside.
   const [attempt, setAttempt] = createSignal<{
     readonly action: C["kind"] | "refresh";

@@ -1,27 +1,21 @@
-import { Api, Authentication } from "@amends-dev/http";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Group } from "@amends-dev/core/group";
 import { Identity } from "@amends-dev/core/identity";
 import type { Thread } from "@amends-dev/core/thread";
-import type { Member, Workspace } from "@amends-dev/core/workspace";
+import type { Member } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Effect, Layer, Redacted, Schedule } from "effect";
 import { Base64 } from "effect/encoding";
-import { HttpClientRequest, HttpRouter } from "effect/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
+import { HttpRouter } from "effect/http";
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
 import * as LocalHost from "../src/LocalHost.ts";
 import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
+import { client, type Client } from "./client.ts";
 import { type Call, withServer } from "./server.ts";
 
 const alice = Identity.HumanId.make("alice");
-const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-    next(HttpClientRequest.bearerToken(request, token)),
-  );
-const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
 /** The real routes, gateway, and PostgreSQL storage behind a Bun test server, over `host`. */
 const serve = (host: LocalHost.HostLayer) =>
@@ -119,21 +113,19 @@ const fakeModels = (answers: ReadonlyArray<string>, release: Promise<void> = Pro
  */
 const workspaceWithAgent = (modelsUrl: string) =>
   Effect.gen(function* () {
-    const asAlice = yield* client(alice);
-    const { id: workspaceId } = yield* asAlice.workspaces.create({
+    const { id: workspaceId } = yield* (yield* client(alice)).workspaces.create({
       headers: {},
       payload: { name: "Studio", memberName: "Alice" },
     });
+    const asAlice = yield* client(alice, workspaceId);
     const connect = (integration: string, settings: Record<string, string> = {}) =>
       asAlice.connections.create({
-        params: { workspaceId },
         headers: {},
         payload: { integration, name: integration, settings, auth: "none" },
       });
     const amends = yield* connect("amends");
     const models = yield* connect("openai-compatible", { url: modelsUrl });
     const agent = yield* asAlice.agents.create({
-      params: { workspaceId },
       headers: {},
       payload: {
         name: "Planner",
@@ -144,15 +136,13 @@ const workspaceWithAgent = (modelsUrl: string) =>
         sandbox: null,
       },
     });
-    return { asAlice, workspaceId, agent };
+    return { asAlice, agent };
   });
-
-type Client = Effect.Success<ReturnType<typeof client>>;
 
 /** The thread's messages the agent `memberId` posted, once it posted `count`, read every 100 ms. */
 const agentMessages = (
   asAlice: Client,
-  params: { readonly workspaceId: Workspace.Id; readonly threadId: Thread.Id },
+  params: { readonly threadId: Thread.Id },
   memberId: Member.Id,
   count: number,
 ) =>
@@ -183,13 +173,13 @@ describe.skipIf(!available).each(Object.entries(servers))(
         withDatabase((url) =>
           Effect.gen(function* () {
             const models = yield* fakeModels(["The plan is on track.", "The risks are small."]);
-            const { asAlice, workspaceId, agent } = yield* workspaceWithAgent(models.baseUrl);
+            const { asAlice, agent } = yield* workspaceWithAgent(models.baseUrl);
             const started = yield* asAlice.threads.start({
-              params: { workspaceId, groupId: Group.GeneralId },
+              params: { groupId: Group.GeneralId },
               headers: {},
               payload: { text: "Planner, summarize the plan.", mentions: [agent.memberId] },
             });
-            const params = { workspaceId, threadId: started.thread.id };
+            const params = { threadId: started.thread.id };
 
             // The mention runs the agent's turn job, which posts its answer as the agent.
             const [answer] = yield* agentMessages(asAlice, params, agent.memberId, 1);
@@ -200,7 +190,7 @@ describe.skipIf(!available).each(Object.entries(servers))(
             ]);
             if (answer?.via?._tag !== "Turn") return yield* Effect.die("Expected an agent's reply");
             const turn = yield* asAlice.turns.get({
-              params: { workspaceId, turnId: answer.via.turnId },
+              params: { turnId: answer.via.turnId },
             });
             expect(turn).toMatchObject({ status: "completed", messageIds: [answer!.id] });
 
@@ -231,9 +221,9 @@ describe.skipIf(!available).each(Object.entries(servers))(
           const released = Promise.withResolvers<void>();
           yield* Effect.addFinalizer(() => Effect.sync(() => released.resolve()));
           const models = yield* fakeModels(["Too late."], released.promise);
-          const { asAlice, workspaceId, agent } = yield* workspaceWithAgent(models.baseUrl);
+          const { asAlice, agent } = yield* workspaceWithAgent(models.baseUrl);
           const started = yield* asAlice.threads.start({
-            params: { workspaceId, groupId: Group.GeneralId },
+            params: { groupId: Group.GeneralId },
             headers: {},
             payload: { text: "Planner, draft the notes.", mentions: [agent.memberId] },
           });
@@ -243,24 +233,21 @@ describe.skipIf(!available).each(Object.entries(servers))(
             Effect.timeout("20 seconds"),
           );
           const [running] = yield* asAlice.turns.listActive({
-            params: { workspaceId },
             query: { limit: 10 },
           });
           expect(running).toMatchObject({ status: "running", stoppable: true });
-          yield* asAlice.turns.cancel({ params: { workspaceId, turnId: running!.id } });
-          const stopped = yield* asAlice.turns
-            .get({ params: { workspaceId, turnId: running!.id } })
-            .pipe(
-              Effect.repeat({
-                until: ({ status }) => status === "cancelled",
-                schedule: Schedule.spaced("100 millis"),
-              }),
-              Effect.timeout("20 seconds"),
-            );
+          yield* asAlice.turns.cancel({ params: { turnId: running!.id } });
+          const stopped = yield* asAlice.turns.get({ params: { turnId: running!.id } }).pipe(
+            Effect.repeat({
+              until: ({ status }) => status === "cancelled",
+              schedule: Schedule.spaced("100 millis"),
+            }),
+            Effect.timeout("20 seconds"),
+          );
           expect(stopped).toMatchObject({ cancelReason: "requested", messageIds: [] });
           released.resolve();
           const timeline = yield* asAlice.threads.timeline({
-            params: { workspaceId, threadId: started.thread.id },
+            params: { threadId: started.thread.id },
             query: { limit: 50 },
           });
           expect(timeline.filter((item) => "message" in item)).toHaveLength(1);
@@ -276,36 +263,44 @@ describe.skipIf(!available).each(Object.entries(servers))(
  * return the text of its reply once it posts one, or nothing after twenty seconds.
  */
 const mentionPlanner = async (call: Call, modelsUrl: string) => {
-  const created = async <A = { readonly id: string }>(path: string, payload: object) => {
-    const { status, body } = await call(alice, "POST", path, payload);
+  const created = async <A = { readonly id: string }>(
+    path: string,
+    payload: object,
+    workspaceId?: string,
+  ) => {
+    const { status, body } = await call(alice, "POST", path, payload, workspaceId);
     expect(status).toBe(201);
     return body as A;
   };
   const { id: workspaceId } = await created("/workspaces", { name: "Studio", memberName: "Alice" });
   const connect = (integration: string, settings: object) =>
-    created(`/workspaces/${workspaceId}/connections`, {
-      integration,
-      name: integration,
-      settings,
-      auth: "none",
-    });
+    created(
+      "/connections",
+      { integration, name: integration, settings, auth: "none" },
+      workspaceId,
+    );
   const amends = await connect("amends", {});
   const models = await connect("openai-compatible", { url: modelsUrl });
-  const agent = await created<{ readonly memberId: string }>(`/workspaces/${workspaceId}/agents`, {
-    name: "Planner",
-    roleId: BuiltinRoles.MemberId,
-    instructions: "Plan each change.",
-    harness: { _tag: "Connection", connectionId: amends.id },
-    model: { connectionId: models.id, id: "fake-model" },
-    sandbox: null,
-  });
-  const { thread } = await created<{ readonly thread: { readonly id: string } }>(
-    `/workspaces/${workspaceId}/groups/${Group.GeneralId}/threads`,
-    { text: "Planner, summarize the plan.", mentions: [agent.memberId] },
+  const agent = await created<{ readonly memberId: string }>(
+    "/agents",
+    {
+      name: "Planner",
+      roleId: BuiltinRoles.MemberId,
+      instructions: "Plan each change.",
+      harness: { _tag: "Connection", connectionId: amends.id },
+      model: { connectionId: models.id, id: "fake-model" },
+      sandbox: null,
+    },
+    workspaceId,
   );
-  const timeline = `/workspaces/${workspaceId}/threads/${thread.id}/timeline?limit=50`;
+  const { thread } = await created<{ readonly thread: { readonly id: string } }>(
+    `/groups/${Group.GeneralId}/threads`,
+    { text: "Planner, summarize the plan.", mentions: [agent.memberId] },
+    workspaceId,
+  );
+  const timeline = `/threads/${thread.id}/timeline?limit=50`;
   for (const deadline = Date.now() + 20_000; Date.now() < deadline; await Bun.sleep(100)) {
-    const { body } = await call(alice, "GET", timeline);
+    const { body } = await call(alice, "GET", timeline, undefined, workspaceId);
     const reply = (body as ReadonlyArray<Partial<TimelineMessage>>).find(
       (item) => item.message?.author.memberId === agent.memberId,
     );

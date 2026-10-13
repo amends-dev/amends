@@ -31,7 +31,7 @@ import { workspaceFailure } from "../api/failures.ts";
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts";
 import { toDate } from "../conversations/time.ts";
 import { memberName } from "../conversations/views.ts";
-import { useApiClient } from "../provider.tsx";
+import { useWorkspaceClient } from "../provider.tsx";
 import { useTurnActivity } from "../turns/views.ts";
 import {
   agentsFailure,
@@ -173,7 +173,7 @@ export interface AgentListEntry {
  * `canCreate` says whether the reader may add one.
  */
 export function useAgentList(workspaceId: string) {
-  const reads = agentsReads(useApiClient(), workspaceId);
+  const reads = agentsReads(useWorkspaceClient(workspaceId), workspaceId);
   const agents = reads ? useAtomValue(() => reads.agents) : undefined;
   const canCreate = useWorkspacePermission(workspaceId, "agent.create");
   const turnActivity = useTurnActivity(workspaceId);
@@ -213,7 +213,7 @@ export function useAgents(
   workspaceId: string,
   options: { readonly done?: (done: AgentsDone) => void } = {},
 ) {
-  const reads = agentsReads(useApiClient(), workspaceId);
+  const reads = agentsReads(useWorkspaceClient(workspaceId), workspaceId);
   const canCreate = useWorkspacePermission(workspaceId, "agent.create");
   const members = useMembers(workspaceId);
   const turnActivity = useTurnActivity(workspaceId);
@@ -366,7 +366,8 @@ export function useAgents(
   );
 
   const changes = useChanges({
-    write: changeAgent(workspaceId),
+    workspaceId,
+    write: changeAgent,
     reload: reads ? reloadAgents(reads) : Effect.void,
     failed: (cause) => {
       const { error, ...problem } = agentsFailure(cause);

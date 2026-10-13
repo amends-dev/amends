@@ -30,11 +30,11 @@ requester and key.
 workspace's active member count, and the caller's pending invitations. This is host routing
 across workspaces, not a core operation.
 
-`GET /workspaces/:id/members` lists the memberships the caller may read: a
+`GET /members` lists the memberships the caller may read: a
 workspace-scoped `member.read` grant sees everyone, active and removed, and an
-exact grant sees that member. `GET …/members/:memberId` reads one.
+exact grant sees that member. `GET /members/:memberId` reads one.
 
-`DELETE …/members/:memberId` removes a member and returns the record with status `removed`.
+`DELETE /members/:memberId` removes a member and returns the record with status `removed`.
 It requires `member.remove` on that member, at workspace or member scope; `member.read` is not
 required. Humans and agents follow the same rules. An authorized non-owner may remove their own
 membership. Administrators can remove ordinary Member-only or unassigned members, but only the
@@ -67,11 +67,13 @@ can make one name read as another; invalid names return HTTP 400. Names recorded
 readable. Joiners stay allowed, for emoji and scripts that need them.
 
 A member names themselves when creating the workspace (`memberName`), when accepting an
-invitation (`name`), or later with `PUT /workspaces/:id/members/me/name`:
+invitation (`name`), or later with `PUT /members/me/name`. Like every request a member makes in a
+workspace, it names the workspace in the `Amends-Workspace` header:
 
 ```bash
-curl -X PUT -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
-  -d '{"name":"Alice"}' http://127.0.0.1:8787/workspaces/<workspace-id>/members/me/name
+curl -X PUT -H 'Authorization: Bearer alice' -H 'Amends-Workspace: <workspace-id>' \
+  -H 'content-type: application/json' \
+  -d '{"name":"Alice"}' http://127.0.0.1:8787/members/me/name
 ```
 
 Renaming needs no permission beyond an active membership and changes only the caller's own name;
@@ -80,22 +82,24 @@ it returns their member record. The same name again records nothing. Each name i
 
 ## Invitations
 
-`POST /workspaces/:id/invitations` issues an invitation to an email address with an
+`POST /invitations` issues an invitation to an email address with an
 ISO expiry in the future and a required built-in role. The host resolves the address to its
 account, creating one with a new human ID the first time the address comes up, and the invitation
 names that human ID as its `recipientId`; the person signing in with the address later signs in as
 that account. With the local host's development tokens, the recipient's token is that human ID:
 
 ```bash
-curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json' \
+curl -X POST -H 'Authorization: Bearer alice' -H 'Amends-Workspace: <workspace-id>' \
+  -H 'content-type: application/json' \
   -d '{"email":"bob@example.com","expiresAt":"<expiry-ISO>","roleId":"builtin:member"}' \
-  http://127.0.0.1:8787/workspaces/<workspace-id>/invitations
+  http://127.0.0.1:8787/invitations
 curl -X POST -H 'Authorization: Bearer <recipient-id>' -H 'content-type: application/json' \
   -d '{"name":"Bob Chen"}' \
   http://127.0.0.1:8787/workspaces/<workspace-id>/invitations/<invitation-id>/accept
 ```
 
-Acceptance takes the new member's `name`. `GET /workspaces/:id/accounts` returns the addresses
+Acceptance takes the new member's `name`; the recipient is not a member yet, so its path names the
+workspace instead of the header. `GET /accounts` returns the addresses
 behind the workspace's human members and invitations to whoever may list invitations, which is
 how settings show them; nobody else in the workspace sees an address.
 
@@ -106,7 +110,7 @@ deadline fails. Invitations require a role and always assign it at workspace sco
 Issuance and revocation require `invitation.manage` and `assignment.manage` on the
 workspace. The shared delegation policy allows the owner to select Member or
 Administrator, and other authorized administrators to select Member. Owner cannot
-be granted through an invitation. `GET …/invitations` requires `invitation.manage`.
+be granted through an invitation. `GET /invitations` requires `invitation.manage`.
 
 Only the named authenticated human can accept. Acceptance rechecks the original
 inviter's active membership, permissions, and current authority to delegate the
@@ -124,26 +128,26 @@ brings. If that
 membership was later removed, the receipt returns the removed record; it never
 reactivates it.
 
-`POST …/invitations/:invitationId/revoke` revokes a pending invitation.
+`POST /invitations/:invitationId/revoke` revokes a pending invitation.
 Repeating revocation is harmless. Revocation cannot undo an accepted membership;
 use member removal for that. Expiry is checked against the clock, so no
 background task changes expired rows.
 
 ## Assignments and delegation
 
-`GET /workspaces/:workspaceId/roles` lists the stored built-in roles with an
+`GET /roles` lists the stored built-in roles with an
 `assignable` flag for the current actor. It requires active membership.
-`GET …/members/:memberId/assignments` requires `assignment.read` on that member
+`GET /members/:memberId/assignments` requires `assignment.read` on that member
 and returns active assignments, role choices, and `canManage`. Removed memberships
 remain readable but cannot receive or change assignments.
 
 All assignment mutations require `assignment.manage` on the workspace:
 
-- `POST …/assignments` accepts `{ memberId, roleId }` and adds a workspace role.
+- `POST /assignments` accepts `{ memberId, roleId }` and adds a workspace role.
   Repeating the same active assignment returns it without recording anything.
-- `DELETE …/members/:memberId/assignments/:assignmentId` revokes one assignment.
+- `DELETE /members/:memberId/assignments/:assignmentId` revokes one assignment.
   Repeating revocation is harmless after current authorization and recipient checks.
-- `PUT …/assignments` accepts `{ memberId, roleId, expectedAssignmentIds }`. The IDs
+- `PUT /assignments` accepts `{ memberId, roleId, expectedAssignmentIds }`. The IDs
   must match all current workspace-scoped role assignments; a stale form receives
   HTTP 409. Revoking previous roles and assigning the replacement share one commit.
   Direct grants and exact-target assignments are preserved and displayed separately.
@@ -156,13 +160,13 @@ has its own operation. Clients should reread access after a stale-change error.
 
 ## Ownership transfer
 
-`GET /workspaces/:workspaceId/ownership` requires active membership and returns
+`GET /settings/ownership` requires active membership and returns
 the workspace, current owner membership, current Owner assignment ID, `canTransfer`,
 and eligible candidates. Only the current owner holding `workspace.transfer-ownership`
 receives candidates: other active human members in that workspace. Agents and
 removed members cannot become owners.
 
-`POST …/ownership` accepts `{ memberId, expectedOwnerAssignmentId }`. The latter
+`POST /settings/ownership` accepts `{ memberId, expectedOwnerAssignmentId }`. The latter
 must match the Owner assignment returned by the ownership read. If ownership moves
 away and later returns to the same person, a new assignment ID still invalidates
 their old form. Stale authority returns HTTP 409; a caller who has lost permission
@@ -233,13 +237,13 @@ Group and thread permissions also need current membership in the group; see each
 
 ## Settings and names
 
-`GET /workspaces/:id/settings` exposes workspace metadata, rename/invitation flags,
-and assignable roles. `GET …/member-management` returns readable members with
+`GET /settings` exposes workspace metadata, rename/invitation flags,
+and assignable roles. `GET /settings/members` returns readable members with
 access summaries and server-computed removal flags. Denied access summaries are null. The
 listing decides every member from one resolution of the reader's grants and the same delegation
 rule (`Delegation.recipientDenial`) that role changes and removals enforce.
 
-`PUT …/name` accepts `{ name, expectedName }`, requires `workspace.rename`, and
+`PUT /settings/name` accepts `{ name, expectedName }`, requires `workspace.rename`, and
 records `workspace.renamed` with the old and new name. A different current name
 returns 409 `CoreError.Changed`; retrying an already-applied name succeeds
 without another fact. This compares names, not a version: a rename away and back

@@ -9,15 +9,14 @@
  * @since 0.1.0
  */
 import { Assignment, Permission } from "@amends-dev/core/authorization";
-import { Member, Workspace } from "@amends-dev/core/workspace";
+import { Member } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
 import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
-const params = { workspaceId: Workspace.Id };
-const member = { ...params, memberId: Member.Id };
+const member = { memberId: Member.Id };
 const error = [...ApiErrors.workspace, ...ApiErrors.assignment];
 
 /**
@@ -31,12 +30,10 @@ const error = [...ApiErrors.workspace, ...ApiErrors.assignment];
 export class AssignmentsGroup extends HttpApiGroup.make("assignments")
   .add(
     HttpApiEndpoint.get("permissions", "/permissions", {
-      params,
       success: Schema.Array(Permission.Name),
       error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.get("roles", "/roles", {
-      params,
       success: Schema.Array(Assignment.RoleChoice),
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
@@ -46,13 +43,11 @@ export class AssignmentsGroup extends HttpApiGroup.make("assignments")
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.post("assign", "/assignments", {
-      params,
       payload: Assignment.AssignInput,
       success: Assignment.Assignment,
       error,
     }),
     HttpApiEndpoint.put("change", "/assignments", {
-      params,
       payload: Assignment.ChangeInput,
       success: Assignment.Assignment,
       error,
@@ -64,5 +59,4 @@ export class AssignmentsGroup extends HttpApiGroup.make("assignments")
     }),
   )
   .middleware(WorkspaceMember)
-  .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId") {}
+  .middleware(Authentication) {}

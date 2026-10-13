@@ -73,6 +73,7 @@ it.effect.each(["make", "layer"] as const)(
         const services = Layer.mergeAll(
           MeHandlers.layer,
           clientAuthentication,
+          WorkspaceMember.layerClientOutsideWorkspace,
           workspaceMember,
           HttpServer.layerServices,
         ).pipe(

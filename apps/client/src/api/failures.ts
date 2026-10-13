@@ -26,11 +26,12 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * The workspace, member, access, invitation, conversation, connection, agent, turn, and channel
- * endpoints.
+ * The workspace, settings, member, access, invitation, conversation, connection, agent, turn, and
+ * channel endpoints.
  */
 type Endpoints =
   | "workspaces"
+  | "settings"
   | "members"
   | "assignments"
   | "invitations"

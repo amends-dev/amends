@@ -139,22 +139,22 @@ function fixture(options: { readonly fail?: boolean } = {}) {
     const request = new Request(input, init);
     const url = new URL(request.url);
     const path = url.pathname;
-    if (path === "/workspaces/one/changes") {
+    if (path === "/changes") {
       const created = eventStream(request);
       streams.push(created);
       created.send({ _tag: "Ready", workspaceId: "one", cursor: null, reset: false });
       return created.response;
     }
     if (path === "/me/workspaces") return json(listing);
-    if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/groups") return json(groups);
-    if (path === "/workspaces/one/notifications/inbox") {
+    if (path === "/members") return json(members);
+    if (path === "/groups") return json(groups);
+    if (path === "/notifications/inbox") {
       const pendingOnly = url.searchParams.get("pendingOnly") === "true";
       return json(
         inbox.filter((item) => !pendingOnly || item.notification.state._tag === "Pending"),
       );
     }
-    if (path === "/workspaces/one/notifications/count")
+    if (path === "/notifications/count")
       return json({
         pending: inbox.filter((item) => item.notification.state._tag === "Pending").length,
       });
@@ -166,7 +166,7 @@ function fixture(options: { readonly fail?: boolean } = {}) {
       announceSeen([markSeen[1]!]);
       return json(inbox.find((item) => item.notification.id === markSeen[1])!.notification);
     }
-    if (request.method === "POST" && path === "/workspaces/one/notifications/seen") {
+    if (request.method === "POST" && path === "/notifications/seen") {
       through.push(await request.json());
       for (const item of inbox) settle(item.notification.id);
       announceSeen(inbox.map((item) => item.notification.id));

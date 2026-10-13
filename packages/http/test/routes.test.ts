@@ -3,7 +3,7 @@ import { Connection } from "@amends-dev/core/connection";
 import { Request } from "@amends-dev/core/request";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { expect, it } from "@effect/vitest";
-import { Api, Authentication, Routes } from "../src/index.ts";
+import { Api, Authentication, Routes, WorkspaceMember } from "../src/index.ts";
 import type * as Core from "@amends-dev/core";
 import { Requirement, Target } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
@@ -38,7 +38,7 @@ import { Accounts, SessionTokens, Gateway, SignIn, WorkspaceDirectory } from "@a
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/http";
-import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
+import { HttpApiMiddleware, HttpApiTest, OpenApi } from "effect/http-api";
 import { CoreError } from "@amends-dev/core/error";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -475,13 +475,16 @@ const run = <A, E>(
   program: (client: Effect.Success<typeof makeClient>) => Effect.Effect<A, E>,
 ) =>
   Effect.scoped(Effect.flatMap(makeClient, program)).pipe(
-    Effect.provide(Layer.mergeAll(services, asToken(token))),
+    Effect.provide(
+      Layer.mergeAll(services, asToken(token), WorkspaceMember.layerClient(workspaceId)),
+    ),
   );
 const makeClient = HttpApiTest.groups(Api.Api, [
   "session",
   "me",
   "accounts",
   "workspaces",
+  "settings",
   "tasks",
   "members",
   "invitations",
@@ -498,11 +501,9 @@ it.effect("the inbox route decodes its cursor and passes the page to the applica
     const pages = yield* run("alice", (client) =>
       Effect.gen(function* () {
         const first = yield* client.notifications.inbox({
-          params: { workspaceId },
           query: { limit: 1 },
         });
         const next = yield* client.notifications.inbox({
-          params: { workspaceId },
           query: { limit: 2, before, pendingOnly: true },
         });
         return [first, next];
@@ -524,7 +525,7 @@ it.effect("marking a missing notification seen exposes a typed 404", () =>
     const missing = yield* run("alice", (client) =>
       client.notifications
         .markSeen({
-          params: { workspaceId, notificationId: Notification.Id.make("missing") },
+          params: { notificationId: Notification.Id.make("missing") },
         })
         .pipe(Effect.flip),
     );
@@ -539,9 +540,7 @@ it.effect("marking a missing notification seen exposes a typed 404", () =>
 it.effect("member reads pass the bearer principal and path parameters to the gateway", () =>
   Effect.gen(function* () {
     calls.length = 0;
-    const fetched = yield* run("alice", (client) =>
-      client.members.get({ params: { workspaceId, memberId } }),
-    );
+    const fetched = yield* run("alice", (client) => client.members.get({ params: { memberId } }));
     expect(fetched).toEqual(member);
     expect(calls).toEqual([
       { operation: "asMember", arguments: [workspaceId, alice] },
@@ -553,9 +552,7 @@ it.effect("member reads pass the bearer principal and path parameters to the gat
 it.effect("domain outcomes keep their tags and statuses", () =>
   Effect.gen(function* () {
     const missing = yield* run("alice", (client) =>
-      client.members
-        .get({ params: { workspaceId, memberId: Member.Id.make("missing") } })
-        .pipe(Effect.flip),
+      client.members.get({ params: { memberId: Member.Id.make("missing") } }).pipe(Effect.flip),
     );
     expect(missing).toMatchObject({
       _tag: "CoreError.NotFound",
@@ -563,7 +560,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
       id: "missing",
     });
     const notMember = yield* run("bob", (client) =>
-      client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
+      client.members.get({ params: { memberId } }).pipe(Effect.flip),
     );
     expect(notMember).toMatchObject({
       _tag: "CoreError.Denied",
@@ -571,7 +568,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
     });
     const forbidden = yield* run("alice", (client) =>
       client.members
-        .remove({ params: { workspaceId, memberId }, responseMode: "decoded-and-response" })
+        .remove({ params: { memberId }, responseMode: "decoded-and-response" })
         .pipe(Effect.flip),
     );
     expect(forbidden).toMatchObject({
@@ -580,12 +577,12 @@ it.effect("domain outcomes keep their tags and statuses", () =>
     });
     const statuses = yield* run("alice", (client) =>
       Effect.all([
-        client.members.get({ params: { workspaceId, memberId }, responseMode: "response-only" }),
+        client.members.get({ params: { memberId }, responseMode: "response-only" }),
         client.members.get({
-          params: { workspaceId, memberId: Member.Id.make("missing") },
+          params: { memberId: Member.Id.make("missing") },
           responseMode: "response-only",
         }),
-        client.members.remove({ params: { workspaceId, memberId }, responseMode: "response-only" }),
+        client.members.remove({ params: { memberId }, responseMode: "response-only" }),
         client.workspaces.create({
           headers: {},
           payload: { name: "Test workspace", memberName: member.name },
@@ -601,12 +598,67 @@ it.effect("missing or rejected credentials are unauthorized before any gateway c
   Effect.gen(function* () {
     calls.length = 0;
     const rejected = yield* run("invalid", (client) =>
-      client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
+      client.members.get({ params: { memberId } }).pipe(Effect.flip),
     );
     expect(rejected).toMatchObject({ _tag: "Authentication.Unauthorized" });
     expect(calls).toEqual([]);
   }),
 );
+
+// A member's request names its workspace in a header, which the client's side of the middleware
+// sets; one that sends none, or an empty one, never reaches the gateway.
+it.effect("a member's request names its workspace in the Amends-Workspace header", () =>
+  Effect.gen(function* () {
+    const sending = (value: string | undefined) =>
+      HttpApiMiddleware.layerClient(WorkspaceMember.WorkspaceMember, ({ next, request }) =>
+        next(
+          value === undefined
+            ? request
+            : HttpClientRequest.setHeader(request, WorkspaceMember.header, value),
+        ),
+      );
+    const withHeader = (value: string | undefined) =>
+      Effect.scoped(
+        Effect.flatMap(makeClient, (client) =>
+          client.members.get({ params: { memberId }, responseMode: "decoded-and-response" }),
+        ),
+      ).pipe(Effect.provide(Layer.mergeAll(services, asToken("alice"), sending(value))));
+    calls.length = 0;
+    for (const value of [undefined, ""])
+      expect(yield* Effect.flip(withHeader(value))).toMatchObject({
+        _tag: "CoreError.Invalid",
+        reason: { _tag: "Malformed" },
+      });
+    expect(calls).toEqual([]);
+    const [fetched, response] = yield* withHeader(workspaceId);
+    expect(fetched).toEqual(member);
+    expect(response.headers["vary"]).toContain(WorkspaceMember.header);
+    expect(calls).toEqual([
+      { operation: "asMember", arguments: [workspaceId, alice] },
+      { operation: "get", arguments: [memberId] },
+    ]);
+  }),
+);
+
+it("the OpenAPI document declares the header on every endpoint a member calls, and no other", () => {
+  const spec = OpenApi.fromApi(Api.Api);
+  const declaring = (operation: {
+    readonly parameters?: ReadonlyArray<{ readonly name: string }>;
+  }) => (operation.parameters ?? []).some((parameter) => parameter.name === WorkspaceMember.header);
+  const operations = Object.values(spec.paths).flatMap((item) =>
+    Object.values(item).filter(
+      (operation) => typeof operation === "object" && "operationId" in operation,
+    ),
+  );
+  const declared = operations.filter(declaring).map((operation) => operation.operationId);
+  expect(declared).toContain("members.get");
+  expect(declared).toContain("settings.transferOwnership");
+  expect(declared).not.toContain("workspaces.create");
+  expect(declared).not.toContain("workspaces.acceptInvitation");
+  expect(declared).not.toContain("me.workspaces");
+  expect(declared).not.toContain("channelEvents.receive");
+  expect(declared.length).toBeGreaterThan(70);
+});
 
 it.effect("workspace creation and acceptance require a human principal", () =>
   Effect.gen(function* () {
@@ -626,7 +678,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
     );
     expect(refused).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } });
     const accepted = yield* run("alice", (client) =>
-      client.invitations.accept({
+      client.workspaces.acceptInvitation({
         params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
         payload: { name: member.name },
       }),
@@ -654,7 +706,6 @@ it.effect("invitation payloads round-trip dates and roles through JSON", () =>
     const issued = yield* run("alice", (client) =>
       client.invitations.issue({
         headers: { "idempotency-key": Request.Key.make("issue-1") },
-        params: { workspaceId },
         payload: { email: "bob@example.com", expiresAt, roleId: BuiltinRoles.MemberId },
       }),
     );
@@ -755,9 +806,7 @@ it.effect("a person reads their account, and signs out with the credential they 
 it.effect("a workspace's accounts are those of its human members and its invitees", () =>
   Effect.gen(function* () {
     calls.length = 0;
-    const listed = yield* run("alice", (client) =>
-      client.accounts.list({ params: { workspaceId } }),
-    );
+    const listed = yield* run("alice", (client) => client.accounts.list());
     expect(listed).toEqual([
       { id: alice.id, email: "alice@example.com" },
       { id: bob, email: "bob@example.com" },
@@ -785,140 +834,136 @@ it.effect(
       const statuses = yield* run("alice", (client) =>
         Effect.all([
           client.groups.create({
-            params: { workspaceId },
             headers: { "idempotency-key": Request.Key.make("group-1") },
             payload: { name: "Studio", memberIds: [memberId], visibility: "Public" },
             responseMode: "response-only",
           }),
           client.groups.list({
-            params: { workspaceId },
             query: { limit: 20, after: groupId },
             responseMode: "response-only",
           }),
           client.groups.listPublic({
-            params: { workspaceId },
             query: { limit: 20, after: groupId },
             responseMode: "response-only",
           }),
-          client.groups.get({ params: { workspaceId, groupId }, responseMode: "response-only" }),
+          client.groups.get({ params: { groupId }, responseMode: "response-only" }),
           client.groups.members({
-            params: { workspaceId, groupId },
+            params: { groupId },
             query: { limit: 5 },
             responseMode: "response-only",
           }),
           client.groups.addMember({
-            params: { workspaceId, groupId },
+            params: { groupId },
             payload: { memberId },
             responseMode: "response-only",
           }),
           client.groups.removeMember({
-            params: { workspaceId, groupId, membershipId },
+            params: { groupId, membershipId },
             responseMode: "response-only",
           }),
           client.groups.leave({
-            params: { workspaceId, groupId, membershipId },
+            params: { groupId, membershipId },
             responseMode: "response-only",
           }),
-          client.groups.join({ params: { workspaceId, groupId }, responseMode: "response-only" }),
+          client.groups.join({ params: { groupId }, responseMode: "response-only" }),
           client.groups.follow({
-            params: { workspaceId, groupId },
+            params: { groupId },
             payload: { memberId },
             responseMode: "response-only",
           }),
           client.groups.unfollow({
-            params: { workspaceId, groupId },
+            params: { groupId },
             payload: { memberId },
             responseMode: "response-only",
           }),
           client.groups.markRead({
-            params: { workspaceId, groupId },
+            params: { groupId },
             responseMode: "response-only",
           }),
           client.threads.list({
-            params: { workspaceId, groupId },
+            params: { groupId },
             query: { limit: 10, before },
             responseMode: "response-only",
           }),
           client.threads.openings({
-            params: { workspaceId, groupId },
+            params: { groupId },
             query: { limit: 10, before: opened },
             responseMode: "response-only",
           }),
           client.threads.start({
-            params: { workspaceId, groupId },
+            params: { groupId },
             headers: { "idempotency-key": key },
             payload: { text: "  Hello\n", mentions: [memberId] },
             responseMode: "response-only",
           }),
           client.threads.startDirect({
-            params: { workspaceId },
             headers: {},
             payload: { memberIds: [memberId], text: "Hi", mentions: [] },
             responseMode: "response-only",
           }),
-          client.threads.get({ params: { workspaceId, threadId }, responseMode: "response-only" }),
+          client.threads.get({ params: { threadId }, responseMode: "response-only" }),
           client.threads.rename({
-            params: { workspaceId, threadId },
+            params: { threadId },
             payload: { title: "Launch plan", expectedTitle: null },
             responseMode: "response-only",
           }),
           client.threads.timeline({
-            params: { workspaceId, threadId },
+            params: { threadId },
             query: { limit: 50, beforeSequence: 9, from: "newest" },
             responseMode: "response-only",
           }),
           client.threads.participants({
-            params: { workspaceId, threadId },
+            params: { threadId },
             query: { limit: 5, after: participationId },
             responseMode: "response-only",
           }),
           client.threads.publish({
-            params: { workspaceId, threadId },
+            params: { threadId },
             headers: { "idempotency-key": Request.Key.make("reply-1") },
             payload: { text: "Reply", mentions: [] },
             responseMode: "response-only",
           }),
           client.threads.edit({
-            params: { workspaceId, messageId },
+            params: { messageId },
             payload: { text: "Edited", mentions: [], expectedRevision: 1 },
             responseMode: "response-only",
           }),
           client.threads.delete({
-            params: { workspaceId, messageId },
+            params: { messageId },
             responseMode: "response-only",
           }),
           client.threads.follow({
-            params: { workspaceId, threadId },
+            params: { threadId },
             responseMode: "response-only",
           }),
           client.threads.unfollow({
-            params: { workspaceId, threadId },
+            params: { threadId },
             payload: { participationId },
             responseMode: "response-only",
           }),
           client.threads.markRead({
-            params: { workspaceId, threadId },
+            params: { threadId },
             payload: { throughSequence: 4 },
             responseMode: "response-only",
           }),
           client.tasks.list({
-            params: { workspaceId, groupId },
+            params: { groupId },
             query: { limit: 10, status: "todo" },
             responseMode: "response-only",
           }),
-          client.tasks.get({ params: { workspaceId, threadId }, responseMode: "response-only" }),
+          client.tasks.get({ params: { threadId }, responseMode: "response-only" }),
           client.tasks.create({
-            params: { workspaceId, threadId },
+            params: { threadId },
             payload: { assignee: memberId },
             responseMode: "response-only",
           }),
           client.tasks.update({
-            params: { workspaceId, threadId },
+            params: { threadId },
             payload: { change: { _tag: "Status", from: "triage", to: "todo" } },
             responseMode: "response-only",
           }),
           client.notifications.markSeen({
-            params: { workspaceId, notificationId: notification.id },
+            params: { notificationId: notification.id },
             responseMode: "response-only",
           }),
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
@@ -1002,28 +1047,27 @@ it.effect(
       const key = Request.Key.make("channel-1");
       const statuses = yield* run("alice", (client) =>
         Effect.all([
-          client.channels.list({ params: { workspaceId }, responseMode: "response-only" }),
+          client.channels.list({ responseMode: "response-only" }),
           client.channels.create({
-            params: { workspaceId },
             headers: { "idempotency-key": key },
             payload: { connectionId, groupId, name: "Support", opensTasks: true },
             responseMode: "response-only",
           }),
           client.channels.get({
-            params: { workspaceId, channelId },
+            params: { channelId },
             responseMode: "response-only",
           }),
           client.channels.redirect({
-            params: { workspaceId, channelId },
+            params: { channelId },
             payload: { groupId },
             responseMode: "response-only",
           }),
           client.channels.remove({
-            params: { workspaceId, channelId },
+            params: { channelId },
             responseMode: "response-only",
           }),
           client.channels.binding({
-            params: { workspaceId, threadId },
+            params: { threadId },
             responseMode: "response-only",
           }),
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
