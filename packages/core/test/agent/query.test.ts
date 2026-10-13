@@ -1,5 +1,5 @@
 import {
-  Connection as ConnectionContract,
+  type Connection as ConnectionContract,
   Integration,
   Integrations,
   type ModelCatalog,

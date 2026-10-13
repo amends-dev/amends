@@ -21,7 +21,7 @@ import {
   GroupStore,
 } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication, type Store, StoreError } from "@amends-dev/core/journal";
 import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { Context, DateTime, Effect, Option, Ref } from "effect";
 import * as Support from "./support.ts";
@@ -34,7 +34,6 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Private team and direct group creation, storage constraints, and replay. */
 

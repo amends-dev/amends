@@ -32,9 +32,9 @@ export interface SignInEmailProps {
   readonly pending?: boolean;
   readonly error?: SignInEmailError;
   /** Other ways to sign in, shown under "or". */
-  readonly providers?: readonly SignInProvider[];
+  readonly providers?: ReadonlyArray<SignInProvider>;
   /** Further providers, behind "More sign-in options". */
-  readonly moreProviders?: readonly SignInProvider[];
+  readonly moreProviders?: ReadonlyArray<SignInProvider>;
   readonly onProvider?: (id: string) => void;
 }
 

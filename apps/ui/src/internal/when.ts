@@ -37,7 +37,7 @@ export function dayLabel(day: number, now = new Date()) {
 export const whenLabel = (at: Date, now = new Date()) =>
   dayOf(at) === dayOf(now) ? clockTime(at) : dayLabel(dayOf(at), now);
 /** One or two names, or several people. Empty when nobody is typing. */
-export function typingText(names: readonly string[]) {
+export function typingText(names: ReadonlyArray<string>) {
   if (names.length === 0) return "";
   if (names.length === 1) return `${names[0]} is typing…`;
   if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;

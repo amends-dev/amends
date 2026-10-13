@@ -16,10 +16,10 @@ import { Context, Effect, Layer, Option } from "effect";
 import * as Connection from "../connection/Connection.ts";
 import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";
-import * as Channel from "./Channel.ts";
+import type * as Channel from "./Channel.ts";
 import * as ChannelStore from "./ChannelStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The shared reads of channels. Internal: not among `Core.Operations`.

@@ -28,7 +28,7 @@ export interface ThreadPaneProps extends ConversationProps {
   /** The bell follows the thread, so its replies reach the reader, or stops. */
   readonly follow?: GroupFollow;
   /** The people typing a reply now. */
-  readonly typing?: readonly string[];
+  readonly typing?: ReadonlyArray<string>;
   /** Put an "N replies" divider after the first message, as the thread's replies begin. */
   readonly repliesDivider?: boolean;
   /** Opened from a notification: the subtitle says why, such as "Mention · #general". */
@@ -47,7 +47,7 @@ export interface ThreadPaneProps extends ConversationProps {
 const reasons = { mention: "Mention", reply: "Reply", thread: "New thread" } as const;
 
 /** The entries with a replies divider after the first message. */
-function withReplies(entries: readonly TimelineEntry[]): readonly TimelineEntry[] {
+function withReplies(entries: ReadonlyArray<TimelineEntry>): ReadonlyArray<TimelineEntry> {
   const first = entries.findIndex((entry) => entry.kind === "message");
   if (first === -1) return entries;
   const replies = entries.slice(first + 1).filter((entry) => entry.kind === "message").length;

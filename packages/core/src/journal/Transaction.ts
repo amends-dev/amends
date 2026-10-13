@@ -14,7 +14,7 @@ import { Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect"
 import type { Cause, Scope } from "effect";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Store from "./Store.ts";
-import * as StoreError from "./StoreError.ts";
+import type * as StoreError from "./StoreError.ts";
 
 /**
  * A write in the commit had failed, though its caller caught the failure, so the commit rolls

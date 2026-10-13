@@ -13,7 +13,7 @@ import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Publication from "../../src/journal/Publication.ts";
 import * as Store from "../../src/journal/Store.ts";
-import * as Transaction from "../../src/journal/Transaction.ts";
+import type * as Transaction from "../../src/journal/Transaction.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import * as MemberId from "../../src/workspace/MemberId.ts";
 import { make, type Fixture } from "../memory.ts";
@@ -221,7 +221,7 @@ it.effect("replay preserves recorded attribution without a current publication c
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const seen: Event.Event[] = [];
+        const seen: Array<Event.Event> = [];
         const projection = Projection.make("provenance", { version: 1 }).on(Changed, (event) =>
           Effect.sync(() => {
             seen.push(event);

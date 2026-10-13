@@ -221,7 +221,7 @@ export interface TransferOwnershipProps {
   readonly onClose: () => void;
   readonly workspaceName: string;
   /** Who may become the owner. */
-  readonly candidates: readonly SettingsPerson[];
+  readonly candidates: ReadonlyArray<SettingsPerson>;
   readonly chosen?: string;
   readonly onChoose: (memberId: string) => void;
   readonly onConfirm: () => void;

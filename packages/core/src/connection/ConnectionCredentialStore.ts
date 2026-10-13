@@ -14,7 +14,7 @@ import * as Store from "../journal/Store.ts";
 import * as Connection from "./Connection.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
-import * as CoreError from "../error/CoreError.ts";
+import type * as CoreError from "../error/CoreError.ts";
 import * as StoreError from "../journal/StoreError.ts";
 
 /**

@@ -11,8 +11,8 @@ import { Context, DateTime, Effect, Layer, Option } from "effect";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
 import type * as Projection from "../journal/Projection.ts";
-import * as Publication from "../journal/Publication.ts";
-import * as Store from "../journal/Store.ts";
+import type * as Publication from "../journal/Publication.ts";
+import type * as Store from "../journal/Store.ts";
 import * as ThreadCommand from "../thread/ThreadCommand.ts";
 import type * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadStore from "../thread/ThreadStore.ts";
@@ -20,7 +20,7 @@ import type * as ThreadMessageId from "../thread/ThreadMessageId.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 import * as TurnFacts from "./TurnFacts.ts";
 import * as Turn from "./Turn.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * How a turn ended: completed with the reply it posted, if any, failed and why, or stopped and why

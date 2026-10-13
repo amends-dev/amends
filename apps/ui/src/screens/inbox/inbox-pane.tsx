@@ -31,7 +31,7 @@ export interface InboxItem {
   /** What was said: markdown, shown as one run of words. */
   readonly text?: string;
   /** The members its mentions name. */
-  readonly mentions?: readonly RichTextMention[];
+  readonly mentions?: ReadonlyArray<RichTextMention>;
   /** Opens its thread beside the inbox; absent while it is unavailable. */
   readonly href?: string;
 }
@@ -47,7 +47,7 @@ export interface InboxPaneProps {
   /** How many are unread, for the Unread tab and Mark all seen. */
   readonly unreadCount?: number;
   /** The current tab's notifications, newest first. */
-  readonly items: readonly InboxItem[];
+  readonly items: ReadonlyArray<InboxItem>;
   /** The notification whose thread is open beside the inbox. */
   readonly selectedId?: string;
   /** The reader opens a notification's thread, which marks it seen. */
@@ -74,8 +74,8 @@ const titles: Record<NotificationReason, string> = {
 };
 
 /** Items grouped under the local day they came. */
-function byDay(items: readonly InboxItem[]) {
-  const days: Array<{ day: number; items: InboxItem[] }> = [];
+function byDay(items: ReadonlyArray<InboxItem>) {
+  const days: Array<{ day: number; items: Array<InboxItem> }> = [];
   for (const item of items) {
     const day = dayOf(item.at);
     const last = days.at(-1);

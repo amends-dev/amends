@@ -12,7 +12,7 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
+import { type Effect, Schema } from "effect";
 
 /**
  * An identifier of the external system's own: of a conversation, a message, or a user there.

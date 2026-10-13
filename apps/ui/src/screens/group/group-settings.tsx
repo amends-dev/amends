@@ -91,12 +91,12 @@ export interface GroupSettingsProps {
   readonly removingId?: string;
   /** Why the last change to the members failed. */
   readonly membersError?: GroupChangeError;
-  readonly members: readonly SettingsMember[];
+  readonly members: ReadonlyArray<SettingsMember>;
   readonly onRemove: (id: string) => void;
   /** Workspace members who are not in the group. */
-  readonly candidates: readonly PickerPerson[];
-  readonly selected: readonly string[];
-  readonly onSelectedChange: (ids: string[]) => void;
+  readonly candidates: ReadonlyArray<PickerPerson>;
+  readonly selected: ReadonlyArray<string>;
+  readonly onSelectedChange: (ids: Array<string>) => void;
   readonly onAdd: () => void;
   readonly adding?: boolean;
 }

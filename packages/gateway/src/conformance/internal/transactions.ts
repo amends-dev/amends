@@ -1,6 +1,6 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 
-import { Journal, Store } from "@amends-dev/core/journal";
+import { Journal, Store, StoreError } from "@amends-dev/core/journal";
 
 import { WorkspaceInitialization } from "@amends-dev/core/workspace";
 
@@ -19,7 +19,6 @@ import {
   otherWorkspaceId,
   workspaceId,
 } from "../Support.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Atomic commits: concurrent writers, rollback, interruption, foreign handles, and work after a commit. */
 export const transactions = (fixture: Fixture) => {

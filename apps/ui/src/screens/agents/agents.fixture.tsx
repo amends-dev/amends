@@ -29,17 +29,17 @@ import {
   type SetupFieldsProps,
 } from "./index.ts";
 
-export const sampleHarnesses: readonly HarnessOption[] = [
+export const sampleHarnesses: ReadonlyArray<HarnessOption> = [
   { id: "amends", name: "Amends harness", integrationName: "amends", requiresSandbox: false },
   { id: "opencode", name: "opencode", integrationName: "opencode", requiresSandbox: true },
 ];
 
-export const sampleModelConnections: readonly ConnectionOption[] = [
+export const sampleModelConnections: ReadonlyArray<ConnectionOption> = [
   { id: "openrouter", name: "OpenRouter", integrationName: "OpenRouter" },
   { id: "local-models", name: "Local models", integrationName: "OpenAI-compatible API" },
 ];
 
-export const sampleSandboxes: readonly ConnectionOption[] = [
+export const sampleSandboxes: ReadonlyArray<ConnectionOption> = [
   { id: "this-machine", name: "This machine", integrationName: "This machine" },
   { id: "daytona", name: "Daytona", integrationName: "Daytona" },
 ];
@@ -52,10 +52,10 @@ const uninstalled = { id: "vertex", name: "Vertex" };
  * unavailable, as the client lists it.
  */
 function withCurrent<Option extends ConnectionOption>(
-  options: readonly Option[],
+  options: ReadonlyArray<Option>,
   id: string | undefined,
   unavailable: (option: ConnectionOption) => Option,
-): readonly Option[] {
+): ReadonlyArray<Option> {
   if (id === undefined || id === autoHarness || options.some((option) => option.id === id))
     return options;
   return [
@@ -91,7 +91,7 @@ const sampleModels: Readonly<Record<string, ModelChoices>> = {
   "local-models": { status: "loaded", listed: [], unlisted: true },
 };
 
-const roles: readonly AgentRoleOption[] = [
+const roles: ReadonlyArray<AgentRoleOption> = [
   { id: "builtin:member", name: "Member", assignable: true },
   { id: "builtin:administrator", name: "Administrator", assignable: false },
 ];
@@ -111,7 +111,7 @@ interface Sample extends Setup {
   readonly name: string;
 }
 
-const samples: readonly Sample[] = [
+const samples: ReadonlyArray<Sample> = [
   {
     id: "reviewer",
     name: "Reviewer",
@@ -160,9 +160,9 @@ const samples: readonly Sample[] = [
 /** What keeps an agent set up as `setup` from running, as core's readiness finds it. */
 function issuesOf(
   setup: Setup,
-  harnesses: readonly HarnessOption[] = sampleHarnesses,
-): readonly AgentIssue[] {
-  const issues: AgentIssue[] = [];
+  harnesses: ReadonlyArray<HarnessOption> = sampleHarnesses,
+): ReadonlyArray<AgentIssue> {
+  const issues: Array<AgentIssue> = [];
   const harness = harnesses.find((option) => option.id === setup.harness);
   if (setup.harness === autoHarness) {
     const choosable = harnesses.some(
@@ -195,7 +195,7 @@ function issuesOf(
 }
 
 /** Each agent's turns in progress, by its id; the others are idle. */
-const sampleTurns: Readonly<Record<string, readonly AgentTurn[]>> = {
+const sampleTurns: Readonly<Record<string, ReadonlyArray<AgentTurn>>> = {
   reviewer: [
     { id: "turn-review", state: "working", place: "#general", href: "#turn-review" },
     { id: "turn-design", state: "queued", place: "#design", href: "#turn-design" },
@@ -206,7 +206,7 @@ const sampleTurns: Readonly<Record<string, readonly AgentTurn[]>> = {
 const urgency = { working: 0, stopping: 1, queued: 2 } as const;
 
 /** Where an agent is at work, as the client finds it from its turns in progress. */
-const activityOf = (turns: readonly AgentTurn[]): AgentActivity | undefined => {
+const activityOf = (turns: ReadonlyArray<AgentTurn>): AgentActivity | undefined => {
   const [state] = turns
     .map((turn) => turn.state)
     .toSorted((left, right) => urgency[left] - urgency[right]);
@@ -221,7 +221,7 @@ const connectionName = (id: string | undefined) =>
 function summaryOf(
   record: Sample,
   configurable: boolean,
-  harnesses: readonly HarnessOption[],
+  harnesses: ReadonlyArray<HarnessOption>,
 ): AgentSummary {
   const models = record.modelConnectionId ? sampleModels[record.modelConnectionId] : undefined;
   const listed =
@@ -298,7 +298,7 @@ export interface AgentsWorkspaceProps {
 
 /** Agents in a workspace, over sample connections, with every change applied in place. */
 export function AgentsWorkspace(props: AgentsWorkspaceProps) {
-  const [records, setRecords] = createSignal<readonly Sample[]>(props.empty ? [] : samples);
+  const [records, setRecords] = createSignal<ReadonlyArray<Sample>>(props.empty ? [] : samples);
   const [selected, setSelected] = createSignal(props.selected);
   const [tab, setTab] = createSignal<AgentsTab>(props.tab ?? "all");
   const [query, setQuery] = createSignal("");

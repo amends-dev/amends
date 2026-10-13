@@ -18,7 +18,7 @@ import type * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as MemberFacts from "./MemberFacts.ts";
 import * as Member from "./Member.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What adding a member can fail with: the failures of assigning its role, of reading the general

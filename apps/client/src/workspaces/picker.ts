@@ -18,8 +18,8 @@ import { useDirectory, DirectoryState } from "../session/directory.tsx";
 
 export interface WorkspacePickerController {
   /** Active memberships; the app gives each its link. */
-  readonly workspaces: Accessor<readonly Omit<PickerWorkspace, "href">[]>;
-  readonly invitations: Accessor<readonly PickerInvitation[]>;
+  readonly workspaces: Accessor<ReadonlyArray<Omit<PickerWorkspace, "href">>>;
+  readonly invitations: Accessor<ReadonlyArray<PickerInvitation>>;
   /** The last reload failed; the lists show what loaded before. */
   readonly refreshFailed: Accessor<boolean>;
   readonly retry: () => void;

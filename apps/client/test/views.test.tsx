@@ -91,7 +91,7 @@ const message = (
   threadId: string,
   by: string,
   text: string,
-  mentions: string[] = [],
+  mentions: Array<string> = [],
 ) => ({
   id,
   workspaceId: "one",

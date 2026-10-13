@@ -13,7 +13,7 @@ import { Context, Effect, Layer, Schema } from "effect";
 import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
 import type * as Event from "../journal/Event.ts";
 import type * as Reaction from "../journal/Reaction.ts";
-import * as Store from "../journal/Store.ts";
+import type * as Store from "../journal/Store.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
@@ -23,7 +23,7 @@ import * as MemberId from "../workspace/MemberId.ts";
 import * as TurnFacts from "./TurnFacts.ts";
 import * as TurnStore from "./TurnStore.ts";
 import type * as Turn from "./Turn.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * An agent's turn job: the work of one agent in one thread, named by its membership.

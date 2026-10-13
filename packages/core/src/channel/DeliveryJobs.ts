@@ -16,7 +16,7 @@ import * as Notification from "../notification/Notification.ts";
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * A delivery job: the deliveries of one bound thread.

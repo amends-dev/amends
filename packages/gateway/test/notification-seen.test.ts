@@ -6,7 +6,7 @@ import { GroupService, GroupMembershipService } from "@amends-dev/core/group";
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication, Store, StoreError } from "@amends-dev/core/journal";
 import {
   Notification,
   NotificationService,
@@ -42,7 +42,6 @@ import {
 } from "./support.ts";
 
 import { withStorage } from "./fixture.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * Marking notifications seen: a human's Seen is private state outside the journal. Ownership,

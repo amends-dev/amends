@@ -13,7 +13,7 @@ import * as ThreadActivity from "./ThreadActivity.ts";
 import * as ThreadId from "./ThreadId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Thread from "./Thread.ts";
+import type * as Thread from "./Thread.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 import * as StoreError from "../journal/StoreError.ts";
 

@@ -70,9 +70,9 @@ for (const [file, content] of outputs) {
     outputs.set(file, result.code);
   }
 }
-const stale: string[] = [];
+const stale: Array<string> = [];
 for (const directory of ["src/generated", "svg"]) {
-  let files: string[];
+  let files: Array<string>;
   try {
     files = await readdir(`${root}${directory}`);
   } catch (error) {
@@ -82,7 +82,7 @@ for (const directory of ["src/generated", "svg"]) {
   for (const file of files)
     if (!outputs.has(`${directory}/${file}`)) stale.push(`${directory}/${file}`);
 }
-const changed: string[] = [];
+const changed: Array<string> = [];
 for (const [file, content] of outputs) {
   let current: string | undefined;
   try {

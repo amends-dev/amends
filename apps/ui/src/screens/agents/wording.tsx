@@ -50,7 +50,7 @@ export interface AgentSummary {
   /** Where it works, or nowhere, when it answers from its model alone. */
   readonly sandbox?: SetupConnection;
   /** Why it can't run as it is set up; empty when it can. */
-  readonly issues: readonly AgentIssue[];
+  readonly issues: ReadonlyArray<AgentIssue>;
   /** The reader may rename it and change how it is set up. */
   readonly configurable: boolean;
   /** Who added it, by name. */
@@ -63,7 +63,7 @@ export interface AgentSummary {
 /** Where an agent is at work: its most pressing turn state, and each place, such as "#general". */
 export interface AgentActivity {
   readonly state: "queued" | "working" | "stopping";
-  readonly places: readonly string[];
+  readonly places: ReadonlyArray<string>;
 }
 
 /** One of an agent's turns in progress, as its page lists it. */
@@ -82,7 +82,7 @@ const turnStates = { queued: "Queued", working: "Working", stopping: "Stopping" 
 export const turnStateWord = (state: AgentTurn["state"]) => turnStates[state];
 
 /** Where an agent is at work, as a line: "#general", or "#general + 1 more". */
-export const placesLine = (places: readonly string[]) =>
+export const placesLine = (places: ReadonlyArray<string>) =>
   places.length > 1 ? `${places[0]} + ${places.length - 1} more` : (places[0] ?? "");
 
 /** A connection that gives harnesses, as the harness choice offers it. */
@@ -110,7 +110,7 @@ export interface ConnectionOption {
 export interface ModelOption {
   readonly id: string;
   readonly name: string;
-  readonly efforts: readonly Effort[];
+  readonly efforts: ReadonlyArray<Effort>;
 }
 
 /**
@@ -122,7 +122,7 @@ export type ModelChoices =
   | { readonly status: "failed" }
   | {
       readonly status: "loaded";
-      readonly listed: readonly ModelOption[];
+      readonly listed: ReadonlyArray<ModelOption>;
       readonly unlisted: boolean;
     };
 
@@ -162,7 +162,7 @@ export interface AgentsFailure {
   /** The part whose connection is unavailable, for `unavailable`. */
   readonly part?: SetupPart;
   /** Why the setup couldn't run, for `incomplete`. */
-  readonly issues?: readonly AgentIssue[];
+  readonly issues?: ReadonlyArray<AgentIssue>;
 }
 
 export const effortLabels = {
@@ -176,7 +176,7 @@ export const effortLabels = {
 } as const satisfies Record<Effort, string>;
 
 /** Every effort, least first, as a model offered unlisted takes any of them. */
-export const efforts: readonly Effort[] = [
+export const efforts: ReadonlyArray<Effort> = [
   "none",
   "minimal",
   "low",
@@ -229,7 +229,7 @@ export function issueField(issue: AgentIssue): SetupField {
  * while it is ready and idle, which shows nothing.
  */
 export function agentStatus(
-  issues: readonly AgentIssue[],
+  issues: ReadonlyArray<AgentIssue>,
   activity?: AgentActivity,
 ): Status | undefined {
   const [first] = issues;

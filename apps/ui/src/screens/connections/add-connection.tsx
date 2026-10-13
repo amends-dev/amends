@@ -27,7 +27,7 @@ export interface ChooseIntegrationProps {
   /** What the new connection should give, when it was asked for from one capability. */
   readonly capability?: IntegrationCapability;
   /** The integrations this host installs that give it. */
-  readonly integrations: readonly IntegrationOption[];
+  readonly integrations: ReadonlyArray<IntegrationOption>;
   readonly onChoose: (integrationId: string) => void;
 }
 

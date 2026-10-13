@@ -104,7 +104,7 @@ export function usePeople(workspaceId: string) {
    * The members a message's text mentions, named as they are now. Someone no longer in the
    * workspace is left out, and shows by the name the text recorded.
    */
-  const mentionsOf = (text: string): RichTextMention[] =>
+  const mentionsOf = (text: string): Array<RichTextMention> =>
     ThreadMessage.mentionedIn(text).flatMap((id) => {
       const member = members.member(id);
       return member === undefined ? [] : [{ id, name: memberName(member) }];

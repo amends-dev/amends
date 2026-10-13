@@ -18,7 +18,7 @@ export interface InviteMemberProps {
   readonly recipient: string;
   readonly onRecipientChange: (recipient: string) => void;
   /** The roles an invitation may give. */
-  readonly roles: readonly SettingsRole[];
+  readonly roles: ReadonlyArray<SettingsRole>;
   readonly role?: string;
   readonly onRoleChange: (roleId: string) => void;
   readonly onCreate: () => void;
@@ -122,7 +122,7 @@ export interface InvitationHistoryProps {
   readonly onClose: () => void;
   readonly workspaceName: string;
   /** Every invitation, newest first. */
-  readonly invitations: readonly SettingsInvitation[];
+  readonly invitations: ReadonlyArray<SettingsInvitation>;
   /** Asks to revoke a pending invitation. */
   readonly onRevoke?: (id: string) => void;
   /** Opens InviteMember; shown to a reader who may invite. */

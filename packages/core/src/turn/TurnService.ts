@@ -21,14 +21,13 @@ import {
   Schema,
   Stream,
   Struct,
+  type Scope,
 } from "effect";
-import type { Scope } from "effect";
 import * as AgentPermissions from "../agent/AgentPermissions.ts";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as ChangeFeedSource from "../change-feed/ChangeFeedSource.ts";
 import * as Actor from "../identity/Actor.ts";
-import type * as Source from "../change-feed/ChangeFeedSource.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
@@ -193,7 +192,7 @@ const endings: ReadonlySet<string> = new Set([
 ]);
 
 /** Whether a commit ends the turn: it holds a fact ending a turn, whose payload names this one. */
-const endsTurn = (delivery: Source.Delivery, turnId: Turn.Id) =>
+const endsTurn = (delivery: ChangeFeedSource.Delivery, turnId: Turn.Id) =>
   delivery.events.some(
     ({ event }) =>
       endings.has(event.name) &&

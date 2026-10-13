@@ -5,7 +5,7 @@ import { Entry, Journal, Store } from "@amends-dev/core/journal";
 import {
   Notification,
   NotificationService,
-  NotificationStore,
+  type NotificationStore,
 } from "@amends-dev/core/notification";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group";
@@ -1032,11 +1032,11 @@ describe("notifications", () => {
           yield* mention(left.id);
           yield* mention(kept.id);
           expect(yield* count).toBe(3);
-          const [admission] = (yield* asBob(
+          const admission = (yield* asBob(
             GroupMembershipService.GroupMembershipService.use((memberships) =>
               memberships.listCurrent(left.id, page),
             ),
-          )).filter((value) => value.memberId === member.id);
+          )).find((value) => value.memberId === member.id);
           yield* asBob(
             GroupMembershipService.GroupMembershipService.use((memberships) =>
               memberships.leave({ groupId: left.id, membershipId: admission!.id }),

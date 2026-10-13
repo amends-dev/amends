@@ -36,7 +36,7 @@ import * as ChannelStore from "./ChannelStore.ts";
 import * as Delivery from "./Delivery.ts";
 import * as DeliveryFacts from "./DeliveryFacts.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
-import * as CoreError from "../error/CoreError.ts";
+import type * as CoreError from "../error/CoreError.ts";
 import * as Operation from "../operation/Operation.ts";
 
 /**

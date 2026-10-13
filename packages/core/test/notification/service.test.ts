@@ -25,7 +25,7 @@ import * as MemberStore from "../../src/workspace/MemberStore.ts";
 import * as Workspace from "../../src/workspace/Workspace.ts";
 import { make, type Fixture } from "../memory.ts";
 import * as TestSignalHub from "../signal-hub.ts";
-import * as SignalHub from "../../src/signal/SignalHub.ts";
+import type * as SignalHub from "../../src/signal/SignalHub.ts";
 import * as CoreError from "../../src/error/CoreError.ts";
 import * as StoreError from "../../src/journal/StoreError.ts";
 

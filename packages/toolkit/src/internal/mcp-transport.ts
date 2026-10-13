@@ -10,7 +10,12 @@
 import { Data, Effect, Option, Ref, Schema, Semaphore, Stream } from "effect";
 import { McpSchema } from "effect/ai";
 import { Sse } from "effect/encoding";
-import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http";
+import {
+  type HttpClient,
+  type HttpClientError,
+  HttpClientRequest,
+  type HttpClientResponse,
+} from "effect/http";
 import {
   AuthenticationError,
   InvalidInputError,

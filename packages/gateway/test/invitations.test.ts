@@ -1,8 +1,8 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Group } from "@amends-dev/core/group";
-import { Actor } from "@amends-dev/core/identity";
+import type { Actor } from "@amends-dev/core/identity";
 import { Entry, Journal } from "@amends-dev/core/journal";
-import { Invitation, InvitationService, Member } from "@amends-dev/core/workspace";
+import { Invitation, type InvitationService, Member } from "@amends-dev/core/workspace";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Result } from "effect";
 import { withStorage } from "./fixture.ts";

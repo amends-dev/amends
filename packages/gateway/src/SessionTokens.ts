@@ -6,7 +6,7 @@
  *
  * @since 0.1.0
  */
-import { Identity } from "@amends-dev/core/identity";
+import type { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { Effect, Redacted } from "effect";
 

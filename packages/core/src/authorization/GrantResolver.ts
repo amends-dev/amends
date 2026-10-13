@@ -19,7 +19,7 @@ import type * as Permission from "./Permission.ts";
 import * as RoleStore from "./RoleStore.ts";
 
 import type * as Scope from "./Scope.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What resolving grants can fail with: the assignment and role stores.

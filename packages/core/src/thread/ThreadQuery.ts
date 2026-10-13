@@ -13,13 +13,13 @@ import * as Requirement from "../authorization/Requirement.ts";
 import * as GroupFollowStore from "../group/GroupFollowStore.ts";
 import * as Group from "../group/Group.ts";
 import * as GroupQuery from "../group/GroupQuery.ts";
-import * as GroupMembership from "../group/GroupMembership.ts";
+import type * as GroupMembership from "../group/GroupMembership.ts";
 import * as GroupMembershipStore from "../group/GroupMembershipStore.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Store from "../journal/Store.ts";
 import * as ReadStateStore from "../read-state/ReadStateStore.ts";
 import * as TaskStore from "../task/TaskStore.ts";
-import * as Member from "../workspace/Member.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Thread from "./Thread.ts";
 import * as ThreadStore from "./ThreadStore.ts";
@@ -30,7 +30,7 @@ import * as ThreadActivity from "./ThreadActivity.ts";
 import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
 import * as ThreadActivityStore from "./ThreadActivityStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * A member who may take part in a group's threads: a current admission and active membership.

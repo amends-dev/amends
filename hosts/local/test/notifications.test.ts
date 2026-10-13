@@ -1,7 +1,7 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Entry, Store } from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
-import { Member, MemberStore, Workspace } from "@amends-dev/core/workspace";
+import { Member, MemberStore, type Workspace } from "@amends-dev/core/workspace";
 import { SessionTokens } from "@amends-dev/gateway";
 import { PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";

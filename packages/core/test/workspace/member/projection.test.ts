@@ -8,7 +8,7 @@ import * as Journal from "../../../src/journal/Journal.ts";
 import * as Entry from "../../../src/journal/Entry.ts";
 import * as Log from "../../../src/journal/Log.ts";
 import * as Store from "../../../src/journal/Store.ts";
-import * as Transaction from "../../../src/journal/Transaction.ts";
+import type * as Transaction from "../../../src/journal/Transaction.ts";
 import * as MemberFacts from "../../../src/workspace/MemberFacts.ts";
 import * as MemberProjection from "../../../src/workspace/MemberProjection.ts";
 import * as MemberStore from "../../../src/workspace/MemberStore.ts";

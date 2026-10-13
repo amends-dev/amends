@@ -96,7 +96,7 @@ export interface AvatarStackPerson {
 }
 
 export type AvatarStackProps = Omit<JSX.HTMLAttributes<HTMLSpanElement>, "children"> & {
-  people: readonly AvatarStackPerson[];
+  people: ReadonlyArray<AvatarStackPerson>;
   /** Default 22, the size threads and group headers use. */
   size?: s.AvatarSize;
 };

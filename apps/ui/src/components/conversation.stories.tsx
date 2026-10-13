@@ -160,7 +160,7 @@ export const TaskStates = {
 
 function ComposerExample() {
   const [draft, setDraft] = createSignal("");
-  const [sent, setSent] = createSignal<string[]>([]);
+  const [sent, setSent] = createSignal<Array<string>>([]);
   return (
     <div class={s.stack}>
       <Composer.Root

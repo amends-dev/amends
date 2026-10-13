@@ -25,7 +25,7 @@ import {
   FileSystem,
   flow,
   Path,
-  Record,
+  type Record,
   Redacted,
   type Schema,
   Stream,

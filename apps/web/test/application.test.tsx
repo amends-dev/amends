@@ -598,12 +598,12 @@ it("invites someone and removes a member from the Members tab, confirming each w
     canManage: true,
   });
   let adaStatus = "active";
-  const invitations: unknown[] = [];
+  const invitations: Array<unknown> = [];
   const accounts = [
     { id: "alice", email: "alice@example.com" },
     { id: "human-ada", email: "ada@example.test" },
   ];
-  const requests: string[] = [];
+  const requests: Array<string> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;

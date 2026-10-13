@@ -66,7 +66,7 @@ function mount(
       };
     },
   };
-  const controllers: SignInController[] = [];
+  const controllers: Array<SignInController> = [];
   const [shown, setShown] = createSignal(true);
   const transport = FetchHttpClient.layer.pipe(
     Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),

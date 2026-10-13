@@ -4,7 +4,7 @@ import { Show, createSignal } from "solid-js";
 import type { MentionCandidate } from "../../components/composer/index.ts";
 import { Profiles } from "../../components/profile-card/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
-import { people, profile } from "../sample.ts";
+import { people, profile, navigation } from "../sample.ts";
 import type { ColorPalette } from "../../foundations/color/palettes.ts";
 import type { TimelineEntry } from "../timeline/index.ts";
 import {
@@ -12,7 +12,6 @@ import {
   WorkspaceNavigation,
   type Appearance,
 } from "../workspace-navigation/index.ts";
-import { navigation } from "../sample.ts";
 import { GroupPane } from "./group-pane.tsx";
 import { GroupThreads, type ConversationStatus } from "./group-threads.tsx";
 import { ThreadPane } from "./thread-pane.tsx";
@@ -27,13 +26,13 @@ const daysAgo = (days: number, hour: number) => {
   return date;
 };
 
-export const candidates: readonly MentionCandidate[] = [
+export const candidates: ReadonlyArray<MentionCandidate> = [
   { id: "alex", name: "Alex Morgan" },
   { id: "sara", name: "Sara Lind" },
   { id: "yumi", name: "Yumi", agent: true },
 ];
 
-const openings: readonly TimelineEntry[] = [
+const openings: ReadonlyArray<TimelineEntry> = [
   {
     kind: "message",
     id: "t1",
@@ -61,7 +60,7 @@ const openings: readonly TimelineEntry[] = [
   },
 ];
 
-const thread: readonly TimelineEntry[] = [
+const thread: ReadonlyArray<TimelineEntry> = [
   {
     kind: "message",
     id: "r0",

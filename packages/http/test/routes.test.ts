@@ -1,11 +1,10 @@
 import { Channel, ChannelIntake, ChannelService } from "@amends-dev/core/channel";
 import { Connection } from "@amends-dev/core/connection";
 import { Request } from "@amends-dev/core/request";
-import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { BuiltinRoles, Requirement, Target } from "@amends-dev/core/authorization";
 import { expect, it } from "@effect/vitest";
 import { Api, Authentication, Routes, WorkspaceMember } from "../src/index.ts";
 import type * as Core from "@amends-dev/core";
-import { Requirement, Target } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { Entry } from "@amends-dev/core/journal";
 import { Notification, NotificationService } from "@amends-dev/core/notification";

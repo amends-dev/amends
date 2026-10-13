@@ -195,9 +195,9 @@ function fixture() {
           { _tag: "Removed", part: "sandbox" },
         ],
       },
-    ] as Stored[],
+    ] as Array<Stored>,
     /** Answers to the next writes, in order; then success. */
-    answers: [] as Response[],
+    answers: [] as Array<Response>,
   };
   const writes: Array<{ method: string; path: string; key: string | null; body: unknown }> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -262,7 +262,7 @@ function fixture() {
     if (path.endsWith("/configuration")) Object.assign(stored, body);
     return json(viewOf(stored));
   });
-  const done: AgentsDone[] = [];
+  const done: Array<AgentsDone> = [];
   let view!: ReturnType<typeof useAgents>;
   let list!: ReturnType<typeof useAgentList>;
   function Consumer() {

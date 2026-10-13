@@ -30,7 +30,7 @@ export interface TaskRow {
 export type TaskStateFilter = "all" | TaskState;
 export type TaskSort = "activity" | "newest" | "oldest";
 
-const states: readonly TaskState[] = ["triage", "open", "progress", "done"];
+const states: ReadonlyArray<TaskState> = ["triage", "open", "progress", "done"];
 const sorts: ReadonlyArray<{ value: TaskSort; label: string }> = [
   { value: "activity", label: "Latest activity" },
   { value: "newest", label: "Newest" },
@@ -39,7 +39,7 @@ const sorts: ReadonlyArray<{ value: TaskSort; label: string }> = [
 
 export interface GroupTasksProps {
   /** Tasks after filtering and sorting. */
-  readonly tasks: readonly TaskRow[];
+  readonly tasks: ReadonlyArray<TaskRow>;
   /** The task open in the side panel. */
   readonly openTaskKey?: string;
   readonly taskHref: (key: string) => string;
@@ -51,7 +51,7 @@ export interface GroupTasksProps {
   readonly onStateChange: (state: TaskStateFilter) => void;
   /** "all", "unassigned", or a person's id. */
   readonly assignee: string;
-  readonly people: readonly TaskPerson[];
+  readonly people: ReadonlyArray<TaskPerson>;
   readonly onAssigneeChange: (assignee: string) => void;
   readonly sort: TaskSort;
   readonly onSortChange: (sort: TaskSort) => void;

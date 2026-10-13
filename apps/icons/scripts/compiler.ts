@@ -12,7 +12,7 @@ export const spec = {
 type Point = [number, number];
 type Shape =
   | { line: [number, number, number, number] }
-  | { polyline: Point[]; close: boolean; corner: number }
+  | { polyline: Array<Point>; close: boolean; corner: number }
   | { rect: [number, number, number, number]; radius: number }
   | { circle: [number, number, number] }
   | { arc: [number, number, number, number, number] }
@@ -21,11 +21,11 @@ type Shape =
 export interface Drawing {
   name: string;
   title: string;
-  categories: string[];
-  keywords: string[];
+  categories: Array<string>;
+  keywords: Array<string>;
   /** Paint the enclosed areas as well as the strokes, for an active state such as a set bell. */
   fill: boolean;
-  shapes: Shape[];
+  shapes: Array<Shape>;
 }
 export interface CompiledIcon extends Drawing {
   path: string;
@@ -40,11 +40,11 @@ function object(value: unknown, context: string): Record<string, unknown> {
     fail(context, "expected an object");
   return value as Record<string, unknown>;
 }
-function keys(value: Record<string, unknown>, allowed: readonly string[], context: string) {
+function keys(value: Record<string, unknown>, allowed: ReadonlyArray<string>, context: string) {
   for (const key of Object.keys(value))
     if (!allowed.includes(key)) fail(context, `unsupported field ${key}`);
 }
-function numbers<T extends number[]>(value: unknown, length: T["length"], context: string): T {
+function numbers<T extends Array<number>>(value: unknown, length: T["length"], context: string): T {
   if (
     !Array.isArray(value) ||
     value.length !== length ||
@@ -54,14 +54,14 @@ function numbers<T extends number[]>(value: unknown, length: T["length"], contex
   }
   return value as T;
 }
-function strings(value: unknown, context: string): string[] {
+function strings(value: unknown, context: string): Array<string> {
   if (
     !Array.isArray(value) ||
     value.length === 0 ||
     !value.every((s) => typeof s === "string" && s.trim())
   )
     fail(context, "expected a nonempty string list");
-  return value as string[];
+  return value as Array<string>;
 }
 function number(value: unknown, context: string): number {
   if (typeof value !== "number" || !Number.isFinite(value))
@@ -182,7 +182,7 @@ export function parseDrawing(input: unknown, file: string): Drawing {
   if (typeof d.title !== "string" || !d.title.trim()) fail(file, "title is required");
   const categories = strings(d.categories, file);
   for (const category of categories)
-    if (!(spec.categories as readonly string[]).includes(category))
+    if (!(spec.categories as ReadonlyArray<string>).includes(category))
       fail(file, `unknown category ${category}`);
   if (!Array.isArray(d.shapes) || !d.shapes.length) fail(file, "shapes must be a nonempty list");
   if (d.fill !== undefined && typeof d.fill !== "boolean") fail(file, "fill must be boolean");
@@ -216,7 +216,7 @@ function roundedCorner(a: Point, v: Point, b: Point, radius: number) {
   const p2: Point = [v[0] + (bx / lb) * t, v[1] + (by / lb) * t];
   return { p1, p2, r, sweep: ax * by - ay * bx < 0 ? 1 : 0 };
 }
-function polylinePath(points: Point[], close: boolean, corner: number): string {
+function polylinePath(points: Array<Point>, close: boolean, corner: number): string {
   const n = points.length;
   const corners = points.map((p, i) =>
     !close && (i === 0 || i === n - 1)
@@ -257,8 +257,8 @@ function toPath(s: Primitive): string {
     `A${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(endX)} ${fmt(endY)}`;
   return `M${fmt(x + r)} ${fmt(y)}H${fmt(x + w - r)}${arc(x + w, y + r)}V${fmt(y + h - r)}${arc(x + w - r, y + h)}H${fmt(x + r)}${arc(x, y + h - r)}V${fmt(y + r)}${arc(x + r, y)}Z`;
 }
-function validateGaps(shapes: Primitive[], name: string) {
-  const lines: { axis: string; at: number; lo: number; hi: number }[] = [];
+function validateGaps(shapes: Array<Primitive>, name: string) {
+  const lines: Array<{ axis: string; at: number; lo: number; hi: number }> = [];
   const segment = ([x1, y1]: Point, [x2, y2]: Point) => {
     if (x1 === x2) lines.push({ axis: "v", at: x1, lo: Math.min(y1, y2), hi: Math.max(y1, y2) });
     if (y1 === y2) lines.push({ axis: "h", at: y1, lo: Math.min(x1, x2), hi: Math.max(x1, x2) });
@@ -291,10 +291,10 @@ function validateGaps(shapes: Primitive[], name: string) {
     }
 }
 
-export function compile(drawings: Drawing[]): CompiledIcon[] {
+export function compile(drawings: Array<Drawing>): Array<CompiledIcon> {
   const byName = new Map(drawings.map((d) => [d.name, d]));
   if (byName.size !== drawings.length) fail("icons", "duplicate name");
-  const resolve = (drawing: Drawing, seen: string[]): Primitive[] => {
+  const resolve = (drawing: Drawing, seen: Array<string>): Array<Primitive> => {
     if (seen.includes(drawing.name)) fail(drawing.name, `reference cycle: ${seen.join(" > ")}`);
     return drawing.shapes.flatMap((s) => {
       if (!("use" in s)) return [s];

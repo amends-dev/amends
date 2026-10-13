@@ -18,11 +18,11 @@ export const unavailableWorkspace = "Atlas Labs";
 // Expiries and relative wording are measured from this moment, so stories stay stable.
 const now = new Date("2026-09-27T12:00:00Z");
 const inDays = (days: number) => new Date(now.getTime() + days * 86_400_000);
-const sampleWorkspaces: readonly PickerWorkspace[] = [
+const sampleWorkspaces: ReadonlyArray<PickerWorkspace> = [
   { id: "mercier", name: "Mercier & Co", memberCount: 12, href: "#mercier" },
   { id: "fieldwork", name: "Fieldwork", memberCount: 4, owner: true, href: "#fieldwork" },
 ];
-const sampleInvitations: readonly PickerInvitation[] = [
+const sampleInvitations: ReadonlyArray<PickerInvitation> = [
   {
     id: "northstar",
     workspaceId: "northstar",

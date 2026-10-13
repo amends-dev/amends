@@ -71,7 +71,7 @@ const groups = [
     renamable: true,
   },
 ];
-const message = (id: string, text: string, mentions: string[]) => ({
+const message = (id: string, text: string, mentions: Array<string>) => ({
   id,
   workspaceId: "one",
   threadId: "t1",
@@ -85,7 +85,7 @@ const notification = (
   sequence: number,
   minute: number,
   text: string,
-  mentions: string[] = [],
+  mentions: Array<string> = [],
 ) => ({
   notification: {
     id,
@@ -121,8 +121,8 @@ function fixture(options: { readonly fail?: boolean } = {}) {
     notification("n2", 2, 2, "Here is the draft."),
     notification("n1", 1, 1, "Starting the review."),
   ];
-  const markedSeen: string[] = [];
-  const through: unknown[] = [];
+  const markedSeen: Array<string> = [];
+  const through: Array<unknown> = [];
   const streams: Array<ReturnType<typeof eventStream>> = [];
   /** The server tells the reader's sessions what they saw, as it does after marking it. */
   const announceSeen = (notificationIds: ReadonlyArray<string>) =>
@@ -176,7 +176,7 @@ function fixture(options: { readonly fail?: boolean } = {}) {
   });
   const [filter, setFilter] = createSignal<InboxFilter>("all");
   const [retain, setRetain] = createSignal<string>();
-  const failed: string[] = [];
+  const failed: Array<string> = [];
   let view!: ReturnType<typeof useInboxView>;
   function Consumer() {
     view = useInboxView("one", filter, retain, { failed: (change) => failed.push(change) });

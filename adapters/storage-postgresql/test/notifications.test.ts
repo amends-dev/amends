@@ -1,12 +1,11 @@
 import { Identity } from "@amends-dev/core/identity";
-import { Entry } from "@amends-dev/core/journal";
+import { Entry, type StoreError } from "@amends-dev/core/journal";
 import { Member } from "@amends-dev/core/workspace";
 import { Notification } from "@amends-dev/core/notification";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { boundTo, inDatabase, initialized, setup, workspaceId } from "./support.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {

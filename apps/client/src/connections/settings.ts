@@ -58,7 +58,7 @@ const fieldOf = (key: string, property: Property, required: boolean): FormField 
 };
 
 /** The fields an integration's settings form asks for, in its order. */
-export const fieldsOf = (form: SettingsForm): FormField[] =>
+export const fieldsOf = (form: SettingsForm): Array<FormField> =>
   Object.entries(form.properties).flatMap(([key, property]) => {
     const field = fieldOf(key, property, form.required?.includes(key) ?? false);
     return field === undefined ? [] : [field];
@@ -102,7 +102,7 @@ export function fieldIssue(field: FormField, text: string): FormIssue | undefine
 
 /** Every required field has text, and no field refuses what it has. */
 export const settingsComplete = (
-  fields: readonly FormField[],
+  fields: ReadonlyArray<FormField>,
   texts: Readonly<Record<string, string>>,
 ) =>
   fields.every((field) => {
@@ -112,7 +112,7 @@ export const settingsComplete = (
 
 /** The settings the fields' texts give, leaving out the empty ones. */
 export const settingsOf = (
-  fields: readonly FormField[],
+  fields: ReadonlyArray<FormField>,
   texts: Readonly<Record<string, string>>,
 ): Settings =>
   Object.fromEntries(

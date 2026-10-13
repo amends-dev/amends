@@ -21,7 +21,7 @@ const reply =
   "Deploy the API first, verify compatibility, then release clients on Thursday. Keep rollback ready if error rates rise.";
 
 /** The thread's messages; a completed turn's reply follows them, and shows in its turn's place. */
-const messages = (replied: boolean): readonly TimelineEntry[] => [
+const messages = (replied: boolean): ReadonlyArray<TimelineEntry> => [
   {
     kind: "message",
     id: "m1",
@@ -105,7 +105,7 @@ const turnOf = (scenario: Scenario): ThreadTurn | undefined => {
 export const logOf = (
   state: TurnState,
   options: { readonly failedEarly?: boolean } = {},
-): { readonly turn: TurnLogTurn; readonly activity: readonly TurnLogActivity[] } => {
+): { readonly turn: TurnLogTurn; readonly activity: ReadonlyArray<TurnLogActivity> } => {
   const started = state !== "queued" && !options.failedEarly;
   const turn: TurnLogTurn = {
     agent: { name: "Yumi" },
@@ -119,7 +119,7 @@ export const logOf = (
     agentHref: "#agents",
     ...(state === "done" && { replyId: "m4" }),
   };
-  const activity: TurnLogActivity[] = [{ kind: "accepted", at: at(10, 2) }];
+  const activity: Array<TurnLogActivity> = [{ kind: "accepted", at: at(10, 2) }];
   if (options.failedEarly) {
     activity.push({ kind: "failed", at: at(10, 3), reason: "Anthropic needs its API key." });
     return { turn, activity };
@@ -157,7 +157,7 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
   const [scenario, setScenario] = createSignal(props.scenario);
   const turn = () => turnOf(scenario());
   /** The thread as it reads: its messages, then each turn where the agent took on the work. */
-  const entries = (): readonly TimelineEntry[] => {
+  const entries = (): ReadonlyArray<TimelineEntry> => {
     const current = turn();
     const row = (turn: ThreadTurn, seconds: number): TimelineTurn => ({
       kind: "turn",

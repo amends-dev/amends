@@ -99,7 +99,7 @@ function thread() {
   const ended = (
     turnId: string,
     outcome: string,
-    more: { messageIds?: string[]; reason?: string; cancelReason?: string } = {},
+    more: { messageIds?: Array<string>; reason?: string; cancelReason?: string } = {},
   ) =>
     turn("ended", {
       turnId,

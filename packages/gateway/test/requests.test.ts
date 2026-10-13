@@ -1,6 +1,6 @@
 import { GroupService, GroupMembershipService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Entry } from "@amends-dev/core/journal";
+import { Entry, StoreError } from "@amends-dev/core/journal";
 import { Request } from "@amends-dev/core/request";
 import { ThreadService, ThreadMessageService } from "@amends-dev/core/thread";
 import { InvitationService, Member } from "@amends-dev/core/workspace";
@@ -20,7 +20,6 @@ import {
   workspaceId,
 } from "./support.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 const memberActor = (name: string) =>
   Actor.Actor.of({

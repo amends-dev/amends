@@ -1,5 +1,5 @@
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, type Layer, type Schema } from "effect";
 import * as PermissionCatalog from "../../src/authorization/PermissionCatalog.ts";
 import * as Permission from "../../src/authorization/Permission.ts";
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts";

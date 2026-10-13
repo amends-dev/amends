@@ -13,14 +13,21 @@ import {
   Group,
   GroupService,
   GroupQuery,
-  GroupMembership,
+  type GroupMembership,
   GroupMembershipService,
   GroupMembershipPermissions,
   GroupPermissions,
   GroupStore,
 } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Checkpoint, Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
+import {
+  Checkpoint,
+  Entry,
+  Journal,
+  Publication,
+  Store,
+  StoreError,
+} from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 import { ThreadService } from "@amends-dev/core/thread";
 import { Gateway } from "@amends-dev/gateway";
@@ -36,7 +43,6 @@ import {
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Group reads: audience, rosters, management reads, and paging. */
 

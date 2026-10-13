@@ -1,6 +1,6 @@
 import { For, Show, createMemo, type Accessor, type JSX } from "solid-js";
 
-const sameIds = (previous: readonly string[], next: readonly string[]) =>
+const sameIds = (previous: ReadonlyArray<string>, next: ReadonlyArray<string>) =>
   previous.length === next.length && previous.every((id, index) => id === next[index]);
 
 /**
@@ -8,7 +8,7 @@ const sameIds = (previous: readonly string[], next: readonly string[]) =>
  * list keyed by object would remount each row, dropping its focus. Each row reads its current item.
  */
 export function Keyed<T>(props: {
-  readonly each: readonly T[];
+  readonly each: ReadonlyArray<T>;
   readonly by: (item: T) => string;
   readonly children: (item: Accessor<T>) => JSX.Element;
 }) {

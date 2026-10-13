@@ -16,7 +16,7 @@ import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 
-import * as Member from "../workspace/Member.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Group from "./Group.ts";
 import * as GroupCommand from "./GroupCommand.ts";

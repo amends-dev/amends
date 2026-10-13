@@ -31,7 +31,7 @@ const sendErrors: { readonly [Error in SendError]: string } = {
 export type ConversationStatus = "loading" | "unavailable" | "failed";
 
 export interface ConversationProps {
-  readonly entries: readonly TimelineEntry[];
+  readonly entries: ReadonlyArray<TimelineEntry>;
   readonly taskHref?: (key: string) => string;
   readonly onReact?: (messageId: string, emoji: string) => void;
   /** The composer's placeholder and name, such as "Message #general". */
@@ -44,9 +44,9 @@ export interface ConversationProps {
   readonly sendError?: SendError;
   readonly onAttach?: () => void;
   /** People the draft can mention after "@", which also shows the Mention action. */
-  readonly mentionCandidates?: readonly MentionCandidate[];
+  readonly mentionCandidates?: ReadonlyArray<MentionCandidate>;
   /** What typing "/" as the whole draft offers to do, such as following or renaming. */
-  readonly commands?: readonly ComposerCommand[];
+  readonly commands?: ReadonlyArray<ComposerCommand>;
   /** Runs a command by name, in place of sending the "/name" typed. */
   readonly onCommand?: (name: string) => void;
   /** In place of the timeline, while it loads or when it cannot. */
@@ -196,7 +196,7 @@ export interface GroupThreadsProps extends ConversationProps {
   /** Shown while the group has no messages yet. */
   readonly welcome?: {
     readonly groupName: string;
-    readonly memberNames: readonly string[];
+    readonly memberNames: ReadonlyArray<string>;
     /** A direct conversation, named by the people in it. */
     readonly direct?: boolean;
   };

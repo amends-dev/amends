@@ -27,9 +27,9 @@ export interface CreateGroupProps {
   readonly onVisibilityChange: (visibility: GroupVisibility) => void;
   /** The reader, always included. */
   readonly you: PickerPerson;
-  readonly candidates: readonly PickerPerson[];
-  readonly selected: readonly string[];
-  readonly onSelectedChange: (ids: string[]) => void;
+  readonly candidates: ReadonlyArray<PickerPerson>;
+  readonly selected: ReadonlyArray<string>;
+  readonly onSelectedChange: (ids: Array<string>) => void;
   readonly creating?: boolean;
   /** Why the last attempt failed; the form stays for another try. */
   readonly error?: GroupChangeError;

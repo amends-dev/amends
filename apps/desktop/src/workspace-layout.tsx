@@ -165,7 +165,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     creation.reset();
     setDialog("create-group");
   };
-  const [recipients, setRecipients] = createSignal<string[]>([]);
+  const [recipients, setRecipients] = createSignal<Array<string>>([]);
   const existing = () => (recipients().length > 0 ? groups.directWith(recipients()) : undefined);
   const name = useMemberName(workspaceId, () => setDialog(undefined));
   const profiles = useMemberProfiles(workspaceId);
@@ -179,7 +179,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     return agent && agentStatus(agent.issues, agent.activity);
   };
   /** A one-to-one conversation's status: the other member's. People have none until presence. */
-  const soleStatus = (memberIds: readonly string[]) => {
+  const soleStatus = (memberIds: ReadonlyArray<string>) => {
     const [only, ...others] = memberIds;
     return only !== undefined && others.length === 0 ? agentStatusOf(only) : undefined;
   };
@@ -426,7 +426,7 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
   const agents = useAgentList(workspaceId);
   const connections = useConnectionList(workspaceId);
   const page = (target: WorkspacePage) => paths.workspacePage(workspaceId, target);
-  const places = createMemo((): readonly Place[] => {
+  const places = createMemo((): ReadonlyArray<Place> => {
     const humans = new Set(people().flatMap((person) => (person.agent ? [] : [person.id])));
     return [
       {

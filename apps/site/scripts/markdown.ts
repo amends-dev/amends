@@ -86,7 +86,7 @@ export function moduleFile(page: string): ModuleFile {
  */
 export function referenceBody(markdown: string): string {
   const lines = markdown.replace(/^---\n[\s\S]*?\n---\n/, "").split("\n");
-  const kept: string[] = [];
+  const kept: Array<string> = [];
   let inCode = false;
   let inContents = false;
   for (const line of lines) {

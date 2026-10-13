@@ -10,7 +10,7 @@
  *
  * @since 0.1.0
  */
-import { Store } from "@amends-dev/core/journal";
+import { Store, StoreError } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
 import { Turn, TurnJobs } from "@amends-dev/core/turn";
 import { Member, Workspace } from "@amends-dev/core/workspace";
@@ -19,7 +19,6 @@ import { ClusterSchema, Entity } from "effect/cluster";
 import { Rpc } from "effect/rpc";
 import * as TurnRunner from "./TurnRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * Which request this is among the job's: Cluster keeps one request per key, so a commit that asks

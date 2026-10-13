@@ -37,7 +37,7 @@ import type * as Member from "../workspace/Member.ts";
 import * as Task from "./Task.ts";
 import * as TaskActivity from "./TaskActivity.ts";
 import * as TaskFacts from "./TaskFacts.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What the writes can fail with.

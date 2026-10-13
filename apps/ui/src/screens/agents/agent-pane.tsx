@@ -49,7 +49,7 @@ export interface AgentPaneProps {
   /** Asks to remove the agent from the workspace. */
   readonly onRemove?: () => void;
   /** Its turns in progress, each where it works. */
-  readonly turns?: readonly AgentTurn[];
+  readonly turns?: ReadonlyArray<AgentTurn>;
   /** The change running, if any. */
   readonly pending?: AgentsAction | "refresh";
   /** A failed change made here, or a read that failed. */

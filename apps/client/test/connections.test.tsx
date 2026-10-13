@@ -110,9 +110,9 @@ function fixture() {
         settings: { project: "acme" },
         auth: "apiKey",
       },
-    ] as Stored[],
+    ] as Array<Stored>,
     /** Answers to the next writes and checks, in order; then success. */
-    answers: [] as Response[],
+    answers: [] as Array<Response>,
   };
   const writes: Array<{ method: string; path: string; key: string | null; body: unknown }> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
@@ -161,7 +161,7 @@ function fixture() {
     }
     return json(viewOf(stored));
   });
-  const done: ConnectionsDone[] = [];
+  const done: Array<ConnectionsDone> = [];
   let view!: ReturnType<typeof useConnections>;
   let list!: ReturnType<typeof useConnectionList>;
   function Consumer() {

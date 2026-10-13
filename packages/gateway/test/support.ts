@@ -9,7 +9,7 @@ import { DeliveryJobs } from "@amends-dev/core/channel";
 import { Store } from "@amends-dev/core/journal";
 import type { Thread } from "@amends-dev/core/thread";
 import { type Turn, TurnJobs } from "@amends-dev/core/turn";
-import { Member, Workspace } from "@amends-dev/core/workspace";
+import type { Member, Workspace } from "@amends-dev/core/workspace";
 import { Harness as AgentHarness } from "@amends-dev/harness";
 import type { Host, Storage } from "@amends-dev/gateway/conformance";
 import { Context, Crypto, Effect, Layer, Redacted, Result, Schema } from "effect";

@@ -25,7 +25,7 @@ export interface TimelineMessage {
   /** Markdown, whose mentions link to members by id; empty once deleted. */
   readonly text: string;
   /** The members its mentions name, as the reader knows them now. */
-  readonly mentions?: readonly RichTextMention[];
+  readonly mentions?: ReadonlyArray<RichTextMention>;
   /** Its text was edited since it was sent, so it reads with an edited mark. */
   readonly edited?: boolean;
   /** It was deleted: a deleted mark shows in place of its text. */
@@ -41,13 +41,13 @@ export interface TimelineMessage {
   /** The message started a thread. With no replies yet, it offers "Reply in thread". */
   readonly thread?: {
     readonly replies: number;
-    readonly people?: readonly AvatarStackPerson[];
+    readonly people?: ReadonlyArray<AvatarStackPerson>;
     /** Replies the reader has not seen. */
     readonly unread?: boolean;
     /** The people typing a reply now. */
-    readonly typing?: readonly string[];
+    readonly typing?: ReadonlyArray<string>;
     /** Agents at work in the thread, such as "Yumi working". */
-    readonly activity?: readonly MessageThreadActivity[];
+    readonly activity?: ReadonlyArray<MessageThreadActivity>;
   };
   /** The agent's turn that posted it, whose log its actions open. */
   readonly turn?: { readonly id: string };
@@ -126,8 +126,8 @@ const atOf = (entry: TimelineEntry) =>
   entry.kind === "message" || entry.kind === "note" || entry.kind === "turn" ? entry.at : undefined;
 
 /** Entries with a day seam before the first entry of each new local day. */
-function withDays(entries: readonly TimelineEntry[]): readonly TimelineEntry[] {
-  const out: TimelineEntry[] = [];
+function withDays(entries: ReadonlyArray<TimelineEntry>): ReadonlyArray<TimelineEntry> {
+  const out: Array<TimelineEntry> = [];
   let last: number | undefined;
   for (const entry of entries) {
     const at = atOf(entry);
@@ -149,7 +149,7 @@ const stackWithin = 5 * 60_000;
  * minutes, with nothing between them. A thread's replies summary ends a stack and starts its own,
  * since its elbow hangs from the avatar. Messages without an author id or a time never stack.
  */
-function stacked(entries: readonly TimelineEntry[]): ReadonlySet<string> {
+function stacked(entries: ReadonlyArray<TimelineEntry>): ReadonlySet<string> {
   const out = new Set<string>();
   const replied = (message: TimelineMessage) => (message.thread?.replies ?? 0) > 0;
   let previous: TimelineMessage | undefined;
@@ -175,7 +175,7 @@ function stacked(entries: readonly TimelineEntry[]): ReadonlySet<string> {
 }
 
 export interface TimelineProps {
-  readonly entries: readonly TimelineEntry[];
+  readonly entries: ReadonlyArray<TimelineEntry>;
   /** The message whose thread is open. */
   readonly activeId?: string;
   readonly onOpenThread?: (messageId: string) => void;

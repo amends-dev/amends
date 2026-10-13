@@ -30,7 +30,7 @@ import type * as Thread from "../thread/Thread.ts";
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
 import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts";
 import * as ThreadCommand from "../thread/ThreadCommand.ts";
-import * as ThreadId from "../thread/ThreadId.ts";
+import type * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadMessageActivity from "../thread/ThreadMessageActivity.ts";
 import * as ThreadMessage from "../thread/ThreadMessage.ts";
 import * as ThreadMessagePermissions from "../thread/ThreadMessagePermissions.ts";

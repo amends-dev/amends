@@ -11,7 +11,7 @@
  * @since 0.1.0
  */
 import { DeliveryJobs } from "@amends-dev/core/channel";
-import { Store } from "@amends-dev/core/journal";
+import { Store, StoreError } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer, PrimaryKey, Schema } from "effect";
@@ -19,7 +19,6 @@ import { ClusterSchema, Entity } from "effect/cluster";
 import { Rpc } from "effect/rpc";
 import * as DeliveryRunner from "./DeliveryRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * A request to deliver what the thread's contacts were told, keyed by the commit that stored it;

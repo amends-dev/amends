@@ -178,7 +178,7 @@ export interface AgentListProps {
   readonly query: string;
   readonly onQueryChange: (query: string) => void;
   /** The tab's agents after the search. */
-  readonly agents: readonly AgentSummary[];
+  readonly agents: ReadonlyArray<AgentSummary>;
   /** Agents in the workspace, whatever the tab and search. */
   readonly total: number;
   /** Each agent's page. */

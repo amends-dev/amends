@@ -14,17 +14,17 @@ import {
 } from "@amends-dev/core/authorization";
 
 import {
-  Group,
+  type Group,
   GroupService,
   GroupMembershipService,
-  GroupCommand,
-  GroupQuery,
+  type GroupCommand,
+  type GroupQuery,
   GroupMembershipFacts,
 } from "@amends-dev/core/group";
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -43,7 +43,7 @@ import {
   ThreadParticipation,
   ThreadPermissions,
   ThreadCommand,
-  ThreadQuery,
+  type ThreadQuery,
 } from "@amends-dev/core/thread";
 
 import { Gateway } from "@amends-dev/gateway";
@@ -70,7 +70,6 @@ import {
 
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Replies: admission, recipients, concurrent sequencing, rollback, and replay. */
 
@@ -557,9 +556,9 @@ describe("thread replies", () => {
             });
             expect(yield* bound.activities.listByThread(first.thread.id)).toEqual([first.activity]);
             expect(
-              (yield* bound.groupMemberships.listByGroup(group.id)).filter(
+              (yield* bound.groupMemberships.listByGroup(group.id)).find(
                 (g) => g.memberId === humanId,
-              )[0]?.status,
+              )?.status,
             ).toBe("removed");
           }),
         ),

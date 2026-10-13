@@ -24,16 +24,16 @@ export interface PickerPerson {
 
 export interface MemberPickerProps {
   /** Workspace members who can be added. */
-  readonly candidates: readonly PickerPerson[];
+  readonly candidates: ReadonlyArray<PickerPerson>;
   /** Ids of the people chosen so far, shown as chips. */
-  readonly selected: readonly string[];
-  readonly onSelectedChange: (ids: string[]) => void;
+  readonly selected: ReadonlyArray<string>;
+  readonly onSelectedChange: (ids: Array<string>) => void;
   /** A dropdown under the field on wider layouts, or a list that is always shown on phones. */
   readonly presentation?: "dropdown" | "list";
   /** Default "Search workspace members…". */
   readonly placeholder?: string;
   /** People who are always included and cannot be removed, such as "You". */
-  readonly locked?: readonly PickerPerson[];
+  readonly locked?: ReadonlyArray<PickerPerson>;
   /** Focus the search when it appears, as the first field of a dialog. */
   readonly autofocus?: boolean;
 }

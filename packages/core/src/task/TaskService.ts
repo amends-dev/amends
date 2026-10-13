@@ -16,7 +16,7 @@ import * as Identity from "../identity/Identity.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
-import * as Thread from "../thread/Thread.ts";
+import type * as Thread from "../thread/Thread.ts";
 import * as ThreadQuery from "../thread/ThreadQuery.ts";
 import * as ThreadStore from "../thread/ThreadStore.ts";
 import type * as Member from "../workspace/Member.ts";
@@ -25,7 +25,7 @@ import * as TaskCommand from "./TaskCommand.ts";
 import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 import * as Operation from "../operation/Operation.ts";
 
 /**

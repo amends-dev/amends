@@ -9,7 +9,7 @@ import type {
   IntegrationOption,
 } from "@amends-dev/ui/screens/connections";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Effect, Exit, Option } from "effect";
+import { type Cause, Effect, Exit, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useChanges } from "../api/changes.ts";
@@ -63,7 +63,7 @@ export interface ConnectionListEntry {
   readonly id: string;
   readonly name: string;
   /** What its integration gives; none once this host no longer installs it. */
-  readonly provides: readonly IntegrationCapability[];
+  readonly provides: ReadonlyArray<IntegrationCapability>;
   readonly readiness: ConnectionReadiness;
 }
 
@@ -75,7 +75,7 @@ export function useConnectionList(workspaceId: string) {
   const reads = connectionsReads(useWorkspaceClient(workspaceId), workspaceId);
   const read = reads ? connect(reads) : undefined;
   const canCreate = useWorkspacePermission(workspaceId, "connection.create");
-  const connections = createMemo((): readonly ConnectionListEntry[] | undefined => {
+  const connections = createMemo((): ReadonlyArray<ConnectionListEntry> | undefined => {
     const views = read?.connections();
     if (views === undefined) return undefined;
     const provides = new Map(

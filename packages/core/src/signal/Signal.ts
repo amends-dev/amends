@@ -10,7 +10,7 @@ import { Schema } from "effect";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as Group from "../group/Group.ts";
 import * as GroupId from "../group/GroupId.ts";
-import * as Audience from "../journal/Audience.ts";
+import type * as Audience from "../journal/Audience.ts";
 import * as Notification from "../notification/Notification.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadPermissions from "../thread/ThreadPermissions.ts";

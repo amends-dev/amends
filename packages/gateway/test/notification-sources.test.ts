@@ -7,18 +7,18 @@ import {
   type Permission,
   type Target,
 } from "@amends-dev/core/authorization";
-import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group";
+import { type Group, GroupService, GroupMembershipService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Entry, Journal, Publication, Store } from "@amends-dev/core/journal";
+import { Entry, Journal, Publication, Store, StoreError } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 import {
   Notification,
   NotificationService,
-  NotificationInbox,
+  type NotificationInbox,
   NotificationStore,
 } from "@amends-dev/core/notification";
 import {
-  Thread,
+  type Thread,
   ThreadService,
   ThreadMessageStore,
   ThreadMessageService,
@@ -28,7 +28,7 @@ import {
   ThreadParticipationService,
   ThreadPermissions,
   ThreadCommand,
-  ThreadQuery,
+  type ThreadQuery,
 } from "@amends-dev/core/thread";
 import { Gateway } from "@amends-dev/gateway";
 import { Context, DateTime, Effect, Layer, Option } from "effect";
@@ -46,7 +46,6 @@ import {
   workspaceId,
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Resolving a notification's source under current access, without writing. */
 

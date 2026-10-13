@@ -8,7 +8,7 @@
 import type { Effect } from "effect";
 import type * as Event from "./Event.ts";
 import type * as Store from "./Store.ts";
-import * as StoreError from "./StoreError.ts";
+import type * as StoreError from "./StoreError.ts";
 
 /**
  * What a commit does, in that same commit, when it publishes a fact, such as requesting a job.

@@ -41,7 +41,7 @@ import {
 
 const noop = () => {};
 
-function react(entries: readonly TimelineEntry[], id: string, emoji: string) {
+function react(entries: ReadonlyArray<TimelineEntry>, id: string, emoji: string) {
   return entries.map((entry) => {
     if (entry.kind !== "message" || entry.id !== id) return entry;
     const reactions = (entry.reactions ?? []).map((reaction) =>
@@ -57,7 +57,11 @@ function react(entries: readonly TimelineEntry[], id: string, emoji: string) {
   });
 }
 
-function append(entries: readonly TimelineEntry[], id: string, text: string): TimelineEntry[] {
+function append(
+  entries: ReadonlyArray<TimelineEntry>,
+  id: string,
+  text: string,
+): Array<TimelineEntry> {
   const message: TimelineMessage = {
     kind: "message",
     id,
@@ -75,7 +79,7 @@ interface GroupRecord {
   readonly memberCount: number;
   readonly joined: boolean;
   /** Names for a new group's welcome. */
-  readonly memberNames?: readonly string[];
+  readonly memberNames?: ReadonlyArray<string>;
 }
 
 const threadTitles: Record<string, string> = {
@@ -107,15 +111,15 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
   const [view, setView] = createSignal<WorkspaceView>(
     props.view ?? { kind: "group", id: "general" },
   );
-  const [groups, setGroups] = createSignal<readonly GroupRecord[]>(workspaceGroups);
-  const [timelines, setTimelines] = createSignal<Record<string, readonly TimelineEntry[]>>({
+  const [groups, setGroups] = createSignal<ReadonlyArray<GroupRecord>>(workspaceGroups);
+  const [timelines, setTimelines] = createSignal<Record<string, ReadonlyArray<TimelineEntry>>>({
     general: groupEntries,
     launches: launchesEntries,
   });
   const [tab, setTab] = createSignal<GroupTab>(props.tab ?? "threads");
   const [thread, setThread] = createSignal(props.thread ?? false);
   const [task, setTask] = createSignal(props.task);
-  const [replies, setReplies] = createSignal<Record<string, readonly TimelineEntry[]>>({
+  const [replies, setReplies] = createSignal<Record<string, ReadonlyArray<TimelineEntry>>>({
     general: threadEntries,
     launches: launchesThread,
   });
@@ -140,11 +144,11 @@ export function GroupWorkspace(props: GroupWorkspaceProps) {
     props.general ? groupMembers.map((person) => ({ ...person, removable: false })) : groupMembers,
   );
   const [candidates, setCandidates] = createSignal(workspaceCandidates);
-  const [selected, setSelected] = createSignal<string[]>([]);
+  const [selected, setSelected] = createSignal<Array<string>>([]);
   const [creating, setCreating] = createSignal(props.creating ?? false);
   const [newName, setNewName] = createSignal("");
   const [newVisibility, setNewVisibility] = createSignal<GroupVisibility>("private");
-  const [newMembers, setNewMembers] = createSignal<string[]>([]);
+  const [newMembers, setNewMembers] = createSignal<Array<string>>([]);
   const [toasts, setToasts] = createSignal<
     ReadonlyArray<{ id: number; text: string; action?: { label: string; onClick: () => void } }>
   >([]);

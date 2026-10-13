@@ -25,7 +25,7 @@ const described = { description: Schema.optional(Schema.String) };
  */
 const withDefaults = <
   // A class a mixin extends must take `any[]`, as TypeScript requires.
-  Base extends new (...args: any[]) => { readonly description?: string | undefined },
+  Base extends new (...args: Array<any>) => { readonly description?: string | undefined },
 >(
   Base: Base,
   defaults: {

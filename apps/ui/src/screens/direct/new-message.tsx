@@ -10,9 +10,9 @@ export interface NewMessageProps {
   readonly open: boolean;
   readonly onClose: () => void;
   /** Workspace members and agents the reader can message. */
-  readonly candidates: readonly PickerPerson[];
-  readonly selected: readonly string[];
-  readonly onSelectedChange: (ids: string[]) => void;
+  readonly candidates: ReadonlyArray<PickerPerson>;
+  readonly selected: ReadonlyArray<string>;
+  readonly onSelectedChange: (ids: Array<string>) => void;
   /** The reader already has a conversation with exactly the people chosen. */
   readonly existing?: boolean;
   /** Open that conversation, or start one with them. */

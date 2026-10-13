@@ -78,8 +78,8 @@ function fixture(section: SettingsTab = "members") {
       invitation("pending", -day),
     ],
     /** Answers to the next role changes and invitations, in order; then success. */
-    roleAnswers: [] as Response[],
-    inviteAnswers: [] as Response[],
+    roleAnswers: [] as Array<Response>,
+    inviteAnswers: [] as Array<Response>,
     invitationsDown: false,
     /** Each person's address: members', and every invitation's recipient's. */
     accounts: [
@@ -162,7 +162,7 @@ function fixture(section: SettingsTab = "members") {
     if (path === "/accounts") return json(server.accounts);
     return json({}, 404);
   });
-  const done: SettingsDone[] = [];
+  const done: Array<SettingsDone> = [];
   let view!: ReturnType<typeof useWorkspaceSettings>;
   function Consumer() {
     view = useWorkspaceSettings("one", section, { done: (entry) => done.push(entry) });

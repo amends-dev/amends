@@ -16,11 +16,11 @@ export interface IntegrationOption {
   readonly name: string;
   /** Where its documentation is. */
   readonly docs?: string;
-  readonly provides: readonly IntegrationCapability[];
+  readonly provides: ReadonlyArray<IntegrationCapability>;
   /** The ways its connections may authenticate, preferred first. */
-  readonly auth: readonly AuthMethod[];
+  readonly auth: ReadonlyArray<AuthMethod>;
   /** Its settings, as its form asks for them. */
-  readonly fields: readonly FormField[];
+  readonly fields: ReadonlyArray<FormField>;
 }
 
 /**
@@ -43,11 +43,11 @@ export interface ConnectionSummary {
     | {
         readonly name: string;
         readonly docs?: string;
-        readonly provides: readonly IntegrationCapability[];
+        readonly provides: ReadonlyArray<IntegrationCapability>;
       }
     | undefined;
   /** Its settings' fields, from its integration's form; none once its integration is gone. */
-  readonly fields: readonly FormField[];
+  readonly fields: ReadonlyArray<FormField>;
   /** Its saved settings as text, by key. */
   readonly settings: Readonly<Record<string, string>>;
   readonly auth: AuthMethod;
@@ -127,13 +127,13 @@ export const authLabels = {
 } as const satisfies Record<AuthMethod, string>;
 
 /** "API key", or "API key or no authentication". */
-export const authOptionsLabel = (methods: readonly AuthMethod[]) => {
+export const authOptionsLabel = (methods: ReadonlyArray<AuthMethod>) => {
   const [first, ...rest] = methods.map((method) => authLabels[method]);
   return [first, ...rest.map((label) => label.toLowerCase())].filter(Boolean).join(" or ");
 };
 
 /** "Tools", or "Models and tools". */
-export const providesLabel = (provides: readonly IntegrationCapability[]) => {
+export const providesLabel = (provides: ReadonlyArray<IntegrationCapability>) => {
   const [first, ...rest] = provides.map((capability) => capabilityLabels[capability]);
   return [first, ...rest.map((label) => label.toLowerCase())].filter(Boolean).join(" and ");
 };

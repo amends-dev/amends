@@ -11,7 +11,7 @@ import { Effect, Layer, Queue, Stream } from "effect";
 import { withStorage } from "./fixture.ts";
 import * as Support from "./support.ts";
 import { alice, type Bound, boundTo, runHost, testProvenance, workspaceId } from "./support.ts";
-import { CoreError } from "@amends-dev/core/error";
+import type { CoreError } from "@amends-dev/core/error";
 
 /** Buffer a subscription's messages for the enclosing scope. */
 const listen = <E, R>(

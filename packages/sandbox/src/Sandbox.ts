@@ -12,7 +12,7 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { Context, type Effect, FileSystem, Layer, Path, Schema } from "effect";
 import { ChildProcessSpawner } from "effect/process";
 import type {
   Endpoint,

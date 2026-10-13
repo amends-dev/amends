@@ -23,7 +23,7 @@ const sections = [
   "peerDependencies",
   "optionalDependencies",
 ] as const;
-const errors: string[] = [];
+const errors: Array<string> = [];
 
 for (const { path, manifest } of packages) {
   for (const section of sections) {

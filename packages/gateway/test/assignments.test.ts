@@ -2,7 +2,7 @@ import { AssignmentService, BuiltinRoles, Role } from "@amends-dev/core/authoriz
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry } from "@amends-dev/core/journal";
+import { Entry, StoreError } from "@amends-dev/core/journal";
 
 import type { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
@@ -14,7 +14,6 @@ import * as Operations from "./operations.ts";
 
 import * as Support from "./support.ts";
 import { alice, bob, boundTo, charlie, failingLate, future, request } from "./support.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Assigning, changing, and revoking access, and delegation limits. */
 

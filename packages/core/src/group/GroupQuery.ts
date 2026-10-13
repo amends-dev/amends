@@ -11,10 +11,10 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as GroupId from "./GroupId.ts";
-import * as GroupMembership from "./GroupMembership.ts";
+import type * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What checking the audience can fail with.

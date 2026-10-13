@@ -36,8 +36,8 @@ export interface SetupFieldsProps {
   /** `auto`, or the id of a connection that gives harnesses. */
   readonly harness: string | undefined;
   readonly onHarnessChange: (harness: string) => void;
-  readonly harnesses: readonly HarnessOption[];
-  readonly modelConnections: readonly ConnectionOption[];
+  readonly harnesses: ReadonlyArray<HarnessOption>;
+  readonly modelConnections: ReadonlyArray<ConnectionOption>;
   readonly modelConnectionId: string | undefined;
   readonly onModelConnectionChange: (connectionId: string) => void;
   /** The models the chosen connection offers. */
@@ -48,7 +48,7 @@ export interface SetupFieldsProps {
   /** Undefined for the model's default. */
   readonly effort: Effort | undefined;
   readonly onEffortChange: (effort: Effort | undefined) => void;
-  readonly sandboxes: readonly ConnectionOption[];
+  readonly sandboxes: ReadonlyArray<ConnectionOption>;
   /** Undefined for no sandbox. */
   readonly sandboxId: string | undefined;
   readonly onSandboxChange: (sandboxId: string | undefined) => void;
@@ -71,7 +71,7 @@ export function SetupFields(props: SetupFieldsProps) {
   const loaded = () => (props.models?.status === "loaded" ? props.models : undefined);
   const listedModel = () => loaded()?.listed.find((model) => model.id === props.model.trim());
   /** The efforts the chosen model takes: its own when listed, any when it isn't. */
-  const offeredEfforts = (): readonly Effort[] => listedModel()?.efforts ?? efforts;
+  const offeredEfforts = (): ReadonlyArray<Effort> => listedModel()?.efforts ?? efforts;
   const modelProblem = () => {
     const models = loaded();
     if (props.problems?.model) return props.problems.model;

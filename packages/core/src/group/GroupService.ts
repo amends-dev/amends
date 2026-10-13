@@ -23,7 +23,7 @@ import * as GroupQuery from "./GroupQuery.ts";
 import * as GroupStore from "./GroupStore.ts";
 import * as GroupFacts from "./GroupFacts.ts";
 import * as GroupPermissions from "./GroupPermissions.ts";
-import * as GroupMembership from "./GroupMembership.ts";
+import type * as GroupMembership from "./GroupMembership.ts";
 
 import * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts";
 import * as GroupMembershipStore from "./GroupMembershipStore.ts";

@@ -20,7 +20,7 @@ export function GroupsPage() {
   const tab = () => (search.tab === "discover" ? "discover" : "joined");
   const counts = () =>
     new Map<string, number>((publics.value() ?? []).map((item) => [item.group.id, item.members]));
-  const joined = (): DirectoryGroup[] =>
+  const joined = (): Array<DirectoryGroup> =>
     groups.teams().map((group) => ({
       id: group.id,
       name: group.name,
@@ -28,7 +28,7 @@ export function GroupsPage() {
       memberCount: counts().get(group.id),
       href: href(paths.group(params.workspaceId, group.id)),
     }));
-  const discover = (): DirectoryGroup[] =>
+  const discover = (): Array<DirectoryGroup> =>
     (publics.value() ?? [])
       .filter((item) => !item.joined)
       .map((item) => ({
@@ -37,7 +37,7 @@ export function GroupsPage() {
         visibility: "public",
         memberCount: item.members,
       }));
-  const matching = (list: DirectoryGroup[]) => {
+  const matching = (list: Array<DirectoryGroup>) => {
     const needle = query().trim().toLocaleLowerCase();
     return needle ? list.filter((group) => group.name.toLocaleLowerCase().includes(needle)) : list;
   };

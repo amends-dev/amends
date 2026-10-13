@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Context, Crypto, DateTime, Effect, Layer } from "effect";
+import { type Context, Crypto, DateTime, Effect, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import * as Authorization from "../../src/authorization/Authorization.ts";
 import type * as Requirement from "../../src/authorization/Requirement.ts";

@@ -63,14 +63,14 @@ export interface MemberSettingsProps {
   readonly filter: MemberFilter;
   readonly onFilterChange: (filter: MemberFilter) => void;
   /** Members after the search and filter. */
-  readonly members: readonly RosterMember[];
+  readonly members: ReadonlyArray<RosterMember>;
   /** The member open in the side panel. */
   readonly selectedId?: string;
   readonly memberHref: (id: string) => string;
   /** Opens a member in place of following their link. */
   readonly onOpenMember?: (id: string) => void;
   /** Pending invitations, newest first; absent when the reader may not see invitations. */
-  readonly invitations?: readonly SettingsInvitation[];
+  readonly invitations?: ReadonlyArray<SettingsInvitation>;
   /** An invitation just created, marked in the list. */
   readonly highlightId?: string;
   /** Opens the invitation history. */
@@ -296,7 +296,7 @@ export interface MemberDetailsProps {
   readonly member: MemberDetail;
   readonly onClose: () => void;
   /** Roles the reader may give; empty when they may not change this member's role. */
-  readonly roles: readonly SettingsRole[];
+  readonly roles: ReadonlyArray<SettingsRole>;
   /** The chosen role's id. */
   readonly role?: string;
   readonly onRoleChange: (roleId: string) => void;

@@ -78,7 +78,7 @@ function Group(props: {
           : `Couldn’t unfollow #${name()}. Try again.`,
       ),
   });
-  const [selected, setSelected] = createSignal<string[]>([]);
+  const [selected, setSelected] = createSignal<Array<string>>([]);
   const members = useGroupMembers(workspaceId, groupId, {
     added: () => setSelected([]),
     left: () => navigate(paths.workspace(workspaceId)),

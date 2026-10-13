@@ -10,9 +10,9 @@
  *
  * @since 0.1.0
  */
-import { Thread } from "@amends-dev/core/thread";
+import type { Thread } from "@amends-dev/core/thread";
 import { Turn, TurnStore } from "@amends-dev/core/turn";
-import { Member } from "@amends-dev/core/workspace";
+import type { Member } from "@amends-dev/core/workspace";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import * as Binding from "./Binding.ts";

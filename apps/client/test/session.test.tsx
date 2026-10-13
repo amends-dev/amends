@@ -122,7 +122,7 @@ it("continues in memory when browser storage is blocked", () => {
 });
 it("remounts credential owners and ignores completions from obsolete or disposed scopes", () => {
   const fixture = memoryStore();
-  const scopes: SessionScope[] = [];
+  const scopes: Array<SessionScope> = [];
   function Consumer() {
     const current = useSession();
     scopes.push(current);

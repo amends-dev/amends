@@ -12,7 +12,7 @@ import { Actor, Identity } from "@amends-dev/core/identity";
 import { Entry, Journal, Publication } from "@amends-dev/core/journal";
 import { Notification } from "@amends-dev/core/notification";
 import { Request } from "@amends-dev/core/request";
-import { Task, TaskPermissions, TaskService } from "@amends-dev/core/task";
+import { type Task, TaskPermissions, TaskService } from "@amends-dev/core/task";
 import {
   Thread,
   ThreadMessageService,

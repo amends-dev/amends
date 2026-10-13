@@ -8,7 +8,7 @@
  * @since 0.1.0
  */
 import * as Core from "@amends-dev/core";
-import { Actor, Identity } from "@amends-dev/core/identity";
+import { Actor, type Identity } from "@amends-dev/core/identity";
 import { Checkpoint, Store } from "@amends-dev/core/journal";
 import { Operation } from "@amends-dev/core/operation";
 import {
@@ -22,7 +22,7 @@ import { Request } from "@amends-dev/core/request";
 import type { DeliveryJobs } from "@amends-dev/core/channel";
 import type { TurnJobs } from "@amends-dev/core/turn";
 import { Context, Crypto, Data, Effect, Layer, Option, Schema, Cause } from "effect";
-import { type Scope } from "effect";
+import type { Scope } from "effect";
 import * as WorkspaceStorage from "./WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "./internal/workspace-runtime.ts";
 import { CoreError } from "@amends-dev/core/error";

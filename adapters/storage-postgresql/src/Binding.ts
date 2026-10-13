@@ -9,8 +9,7 @@
  *
  * @since 0.1.0
  */
-import { Commit, Store } from "@amends-dev/core/journal";
-import type { Entry } from "@amends-dev/core/journal";
+import { Commit, Store, type Entry, StoreError } from "@amends-dev/core/journal";
 import type { Workspace } from "@amends-dev/core/workspace";
 import {
   Cause,
@@ -28,7 +27,6 @@ import type { SqlError } from "effect/sql";
 import * as PostgresDatabase from "./PostgresDatabase.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import { isContention } from "./internal/errors.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /**
  * The host's limits on a workspace's transactions and on its statements outside them, each with a

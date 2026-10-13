@@ -23,7 +23,7 @@ import * as MemberPermissions from "./MemberPermissions.ts";
 import * as InvitationPermissions from "./InvitationPermissions.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
 import * as WorkspaceFacts from "./WorkspaceFacts.ts";
-import * as Workspace from "./Workspace.ts";
+import type * as Workspace from "./Workspace.ts";
 import * as WorkspaceSettings from "./WorkspaceSettings.ts";
 import * as WorkspaceSettingsPermissions from "./WorkspaceSettingsPermissions.ts";
 import * as CoreError from "../error/CoreError.ts";

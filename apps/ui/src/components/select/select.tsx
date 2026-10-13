@@ -21,7 +21,7 @@ export interface SelectOption {
 }
 
 export type SelectProps = {
-  options: readonly SelectOption[];
+  options: ReadonlyArray<SelectOption>;
   /** The chosen option's value; nothing chosen shows the placeholder. */
   value: string | undefined;
   onChange: (value: string) => void;
@@ -46,7 +46,7 @@ export function Select(props: SelectProps) {
   const [open, setOpen] = createSignal(false);
   // Options rebuilt with the same content keep their objects, so the chosen one stays the same
   // value to Kobalte rather than a new selection on every render.
-  const options = createMemo<readonly SelectOption[]>(() => props.options, [], {
+  const options = createMemo<ReadonlyArray<SelectOption>>(() => props.options, [], {
     equals: (previous, next) =>
       previous.length === next.length &&
       previous.every(

@@ -32,7 +32,7 @@ function memberOf(href: string) {
 }
 
 /** A link label's words, without the "@" it starts with. */
-function labelOf(tokens: readonly MarkdownToken[]): string {
+function labelOf(tokens: ReadonlyArray<MarkdownToken>): string {
   return tokens
     .map((token) => (token.tokens?.length ? labelOf(token.tokens) : (token.text ?? "")))
     .join("")

@@ -9,7 +9,12 @@
  */
 import * as Api from "./Api.ts";
 import { Identity } from "@amends-dev/core/identity";
-import { Invitation, InvitationService, Member, MemberService } from "@amends-dev/core/workspace";
+import {
+  type Invitation,
+  InvitationService,
+  type Member,
+  MemberService,
+} from "@amends-dev/core/workspace";
 import { Accounts } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";

@@ -16,7 +16,7 @@ import { Turn } from "@amends-dev/core/turn";
 import { Invitation, Member } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
-import { Store } from "@amends-dev/core/journal";
+import type { Store } from "@amends-dev/core/journal";
 import * as Support from "./support.ts";
 import { type Bound, forWorkspace, otherWorkspaceId, workspaceId } from "./support.ts";
 import { withStorage } from "./fixture.ts";

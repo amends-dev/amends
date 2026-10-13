@@ -81,8 +81,8 @@ interface State {
   readonly change: (value: string) => void;
   readonly submit: () => void;
   readonly disabled: Accessor<boolean>;
-  readonly candidates: Accessor<readonly MentionCandidate[]>;
-  readonly commands: Accessor<readonly ComposerCommand[]>;
+  readonly candidates: Accessor<ReadonlyArray<MentionCandidate>>;
+  readonly commands: Accessor<ReadonlyArray<ComposerCommand>>;
   readonly runCommand: (name: string) => void;
   readonly editor: Accessor<Editor | undefined>;
   readonly setEditor: (editor: Editor | undefined) => void;
@@ -112,9 +112,9 @@ export type RootProps = Omit<JSX.FormHTMLAttributes<HTMLFormElement>, "onSubmit"
   /** While sending, the draft stays editable but cannot be sent again. */
   disabled?: boolean;
   /** People the draft can mention; typing "@" suggests them. */
-  mentionCandidates?: readonly MentionCandidate[];
+  mentionCandidates?: ReadonlyArray<MentionCandidate>;
   /** What typing "/" as the whole draft suggests; choosing one runs it rather than sending. */
-  commands?: readonly ComposerCommand[];
+  commands?: ReadonlyArray<ComposerCommand>;
   /** Runs a command by name; the "/name" typed is cleared from the draft. */
   onCommand?: (name: string) => void;
 };
@@ -221,7 +221,7 @@ export function Input(props: InputProps) {
   }>();
   const [dismissed, setDismissed] = createSignal<number>();
   const [active, setActive] = createSignal(0);
-  const suggestions = createMemo((): readonly Choice[] => {
+  const suggestions = createMemo((): ReadonlyArray<Choice> => {
     const current = query();
     if (!current || dismissed() === current.from) return [];
     const needle = current.query.toLocaleLowerCase();

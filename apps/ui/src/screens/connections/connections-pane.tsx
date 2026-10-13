@@ -145,7 +145,7 @@ export interface ConnectionListProps {
   readonly query: string;
   readonly onQueryChange: (query: string) => void;
   /** The tab's connections after the search. */
-  readonly connections: readonly ConnectionSummary[];
+  readonly connections: ReadonlyArray<ConnectionSummary>;
   /** Connections in the workspace, whatever the tab and search. */
   readonly total: number;
   /** Each connection's page. */

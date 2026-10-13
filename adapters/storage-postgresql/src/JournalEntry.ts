@@ -9,7 +9,7 @@
  */
 import { Performer } from "@amends-dev/core/identity";
 import { Event, Store } from "@amends-dev/core/journal";
-import { Workspace } from "@amends-dev/core/workspace";
+import type { Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Schema, Predicate } from "effect";
 import { logEntries } from "./internal/schema.ts";
 

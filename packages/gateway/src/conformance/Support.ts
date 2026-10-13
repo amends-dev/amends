@@ -29,16 +29,16 @@ import {
   Journal,
   Publication,
   Store,
-  StoreError,
+  type StoreError,
 } from "@amends-dev/core/journal";
-import { Notification, NotificationStore } from "@amends-dev/core/notification";
+import { type Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   type ThreadActivity,
   ThreadActivityKind,
   ThreadActivityResolvers,
   ThreadActivityStore,
   ThreadCommand,
-  ThreadMessage,
+  type ThreadMessage,
   ThreadMessageActivity,
   ThreadMessageStore,
   ThreadMessageTimeline,

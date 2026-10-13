@@ -15,15 +15,15 @@ import * as Actor from "../identity/Actor.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 
-import * as Workspace from "../workspace/Workspace.ts";
+import type * as Workspace from "../workspace/Workspace.ts";
 import * as Grant from "./Grant.ts";
 import * as GrantResolver from "./GrantResolver.ts";
 import * as PermissionCatalog from "./PermissionCatalog.ts";
-import * as Requirement from "./Requirement.ts";
+import type * as Requirement from "./Requirement.ts";
 
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What a check can fail with: the actor refused, an actor or target from another workspace, and

@@ -1,7 +1,7 @@
 import { Integration } from "@amends-dev/connection";
 import { Connection, ConnectionService } from "@amends-dev/core/connection";
 import { Actor, type Identity } from "@amends-dev/core/identity";
-import { Journal } from "@amends-dev/core/journal";
+import { Journal, StoreError } from "@amends-dev/core/journal";
 import { Request } from "@amends-dev/core/request";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
@@ -23,7 +23,6 @@ import {
   testModel,
 } from "./support.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,

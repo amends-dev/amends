@@ -22,7 +22,7 @@ export interface AddAgentProps {
   readonly name: string;
   readonly onNameChange: (name: string) => void;
   /** The roles it may start with; the reader may give only those marked assignable. */
-  readonly roles: readonly AgentRoleOption[];
+  readonly roles: ReadonlyArray<AgentRoleOption>;
   readonly roleId: string | undefined;
   readonly onRoleChange: (roleId: string) => void;
   /** The setup being drafted, with what each part may be. */

@@ -10,7 +10,7 @@ import type {
   SettingsTab,
 } from "@amends-dev/ui/screens/settings";
 import { useAtomValue } from "@effect/atom-solid";
-import { Cause, DateTime, Effect, Option, Predicate } from "effect";
+import { type Cause, DateTime, Effect, Option, Predicate } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useChanges } from "../api/changes.ts";
@@ -49,7 +49,7 @@ interface Row {
   /** Their workspace role's id, when the reader may read their access and they hold one. */
   readonly roleId: string | undefined;
   /** The roles the reader may give them; empty when the reader may not change their role. */
-  readonly roles: readonly SettingsRole[];
+  readonly roles: ReadonlyArray<SettingsRole>;
   /** The reader may remove them now. */
   readonly removable: boolean;
 }

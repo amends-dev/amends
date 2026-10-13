@@ -13,8 +13,8 @@ import * as MemberId from "../workspace/MemberId.ts";
 import * as Turn from "./Turn.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Thread from "../thread/Thread.ts";
-import * as Member from "../workspace/Member.ts";
+import type * as Thread from "../thread/Thread.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 import * as StoreError from "../journal/StoreError.ts";
 

@@ -9,7 +9,7 @@
  *
  * @since 0.1.0
  */
-import { Identity } from "@amends-dev/core/identity";
+import type { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { Redacted } from "effect";
 import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";

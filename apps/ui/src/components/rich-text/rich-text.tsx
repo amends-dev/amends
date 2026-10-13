@@ -22,7 +22,7 @@ export interface RichTextProps {
    */
   readonly text: string;
   /** The members its mentions name; a mention of anyone else shows the name the text recorded. */
-  readonly mentions?: readonly RichTextMention[];
+  readonly mentions?: ReadonlyArray<RichTextMention>;
   /** One run of words and mentions without layout or formatting, such as a preview's. */
   readonly inline?: boolean;
   /** The text is still arriving: formatting left open at its end shows as if closed. */
@@ -117,8 +117,8 @@ const tokensOf = (token: Token) => token as MarkedToken;
 type Run = string | { readonly id: string; readonly label: string };
 
 /** The words and mentions of inline tokens, without their formatting. */
-function inlineRuns(tokens: readonly Token[]): Run[] {
-  return tokens.flatMap((token): Run[] => {
+function inlineRuns(tokens: ReadonlyArray<Token>): Array<Run> {
+  return tokens.flatMap((token): Array<Run> => {
     const current = tokensOf(token);
     switch (current.type) {
       case "br":
@@ -146,8 +146,8 @@ function inlineRuns(tokens: readonly Token[]): Run[] {
 }
 
 /** The words and mentions of blocks, a space between each, without their layout. */
-function blockRuns(tokens: readonly Token[]): Run[] {
-  return tokens.flatMap((token): Run[] => {
+function blockRuns(tokens: ReadonlyArray<Token>): Array<Run> {
+  return tokens.flatMap((token): Array<Run> => {
     const current = tokensOf(token);
     switch (current.type) {
       case "space":
@@ -179,15 +179,15 @@ function blockRuns(tokens: readonly Token[]): Run[] {
 }
 
 /** The words of some tokens, without their formatting. */
-function plain(tokens: readonly Token[]) {
+function plain(tokens: ReadonlyArray<Token>) {
   return inlineRuns(tokens)
     .map((run) => (typeof run === "string" ? run : run.label))
     .join("");
 }
 
 /** Runs with each stretch of whitespace a single space, trimmed at both ends. */
-function collapsed(all: readonly Run[]): Run[] {
-  const out: Run[] = [];
+function collapsed(all: ReadonlyArray<Run>): Array<Run> {
+  const out: Array<Run> = [];
   for (const run of all) {
     const previous = out.at(-1);
     if (typeof run !== "string") out.push(run);
@@ -230,7 +230,7 @@ function Mention(props: {
   );
 }
 
-function inlines(tokens: readonly Token[], context: Context): JSX.Element[] {
+function inlines(tokens: ReadonlyArray<Token>, context: Context): Array<JSX.Element> {
   return tokens.map((token) => inline(token, context));
 }
 
@@ -360,7 +360,7 @@ function block(token: Token, context: Context): JSX.Element {
   }
 }
 
-function blocks(tokens: readonly Token[], context: Context): JSX.Element[] {
+function blocks(tokens: ReadonlyArray<Token>, context: Context): Array<JSX.Element> {
   return tokens.map((token) => block(token, context));
 }
 

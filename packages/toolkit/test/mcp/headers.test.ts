@@ -66,14 +66,14 @@ describe("the headers of a call", () => {
       region: "us-west1",
       shard: 42,
       dryRun: false,
-      ratio: 3.14159,
+      ratio: 0.75,
     });
 
     expect(headers).toEqual({
       "mcp-param-region": "us-west1",
       "mcp-param-shard": "42",
       "mcp-param-dry-run": "false",
-      "mcp-param-ratio": "3.14159",
+      "mcp-param-ratio": "0.75",
     });
   });
 

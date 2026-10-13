@@ -272,13 +272,13 @@ const activityWords: Readonly<Record<TurnState, string>> = {
 export type RepliesProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   count: number;
   /** The people who replied, most recent last. */
-  people?: readonly AvatarStackPerson[];
+  people?: ReadonlyArray<AvatarStackPerson>;
   /** The thread has replies the reader has not seen. */
   unread?: boolean;
   /** A quiet line after the count, such as who is typing. */
   note?: string;
   /** Agents at work in the thread. */
-  activity?: readonly ThreadActivity[];
+  activity?: ReadonlyArray<ThreadActivity>;
 };
 
 /** Opens the message's thread. */
@@ -330,7 +330,7 @@ export type ReplyProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "chil
   /** A quiet line after the action, such as who is typing; it keeps the action in view. */
   note?: string;
   /** Agents at work in the thread; they keep the action in view too. */
-  activity?: readonly ThreadActivity[];
+  activity?: ReadonlyArray<ThreadActivity>;
 };
 
 /**

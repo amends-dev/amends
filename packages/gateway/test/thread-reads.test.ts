@@ -29,6 +29,7 @@ import {
   Publication,
   Store,
   Subject,
+  StoreError,
 } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 import {
@@ -41,7 +42,7 @@ import {
   ThreadActivityStore,
   ThreadMessage,
   ThreadMessageActivity,
-  ThreadMessageStore,
+  type ThreadMessageStore,
   ThreadMessageFacts,
   ThreadMessageTimeline,
   ThreadParticipation,
@@ -69,7 +70,6 @@ import {
 } from "./support.ts";
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Thread discovery, metadata, timeline pages, and participant summaries. */
 

@@ -42,7 +42,7 @@ const Patch = (props: { readonly class?: string }) => (
     <rect class={s.patch} x="22" y="22" width="39" height="39" />
   </g>
 );
-const Stitches = (props: { readonly class?: string; readonly paths?: readonly string[] }) => (
+const Stitches = (props: { readonly class?: string; readonly paths?: ReadonlyArray<string> }) => (
   <For each={props.paths ?? stitches}>
     {(d) => <path class={classes(s.knockLine, props.class)} d={d} />}
   </For>

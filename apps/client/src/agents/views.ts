@@ -15,7 +15,7 @@ import type {
   SetupPart,
 } from "@amends-dev/ui/screens/agents";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Effect, Option } from "effect";
+import { type Cause, Effect, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import {
   createEffect,
@@ -118,7 +118,7 @@ const connectionKey = {
 } as const satisfies Record<SetupPart, SetupKey>;
 
 /** The draft fields whose edit may resolve an issue. */
-const resolvingKeys = (issue: AgentIssue): readonly SetupKey[] => {
+const resolvingKeys = (issue: AgentIssue): ReadonlyArray<SetupKey> => {
   switch (issue.kind) {
     case "sandbox-required":
       return ["harness", "sandboxId"];
@@ -163,7 +163,7 @@ export interface AgentListEntry {
   readonly id: string;
   readonly memberId: string;
   readonly name: string;
-  readonly issues: readonly AgentIssue[];
+  readonly issues: ReadonlyArray<AgentIssue>;
   /** Where it is at work; unset while it is idle. */
   readonly activity?: AgentActivity;
 }
@@ -177,7 +177,7 @@ export function useAgentList(workspaceId: string) {
   const agents = reads ? useAtomValue(() => reads.agents) : undefined;
   const canCreate = useWorkspacePermission(workspaceId, "agent.create");
   const turnActivity = useTurnActivity(workspaceId);
-  const entries = createMemo((): readonly AgentListEntry[] | undefined =>
+  const entries = createMemo((): ReadonlyArray<AgentListEntry> | undefined =>
     Option.getOrUndefined(
       Option.map(AsyncResult.value(agents?.() ?? AsyncResult.initial()), (views) =>
         views.map((view) => {
@@ -245,7 +245,7 @@ export function useAgents(
   const optionsFor = (
     part: SetupPart,
     current: string | undefined,
-  ): readonly ConnectionOption[] => {
+  ): ReadonlyArray<ConnectionOption> => {
     const offered = (read?.connections() ?? []).flatMap((connection) => {
       const integration = integrations().get(connection.integration);
       if (!integration?.provides.includes(capabilities[part])) return [];
@@ -279,7 +279,7 @@ export function useAgents(
       },
     ];
   };
-  const harnessOptions = (current: string | undefined): readonly HarnessOption[] =>
+  const harnessOptions = (current: string | undefined): ReadonlyArray<HarnessOption> =>
     optionsFor("harness", current).map((option) => {
       const connection = connections().get(option.id as Connection.Id);
       const integration = connection && integrations().get(connection.integration);
@@ -337,7 +337,7 @@ export function useAgents(
     };
   };
   /** The agent's turns in progress, as its page lists them. */
-  const turnsOf = (memberId: string): readonly AgentTurnEntry[] =>
+  const turnsOf = (memberId: string): ReadonlyArray<AgentTurnEntry> =>
     turnActivity.ofAgent(memberId).flatMap((turn) =>
       turn.state === "queued" || turn.state === "working" || turn.state === "stopping"
         ? [
@@ -357,7 +357,7 @@ export function useAgents(
   const viewOf = (agentId: string) => views().find((entry) => entry.id === agentId);
 
   /** The roles a new agent may start with; only those marked assignable can be given. */
-  const roles = createMemo((): readonly AgentRoleOption[] =>
+  const roles = createMemo((): ReadonlyArray<AgentRoleOption> =>
     (read?.settings()?.roles ?? []).flatMap((choice) =>
       choice.role.id === ownerRole
         ? []
@@ -451,7 +451,7 @@ export function useAgents(
     apply: (change: Partial<SetupDraft>) => void,
   ): Omit<SetupFieldsProps, "problems" | "disabled"> => {
     const edit = (change: Partial<SetupDraft>) => {
-      setEdited((previous) => new Set([...previous, ...(Object.keys(change) as SetupKey[])]));
+      setEdited((previous) => new Set([...previous, ...(Object.keys(change) as Array<SetupKey>)]));
       apply(change);
     };
     return {

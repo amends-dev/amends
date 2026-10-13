@@ -57,8 +57,8 @@ export interface PickerAccept {
 export interface WorkspacePickerProps {
   readonly homeHref: string;
   readonly account: StandaloneAccount;
-  readonly workspaces: readonly PickerWorkspace[];
-  readonly invitations: readonly PickerInvitation[];
+  readonly workspaces: ReadonlyArray<PickerWorkspace>;
+  readonly invitations: ReadonlyArray<PickerInvitation>;
   /** The list could not be reloaded; it shows what was loaded before. */
   readonly refreshFailed?: boolean;
   readonly onRetry?: () => void;

@@ -37,7 +37,7 @@ export type FormField = {
 export type FormIssue = "format" | "length" | "range";
 
 export interface FormFieldsProps {
-  readonly fields: readonly FormField[];
+  readonly fields: ReadonlyArray<FormField>;
   /** A field's value as text: "true" or "false" for yes or no, an option's value for a choice. */
   readonly value: (key: string) => string;
   readonly onChange: (key: string, value: string) => void;

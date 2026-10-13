@@ -51,7 +51,7 @@ const keyHeader: FormField = {
   minLength: 1,
 };
 
-export const sampleIntegrations: readonly IntegrationOption[] = [
+export const sampleIntegrations: ReadonlyArray<IntegrationOption> = [
   modelProvider("anthropic", "Anthropic"),
   modelProvider("deepseek", "DeepSeek"),
   modelProvider("fireworks-ai", "Fireworks AI"),
@@ -172,7 +172,7 @@ interface Sample {
   readonly health?: ConnectionHealth;
 }
 
-const samples: readonly Sample[] = [
+const samples: ReadonlyArray<Sample> = [
   {
     id: "openrouter",
     name: "OpenRouter · Shared",
@@ -215,7 +215,7 @@ const fieldIssue = (field: FormField | undefined, value: string): FormIssue | un
   return undefined;
 };
 /** The fields are complete: every required one has a value and none is refused. */
-const complete = (fields: readonly FormField[], values: Readonly<Record<string, string>>) =>
+const complete = (fields: ReadonlyArray<FormField>, values: Readonly<Record<string, string>>) =>
   fields.every(
     (field) =>
       (!field.required || (values[field.key] ?? "").trim() !== "") &&
@@ -262,7 +262,7 @@ export interface ConnectionsWorkspaceProps {
 export function ConnectionsWorkspace(props: ConnectionsWorkspaceProps) {
   const integrations = sampleIntegrations;
   const integrationOf = (id: string) => integrations.find((candidate) => candidate.id === id);
-  const [records, setRecords] = createSignal<readonly Sample[]>(props.empty ? [] : samples);
+  const [records, setRecords] = createSignal<ReadonlyArray<Sample>>(props.empty ? [] : samples);
   const [tab, setTab] = createSignal<ConnectionsTab>(props.tab ?? "all");
   const [query, setQuery] = createSignal("");
   const [selected, setSelected] = createSignal(props.selected);

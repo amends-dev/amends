@@ -28,6 +28,9 @@ as parallel jobs; see [continuous integration](docs/testing.md#continuous-integr
 Keep these diagnostics enabled in `tsconfig.base.json`: the pinned Oxlint version is
 newer than the versions supported by the Effect Oxlint patch, so Effect checks
 currently run through TypeScript. Check compatibility before changing this setup.
+`.oxlintrc.json` takes the rules of Effect's own Oxlint configuration
+(`repos/effect/packages/tools/oxc/oxlintrc.json`), with its type-aware rules off as Effect
+runs them, and keeps `console` to tests and scripts.
 
 ## Workspace layout
 

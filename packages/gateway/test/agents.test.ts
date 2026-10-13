@@ -9,7 +9,7 @@ import {
 import { Connection, ConnectionPermissions, ConnectionService } from "@amends-dev/core/connection";
 import { Group } from "@amends-dev/core/group";
 import type { Actor, Identity } from "@amends-dev/core/identity";
-import { Journal, Publication } from "@amends-dev/core/journal";
+import { Journal, Publication, StoreError } from "@amends-dev/core/journal";
 import { Request } from "@amends-dev/core/request";
 import { Member, type Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
@@ -32,7 +32,6 @@ import {
   type Bound,
 } from "./support.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,

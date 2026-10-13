@@ -10,7 +10,7 @@ import * as Log from "../../src/journal/Log.ts";
 import * as Projection from "../../src/journal/Projection.ts";
 import * as Publication from "../../src/journal/Publication.ts";
 import * as Store from "../../src/journal/Store.ts";
-import * as Transaction from "../../src/journal/Transaction.ts";
+import type * as Transaction from "../../src/journal/Transaction.ts";
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts";
 import { Counter, make, type Fixture } from "../memory.ts";
 import { testProvenance } from "../publication.ts";

@@ -12,7 +12,7 @@ export interface EmptyStateProps {
   readonly art?: StateArtKind | "working";
   readonly title: string;
   /** Short sentences under the title. */
-  readonly lines?: readonly string[];
+  readonly lines?: ReadonlyArray<string>;
   /** 1 when it is the page's heading. Default 2. */
   readonly level?: 1 | 2;
   /** Actions under the text, such as a Button. */

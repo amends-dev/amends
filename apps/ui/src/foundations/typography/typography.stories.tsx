@@ -35,7 +35,7 @@ export const Scale = {
           its usual one.
         </p>
         <div class={s.panel}>
-          <For each={Object.keys(typeScale) as TypeRole[]}>
+          <For each={Object.keys(typeScale) as Array<TypeRole>}>
             {(role) => (
               <div class={s.specimenRow}>
                 <span>
@@ -57,7 +57,7 @@ export const Scale = {
       <section class={s.section}>
         <h2 class={s.heading}>Weights</h2>
         <div class={s.panel}>
-          <For each={Object.keys(fontWeight) as FontWeight[]}>
+          <For each={Object.keys(fontWeight) as Array<FontWeight>}>
             {(weight) => (
               <div class={s.specimenRow}>
                 <span>

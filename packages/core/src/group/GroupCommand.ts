@@ -9,15 +9,23 @@
  *
  * @since 0.1.0
  */
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { DateTime, PlatformError } from "effect";
+import {
+  Context,
+  Crypto,
+  Effect,
+  Layer,
+  Option,
+  type Schema,
+  type DateTime,
+  type PlatformError,
+} from "effect";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
 import type * as Log from "../journal/Log.ts";
 import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
-import * as Member from "../workspace/Member.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as MemberStore from "../workspace/MemberStore.ts";
 import * as Group from "./Group.ts";
 import * as GroupFacts from "./GroupFacts.ts";
@@ -25,7 +33,7 @@ import * as GroupStore from "./GroupStore.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as GroupMembershipFacts from "./GroupMembershipFacts.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What admitting a member can fail with: publishing the admission.

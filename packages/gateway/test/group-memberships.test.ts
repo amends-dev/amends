@@ -22,7 +22,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal";
 import {
   Invitation,
   InvitationFacts,
@@ -52,7 +52,6 @@ import {
 
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Group admission and departure: authority, workspace removal, concurrency, and replay. */
 

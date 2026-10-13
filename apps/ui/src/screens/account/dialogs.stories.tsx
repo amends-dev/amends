@@ -56,7 +56,7 @@ export const ChangeYourName = {
 export const ChangeNameFailed = { render: () => <Name error="failed" /> } satisfies Story;
 
 function Message() {
-  const [selected, setSelected] = createSignal<string[]>([]);
+  const [selected, setSelected] = createSignal<Array<string>>([]);
   return (
     <Theme mode="light">
       <NewMessage
@@ -86,7 +86,7 @@ export const NewMessageDialog = {
   },
 } satisfies Story;
 
-const places: readonly JumpToItem[] = [
+const places: ReadonlyArray<JumpToItem> = [
   { id: "inbox", label: "Inbox", section: "Go to", icon: IconMarkMail },
   { id: "agents", label: "Agents", section: "Go to", icon: IconMarkAgents },
   { id: "environments", label: "Environments", section: "Go to", icon: IconMarkEnvironments },

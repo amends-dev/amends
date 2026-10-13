@@ -12,7 +12,7 @@
  *
  * @since 0.1.0
  */
-import { Commit, Entry, Occurrence, Store } from "@amends-dev/core/journal";
+import { Commit, Entry, Occurrence, Store, StoreError } from "@amends-dev/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import * as JournalEntry from "./JournalEntry.ts";
@@ -21,7 +21,6 @@ import * as Binding from "./Binding.ts";
 import { isContention, raceError } from "./internal/errors.ts";
 import { insertChunked } from "./internal/parameters.ts";
 import { commits, logAppendKeys, logBatches, logEntries } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 const BatchHeaderRow = Schema.Struct({
   logId: Entry.LogId,

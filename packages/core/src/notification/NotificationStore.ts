@@ -17,7 +17,7 @@ import * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
-import * as Group from "../group/Group.ts";
+import type * as Group from "../group/Group.ts";
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts";
 import * as StoreError from "../journal/StoreError.ts";
 

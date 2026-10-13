@@ -21,7 +21,7 @@ import { SignalHub } from "@amends-dev/core/signal";
 import { AssignmentStore, RoleStore } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
-import { Checkpoint, Commit, Entry, Store } from "@amends-dev/core/journal";
+import { Checkpoint, Commit, Entry, Store, StoreError } from "@amends-dev/core/journal";
 import { NotificationStore } from "@amends-dev/core/notification";
 import {
   InvitationStore,
@@ -49,7 +49,6 @@ import * as Gateway from "../src/Gateway.ts";
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 const workspaceId = Workspace.Id.make("workspace");
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });

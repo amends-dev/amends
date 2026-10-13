@@ -17,7 +17,7 @@ import * as StoredEntry from "./Entry.ts";
 import * as Occurrence from "./Occurrence.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
-import * as StoreError from "./StoreError.ts";
+import type * as StoreError from "./StoreError.ts";
 
 /**
  * A log entry with its payload decoded by the log's schema.

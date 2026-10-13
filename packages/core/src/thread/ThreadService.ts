@@ -15,7 +15,7 @@ import * as Requirement from "../authorization/Requirement.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Group from "../group/Group.ts";
 import * as GroupQuery from "../group/GroupQuery.ts";
-import * as Member from "../workspace/Member.ts";
+import type * as Member from "../workspace/Member.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";

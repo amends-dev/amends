@@ -8,7 +8,7 @@
  */
 import * as Scope from "./Scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import * as Actor from "../identity/Actor.ts";
+import type * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";

@@ -49,7 +49,7 @@ export interface NavigationGroup extends NavigationLink {
   readonly id: string;
   readonly name: string;
   /** Open threads and tasks shown under the group. */
-  readonly threads?: readonly NavigationThread[];
+  readonly threads?: ReadonlyArray<NavigationThread>;
   /** Agents at work in the group: the most pressing turn state. */
   readonly activity?: "queued" | "working" | "stopping";
   /** Notifications addressed to the reader from the group. */
@@ -97,7 +97,7 @@ export interface WorkspaceNavigationProps {
   };
   readonly homeHref: string;
   /** The rail's destinations. Default all of them. */
-  readonly destinations?: readonly Destination[];
+  readonly destinations?: ReadonlyArray<Destination>;
   /** The current destination, if the page is one. */
   readonly destination?: Destination;
   readonly destinationHref: (destination: Destination) => string;
@@ -239,10 +239,10 @@ export interface HomeSidebarProps {
   readonly tasks: NavigationLink;
   /** The directory of groups the title links to. */
   readonly groupsDirectory: NavigationLink;
-  readonly groups: readonly NavigationGroup[];
+  readonly groups: ReadonlyArray<NavigationGroup>;
   /** The groups are still loading, so an empty list says nothing yet. */
   readonly groupsLoading?: boolean;
-  readonly directMessages: readonly NavigationDirect[];
+  readonly directMessages: ReadonlyArray<NavigationDirect>;
   readonly onBrowseGroups: () => void;
   /** Shows Create group, for readers who may create groups. */
   readonly onCreateGroup?: () => void;
@@ -404,7 +404,7 @@ export interface NavigationSection {
   readonly browse?: { readonly label: string; readonly onBrowse: () => void };
   /** Shows Create, for a reader who may, named such as "Add agent". */
   readonly create?: { readonly label: string; readonly onCreate: () => void };
-  readonly entries: readonly NavigationEntry[];
+  readonly entries: ReadonlyArray<NavigationEntry>;
   /** The entries are still loading, so an empty list says nothing yet. */
   readonly loading?: boolean;
   /** Where the list has no entries, such as "No agents yet". */
@@ -412,7 +412,7 @@ export interface NavigationSection {
 }
 
 export interface DestinationSidebarProps {
-  readonly sections: readonly NavigationSection[];
+  readonly sections: ReadonlyArray<NavigationSection>;
 }
 
 /**

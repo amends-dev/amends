@@ -1,7 +1,7 @@
 import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authorization";
 import { Group, GroupFollow, GroupMembership, GroupService } from "@amends-dev/core/group";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Checkpoint, Entry, Store } from "@amends-dev/core/journal";
+import { type Checkpoint, Entry, type Store } from "@amends-dev/core/journal";
 import { Notification } from "@amends-dev/core/notification";
 import {
   ThreadActivity,
@@ -13,7 +13,7 @@ import {
   ThreadService,
 } from "@amends-dev/core/thread";
 import { Turn } from "@amends-dev/core/turn";
-import { Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace";
+import { Member, MemberPermissions, type Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import type { Fixture } from "../Fixture.ts";

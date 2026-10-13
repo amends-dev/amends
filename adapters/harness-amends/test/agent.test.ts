@@ -644,7 +644,7 @@ layer(BunServices.layer)("AmendsAgent compaction", (it) => {
         const again = yield* session.generate({ prompt: "again" });
         const state = yield* throughJson(yield* session.detach);
 
-        const [compaction] = again.parts.filter((part) => part.type === "compaction");
+        const compaction = again.parts.find((part) => part.type === "compaction");
         expect(again.parts[0]).toBe(compaction);
         expect(compaction).toMatchObject({
           trigger: "auto",

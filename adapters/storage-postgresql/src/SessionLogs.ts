@@ -11,7 +11,7 @@
  *
  * @since 0.1.0
  */
-import { Store } from "@amends-dev/core/journal";
+import { Store, StoreError } from "@amends-dev/core/journal";
 import { SessionLog, SessionLogStore } from "@amends-dev/core/turn";
 import { and, asc, eq, gt, max } from "drizzle-orm";
 import { Array, Context, DateTime, Deferred, Effect, Layer, Schema } from "effect";
@@ -19,7 +19,6 @@ import * as Binding from "./Binding.ts";
 import { isConstraintViolation } from "./internal/errors.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import { sessionLogEntries } from "./internal/schema.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 const EntryJson = Schema.toCodecJson(SessionLog.Entry);
 const encodeEntry = Schema.encodeEffect(EntryJson);

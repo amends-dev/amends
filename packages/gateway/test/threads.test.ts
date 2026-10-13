@@ -20,7 +20,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Journal, Publication } from "@amends-dev/core/journal";
+import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -38,7 +38,7 @@ import {
   ThreadParticipationActivity,
   ThreadParticipationStore,
   ThreadPermissions,
-  ThreadCommand,
+  type ThreadCommand,
   ThreadTitleActivity,
 } from "@amends-dev/core/thread";
 
@@ -64,7 +64,6 @@ import {
 
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Thread starts in private groups: records, participation, activity, rollback, and replay. */
 

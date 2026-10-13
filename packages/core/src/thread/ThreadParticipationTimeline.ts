@@ -8,7 +8,7 @@ import { Effect, Schema } from "effect";
 import type * as Thread from "./Thread.ts";
 import type * as ThreadActivity from "./ThreadActivity.ts";
 import * as ThreadActivityKind from "./ThreadActivityKind.ts";
-import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
+import type * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts";
 import * as ThreadParticipationActivity from "./ThreadParticipationActivity.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
 import * as ThreadParticipationStore from "./ThreadParticipationStore.ts";

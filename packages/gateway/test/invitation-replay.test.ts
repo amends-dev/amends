@@ -2,7 +2,7 @@ import { AssignmentFacts, BuiltinRoles, Assignment } from "@amends-dev/core/auth
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Publication } from "@amends-dev/core/journal";
+import { Journal, Publication, StoreError } from "@amends-dev/core/journal";
 
 import { InvitationService, Member, MemberService } from "@amends-dev/core/workspace";
 
@@ -26,7 +26,6 @@ import {
   request,
   testProvenance,
 } from "./support.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Acceptance and removal roll back together, and replay restores invitation records. */
 

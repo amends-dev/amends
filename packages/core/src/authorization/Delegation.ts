@@ -12,8 +12,8 @@
  */
 import { Context, Effect, Layer, Option, Predicate, Schema } from "effect";
 import * as Actor from "../identity/Actor.ts";
-import * as Member from "../workspace/Member.ts";
-import * as Workspace from "../workspace/Workspace.ts";
+import type * as Member from "../workspace/Member.ts";
+import type * as Workspace from "../workspace/Workspace.ts";
 import * as WorkspaceStore from "../workspace/WorkspaceStore.ts";
 import * as Assignment from "./Assignment.ts";
 import * as AssignmentPermissions from "./AssignmentPermissions.ts";
@@ -27,7 +27,7 @@ import * as Role from "./Role.ts";
 import * as RoleStore from "./RoleStore.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * What a delegation check can fail with: the outcomes above, authorization's, and

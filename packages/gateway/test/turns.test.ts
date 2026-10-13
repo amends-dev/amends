@@ -1379,7 +1379,7 @@ describe("turns", () => {
 
             // Leaving the thread's group ends following, with nothing more of the step.
             const left = yield* following(team.id);
-            const [membership] = (yield* as(
+            const membership = (yield* as(
               workspace.id,
               bob,
               Effect.flatMap(
@@ -1387,7 +1387,7 @@ describe("turns", () => {
                 (groupMembershipService) =>
                   groupMembershipService.listCurrent(team.id, { limit: 10 }),
               ),
-            )).filter((admission) => admission.memberId === reader.id);
+            )).find((admission) => admission.memberId === reader.id);
             yield* as(
               workspace.id,
               bob,

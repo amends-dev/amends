@@ -8,7 +8,7 @@
 import { Array, Context, Effect, Layer, Option, Schema } from "effect";
 import * as Store from "../journal/Store.ts";
 import * as MemberId from "../workspace/MemberId.ts";
-import * as Group from "./Group.ts";
+import type * as Group from "./Group.ts";
 import * as GroupId from "./GroupId.ts";
 import * as GroupMembership from "./GroupMembership.ts";
 import * as StoreInput from "../journal/StoreInput.ts";

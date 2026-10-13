@@ -12,7 +12,7 @@
 import * as Identity from "../identity/Identity.ts";
 import * as Notification from "../notification/Notification.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema, Predicate } from "effect";
-import { type DateTime, type PlatformError } from "effect";
+import type { DateTime, PlatformError } from "effect";
 import * as Group from "../group/Group.ts";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
@@ -37,7 +37,7 @@ import * as ThreadMessageFacts from "./ThreadMessageFacts.ts";
 import * as ThreadParticipation from "./ThreadParticipation.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import type * as StoreError from "../journal/StoreError.ts";
 
 /**
  * The thread's next position is not the one the caller accounted for: activity took it first.

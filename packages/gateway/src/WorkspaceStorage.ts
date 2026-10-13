@@ -36,7 +36,7 @@ import type { TurnJobs } from "@amends-dev/core/turn";
 import {
   InvitationStore,
   MemberStore,
-  Workspace,
+  type Workspace,
   WorkspaceStore,
 } from "@amends-dev/core/workspace";
 import { Context, Effect, Layer } from "effect";

@@ -8,7 +8,7 @@ import { Gateway } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import {
   PostgresClusterStorage,
-  PostgresDatabase,
+  type PostgresDatabase,
   PostgresWorkspaceStorage,
 } from "@amends-dev/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
@@ -203,6 +203,8 @@ describe.skipIf(!available)("jobs on the local host", () => {
               requests.requestRun(job).pipe(Effect.andThen(Effect.sleep("100 millis"))),
             );
             const committedAt = yield* Clock.currentTimeMillis;
+            // `runs` grows in the runner's fiber, which the rule cannot see.
+            // oxlint-disable-next-line eslint/no-unmodified-loop-condition
             while (runs < commit) {
               if ((yield* Clock.currentTimeMillis) - committedAt > 5_000)
                 return expect.fail(`Request ${commit} waited for the runner's next poll`);

@@ -16,7 +16,7 @@ const yesterday = (hour: number) => {
   return date;
 };
 
-export const sampleInbox: readonly InboxItem[] = [
+export const sampleInbox: ReadonlyArray<InboxItem> = [
   {
     id: "sara",
     at: minutesAgo(2),
@@ -74,7 +74,7 @@ export const sampleInbox: readonly InboxItem[] = [
 
 export interface InboxWorkspaceProps {
   readonly tab?: InboxTab;
-  readonly items?: readonly InboxItem[];
+  readonly items?: ReadonlyArray<InboxItem>;
   readonly selected?: string;
   readonly status?: "loading" | "failed";
 }

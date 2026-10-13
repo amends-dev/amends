@@ -3,7 +3,7 @@ import { Group } from "@amends-dev/core/group";
 import { Identity } from "@amends-dev/core/identity";
 import { Entry, Store } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
-import { Invitation, Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace";
+import { Invitation, Member, MemberPermissions, type Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import * as Support from "./support.ts";

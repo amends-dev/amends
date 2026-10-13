@@ -21,7 +21,7 @@ const message = (
   ...(replies === undefined ? {} : { thread: { replies } }),
 });
 
-const stackedIds = (entries: readonly TimelineEntry[], days = false) => {
+const stackedIds = (entries: ReadonlyArray<TimelineEntry>, days = false) => {
   const view = render(() => (
     <Theme mode="light">
       <Timeline entries={entries} days={days} />

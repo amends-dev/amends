@@ -71,7 +71,7 @@ export type TurnLogActivity =
 export interface TurnLogPaneProps {
   /** The turn, once loaded. */
   readonly turn?: TurnLogTurn;
-  readonly activity: readonly TurnLogActivity[];
+  readonly activity: ReadonlyArray<TurnLogActivity>;
   /** The response the agent is writing now, before it completes. */
   readonly draft?: { readonly text: string; readonly broken: boolean };
   /** The log is loading, is out of reach, or could not be read. */

@@ -11,8 +11,8 @@ import { Sandbox } from "@amends-dev/sandbox";
 import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
 import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
 import { Daytona, type DaytonaConfig, DaytonaError } from "@daytona/sdk";
-import { Crypto, Effect, FileSystem, Path, Redacted, Schema } from "effect";
-import { ChildProcessSpawner } from "effect/process";
+import { Crypto, Effect, type FileSystem, Path, Redacted, Schema } from "effect";
+import type { ChildProcessSpawner } from "effect/process";
 
 /**
  * What the host installs this machine's sandboxes with.

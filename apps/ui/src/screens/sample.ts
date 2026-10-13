@@ -33,7 +33,7 @@ export function profile(memberId: string): Profile | undefined {
   };
 }
 
-export const groupEntries: readonly TimelineEntry[] = [
+export const groupEntries: ReadonlyArray<TimelineEntry> = [
   { kind: "divider", id: "yesterday", label: "Yesterday" },
   {
     kind: "message",
@@ -77,7 +77,7 @@ export const groupEntries: readonly TimelineEntry[] = [
   },
 ];
 
-export const threadEntries: readonly TimelineEntry[] = [
+export const threadEntries: ReadonlyArray<TimelineEntry> = [
   {
     kind: "message",
     id: "t0",
@@ -215,7 +215,7 @@ export const workspaceGroups: ReadonlyArray<{
 
 const caleb = { name: "Caleb", tone: "sage" } as const;
 
-export const launchesEntries: readonly TimelineEntry[] = [
+export const launchesEntries: ReadonlyArray<TimelineEntry> = [
   { kind: "divider", id: "today", label: "Today" },
   {
     kind: "message",
@@ -255,7 +255,7 @@ export const launchesEntries: readonly TimelineEntry[] = [
   },
 ];
 
-export const launchesThread: readonly TimelineEntry[] = [
+export const launchesThread: ReadonlyArray<TimelineEntry> = [
   {
     kind: "message",
     id: "lt0",
@@ -316,7 +316,7 @@ export const you: PickerPerson = {
   kind: "Person",
 };
 
-export const creationCandidates: readonly PickerPerson[] = [
+export const creationCandidates: ReadonlyArray<PickerPerson> = [
   { id: "alex", name: "Alex Morgan", tone: "sand", kind: "Person" },
   { id: "caleb", name: "Caleb", tone: "sage", kind: "Person" },
   { id: "graeme", name: "Graeme", tone: "slate", kind: "Person" },
@@ -332,12 +332,12 @@ export const taskPeople = [
   { id: "oliver", name: "Oliver", tone: "olive" },
   { id: "sara", name: "Sara", tone: "clay" },
   { id: "yumi", name: "Yumi", tone: "lilac" },
-] as const satisfies readonly TaskPerson[];
+] as const satisfies ReadonlyArray<TaskPerson>;
 
 const person = (id: (typeof taskPeople)[number]["id"]) =>
   taskPeople.find((candidate) => candidate.id === id);
 
-export const tasks: readonly TaskRow[] = [
+export const tasks: ReadonlyArray<TaskRow> = [
   {
     key: "AND-214",
     title: "Composer paste crash",
@@ -416,7 +416,7 @@ export const taskDescriptions: Record<string, string> = {
   "AND-214": "Handle clipboard images over 5 MB without crashing the composer.",
 };
 
-export const taskEntries: readonly TimelineEntry[] = [
+export const taskEntries: ReadonlyArray<TimelineEntry> = [
   { kind: "event", id: "created", text: "AJ created this task · 10:06 AM" },
   {
     kind: "message",
@@ -434,7 +434,7 @@ export const taskEntries: readonly TimelineEntry[] = [
   },
 ];
 
-export const groupMembers: readonly SettingsMember[] = [
+export const groupMembers: ReadonlyArray<SettingsMember> = [
   { id: "aj", name: "AJ", tone: "ink", removable: true },
   { id: "alex", name: "Alex Morgan", tone: "sand", removable: true },
   { id: "caleb", name: "Caleb", tone: "sage", removable: true },
@@ -444,7 +444,7 @@ export const groupMembers: readonly SettingsMember[] = [
   { id: "yumi", name: "Yumi", tone: "lilac", agent: true, removable: true },
 ];
 
-export const workspaceCandidates: readonly PickerPerson[] = [
+export const workspaceCandidates: ReadonlyArray<PickerPerson> = [
   { id: "casey", name: "Casey Park", tone: "sage", kind: "Person" },
   { id: "morgan", name: "Morgan Lee", tone: "slate", kind: "Person" },
   { id: "riley", name: "Riley Chen", tone: "clay", kind: "Person" },

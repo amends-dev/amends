@@ -4,12 +4,12 @@ import { ChangeFeed } from "@amends-dev/core/change-feed";
 import { GroupFacts } from "@amends-dev/core/group";
 import { Identity } from "@amends-dev/core/identity";
 import { Thread, ThreadService } from "@amends-dev/core/thread";
-import { InvitationFacts, Member, MemberFacts, Workspace } from "@amends-dev/core/workspace";
+import { InvitationFacts, Member, MemberFacts, type Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {
-  Context,
+  type Context,
   DateTime,
   Effect,
   Exit,

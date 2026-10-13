@@ -1,7 +1,6 @@
-import { Actor, type Identity } from "@amends-dev/core/identity";
-import { Journal } from "@amends-dev/core/journal";
+import { Actor, type Identity, Identity as Identities } from "@amends-dev/core/identity";
+import { Journal, StoreError } from "@amends-dev/core/journal";
 import { BuiltinRoles, type Role } from "@amends-dev/core/authorization";
-import { Identity as Identities } from "@amends-dev/core/identity";
 import { Workspace, WorkspaceSettingsService } from "@amends-dev/core/workspace";
 import { Gateway, WorkspaceDirectory } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
@@ -19,7 +18,6 @@ import {
   journalLog,
   request,
 } from "./support.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 const read = (id: Workspace.Id, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>

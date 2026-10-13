@@ -219,7 +219,7 @@ layer(ModelCatalog.layer)("ModelIntegrations", (it) => {
         ),
       );
 
-      expect(checked).toEqual(Array(3).fill({ status: "healthy" }));
+      expect(checked).toEqual(Array.from({ length: 3 }, () => ({ status: "healthy" })));
       const [anthropic, openai, openrouter] = sent;
       expect(anthropic).toMatchObject({
         method: "POST",

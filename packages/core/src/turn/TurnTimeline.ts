@@ -10,7 +10,7 @@ import { Effect, Schema } from "effect";
 import type * as Thread from "../thread/Thread.ts";
 import type * as ThreadActivity from "../thread/ThreadActivity.ts";
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts";
-import * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts";
+import type * as ThreadActivityResolvers from "../thread/ThreadActivityResolvers.ts";
 import * as TurnActivity from "./TurnActivity.ts";
 
 /**

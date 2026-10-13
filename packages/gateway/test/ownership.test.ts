@@ -8,7 +8,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Publication } from "@amends-dev/core/journal";
+import { Journal, Publication, StoreError } from "@amends-dev/core/journal";
 
 import {
   Member,
@@ -37,7 +37,6 @@ import {
   request,
   testProvenance,
 } from "./support.ts";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Ownership transfer: authority, recipients, competition, rollback, and replay. */
 

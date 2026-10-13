@@ -27,7 +27,7 @@ import * as Group from "../../src/group/Group.ts";
 import * as GroupMembership from "../../src/group/GroupMembership.ts";
 import * as GroupMembershipFacts from "../../src/group/GroupMembershipFacts.ts";
 import * as Member from "../../src/workspace/Member.ts";
-import * as Transaction from "../../src/journal/Transaction.ts";
+import type * as Transaction from "../../src/journal/Transaction.ts";
 import * as NotificationProjection from "../../src/notification/NotificationProjection.ts";
 import { make, type Fixture } from "../memory.ts";
 

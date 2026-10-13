@@ -9,7 +9,7 @@ import { Gateway } from "../../index.ts";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import { alice, bob } from "../Support.ts";
-import { CoreError } from "@amends-dev/core/error";
+import type { CoreError } from "@amends-dev/core/error";
 
 const issue = (recipient: Identity.HumanId) =>
   InvitationService.InvitationService.use((invitations) =>

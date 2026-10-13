@@ -5,8 +5,10 @@ import { RichText, type RichTextMention } from "../src/components/rich-text/inde
 
 afterEach(cleanup);
 
-const mount = (text: string, options: { mentions?: RichTextMention[]; inline?: boolean } = {}) =>
-  render(() => <RichText text={text} mentions={options.mentions} inline={options.inline} />);
+const mount = (
+  text: string,
+  options: { mentions?: Array<RichTextMention>; inline?: boolean } = {},
+) => render(() => <RichText text={text} mentions={options.mentions} inline={options.inline} />);
 
 it("links only web and email addresses, and never loads images", () => {
   const view = mount(

@@ -33,7 +33,7 @@ export interface GroupDirectoryProps {
   readonly query: string;
   readonly onQueryChange: (query: string) => void;
   /** The current tab's groups, after searching. */
-  readonly groups: readonly DirectoryGroup[];
+  readonly groups: ReadonlyArray<DirectoryGroup>;
   /** Opens a group in place of following its link, such as into a preview. */
   readonly onOpenGroup?: (id: string) => void;
   readonly onJoin: (id: string) => void;

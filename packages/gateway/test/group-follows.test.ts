@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { AgentPermissions } from "@amends-dev/core/agent";
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends-dev/core/authorization";
 import {
-  Group,
+  type Group,
   GroupService,
   GroupFollow,
   GroupFollowService,
@@ -13,7 +13,7 @@ import {
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { Entry, Journal, Publication } from "@amends-dev/core/journal";
 import {
-  Thread,
+  type Thread,
   ThreadService,
   ThreadParticipation,
   ThreadPermissions,

@@ -12,7 +12,7 @@ import type { TaskPerson } from "./group-tasks.tsx";
 import { ConversationComposer, type ConversationProps } from "./group-threads.tsx";
 import * as s from "./tasks.css.ts";
 
-const states: readonly TaskState[] = ["triage", "open", "progress", "done"];
+const states: ReadonlyArray<TaskState> = ["triage", "open", "progress", "done"];
 
 export interface TaskDetail {
   readonly key: string;
@@ -28,7 +28,7 @@ export interface TaskPaneProps extends ConversationProps {
   readonly task: TaskDetail;
   readonly groupName: string;
   /** People the task can be assigned to. */
-  readonly people: readonly TaskPerson[];
+  readonly people: ReadonlyArray<TaskPerson>;
   readonly onStateChange: (state: TaskState) => void;
   /** A person's id, or "unassigned". */
   readonly onAssigneeChange: (assignee: string) => void;

@@ -23,7 +23,7 @@ export interface ComboboxProps {
   /** The text entered; any text is a value, and a suggestion enters its own. */
   readonly value: string;
   readonly onChange: (value: string) => void;
-  readonly suggestions: readonly ComboboxSuggestion[];
+  readonly suggestions: ReadonlyArray<ComboboxSuggestion>;
   /** Names the suggestions above them, such as "Suggested models". */
   readonly heading?: string;
   /** Under the suggestions, such as how to enter another value. */
@@ -63,7 +63,7 @@ export function Combobox(props: ComboboxProps): JSX.Element {
   const [control, setControl] = createSignal<HTMLDivElement>();
   const [position, setPosition] = createSignal<JSX.CSSProperties>();
   const text = () => props.value.trim();
-  const entries = createMemo((): readonly Entry[] => {
+  const entries = createMemo((): ReadonlyArray<Entry> => {
     const typed = text().toLowerCase();
     const matching = props.suggestions.filter(
       (suggestion) =>

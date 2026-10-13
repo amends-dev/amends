@@ -19,7 +19,7 @@ import {
 
 import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Entry, Event, Fact, Journal, Publication } from "@amends-dev/core/journal";
+import { Entry, Event, Fact, Journal, Publication, StoreError } from "@amends-dev/core/journal";
 import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -71,7 +71,6 @@ import {
 
 import { withStorage } from "./fixture.ts";
 import { CoreError } from "@amends-dev/core/error";
-import { StoreError } from "@amends-dev/core/journal";
 
 /** Following and unfollowing threads: quiet activity, stale departures, settlement, and replay. */
 

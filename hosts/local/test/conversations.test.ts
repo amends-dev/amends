@@ -1,6 +1,6 @@
 import { ThreadParticipation } from "@amends-dev/core/thread";
 import { Group } from "@amends-dev/core/group";
-import { type ThreadTimeline } from "@amends-dev/core/thread";
+import type { ThreadTimeline } from "@amends-dev/core/thread";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Identity } from "@amends-dev/core/identity";
 import { Request } from "@amends-dev/core/request";

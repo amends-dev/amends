@@ -15,7 +15,7 @@
 import { type Bridge, HarnessError, type HostToolRelay } from "@amends-dev/harness";
 import { Effect, FileSystem, Ref, Schedule, Schema, Stream } from "effect";
 import type { Prompt } from "effect/ai";
-import * as Driver from "../Driver.ts";
+import type * as Driver from "../Driver.ts";
 import * as HostTools from "../HostTools.ts";
 import * as Server from "../Server.ts";
 import * as Api from "./Api.ts";

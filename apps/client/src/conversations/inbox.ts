@@ -56,7 +56,7 @@ export function useInboxView(
   const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set());
   const [seenError, setSeenError] = createSignal<WorkspaceFailure>();
   // Opened notifications waiting their turn to be marked seen, one request at a time.
-  const queue: string[] = [];
+  const queue: Array<string> = [];
   const seen = useWorkspaceMutation(workspaceId, markSeen);
   async function markOpenedSeen() {
     for (let next = queue.shift(); next !== undefined; next = queue.shift()) {

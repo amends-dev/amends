@@ -32,7 +32,7 @@ import {
   Sink,
   Stream,
 } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { type ChildProcess, ChildProcessSpawner } from "effect/process";
 import { callPlatform } from "./call.ts";
 import { quote } from "./shell.ts";
 

@@ -36,10 +36,10 @@ export interface GroupPaneProps {
   /** Shown under the name on phones. */
   readonly workspaceName: string;
   /** A few members for the header stack, such as the most recent to post. */
-  readonly members: readonly AvatarStackPerson[];
+  readonly members: ReadonlyArray<AvatarStackPerson>;
   readonly memberCount: number;
   /** The tabs to offer, in a row even when there is one, such as Threads alone. Default all three. */
-  readonly tabs?: readonly GroupTab[];
+  readonly tabs?: ReadonlyArray<GroupTab>;
   readonly tab: GroupTab;
   readonly tabHref: (tab: GroupTab) => string;
   /** Switches tabs in place of following their links. */

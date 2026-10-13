@@ -51,7 +51,7 @@ const member = (
   ...rest,
 });
 
-export const sampleMembers: readonly SampleMember[] = [
+export const sampleMembers: ReadonlyArray<SampleMember> = [
   member("jamie", "Jamie Morgan", "owner", { you: true, initials: "JM", tone: "neutral" }),
   member("alex", "Alex Morgan", "member", { initials: "AM", tone: "sand" }),
   member("sara", "Sara", "administrator", { tone: "clay" }),
@@ -79,7 +79,7 @@ const invitation = (
   revocable: status === "pending",
 });
 
-export const sampleInvitations: readonly SettingsInvitation[] = [
+export const sampleInvitations: ReadonlyArray<SettingsInvitation> = [
   invitation("casey@mercier.example", "Member", "pending", -2),
   invitation("taylor@mercier.example", "Administrator", "pending", -1),
   invitation("caleb@mercier.example", "Member", "accepted", -7),

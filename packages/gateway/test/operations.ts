@@ -1,13 +1,13 @@
-import { Identity } from "@amends-dev/core/identity";
-import { Assignment, AssignmentService } from "@amends-dev/core/authorization";
+import type { Identity } from "@amends-dev/core/identity";
+import { type Assignment, AssignmentService } from "@amends-dev/core/authorization";
 import {
-  Invitation,
+  type Invitation,
   InvitationService,
   Member,
   MemberService,
-  Ownership,
+  type Ownership,
   OwnershipService,
-  Workspace,
+  type Workspace,
 } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";

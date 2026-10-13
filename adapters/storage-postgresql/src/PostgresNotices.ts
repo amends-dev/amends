@@ -14,8 +14,17 @@
 import { PgClient } from "@effect/sql-pg";
 import { LocalSignalHub, Signal } from "@amends-dev/core/signal";
 import type { Workspace } from "@amends-dev/core/workspace";
-import { Deferred, Duration, Effect, Option, Queue, RcRef, Schema, Stream } from "effect";
-import type { Scope } from "effect";
+import {
+  Deferred,
+  Duration,
+  Effect,
+  Option,
+  Queue,
+  RcRef,
+  Schema,
+  type Stream,
+  type Scope,
+} from "effect";
 
 /**
  * The channel every notice uses.

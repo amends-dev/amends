@@ -47,7 +47,7 @@ function FieldsExample() {
   const [name, setName] = createSignal("general");
   const [visibility, setVisibility] = createSignal("private");
   const [status, setStatus] = createSignal("all");
-  const [selected, setSelected] = createSignal<string[]>([]);
+  const [selected, setSelected] = createSignal<Array<string>>([]);
   return (
     <div class={s.stack}>
       <Field.Root
@@ -124,7 +124,7 @@ export const Fields = {
   },
 } satisfies Story;
 
-const settingsFields: readonly FormField[] = [
+const settingsFields: ReadonlyArray<FormField> = [
   {
     key: "url",
     label: "Server URL",

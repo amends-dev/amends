@@ -29,7 +29,7 @@ export function ConnectionsPage() {
 
 type Dialog = "choose" | "configure" | "replace-key" | "remove";
 
-const capabilities: readonly IntegrationCapability[] = [
+const capabilities: ReadonlyArray<IntegrationCapability> = [
   "models",
   "tools",
   "sandboxes",
@@ -90,8 +90,10 @@ function Connections(props: { readonly workspaceId: string }) {
   );
   const tab = (): ConnectionsTab => capabilityOf(search.tab) ?? "all";
   const add = () => setSearch({ add: capabilityOf(search.tab) ?? "connection" });
-  const inTab = (provides: readonly IntegrationCapability[] | undefined, next: ConnectionsTab) =>
-    next === "all" || (provides?.includes(next) ?? false);
+  const inTab = (
+    provides: ReadonlyArray<IntegrationCapability> | undefined,
+    next: ConnectionsTab,
+  ) => next === "all" || (provides?.includes(next) ?? false);
   const ofTab = createMemo(() =>
     view.connections().filter((connection) => inTab(connection.integration?.provides, tab())),
   );

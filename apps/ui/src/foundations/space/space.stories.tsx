@@ -4,7 +4,7 @@ import { space, type Space } from "./tokens.ts";
 import * as s from "../foundations.stories.css.ts";
 
 // Object keys list integers before fractions; show the scale in order.
-const steps = (Object.keys(space).map(Number) as Space[]).sort((a, b) => a - b);
+const steps = (Object.keys(space).map(Number) as Array<Space>).sort((a, b) => a - b);
 
 const meta = { title: "Foundations/Space" } satisfies Meta;
 export default meta;

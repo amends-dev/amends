@@ -5,8 +5,7 @@
  * export this module.
  */
 import { Data, Effect, Ref, Schema, Stream } from "effect";
-import { AiError, Prompt, type Tool } from "effect/ai";
-import type { Response } from "effect/ai";
+import { AiError, Prompt, type Tool, type Response } from "effect/ai";
 import type { AgentSession, SessionId, TurnOptions } from "../Agent.ts";
 import { GenerateObjectResult, GenerateResult } from "../GenerateResult.ts";
 import {

@@ -17,7 +17,7 @@ import type * as Fact from "./Fact.ts";
 import type * as Log from "./Log.ts";
 import * as Store from "./Store.ts";
 import * as Transaction from "./Transaction.ts";
-import * as StoreError from "./StoreError.ts";
+import type * as StoreError from "./StoreError.ts";
 
 /**
  * The decoded event supplied to a handler for this fact.

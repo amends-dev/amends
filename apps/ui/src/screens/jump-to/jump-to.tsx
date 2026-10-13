@@ -29,7 +29,7 @@ export interface JumpToItem {
 export interface JumpToProps {
   readonly open: boolean;
   readonly onClose: () => void;
-  readonly items: readonly JumpToItem[];
+  readonly items: ReadonlyArray<JumpToItem>;
   /** Goes to an item; the caller closes the dialog. */
   readonly onOpen: (id: string) => void;
   /** Some of the items are still loading. */
@@ -54,11 +54,11 @@ function score(label: string, query: string) {
 
 interface Section {
   readonly name: string;
-  readonly items: readonly JumpToItem[];
+  readonly items: ReadonlyArray<JumpToItem>;
 }
 
 /** The items matching what is typed, best first within each section. */
-function sectionsOf(items: readonly JumpToItem[], typed: string): readonly Section[] {
+function sectionsOf(items: ReadonlyArray<JumpToItem>, typed: string): ReadonlyArray<Section> {
   const query = normalize(typed).replace(/^[#@]/u, "");
   const limit = query === "" ? shown.browsing : shown.searching;
   const sections = new Map<string, Array<{ item: JumpToItem; score: number }>>();

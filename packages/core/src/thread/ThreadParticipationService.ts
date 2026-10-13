@@ -12,7 +12,7 @@ import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
-import * as Thread from "./Thread.ts";
+import type * as Thread from "./Thread.ts";
 import * as ThreadCommand from "./ThreadCommand.ts";
 import * as ThreadQuery from "./ThreadQuery.ts";
 import * as ThreadParticipationActivity from "./ThreadParticipationActivity.ts";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Crypto, Deferred, Effect, Fiber, Redacted, Schema, Stream } from "effect";
+import { Crypto, Deferred, Effect, Fiber, Redacted, type Schema, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { SessionId } from "../src/Agent.ts";
 import type { ToolDefinition } from "../src/Bridge.ts";

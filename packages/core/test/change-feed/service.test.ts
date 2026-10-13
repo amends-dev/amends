@@ -23,7 +23,18 @@ import {
   GroupPermissions,
 } from "@amends-dev/core/group";
 import { expect, it } from "@effect/vitest";
-import { DateTime, Effect, Exit, Fiber, Layer, Option, Queue, Schema, Scope, Stream } from "effect";
+import {
+  DateTime,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Queue,
+  Schema,
+  type Scope,
+  Stream,
+} from "effect";
 import * as Assignment from "../../src/authorization/Assignment.ts";
 import * as AssignmentStore from "../../src/authorization/AssignmentStore.ts";
 import * as Authorization from "../../src/authorization/Authorization.ts";
