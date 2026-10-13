@@ -126,25 +126,27 @@ const makeMemory = Effect.fn("InvitationStore.makeMemory")(function* () {
           .toSorted((left, right) => MemoryDatabase.compareBinary(left.details.id, right.details.id))
       ),
     list: Effect.map(all("list"), (records) => records.toSorted(byIssue)),
-    insert: Effect.fn("InvitationStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("InvitationStore", "insert")))
-      if (space.records.of("invitations").has(record.details.id))
-        return yield* StoreError.rejected("InvitationStore", "insert", "Invitation ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("InvitationStore", "insert")))
-      space.records.of("invitations").set(record.details.id, row)
-    }),
-    settle: Effect.fn("InvitationStore.memory.settle")(function* (id, state) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("InvitationStore", "settle")))
-      const current = yield* rows
-        .get(space.records.of("invitations"), id)
-        .pipe(Effect.mapError(StoreError.failed("InvitationStore", "settle")))
-      if (Option.isNone(current) || !Invitation.State.isAnyOf(["Pending"])(current.value.state))
-        return yield* StoreError.rejected("InvitationStore", "settle", "Expected a pending invitation")
-      const row = yield* rows
-        .encode({ ...current.value, state })
-        .pipe(Effect.mapError(StoreError.failed("InvitationStore", "settle")))
-      space.records.of("invitations").set(id, row)
-    })
+    insert: Effect.fn("InvitationStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("invitations").has(record.details.id))
+          return yield* StoreError.rejected("InvitationStore", "insert", "Invitation ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("invitations").set(record.details.id, row)
+      },
+      Effect.mapError(StoreError.failed("InvitationStore", "insert"))
+    ),
+    settle: Effect.fn("InvitationStore.memory.settle")(
+      function* (id, state) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("invitations"), id)
+        if (Option.isNone(current) || !Invitation.State.isAnyOf(["Pending"])(current.value.state))
+          return yield* StoreError.rejected("InvitationStore", "settle", "Expected a pending invitation")
+        const row = yield* rows.encode({ ...current.value, state })
+        space.records.of("invitations").set(id, row)
+      },
+      Effect.mapError(StoreError.failed("InvitationStore", "settle"))
+    )
   }
   return make(workspaceId, driver)
 })

@@ -214,38 +214,39 @@ const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("ThreadStore", "getLatest"))
     ),
-    recordLatest: Effect.fn("ThreadStore.memory.recordLatest")(function* (latest) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadStore", "recordLatest")))
-      if (!space.records.of("threads").has(latest.threadId))
-        return yield* StoreError.rejected("ThreadStore", "recordLatest", "Thread is missing")
-      const current = yield* latestRows
-        .get(space.records.of("threadLatest"), latest.threadId)
-        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "recordLatest")))
-      // Only a later position advances; an earlier one changes nothing.
-      if (Option.isSome(current) && latest.sequence <= current.value.sequence) return
-      const row = yield* latestRows
-        .encode(latest)
-        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "recordLatest")))
-      space.records.of("threadLatest").set(latest.threadId, row)
-    }),
-    rename: Effect.fn("ThreadStore.memory.rename")(function* (renamed) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadStore", "rename")))
-      const found = yield* rows
-        .get(space.records.of("threads"), renamed.threadId)
-        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "rename")))
-      if (Option.isNone(found)) return yield* StoreError.rejected("ThreadStore", "rename", "Thread is missing")
-      const row = yield* rows
-        .encode({ ...found.value, title: renamed.title })
-        .pipe(Effect.mapError(StoreError.failed("ThreadStore", "rename")))
-      space.records.of("threads").set(renamed.threadId, row)
-    }),
-    insert: Effect.fn("ThreadStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadStore", "insert")))
-      if (space.records.of("threads").has(record.id))
-        return yield* StoreError.rejected("ThreadStore", "insert", "Thread ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ThreadStore", "insert")))
-      space.records.of("threads").set(record.id, row)
-    })
+    recordLatest: Effect.fn("ThreadStore.memory.recordLatest")(
+      function* (latest) {
+        const space = yield* write
+        if (!space.records.of("threads").has(latest.threadId))
+          return yield* StoreError.rejected("ThreadStore", "recordLatest", "Thread is missing")
+        const current = yield* latestRows.get(space.records.of("threadLatest"), latest.threadId)
+        // Only a later position advances; an earlier one changes nothing.
+        if (Option.isSome(current) && latest.sequence <= current.value.sequence) return
+        const row = yield* latestRows.encode(latest)
+        space.records.of("threadLatest").set(latest.threadId, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadStore", "recordLatest"))
+    ),
+    rename: Effect.fn("ThreadStore.memory.rename")(
+      function* (renamed) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("threads"), renamed.threadId)
+        if (Option.isNone(found)) return yield* StoreError.rejected("ThreadStore", "rename", "Thread is missing")
+        const row = yield* rows.encode({ ...found.value, title: renamed.title })
+        space.records.of("threads").set(renamed.threadId, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadStore", "rename"))
+    ),
+    insert: Effect.fn("ThreadStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("threads").has(record.id))
+          return yield* StoreError.rejected("ThreadStore", "insert", "Thread ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("threads").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadStore", "insert"))
+    )
   }
   return make(workspaceId, driver)
 })

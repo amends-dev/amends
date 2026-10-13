@@ -153,47 +153,46 @@ const makeMemory = Effect.fn("GroupStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("GroupStore", "getLatest"))
     ),
-    rename: Effect.fn("GroupStore.memory.rename")(function* (renamed) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")))
-      const found = yield* rows
-        .get(space.records.of("groups"), renamed.groupId)
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")))
-      if (Option.isNone(found) || found.value.kind !== "Team")
-        return yield* StoreError.rejected("GroupStore", "rename", "Expected a team group")
-      const row = yield* rows
-        .encode({ ...found.value, name: renamed.name })
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "rename")))
-      space.records.of("groups").set(renamed.groupId, row)
-    }),
-    recordLatest: Effect.fn("GroupStore.memory.recordLatest")(function* (latest) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")))
-      if (!space.records.of("groups").has(latest.groupId))
-        return yield* StoreError.rejected("GroupStore", "recordLatest", "Group is missing")
-      const current = yield* latestRows
-        .get(space.records.of("groupLatest"), latest.groupId)
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")))
-      // Only a later time advances; an earlier one changes nothing.
-      if (Option.isSome(current) && !DateTime.isGreaterThan(latest.occurredAt, current.value.occurredAt)) return
-      const row = yield* latestRows
-        .encode(latest)
-        .pipe(Effect.mapError(StoreError.failed("GroupStore", "recordLatest")))
-      space.records.of("groupLatest").set(latest.groupId, row)
-    }),
-    insert: Effect.fn("GroupStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")))
-      if (space.records.of("groups").has(record.id))
-        return yield* StoreError.rejected("GroupStore", "insert", "Group ID already exists")
-      const key = directKeyOf(record)
-      if (key !== undefined) {
-        const groups = yield* rows
-          .all(space.records.of("groups"))
-          .pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")))
-        if (groups.some((group) => directKeyOf(group) === key))
-          return yield* StoreError.rejected("GroupStore", "insert", "A direct group already exists for these members")
-      }
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("GroupStore", "insert")))
-      space.records.of("groups").set(record.id, row)
-    })
+    rename: Effect.fn("GroupStore.memory.rename")(
+      function* (renamed) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("groups"), renamed.groupId)
+        if (Option.isNone(found) || found.value.kind !== "Team")
+          return yield* StoreError.rejected("GroupStore", "rename", "Expected a team group")
+        const row = yield* rows.encode({ ...found.value, name: renamed.name })
+        space.records.of("groups").set(renamed.groupId, row)
+      },
+      Effect.mapError(StoreError.failed("GroupStore", "rename"))
+    ),
+    recordLatest: Effect.fn("GroupStore.memory.recordLatest")(
+      function* (latest) {
+        const space = yield* write
+        if (!space.records.of("groups").has(latest.groupId))
+          return yield* StoreError.rejected("GroupStore", "recordLatest", "Group is missing")
+        const current = yield* latestRows.get(space.records.of("groupLatest"), latest.groupId)
+        // Only a later time advances; an earlier one changes nothing.
+        if (Option.isSome(current) && !DateTime.isGreaterThan(latest.occurredAt, current.value.occurredAt)) return
+        const row = yield* latestRows.encode(latest)
+        space.records.of("groupLatest").set(latest.groupId, row)
+      },
+      Effect.mapError(StoreError.failed("GroupStore", "recordLatest"))
+    ),
+    insert: Effect.fn("GroupStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("groups").has(record.id))
+          return yield* StoreError.rejected("GroupStore", "insert", "Group ID already exists")
+        const key = directKeyOf(record)
+        if (key !== undefined) {
+          const groups = yield* rows.all(space.records.of("groups"))
+          if (groups.some((group) => directKeyOf(group) === key))
+            return yield* StoreError.rejected("GroupStore", "insert", "A direct group already exists for these members")
+        }
+        const row = yield* rows.encode(record)
+        space.records.of("groups").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("GroupStore", "insert"))
+    )
   }
   return make(workspaceId, driver)
 })

@@ -142,40 +142,44 @@ const makeMemory = Effect.fn("GroupFollowStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("GroupFollowStore", "listActiveByGroup"))
     ),
-    insert: Effect.fn("GroupFollowStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "insert")))
-      const follows = yield* rows
-        .all(space.records.of("groupFollows"))
-        .pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "insert")))
-      if (
-        space.records.of("groupFollows").has(record.id) ||
-        follows.some((follow) => follow.groupMembershipId === record.groupMembershipId && follow.status === "active")
-      )
-        return yield* StoreError.rejected(
-          "GroupFollowStore",
-          "insert",
-          "Follow ID reused, or the admission already follows"
+    insert: Effect.fn("GroupFollowStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        const follows = yield* rows.all(space.records.of("groupFollows"))
+        if (
+          space.records.of("groupFollows").has(record.id) ||
+          follows.some((follow) => follow.groupMembershipId === record.groupMembershipId && follow.status === "active")
         )
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "insert")))
-      space.records.of("groupFollows").set(record.id, row)
-    }),
-    end: Effect.fn("GroupFollowStore.memory.end")(function* (ending, endedAt) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "end")))
-      const current = yield* rows
-        .get(space.records.of("groupFollows"), ending.followId)
-        .pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "end")))
-      if (
-        Option.isNone(current) ||
-        current.value.groupId !== ending.groupId ||
-        current.value.memberId !== ending.memberId ||
-        current.value.status !== "active"
-      )
-        return yield* StoreError.rejected("GroupFollowStore", "end", "Follow is missing, mismatched, or already ended")
-      const row = yield* rows
-        .encode({ ...current.value, status: "ended", endedAt })
-        .pipe(Effect.mapError(StoreError.failed("GroupFollowStore", "end")))
-      space.records.of("groupFollows").set(ending.followId, row)
-    })
+          return yield* StoreError.rejected(
+            "GroupFollowStore",
+            "insert",
+            "Follow ID reused, or the admission already follows"
+          )
+        const row = yield* rows.encode(record)
+        space.records.of("groupFollows").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("GroupFollowStore", "insert"))
+    ),
+    end: Effect.fn("GroupFollowStore.memory.end")(
+      function* (ending, endedAt) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("groupFollows"), ending.followId)
+        if (
+          Option.isNone(current) ||
+          current.value.groupId !== ending.groupId ||
+          current.value.memberId !== ending.memberId ||
+          current.value.status !== "active"
+        )
+          return yield* StoreError.rejected(
+            "GroupFollowStore",
+            "end",
+            "Follow is missing, mismatched, or already ended"
+          )
+        const row = yield* rows.encode({ ...current.value, status: "ended", endedAt })
+        space.records.of("groupFollows").set(ending.followId, row)
+      },
+      Effect.mapError(StoreError.failed("GroupFollowStore", "end"))
+    )
   }
   return make(workspaceId, driver)
 })

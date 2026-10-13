@@ -144,6 +144,7 @@ const makeMemory = Effect.fn("SessionLogStore.makeMemory")(function* () {
         recordedAt,
         entry
       }))
+      // Overtaken passes as it is; only the encoding fails as the store.
       const encoded = yield* Effect.forEach(recorded, (entry) => rows.encode(entry)).pipe(
         Effect.mapError(StoreError.failed("SessionLogStore", "append"))
       )

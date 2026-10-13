@@ -142,25 +142,31 @@ const makeMemory = Effect.fn("TaskStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("TaskStore", "listByGroup"))
     ),
-    insert: Effect.fn("TaskStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("TaskStore", "insert")))
-      if (space.records.of("tasks").has(record.threadId))
-        return yield* StoreError.rejected("TaskStore", "insert", "Thread already has a task")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("TaskStore", "insert")))
-      space.records.of("tasks").set(record.threadId, row)
-    }),
-    apply: Effect.fn("TaskStore.memory.apply")(function* (threadId, change) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("TaskStore", "apply")))
-      const found = yield* rows
-        .get(space.records.of("tasks"), threadId)
-        .pipe(Effect.mapError(StoreError.failed("TaskStore", "apply")))
-      if (Option.isNone(found) || Task.valueOf(found.value, change) !== change.from)
-        return yield* StoreError.rejected("TaskStore", "apply", "Expected a task holding the value the change replaces")
-      const row = yield* rows
-        .encode(Task.apply(found.value, change))
-        .pipe(Effect.mapError(StoreError.failed("TaskStore", "apply")))
-      space.records.of("tasks").set(threadId, row)
-    })
+    insert: Effect.fn("TaskStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("tasks").has(record.threadId))
+          return yield* StoreError.rejected("TaskStore", "insert", "Thread already has a task")
+        const row = yield* rows.encode(record)
+        space.records.of("tasks").set(record.threadId, row)
+      },
+      Effect.mapError(StoreError.failed("TaskStore", "insert"))
+    ),
+    apply: Effect.fn("TaskStore.memory.apply")(
+      function* (threadId, change) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("tasks"), threadId)
+        if (Option.isNone(found) || Task.valueOf(found.value, change) !== change.from)
+          return yield* StoreError.rejected(
+            "TaskStore",
+            "apply",
+            "Expected a task holding the value the change replaces"
+          )
+        const row = yield* rows.encode(Task.apply(found.value, change))
+        space.records.of("tasks").set(threadId, row)
+      },
+      Effect.mapError(StoreError.failed("TaskStore", "apply"))
+    )
   }
   return make(workspaceId, driver)
 })

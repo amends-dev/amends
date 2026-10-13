@@ -131,25 +131,27 @@ const makeMemory = Effect.fn("AssignmentStore.makeMemory")(function* () {
           Assignment.Source.isAnyOf(["Role"])(record.source) &&
           record.source.roleId === roleId
       ),
-    insert: Effect.fn("AssignmentStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("AssignmentStore", "insert")))
-      if (space.records.of("assignments").has(record.id))
-        return yield* StoreError.rejected("AssignmentStore", "insert", "Assignment ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("AssignmentStore", "insert")))
-      space.records.of("assignments").set(record.id, row)
-    }),
-    markRevoked: Effect.fn("AssignmentStore.memory.markRevoked")(function* (id) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")))
-      const current = yield* rows
-        .get(space.records.of("assignments"), id)
-        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")))
-      if (Option.isNone(current) || current.value.status !== "active")
-        return yield* StoreError.rejected("AssignmentStore", "markRevoked", "Expected an active assignment")
-      const row = yield* rows
-        .encode({ ...current.value, status: "revoked" })
-        .pipe(Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked")))
-      space.records.of("assignments").set(id, row)
-    })
+    insert: Effect.fn("AssignmentStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("assignments").has(record.id))
+          return yield* StoreError.rejected("AssignmentStore", "insert", "Assignment ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("assignments").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("AssignmentStore", "insert"))
+    ),
+    markRevoked: Effect.fn("AssignmentStore.memory.markRevoked")(
+      function* (id) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("assignments"), id)
+        if (Option.isNone(current) || current.value.status !== "active")
+          return yield* StoreError.rejected("AssignmentStore", "markRevoked", "Expected an active assignment")
+        const row = yield* rows.encode({ ...current.value, status: "revoked" })
+        space.records.of("assignments").set(id, row)
+      },
+      Effect.mapError(StoreError.failed("AssignmentStore", "markRevoked"))
+    )
   }
   return make(workspaceId, driver)
 })

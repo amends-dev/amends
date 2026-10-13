@@ -80,22 +80,27 @@ const makeMemory = Effect.fn("ChannelStore.makeMemory")(function* () {
       const records = yield* rows.all((yield* read).records.of("channels"))
       return records.filter((record) => record.status === "active")
     }).pipe(Effect.mapError(StoreError.failed("ChannelStore", "listActive"))),
-    insert: Effect.fn("ChannelStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ChannelStore", "insert")))
-      if (space.records.of("channels").has(record.id))
-        return yield* StoreError.rejected("ChannelStore", "insert", "Channel ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ChannelStore", "insert")))
-      space.records.of("channels").set(record.id, row)
-    }),
-    update: Effect.fn("ChannelStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ChannelStore", "update")))
-      const found = yield* rows
-        .get(space.records.of("channels"), record.id)
-        .pipe(Effect.mapError(StoreError.failed("ChannelStore", "update")))
-      if (Option.isNone(found)) return yield* StoreError.rejected("ChannelStore", "update", "Expected a stored channel")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ChannelStore", "update")))
-      space.records.of("channels").set(record.id, row)
-    })
+    insert: Effect.fn("ChannelStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("channels").has(record.id))
+          return yield* StoreError.rejected("ChannelStore", "insert", "Channel ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("channels").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ChannelStore", "insert"))
+    ),
+    update: Effect.fn("ChannelStore.memory.update")(
+      function* (record) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("channels"), record.id)
+        if (Option.isNone(found))
+          return yield* StoreError.rejected("ChannelStore", "update", "Expected a stored channel")
+        const row = yield* rows.encode(record)
+        space.records.of("channels").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ChannelStore", "update"))
+    )
   }
   return make(workspaceId, driver)
 })

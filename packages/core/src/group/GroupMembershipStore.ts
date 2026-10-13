@@ -279,49 +279,49 @@ const makeMemory = Effect.fn("GroupMembershipStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("GroupMembershipStore", "listActiveByMember"))
     ),
-    markRemoved: Effect.fn("GroupMembershipStore.memory.markRemoved")(function* (removal) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupMembershipStore", "markRemoved")))
-      const current = yield* rows
-        .get(space.records.of("groupMemberships"), removal.membershipId)
-        .pipe(Effect.mapError(StoreError.failed("GroupMembershipStore", "markRemoved")))
-      if (
-        Option.isNone(current) ||
-        current.value.groupId !== removal.groupId ||
-        current.value.memberId !== removal.memberId ||
-        current.value.status !== "active"
-      )
-        return yield* StoreError.rejected(
-          "GroupMembershipStore",
-          "markRemoved",
-          "Expected the specified active group admission"
+    markRemoved: Effect.fn("GroupMembershipStore.memory.markRemoved")(
+      function* (removal) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("groupMemberships"), removal.membershipId)
+        if (
+          Option.isNone(current) ||
+          current.value.groupId !== removal.groupId ||
+          current.value.memberId !== removal.memberId ||
+          current.value.status !== "active"
         )
-      const row = yield* rows
-        .encode({ ...current.value, status: "removed" })
-        .pipe(Effect.mapError(StoreError.failed("GroupMembershipStore", "markRemoved")))
-      space.records.of("groupMemberships").set(removal.membershipId, row)
-    }),
-    insert: Effect.fn("GroupMembershipStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("GroupMembershipStore", "insert")))
-      const admissions = yield* rows
-        .all(space.records.of("groupMemberships"))
-        .pipe(Effect.mapError(StoreError.failed("GroupMembershipStore", "insert")))
-      if (
-        space.records.of("groupMemberships").has(record.id) ||
-        admissions.some(
-          (admission) =>
-            admission.groupId === record.groupId &&
-            admission.memberId === record.memberId &&
-            admission.status === "active"
+          return yield* StoreError.rejected(
+            "GroupMembershipStore",
+            "markRemoved",
+            "Expected the specified active group admission"
+          )
+        const row = yield* rows.encode({ ...current.value, status: "removed" })
+        space.records.of("groupMemberships").set(removal.membershipId, row)
+      },
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "markRemoved"))
+    ),
+    insert: Effect.fn("GroupMembershipStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        const admissions = yield* rows.all(space.records.of("groupMemberships"))
+        if (
+          space.records.of("groupMemberships").has(record.id) ||
+          admissions.some(
+            (admission) =>
+              admission.groupId === record.groupId &&
+              admission.memberId === record.memberId &&
+              admission.status === "active"
+          )
         )
-      )
-        return yield* StoreError.rejected(
-          "GroupMembershipStore",
-          "insert",
-          "Admission ID reused, or the member is already admitted"
-        )
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("GroupMembershipStore", "insert")))
-      space.records.of("groupMemberships").set(record.id, row)
-    })
+          return yield* StoreError.rejected(
+            "GroupMembershipStore",
+            "insert",
+            "Admission ID reused, or the member is already admitted"
+          )
+        const row = yield* rows.encode(record)
+        space.records.of("groupMemberships").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("GroupMembershipStore", "insert"))
+    )
   }
   return make(workspaceId, driver)
 })

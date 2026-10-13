@@ -73,9 +73,7 @@ const makeMemory = Effect.fn("AgentStore.makeMemory")(function* () {
   /** Fails when another agent than `record` has its membership, as PostgreSQL's unique index does. */
   const requireOwnMembership = (operation: string, record: Agent.Agent, space: MemoryDatabase.Space) =>
     Effect.gen(function* () {
-      const agents = yield* rows
-        .all(space.records.of("agents"))
-        .pipe(Effect.mapError(StoreError.failed("AgentStore", operation)))
+      const agents = yield* rows.all(space.records.of("agents"))
       if (agents.some((agent) => agent.memberId === record.memberId && agent.id !== record.id))
         return yield* StoreError.rejected("AgentStore", operation, "Another agent has this membership")
     })
@@ -89,24 +87,28 @@ const makeMemory = Effect.fn("AgentStore.makeMemory")(function* () {
     list: Effect.gen(function* () {
       return yield* rows.all((yield* read).records.of("agents"))
     }).pipe(Effect.mapError(StoreError.failed("AgentStore", "list"))),
-    insert: Effect.fn("AgentStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("AgentStore", "insert")))
-      if (space.records.of("agents").has(record.id))
-        return yield* StoreError.rejected("AgentStore", "insert", "Agent ID already exists")
-      yield* requireOwnMembership("insert", record, space)
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("AgentStore", "insert")))
-      space.records.of("agents").set(record.id, row)
-    }),
-    update: Effect.fn("AgentStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("AgentStore", "update")))
-      const found = yield* rows
-        .get(space.records.of("agents"), record.id)
-        .pipe(Effect.mapError(StoreError.failed("AgentStore", "update")))
-      if (Option.isNone(found)) return yield* StoreError.rejected("AgentStore", "update", "Expected a stored agent")
-      yield* requireOwnMembership("update", record, space)
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("AgentStore", "update")))
-      space.records.of("agents").set(record.id, row)
-    })
+    insert: Effect.fn("AgentStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("agents").has(record.id))
+          return yield* StoreError.rejected("AgentStore", "insert", "Agent ID already exists")
+        yield* requireOwnMembership("insert", record, space)
+        const row = yield* rows.encode(record)
+        space.records.of("agents").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("AgentStore", "insert"))
+    ),
+    update: Effect.fn("AgentStore.memory.update")(
+      function* (record) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("agents"), record.id)
+        if (Option.isNone(found)) return yield* StoreError.rejected("AgentStore", "update", "Expected a stored agent")
+        yield* requireOwnMembership("update", record, space)
+        const row = yield* rows.encode(record)
+        space.records.of("agents").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("AgentStore", "update"))
+    )
   }
   return make(workspaceId, driver)
 })

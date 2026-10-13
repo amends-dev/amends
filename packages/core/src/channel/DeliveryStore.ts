@@ -123,23 +123,27 @@ const makeMemory = Effect.fn("DeliveryStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("DeliveryStore", "findByExternalMessage"))
     ),
-    insert: Effect.fn("DeliveryStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("DeliveryStore", "insert")))
-      if (space.records.of("deliveries").has(record.id))
-        return yield* StoreError.rejected("DeliveryStore", "insert", "Delivery ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("DeliveryStore", "insert")))
-      space.records.of("deliveries").set(record.id, row)
-    }),
-    update: Effect.fn("DeliveryStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("DeliveryStore", "update")))
-      const found = yield* rows
-        .get(space.records.of("deliveries"), record.id)
-        .pipe(Effect.mapError(StoreError.failed("DeliveryStore", "update")))
-      if (Option.isNone(found))
-        return yield* StoreError.rejected("DeliveryStore", "update", "Expected a stored delivery")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("DeliveryStore", "update")))
-      space.records.of("deliveries").set(record.id, row)
-    })
+    insert: Effect.fn("DeliveryStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("deliveries").has(record.id))
+          return yield* StoreError.rejected("DeliveryStore", "insert", "Delivery ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("deliveries").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("DeliveryStore", "insert"))
+    ),
+    update: Effect.fn("DeliveryStore.memory.update")(
+      function* (record) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("deliveries"), record.id)
+        if (Option.isNone(found))
+          return yield* StoreError.rejected("DeliveryStore", "update", "Expected a stored delivery")
+        const row = yield* rows.encode(record)
+        space.records.of("deliveries").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("DeliveryStore", "update"))
+    )
   }
   return make(workspaceId, driver)
 })

@@ -88,46 +88,46 @@ const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Workspace.Workspace))
  */
 const makeMemory = Effect.fn("WorkspaceStore.makeMemory")(function* () {
   const { workspaceId, read, write } = yield* Store.MemoryBinding
-  const writable = (operation: string) => write.pipe(Effect.mapError(StoreError.failed("WorkspaceStore", operation)))
   const driver: WorkspaceStore["Service"] = {
     get: Effect.flatMap(read, (space) => rows.get(space.records.of("workspace"), workspaceId)).pipe(
       Effect.mapError(StoreError.failed("WorkspaceStore", "get"))
     ),
-    insert: Effect.fn("WorkspaceStore.memory.insert")(function* (record) {
-      const space = yield* writable("insert")
-      if (space.records.of("workspace").has(workspaceId))
-        return yield* StoreError.rejected("WorkspaceStore", "insert", "Workspace already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("WorkspaceStore", "insert")))
-      space.records.of("workspace").set(workspaceId, row)
-    }),
-    rename: Effect.fn("WorkspaceStore.memory.rename")(function* (change) {
-      const space = yield* writable("rename")
-      const current = yield* rows
-        .get(space.records.of("workspace"), workspaceId)
-        .pipe(Effect.mapError(StoreError.failed("WorkspaceStore", "rename")))
-      if (Option.isNone(current) || current.value.name !== change.previousName)
-        return yield* StoreError.rejected("WorkspaceStore", "rename", "Workspace is missing or name has changed")
-      const row = yield* rows
-        .encode({ ...current.value, name: change.name })
-        .pipe(Effect.mapError(StoreError.failed("WorkspaceStore", "rename")))
-      space.records.of("workspace").set(workspaceId, row)
-    }),
-    transferOwnership: Effect.fn("WorkspaceStore.memory.transferOwnership")(function* (change) {
-      const space = yield* writable("transferOwnership")
-      const current = yield* rows
-        .get(space.records.of("workspace"), workspaceId)
-        .pipe(Effect.mapError(StoreError.failed("WorkspaceStore", "transferOwnership")))
-      if (Option.isNone(current) || current.value.ownerMemberId !== change.previousOwnerMemberId)
-        return yield* StoreError.rejected(
-          "WorkspaceStore",
-          "transferOwnership",
-          "Workspace is missing or ownership has changed"
-        )
-      const row = yield* rows
-        .encode({ ...current.value, ownerMemberId: change.ownerMemberId })
-        .pipe(Effect.mapError(StoreError.failed("WorkspaceStore", "transferOwnership")))
-      space.records.of("workspace").set(workspaceId, row)
-    })
+    insert: Effect.fn("WorkspaceStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("workspace").has(workspaceId))
+          return yield* StoreError.rejected("WorkspaceStore", "insert", "Workspace already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("workspace").set(workspaceId, row)
+      },
+      Effect.mapError(StoreError.failed("WorkspaceStore", "insert"))
+    ),
+    rename: Effect.fn("WorkspaceStore.memory.rename")(
+      function* (change) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("workspace"), workspaceId)
+        if (Option.isNone(current) || current.value.name !== change.previousName)
+          return yield* StoreError.rejected("WorkspaceStore", "rename", "Workspace is missing or name has changed")
+        const row = yield* rows.encode({ ...current.value, name: change.name })
+        space.records.of("workspace").set(workspaceId, row)
+      },
+      Effect.mapError(StoreError.failed("WorkspaceStore", "rename"))
+    ),
+    transferOwnership: Effect.fn("WorkspaceStore.memory.transferOwnership")(
+      function* (change) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("workspace"), workspaceId)
+        if (Option.isNone(current) || current.value.ownerMemberId !== change.previousOwnerMemberId)
+          return yield* StoreError.rejected(
+            "WorkspaceStore",
+            "transferOwnership",
+            "Workspace is missing or ownership has changed"
+          )
+        const row = yield* rows.encode({ ...current.value, ownerMemberId: change.ownerMemberId })
+        space.records.of("workspace").set(workspaceId, row)
+      },
+      Effect.mapError(StoreError.failed("WorkspaceStore", "transferOwnership"))
+    )
   }
   return make(workspaceId, driver)
 })

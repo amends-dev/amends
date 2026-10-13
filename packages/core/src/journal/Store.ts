@@ -761,73 +761,74 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
       if (!session.space.appends.has(key)) session.space.appends.set(key, slice)
   })
 
-  const append = Effect.fn("Store.memory.append")(function* (
-    session: MemoryTransaction["Service"],
-    request: AppendInput
-  ) {
-    const current = yield* Effect.serviceOption(MemoryTransaction)
-    if (!session.active || Option.isNone(current) || current.value !== session)
-      return yield* StoreError.failed("Store", "append")("Closed or foreign append handle")
-    yield* hold(session, request.logId)
-    const space = session.space
-    if (request.idempotencyKey !== undefined) {
-      const previous = yield* receiptOf(space, request.logId, request.idempotencyKey).pipe(
-        Effect.mapError(StoreError.failed("Store", "append"))
-      )
-      if (Option.isSome(previous)) {
-        if (!sameContents(request.entries, previous.value.entries))
-          return yield* StoreError.rejected(
-            "Store",
-            "append",
-            "Idempotency key is already associated with different content"
-          )
-        return previous.value.entries
+  const append = Effect.fn("Store.memory.append")(
+    function* (session: MemoryTransaction["Service"], request: AppendInput) {
+      const current = yield* Effect.serviceOption(MemoryTransaction)
+      if (!session.active || Option.isNone(current) || current.value !== session)
+        return yield* StoreError.failed("Store", "append")("Closed or foreign append handle")
+      yield* hold(session, request.logId)
+      const space = session.space
+      if (request.idempotencyKey !== undefined) {
+        const previous = yield* receiptOf(space, request.logId, request.idempotencyKey)
+        if (Option.isSome(previous)) {
+          if (!sameContents(request.entries, previous.value.entries))
+            return yield* StoreError.rejected(
+              "Store",
+              "append",
+              "Idempotency key is already associated with different content"
+            )
+          return previous.value.entries
+        }
       }
-    }
-    const batches = space.logs.get(request.logId) ?? []
-    const last = Array.last(batches)
-    if (request.expectedAfter !== undefined) {
-      const actual = Option.map(last, (batch) => batch.position)
-      if (!Option.makeEquivalence<number>((a, b) => a === b)(actual, request.expectedAfter))
-        return yield* StoreError.contended("Store", "append", "Expected log position changed")
-    }
-    if (request.entries.length === 0) return []
-    // A commit's appends to one log share a position and extend its indexes.
-    const open = Option.filter(last, (batch) => batch.commitId === session.commit.id)
-    const position = LogEntry.Position.make(
-      Option.match(last, {
-        onNone: () => 0,
-        onSome: (batch) => batch.position + (Option.isSome(open) ? 0 : 1)
-      })
-    )
-    const existing = Option.match(open, { onNone: () => [], onSome: (batch) => batch.entries })
-    const recordedAt = yield* DateTime.now
-    const written = request.entries.map((content, offset): Entry =>
-      Object.assign(
-        {
-          id: LogEntry.Id.make(database.nextId("entry")),
-          logId: request.logId,
-          position,
-          commitId: session.commit.id,
-          index: existing.length + offset,
-          recordedAt
-        },
-        content,
-        { payload: content.payload.slice() }
+      const batches = space.logs.get(request.logId) ?? []
+      const last = Array.last(batches)
+      if (request.expectedAfter !== undefined) {
+        const actual = Option.map(last, (batch) => batch.position)
+        if (!Option.makeEquivalence<number>((a, b) => a === b)(actual, request.expectedAfter))
+          return yield* StoreError.contended("Store", "append", "Expected log position changed")
+      }
+      if (request.entries.length === 0) return []
+      // A commit's appends to one log share a position and extend its indexes.
+      const open = Option.filter(last, (batch) => batch.commitId === session.commit.id)
+      const position = LogEntry.Position.make(
+        Option.match(last, {
+          onNone: () => 0,
+          onSome: (batch) => batch.position + (Option.isSome(open) ? 0 : 1)
+        })
       )
-    )
-    const batch = { position, commitId: session.commit.id, entries: [...existing, ...written] }
-    space.logs.set(request.logId, Option.isSome(open) ? [...batches.slice(0, -1), batch] : [...batches, batch])
-    const commit = space.commits.get(session.commit.id) ?? session.commit
-    space.commits.set(session.commit.id, Object.assign({}, commit, { entryCount: commit.entryCount + written.length }))
-    if (request.idempotencyKey !== undefined)
-      space.appends.set(MemoryDatabase.keyOf(request.logId, request.idempotencyKey), {
-        commitId: session.commit.id,
-        firstIndex: existing.length,
-        entryCount: written.length
-      })
-    return yield* copyEntries(written).pipe(Effect.mapError(StoreError.failed("Store", "append")))
-  })
+      const existing = Option.match(open, { onNone: () => [], onSome: (batch) => batch.entries })
+      const recordedAt = yield* DateTime.now
+      const written = request.entries.map((content, offset): Entry =>
+        Object.assign(
+          {
+            id: LogEntry.Id.make(database.nextId("entry")),
+            logId: request.logId,
+            position,
+            commitId: session.commit.id,
+            index: existing.length + offset,
+            recordedAt
+          },
+          content,
+          { payload: content.payload.slice() }
+        )
+      )
+      const batch = { position, commitId: session.commit.id, entries: [...existing, ...written] }
+      space.logs.set(request.logId, Option.isSome(open) ? [...batches.slice(0, -1), batch] : [...batches, batch])
+      const commit = space.commits.get(session.commit.id) ?? session.commit
+      space.commits.set(
+        session.commit.id,
+        Object.assign({}, commit, { entryCount: commit.entryCount + written.length })
+      )
+      if (request.idempotencyKey !== undefined)
+        space.appends.set(MemoryDatabase.keyOf(request.logId, request.idempotencyKey), {
+          commitId: session.commit.id,
+          firstIndex: existing.length,
+          entryCount: written.length
+        })
+      return yield* copyEntries(written)
+    },
+    Effect.mapError(StoreError.failed("Store", "append"))
+  )
 
   const driver: Store["Service"] = {
     workspaceId,
@@ -918,25 +919,28 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("Store", "read"))
     ),
-    waitForAppend: Effect.fn("Store.memory.waitForAppend")(function* (logId, after) {
-      if (Option.isSome(yield* Effect.serviceOption(Transaction)))
-        return yield* StoreError.failed("Store", "waitForAppend")("Cannot wait inside a transaction")
-      yield* read.pipe(Effect.mapError(StoreError.failed("Store", "waitForAppend")))
-      while (true) {
-        // Take the signal before checking committed state, so no append falls between the two.
-        const appended = database.appended
-        const last = Array.last(MemoryDatabase.committed(database, workspaceId).logs.get(logId) ?? [])
-        if (
-          Option.isSome(last) &&
-          Option.match(after, {
-            onNone: () => true,
-            onSome: (position) => last.value.position > position
-          })
-        )
-          return
-        yield* Deferred.await(appended)
-      }
-    })
+    waitForAppend: Effect.fn("Store.memory.waitForAppend")(
+      function* (logId, after) {
+        if (Option.isSome(yield* Effect.serviceOption(Transaction)))
+          return yield* StoreError.failed("Store", "waitForAppend")("Cannot wait inside a transaction")
+        yield* read
+        while (true) {
+          // Take the signal before checking committed state, so no append falls between the two.
+          const appended = database.appended
+          const last = Array.last(MemoryDatabase.committed(database, workspaceId).logs.get(logId) ?? [])
+          if (
+            Option.isSome(last) &&
+            Option.match(after, {
+              onNone: () => true,
+              onSome: (position) => last.value.position > position
+            })
+          )
+            return
+          yield* Deferred.await(appended)
+        }
+      },
+      Effect.mapError(StoreError.failed("Store", "waitForAppend"))
+    )
   }
   return make(driver)
 })

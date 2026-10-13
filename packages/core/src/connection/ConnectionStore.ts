@@ -81,23 +81,27 @@ const makeMemory = Effect.fn("ConnectionStore.makeMemory")(function* () {
       const records = yield* rows.all((yield* read).records.of("connections"))
       return records.filter((record) => record.status === "active")
     }).pipe(Effect.mapError(StoreError.failed("ConnectionStore", "listActive"))),
-    insert: Effect.fn("ConnectionStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ConnectionStore", "insert")))
-      if (space.records.of("connections").has(record.id))
-        return yield* StoreError.rejected("ConnectionStore", "insert", "Connection ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ConnectionStore", "insert")))
-      space.records.of("connections").set(record.id, row)
-    }),
-    update: Effect.fn("ConnectionStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ConnectionStore", "update")))
-      const found = yield* rows
-        .get(space.records.of("connections"), record.id)
-        .pipe(Effect.mapError(StoreError.failed("ConnectionStore", "update")))
-      if (Option.isNone(found))
-        return yield* StoreError.rejected("ConnectionStore", "update", "Expected a stored connection")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ConnectionStore", "update")))
-      space.records.of("connections").set(record.id, row)
-    })
+    insert: Effect.fn("ConnectionStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("connections").has(record.id))
+          return yield* StoreError.rejected("ConnectionStore", "insert", "Connection ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("connections").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ConnectionStore", "insert"))
+    ),
+    update: Effect.fn("ConnectionStore.memory.update")(
+      function* (record) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("connections"), record.id)
+        if (Option.isNone(found))
+          return yield* StoreError.rejected("ConnectionStore", "update", "Expected a stored connection")
+        const row = yield* rows.encode(record)
+        space.records.of("connections").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ConnectionStore", "update"))
+    )
   }
   return make(workspaceId, driver)
 })

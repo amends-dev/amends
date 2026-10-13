@@ -226,47 +226,49 @@ const makeMemory = Effect.fn("ThreadParticipationStore.makeMemory")(function* ()
       },
       Effect.mapError(StoreError.failed("ThreadParticipationStore", "endByAdmission"))
     ),
-    end: Effect.fn("ThreadParticipationStore.memory.end")(function* (departure, endedAt) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadParticipationStore", "end")))
-      const current = yield* rows
-        .get(space.records.of("threadParticipations"), departure.participationId)
-        .pipe(Effect.mapError(StoreError.failed("ThreadParticipationStore", "end")))
-      if (Option.isNone(current) || current.value.threadId !== departure.threadId || current.value.status !== "active")
-        return yield* StoreError.rejected(
-          "ThreadParticipationStore",
-          "end",
-          "Participation is missing, mismatched, or already ended"
+    end: Effect.fn("ThreadParticipationStore.memory.end")(
+      function* (departure, endedAt) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("threadParticipations"), departure.participationId)
+        if (
+          Option.isNone(current) ||
+          current.value.threadId !== departure.threadId ||
+          current.value.status !== "active"
         )
-      const row = yield* rows
-        .encode({ ...current.value, status: "ended", endedAt })
-        .pipe(Effect.mapError(StoreError.failed("ThreadParticipationStore", "end")))
-      space.records.of("threadParticipations").set(departure.participationId, row)
-    }),
-    insert: Effect.fn("ThreadParticipationStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadParticipationStore", "insert")))
-      const participations = yield* rows
-        .all(space.records.of("threadParticipations"))
-        .pipe(Effect.mapError(StoreError.failed("ThreadParticipationStore", "insert")))
-      const key = ThreadParticipation.keyOf(record.participant)
-      if (
-        space.records.of("threadParticipations").has(record.id) ||
-        participations.some(
-          (participation) =>
-            participation.threadId === record.threadId &&
-            participation.status === "active" &&
-            ThreadParticipation.keyOf(participation.participant) === key
+          return yield* StoreError.rejected(
+            "ThreadParticipationStore",
+            "end",
+            "Participation is missing, mismatched, or already ended"
+          )
+        const row = yield* rows.encode({ ...current.value, status: "ended", endedAt })
+        space.records.of("threadParticipations").set(departure.participationId, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "end"))
+    ),
+    insert: Effect.fn("ThreadParticipationStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        const participations = yield* rows.all(space.records.of("threadParticipations"))
+        const key = ThreadParticipation.keyOf(record.participant)
+        if (
+          space.records.of("threadParticipations").has(record.id) ||
+          participations.some(
+            (participation) =>
+              participation.threadId === record.threadId &&
+              participation.status === "active" &&
+              ThreadParticipation.keyOf(participation.participant) === key
+          )
         )
-      )
-        return yield* StoreError.rejected(
-          "ThreadParticipationStore",
-          "insert",
-          "Participation ID reused, or the participant already takes part"
-        )
-      const row = yield* rows
-        .encode(record)
-        .pipe(Effect.mapError(StoreError.failed("ThreadParticipationStore", "insert")))
-      space.records.of("threadParticipations").set(record.id, row)
-    })
+          return yield* StoreError.rejected(
+            "ThreadParticipationStore",
+            "insert",
+            "Participation ID reused, or the participant already takes part"
+          )
+        const row = yield* rows.encode(record)
+        space.records.of("threadParticipations").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadParticipationStore", "insert"))
+    )
   }
   return make(workspaceId, driver)
 })

@@ -169,14 +169,17 @@ const makeMemory = Effect.fn("ReadStateStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("ReadStateStore", "getGroupReads"))
     ),
-    advanceGroup: Effect.fn("ReadStateStore.memory.advanceGroup")(function* (groupRead) {
-      const space = yield* join.pipe(Effect.mapError(StoreError.failed("ReadStateStore", "advanceGroup")))
-      advance(
-        space.groupTimes,
-        MemoryDatabase.keyOf(groupRead.memberId, groupRead.groupId),
-        DateTime.toEpochMillis(groupRead.readAt)
-      )
-    })
+    advanceGroup: Effect.fn("ReadStateStore.memory.advanceGroup")(
+      function* (groupRead) {
+        const space = yield* join
+        advance(
+          space.groupTimes,
+          MemoryDatabase.keyOf(groupRead.memberId, groupRead.groupId),
+          DateTime.toEpochMillis(groupRead.readAt)
+        )
+      },
+      Effect.mapError(StoreError.failed("ReadStateStore", "advanceGroup"))
+    )
   }
   return make(workspaceId, driver)
 })

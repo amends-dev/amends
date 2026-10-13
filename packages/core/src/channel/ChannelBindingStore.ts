@@ -103,19 +103,22 @@ const makeMemory = Effect.fn("ChannelBindingStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("ChannelBindingStore", "findByConversation"))
     ),
-    insert: Effect.fn("ChannelBindingStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ChannelBindingStore", "insert")))
-      const stored = yield* rows
-        .all(space.records.of("channelBindings"))
-        .pipe(Effect.mapError(StoreError.failed("ChannelBindingStore", "insert")))
-      if (
-        space.records.of("channelBindings").has(record.threadId) ||
-        stored.some((other) => other.channelId === record.channelId && other.conversation.id === record.conversation.id)
-      )
-        return yield* StoreError.rejected("ChannelBindingStore", "insert", "Thread or conversation already bound")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ChannelBindingStore", "insert")))
-      space.records.of("channelBindings").set(record.threadId, row)
-    })
+    insert: Effect.fn("ChannelBindingStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        const stored = yield* rows.all(space.records.of("channelBindings"))
+        if (
+          space.records.of("channelBindings").has(record.threadId) ||
+          stored.some(
+            (other) => other.channelId === record.channelId && other.conversation.id === record.conversation.id
+          )
+        )
+          return yield* StoreError.rejected("ChannelBindingStore", "insert", "Thread or conversation already bound")
+        const row = yield* rows.encode(record)
+        space.records.of("channelBindings").set(record.threadId, row)
+      },
+      Effect.mapError(StoreError.failed("ChannelBindingStore", "insert"))
+    )
   }
   return make(workspaceId, driver)
 })

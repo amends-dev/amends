@@ -164,32 +164,40 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
         .filter((record) => record.memberId === memberId && Turn.active(record.status))
         .toSorted(byCreated)
     }),
-    insert: Effect.fn("TurnStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("TurnStore", "insert")))
-      if (space.records.of("turns").has(record.id))
-        return yield* StoreError.rejected("TurnStore", "insert", "Turn ID already exists")
-      const records = yield* rows
-        .all(space.records.of("turns"))
-        .pipe(Effect.mapError(StoreError.failed("TurnStore", "insert")))
-      if (secondActive(records, record))
-        return yield* StoreError.rejected("TurnStore", "insert", "The agent already has an active turn on this thread")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("TurnStore", "insert")))
-      space.records.of("turns").set(record.id, row)
-    }),
-    update: Effect.fn("TurnStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("TurnStore", "update")))
-      const found = yield* rows
-        .get(space.records.of("turns"), record.id)
-        .pipe(Effect.mapError(StoreError.failed("TurnStore", "update")))
-      if (Option.isNone(found)) return yield* StoreError.rejected("TurnStore", "update", "Expected a stored turn")
-      const records = yield* rows
-        .all(space.records.of("turns"))
-        .pipe(Effect.mapError(StoreError.failed("TurnStore", "update")))
-      if (secondActive(records, record))
-        return yield* StoreError.rejected("TurnStore", "update", "The agent already has an active turn on this thread")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("TurnStore", "update")))
-      space.records.of("turns").set(record.id, row)
-    })
+    insert: Effect.fn("TurnStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("turns").has(record.id))
+          return yield* StoreError.rejected("TurnStore", "insert", "Turn ID already exists")
+        const records = yield* rows.all(space.records.of("turns"))
+        if (secondActive(records, record))
+          return yield* StoreError.rejected(
+            "TurnStore",
+            "insert",
+            "The agent already has an active turn on this thread"
+          )
+        const row = yield* rows.encode(record)
+        space.records.of("turns").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("TurnStore", "insert"))
+    ),
+    update: Effect.fn("TurnStore.memory.update")(
+      function* (record) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("turns"), record.id)
+        if (Option.isNone(found)) return yield* StoreError.rejected("TurnStore", "update", "Expected a stored turn")
+        const records = yield* rows.all(space.records.of("turns"))
+        if (secondActive(records, record))
+          return yield* StoreError.rejected(
+            "TurnStore",
+            "update",
+            "The agent already has an active turn on this thread"
+          )
+        const row = yield* rows.encode(record)
+        space.records.of("turns").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("TurnStore", "update"))
+    )
   }
   return make(workspaceId, driver)
 })

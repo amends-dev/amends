@@ -453,33 +453,29 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
   })
 
   /** Write every record or none: an ID or source already recorded is rejected. */
-  const insert = Effect.fnUntraced(function* (records: ReadonlyArray<Notification.Notification>, operation: string) {
-    if (records.length === 0) return
-    const space = yield* write.pipe(Effect.mapError(StoreError.failed("NotificationStore", operation)))
-    const stored = yield* rows
-      .all(space.records.of("notifications"))
-      .pipe(Effect.mapError(StoreError.failed("NotificationStore", operation)))
-    const ids = new Set(space.records.of("notifications").keys())
-    const sources = new Set(stored.map(sourceKey))
-    const written: Array<[string, string]> = []
-    for (const record of records) {
-      if (ids.has(record.id) || sources.has(sourceKey(record)))
-        return yield* StoreError.rejected(
-          "NotificationStore",
-          operation,
-          "Notification ID or source and recipient already recorded"
-        )
-      ids.add(record.id)
-      sources.add(sourceKey(record))
-      written.push([
-        record.id,
-        yield* rows
-          .encode(withSeen(space, record))
-          .pipe(Effect.mapError(StoreError.failed("NotificationStore", operation)))
-      ])
-    }
-    for (const [id, row] of written) space.records.of("notifications").set(id, row)
-  })
+  const insert = Effect.fnUntraced(
+    function* (records: ReadonlyArray<Notification.Notification>, operation: string) {
+      if (records.length === 0) return
+      const space = yield* write
+      const stored = yield* rows.all(space.records.of("notifications"))
+      const ids = new Set(space.records.of("notifications").keys())
+      const sources = new Set(stored.map(sourceKey))
+      const written: Array<[string, string]> = []
+      for (const record of records) {
+        if (ids.has(record.id) || sources.has(sourceKey(record)))
+          return yield* StoreError.rejected(
+            "NotificationStore",
+            operation,
+            "Notification ID or source and recipient already recorded"
+          )
+        ids.add(record.id)
+        sources.add(sourceKey(record))
+        written.push([record.id, yield* rows.encode(withSeen(space, record))])
+      }
+      for (const [id, row] of written) space.records.of("notifications").set(id, row)
+    },
+    (effect, _records, operation) => Effect.mapError(effect, StoreError.failed("NotificationStore", operation))
+  )
 
   const driver: NotificationStore["Service"] = {
     get: Effect.fn("NotificationStore.memory.get")(
@@ -569,84 +565,82 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("NotificationStore", "countPendingByGroup"))
     ),
-    markSeen: Effect.fn("NotificationStore.memory.markSeen")(function* (ids, seenAt) {
-      // Checked and recorded without a commit in between, as a row lock orders them on PostgreSQL:
-      // a departure that settles one first has the store reject this, and one after keeps its Seen.
-      yield* exclusive((space) =>
-        Effect.gen(function* () {
-          // Check every notification before recording any of them; one seen before keeps its time.
-          const pending: Array<Notification.Notification> = []
-          for (const id of new Set(ids)) {
-            const found = yield* rows
-              .get(space.records.of("notifications"), id)
-              .pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")))
-            const record = Option.getOrUndefined(found)
-            if (
-              record === undefined ||
-              !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
-              !Notification.State.isAnyOf(["Pending", "Seen"])(record.state)
-            )
-              return yield* StoreError.rejected(
-                "NotificationStore",
-                "markSeen",
-                "Expected a pending notification of a human recipient"
+    markSeen: Effect.fn("NotificationStore.memory.markSeen")(
+      function* (ids, seenAt) {
+        // Checked and recorded without a commit in between, as a row lock orders them on PostgreSQL:
+        // a departure that settles one first has the store reject this, and one after keeps its Seen.
+        yield* exclusive((space) =>
+          Effect.gen(function* () {
+            // Check every notification before recording any of them; one seen before keeps its time.
+            const pending: Array<Notification.Notification> = []
+            for (const id of new Set(ids)) {
+              const found = yield* rows.get(space.records.of("notifications"), id)
+              const record = Option.getOrUndefined(found)
+              if (
+                record === undefined ||
+                !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
+                !Notification.State.isAnyOf(["Pending", "Seen"])(record.state)
               )
-            if (Notification.State.isAnyOf(["Pending"])(record.state)) pending.push(record)
-          }
-          for (const record of pending) {
-            const row = yield* rows
-              .encode(
+                return yield* StoreError.rejected(
+                  "NotificationStore",
+                  "markSeen",
+                  "Expected a pending notification of a human recipient"
+                )
+              if (Notification.State.isAnyOf(["Pending"])(record.state)) pending.push(record)
+            }
+            for (const record of pending) {
+              const row = yield* rows.encode(
                 Object.assign({}, record, {
                   state: Notification.State.cases.Seen.make({ seenAt })
                 })
               )
-              .pipe(Effect.mapError(StoreError.failed("NotificationStore", "markSeen")))
-            space.records.of("notifications").set(record.id, row)
-            space.notificationsSeen.set(record.id, DateTime.toEpochMillis(seenAt))
-          }
-        })
-      )
-    }),
-    accept: Effect.fn("NotificationStore.memory.accept")(function* (ids, by, acceptedAt) {
-      if (ids.length === 0) return
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")))
-      // A turn takes pending notifications of one agent; a delivery takes those of contacts.
-      const takes = Notification.AcceptedBy.isAnyOf(["Turn"])(by)
-        ? (recipient: Notification.Recipient, first: Notification.Recipient | undefined) =>
-            Notification.Recipient.isAnyOf(["Agent"])(recipient) &&
-            (!Predicate.isTagged(first, "Agent") || first.memberId === recipient.memberId)
-        : (recipient: Notification.Recipient) => Notification.Recipient.isAnyOf(["Contact"])(recipient)
-      const accepted: Array<Notification.Notification> = []
-      for (const id of new Set(ids)) {
-        const found = yield* rows
-          .get(space.records.of("notifications"), id)
-          .pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")))
-        const record = Option.getOrUndefined(found)
-        if (
-          record === undefined ||
-          !Notification.State.isAnyOf(["Pending"])(record.state) ||
-          !takes(record.recipient, accepted[0]?.recipient)
+              space.records.of("notifications").set(record.id, row)
+              space.notificationsSeen.set(record.id, DateTime.toEpochMillis(seenAt))
+            }
+          })
         )
-          return yield* StoreError.rejected(
-            "NotificationStore",
-            "accept",
-            Notification.AcceptedBy.isAnyOf(["Turn"])(by)
-              ? "Expected pending notifications of one agent"
-              : "Expected pending notifications of contacts"
+      },
+      Effect.mapError(StoreError.failed("NotificationStore", "markSeen"))
+    ),
+    accept: Effect.fn("NotificationStore.memory.accept")(
+      function* (ids, by, acceptedAt) {
+        if (ids.length === 0) return
+        const space = yield* write
+        // A turn takes pending notifications of one agent; a delivery takes those of contacts.
+        const takes = Notification.AcceptedBy.isAnyOf(["Turn"])(by)
+          ? (recipient: Notification.Recipient, first: Notification.Recipient | undefined) =>
+              Notification.Recipient.isAnyOf(["Agent"])(recipient) &&
+              (!Predicate.isTagged(first, "Agent") || first.memberId === recipient.memberId)
+          : (recipient: Notification.Recipient) => Notification.Recipient.isAnyOf(["Contact"])(recipient)
+        const accepted: Array<Notification.Notification> = []
+        for (const id of new Set(ids)) {
+          const found = yield* rows.get(space.records.of("notifications"), id)
+          const record = Option.getOrUndefined(found)
+          if (
+            record === undefined ||
+            !Notification.State.isAnyOf(["Pending"])(record.state) ||
+            !takes(record.recipient, accepted[0]?.recipient)
           )
-        accepted.push(record)
-      }
-      for (const record of accepted) {
-        const row = yield* rows
-          .encode(
+            return yield* StoreError.rejected(
+              "NotificationStore",
+              "accept",
+              Notification.AcceptedBy.isAnyOf(["Turn"])(by)
+                ? "Expected pending notifications of one agent"
+                : "Expected pending notifications of contacts"
+            )
+          accepted.push(record)
+        }
+        for (const record of accepted) {
+          const row = yield* rows.encode(
             Object.assign({}, record, {
               state: Notification.State.cases.Accepted.make({ by, acceptedAt })
             })
           )
-          .pipe(Effect.mapError(StoreError.failed("NotificationStore", "accept")))
-        space.records.of("notifications").set(record.id, row)
-      }
-    }),
+          space.records.of("notifications").set(record.id, row)
+        }
+      },
+      Effect.mapError(StoreError.failed("NotificationStore", "accept"))
+    ),
     discardPendingForParticipation: Effect.fn("NotificationStore.memory.discardPendingForParticipation")(
       function* (participationId) {
         const space = yield* write

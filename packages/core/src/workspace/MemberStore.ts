@@ -149,42 +149,41 @@ const makeMemory = Effect.fn("MemberStore.makeMemory")(function* () {
     list: Effect.map(all("list"), (members) =>
       members.toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id))
     ),
-    insert: Effect.fn("MemberStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("MemberStore", "insert")))
-      const members = yield* rows
-        .all(space.records.of("members"))
-        .pipe(Effect.mapError(StoreError.failed("MemberStore", "insert")))
-      if (space.records.of("members").has(record.id))
-        return yield* StoreError.rejected("MemberStore", "insert", "Member ID already exists")
-      if (members.some((member) => isActive(member, record.identity)))
-        return yield* StoreError.rejected("MemberStore", "insert", "Identity already has an active membership")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("MemberStore", "insert")))
-      space.records.of("members").set(record.id, row)
-    }),
-    rename: Effect.fn("MemberStore.memory.rename")(function* (id, name) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("MemberStore", "rename")))
-      const current = yield* rows
-        .get(space.records.of("members"), id)
-        .pipe(Effect.mapError(StoreError.failed("MemberStore", "rename")))
-      if (Option.isNone(current) || current.value.status !== "active")
-        return yield* StoreError.rejected("MemberStore", "rename", "Expected an active membership")
-      const row = yield* rows
-        .encode({ ...current.value, name })
-        .pipe(Effect.mapError(StoreError.failed("MemberStore", "rename")))
-      space.records.of("members").set(id, row)
-    }),
-    markRemoved: Effect.fn("MemberStore.memory.markRemoved")(function* (id) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("MemberStore", "markRemoved")))
-      const current = yield* rows
-        .get(space.records.of("members"), id)
-        .pipe(Effect.mapError(StoreError.failed("MemberStore", "markRemoved")))
-      if (Option.isNone(current) || current.value.status !== "active")
-        return yield* StoreError.rejected("MemberStore", "markRemoved", "Expected an active membership")
-      const row = yield* rows
-        .encode({ ...current.value, status: "removed" })
-        .pipe(Effect.mapError(StoreError.failed("MemberStore", "markRemoved")))
-      space.records.of("members").set(id, row)
-    })
+    insert: Effect.fn("MemberStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        const members = yield* rows.all(space.records.of("members"))
+        if (space.records.of("members").has(record.id))
+          return yield* StoreError.rejected("MemberStore", "insert", "Member ID already exists")
+        if (members.some((member) => isActive(member, record.identity)))
+          return yield* StoreError.rejected("MemberStore", "insert", "Identity already has an active membership")
+        const row = yield* rows.encode(record)
+        space.records.of("members").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("MemberStore", "insert"))
+    ),
+    rename: Effect.fn("MemberStore.memory.rename")(
+      function* (id, name) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("members"), id)
+        if (Option.isNone(current) || current.value.status !== "active")
+          return yield* StoreError.rejected("MemberStore", "rename", "Expected an active membership")
+        const row = yield* rows.encode({ ...current.value, name })
+        space.records.of("members").set(id, row)
+      },
+      Effect.mapError(StoreError.failed("MemberStore", "rename"))
+    ),
+    markRemoved: Effect.fn("MemberStore.memory.markRemoved")(
+      function* (id) {
+        const space = yield* write
+        const current = yield* rows.get(space.records.of("members"), id)
+        if (Option.isNone(current) || current.value.status !== "active")
+          return yield* StoreError.rejected("MemberStore", "markRemoved", "Expected an active membership")
+        const row = yield* rows.encode({ ...current.value, status: "removed" })
+        space.records.of("members").set(id, row)
+      },
+      Effect.mapError(StoreError.failed("MemberStore", "markRemoved"))
+    )
   }
   return make(workspaceId, driver)
 })

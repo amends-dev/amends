@@ -86,22 +86,27 @@ const makeMemory = Effect.fn("ContactStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("ContactStore", "getMany"))
     ),
-    insert: Effect.fn("ContactStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ContactStore", "insert")))
-      if (space.records.of("contacts").has(record.id))
-        return yield* StoreError.rejected("ContactStore", "insert", "Contact ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ContactStore", "insert")))
-      space.records.of("contacts").set(record.id, row)
-    }),
-    update: Effect.fn("ContactStore.memory.update")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ContactStore", "update")))
-      const found = yield* rows
-        .get(space.records.of("contacts"), record.id)
-        .pipe(Effect.mapError(StoreError.failed("ContactStore", "update")))
-      if (Option.isNone(found)) return yield* StoreError.rejected("ContactStore", "update", "Expected a stored contact")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ContactStore", "update")))
-      space.records.of("contacts").set(record.id, row)
-    })
+    insert: Effect.fn("ContactStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("contacts").has(record.id))
+          return yield* StoreError.rejected("ContactStore", "insert", "Contact ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("contacts").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ContactStore", "insert"))
+    ),
+    update: Effect.fn("ContactStore.memory.update")(
+      function* (record) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("contacts"), record.id)
+        if (Option.isNone(found))
+          return yield* StoreError.rejected("ContactStore", "update", "Expected a stored contact")
+        const row = yield* rows.encode(record)
+        space.records.of("contacts").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ContactStore", "update"))
+    )
   }
   return make(workspaceId, driver)
 })

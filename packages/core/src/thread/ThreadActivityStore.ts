@@ -193,31 +193,32 @@ const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("ThreadActivityStore", "readPage"))
     ),
-    insert: Effect.fn("ThreadActivityStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadActivityStore", "insert")))
-      const activities = yield* rows
-        .all(space.records.of("threadActivities"))
-        .pipe(Effect.mapError(StoreError.failed("ThreadActivityStore", "insert")))
-      const timeline = activities.filter((activity) => activity.threadId === record.threadId)
-      const next = timeline.reduce((latest, activity) => Math.max(latest, activity.sequence), 0) + 1
-      if (record.sequence !== next)
-        return yield* StoreError.rejected(
-          "ThreadActivityStore",
-          "insert",
-          "Activity must follow the current thread sequence"
+    insert: Effect.fn("ThreadActivityStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        const activities = yield* rows.all(space.records.of("threadActivities"))
+        const timeline = activities.filter((activity) => activity.threadId === record.threadId)
+        const next = timeline.reduce((latest, activity) => Math.max(latest, activity.sequence), 0) + 1
+        if (record.sequence !== next)
+          return yield* StoreError.rejected(
+            "ThreadActivityStore",
+            "insert",
+            "Activity must follow the current thread sequence"
+          )
+        if (
+          space.records.of("threadActivities").has(record.id) ||
+          (record.occurrence !== null && activities.some((activity) => activity.occurrence === record.occurrence))
         )
-      if (
-        space.records.of("threadActivities").has(record.id) ||
-        (record.occurrence !== null && activities.some((activity) => activity.occurrence === record.occurrence))
-      )
-        return yield* StoreError.rejected(
-          "ThreadActivityStore",
-          "insert",
-          "Activity ID reused, or its occurrence is already recorded"
-        )
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ThreadActivityStore", "insert")))
-      space.records.of("threadActivities").set(record.id, row)
-    })
+          return yield* StoreError.rejected(
+            "ThreadActivityStore",
+            "insert",
+            "Activity ID reused, or its occurrence is already recorded"
+          )
+        const row = yield* rows.encode(record)
+        space.records.of("threadActivities").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadActivityStore", "insert"))
+    )
   }
   return make(workspaceId, driver)
 })

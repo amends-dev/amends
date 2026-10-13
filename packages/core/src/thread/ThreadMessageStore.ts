@@ -145,48 +145,49 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
       },
       Effect.mapError(StoreError.failed("ThreadMessageStore", "countByThread"))
     ),
-    insert: Effect.fn("ThreadMessageStore.memory.insert")(function* (record) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "insert")))
-      if (space.records.of("threadMessages").has(record.id))
-        return yield* StoreError.rejected("ThreadMessageStore", "insert", "Message ID already exists")
-      const row = yield* rows.encode(record).pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "insert")))
-      space.records.of("threadMessages").set(record.id, row)
-    }),
-    edit: Effect.fn("ThreadMessageStore.memory.edit")(function* (edited) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "edit")))
-      const found = yield* rows
-        .get(space.records.of("threadMessages"), edited.messageId)
-        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "edit")))
-      if (Option.isNone(found) || !ThreadMessage.Content.isAnyOf(["Text"])(found.value.content))
-        return yield* StoreError.rejected("ThreadMessageStore", "edit", "Expected a message with text")
-      if (edited.revision !== found.value.content.revision + 1)
-        return yield* StoreError.rejected("ThreadMessageStore", "edit", "Expected the message's next revision")
-      // The row's encoder checks the edit, so a literal leaves its failure to the store.
-      const content: ThreadMessage.Content = {
-        _tag: "Text",
-        text: edited.text,
-        mentions: edited.mentions,
-        revision: edited.revision,
-        editedAt: edited.editedAt
-      }
-      const row = yield* rows
-        .encode(Object.assign({}, found.value, { content }))
-        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "edit")))
-      space.records.of("threadMessages").set(edited.messageId, row)
-    }),
-    delete: Effect.fn("ThreadMessageStore.memory.delete")(function* (deleted) {
-      const space = yield* write.pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "delete")))
-      const found = yield* rows
-        .get(space.records.of("threadMessages"), deleted.messageId)
-        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "delete")))
-      if (Option.isNone(found) || !hasText(found.value))
-        return yield* StoreError.rejected("ThreadMessageStore", "delete", "Expected a message with text")
-      const content: ThreadMessage.Content = { _tag: "Deleted", deletedAt: deleted.deletedAt }
-      const row = yield* rows
-        .encode(Object.assign({}, found.value, { content }))
-        .pipe(Effect.mapError(StoreError.failed("ThreadMessageStore", "delete")))
-      space.records.of("threadMessages").set(deleted.messageId, row)
-    })
+    insert: Effect.fn("ThreadMessageStore.memory.insert")(
+      function* (record) {
+        const space = yield* write
+        if (space.records.of("threadMessages").has(record.id))
+          return yield* StoreError.rejected("ThreadMessageStore", "insert", "Message ID already exists")
+        const row = yield* rows.encode(record)
+        space.records.of("threadMessages").set(record.id, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "insert"))
+    ),
+    edit: Effect.fn("ThreadMessageStore.memory.edit")(
+      function* (edited) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("threadMessages"), edited.messageId)
+        if (Option.isNone(found) || !ThreadMessage.Content.isAnyOf(["Text"])(found.value.content))
+          return yield* StoreError.rejected("ThreadMessageStore", "edit", "Expected a message with text")
+        if (edited.revision !== found.value.content.revision + 1)
+          return yield* StoreError.rejected("ThreadMessageStore", "edit", "Expected the message's next revision")
+        // The row's encoder checks the edit, so a literal leaves its failure to the store.
+        const content: ThreadMessage.Content = {
+          _tag: "Text",
+          text: edited.text,
+          mentions: edited.mentions,
+          revision: edited.revision,
+          editedAt: edited.editedAt
+        }
+        const row = yield* rows.encode(Object.assign({}, found.value, { content }))
+        space.records.of("threadMessages").set(edited.messageId, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "edit"))
+    ),
+    delete: Effect.fn("ThreadMessageStore.memory.delete")(
+      function* (deleted) {
+        const space = yield* write
+        const found = yield* rows.get(space.records.of("threadMessages"), deleted.messageId)
+        if (Option.isNone(found) || !hasText(found.value))
+          return yield* StoreError.rejected("ThreadMessageStore", "delete", "Expected a message with text")
+        const content: ThreadMessage.Content = { _tag: "Deleted", deletedAt: deleted.deletedAt }
+        const row = yield* rows.encode(Object.assign({}, found.value, { content }))
+        space.records.of("threadMessages").set(deleted.messageId, row)
+      },
+      Effect.mapError(StoreError.failed("ThreadMessageStore", "delete"))
+    )
   }
   return make(workspaceId, driver)
 })
