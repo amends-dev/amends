@@ -196,7 +196,7 @@ const recordedConversation = ({ status, history }: State): ReadonlyArray<Prompt.
   (isRunning(status) ? withTurn(history, status.turn.prompt, status.turn.steps) : history).content
 
 /** Makes the session `Harness.createSession` hands out, over an agent session it started. */
-export const makeSession = Effect.fn("Session.make")(function* (options: {
+export const makeSession = Effect.fnUntraced(function* (options: {
   readonly id: Agent.SessionId
   readonly agent: string
   readonly agentSession: Agent.AgentSession

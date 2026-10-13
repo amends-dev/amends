@@ -345,7 +345,7 @@ export const wakeAppendReaders = (database: MemoryDatabase["Service"]) => {
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("MemoryDatabase.make")(function* () {
+export const make = Effect.gen(function* () {
   let issued = 0
   return MemoryDatabase.of({
     spaces: new Map(),
@@ -365,7 +365,7 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(MemoryDatabase, make())
+export const layer = Layer.effect(MemoryDatabase, make)
 
 /**
  * One host's connection to the storage, like one database connection: the storage it reaches, and
@@ -392,7 +392,7 @@ export class Connection extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const makeConnection = Effect.fn("MemoryDatabase.makeConnection")(function* () {
+export const makeConnection = Effect.gen(function* () {
   return Connection.of({
     database: yield* MemoryDatabase,
     gate: yield* Semaphore.make(1)
@@ -405,7 +405,7 @@ export const makeConnection = Effect.fn("MemoryDatabase.makeConnection")(functio
  * @category layers
  * @since 0.1.0
  */
-export const layerConnection = Layer.effect(Connection, makeConnection())
+export const layerConnection = Layer.effect(Connection, makeConnection)
 
 /**
  * How one kind of record is stored: the JSON of its encoded form, keyed by ID, one map where the

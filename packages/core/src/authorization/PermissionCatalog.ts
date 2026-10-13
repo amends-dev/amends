@@ -58,7 +58,7 @@ const decodeDefinition = Schema.decodeEffect(Permission.Definition)
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PermissionCatalog.make")(function* (
+export const make = Effect.fnUntraced(function* (
   definitions: ReadonlyArray<Permission.Definition>
 ): Effect.fn.Return<PermissionCatalog["Service"], Duplicate | Schema.SchemaError> {
   const byName = new Map<Permission.Name, Permission.Definition>()

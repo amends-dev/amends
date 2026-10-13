@@ -168,7 +168,7 @@ const typingEvery = Duration.seconds(2)
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ThreadMessageService.make")(function* () {
+export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const threadCommand = yield* ThreadCommand.ThreadCommand
@@ -423,4 +423,4 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ThreadMessageService, make())
+export const layer = Layer.effect(ThreadMessageService, make)

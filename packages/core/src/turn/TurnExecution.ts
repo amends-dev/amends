@@ -263,7 +263,7 @@ const pageSize = 100
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("TurnExecution.make")(function* () {
+export const make = Effect.gen(function* () {
   const turnStore = yield* TurnStore.TurnStore
   const sessionStateStore = yield* SessionStateStore.SessionStateStore
   const sessionLogStore = yield* SessionLogStore.SessionLogStore
@@ -807,4 +807,4 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(TurnExecution, make())
+export const layer = Layer.effect(TurnExecution, make)

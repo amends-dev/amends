@@ -228,7 +228,7 @@ const hmacSha256 = Effect.fnUntraced(function* (crypto: Crypto.Crypto, key: Uint
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("EmailSignIn.make")(function* (options: Options) {
+export const make = Effect.fnUntraced(function* (options: Options) {
   const policy: Policy = { ...defaultPolicy, ...options.policy }
   const signInStorage = yield* SignInStorage.SignInStorage
   const accounts = yield* Accounts.Accounts

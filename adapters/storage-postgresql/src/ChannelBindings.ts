@@ -45,7 +45,7 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ChannelBindings.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(channelBindings.workspaceId, workspaceId)
@@ -102,4 +102,4 @@ export const make = Effect.fn("ChannelBindings.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ChannelBindingStore.ChannelBindingStore, make())
+export const layer = Layer.effect(ChannelBindingStore.ChannelBindingStore, make)

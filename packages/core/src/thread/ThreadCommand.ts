@@ -375,7 +375,7 @@ const recipientsOf = (
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ThreadCommand.make")(function* () {
+export const make = Effect.gen(function* () {
   const threadQuery = yield* ThreadQuery.ThreadQuery
   const threadStore = yield* ThreadStore.ThreadStore
   const threadActivityStore = yield* ThreadActivityStore.ThreadActivityStore
@@ -717,4 +717,4 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ThreadCommand, make())
+export const layer = Layer.effect(ThreadCommand, make)

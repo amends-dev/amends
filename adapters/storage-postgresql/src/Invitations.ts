@@ -84,7 +84,7 @@ export const select = (
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Invitations.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(invitations.workspaceId, workspaceId)
@@ -149,4 +149,4 @@ export const make = Effect.fn("Invitations.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(InvitationStore.InvitationStore, make())
+export const layer = Layer.effect(InvitationStore.InvitationStore, make)

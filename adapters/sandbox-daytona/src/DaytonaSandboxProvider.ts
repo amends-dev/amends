@@ -139,7 +139,7 @@ const stoppedStates = new Set(["stopped", "archived"])
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options: Options) {
+export const make = Effect.fnUntraced(function* (options: Options) {
   const crypto = yield* Crypto.Crypto
   // Snapshots of templates are made in the background, until the provider closes.
   const scope = yield* Effect.scope

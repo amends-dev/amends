@@ -144,7 +144,7 @@ export const recipientDenial = (
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   Delegation["Service"],
   never,
   | WorkspaceStore.WorkspaceStore
@@ -153,7 +153,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   | Authorization.Authorization
   | PermissionCatalog.PermissionCatalog
   | Store.Store
-> {
+> = Effect.gen(function* () {
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
   const assignmentStore = yield* AssignmentStore.AssignmentStore
   const roleStore = yield* RoleStore.RoleStore
@@ -246,7 +246,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Delegation, make())
+export const layer = Layer.effect(Delegation, make)
 
 /**
  * What a check answers when it refuses the actor: a denial, for whatever reason, or the owner's

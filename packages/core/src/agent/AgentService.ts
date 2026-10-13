@@ -151,7 +151,7 @@ export class AgentService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("AgentService.make")(function* () {
+export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const delegation = yield* Delegation.Delegation
   const memberCommand = yield* MemberCommand.MemberCommand
@@ -389,4 +389,4 @@ export const make = Effect.fn("AgentService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(AgentService, make())
+export const layer = Layer.effect(AgentService, make)

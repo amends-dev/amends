@@ -158,9 +158,7 @@ const isReadable = (delivery: Prepared) => delivery.unreadable.length === 0
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ChangeFeedSource.make")(function* (
-  input: Options = { capacity: 256, replayLimit: 500, pageSize: 100 }
-) {
+export const make = Effect.fnUntraced(function* (input: Options = { capacity: 256, replayLimit: 500, pageSize: 100 }) {
   const { capacity, replayLimit, pageSize } = yield* Schema.decodeEffect(Options)(input)
   const log = (yield* Journal.Journal).log
 

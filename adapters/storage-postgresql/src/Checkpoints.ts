@@ -29,7 +29,7 @@ import { checkpoints, liveProjections } from "./internal/schema.ts"
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Checkpoints.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const cursorColumns = {
@@ -119,4 +119,4 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Checkpoint.Checkpoint, make())
+export const layer = Layer.effect(Checkpoint.Checkpoint, make)

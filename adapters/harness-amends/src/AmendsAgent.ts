@@ -149,7 +149,7 @@ const standInFor = (tool: Tool.Any) =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
+export const make = Effect.fnUntraced(function* (options: Options) {
   const languageModels = yield* Models.LanguageModels
   const modelOf = (endpoint: ModelEndpoint.ModelEndpoint) =>
     Effect.map(languageModels.make(endpoint), (languageModel): TurnModel => ({

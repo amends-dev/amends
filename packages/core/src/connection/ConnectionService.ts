@@ -207,7 +207,7 @@ export class ConnectionService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ConnectionService.make")(function* () {
+export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const connectionStore = yield* ConnectionStore.ConnectionStore
   const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore
@@ -471,4 +471,4 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ConnectionService, make())
+export const layer = Layer.effect(ConnectionService, make)

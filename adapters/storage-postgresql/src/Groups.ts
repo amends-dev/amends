@@ -69,7 +69,7 @@ const toRow = (record: Group.Group): typeof groups.$inferInsert => ({
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Groups.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const driver: GroupStore.GroupStore["Service"] = {
@@ -199,4 +199,4 @@ export const make = Effect.fn("Groups.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GroupStore.GroupStore, make())
+export const layer = Layer.effect(GroupStore.GroupStore, make)

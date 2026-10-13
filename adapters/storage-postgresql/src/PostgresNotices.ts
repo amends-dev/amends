@@ -143,7 +143,7 @@ export interface Options {
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresNotices.make")(function* (options: Options = {}) {
+export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const client = yield* PgClient.PgClient
   const retry = Duration.fromInputUnsafe(options.retry ?? "1 second")
   const waiting = new Map<string, Deferred.Deferred<void>>()

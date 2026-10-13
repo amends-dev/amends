@@ -44,7 +44,7 @@ const toRow = (record: Connection.Connection): typeof connections.$inferInsert =
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Connections.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = (id: Connection.Id) => and(eq(connections.workspaceId, workspaceId), eq(connections.id, id))
@@ -87,4 +87,4 @@ export const make = Effect.fn("Connections.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ConnectionStore.ConnectionStore, make())
+export const layer = Layer.effect(ConnectionStore.ConnectionStore, make)

@@ -275,7 +275,7 @@ interface Entry {
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options) {
+export const make = Effect.fnUntraced(function* (options?: Options) {
   const crypto = yield* Crypto.Crypto
   const heartbeat = options?.heartbeat ?? "10 seconds"
   const maxWait = options?.maxWait ?? "1 hour"

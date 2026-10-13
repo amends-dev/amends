@@ -1,6 +1,6 @@
 /**
- * The local host's entry point, which `bun run start` runs: it loads the configuration with
- * `LocalConfig.load` and builds `LocalHost.layer` for the role `AMENDS_ROLE` names. A process that
+ * The local host's entry point, which `bun run start` runs: it reads the configuration,
+ * `LocalConfig.options`, and builds `LocalHost.layer` for the role `AMENDS_ROLE` names. A process that
  * serves the API adds the authentication `AMENDS_SIGN_IN` names and serves them with
  * `LocalServer.layer`; one that only runs jobs runs the host alone. Either way it runs until the
  * process stops, through `BunRuntime.runMain`. It reads settings from the environment keeping empty
@@ -36,7 +36,7 @@ const program = Effect.gen(function* () {
     credentialKey,
     sandboxDirectory,
     signIn
-  } = yield* LocalConfig.load()
+  } = yield* LocalConfig.options
   const host = LocalHost.layer(databaseUrl, {
     runJobs: role !== "api",
     poolSize,

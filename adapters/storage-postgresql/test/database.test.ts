@@ -43,7 +43,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           })
           const configured =
             construction === "make"
-              ? Effect.flatMap(PostgresDatabase.make(), (database) =>
+              ? Effect.flatMap(PostgresDatabase.make, (database) =>
                   program.pipe(Effect.provideService(PostgresDatabase.PostgresDatabase, database))
                 ).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })))
               : program.pipe(Effect.provide(database(url)))

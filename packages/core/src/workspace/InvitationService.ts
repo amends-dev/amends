@@ -102,7 +102,7 @@ export class InvitationService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   InvitationService["Service"],
   never,
   | InvitationStore.InvitationStore
@@ -113,7 +113,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   | Journal.Journal
   | Crypto.Crypto
   | Store.Store
-> {
+> = Effect.gen(function* () {
   const invitationStore = yield* InvitationStore.InvitationStore
   const memberStore = yield* MemberStore.MemberStore
   const authorization = yield* Authorization.Authorization
@@ -285,4 +285,4 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(InvitationService, make())
+export const layer = Layer.effect(InvitationService, make)

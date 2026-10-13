@@ -25,8 +25,8 @@ export class Counter extends Context.Service<
 export const make = Effect.fn("JournalTest.memory")(function* (
   workspaceId: Workspace.Id = Workspace.Id.make("workspace-one")
 ) {
-  const database = yield* MemoryDatabase.make()
-  const connection = yield* MemoryDatabase.makeConnection().pipe(
+  const database = yield* MemoryDatabase.make
+  const connection = yield* MemoryDatabase.makeConnection.pipe(
     Effect.provideService(MemoryDatabase.MemoryDatabase, database)
   )
   /** The stores bound to one workspace over this host's connection. */

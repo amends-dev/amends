@@ -174,7 +174,7 @@ export class ThreadService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ThreadService.make")(function* () {
+export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const groupQuery = yield* GroupQuery.GroupQuery
   const threadCommand = yield* ThreadCommand.ThreadCommand
@@ -571,4 +571,4 @@ export const make = Effect.fn("ThreadService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ThreadService, make())
+export const layer = Layer.effect(ThreadService, make)

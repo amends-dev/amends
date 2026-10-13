@@ -58,11 +58,11 @@ export class GrantResolver extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   GrantResolver["Service"],
   never,
   AssignmentStore.AssignmentStore | RoleStore.RoleStore | PermissionCatalog.PermissionCatalog
-> {
+> = Effect.gen(function* () {
   const assignmentStore = yield* AssignmentStore.AssignmentStore
   const roleStore = yield* RoleStore.RoleStore
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
@@ -104,4 +104,4 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GrantResolver, make())
+export const layer = Layer.effect(GrantResolver, make)

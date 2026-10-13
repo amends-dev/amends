@@ -140,9 +140,7 @@ it.effect("authorization reads each caller's actor and uses an agent's own grant
     expectTypeOf<
       Effect.Services<ReturnType<Authorization.Authorization["Service"]["require"]>>
     >().toEqualTypeOf<Actor.Actor>()
-    expectTypeOf<Effect.Success<ReturnType<typeof Authorization.make>>>().toEqualTypeOf<
-      Authorization.Authorization["Service"]
-    >()
+    expectTypeOf<Effect.Success<typeof Authorization.make>>().toEqualTypeOf<Authorization.Authorization["Service"]>()
     expectTypeOf<
       Effect.Error<ReturnType<Authorization.Authorization["Service"]["require"]>>
     >().toEqualTypeOf<Authorization.Error>()

@@ -111,8 +111,8 @@ it.effect.each(["make", "layer"] as const)(
       expectTypeOf<Effect.Services<typeof consume>>().toEqualTypeOf<Journal.Journal | Publication.Publication>()
       expectTypeOf<Effect.Error<typeof consume>>().toEqualTypeOf<Projection.Error | Log.WriteError>()
       const acquire = Effect.gen(function* () {
-        const transaction = yield* Transaction.make()
-        const logs = yield* Log.make().pipe(Effect.provideService(Transaction.Transaction, transaction))
+        const transaction = yield* Transaction.make
+        const logs = yield* Log.make.pipe(Effect.provideService(Transaction.Transaction, transaction))
         return yield* Journal.make({
           logId: Entry.LogId.make("domain"),
           projections: [counter, audit]
@@ -137,11 +137,11 @@ it.effect.each(["make", "layer"] as const)(
 it.effect("each evaluation of the transaction constructor owns a separate coordinator", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
-    const acquire = Transaction.make()
+    const acquire = Transaction.make
     expectTypeOf<Effect.Success<typeof acquire>>().toEqualTypeOf<Transaction.Transaction["Service"]>()
     expectTypeOf<Effect.Services<typeof acquire>>().toEqualTypeOf<Store.Store>()
-    expectTypeOf<Effect.Success<ReturnType<typeof Log.make>>>().toEqualTypeOf<Log.Log["Service"]>()
-    expectTypeOf<Effect.Services<ReturnType<typeof Log.make>>>().toEqualTypeOf<Store.Store | Transaction.Transaction>()
+    expectTypeOf<Effect.Success<typeof Log.make>>().toEqualTypeOf<Log.Log["Service"]>()
+    expectTypeOf<Effect.Services<typeof Log.make>>().toEqualTypeOf<Store.Store | Transaction.Transaction>()
     yield* Effect.gen(function* () {
       const first = yield* acquire
       const second = yield* acquire

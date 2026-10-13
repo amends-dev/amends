@@ -119,7 +119,7 @@ const Admission = Data.taggedEnum<Admission>()
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Gateway.make")(function* (
+export const make = Effect.fnUntraced(function* (
   options: Options = {}
 ): Effect.fn.Return<
   Gateway["Service"],

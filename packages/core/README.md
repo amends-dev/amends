@@ -767,8 +767,8 @@ import { Log, Transaction } from "@amends-dev/core/journal"
 import { Effect } from "effect"
 
 const makeLogs = Effect.gen(function* () {
-  const transaction = yield* Transaction.make()
-  return yield* Log.make().pipe(Effect.provideService(Transaction.Transaction, transaction))
+  const transaction = yield* Transaction.make
+  return yield* Log.make.pipe(Effect.provideService(Transaction.Transaction, transaction))
 })
 ```
 

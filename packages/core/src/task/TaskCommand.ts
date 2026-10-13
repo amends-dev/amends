@@ -174,7 +174,7 @@ const leftBy = (task: Task.Task, change: Task.Change): Member.Id | null =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("TaskCommand.make")(function* () {
+export const make = Effect.gen(function* () {
   const journal = yield* Journal.Journal
   const threadCommand = yield* ThreadCommand.ThreadCommand
   const threadQuery = yield* ThreadQuery.ThreadQuery
@@ -293,4 +293,4 @@ export const make = Effect.fn("TaskCommand.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(TaskCommand, make())
+export const layer = Layer.effect(TaskCommand, make)

@@ -62,7 +62,7 @@ conditional writes, and uniqueness.
 ### Construction
 
 Adapters follow the [shared construction conventions](../packages/README.md#constructors-and-layers).
-In the PostgreSQL adapter, `PostgresDatabase.make()` applies the current schema baseline to an
+In the PostgreSQL adapter, `PostgresDatabase.make` applies the current schema baseline to an
 Effect SQL client it is given, without opening a connection, and `PostgresDatabase.layer(config)`
 opens the client's pool and delegates to it. The binding, `PostgresWorkspaceStorage`, and
 `PostgresDirectory` construct over the database service, and each store over the binding.

@@ -85,7 +85,7 @@ export class OwnershipService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   OwnershipService["Service"],
   never,
   | WorkspaceStore.WorkspaceStore
@@ -97,7 +97,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   | Journal.Journal
   | Crypto.Crypto
   | Store.Store
-> {
+> = Effect.gen(function* () {
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
   const memberStore = yield* MemberStore.MemberStore
   const assignmentStore = yield* AssignmentStore.AssignmentStore
@@ -223,4 +223,4 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(OwnershipService, make())
+export const layer = Layer.effect(OwnershipService, make)

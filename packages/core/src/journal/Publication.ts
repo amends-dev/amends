@@ -42,7 +42,7 @@ export class Publication extends Context.Service<Publication, Event.Provenance>(
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Publication.make")(function* (
+export const make = Effect.fnUntraced(function* (
   workspaceId: WorkspaceId.Id,
   performedBy: Performer.Reference,
   occurredAt?: DateTime.Utc
@@ -66,7 +66,7 @@ export const make = Effect.fn("Publication.make")(function* (
  * @category constructors
  * @since 0.1.0
  */
-export const makeForActor = Effect.fn("Publication.makeForActor")(function* (occurredAt?: DateTime.Utc) {
+export const makeForActor = Effect.fnUntraced(function* (occurredAt?: DateTime.Utc) {
   const actor = yield* Actor.Actor
   return yield* make(
     actor.workspaceId,
@@ -83,7 +83,7 @@ export const makeForActor = Effect.fn("Publication.makeForActor")(function* (occ
  * @category constructors
  * @since 0.1.0
  */
-export const makeCausedBy = Effect.fn("Publication.makeCausedBy")(function* (
+export const makeCausedBy = Effect.fnUntraced(function* (
   event: Event.Event,
   performedBy: Performer.Reference = event.provenance.performedBy,
   occurredAt?: DateTime.Utc

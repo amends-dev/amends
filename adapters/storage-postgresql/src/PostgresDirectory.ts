@@ -35,7 +35,7 @@ const Membership = Schema.Struct({
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresDirectory.make")(function* () {
+export const make = Effect.gen(function* () {
   const { db } = yield* PostgresDatabase.PostgresDatabase
   const list: WorkspaceDirectory.WorkspaceDirectory["Service"]["list"] = Effect.fn("PostgresDirectory.list")(function* (
     identity: Identity.MemberReference
@@ -118,4 +118,4 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(WorkspaceDirectory.WorkspaceDirectory, make())
+export const layer = Layer.effect(WorkspaceDirectory.WorkspaceDirectory, make)

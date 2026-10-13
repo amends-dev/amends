@@ -117,7 +117,7 @@ const decodeId = Schema.decodeEffect(Member.Id)
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   MemberService["Service"],
   never,
   | MemberStore.MemberStore
@@ -130,7 +130,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
   | Journal.Journal
   | Crypto.Crypto
   | Store.Store
-> {
+> = Effect.gen(function* () {
   const memberStore = yield* MemberStore.MemberStore
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore
   const invitationStore = yield* InvitationStore.InvitationStore
@@ -246,4 +246,4 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(MemberService, make())
+export const layer = Layer.effect(MemberService, make)

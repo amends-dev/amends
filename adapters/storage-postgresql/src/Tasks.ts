@@ -61,7 +61,7 @@ const changeColumns = Task.Change.match<{ readonly set: Partial<Insert>; readonl
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Tasks.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(tasks.workspaceId, workspaceId)
@@ -138,4 +138,4 @@ export const make = Effect.fn("Tasks.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(TaskStore.TaskStore, make())
+export const layer = Layer.effect(TaskStore.TaskStore, make)

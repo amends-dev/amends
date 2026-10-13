@@ -191,7 +191,7 @@ const queryIn = (world: World = {}) => {
     }),
     Layer.effect(Integrations.Integrations, installed)
   )
-  return AgentQuery.make().pipe(Effect.provide(stores))
+  return AgentQuery.make.pipe(Effect.provide(stores))
 }
 
 const selection = (fields: Partial<Agent.Selection> = {}): Agent.Selection => ({

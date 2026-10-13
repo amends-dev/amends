@@ -47,7 +47,7 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Assignment.Assignment))
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Assignments.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(assignments.workspaceId, workspaceId)
@@ -111,4 +111,4 @@ export const make = Effect.fn("Assignments.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(AssignmentStore.AssignmentStore, make())
+export const layer = Layer.effect(AssignmentStore.AssignmentStore, make)

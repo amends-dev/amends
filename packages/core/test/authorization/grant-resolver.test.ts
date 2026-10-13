@@ -96,15 +96,13 @@ it.effect("the resolver reads current state without requiring a transaction", ()
       AssignmentStore.AssignmentStore | RoleStore.RoleStore | PermissionCatalog.PermissionCatalog
     >()
     expectTypeOf<Layer.Error<typeof GrantResolver.layer>>().toEqualTypeOf<never>()
-    expectTypeOf<Effect.Success<ReturnType<typeof GrantResolver.make>>>().toEqualTypeOf<
-      GrantResolver.GrantResolver["Service"]
-    >()
+    expectTypeOf<Effect.Success<typeof GrantResolver.make>>().toEqualTypeOf<GrantResolver.GrantResolver["Service"]>()
     expectTypeOf<Effect.Services<typeof resolve>>().toEqualTypeOf<GrantResolver.GrantResolver>()
     expectTypeOf<Effect.Error<typeof resolve>>().toEqualTypeOf<GrantResolver.Error>()
     const fixture = yield* make()
     yield* seed(fixture, [], [assigned("direct", directSource(MemberPermissions.Read.name, memberScope))])
     // Building within an earlier transaction must not capture its now-expired handle.
-    const resolver = yield* fixture.store.transaction(GrantResolver.make()).pipe(Effect.provide(dependencies(fixture)))
+    const resolver = yield* fixture.store.transaction(GrantResolver.make).pipe(Effect.provide(dependencies(fixture)))
     expect(yield* resolver.resolve(memberId)).toEqual([Grant.make(MemberPermissions.Read, memberScope)])
   })
 )

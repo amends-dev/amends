@@ -78,7 +78,7 @@ export class GroupFollowService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("GroupFollowService.make")(function* () {
+export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const groupQuery = yield* GroupQuery.GroupQuery
   const groupStore = yield* GroupStore.GroupStore
@@ -186,4 +186,4 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GroupFollowService, make())
+export const layer = Layer.effect(GroupFollowService, make)

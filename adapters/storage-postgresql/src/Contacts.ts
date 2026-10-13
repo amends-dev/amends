@@ -41,7 +41,7 @@ const toRow = (record: Contact.Contact): typeof contacts.$inferInsert => ({
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Contacts.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(contacts.workspaceId, workspaceId)
@@ -95,4 +95,4 @@ export const make = Effect.fn("Contacts.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ContactStore.ContactStore, make())
+export const layer = Layer.effect(ContactStore.ContactStore, make)

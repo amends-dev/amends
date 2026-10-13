@@ -133,7 +133,7 @@ export class GroupCommand extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("GroupCommand.make")(function* () {
+export const make = Effect.gen(function* () {
   const groupStore = yield* GroupStore.GroupStore
   const memberStore = yield* MemberStore.MemberStore
   const journal = yield* Journal.Journal
@@ -208,4 +208,4 @@ export const make = Effect.fn("GroupCommand.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GroupCommand, make())
+export const layer = Layer.effect(GroupCommand, make)

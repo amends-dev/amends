@@ -143,7 +143,7 @@ const maxFailureLength = 500
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Http.make")(function* (options: Options) {
+export const make = Effect.fnUntraced(function* (options: Options) {
   const { name, client } = options
   const baseUrl = options.baseUrl.replace(/\/+$/, "")
   const operations = new Map(options.operations.map((operation) => [operation.definition.name, operation]))

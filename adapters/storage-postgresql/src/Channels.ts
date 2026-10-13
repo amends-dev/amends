@@ -42,7 +42,7 @@ const toRow = (record: Channel.Channel): typeof channels.$inferInsert => ({
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Channels.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = (id: Channel.Id) => and(eq(channels.workspaceId, workspaceId), eq(channels.id, id))
@@ -84,4 +84,4 @@ export const make = Effect.fn("Channels.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ChannelStore.ChannelStore, make())
+export const layer = Layer.effect(ChannelStore.ChannelStore, make)

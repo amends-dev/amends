@@ -28,9 +28,7 @@ it.effect.each(["make", "layer"] as const)(
           construction === "make"
             ? Layer.succeed(
                 Authentication.Authentication,
-                yield* BearerAuthentication.make().pipe(
-                  Effect.provideService(SessionTokens.SessionTokens, sessionTokens)
-                )
+                yield* BearerAuthentication.make.pipe(Effect.provideService(SessionTokens.SessionTokens, sessionTokens))
               )
             : BearerAuthentication.layer.pipe(Layer.provide(Layer.succeed(SessionTokens.SessionTokens, sessionTokens)))
         const directory = Layer.succeed(

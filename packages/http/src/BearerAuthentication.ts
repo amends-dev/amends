@@ -26,7 +26,7 @@ const messages: Record<SessionTokens.Rejected["reason"], string> = {
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("BearerAuthentication.make")(function* () {
+export const make = Effect.gen(function* () {
   const sessionTokens = yield* SessionTokens.SessionTokens
   return Authentication.Authentication.of({
     bearer: (httpEffect, { credential }) =>
@@ -48,4 +48,4 @@ export const make = Effect.fn("BearerAuthentication.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Authentication.Authentication, make())
+export const layer = Layer.effect(Authentication.Authentication, make)

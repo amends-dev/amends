@@ -58,7 +58,7 @@ export class ChannelQuery extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ChannelQuery.make")(function* () {
+export const make = Effect.gen(function* () {
   const channelStore = yield* ChannelStore.ChannelStore
   const connectionStore = yield* ConnectionStore.ConnectionStore
   const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore
@@ -153,4 +153,4 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ChannelQuery, make())
+export const layer = Layer.effect(ChannelQuery, make)

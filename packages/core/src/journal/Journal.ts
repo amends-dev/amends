@@ -125,7 +125,7 @@ export interface Options<Requirements extends ReadonlyArray<unknown> = readonly 
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Journal.make")(function* <
+export const make = Effect.fnUntraced(function* <
   const Requirements extends ReadonlyArray<unknown>,
   ReactionRequirements = never
 >(options: Options<Requirements, ReactionRequirements>) {

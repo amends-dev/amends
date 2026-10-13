@@ -55,7 +55,7 @@ export type HostLayer<E> = Layer.Layer<
 
 /**
  * What `layer` and `layerDatabase` take besides the database URL, each with its default.
- * `LocalConfig.load` reads them from the environment.
+ * `LocalConfig.options` reads them from the environment.
  *
  * @category options
  * @since 0.1.0
@@ -109,7 +109,7 @@ export interface Options {
  * @category constructors
  * @since 0.1.0
  */
-export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
+export const makeIntegrations = Effect.fnUntraced(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
     // A host reaches a bridge another host launched.
     const bridgeSecret = LocalConfig.deriveSecret(credentialKey, "amends/opencode-bridge")

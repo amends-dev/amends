@@ -142,7 +142,7 @@ const ignored = (reason: IgnoredReason) => Intake.cases.Ignored.make({ reason })
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ChannelIntake.make")(function* () {
+export const make = Effect.gen(function* () {
   const channelQuery = yield* ChannelQuery.ChannelQuery
   const channelBindingStore = yield* ChannelBindingStore.ChannelBindingStore
   const contactStore = yield* ContactStore.ContactStore
@@ -437,4 +437,4 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ChannelIntake, make())
+export const layer = Layer.effect(ChannelIntake, make)

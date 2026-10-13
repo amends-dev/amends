@@ -308,7 +308,7 @@ describe("group reads", () => {
             bound,
             reader,
             Effect.gen(function* () {
-              const groupQuery = yield* GroupQuery.make()
+              const groupQuery = yield* GroupQuery.make
               expect(yield* groupQuery.requireAudience(first.id)).toEqual(
                 Option.getOrThrow(yield* bound.groupMemberships.findActive(first.id, readerId))
               )
@@ -408,7 +408,7 @@ describe("group reads", () => {
               const groupService = yield* GroupService.GroupService
               const groupMembershipService = yield* GroupMembershipService.GroupMembershipService
               const memberService = yield* MemberService.MemberService
-              const groupQuery = yield* GroupQuery.make()
+              const groupQuery = yield* GroupQuery.make
               const journal = yield* Journal.Journal
               const original = yield* groupQuery.requireAudience(first.id)
               expect(yield* groupService.get(first.id)).toEqual(first)
@@ -517,7 +517,7 @@ describe("group reads", () => {
               yield* get(first.id)
               yield* mine
               yield* roster(first.id)
-              yield* (yield* GroupQuery.make()).requireAudience(first.id)
+              yield* (yield* GroupQuery.make).requireAudience(first.id)
             })
           )
           expect(yield* history(bound)).toEqual(before)

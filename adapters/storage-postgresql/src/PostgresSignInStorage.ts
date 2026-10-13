@@ -40,7 +40,7 @@ const decodeSession = Schema.decodeUnknownEffect(SessionRow)
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresSignInStorage.make")(function* () {
+export const make = Effect.gen(function* () {
   const { db, sql } = yield* PostgresDatabase.PostgresDatabase
   return SignInStorage.SignInStorage.of({
     modifyCode: (email, decide) =>
@@ -106,4 +106,4 @@ export const make = Effect.fn("PostgresSignInStorage.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(SignInStorage.SignInStorage, make())
+export const layer = Layer.effect(SignInStorage.SignInStorage, make)

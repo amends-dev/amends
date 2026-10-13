@@ -69,8 +69,8 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   const crypto = yield* Crypto.Crypto
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
   // Creation runs before the workspace's operations exist, so it builds the commands it shares.
-  const assignmentCommand = yield* AssignmentCommand.make()
-  const groupCommand = yield* GroupCommand.make()
+  const assignmentCommand = yield* AssignmentCommand.make
+  const groupCommand = yield* GroupCommand.make
   const provenance = yield* Publication.make(
     workspaceId,
     Performer.Reference.cases.Identity.make({ identity: Identity.Reference.cases.Human.make({ id: createdBy }) })

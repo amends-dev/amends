@@ -22,7 +22,7 @@ import * as Binding from "./Binding.ts"
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresSignalHub.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database } = yield* Binding.Binding
   return SignalHub.SignalHub.of({
     publish: database.notices.publishSignal,
@@ -36,4 +36,4 @@ export const make = Effect.fn("PostgresSignalHub.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(SignalHub.SignalHub, make())
+export const layer = Layer.effect(SignalHub.SignalHub, make)

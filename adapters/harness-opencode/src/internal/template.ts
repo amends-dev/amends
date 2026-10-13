@@ -146,7 +146,7 @@ export interface Installation {
  * installs it with the command that launches it. The template's identity changes with anything it
  * installs.
  */
-export const makeInstallation = Effect.fn("OpencodeAgent.makeInstallation")(function* (version: Version) {
+export const makeInstallation = Effect.fnUntraced(function* (version: Version) {
   const crypto = yield* Crypto.Crypto
   const hashOf = (text: string) =>
     Effect.map(crypto.digest("SHA-256", new TextEncoder().encode(text)), (digest) => Hex.encode(digest).slice(0, 16))

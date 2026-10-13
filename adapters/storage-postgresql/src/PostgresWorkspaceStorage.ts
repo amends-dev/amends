@@ -119,7 +119,7 @@ export const layerWorkspace = (
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresWorkspaceStorage.make")(function* (options: Options = {}) {
+export const make = Effect.fnUntraced(function* (options: Options = {}) {
   // Invalid options stop the host starting, rather than its first workspace.
   yield* Binding.settings(options)
   const credentialKey =

@@ -88,7 +88,7 @@ export const make = <const Name extends string, const Version extends number, Pa
  * @category constructors
  * @since 0.1.0
  */
-export const makeOccurrenceKey = Effect.fn("Fact.makeOccurrenceKey")(function* <F extends Definition>(
+export const makeOccurrenceKey = Effect.fnUntraced(function* <F extends Definition>(
   fact: F,
   payload: Payload<NoInfer<F>>
 ) {
@@ -105,10 +105,7 @@ export const makeOccurrenceKey = Effect.fn("Fact.makeOccurrenceKey")(function* <
  * @category constructors
  * @since 0.1.0
  */
-export const makeSubject = Effect.fn("Fact.makeSubject")(function* <F extends Definition>(
-  fact: F,
-  payload: Payload<NoInfer<F>>
-) {
+export const makeSubject = Effect.fnUntraced(function* <F extends Definition>(fact: F, payload: Payload<NoInfer<F>>) {
   const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload)
   return yield* Schema.decodeEffect(Subject.Subject)(fact.subject(validated))
 })
@@ -121,10 +118,7 @@ export const makeSubject = Effect.fn("Fact.makeSubject")(function* <F extends De
  * @category constructors
  * @since 0.1.0
  */
-export const makeAudience = Effect.fn("Fact.makeAudience")(function* <F extends Definition>(
-  fact: F,
-  payload: Payload<NoInfer<F>>
-) {
+export const makeAudience = Effect.fnUntraced(function* <F extends Definition>(fact: F, payload: Payload<NoInfer<F>>) {
   if (fact.audience === undefined) return Audience.internal
   const validated = yield* Schema.decodeUnknownEffect(Schema.toType(fact.payload))(payload)
   return yield* Schema.decodeEffect(Audience.Audience)(fact.audience(validated))

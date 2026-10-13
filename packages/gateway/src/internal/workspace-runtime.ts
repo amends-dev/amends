@@ -74,7 +74,7 @@ export interface Interface {
  * next request prepares it again. Request identity and transaction context must never enter
  * service construction.
  */
-export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
+export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage
   const turnJobs = yield* TurnJobs.TurnJobs
   const deliveryJobs = yield* DeliveryJobs.DeliveryJobs

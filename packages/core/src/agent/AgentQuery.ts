@@ -124,7 +124,7 @@ const invalid = (part: Agent.Part, description: string) =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("AgentQuery.make")(function* () {
+export const make = Effect.gen(function* () {
   const memberStore = yield* MemberStore.MemberStore
   const agentStore = yield* AgentStore.AgentStore
   const connectionStore = yield* ConnectionStore.ConnectionStore
@@ -242,4 +242,4 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(AgentQuery, make())
+export const layer = Layer.effect(AgentQuery, make)

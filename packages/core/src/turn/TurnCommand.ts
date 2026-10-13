@@ -120,7 +120,7 @@ export class TurnCommand extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("TurnCommand.make")(function* () {
+export const make = Effect.gen(function* () {
   const threadStore = yield* ThreadStore.ThreadStore
   const threadCommand = yield* ThreadCommand.ThreadCommand
   const journal = yield* Journal.Journal
@@ -209,4 +209,4 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(TurnCommand, make())
+export const layer = Layer.effect(TurnCommand, make)

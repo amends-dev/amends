@@ -56,7 +56,7 @@ const agentStateColumn = (agentState: Schema.Json | undefined) =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("SessionStates.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const ofParticipation = (participationId: string) =>
@@ -107,4 +107,4 @@ export const make = Effect.fn("SessionStates.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(SessionStateStore.SessionStateStore, make())
+export const layer = Layer.effect(SessionStateStore.SessionStateStore, make)

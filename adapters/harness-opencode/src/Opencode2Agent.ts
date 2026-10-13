@@ -103,7 +103,7 @@ export interface Options extends Agent.Options {
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Opencode2Agent.make")(function* (options: Options) {
+export const make = Effect.fnUntraced(function* (options: Options) {
   const models = yield* Effect.fromResult(modelsOf(2, options)).pipe(
     Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode2", reason }))
   )

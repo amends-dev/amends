@@ -22,7 +22,7 @@ options are the [lock and timeout](#locks-and-timeouts) settings and `credential
 as base64, that seal connections' credentials; without it the store keeps none and reports
 `Unavailable`. `PostgresDatabase.layer` takes the Effect client's pool configuration, such as
 `maxConnections` (ten by default), and applies the schema before returning.
-`PostgresDatabase.make()` instead takes a `SqlClient.SqlClient` from the context and applies the
+`PostgresDatabase.make` instead takes a `SqlClient.SqlClient` from the context and applies the
 schema through it, inside a transaction holding an advisory lock, so processes starting together on
 an empty database take turns. Keep the client's scope open while using the result; bindings,
 queries, and journal transactions all share it.

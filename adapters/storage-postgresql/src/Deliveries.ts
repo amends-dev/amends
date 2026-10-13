@@ -56,7 +56,7 @@ const toRow = (record: Delivery.Delivery): typeof channelDeliveries.$inferInsert
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Deliveries.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(channelDeliveries.workspaceId, workspaceId)
@@ -131,4 +131,4 @@ export const make = Effect.fn("Deliveries.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(DeliveryStore.DeliveryStore, make())
+export const layer = Layer.effect(DeliveryStore.DeliveryStore, make)

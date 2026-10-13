@@ -30,7 +30,7 @@ export const fixture: Fixture = {
   withStorage: (use) =>
     Effect.scoped(
       Effect.gen(function* () {
-        const database = yield* MemoryDatabase.make()
+        const database = yield* MemoryDatabase.make
         return yield* use({
           connect: () =>
             Layer.build(layerMemoryStorage.pipe(Layer.provideMerge(Layer.succeed(Crypto.Crypto, webCrypto)))).pipe(

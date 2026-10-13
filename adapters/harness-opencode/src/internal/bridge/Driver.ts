@@ -87,11 +87,7 @@ export type CreateSession = (
  * session starts, and creates each session on it with `createSession`. The server runs in the
  * scope the driver is made in.
  */
-export const make = Effect.fn("Driver.make")(function* (
-  id: string,
-  options: Required<Options>,
-  createSession: CreateSession
-) {
+export const make = Effect.fnUntraced(function* (id: string, options: Required<Options>, createSession: CreateSession) {
   const services = yield* Effect.context<
     ChildProcessSpawner.ChildProcessSpawner | HttpClient.HttpClient | Crypto.Crypto | FileSystem.FileSystem | Path.Path
   >()

@@ -41,7 +41,7 @@ const decode = Schema.decodeUnknownEffect(
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("GroupFollows.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(groupFollows.workspaceId, workspaceId)
@@ -133,4 +133,4 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make())
+export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make)

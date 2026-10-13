@@ -70,7 +70,7 @@ const toRow = (record: Agent.Agent): typeof agents.$inferInsert => ({
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Agents.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = (id: Agent.Id) => and(eq(agents.workspaceId, workspaceId), eq(agents.id, id))
@@ -110,4 +110,4 @@ export const make = Effect.fn("Agents.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(AgentStore.AgentStore, make())
+export const layer = Layer.effect(AgentStore.AgentStore, make)

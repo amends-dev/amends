@@ -135,7 +135,7 @@ const seenBatch = 100
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("NotificationService.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   NotificationService["Service"],
   never,
   | NotificationStore.NotificationStore
@@ -144,7 +144,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
   | ThreadQuery.ThreadQuery
   | SignalHub.SignalHub
   | Store.Store
-> {
+> = Effect.gen(function* () {
   const notificationStore = yield* NotificationStore.NotificationStore
   const signalHub = yield* SignalHub.SignalHub
   const authorization = yield* Authorization.Authorization
@@ -297,4 +297,4 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(NotificationService, make())
+export const layer = Layer.effect(NotificationService, make)

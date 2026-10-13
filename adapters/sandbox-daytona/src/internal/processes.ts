@@ -58,10 +58,7 @@ const delayAfter = (idle: number) => Duration.millis(Math.min(50 * 2 ** idle, 10
 const readLimit = 1024 * 1024
 
 /** The process spawner of `sandbox`, whose commands start in `workingDirectory`. */
-export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChildProcessSpawner")(function* (
-  sandbox: DaytonaSandbox,
-  workingDirectory: string
-) {
+export const makeChildProcessSpawner = Effect.fnUntraced(function* (sandbox: DaytonaSandbox, workingDirectory: string) {
   const crypto = yield* Crypto.Crypto
   // Daytona gives no process ids, so each process is numbered by the spawner that started it.
   const lastPid = yield* Ref.make(0)

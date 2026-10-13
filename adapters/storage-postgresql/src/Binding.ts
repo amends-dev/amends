@@ -231,7 +231,7 @@ const isCommitted = Schema.is(Schema.Struct({ command: Schema.Literal("COMMIT") 
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.Id, options: Options = {}) {
+export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id, options: Options = {}) {
   const postgresDatabase = yield* PostgresDatabase.PostgresDatabase
   const { sql, turns, reads } = postgresDatabase
   const { lockTimeout, statementTimeout, transactionTimeout, pollInterval, readConnections } = yield* settings(options)

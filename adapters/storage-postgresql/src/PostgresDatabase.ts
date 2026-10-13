@@ -85,7 +85,7 @@ export class MigrationFailed extends Schema.TaggedError<MigrationFailed>()("Post
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresDatabase.make")(function* () {
+export const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
   const db = yield* PgDrizzle.makeWithDefaults()
   // Processes starting together would otherwise race to create the schema. The first to take
@@ -115,4 +115,4 @@ export const make = Effect.fn("PostgresDatabase.make")(function* () {
  * @since 0.1.0
  */
 export const layer = (config: PgClient.PgPoolConfig) =>
-  Layer.effect(PostgresDatabase, make()).pipe(Layer.provideMerge(PgClient.layer(config)))
+  Layer.effect(PostgresDatabase, make).pipe(Layer.provideMerge(PgClient.layer(config)))

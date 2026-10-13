@@ -99,7 +99,7 @@ const changesAccessOf = (actor: Actor.Actor["Service"]) => (prepared: ChangeFeed
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ChangeFeedService.make")(function* () {
+export const make = Effect.gen(function* () {
   const changeFeedSource = yield* ChangeFeedSource.ChangeFeedSource
   const signalHub = yield* SignalHub.SignalHub
   const authorization = yield* Authorization.Authorization
@@ -197,4 +197,4 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ChangeFeedService, make())
+export const layer = Layer.effect(ChangeFeedService, make)

@@ -163,11 +163,7 @@ const recordFailure = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return<
-  Transaction["Service"],
-  never,
-  Store.Store
-> {
+export const make: Effect.Effect<Transaction["Service"], never, Store.Store> = Effect.gen(function* () {
   const store = yield* Store.Store
   const owner = Symbol("transaction coordinator")
 
@@ -272,4 +268,4 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Transaction, make())
+export const layer = Layer.effect(Transaction, make)

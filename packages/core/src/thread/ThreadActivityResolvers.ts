@@ -67,7 +67,7 @@ export class ThreadActivityResolvers extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ThreadActivityResolvers.make")(function* (resolvers: ReadonlyArray<Resolver>) {
+export const make = Effect.fnUntraced(function* (resolvers: ReadonlyArray<Resolver>) {
   const byKind = new Map<string, Resolver>()
   for (const resolver of resolvers)
     for (const kind of resolver.kinds) {

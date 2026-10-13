@@ -125,7 +125,7 @@ export class AssignmentService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   AssignmentService["Service"],
   never,
   | AssignmentStore.AssignmentStore
@@ -137,7 +137,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   | Crypto.Crypto
   | PermissionCatalog.PermissionCatalog
   | Store.Store
-> {
+> = Effect.gen(function* () {
   const assignmentStore = yield* AssignmentStore.AssignmentStore
   const memberStore = yield* MemberStore.MemberStore
   const authorization = yield* Authorization.Authorization
@@ -274,4 +274,4 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(AssignmentService, make())
+export const layer = Layer.effect(AssignmentService, make)

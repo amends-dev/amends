@@ -43,7 +43,7 @@ const decodeSummaries = Schema.decodeUnknownEffect(Schema.Array(Group.Summary))
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("GroupMemberships.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(groupMemberships.workspaceId, workspaceId)
@@ -232,4 +232,4 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(GroupMembershipStore.GroupMembershipStore, make())
+export const layer = Layer.effect(GroupMembershipStore.GroupMembershipStore, make)

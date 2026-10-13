@@ -41,7 +41,7 @@ const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("ThreadActivities.make")(function* () {
+export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
   const inWorkspace = eq(threadActivities.workspaceId, workspaceId)
@@ -150,4 +150,4 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(ThreadActivityStore.ThreadActivityStore, make())
+export const layer = Layer.effect(ThreadActivityStore.ThreadActivityStore, make)

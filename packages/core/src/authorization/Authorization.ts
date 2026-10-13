@@ -87,11 +87,11 @@ const requireWorkspace = Effect.fnUntraced(function* (
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Return<
+export const make: Effect.Effect<
   Authorization["Service"],
   never,
   MemberStore.MemberStore | GrantResolver.GrantResolver | PermissionCatalog.PermissionCatalog | Store.Store
-> {
+> = Effect.gen(function* () {
   const memberStore = yield* MemberStore.MemberStore
   const grantResolver = yield* GrantResolver.GrantResolver
   const permissionCatalog = yield* PermissionCatalog.PermissionCatalog
@@ -175,7 +175,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Authorization, make())
+export const layer = Layer.effect(Authorization, make)
 
 /**
  * Require an action on a target the actor may read, in one grant resolution. A target they can't

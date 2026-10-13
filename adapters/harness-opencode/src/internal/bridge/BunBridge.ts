@@ -54,7 +54,7 @@ export const runProgram = (
       )
     }).pipe(
       Effect.scoped,
-      Effect.provide(RelayLayer.pipe(Layer.provideMerge(Layer.merge(BunServices.layer, FetchHttpClient.layer))))
+      Effect.provide(layerRelay.pipe(Layer.provideMerge(Layer.merge(BunServices.layer, FetchHttpClient.layer))))
     )
   )
 
@@ -62,7 +62,7 @@ export const runProgram = (
  * The relay, on a server of its own. A call of a host's tool waits for the host for as long as an
  * approval takes, so the server never closes a connection for being idle.
  */
-const RelayLayer = HostToolRelay.layer().pipe(
+const layerRelay = HostToolRelay.layer().pipe(
   Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port: 0, idleTimeout: 0 }))
 )
 

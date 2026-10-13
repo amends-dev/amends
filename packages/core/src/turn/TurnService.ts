@@ -191,7 +191,7 @@ const endsTurn = (delivery: ChangeFeedSource.Delivery, turnId: Turn.Id) =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("TurnService.make")(function* () {
+export const make = Effect.gen(function* () {
   const turnStore = yield* TurnStore.TurnStore
   const threadParticipationStore = yield* ThreadParticipationStore.ThreadParticipationStore
   const threadQuery = yield* ThreadQuery.ThreadQuery
@@ -477,4 +477,4 @@ export const make = Effect.fn("TurnService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(TurnService, make())
+export const layer = Layer.effect(TurnService, make)

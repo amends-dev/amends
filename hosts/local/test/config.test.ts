@@ -3,7 +3,7 @@ import { ConfigProvider, Duration, Effect, Redacted } from "effect"
 import * as LocalConfig from "../src/LocalConfig.ts"
 
 const load = (values: Record<string, unknown>) =>
-  LocalConfig.load().pipe(
+  LocalConfig.options.pipe(
     Effect.provideService(
       ConfigProvider.ConfigProvider,
       ConfigProvider.fromUnknown(values, { preserveEmptyStrings: true })

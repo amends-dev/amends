@@ -24,7 +24,7 @@ const decodeAccounts = Schema.decodeUnknownEffect(Schema.Array(Accounts.Account)
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("PostgresAccounts.make")(function* () {
+export const make = Effect.gen(function* () {
   const { db } = yield* PostgresDatabase.PostgresDatabase
   const crypto = yield* Crypto.Crypto
   const toAccounts = (rows: ReadonlyArray<typeof accounts.$inferSelect>) =>
@@ -60,4 +60,4 @@ export const make = Effect.fn("PostgresAccounts.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(Accounts.Accounts, make())
+export const layer = Layer.effect(Accounts.Accounts, make)

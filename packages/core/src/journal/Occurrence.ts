@@ -53,7 +53,7 @@ export type Parts = typeof Parts.Type
  * @category constructors
  * @since 0.1.0
  */
-export const makeKey = Effect.fn("Occurrence.makeKey")(function* (name: string, input: ReadonlyArray<string>) {
+export const makeKey = Effect.fnUntraced(function* (name: string, input: ReadonlyArray<string>) {
   const factName = yield* Schema.decodeEffect(component)(name)
   const parts = yield* Schema.decodeUnknownEffect(Parts)(input)
   return Key.make(`fact:${JSON.stringify([factName, parts])}`)

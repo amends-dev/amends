@@ -2,7 +2,7 @@
  * What the local host reads at start: every `AMENDS_*` setting, from the environment, validated
  * before any resource is acquired, so a missing or invalid setting fails startup before a
  * connection opens. The database URL and the credential key stay redacted, in errors too. The entry
- * point passes what `load` returns to `LocalHost.layer`, `LocalServer.layer`, and the
+ * point passes the `options` it reads to `LocalHost.layer`, `LocalServer.layer`, and the
  * authentication `AMENDS_SIGN_IN` names. `deriveSecret` makes each purpose's secret from the
  * credential key.
  *
@@ -12,9 +12,7 @@
 import { createHmac, randomBytes } from "node:crypto"
 import * as Config from "effect/Config"
 import * as Duration from "effect/Duration"
-import * as Effect from "effect/Effect"
 import * as Base64 from "effect/encoding/Base64"
-import * as Option from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
@@ -131,34 +129,34 @@ const credentialKey = Config.schema(
     )
   ),
   "AMENDS_CREDENTIAL_KEY"
-).pipe(Config.option)
+).pipe(Config.withDefault(undefined))
 
-const sandboxDirectory = Config.schema(Schema.NonEmptyString, "AMENDS_SANDBOX_DIRECTORY").pipe(Config.option)
+const sandboxDirectory = Config.schema(Schema.NonEmptyString, "AMENDS_SANDBOX_DIRECTORY").pipe(
+  Config.withDefault(undefined)
+)
 
 const signIn = Config.schema(Schema.Literals(["email", "development"]), "AMENDS_SIGN_IN").pipe(
   Config.withDefault("email" as const)
 )
 
 /**
- * Read and validate startup options without opening a database or server, failing with a
- * `Config.ConfigError` that names the setting missing or invalid.
+ * The startup options, read and validated without opening a database or server: reading them fails
+ * with a `Config.ConfigError` that names the setting missing or invalid.
  *
- * @category constructors
+ * @category configs
  * @since 0.1.0
  */
-export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return<Options, Config.ConfigError> {
-  return {
-    role: yield* role,
-    port: yield* port,
-    databaseUrl: yield* databaseUrl,
-    poolSize: yield* poolSize,
-    runnerAddress: yield* runnerAddress,
-    runnerTransport: yield* runnerTransport,
-    runnerTakeover: yield* runnerTakeover,
-    credentialKey: Option.getOrUndefined(yield* credentialKey),
-    sandboxDirectory: Option.getOrUndefined(yield* sandboxDirectory),
-    signIn: yield* signIn
-  }
+export const options: Config.Config<Options> = Config.all({
+  role,
+  port,
+  databaseUrl,
+  poolSize,
+  runnerAddress,
+  runnerTransport,
+  runnerTakeover,
+  credentialKey,
+  sandboxDirectory,
+  signIn
 })
 
 /**

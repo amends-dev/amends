@@ -70,7 +70,7 @@ const Settings = Schema.fromJsonString(Schema.Struct({ ports: Schema.Array(Netwo
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: Options) {
+export const make = Effect.fnUntraced(function* (options: Options) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const crypto = yield* Crypto.Crypto

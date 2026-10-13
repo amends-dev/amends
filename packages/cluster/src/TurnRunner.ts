@@ -234,7 +234,7 @@ export const advance = (run: Run, progress: Progress, part: StreamPart.StreamPar
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
+export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
   const runs = yield* Semaphore.make(1)
   /** The turn a run holds, and how to ask it to stop. */
   const running = yield* Ref.make<Running | undefined>(undefined)

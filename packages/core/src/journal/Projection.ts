@@ -294,7 +294,7 @@ export const replaceLive = Effect.fnUntraced(function* (
  * @category constructors
  * @since 0.1.0
  */
-export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(options: {
+export const makeRunner = Effect.fnUntraced(function* <E, R>(options: {
   readonly definition: Definition<string, number, E, R>
   readonly log: Log.Reader<typeof Event.Envelope>
 }) {

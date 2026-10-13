@@ -103,7 +103,7 @@ export class WorkspaceSettingsService extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
+export const make = Effect.gen(function* () {
   const workspaceStore = yield* WorkspaceStore.WorkspaceStore,
     authorization = yield* Authorization.Authorization,
     delegation = yield* Delegation.Delegation,
@@ -214,4 +214,4 @@ export const make = Effect.fn("WorkspaceSettingsService.make")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layer = Layer.effect(WorkspaceSettingsService, make())
+export const layer = Layer.effect(WorkspaceSettingsService, make)
