@@ -4,9 +4,10 @@ import { Fact, Journal, Publication, Subject } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { ThreadService } from "@amends-dev/core/thread"
 import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { BunCrypto } from "@effect/platform-bun"
 import { PgClient } from "@effect/sql-pg"
 import { describe, it, expect } from "@effect/vitest"
-import { Array, DateTime, Effect, Option, Redacted, Schema, Exit } from "effect"
+import { Array, DateTime, Effect, Layer, Option, Redacted, Schema, Exit } from "effect"
 import { SqlClient } from "effect/sql"
 import { PostgresDatabase } from "../src/index.ts"
 import {
@@ -45,7 +46,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
             construction === "make"
               ? Effect.flatMap(PostgresDatabase.make, (database) =>
                   program.pipe(Effect.provideService(PostgresDatabase.PostgresDatabase, database))
-                ).pipe(Effect.provide(PgClient.layer({ url: Redacted.make(url), maxConnections: 4 })))
+                ).pipe(
+                  Effect.provide(
+                    Layer.merge(PgClient.layer({ url: Redacted.make(url), maxConnections: 4 }), BunCrypto.layer)
+                  )
+                )
               : program.pipe(Effect.provide(database(url)))
           const record = yield* configured
           yield* inDatabase(

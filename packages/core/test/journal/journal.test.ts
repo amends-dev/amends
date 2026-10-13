@@ -156,7 +156,7 @@ it.effect("storage work started concurrently in one commit is a defect, and writ
         const { journal, turn } = yield* setup
         const transaction = yield* Transaction.Transaction
         const concurrent = (exit: Exit.Exit<unknown, unknown>) =>
-          Exit.isFailure(exit) && Result.getOrUndefined(Cause.findDefect(exit.cause)) instanceof Transaction.Concurrent
+          Exit.isFailure(exit) && Schema.is(Transaction.Concurrent)(Result.getOrUndefined(Cause.findDefect(exit.cause)))
         const publish = (amount: number) => journal.publish(Changed, { amount })
         const attempts: ReadonlyArray<Effect.Effect<unknown, unknown, Publication.Publication>> = [
           // Publications side by side.

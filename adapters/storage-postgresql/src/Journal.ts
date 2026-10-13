@@ -16,6 +16,7 @@
 import { Commit, Entry, Occurrence, Store, StoreError } from "@amends-dev/core/journal"
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
+import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -82,6 +83,7 @@ const copyReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard, transaction, pollInterval } = yield* Binding.Binding
+  const crypto = yield* Crypto.Crypto
   const { db } = database
 
   const scoped = (logId: Entry.LogId) => and(eq(logBatches.workspaceId, workspaceId), eq(logBatches.logId, logId))
@@ -334,6 +336,10 @@ export const make = Effect.gen(function* () {
         return yield* StoreError.contended("Store", "append", "Expected log position changed")
     }
     if (request.entries.length === 0) return []
+    // Named before anything is staged, so a failure leaves the commit as it was.
+    const named = yield* Effect.forEach(request.entries, (content) =>
+      Effect.map(crypto.randomUUIDv4, (id) => ({ id: Entry.Id.make(id), content }))
+    ).pipe(Effect.mapError(StoreError.failed("Store", "append")))
     const batch =
       opened ??
       (() => {
@@ -345,10 +351,10 @@ export const make = Effect.gen(function* () {
       })()
     const first = batch.next
     const recordedAt = yield* DateTime.now
-    const entries = request.entries.map((content, offset): Store.Entry =>
+    const entries = named.map(({ id, content }, offset): Store.Entry =>
       Object.assign(
         {
-          id: Entry.Id.make(crypto.randomUUID()),
+          id,
           logId: request.logId,
           position: batch.position,
           commitId: session.commit.id,

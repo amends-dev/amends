@@ -83,11 +83,13 @@ export const entity = Entity.make("amends/TurnJob", [
  * @category utils
  * @since 0.1.0
  */
-export const entityId = (job: TurnJobs.Job) => JSON.stringify([job.workspaceId, job.memberId, job.threadId])
+export const entityId = (job: TurnJobs.Job) => encodeEntityId([job.workspaceId, job.memberId, job.threadId])
 
-const decodeEntityId = Schema.decodeUnknownSync(
-  Schema.fromJsonString(Schema.Tuple([Workspace.Id, Member.Id, ThreadId.Id]))
-)
+/** An entity's ID, written and read back by the one codec. */
+const EntityId = Schema.fromJsonString(Schema.Tuple([Workspace.Id, Member.Id, ThreadId.Id]))
+const encodeEntityId = Schema.encodeSync(EntityId)
+const decodeEntityId = Schema.decodeUnknownSync(EntityId)
+
 /** The job an entity is. */
 const jobOf = (entityId: string): TurnJobs.Job => {
   const [workspaceId, memberId, threadId] = decodeEntityId(entityId)

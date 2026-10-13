@@ -8,7 +8,7 @@ import { Gateway } from "@amends-dev/gateway"
 import { PostgresClusterStorage, type PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql"
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Clock, Context, Effect, Exit, Layer, Option, Redacted } from "effect"
+import { Clock, Context, type Crypto, Effect, Exit, Layer, Option, Redacted } from "effect"
 import { SqlClient } from "effect/sql"
 import * as LocalHost from "../src/LocalHost.ts"
 import { setup } from "./database.ts"
@@ -67,17 +67,21 @@ const turnJobs = (gateway: Gateway.Gateway["Service"], database: ReturnType<type
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(Gateway.Gateway, gateway),
-        Layer.effect(Integrations.Integrations, Integrations.make([])),
-        BunCrypto.layer
+        Layer.effect(Integrations.Integrations, Integrations.make([]))
       )
     ),
     Layer.provide(PostgresClusterStorage.layerWakeup),
-    Layer.provideMerge(database)
+    Layer.provideMerge(database),
+    Layer.provideMerge(BunCrypto.layer)
   )
 
 /** Turn job requests alone, as a process that serves the API and runs no jobs stores them. */
 const turnJobRequests = (database: ReturnType<typeof LocalHost.layerDatabase>) =>
-  TurnJob.layerRequests.pipe(Layer.provide(PostgresClusterStorage.layerWakeup), Layer.provideMerge(database))
+  TurnJob.layerRequests.pipe(
+    Layer.provide(PostgresClusterStorage.layerWakeup),
+    Layer.provideMerge(database),
+    Layer.provideMerge(BunCrypto.layer)
+  )
 
 /** A job that ran: which process ran it, in which workspace. */
 interface Ran {
@@ -95,7 +99,7 @@ const recordingRuns = (runs: Array<Ran>, runner: string) =>
  * has not run `within` milliseconds after its commit.
  */
 const commitAndAwait = Effect.fnUntraced(function* (
-  context: Context.Context<TurnJobs.TurnJobs | PostgresDatabase.PostgresDatabase>,
+  context: Context.Context<TurnJobs.TurnJobs | PostgresDatabase.PostgresDatabase | Crypto.Crypto>,
   runs: ReadonlyArray<Ran>,
   workspaceIds: ReadonlyArray<Workspace.Id>,
   within: number

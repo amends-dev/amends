@@ -20,7 +20,7 @@ import {
 import type { WorkspaceStorage } from "@amends-dev/gateway"
 import { BunCrypto } from "@effect/platform-bun"
 import { inject } from "@effect/vitest"
-import { Context, DateTime, Effect, Layer, Redacted } from "effect"
+import { Context, type Crypto, DateTime, Effect, Layer, Redacted } from "effect"
 import type { SqlClient } from "effect/sql"
 import { PostgresDatabase, PostgresWorkspaceStorage } from "../src/index.ts"
 import { temporary } from "./postgres.ts"
@@ -79,7 +79,9 @@ export const views = (options: PostgresWorkspaceStorage.Options = {}) =>
         )
     }
   })
-export const database = (url: string) => PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 })
+/** A pool over the test's database, with the randomness its stores name commits with. */
+export const database = (url: string, maxConnections = 4) =>
+  Layer.merge(PostgresDatabase.layer({ url: Redacted.make(url), maxConnections }), BunCrypto.layer)
 export const core = (bound: Bound) =>
   Core.layer.pipe(
     Layer.provideMerge(
@@ -92,7 +94,7 @@ export const core = (bound: Bound) =>
   )
 export const inDatabase = <A, E>(
   url: string,
-  program: Effect.Effect<A, E, PostgresDatabase.PostgresDatabase | SqlClient.SqlClient>
+  program: Effect.Effect<A, E, PostgresDatabase.PostgresDatabase | SqlClient.SqlClient | Crypto.Crypto>
 ) => program.pipe(Effect.provide(database(url)))
 export const initialized = (bound: Bound, creator = alice.id) =>
   WorkspaceInitialization.initialize(creator, {

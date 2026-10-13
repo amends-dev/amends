@@ -569,6 +569,8 @@ const readTurn = (turn: Turn, after: number): Stream.Stream<Bridge.NumberedPart,
 const finishedStepsOf = (parts: ReadonlyArray<Bridge.NumberedPart>) =>
   parts.slice(0, parts.findLastIndex(({ part }) => part.type === "finish-step") + 1)
 
+const isHarnessError = Schema.is(HarnessError.HarnessError)
+
 /**
  * How a turn whose run exited with `exit` ended. `bridgeFailure` gives the error for any failure
  * that is not the agent's, such as the bridge failing to keep a part.
@@ -582,7 +584,7 @@ const endOf = (
   const error = Cause.findError(exit.cause)
   const cause = Result.isSuccess(error) ? error.success : Cause.squash(exit.cause)
   return TurnEnd.cases.Failed.make({
-    error: cause instanceof HarnessError.HarnessError ? cause : bridgeFailure(cause)
+    error: isHarnessError(cause) ? cause : bridgeFailure(cause)
   })
 }
 

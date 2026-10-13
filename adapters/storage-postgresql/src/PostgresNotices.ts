@@ -34,6 +34,20 @@ import type * as Stream from "effect/Stream"
 export const channel = "amends_notices"
 
 /**
+ * A notice on the channel, as a JSON array: an append to a log in a workspace, a signal in one,
+ * encoded, or a commit that stored job requests.
+ */
+const Notice = Schema.fromJsonString(
+  Schema.Union([
+    Schema.Tuple([Schema.Literal("append"), Schema.String, Schema.String]),
+    Schema.Tuple([Schema.Literal("signal"), Schema.String, Schema.Json]),
+    Schema.Tuple([Schema.Literal("job-requests")])
+  ])
+)
+const encodeNotice = Schema.encodeSync(Notice)
+const decodeNotice = Schema.decodeUnknownOption(Notice)
+
+/**
  * The notice an append sends for each log it appended to: a journal log, by its id, or a session
  * log, by `sessionLogKey`.
  *
@@ -41,7 +55,7 @@ export const channel = "amends_notices"
  * @since 0.1.0
  */
 export const appendNotice = (workspaceId: Workspace.Id, logId: string): string =>
-  JSON.stringify(["append", workspaceId, logId])
+  encodeNotice(["append", workspaceId, logId])
 
 /**
  * How appends name a participation's session log, apart from every journal log's id.
@@ -58,28 +72,11 @@ export const sessionLogKey = (participationId: string): string => JSON.stringify
  * @category utils
  * @since 0.1.0
  */
-export const jobRequestsNotice = JSON.stringify(["job-requests"])
+export const jobRequestsNotice = encodeNotice(["job-requests"])
 
 const signalCodec = Schema.toCodecJson(Signal.Signal)
 const encodeSignal = Schema.encodeEffect(signalCodec)
 const decodeSignal = Schema.decodeUnknownEffect(signalCodec)
-
-/** A notice's kind, workspace, and subject, or undefined for one this version does not know. */
-const parse = (payload: string) => {
-  try {
-    const value: unknown = JSON.parse(payload)
-    if (
-      Array.isArray(value) &&
-      value.length === 3 &&
-      (value[0] === "append" || value[0] === "signal") &&
-      typeof value[1] === "string"
-    )
-      return { kind: value[0] as "append" | "signal", workspaceId: value[1], subject: value[2] }
-  } catch {
-    // An unreadable notice wakes nobody.
-  }
-  return undefined
-}
 
 /**
  * One pool's notices: waiting for appends and job requests, telling other pools of appends, and
@@ -158,18 +155,16 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
     for (const key of waiting.keys()) wake(key)
   }
   const route = (payload: string) => {
-    if (payload === jobRequestsNotice) {
-      wake(payload)
-      return Effect.void
-    }
-    const notice = parse(payload)
-    if (notice === undefined) return Effect.void
-    if (notice.kind === "append") {
+    // A notice this version does not know, or cannot read, wakes nobody.
+    const notice = decodeNotice(payload)
+    if (Option.isNone(notice)) return Effect.void
+    const [kind, , signal] = notice.value
+    if (kind !== "signal") {
       wake(payload)
       return Effect.void
     }
     // A signal this version cannot read is skipped.
-    return decodeSignal(notice.subject).pipe(
+    return decodeSignal(signal).pipe(
       Effect.option,
       Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: signals.publish }))
     )
@@ -219,7 +214,7 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
 
   const publishSignal = (signal: Signal.Signal) =>
     encodeSignal(signal).pipe(
-      Effect.flatMap((encoded) => client.notify(channel, JSON.stringify(["signal", signal.workspaceId, encoded]))),
+      Effect.flatMap((encoded) => client.notify(channel, encodeNotice(["signal", signal.workspaceId, encoded]))),
       Effect.catchCause((cause) => Effect.logWarning("Signal not published", cause))
     )
 

@@ -86,7 +86,14 @@
           "deterministicKeys": "warning",
           "unsafeEffectTypeAssertion": "warning",
           "globalFetch": "warning",
-          "nestedEffectGenYield": "warning"
+          "nestedEffectGenYield": "warning",
+          "cryptoRandomUUID": "warning",
+          "cryptoRandomUUIDInEffect": "warning",
+          "instanceOfSchema": "warning",
+          "processEnv": "warning",
+          "processEnvInEffect": "warning",
+          "globalConsole": "warning",
+          "globalTimers": "warning"
         },
         "overrides": [
           {
@@ -97,7 +104,14 @@
                 "unsafeEffectTypeAssertion": "off",
                 "globalFetch": "off",
                 "nestedEffectGenYield": "off",
-                "anyUnknownInErrorContext": "off"
+                "anyUnknownInErrorContext": "off",
+                "cryptoRandomUUID": "off",
+                "cryptoRandomUUIDInEffect": "off",
+                "processEnv": "off",
+                "processEnvInEffect": "off",
+                "globalConsole": "off",
+                "globalTimers": "off",
+                "returnEffectInGen": "off"
               }
             }
           },
@@ -105,7 +119,9 @@
             "include": ["**/apps/**/*.ts", "**/apps/**/*.tsx"],
             "options": {
               "diagnosticSeverity": {
-                "anyUnknownInErrorContext": "off"
+                "anyUnknownInErrorContext": "off",
+                "cryptoRandomUUID": "off",
+                "globalTimers": "off"
               }
             }
           }

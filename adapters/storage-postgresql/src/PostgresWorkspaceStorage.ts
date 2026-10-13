@@ -11,6 +11,7 @@
 
 import type { Workspace } from "@amends-dev/core/workspace"
 import { WorkspaceStorage } from "@amends-dev/gateway"
+import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -127,19 +128,22 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
       ? Option.none()
       : Option.some(yield* Effect.orDie(CredentialKey.make(options.credentialKey)))
   const postgresDatabase = yield* PostgresDatabase.PostgresDatabase
+  const crypto = yield* Crypto.Crypto
   const forWorkspace: WorkspaceStorage.WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn(
     "PostgresWorkspaceStorage.forWorkspace"
   )(
     function* (workspaceId: Workspace.Id) {
       return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options, credentialKey)))
     },
-    Effect.provideService(PostgresDatabase.PostgresDatabase, postgresDatabase)
+    Effect.provideService(PostgresDatabase.PostgresDatabase, postgresDatabase),
+    Effect.provideService(Crypto.Crypto, crypto)
   )
   return WorkspaceStorage.WorkspaceStorage.of({ forWorkspace })
 })
 
 /**
- * Expose the workspace views to the gateway as its workspace storage contract.
+ * Expose the workspace views to the gateway as its workspace storage contract, over the caller's
+ * database, with the `Crypto.Crypto` that names commits and journal entries.
  *
  * @category layers
  * @since 0.1.0

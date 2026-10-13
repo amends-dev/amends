@@ -9,6 +9,7 @@
  * `CodeMode.toolkit` shows them to the model in the description of `execute`.
  */
 
+import * as Predicate from "effect/Predicate"
 import type * as Schema from "effect/Schema"
 
 /**
@@ -53,8 +54,7 @@ interface Scope {
   readonly depth: number
 }
 
-const isObject = (json: Schema.Json | undefined): json is Schema.JsonObject =>
-  typeof json === "object" && json !== null && !Array.isArray(json)
+const isJsonObject = (json: Schema.Json | undefined): json is Schema.JsonObject => Predicate.isReadonlyObject(json)
 
 const hasRequired = (schema: Schema.JsonObject) => Array.isArray(schema.required) && schema.required.length > 0
 
@@ -62,7 +62,7 @@ const hasRequired = (schema: Schema.JsonObject) => Array.isArray(schema.required
 const typeOf = (schema: Schema.Json, scope: Scope, indent: string): string => {
   if (schema === true) return "unknown"
   if (schema === false) return "never"
-  if (!isObject(schema) || scope.depth > maxDepth) return "unknown"
+  if (!isJsonObject(schema) || scope.depth > maxDepth) return "unknown"
   if (typeof schema.$ref === "string") return referenceType(schema.$ref, scope, indent)
   if (schema.const !== undefined) return JSON.stringify(schema.const)
   if (Array.isArray(schema.enum)) return union(schema.enum.map((value) => JSON.stringify(value)))
@@ -88,7 +88,7 @@ const typeOf = (schema: Schema.Json, scope: Scope, indent: string): string => {
 const referenceType = (reference: string, scope: Scope, indent: string) => {
   const [, container, name] = /^#\/(\$defs|definitions)\/(.+)$/.exec(reference) ?? []
   const defs = container === undefined ? undefined : scope.root[container]
-  const target = name === undefined || !isObject(defs) ? undefined : defs[name]
+  const target = name === undefined || !isJsonObject(defs) ? undefined : defs[name]
   if (target === undefined || scope.path.includes(reference)) return "unknown"
   return typeOf(target, { ...scope, path: [...scope.path, reference] }, indent)
 }
@@ -121,7 +121,7 @@ const arrayType = (schema: Schema.JsonObject, scope: Scope, indent: string) => {
 }
 
 const objectType = (schema: Schema.JsonObject, scope: Scope, indent: string) => {
-  const properties = isObject(schema.properties) ? Object.entries(schema.properties) : []
+  const properties = isJsonObject(schema.properties) ? Object.entries(schema.properties) : []
   const additional = schema.additionalProperties
   const additionalType =
     additional === undefined || additional === false ? undefined : typeOf(additional, scope, indent)
@@ -131,7 +131,7 @@ const objectType = (schema: Schema.JsonObject, scope: Scope, indent: string) => 
   return [
     "{",
     ...properties.flatMap(([name, property]) => [
-      ...commentOf(isObject(property) ? property.description : undefined, inner),
+      ...commentOf(isJsonObject(property) ? property.description : undefined, inner),
       `${inner}${propertyKey(name)}${required.has(name) ? "" : "?"}: ${typeOf(property, scope, inner)};`
     ]),
     ...(additionalType === undefined ? [] : [`${inner}[key: string]: ${additionalType};`]),

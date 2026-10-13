@@ -3,12 +3,15 @@ import { EffectDrizzleQueryError } from "drizzle-orm/effect-core"
 import * as Cause from "effect/Cause"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import * as SqlError from "effect/sql/SqlError"
+
+const isDrizzleQueryError = Schema.is(EffectDrizzleQueryError)
 
 /** The client's classification of a failed statement, whether Drizzle or the client raised it. */
 export const sqlError = (error: unknown): SqlError.SqlError | undefined => {
-  if (error instanceof SqlError.SqlError) return error
-  if (error instanceof EffectDrizzleQueryError) {
+  if (SqlError.isSqlError(error)) return error
+  if (isDrizzleQueryError(error)) {
     const failure = Cause.isCause(error.cause) ? Cause.findErrorOption(error.cause) : Option.none()
     return Option.isSome(failure) ? sqlError(failure.value) : undefined
   }

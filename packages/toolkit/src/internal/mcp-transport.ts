@@ -103,6 +103,8 @@ class HeaderMismatch extends Data.TaggedError("HeaderMismatch") {}
  */
 export const isHeaderMismatch = (error: ToolSourceError.ToolSourceError) => error.cause instanceof HeaderMismatch
 
+const isToolSourceError = Schema.is(ToolSourceError.ToolSourceError)
+
 /** What a server answers a request with, as JSON-RPC defines it. */
 const Reply = Schema.Struct({
   id: Schema.Union([Schema.String, Schema.Finite, Schema.Null]),
@@ -254,7 +256,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
         })
       ),
       Effect.mapError((error) =>
-        error instanceof ToolSourceError.ToolSourceError
+        isToolSourceError(error)
           ? error
           : fail(
               new ToolSourceError.InvalidResponseError({
@@ -320,7 +322,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
     const answer = yield* readResult(response, id).pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(Initialized)),
       Effect.mapError((error) =>
-        error instanceof ToolSourceError.ToolSourceError
+        isToolSourceError(error)
           ? error
           : fail(
               new ToolSourceError.InvalidResponseError({

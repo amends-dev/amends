@@ -1,25 +1,12 @@
 import { Entry, Store } from "@amends-dev/core/journal"
 import { Workspace } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
-import {
-  Cause,
-  Clock,
-  Context,
-  DateTime,
-  Deferred,
-  Duration,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  Option,
-  Redacted
-} from "effect"
+import { Cause, Clock, Context, DateTime, Deferred, Duration, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { SqlClient, SqlError } from "effect/sql"
 import * as Binding from "../src/Binding.ts"
 import { PostgresDatabase, PostgresWorkspaceStorage } from "../src/index.ts"
 import type { Bound } from "./support.ts"
-import { initialized, inDatabase, setup, views, workspaceId } from "./support.ts"
+import { database, initialized, inDatabase, setup, views, workspaceId } from "./support.ts"
 
 const { available, withDatabase } = setup()
 const execution = Entry.LogId.make("execution")
@@ -32,7 +19,7 @@ const process = Effect.fnUntraced(function* (
   size: number,
   options: PostgresWorkspaceStorage.Options = {}
 ) {
-  const pool = yield* Layer.build(PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: size }))
+  const pool = yield* Layer.build(database(url, size))
   const storage = yield* views(options).pipe(Effect.provide(pool))
   return { pool, forWorkspace: storage.forWorkspace }
 })
@@ -180,7 +167,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
   it.live("one workspace's reads use at most their share of the pool, leaving the rest to others", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
-        const pool = yield* Layer.build(PostgresDatabase.layer({ url: Redacted.make(url), maxConnections: 4 }))
+        const pool = yield* Layer.build(database(url))
         const { sql } = Context.get(pool, PostgresDatabase.PostgresDatabase)
         const binding = (id: Workspace.Id) => Binding.make(id, { readConnections: 2 }).pipe(Effect.provide(pool))
         const busy = yield* binding(first)

@@ -15,6 +15,7 @@ import type { Workspace } from "@amends-dev/core/workspace"
 import * as Cause from "effect/Cause"
 import * as Clock from "effect/Clock"
 import * as Context from "effect/Context"
+import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
@@ -225,14 +226,16 @@ const transactionError = (cause: SqlError.SqlError) =>
 const isCommitted = Schema.is(Schema.Struct({ command: Schema.Literal("COMMIT") }))
 
 /**
- * Construct one workspace binding over the caller's database; transactions are resolved per
- * operation. Dies on options `settings` refuses.
+ * Construct one workspace binding over the caller's database, naming each commit with the
+ * caller's `Crypto.Crypto`; transactions are resolved per operation. Dies on options `settings`
+ * refuses.
  *
  * @category constructors
  * @since 0.1.0
  */
 export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id, options: Options = {}) {
   const postgresDatabase = yield* PostgresDatabase.PostgresDatabase
+  const crypto = yield* Crypto.Crypto
   const { sql, turns, reads } = postgresDatabase
   const { lockTimeout, statementTimeout, transactionTimeout, pollInterval, readConnections } = yield* settings(options)
   const lockMillis = Duration.toMillis(lockTimeout)
@@ -272,6 +275,9 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id, opti
     yield* check(false)
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* StoreError.failed("Store", "transaction")("Native transactions cannot nest; use journal.commit")
+    const commitId = Commit.Id.make(
+      yield* crypto.randomUUIDv4.pipe(Effect.mapError(StoreError.failed("Store", "transaction")))
+    )
     const standalone = options.log !== undefined
     const held = standalone ? "log" : "workspace"
     const committed: Array<Effect.Effect<void>> = []
@@ -320,7 +326,7 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id, opti
             workspaceId,
             active: true,
             commit: {
-              id: Commit.Id.make(crypto.randomUUID()),
+              id: commitId,
               recordedAt: yield* DateTime.now,
               entryCount: 0
             },

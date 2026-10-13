@@ -35,7 +35,11 @@ currently run through TypeScript. Check compatibility before changing this setup
 which fail `typecheck`; the few that only fit source, such as `deterministicKeys` for service
 keys, are off in tests and scripts. `anyUnknownInErrorContext` keeps `unknown` and `any` out of
 the packages' error channels; the apps' failures are still classified from `Cause<unknown>`, so it
-is off there too.
+is off there too. Source reaches the platform through Effect: `Config` rather than `process.env`,
+the `Crypto` service rather than `crypto.randomUUID`, `Schema.is` rather than `instanceof` on a
+schema class, and no `console` or timers; tests and scripts are exempt, and the apps keep their
+UI's timers and request keys. Converting a known time with `Date`, as Effect's own source does, is
+allowed; reading the clock goes through `Clock` or `DateTime`.
 `.oxlintrc.json` takes the rules of Effect's own Oxlint configuration
 (`repos/effect/packages/tools/oxc/oxlintrc.json`), with its type-aware rules off as Effect
 runs them, and keeps `console` to tests and scripts.

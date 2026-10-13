@@ -9,6 +9,7 @@
  */
 
 import * as Base64 from "effect/encoding/Base64"
+import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import type * as Schema from "effect/Schema"
 
@@ -26,8 +27,7 @@ export interface Binding {
 type Json = Schema.Json
 type JsonObject = { readonly [key: string]: Json }
 
-const isObject = (value: Json | undefined): value is JsonObject =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const isJsonObject = (value: Json | undefined): value is JsonObject => Predicate.isReadonlyObject(value)
 
 const annotation = "x-mcp-header"
 
@@ -78,11 +78,11 @@ const declarationsIn = (
   schema: Json | undefined,
   path: ReadonlyArray<string> | undefined
 ): ReadonlyArray<Declaration> => {
-  if (!isObject(schema)) return []
+  if (!isJsonObject(schema)) return []
   const here = Object.hasOwn(schema, annotation) ? [{ path, name: schema[annotation], type: schema["type"] }] : []
   const holders = (keyword: string) => {
     const held = schema[keyword]
-    return isObject(held) ? Object.entries(held) : []
+    return isJsonObject(held) ? Object.entries(held) : []
   }
   const reached = holders("properties").flatMap(([name, child]) =>
     declarationsIn(child, path === undefined ? undefined : [...path, name])
@@ -145,7 +145,7 @@ export const encodeHeaderValue = (text: string): string => {
 const valueAt = (input: Json, path: ReadonlyArray<string>): Json | undefined => {
   let node: Json | undefined = input
   for (const key of path) {
-    if (!isObject(node)) return undefined
+    if (!isJsonObject(node)) return undefined
     node = node[key]
   }
   return node

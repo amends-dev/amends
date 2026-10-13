@@ -124,7 +124,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* Context.get(other, Store.Store).transaction(
             Context.get(other, NotificationStore.NotificationStore).insert(foreign)
           )
-        }).pipe(Effect.provide(PostgresDatabase.layer({ url: Redacted.make(url) })))
+        }).pipe(Effect.provide(Layer.merge(PostgresDatabase.layer({ url: Redacted.make(url) }), BunCrypto.layer)))
         // Newest first, and without sources the reader cannot reach, as with these fixtures.
         expect(yield* humanClient.notifications.inbox({ query: { limit: 1 } })).toEqual([{ notification: second }])
         expect(

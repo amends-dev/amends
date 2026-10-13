@@ -34,6 +34,7 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import * as Layer from "effect/Layer"
 import * as NetAddress from "effect/net/NetAddress"
 import * as Option from "effect/Option"
+import * as Predicate from "effect/Predicate"
 import * as Queue from "effect/Queue"
 import * as Redacted from "effect/Redacted"
 import * as Ref from "effect/Ref"
@@ -351,7 +352,7 @@ export const make = Effect.fnUntraced(function* (options?: Options) {
       tools.map((tool) => ({
         name: tool.name,
         ...(tool.description === undefined ? {} : { description: tool.description }),
-        inputSchema: isObject(tool.parameters) ? tool.parameters : { type: "object" }
+        inputSchema: isJsonObject(tool.parameters) ? tool.parameters : { type: "object" }
       }))
     )
 
@@ -526,8 +527,7 @@ const respond = (answer: Answer) =>
       )
   })
 
-const isObject = (json: Schema.Json): json is Schema.JsonObject =>
-  typeof json === "object" && json !== null && !Array.isArray(json)
+const isJsonObject = (json: Schema.Json): json is Schema.JsonObject => Predicate.isReadonlyObject(json)
 
 const success = (id: RequestId, result: Schema.Json): Schema.Json => ({
   jsonrpc: "2.0",

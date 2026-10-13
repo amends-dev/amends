@@ -25,7 +25,7 @@ const issue = (recipient: Identity.HumanId) =>
     )
   )
 
-/** Buffer a subscription's messages for the enclosing scope. */
+/** Buffer a subscription's messages for the enclosing scope, returning what takes the next one. */
 const listen = <E, R>(watch: Effect.Effect<Stream.Stream<ChangeFeed.Message, CoreError.Unavailable>, E, R>) =>
   Effect.gen(function* () {
     const stream = yield* watch
@@ -34,6 +34,7 @@ const listen = <E, R>(watch: Effect.Effect<Stream.Stream<ChangeFeed.Message, Cor
       Stream.runForEach((message) => Queue.offer(queue, message)),
       Effect.forkScoped
     )
+    // @effect-diagnostics-next-line returnEffectInGen:off
     return Queue.take(queue).pipe(Effect.timeout("10 seconds"))
   })
 const committed = (message: ChangeFeed.Message) => {

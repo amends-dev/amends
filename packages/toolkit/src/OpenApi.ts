@@ -12,6 +12,8 @@
  */
 
 import * as Effect from "effect/Effect"
+import * as JsonPointer from "effect/JsonPointer"
+import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Struct from "effect/Struct"
@@ -68,12 +70,11 @@ export class InvalidSpecError extends Schema.TaggedError<InvalidSpecError>(
 type Json = Schema.Json
 type Entries = { [key: string]: Json }
 
-const isObject = (value: Json | undefined): value is Schema.JsonObject =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+const isJsonObject = (value: Json | undefined): value is Schema.JsonObject => Predicate.isReadonlyObject(value)
 
 const objectAt = (object: Schema.JsonObject, key: string) => {
   const value = object[key]
-  return isObject(value) ? value : undefined
+  return isJsonObject(value) ? value : undefined
 }
 
 const stringAt = (object: Schema.JsonObject, key: string) => {
@@ -94,7 +95,7 @@ export const readOperations = (document: Json): Effect.Effect<Imported, InvalidS
   Effect.fromResult(readDocument(document))
 
 const readDocument = (document: Json): Result.Result<Imported, InvalidSpecError> => {
-  if (!isObject(document)) return invalid("The document is not an object")
+  if (!isJsonObject(document)) return invalid("The document is not an object")
   if ("swagger" in document) {
     return invalid("A Swagger 2.0 document is not supported, so it must be converted to OpenAPI 3")
   }
@@ -103,19 +104,19 @@ const readDocument = (document: Json): Result.Result<Imported, InvalidSpecError>
     return invalid("The document does not say that it is OpenAPI 3")
   }
   const paths = document["paths"] ?? {}
-  if (!isObject(paths)) return invalid("The paths of the document are not an object")
+  if (!isJsonObject(paths)) return invalid("The paths of the document are not an object")
 
   const operations: Array<Http.Operation> = []
   const skipped: Array<Skipped> = []
   const namesTaken = new Map<string, string>()
   for (const [path, pathItem] of Object.entries(paths)) {
-    if (!isObject(pathItem) || typeof pathItem["$ref"] === "string") {
+    if (!isJsonObject(pathItem) || typeof pathItem["$ref"] === "string") {
       skipped.push({ operation: path, reason: "The path is not described in the document itself" })
       continue
     }
     for (const method of methods) {
       const operation = pathItem[method.toLowerCase()]
-      if (!isObject(operation)) continue
+      if (!isJsonObject(operation)) continue
       const label = `${method} ${path}`
       const made = readOperation(document, version, method, path, pathItem, operation)
       if (Result.isFailure(made)) {
@@ -241,7 +242,7 @@ const readParameters = (
     if (problem !== undefined) return Result.fail(problem)
 
     const converted = schemas.convert(parameter.schema ?? { type: "string" })
-    const schema = isObject(converted) ? converted : {}
+    const schema = isJsonObject(converted) ? converted : {}
     byPlace.set(place, {
       in: parameter.in,
       name: parameter.name,
@@ -273,13 +274,14 @@ const serializationProblem = (
     return `\`${parameter.name}\` is a list in one value`
   }
   const schema = dereference(document, parameter.schema)
-  if (!isObject(schema)) return undefined
+  if (!isJsonObject(schema)) return undefined
   const isList = schema["type"] === "array"
   const items = isList ? dereference(document, schema["items"]) : undefined
   if (
     schema["type"] === "object" ||
-    isObject(schema["properties"]) ||
-    (isList && (parameter.in === "path" || !isObject(items) || items["type"] === "object" || items["type"] === "array"))
+    isJsonObject(schema["properties"]) ||
+    (isList &&
+      (parameter.in === "path" || !isJsonObject(items) || items["type"] === "object" || items["type"] === "array"))
   ) {
     return `\`${parameter.name}\` is not ${kinds}`
   }
@@ -298,7 +300,7 @@ const readBody = (
   operation: Schema.JsonObject
 ): Result.Result<BodyRead | undefined, string> => {
   const body = dereference(document, operation["requestBody"])
-  if (!isObject(body)) return Result.succeed(undefined)
+  if (!isJsonObject(body)) return Result.succeed(undefined)
   const content = objectAt(body, "content") ?? {}
   const types = Object.keys(content)
   if (types.length === 0) return Result.succeed(undefined)
@@ -308,7 +310,7 @@ const readBody = (
   }
   const converted = schemas.convert(objectAt(content, mediaType)?.["schema"] ?? {})
   return Result.succeed({
-    schema: isObject(converted) ? converted : {},
+    schema: isJsonObject(converted) ? converted : {},
     isRequired: body["required"] === true
   })
 }
@@ -375,7 +377,7 @@ const annotationsOf = (method: Http.Method, title: string | undefined): ToolDefi
 const serversOf = (document: Schema.JsonObject): ReadonlyArray<string> => {
   const servers = Array.isArray(document["servers"]) ? document["servers"] : []
   const urls = servers.flatMap((server) => {
-    if (!isObject(server)) return []
+    if (!isJsonObject(server)) return []
     const url = stringAt(server, "url")
     if (url === undefined) return []
     const variables = objectAt(server, "variables") ?? {}
@@ -389,14 +391,17 @@ const serversOf = (document: Schema.JsonObject): ReadonlyArray<string> => {
   return [...new Set(urls)]
 }
 
-/** The names a reference to a place in the document goes through, as a JSON pointer writes them. */
+/**
+ * The names a reference to a place in the document goes through, as a JSON pointer writes them.
+ * Laxer than a URI fragment: documents write characters a URI escapes, such as spaces, as they are.
+ */
 const pathOf = (reference: string): ReadonlyArray<string> | undefined => {
   if (!reference.startsWith("#/")) return undefined
   try {
     return reference
       .slice(2)
       .split("/")
-      .map((token) => decodeURIComponent(token).replaceAll("~1", "/").replaceAll("~0", "~"))
+      .map((token) => JsonPointer.unescapeToken(decodeURIComponent(token)))
   } catch {
     return undefined
   }
@@ -408,7 +413,7 @@ const resolve = (document: Schema.JsonObject, reference: string): Json | undefin
   if (path === undefined) return undefined
   let node: Json | undefined = document
   for (const key of path) {
-    if (!isObject(node)) return undefined
+    if (!isJsonObject(node)) return undefined
     node = node[key]
   }
   return node
@@ -418,7 +423,7 @@ const resolve = (document: Schema.JsonObject, reference: string): Json | undefin
 const dereference = (document: Schema.JsonObject, node: Json | undefined): Json | undefined => {
   let current = node
   for (let hops = 0; hops < 20; hops++) {
-    if (!isObject(current) || typeof current["$ref"] !== "string") return current
+    if (!isJsonObject(current) || typeof current["$ref"] !== "string") return current
     current = resolve(document, current["$ref"])
   }
   return undefined
@@ -477,7 +482,7 @@ const schemaConverter = (document: Schema.JsonObject, isVersion30: boolean): Sch
       case "properties":
       case "patternProperties":
       case "dependentSchemas":
-        return isObject(value)
+        return isJsonObject(value)
           ? Object.fromEntries(Object.entries(value).map(([name, schema]) => [name, convert(schema)]))
           : value
       case "items":
@@ -501,7 +506,7 @@ const schemaConverter = (document: Schema.JsonObject, isVersion30: boolean): Sch
   }
 
   const convert = (schema: Json): Json => {
-    if (!isObject(schema)) return schema
+    if (!isJsonObject(schema)) return schema
     const converted: Entries = {}
     for (const [key, value] of Object.entries(schema)) converted[key] = convertKeyword(key, value)
     return isVersion30 ? upgradeFrom30(converted) : converted

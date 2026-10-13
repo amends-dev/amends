@@ -36,6 +36,7 @@ const buffer = <A, E>(stream: Stream.Stream<A, E>) =>
       Stream.runForEach((value) => Queue.offer(queue, value)),
       Effect.forkScoped
     )
+    // @effect-diagnostics-next-line returnEffectInGen:off
     return Queue.take(queue).pipe(Effect.timeout("10 seconds"))
   })
 const sameSignal = Schema.toEquivalence(Signal.Signal)
@@ -122,6 +123,7 @@ export const signals = (fixture: Fixture.Fixture) => {
           Effect.flatMap(ChangeFeedService.ChangeFeedService, (changeFeedService) => changeFeedService.watch())
         ).pipe(Effect.flatMap(buffer))
         expect(yield* next).toMatchObject({ _tag: "Ready", reset: true })
+        // @effect-diagnostics-next-line returnEffectInGen:off
         return signalsOf(next)
       })
       return {

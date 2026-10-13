@@ -15,7 +15,6 @@ import * as Base64 from "effect/encoding/Base64"
 import * as Layer from "effect/Layer"
 import type * as Option from "effect/Option"
 import * as Redacted from "effect/Redacted"
-import * as Result from "effect/Result"
 
 /**
  * The key is malformed, or a secret failed to seal or open.
@@ -56,11 +55,10 @@ const version = "v1"
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const asFailure = (cause: unknown) =>
-  cause instanceof Failure
-    ? cause
-    : new Failure({ message: cause instanceof Error ? cause.message : String(cause), cause })
-const bytes = (base64: string) =>
-  Result.getOrThrowWith(Base64.decode(base64), () => new Failure({ message: "The credential key must be base64" }))
+  new Failure({ message: cause instanceof Error ? cause.message : String(cause), cause })
+/** The bytes `base64` encodes, failing with `message` for anything else. */
+const bytesOf = (base64: string, message: string) =>
+  Effect.mapError(Effect.fromResult(Base64.decode(base64)), () => new Failure({ message }))
 
 /**
  * Import a base64-encoded 32-byte key, failing for anything else.
@@ -68,46 +66,44 @@ const bytes = (base64: string) =>
  * @category constructors
  * @since 0.1.0
  */
-export const make = (key: Redacted.Redacted<string>): Effect.Effect<Cipher, Failure> =>
-  Effect.tryPromise({
-    try: async () => {
-      const raw = bytes(Redacted.value(key))
-      if (raw.length !== 32) throw new Failure({ message: "The credential key must be 32 bytes, encoded as base64" })
-      return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"])
-    },
+export const make = Effect.fnUntraced(function* (key: Redacted.Redacted<string>) {
+  const raw = yield* bytesOf(Redacted.value(key), "The credential key must be base64")
+  if (raw.length !== 32)
+    return yield* new Failure({ message: "The credential key must be 32 bytes, encoded as base64" })
+  const cryptoKey = yield* Effect.tryPromise({
+    try: () => crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]),
     catch: asFailure
-  }).pipe(
-    Effect.map((cryptoKey) => ({
-      seal: (secret, binding) =>
-        Effect.tryPromise({
-          try: async () => {
-            const nonce = crypto.getRandomValues(new Uint8Array(12))
-            const sealed = await crypto.subtle.encrypt(
-              { name: "AES-GCM", iv: nonce, additionalData: encoder.encode(binding) },
-              cryptoKey,
-              encoder.encode(secret)
-            )
-            return `${version}:${Base64.encode(nonce)}:${Base64.encode(new Uint8Array(sealed))}`
-          },
-          catch: asFailure
-        }),
-      open: (sealed, binding) =>
-        Effect.tryPromise({
-          try: async () => {
-            const [tag, nonce, data] = sealed.split(":")
-            if (tag !== version || nonce === undefined || data === undefined)
-              throw new Failure({ message: "Unrecognized sealed credential" })
-            const opened = await crypto.subtle.decrypt(
-              { name: "AES-GCM", iv: bytes(nonce), additionalData: encoder.encode(binding) },
-              cryptoKey,
-              bytes(data)
-            )
-            return decoder.decode(opened)
-          },
-          catch: asFailure
-        })
-    }))
-  )
+  })
+  const seal = (secret: string, binding: string) =>
+    Effect.tryPromise({
+      try: async () => {
+        const nonce = crypto.getRandomValues(new Uint8Array(12))
+        const sealed = await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv: nonce, additionalData: encoder.encode(binding) },
+          cryptoKey,
+          encoder.encode(secret)
+        )
+        return `${version}:${Base64.encode(nonce)}:${Base64.encode(new Uint8Array(sealed))}`
+      },
+      catch: asFailure
+    })
+  const open = Effect.fnUntraced(function* (sealed: string, binding: string) {
+    const unrecognized = "Unrecognized sealed credential"
+    const [tag, nonce, data] = sealed.split(":")
+    if (tag !== version || nonce === undefined || data === undefined)
+      return yield* new Failure({ message: unrecognized })
+    const iv = yield* bytesOf(nonce, unrecognized)
+    const ciphertext = yield* bytesOf(data, unrecognized)
+    const opened = yield* Effect.tryPromise({
+      try: () =>
+        crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(binding) }, cryptoKey, ciphertext),
+      catch: asFailure
+    })
+    return decoder.decode(opened)
+  })
+  const cipher: Cipher = { seal, open }
+  return cipher
+})
 
 /**
  * Provides `CredentialKey` with the key the host imported, or none.
