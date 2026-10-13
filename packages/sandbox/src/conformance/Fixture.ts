@@ -4,9 +4,11 @@
  *
  * @since 0.1.0
  */
-import type { Effect, Layer, Scope } from "effect";
-import type { HttpClient } from "effect/http";
-import type { ChildProcess } from "effect/process";
+import type * as Effect from "effect/Effect";
+import type * as Layer from "effect/Layer";
+import type * as Scope from "effect/Scope";
+import type * as HttpClient from "effect/http/HttpClient";
+import type * as ChildProcess from "effect/process/ChildProcess";
 import type { Port } from "../Network.ts";
 import type { SandboxProvider } from "../SandboxProvider.ts";
 

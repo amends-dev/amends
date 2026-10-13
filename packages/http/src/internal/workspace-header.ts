@@ -3,7 +3,8 @@
  * `WorkspaceMember` reads it, so `Api` declares it on every operation whose endpoint declares the
  * middleware.
  */
-import type { HttpApi, HttpApiGroup } from "effect/http-api";
+import type * as HttpApi from "effect/http-api/HttpApi";
+import type * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import { header, WorkspaceMember } from "../WorkspaceMember.ts";
 
 /** The header as an OpenAPI parameter. */

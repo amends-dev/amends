@@ -8,7 +8,14 @@
  * @since 0.1.0
  */
 import { Integrations } from "@amends-dev/connection";
-import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Delegation from "../authorization/Delegation.ts";
 import type * as Permission from "../authorization/Permission.ts";

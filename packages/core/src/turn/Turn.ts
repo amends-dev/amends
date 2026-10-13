@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Schema, Struct } from "effect";
+import * as Schema from "effect/Schema";
+import * as Struct from "effect/Struct";
 import * as Agent from "../agent/Agent.ts";
 import * as GroupId from "../group/GroupId.ts";
 import * as Identity from "../identity/Identity.ts";

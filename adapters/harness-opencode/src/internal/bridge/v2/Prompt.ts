@@ -10,9 +10,11 @@
  * fails with `UnsupportedError`.
  */
 import { HarnessError } from "@amends-dev/harness";
-import { Predicate, Result, Schema } from "effect";
-import type { Prompt } from "effect/ai";
-import { Base64 } from "effect/encoding";
+import * as Predicate from "effect/Predicate";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import type * as Prompt from "effect/ai/Prompt";
+import * as Base64 from "effect/encoding/Base64";
 import type { ModelRef } from "../Driver.ts";
 import { ToolContent } from "./Event.ts";
 

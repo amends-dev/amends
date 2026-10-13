@@ -6,8 +6,11 @@
  *
  * @since 0.1.0
  */
-import { Cron, DateTime, Duration, Effect } from "effect";
-import { ClusterCron } from "effect/cluster";
+import * as Cron from "effect/Cron";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as ClusterCron from "effect/cluster/ClusterCron";
 
 /**
  * The name of the job that prunes handled requests, under which `ClusterCron` stores its own runs,

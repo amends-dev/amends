@@ -13,7 +13,10 @@
  */
 import { Checkpoint, StoreError } from "@amends-dev/core/journal";
 import { and, eq, sql } from "drizzle-orm";
-import { Array, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import { raceError } from "./internal/errors.ts";
 import { checkpoints, liveProjections } from "./internal/schema.ts";

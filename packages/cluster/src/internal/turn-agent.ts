@@ -9,7 +9,7 @@ import type { AgentQuery } from "@amends-dev/core/agent";
 import type { Connection } from "@amends-dev/core/connection";
 import type { Agent, Session } from "@amends-dev/harness";
 import { Sandbox } from "@amends-dev/sandbox";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import type * as SessionLogWriter from "./session-log-writer.ts";
 
 /**

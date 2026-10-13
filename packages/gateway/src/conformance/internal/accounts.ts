@@ -1,7 +1,8 @@
 import { Identity } from "@amends-dev/core/identity";
 import { Accounts } from "../../index.ts";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import type { Fixture } from "../Fixture.ts";
 import { runHost } from "../Support.ts";
 

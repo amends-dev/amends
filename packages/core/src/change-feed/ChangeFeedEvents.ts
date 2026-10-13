@@ -7,7 +7,10 @@
  *
  * @since 0.1.0
  */
-import { Data, Effect, Option, Schema } from "effect";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as TurnFacts from "../turn/TurnFacts.ts";
 import * as AgentFacts from "../agent/AgentFacts.ts";
 import * as AgentPermissions from "../agent/AgentPermissions.ts";

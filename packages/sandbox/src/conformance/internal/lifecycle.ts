@@ -1,6 +1,12 @@
 import { expect, layer } from "@effect/vitest";
-import { Data, Deferred, Effect, Fiber, FileSystem, Path } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as Data from "effect/Data";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { layerServices, type Sandbox } from "../../Sandbox.ts";
 import { TemplateName } from "../../Template.ts";
 import type { Fixture } from "../Fixture.ts";

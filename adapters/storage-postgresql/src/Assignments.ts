@@ -13,7 +13,10 @@
 import { Assignment, AssignmentStore } from "@amends-dev/core/authorization";
 import type { Workspace } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Array, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import { storeError } from "./internal/errors.ts";
 import { assignments } from "./internal/schema.ts";

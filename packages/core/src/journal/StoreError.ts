@@ -9,7 +9,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * Storage failed while reading or writing, for the `cause` given.

@@ -10,7 +10,7 @@
 import * as Api from "./Api.ts";
 import { ReadStateService } from "@amends-dev/core/read-state";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
-import { HttpApiBuilder } from "effect/http-api";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register group handlers.

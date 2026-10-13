@@ -7,7 +7,10 @@
  * @since 0.1.0
  */
 import type { Accounts, SignInStorage, WorkspaceDirectory, WorkspaceStorage } from "../index.ts";
-import type { Context, Crypto, Effect, Scope } from "effect";
+import type * as Context from "effect/Context";
+import type * as Crypto from "effect/Crypto";
+import type * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
 
 /**
  * The gateway contracts a storage adapter implements, with the cryptography it was built over;

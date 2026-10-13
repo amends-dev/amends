@@ -12,8 +12,14 @@
  */
 import { JobRequests } from "@amends-dev/cluster";
 import { StoreError } from "@amends-dev/core/journal";
-import { DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
-import { Sharding, Snowflake } from "effect/cluster";
+import * as DateTime from "effect/DateTime";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Sharding from "effect/cluster/Sharding";
+import * as Snowflake from "effect/cluster/Snowflake";
 import * as Binding from "./Binding.ts";
 import * as PostgresDatabase from "./PostgresDatabase.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";

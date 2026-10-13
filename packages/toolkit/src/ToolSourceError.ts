@@ -14,7 +14,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /** The field every reason has: what happened, in the words of whoever reports it. */
 const described = { description: Schema.optional(Schema.String) };

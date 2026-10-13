@@ -10,7 +10,10 @@
  *
  * @since 0.1.0
  */
-import { Effect, Result, Schema, Struct } from "effect";
+import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as Struct from "effect/Struct";
 import type { Method, Operation, Parameter } from "./Http.ts";
 import type { Annotations } from "./ToolDefinition.ts";
 

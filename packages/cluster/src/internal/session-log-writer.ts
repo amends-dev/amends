@@ -8,8 +8,11 @@
  */
 import { SessionLog, SessionLogStore, Turn, TurnExecution } from "@amends-dev/core/turn";
 import { Agent, type Session } from "@amends-dev/harness";
-import { Array, Effect, Ref, Schema } from "effect";
-import type { Prompt } from "effect/ai";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import type * as Prompt from "effect/ai/Prompt";
 
 /**
  * Another run of the turn wrote to its session log after this one: this one stops.

@@ -7,7 +7,7 @@
  */
 import * as Api from "./Api.ts";
 import { AssignmentService } from "@amends-dev/core/authorization";
-import { HttpApiBuilder } from "effect/http-api";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register the assignment handlers.

@@ -1,4 +1,4 @@
-import { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 import {
   paths,
   useDirectMessage,

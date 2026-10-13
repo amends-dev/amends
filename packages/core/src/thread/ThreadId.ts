@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * Names a thread. A start names its thread itself, so a keyed start names the same thread on a

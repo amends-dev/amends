@@ -5,8 +5,10 @@
  * conversation on request. Tokens are estimated from the JSON of the messages.
  */
 import { Session, type StreamPart } from "@amends-dev/harness";
-import { Effect, Schema } from "effect";
-import { LanguageModel, Prompt } from "effect/ai";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as LanguageModel from "effect/ai/LanguageModel";
+import * as Prompt from "effect/ai/Prompt";
 
 /** How full of its model's context window the conversation gets before a step compacts it. */
 export const compactAt = 0.8;

@@ -1,5 +1,5 @@
 import type { GroupChangeError } from "@amends-dev/ui/screens/group";
-import { Exit } from "effect";
+import * as Exit from "effect/Exit";
 import { createSignal, type Accessor } from "solid-js";
 import { isGroupName, renameGroup } from "./api.ts";
 import { workspaceFailure } from "../api/failures.ts";

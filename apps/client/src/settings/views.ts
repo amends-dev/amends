@@ -9,9 +9,13 @@ import type {
   SettingsRole,
   SettingsTab,
 } from "@amends-dev/ui/screens/settings";
-import { useAtomValue } from "@effect/atom-solid";
-import { type Cause, DateTime, Effect, Option, Predicate } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { useAtomValue } from "@effect/atom-solid/Hooks";
+import type * as Cause from "effect/Cause";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useChanges } from "../api/changes.ts";
 import type { Member } from "../conversations/api.ts";

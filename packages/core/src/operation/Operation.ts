@@ -4,8 +4,9 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
-import type { PlatformError } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import type * as PlatformError from "effect/PlatformError";
 import * as CoreError from "../error/CoreError.ts";
 import type * as Log from "../journal/Log.ts";
 import * as Projection from "../journal/Projection.ts";

@@ -10,7 +10,12 @@
  */
 import { Identity } from "@amends-dev/core/identity";
 import { MemoryDatabase } from "@amends-dev/core/journal";
-import { Context, Crypto, Effect, Layer, Schema, SchemaGetter } from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as SchemaGetter from "effect/SchemaGetter";
 
 /**
  * An email address as accounts hold it. Decoding trims and lowercases it, so one address is one

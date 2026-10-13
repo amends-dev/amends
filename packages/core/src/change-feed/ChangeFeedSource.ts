@@ -8,22 +8,20 @@
  *
  * @since 0.1.0
  */
-import {
-  Cause,
-  Context,
-  Data,
-  Duration,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  PubSub,
-  RcRef,
-  Schema,
-  Semaphore,
-  Stream,
-} from "effect";
-import type { Scope } from "effect";
+import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as PubSub from "effect/PubSub";
+import * as RcRef from "effect/RcRef";
+import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
+import type * as Scope from "effect/Scope";
 import type * as Commit from "../journal/Commit.ts";
 import type * as Entry from "../journal/Entry.ts";
 import type * as Event from "../journal/Event.ts";

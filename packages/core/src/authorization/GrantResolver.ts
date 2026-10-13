@@ -8,7 +8,11 @@
  * @since 0.1.0
  */
 import * as Assignment from "./Assignment.ts";
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import type * as Member from "../workspace/Member.ts";
 
 import * as AssignmentStore from "./AssignmentStore.ts";

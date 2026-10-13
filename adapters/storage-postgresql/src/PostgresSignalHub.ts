@@ -8,7 +8,8 @@
  * @since 0.1.0
  */
 import { SignalHub } from "@amends-dev/core/signal";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Binding from "./Binding.ts";
 
 /**

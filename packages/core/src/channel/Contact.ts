@@ -8,7 +8,7 @@
  * @since 0.1.0
  */
 import { ChannelTransport } from "@amends-dev/channel";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Identity from "../identity/Identity.ts";
 import * as Text from "../text/Text.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";

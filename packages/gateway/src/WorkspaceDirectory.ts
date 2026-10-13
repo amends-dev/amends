@@ -10,7 +10,12 @@
 import { Identity } from "@amends-dev/core/identity";
 import { MemoryDatabase } from "@amends-dev/core/journal";
 import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
-import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 /**
  * One identity's membership of one workspace, with that workspace's active member count.

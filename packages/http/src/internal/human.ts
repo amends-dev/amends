@@ -3,7 +3,7 @@
  */
 import { CoreError } from "@amends-dev/core/error";
 import { Identity } from "@amends-dev/core/identity";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import * as Authentication from "../Authentication.ts";
 
 /** The principal as the person it is, or `CoreError.Denied` (`HumanRequired`) for an agent. */

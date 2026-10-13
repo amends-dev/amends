@@ -4,8 +4,14 @@
  * turn's own `finish` and `error`.
  */
 import type { StreamPart } from "@amends-dev/harness";
-import { Effect, flow, Schema } from "effect";
-import { AiError, type LanguageModel, Response, type Tool, Toolkit } from "effect/ai";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import { flow } from "effect/Function";
+import * as AiError from "effect/ai/AiError";
+import type * as LanguageModel from "effect/ai/LanguageModel";
+import * as Response from "effect/ai/Response";
+import type * as Tool from "effect/ai/Tool";
+import * as Toolkit from "effect/ai/Toolkit";
 
 /**
  * The parts the harness streams for one of Effect AI's. Calls and results of the agent's own tools

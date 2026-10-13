@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Effect, Option } from "effect";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Performer from "../identity/Performer.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";

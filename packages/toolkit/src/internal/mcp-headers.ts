@@ -7,8 +7,9 @@
  * that has marked a parameter refuses a call that sends the value without the header. `Mcp.http`
  * finds the marks when it lists a server's tools, and sends the headers with each call.
  */
-import { Result, type Schema } from "effect";
-import { Base64 } from "effect/encoding";
+import * as Result from "effect/Result";
+import type * as Schema from "effect/Schema";
+import * as Base64 from "effect/encoding/Base64";
 
 /**
  * A parameter of a tool that is also sent as a header.

@@ -6,7 +6,7 @@
  *
  * @since 0.1.0
  */
-import { Layer } from "effect";
+import * as Layer from "effect/Layer";
 import * as DevelopmentSessionTokens from "./DevelopmentSessionTokens.ts";
 import * as DevelopmentSignIn from "./DevelopmentSignIn.ts";
 

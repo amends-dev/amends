@@ -22,7 +22,14 @@ import {
 } from "@amends-dev/core/thread";
 import { InvitationService, Member, MemberPermissions } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
+import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import {

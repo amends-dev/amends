@@ -17,7 +17,11 @@
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
-import { Array, DateTime, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import { storeError } from "./internal/errors.ts";
 import { inIds } from "./internal/id-list.ts";

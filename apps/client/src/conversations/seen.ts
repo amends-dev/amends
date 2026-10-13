@@ -1,4 +1,4 @@
-import { Exit } from "effect";
+import * as Exit from "effect/Exit";
 import { createSignal, type Accessor } from "solid-js";
 import { markSeen, markSeenThrough, type Notification } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";

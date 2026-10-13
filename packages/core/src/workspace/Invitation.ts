@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { DateTime, Schema } from "effect";
+import * as DateTime from "effect/DateTime";
+import * as Schema from "effect/Schema";
 import * as Role from "../authorization/Role.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as Member from "./Member.ts";

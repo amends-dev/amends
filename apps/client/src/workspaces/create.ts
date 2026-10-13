@@ -1,5 +1,6 @@
 import type { CreateWorkspaceError } from "@amends-dev/ui/screens/workspaces";
-import { Data, Exit } from "effect";
+import * as Data from "effect/Data";
+import * as Exit from "effect/Exit";
 import { createSignal, type Accessor } from "solid-js";
 import { directoryQuery } from "../api/directory.ts";
 import { useMutation } from "../api/mutation.ts";

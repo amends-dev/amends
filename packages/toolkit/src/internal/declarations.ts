@@ -8,7 +8,7 @@
  * more than six levels deep, ends in `unknown`, as does any keyword this does not read.
  * `CodeMode.toolkit` shows them to the model in the description of `execute`.
  */
-import type { Schema } from "effect";
+import type * as Schema from "effect/Schema";
 
 /**
  * A tool as `declare` takes it: its name, what it does, and its input's JSON Schema.

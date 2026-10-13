@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as ThreadMessageTimeline from "./ThreadMessageTimeline.ts";
 import * as ThreadParticipationTimeline from "./ThreadParticipationTimeline.ts";
 import * as ThreadTitleTimeline from "./ThreadTitleTimeline.ts";

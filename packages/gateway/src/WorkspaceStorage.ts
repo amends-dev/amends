@@ -39,8 +39,10 @@ import {
   type Workspace,
   WorkspaceStore,
 } from "@amends-dev/core/workspace";
-import { Context, Effect, Layer } from "effect";
-import type { Crypto } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type * as Crypto from "effect/Crypto";
 
 /**
  * What storage binds to one workspace: its stores and its signal hub. The gateway supplies

@@ -1,5 +1,6 @@
 import { getColumns, type Table } from "drizzle-orm";
-import { Array, Effect } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
 
 /**
  * The most parameters one statement can bind. `@effect/sql-pg` encodes their count as a signed

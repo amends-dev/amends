@@ -14,9 +14,11 @@ import type {
   SetupFieldsProps,
   SetupPart,
 } from "@amends-dev/ui/screens/agents";
-import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { type Cause, Effect, Option } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-solid/Hooks";
+import type * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import {
   createEffect,
   createMemo,

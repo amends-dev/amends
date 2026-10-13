@@ -15,8 +15,9 @@
  * took no step.
  */
 import { HarnessError, type StreamPart } from "@amends-dev/harness";
-import { Result, Schema } from "effect";
-import type { Response } from "effect/ai";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import type * as Response from "effect/ai/Response";
 import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts";
 import type { SessionError, SessionEvent, ToolContent } from "./Event.ts";
 

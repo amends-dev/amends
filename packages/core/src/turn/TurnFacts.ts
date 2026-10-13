@@ -7,7 +7,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Agent from "../agent/Agent.ts";
 import * as Group from "../group/Group.ts";
 import * as GroupId from "../group/GroupId.ts";

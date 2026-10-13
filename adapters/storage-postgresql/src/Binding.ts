@@ -11,19 +11,17 @@
  */
 import { Commit, Store, type Entry, StoreError } from "@amends-dev/core/journal";
 import type { Workspace } from "@amends-dev/core/workspace";
-import {
-  Cause,
-  Clock,
-  Context,
-  DateTime,
-  Duration,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  Schema,
-} from "effect";
-import type { SqlError } from "effect/sql";
+import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
+import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import type * as SqlError from "effect/sql/SqlError";
 import * as PostgresDatabase from "./PostgresDatabase.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import { isContention } from "./internal/errors.ts";

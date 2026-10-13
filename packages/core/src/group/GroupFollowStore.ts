@@ -5,8 +5,13 @@
  *
  * @since 0.1.0
  */
-import { Array, Context, Effect, Layer, Option, Schema } from "effect";
-import type { DateTime } from "effect";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import type * as DateTime from "effect/DateTime";
 import * as Store from "../journal/Store.ts";
 import * as GroupId from "./GroupId.ts";
 import * as GroupMembership from "./GroupMembership.ts";

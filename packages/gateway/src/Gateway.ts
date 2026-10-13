@@ -21,8 +21,15 @@ import {
 import { Request } from "@amends-dev/core/request";
 import type { DeliveryJobs } from "@amends-dev/core/channel";
 import type { TurnJobs } from "@amends-dev/core/turn";
-import { Context, Crypto, Data, Effect, Layer, Option, Schema, Cause } from "effect";
-import type { Scope } from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Cause from "effect/Cause";
+import type * as Scope from "effect/Scope";
 import * as WorkspaceStorage from "./WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "./internal/workspace-runtime.ts";
 import { CoreError } from "@amends-dev/core/error";

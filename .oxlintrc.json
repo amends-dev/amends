@@ -22,6 +22,16 @@
             "name": "vitest",
             "message": "Import test APIs from @effect/vitest so Effect tests use the scoped runner."
           }
+        ],
+        "patterns": [
+          {
+            "regex": "^effect(/(.+/)?[a-z][a-z0-9-]*)?$",
+            "message": "Import the module, as Effect's packages do: `import * as Effect from \"effect/Effect\"`."
+          },
+          {
+            "group": ["@effect/*", "!@effect/vitest", "!@effect/*/[A-Z]*"],
+            "message": "Import the module, as Effect's packages do: `import * as BunRuntime from \"@effect/platform-bun/BunRuntime\"`."
+          }
         ]
       }
     ],
@@ -87,6 +97,35 @@
       "files": ["**/test/**", "**/*.test.ts", "**/*.test.tsx", "**/scripts/**", "stacks/**"],
       "rules": {
         "eslint/no-console": "off"
+      }
+    },
+    {
+      "files": [
+        "**/test/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/scripts/**",
+        "stacks/**",
+        "**/*.config.ts",
+        "**/alchemy.run.ts",
+        "**/.storybook/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "bun:test",
+                "message": "Import test APIs from @effect/vitest. Run tests with bun run test."
+              },
+              {
+                "name": "vitest",
+                "message": "Import test APIs from @effect/vitest so Effect tests use the scoped runner."
+              }
+            ]
+          }
+        ]
       }
     }
   ],

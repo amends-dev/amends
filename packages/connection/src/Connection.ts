@@ -9,7 +9,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * The identity of a connection, as core records it.

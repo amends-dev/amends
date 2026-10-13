@@ -6,8 +6,12 @@
  *
  * @since 0.1.0
  */
-import { Context, Crypto, Effect, Layer } from "effect";
-import type { PlatformError, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type * as PlatformError from "effect/PlatformError";
+import type * as Schema from "effect/Schema";
 import * as Journal from "../journal/Journal.ts";
 import type * as Log from "../journal/Log.ts";
 import type * as Projection from "../journal/Projection.ts";

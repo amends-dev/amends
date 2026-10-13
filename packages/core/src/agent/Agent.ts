@@ -10,7 +10,7 @@
  * @since 0.1.0
  */
 import { ModelEndpoint } from "@amends-dev/harness";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Role from "../authorization/Role.ts";
 import * as Connection from "../connection/Connection.ts";
 import * as Identity from "../identity/Identity.ts";

@@ -1,8 +1,10 @@
 import { ThreadParticipation } from "@amends-dev/core/thread";
 import { type SessionLog, Turn } from "@amends-dev/core/turn";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber, Result } from "effect";
-import { Prompt } from "effect/ai";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Result from "effect/Result";
+import * as Prompt from "effect/ai/Prompt";
 import type { Fixture } from "../Fixture.ts";
 import { forWorkspace, otherWorkspaceId, workspaceId } from "../Support.ts";
 

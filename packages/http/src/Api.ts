@@ -6,7 +6,8 @@
  *
  * @since 0.1.0
  */
-import { HttpApi, OpenApi } from "effect/http-api";
+import * as HttpApi from "effect/http-api/HttpApi";
+import * as OpenApi from "effect/http-api/OpenApi";
 import { declareWorkspaceHeader } from "./internal/workspace-header.ts";
 import { AccountsGroup } from "./AccountsGroup.ts";
 import { InvitationsGroup } from "./InvitationsGroup.ts";

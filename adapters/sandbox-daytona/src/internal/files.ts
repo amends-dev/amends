@@ -6,7 +6,12 @@
  * message names, as Effect's own file systems name an `errno`.
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
-import { ByteSize, Effect, FileSystem, Option, PlatformError, Stream } from "effect";
+import * as ByteSize from "effect/ByteSize";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
+import * as PlatformError from "effect/PlatformError";
+import * as Stream from "effect/Stream";
 import { callPlatform, systemErrorTagOf, toPlatformError } from "./call.ts";
 import { quote } from "./shell.ts";
 

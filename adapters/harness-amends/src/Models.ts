@@ -9,15 +9,23 @@
  * @since 0.1.0
  */
 import type { ModelEndpoint } from "@amends-dev/harness";
-import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic";
-import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai";
-import {
-  OpenAiClient as ChatClient,
-  OpenAiLanguageModel as ChatLanguageModel,
-} from "@effect/ai-openai-compat";
-import { Context, Effect, Layer, Record, Redacted, Stream, flow } from "effect";
-import type { LanguageModel } from "effect/ai";
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import * as AnthropicClient from "@effect/ai-anthropic/AnthropicClient";
+import * as AnthropicLanguageModel from "@effect/ai-anthropic/AnthropicLanguageModel";
+import * as OpenAiClient from "@effect/ai-openai/OpenAiClient";
+import * as OpenAiLanguageModel from "@effect/ai-openai/OpenAiLanguageModel";
+import * as ChatClient from "@effect/ai-openai-compat/OpenAiClient";
+import * as ChatLanguageModel from "@effect/ai-openai-compat/OpenAiLanguageModel";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Record from "effect/Record";
+import * as Redacted from "effect/Redacted";
+import * as Stream from "effect/Stream";
+import { flow } from "effect/Function";
+import type * as LanguageModel from "effect/ai/LanguageModel";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
 /**
  * Makes the language model an endpoint reaches. The agent takes it as a service, so that a test

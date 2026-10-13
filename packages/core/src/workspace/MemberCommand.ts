@@ -6,7 +6,12 @@
  *
  * @since 0.1.0
  */
-import { Context, Crypto, type DateTime, Effect, Layer, Option } from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import type * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as AssignmentCommand from "../authorization/AssignmentCommand.ts";
 import type * as Role from "../authorization/Role.ts";
 import * as Group from "../group/Group.ts";

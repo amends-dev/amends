@@ -12,7 +12,8 @@
  *
  * @since 0.1.0
  */
-import { type Effect, Schema } from "effect";
+import type * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 /**
  * An identifier of the external system's own: of a conversation, a message, or a user there.

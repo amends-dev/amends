@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as ThreadTimeline from "../thread/ThreadTimeline.ts";
 import * as Notification from "./Notification.ts";
 import * as NotificationStore from "./NotificationStore.ts";

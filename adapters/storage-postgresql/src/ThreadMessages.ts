@@ -12,7 +12,11 @@
  */
 import { ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread";
 
-import { Array, DateTime, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import { and, count, eq } from "drizzle-orm";
 import { threadMessages } from "./internal/schema.ts";
 import * as Binding from "./Binding.ts";

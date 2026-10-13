@@ -2,10 +2,16 @@ import * as Contract from "@amends-dev/http/Api";
 import * as Authentication from "@amends-dev/http/Authentication";
 import * as WorkspaceMember from "@amends-dev/http/WorkspaceMember";
 import { Workspace } from "@amends-dev/core/workspace";
-import { Cause, Effect, Layer, Schema } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
-import { AtomHttpApi } from "effect/reactivity";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
+import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type { SignIn } from "./contracts.ts";
 
 export interface ApiClientOptions {

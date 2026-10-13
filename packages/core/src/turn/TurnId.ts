@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * Identifies one agent's attempt on one thread. A retry derives its ID from the turn it retries,

@@ -1,7 +1,7 @@
 import type { SendError } from "@amends-dev/ui/screens/group";
-import { useAtomSet, useAtomValue } from "@effect/atom-solid";
-import { Exit } from "effect";
-import { Atom } from "effect/reactivity";
+import { useAtomSet, useAtomValue } from "@effect/atom-solid/Hooks";
+import * as Exit from "effect/Exit";
+import * as Atom from "effect/reactivity/Atom";
 import { createSignal, type Accessor } from "solid-js";
 import {
   ThreadMessage,

@@ -2,21 +2,21 @@ import * as ApiErrors from "@amends-dev/http/ApiErrors";
 import { ChangeFeed } from "@amends-dev/core/change-feed";
 import { Signal } from "@amends-dev/core/signal";
 import { Workspace } from "@amends-dev/core/workspace";
-import {
-  Cause,
-  Clock,
-  Data,
-  Duration,
-  Effect,
-  Exit,
-  Queue,
-  Random,
-  Schema,
-  Stream,
-  Option,
-} from "effect";
-import { Sse } from "effect/encoding";
-import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
+import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
+import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Queue from "effect/Queue";
+import * as Random from "effect/Random";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as Option from "effect/Option";
+import * as Sse from "effect/encoding/Sse";
+import * as Atom from "effect/reactivity/Atom";
+import * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import * as Reactivity from "effect/reactivity/Reactivity";
 import { watchWake } from "./wake.ts";
 import { isUnauthorized, type ApiClient } from "../api/client.ts";
 import { posted, typing, typistsAtom } from "../conversations/typing.ts";

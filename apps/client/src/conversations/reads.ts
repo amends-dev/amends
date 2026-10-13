@@ -1,6 +1,7 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-solid";
-import { Option } from "effect";
-import { AsyncResult, type Atom } from "effect/reactivity";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-solid/Hooks";
+import * as Option from "effect/Option";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import type * as Atom from "effect/reactivity/Atom";
 import { createMemo, type Accessor } from "solid-js";
 import { useWorkspaceClient } from "../provider.tsx";
 import {

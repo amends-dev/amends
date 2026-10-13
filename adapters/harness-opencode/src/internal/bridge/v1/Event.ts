@@ -11,7 +11,7 @@
  * holds it whole; a call of a tool is a part that goes from `pending` to `running`, and then to
  * `completed` or `error`.
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { Tokens } from "../Steps.ts";
 
 /** What opencode reports of a failure: its kind, such as `MessageAbortedError`, and its message. */

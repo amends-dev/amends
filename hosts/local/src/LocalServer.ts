@@ -7,11 +7,12 @@
  * @since 0.1.0
  */
 import { Draining, Routes } from "@amends-dev/http";
-import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
+import * as BunCrypto from "@effect/platform-bun/BunCrypto";
+import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
 import type { Accounts, SessionTokens, SignIn, SignInStorage } from "@amends-dev/gateway";
-import type { Crypto } from "effect";
-import { Layer } from "effect";
-import { HttpRouter } from "effect/http";
+import type * as Crypto from "effect/Crypto";
+import * as Layer from "effect/Layer";
+import * as HttpRouter from "effect/http/HttpRouter";
 import type * as LocalHost from "./LocalHost.ts";
 
 /**

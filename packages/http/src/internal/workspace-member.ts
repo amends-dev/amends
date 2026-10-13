@@ -8,8 +8,13 @@
 import { CoreError } from "@amends-dev/core/error";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
-import { Effect, Layer, Option, Schema } from "effect";
-import { Headers, HttpServerRequest, HttpServerResponse } from "effect/http";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Headers from "effect/http/Headers";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import { Principal } from "../Authentication.ts";
 import { header, WorkspaceMember } from "../WorkspaceMember.ts";
 

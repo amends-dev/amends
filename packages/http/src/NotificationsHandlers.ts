@@ -8,8 +8,8 @@
  */
 import * as Api from "./Api.ts";
 import { NotificationService } from "@amends-dev/core/notification";
-import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
+import * as Effect from "effect/Effect";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register the inbox, its pending count, and marking notifications seen, resolving the

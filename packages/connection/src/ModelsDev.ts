@@ -10,7 +10,8 @@
  * @since 0.1.0
  */
 import type { ModelEndpoint } from "@amends-dev/harness";
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import type * as ModelCatalog from "./ModelCatalog.ts";
 
 /** A level of reasoning effort, where `null` and `default` leave the level to the provider. */

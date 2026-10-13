@@ -16,19 +16,18 @@
  * @since 0.1.0
  */
 import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends-dev/sandbox";
-import {
-  Crypto,
-  Effect,
-  Exit,
-  FileSystem,
-  Layer,
-  Path,
-  type PlatformError,
-  Schema,
-  Scope,
-  Semaphore,
-} from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
+import type * as PlatformError from "effect/PlatformError";
+import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 /**
  * Where the provider keeps its sandboxes.

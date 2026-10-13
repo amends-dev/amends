@@ -7,8 +7,13 @@
  *
  * @since 0.1.0
  */
-import { Effect, Option, Schema, Stream } from "effect";
-import { AiError, Tool, type Toolkit } from "effect/ai";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as AiError from "effect/ai/AiError";
+import * as Tool from "effect/ai/Tool";
+import type * as Toolkit from "effect/ai/Toolkit";
 import { Failure } from "./ToolSource.ts";
 
 /**

@@ -9,8 +9,8 @@
 import * as Api from "./Api.ts";
 import { Gateway } from "@amends-dev/gateway";
 import { InvitationService } from "@amends-dev/core/workspace";
-import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
+import * as Effect from "effect/Effect";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { requireHuman } from "./internal/human.ts";
 
 /**

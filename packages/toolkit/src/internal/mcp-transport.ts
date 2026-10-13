@@ -7,15 +7,19 @@
  * with sessions that older servers speak, which starts with `initialize`. It finds out which when it
  * first needs the server, and again when the server ends a session.
  */
-import { Data, Effect, Option, Ref, Schema, Semaphore, Stream } from "effect";
-import { McpSchema } from "effect/ai";
-import { Sse } from "effect/encoding";
-import {
-  type HttpClient,
-  type HttpClientError,
-  HttpClientRequest,
-  type HttpClientResponse,
-} from "effect/http";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
+import * as McpSchema from "effect/ai/McpSchema";
+import * as Sse from "effect/encoding/Sse";
+import type * as HttpClient from "effect/http/HttpClient";
+import type * as HttpClientError from "effect/http/HttpClientError";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/http/HttpClientResponse";
 import {
   AuthenticationError,
   InvalidInputError,

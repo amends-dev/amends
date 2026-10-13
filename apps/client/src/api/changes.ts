@@ -1,5 +1,8 @@
-import { type Cause, Exit, type Effect } from "effect";
-import type { AtomRegistry, Reactivity } from "effect/reactivity";
+import type * as Cause from "effect/Cause";
+import * as Exit from "effect/Exit";
+import type * as Effect from "effect/Effect";
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import type * as Reactivity from "effect/reactivity/Reactivity";
 import { createSignal, type Accessor } from "solid-js";
 import type { WorkspaceApi } from "./client.ts";
 import { isStale, workspaceFailure, type WorkspaceFailure } from "./failures.ts";

@@ -3,7 +3,8 @@
  * never accumulate. `PostgresReads` caps a workspace's reads with one, and `PostgresTurns` queues
  * a workspace's writers with one.
  */
-import { Effect, Semaphore } from "effect";
+import * as Effect from "effect/Effect";
+import * as Semaphore from "effect/Semaphore";
 
 interface Lane {
   readonly semaphore: Semaphore.Semaphore;

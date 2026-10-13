@@ -32,28 +32,29 @@
  * @since 0.1.0
  */
 import { type Network, Sandbox, type Template } from "@amends-dev/sandbox";
-import {
-  Crypto,
-  Deferred,
-  Effect,
-  Exit,
-  FileSystem,
-  Path,
-  RcRef,
-  Record,
-  Redacted,
-  Ref,
-  Schedule,
-  Schema,
-  Scope,
-  Semaphore,
-  Stream,
-} from "effect";
-import { Tool } from "effect/ai";
-import { Hex } from "effect/encoding";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { RpcClient, type RpcClientError, RpcSerialization } from "effect/rpc";
-import { Socket } from "effect/socket";
+import * as Crypto from "effect/Crypto";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as RcRef from "effect/RcRef";
+import * as Record from "effect/Record";
+import * as Redacted from "effect/Redacted";
+import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
+import * as Tool from "effect/ai/Tool";
+import * as Hex from "effect/encoding/Hex";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as RpcClient from "effect/rpc/RpcClient";
+import type * as RpcClientError from "effect/rpc/RpcClientError";
+import * as RpcSerialization from "effect/rpc/RpcSerialization";
+import * as Socket from "effect/socket/Socket";
 import type * as Agent from "./Agent.ts";
 import * as Bridge from "./Bridge.ts";
 import {

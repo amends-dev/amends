@@ -12,7 +12,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Agent from "../agent/Agent.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as Role from "../authorization/Role.ts";

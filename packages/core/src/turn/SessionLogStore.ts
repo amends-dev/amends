@@ -7,7 +7,13 @@
  *
  * @since 0.1.0
  */
-import { Array, Context, DateTime, Deferred, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as SessionLog from "./SessionLog.ts";
 import * as StoreInput from "../journal/StoreInput.ts";

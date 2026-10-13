@@ -10,20 +10,18 @@
  * with it.
  */
 import type { Bridge, HarnessError } from "@amends-dev/harness";
-import {
-  type Crypto,
-  Deferred,
-  Effect,
-  Exit,
-  type FileSystem,
-  type Path,
-  Ref,
-  Schema,
-  Scope,
-  Semaphore,
-} from "effect";
-import type { HttpClient } from "effect/http";
-import type { ChildProcessSpawner } from "effect/process";
+import type * as Crypto from "effect/Crypto";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import type * as FileSystem from "effect/FileSystem";
+import type * as Path from "effect/Path";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
+import type * as HttpClient from "effect/http/HttpClient";
+import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Server from "./Server.ts";
 
 /** A model, as opencode names one: its provider, its id there, and a variant such as `high`. */

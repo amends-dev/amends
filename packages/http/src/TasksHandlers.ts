@@ -7,7 +7,7 @@
  */
 import * as Api from "./Api.ts";
 import { TaskService } from "@amends-dev/core/task";
-import { HttpApiBuilder } from "effect/http-api";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register task handlers.

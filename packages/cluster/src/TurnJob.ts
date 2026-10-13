@@ -14,9 +14,14 @@ import { Store, StoreError } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
 import { Turn, TurnJobs } from "@amends-dev/core/turn";
 import { Member, Workspace } from "@amends-dev/core/workspace";
-import { Effect, Layer, PrimaryKey, Ref, Schema } from "effect";
-import { ClusterSchema, Entity } from "effect/cluster";
-import { Rpc } from "effect/rpc";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as PrimaryKey from "effect/PrimaryKey";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as ClusterSchema from "effect/cluster/ClusterSchema";
+import * as Entity from "effect/cluster/Entity";
+import * as Rpc from "effect/rpc/Rpc";
 import * as TurnRunner from "./TurnRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
 

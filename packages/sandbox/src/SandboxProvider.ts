@@ -6,7 +6,10 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Schema, type Scope } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
 import type { NetworkPolicy, Port } from "./Network.ts";
 import type { Sandbox, SandboxId } from "./Sandbox.ts";
 import type { SandboxError } from "./SandboxError.ts";

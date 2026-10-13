@@ -12,7 +12,11 @@
  * there, such as whether it calls tools.
  */
 import { HarnessError, type ModelEndpoint } from "@amends-dev/harness";
-import { Array, Record, Redacted, Result, type Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Record from "effect/Record";
+import * as Redacted from "effect/Redacted";
+import * as Result from "effect/Result";
+import type * as Schema from "effect/Schema";
 import type { ModelRef } from "./bridge/Driver.ts";
 import type { Version } from "./template.ts";
 

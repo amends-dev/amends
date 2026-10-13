@@ -11,8 +11,9 @@ import * as Api from "./Api.ts";
 import { Actor } from "@amends-dev/core/identity";
 import * as Authentication from "./Authentication.ts";
 import { ChangeFeedService } from "@amends-dev/core/change-feed";
-import { Effect, Layer } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Streams from "./Streams.ts";
 import { CoreError } from "@amends-dev/core/error";
 

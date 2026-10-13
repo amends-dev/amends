@@ -8,8 +8,12 @@ import {
   Workspace,
   WorkspaceSettings,
 } from "@amends-dev/core/workspace";
-import { DateTime, Effect, Option, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/reactivity";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import * as Atom from "effect/reactivity/Atom";
 import type { ApiClient, WorkspaceApi } from "../api/client.ts";
 import { Accounts } from "../api/contracts.ts";
 import { directoryQuery } from "../api/directory.ts";

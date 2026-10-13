@@ -2,7 +2,9 @@
  * What the suites make of a fixture for each test: a provider that destroys the sandboxes the test
  * created when it ends, and names no other test or run uses.
  */
-import { Clock, Effect, Random } from "effect";
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
+import * as Random from "effect/Random";
 import { type Sandbox, SandboxId } from "../../Sandbox.ts";
 import { make } from "../../SandboxProvider.ts";
 import type { Fixture } from "../Fixture.ts";

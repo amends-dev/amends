@@ -1,7 +1,9 @@
 import * as ApiErrors from "@amends-dev/http/ApiErrors";
 import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
-import { Cause, Effect, Schema } from "effect";
-import { Reactivity } from "effect/reactivity";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as Reactivity from "effect/reactivity/Reactivity";
 import type { Api, WorkspaceApi } from "../api/client.ts";
 import type { WorkspaceDirectory } from "../api/contracts.ts";
 import { command } from "../api/failures.ts";

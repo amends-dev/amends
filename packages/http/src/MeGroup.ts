@@ -10,7 +10,9 @@
  */
 import * as Accounts from "@amends-dev/gateway/Accounts";
 import * as WorkspaceDirectory from "@amends-dev/gateway/WorkspaceDirectory";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import { Authentication, Unauthorized } from "./Authentication.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 

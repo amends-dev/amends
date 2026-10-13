@@ -8,8 +8,12 @@
  */
 import { Identity } from "@amends-dev/core/identity";
 import { MemoryDatabase } from "@amends-dev/core/journal";
-import { Context, Effect, Layer, Option, Schema } from "effect";
-import type { DateTime } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import type * as DateTime from "effect/DateTime";
 import type * as Accounts from "./Accounts.ts";
 
 /**

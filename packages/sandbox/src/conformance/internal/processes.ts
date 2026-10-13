@@ -1,6 +1,13 @@
 import { expect, layer } from "@effect/vitest";
-import { type Cause, Effect, Exit, FileSystem, Path, Queue, Stream } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import type * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as Queue from "effect/Queue";
+import * as Stream from "effect/Stream";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { layerServices, type Sandbox } from "../../Sandbox.ts";
 import type { Fixture } from "../Fixture.ts";
 import { providerForTest } from "./fixture.ts";

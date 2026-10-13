@@ -15,8 +15,13 @@
  */
 import { SandboxError, type Template } from "@amends-dev/sandbox";
 import { type Daytona, type Snapshot, SnapshotState } from "@daytona/sdk";
-import { Clock, Crypto, Duration, Effect, Option, type Scope } from "effect";
-import { Hex } from "effect/encoding";
+import * as Clock from "effect/Clock";
+import * as Crypto from "effect/Crypto";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import type * as Scope from "effect/Scope";
+import * as Hex from "effect/encoding/Hex";
 import { call, sandboxError } from "./call.ts";
 
 /** How many minutes the sandbox making a version's snapshot lives at most, and so claims it. */

@@ -7,7 +7,9 @@
  * @since 0.1.0
  */
 import { EmailSender, EmailSignIn } from "@amends-dev/gateway";
-import { Effect, Layer, Redacted } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 import * as LocalConfig from "./LocalConfig.ts";
 
 /**

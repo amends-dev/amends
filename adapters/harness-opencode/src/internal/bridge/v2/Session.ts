@@ -11,8 +11,14 @@
  * without instructions. opencode 2 does not answer in JSON, which fails with `UnsupportedError`.
  */
 import { type Bridge, HarnessError, type HostToolRelay } from "@amends-dev/harness";
-import { Clock, Crypto, Effect, FileSystem, Ref, Schema, Stream } from "effect";
-import type { Prompt as AiPrompt } from "effect/ai";
+import * as Clock from "effect/Clock";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import type * as AiPrompt from "effect/ai/Prompt";
 import * as Driver from "../Driver.ts";
 import * as HostTools from "../HostTools.ts";
 import * as Server from "../Server.ts";

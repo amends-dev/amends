@@ -20,19 +20,18 @@
  * deletes itself first.
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
-import {
-  Crypto,
-  Data,
-  Duration,
-  Effect,
-  Option,
-  PlatformError,
-  Ref,
-  Schedule,
-  Sink,
-  Stream,
-} from "effect";
-import { type ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as Crypto from "effect/Crypto";
+import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as PlatformError from "effect/PlatformError";
+import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
+import * as Sink from "effect/Sink";
+import * as Stream from "effect/Stream";
+import type * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { callPlatform } from "./call.ts";
 import { quote } from "./shell.ts";
 

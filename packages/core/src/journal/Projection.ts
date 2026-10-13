@@ -9,7 +9,11 @@
  *
  * @since 0.1.0
  */
-import { Array, Context, Effect, Option, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Checkpoint from "./Checkpoint.ts";
 import * as Entry from "./Entry.ts";
 import * as Event from "./Event.ts";

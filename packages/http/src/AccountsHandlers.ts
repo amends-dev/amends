@@ -16,8 +16,8 @@ import {
   MemberService,
 } from "@amends-dev/core/workspace";
 import { Accounts } from "@amends-dev/gateway";
-import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
+import * as Effect from "effect/Effect";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register the workspace accounts handler over the gateway and the host's accounts. Listing the

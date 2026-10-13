@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * Text storage keeps as given: no NUL, which PostgreSQL text cannot hold, and no unpaired

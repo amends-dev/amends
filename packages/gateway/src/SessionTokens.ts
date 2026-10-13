@@ -7,8 +7,10 @@
  * @since 0.1.0
  */
 import type { Identity } from "@amends-dev/core/identity";
-import { Context, Schema } from "effect";
-import type { Effect, Redacted } from "effect";
+import * as Context from "effect/Context";
+import * as Schema from "effect/Schema";
+import type * as Effect from "effect/Effect";
+import type * as Redacted from "effect/Redacted";
 
 /**
  * A token that authenticates nobody: not one the host issued, or one it no longer honors.

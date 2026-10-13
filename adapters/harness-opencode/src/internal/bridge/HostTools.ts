@@ -5,7 +5,9 @@
  * it again whenever a turn's tools change, and disconnects it for a turn without any.
  */
 import type { Bridge, HarnessError, HostToolRelay } from "@amends-dev/harness";
-import { Effect, Redacted, Ref } from "effect";
+import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
+import * as Ref from "effect/Ref";
 
 /** The name the relay's MCP server has in opencode. */
 export const serverName = "host";

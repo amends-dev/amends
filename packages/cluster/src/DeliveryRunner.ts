@@ -14,7 +14,12 @@ import type * as Core from "@amends-dev/core";
 import type { Delivery, DeliveryJobs } from "@amends-dev/core/channel";
 import { DeliveryExecution } from "@amends-dev/core/channel";
 import { Gateway } from "@amends-dev/gateway";
-import { Data, Effect, Predicate, Ref, Result, type Scope } from "effect";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
+import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
+import type * as Scope from "effect/Scope";
 
 /**
  * A run of the job failed before it had posted every delivery; `deliveryId` names the one it was

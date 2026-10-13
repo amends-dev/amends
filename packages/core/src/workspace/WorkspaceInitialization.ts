@@ -7,7 +7,11 @@
  *
  * @since 0.1.0
  */
-import { Crypto, DateTime, Effect, Option, Schema } from "effect";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import * as PermissionCatalog from "../authorization/PermissionCatalog.ts";
 import * as BuiltinRoles from "../authorization/BuiltinRoles.ts";

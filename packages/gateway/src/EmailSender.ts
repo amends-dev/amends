@@ -5,8 +5,10 @@
  *
  * @since 0.1.0
  */
-import { Context, Schema } from "effect";
-import type { Effect, Redacted } from "effect";
+import * as Context from "effect/Context";
+import * as Schema from "effect/Schema";
+import type * as Effect from "effect/Effect";
+import type * as Redacted from "effect/Redacted";
 import type * as Accounts from "./Accounts.ts";
 
 /**

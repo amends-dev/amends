@@ -15,7 +15,11 @@
 import { Connection } from "@amends-dev/connection";
 import { ConnectionCredentialStore } from "@amends-dev/core/connection";
 import { and, eq } from "drizzle-orm";
-import { Array, Effect, Layer, Option, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import * as CredentialKey from "./CredentialKey.ts";
 

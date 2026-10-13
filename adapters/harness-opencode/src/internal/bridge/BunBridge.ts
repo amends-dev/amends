@@ -8,9 +8,17 @@
  * than wait for hosts to close their connections.
  */
 import { type Bridge, BridgeServer, HostToolRelay } from "@amends-dev/harness";
-import { BunHttpServer, BunRuntime, BunServices } from "@effect/platform-bun";
-import { Effect, Exit, Fiber, Layer, Redacted, Schema, Scope } from "effect";
-import { FetchHttpClient } from "effect/http";
+import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Driver from "./Driver.ts";
 
 /**

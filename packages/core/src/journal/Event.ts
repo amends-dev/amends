@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as Performer from "../identity/Performer.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Codec from "./Codec.ts";

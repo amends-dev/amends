@@ -5,7 +5,11 @@
  *
  * @since 0.1.0
  */
-import { Effect, Option, PubSub, RcMap, Stream } from "effect";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as PubSub from "effect/PubSub";
+import * as RcMap from "effect/RcMap";
+import * as Stream from "effect/Stream";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import type * as Signal from "./Signal.ts";
 

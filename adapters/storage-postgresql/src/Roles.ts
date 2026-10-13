@@ -11,7 +11,10 @@
  */
 import { Role, RoleStore } from "@amends-dev/core/authorization";
 import { and, eq, lt } from "drizzle-orm";
-import { Array, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import { storeError } from "./internal/errors.ts";
 import { builtinRoleRevisions, roles } from "./internal/schema.ts";

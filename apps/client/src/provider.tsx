@@ -1,6 +1,7 @@
-import { RegistryProvider } from "@effect/atom-solid";
-import { Effect, type Layer } from "effect";
-import type { HttpClient } from "effect/http";
+import { RegistryProvider } from "@effect/atom-solid/RegistryContext";
+import * as Effect from "effect/Effect";
+import type * as Layer from "effect/Layer";
+import type * as HttpClient from "effect/http/HttpClient";
 import {
   createContext,
   createSignal,

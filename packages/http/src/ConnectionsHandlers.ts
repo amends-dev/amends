@@ -8,7 +8,7 @@
  */
 import * as Api from "./Api.ts";
 import { ConnectionService } from "@amends-dev/core/connection";
-import { HttpApiBuilder } from "effect/http-api";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register the handlers of connections, each entering the workspace

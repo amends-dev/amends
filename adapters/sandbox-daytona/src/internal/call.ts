@@ -15,7 +15,8 @@ import {
   DaytonaServiceUnavailableError,
   DaytonaTimeoutError,
 } from "@daytona/sdk";
-import { Effect, PlatformError } from "effect";
+import * as Effect from "effect/Effect";
+import * as PlatformError from "effect/PlatformError";
 
 /** The provider's id, which its errors and its entry of `providerOptions` carry. */
 export const providerId = "daytona";

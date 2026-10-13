@@ -18,21 +18,23 @@
  * reports, naming the agent, as `requestError` maps it.
  */
 import { HarnessError } from "@amends-dev/harness";
-import {
-  Crypto,
-  Deferred,
-  Effect,
-  FileSystem,
-  flow,
-  Path,
-  type Record,
-  Redacted,
-  type Schema,
-  Stream,
-} from "effect";
-import { Hex, type Sse } from "effect/encoding";
-import { HttpClient, type HttpClientError, HttpClientRequest } from "effect/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as Crypto from "effect/Crypto";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import type * as Record from "effect/Record";
+import * as Redacted from "effect/Redacted";
+import type * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import { flow } from "effect/Function";
+import * as Hex from "effect/encoding/Hex";
+import type * as Sse from "effect/encoding/Sse";
+import * as HttpClient from "effect/http/HttpClient";
+import type * as HttpClientError from "effect/http/HttpClientError";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 export interface Options {
   /** The agent the server runs for, which its errors name, such as `opencode`. */

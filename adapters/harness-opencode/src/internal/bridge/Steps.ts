@@ -3,8 +3,8 @@
  * ended, which become the usage and the finish reason of the harness's `finish-step` and `finish`
  * parts.
  */
-import { Schema } from "effect";
-import { Response } from "effect/ai";
+import * as Schema from "effect/Schema";
+import * as Response from "effect/ai/Response";
 
 /** The tokens of a step, as opencode counts them. */
 export const Tokens = Schema.Struct({

@@ -10,7 +10,10 @@
 import { Performer } from "@amends-dev/core/identity";
 import { Event, Store } from "@amends-dev/core/journal";
 import type { Workspace } from "@amends-dev/core/workspace";
-import { DateTime, Effect, Schema, Predicate } from "effect";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as Predicate from "effect/Predicate";
 import { logEntries } from "./internal/schema.ts";
 
 /**

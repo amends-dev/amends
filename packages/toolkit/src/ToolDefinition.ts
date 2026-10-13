@@ -7,8 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
-import { McpSchema } from "effect/ai";
+import * as Schema from "effect/Schema";
+import * as McpSchema from "effect/ai/McpSchema";
 
 /**
  * What a source says about a tool besides what it takes, under the names Effect AI gives its tool

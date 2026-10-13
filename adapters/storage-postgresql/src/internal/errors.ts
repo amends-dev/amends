@@ -1,6 +1,7 @@
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
-import { Cause, Option } from "effect";
-import { SqlError } from "effect/sql";
+import * as Cause from "effect/Cause";
+import * as Option from "effect/Option";
+import * as SqlError from "effect/sql/SqlError";
 import { StoreError } from "@amends-dev/core/journal";
 
 /** The client's classification of a failed statement, whether Drizzle or the client raised it. */

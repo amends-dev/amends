@@ -18,8 +18,11 @@
  */
 import { type Agent, BridgeClient, HarnessError } from "@amends-dev/harness";
 import type { Sandbox } from "@amends-dev/sandbox";
-import { type Crypto, Effect, type Redacted, type Schema } from "effect";
-import type { Socket } from "effect/socket";
+import type * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import type * as Redacted from "effect/Redacted";
+import type * as Schema from "effect/Schema";
+import type * as Socket from "effect/socket/Socket";
 import type { Options as DriverOptions } from "./internal/bridge/Driver.ts";
 import { modelsOf } from "./internal/models.ts";
 import { makeInstallation } from "./internal/template.ts";

@@ -11,20 +11,18 @@
  *
  * @since 0.1.0
  */
-import { PgClient } from "@effect/sql-pg";
+import * as PgClient from "@effect/sql-pg/PgClient";
 import { LocalSignalHub, Signal } from "@amends-dev/core/signal";
 import type { Workspace } from "@amends-dev/core/workspace";
-import {
-  Deferred,
-  Duration,
-  Effect,
-  Option,
-  Queue,
-  RcRef,
-  Schema,
-  type Stream,
-  type Scope,
-} from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
+import * as RcRef from "effect/RcRef";
+import * as Schema from "effect/Schema";
+import type * as Stream from "effect/Stream";
+import type * as Scope from "effect/Scope";
 
 /**
  * The channel every notice uses.

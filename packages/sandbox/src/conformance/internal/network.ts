@@ -1,7 +1,11 @@
 import { expect, layer } from "@effect/vitest";
-import { Effect, Exit, Record, Redacted, Schedule } from "effect";
-import { HttpClient } from "effect/http";
-import { ChildProcessSpawner } from "effect/process";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Record from "effect/Record";
+import * as Redacted from "effect/Redacted";
+import * as Schedule from "effect/Schedule";
+import * as HttpClient from "effect/http/HttpClient";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { NetworkPolicy, type Port } from "../../Network.ts";
 import { layerServices, type Sandbox } from "../../Sandbox.ts";
 import type { SandboxError } from "../../SandboxError.ts";

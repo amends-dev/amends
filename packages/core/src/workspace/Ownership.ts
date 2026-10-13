@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Assignment from "../authorization/Assignment.ts";
 import * as Member from "./Member.ts";
 import * as Workspace from "./Workspace.ts";

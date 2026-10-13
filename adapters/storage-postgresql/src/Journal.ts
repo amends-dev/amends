@@ -14,7 +14,13 @@
  */
 import { Commit, Entry, Occurrence, Store, StoreError } from "@amends-dev/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
-import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as DateTime from "effect/DateTime";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as JournalEntry from "./JournalEntry.ts";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import * as Binding from "./Binding.ts";

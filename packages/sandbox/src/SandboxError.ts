@@ -11,7 +11,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * The provider's credentials are missing, invalid, or not authorized for the operation.

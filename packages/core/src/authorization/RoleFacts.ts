@@ -7,7 +7,7 @@
  * @since 0.1.0
  */
 import * as Subject from "../journal/Subject.ts";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Audience from "../journal/Audience.ts";
 import * as Fact from "../journal/Fact.ts";
 import * as Workspace from "../workspace/Workspace.ts";

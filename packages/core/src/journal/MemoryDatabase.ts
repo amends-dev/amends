@@ -9,7 +9,12 @@
  *
  * @since 0.1.0
  */
-import { Context, Deferred, Effect, Layer, Schema, Semaphore } from "effect";
+import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
 import * as LocalSignalHub from "../signal/LocalSignalHub.ts";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import type * as Commit from "./Commit.ts";

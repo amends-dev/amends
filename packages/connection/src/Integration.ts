@@ -19,8 +19,13 @@
 import type { Agent, Harness, ModelEndpoint } from "@amends-dev/harness";
 import type { SandboxProvider } from "@amends-dev/sandbox";
 import type { ToolSource } from "@amends-dev/toolkit";
-import { type Array, Effect, type Redacted, type Result, Schema, type Scope } from "effect";
-import { McpSchema } from "effect/ai";
+import type * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import type * as Redacted from "effect/Redacted";
+import type * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
+import * as McpSchema from "effect/ai/McpSchema";
 import type { ChannelTransport } from "@amends-dev/channel";
 import {
   type AuthMethod,

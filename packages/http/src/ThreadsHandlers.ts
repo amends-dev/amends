@@ -14,7 +14,7 @@ import {
   ThreadMessageService,
   ThreadParticipationService,
 } from "@amends-dev/core/thread";
-import { HttpApiBuilder } from "effect/http-api";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register thread handlers.

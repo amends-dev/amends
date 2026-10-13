@@ -29,7 +29,14 @@ import {
   DaytonaConflictError,
   type Sandbox as DaytonaSandbox,
 } from "@daytona/sdk";
-import { Crypto, Effect, Exit, Layer, Option, Redacted, Schedule, Schema } from "effect";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
+import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
 import { call, fromDaytonaError, providerId, sandboxError } from "./internal/call.ts";
 import { makeFileSystem } from "./internal/files.ts";
 import { makeChildProcessSpawner } from "./internal/processes.ts";

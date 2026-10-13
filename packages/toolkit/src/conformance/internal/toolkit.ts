@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Stream } from "effect";
+import * as Effect from "effect/Effect";
+import * as Stream from "effect/Stream";
 import * as Assembly from "../../Assembly.ts";
 import * as ToolSource from "../../ToolSource.ts";
 import type { Condition, Fixture } from "../Fixture.ts";

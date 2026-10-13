@@ -19,8 +19,12 @@
  * @since 0.1.0
  */
 import { Sandbox, type Template } from "@amends-dev/sandbox";
-import { type Effect, Schema, type Stream } from "effect";
-import type { LanguageModel, Prompt, Tool } from "effect/ai";
+import type * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import type * as Stream from "effect/Stream";
+import type * as LanguageModel from "effect/ai/LanguageModel";
+import type * as Prompt from "effect/ai/Prompt";
+import type * as Tool from "effect/ai/Tool";
 import type { HarnessError } from "./HarnessError.ts";
 import type { ModelEndpoint } from "./ModelEndpoint.ts";
 import type { CompactionPart, StreamPart } from "./StreamPart.ts";

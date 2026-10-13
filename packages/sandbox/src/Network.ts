@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * A TCP port a sandbox exposes, from 1 to 65535.

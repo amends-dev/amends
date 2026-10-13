@@ -8,7 +8,10 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import type * as Event from "../journal/Event.ts";
 import type * as Reaction from "../journal/Reaction.ts";
 import type * as Store from "../journal/Store.ts";

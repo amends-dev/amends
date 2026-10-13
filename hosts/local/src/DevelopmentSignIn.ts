@@ -7,7 +7,13 @@
  * @since 0.1.0
  */
 import { Accounts, SignIn } from "@amends-dev/gateway";
-import { Crypto, DateTime, Duration, Effect, Exit, Layer, Schema } from "effect";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 interface PendingCode {
   readonly code: SignIn.Code;

@@ -18,8 +18,11 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Option } from "effect";
-import type { DateTime } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import type * as DateTime from "effect/DateTime";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";

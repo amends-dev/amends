@@ -12,7 +12,11 @@
  */
 import { SessionStateStore } from "@amends-dev/core/turn";
 import { and, eq, sql } from "drizzle-orm";
-import { Array, Effect, Layer, Option, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 
 import { sessionStates } from "./internal/schema.ts";

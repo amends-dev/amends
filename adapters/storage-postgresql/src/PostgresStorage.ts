@@ -6,7 +6,7 @@
  *
  * @since 0.1.0
  */
-import { Layer } from "effect";
+import * as Layer from "effect/Layer";
 import * as PostgresAccounts from "./PostgresAccounts.ts";
 import * as PostgresDirectory from "./PostgresDirectory.ts";
 import * as PostgresSignInStorage from "./PostgresSignInStorage.ts";

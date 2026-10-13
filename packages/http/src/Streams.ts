@@ -10,19 +10,19 @@
 import * as ApiErrors from "./ApiErrors.ts";
 import type { Identity } from "@amends-dev/core/identity";
 import type { Workspace } from "@amends-dev/core/workspace";
-import {
-  Cause,
-  Context,
-  Deferred,
-  Effect,
-  Layer,
-  Option,
-  Stream,
-  type Scope,
-  Predicate,
-} from "effect";
+import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Stream from "effect/Stream";
+import type * as Scope from "effect/Scope";
+import * as Predicate from "effect/Predicate";
 
-import { HttpBody, HttpEffect, HttpServerResponse } from "effect/http";
+import * as HttpBody from "effect/http/HttpBody";
+import * as HttpEffect from "effect/http/HttpEffect";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Draining from "./Draining.ts";
 
 const heartbeat = Stream.tick("5 seconds").pipe(

@@ -8,7 +8,7 @@
  */
 import * as Api from "./Api.ts";
 import { AgentService } from "@amends-dev/core/agent";
-import { HttpApiBuilder } from "effect/http-api";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register the handlers of agents.

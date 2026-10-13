@@ -23,32 +23,33 @@
  * @since 0.1.0
  */
 import { Network } from "@amends-dev/sandbox";
-import {
-  Cause,
-  Clock,
-  Data,
-  Duration,
-  Effect,
-  Exit,
-  Fiber,
-  FileSystem,
-  Layer,
-  Option,
-  Path,
-  Redacted,
-  Ref,
-  Result,
-  Schedule,
-  Schema,
-  Scope,
-  Semaphore,
-  Stdio,
-  Stream,
-  SubscriptionRef,
-} from "effect";
-import { Prompt } from "effect/ai";
-import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http";
-import { RpcSerialization, RpcServer } from "effect/rpc";
+import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
+import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Path from "effect/Path";
+import * as Redacted from "effect/Redacted";
+import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
+import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
+import * as Stdio from "effect/Stdio";
+import * as Stream from "effect/Stream";
+import * as SubscriptionRef from "effect/SubscriptionRef";
+import * as Prompt from "effect/ai/Prompt";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServer from "effect/http/HttpServer";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as RpcSerialization from "effect/rpc/RpcSerialization";
+import * as RpcServer from "effect/rpc/RpcServer";
 import type { SessionId } from "./Agent.ts";
 import * as Bridge from "./Bridge.ts";
 import { isPresented } from "./internal/bearer.ts";

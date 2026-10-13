@@ -13,7 +13,10 @@
  */
 import { ReadState, ReadStateStore } from "@amends-dev/core/read-state";
 import { and, eq, sql } from "drizzle-orm";
-import { DateTime, Effect, Layer, Schema } from "effect";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import { storeError } from "./internal/errors.ts";
 import { inIds } from "./internal/id-list.ts";

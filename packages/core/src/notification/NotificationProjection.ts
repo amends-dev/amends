@@ -7,7 +7,7 @@
  *
  * @since 0.1.0
  */
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import * as DeliveryFacts from "../channel/DeliveryFacts.ts";
 import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
 import * as Projection from "../journal/Projection.ts";

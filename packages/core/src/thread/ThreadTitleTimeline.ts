@@ -4,7 +4,8 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import type * as Thread from "./Thread.ts";
 import type * as ThreadActivity from "./ThreadActivity.ts";
 import * as ThreadActivityKind from "./ThreadActivityKind.ts";

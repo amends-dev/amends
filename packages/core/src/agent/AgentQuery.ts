@@ -9,7 +9,12 @@
  * @since 0.1.0
  */
 import { Integrations } from "@amends-dev/connection";
-import { Array, Context, Effect, Layer, Option, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Connection from "../connection/Connection.ts";
 import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";

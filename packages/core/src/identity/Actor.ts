@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import { Context } from "effect";
+import * as Context from "effect/Context";
 import type * as Identity from "./Identity.ts";
 import type * as Member from "../workspace/Member.ts";
 import type * as Workspace from "../workspace/Workspace.ts";

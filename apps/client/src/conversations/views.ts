@@ -14,9 +14,10 @@ import type {
   TimelineNote,
   TimelineTurn,
 } from "@amends-dev/ui/screens/timeline";
-import { useAtomValue } from "@effect/atom-solid";
-import { Option, Predicate } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { useAtomValue } from "@effect/atom-solid/Hooks";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
 import { agentsReads } from "../agents/api.ts";
 import { useWorkspaceClient } from "../provider.tsx";

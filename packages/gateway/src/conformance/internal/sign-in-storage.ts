@@ -1,7 +1,9 @@
 import { Accounts, SignInStorage } from "../../index.ts";
 import { Identity } from "@amends-dev/core/identity";
 import { describe, expect, it } from "@effect/vitest";
-import { DateTime, Effect, Option } from "effect";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import type { Fixture } from "../Fixture.ts";
 import { runHost } from "../Support.ts";
 

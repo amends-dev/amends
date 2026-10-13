@@ -7,9 +7,12 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Agent from "../agent/Agent.ts";
-import type { Option } from "effect";
+import type * as Option from "effect/Option";
 import * as Store from "../journal/Store.ts";
 import * as ThreadParticipationId from "../thread/ThreadParticipationId.ts";
 import * as StoreInput from "../journal/StoreInput.ts";

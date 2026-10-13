@@ -15,9 +15,18 @@
  */
 import type { Agent } from "@amends-dev/harness";
 import { Sandbox } from "@amends-dev/sandbox";
-import { Duration, Effect, FileSystem, Option, Path, Ref, Schema, Stream } from "effect";
-import { Tool, Toolkit } from "effect/ai";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
+import * as Path from "effect/Path";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as Tool from "effect/ai/Tool";
+import * as Toolkit from "effect/ai/Toolkit";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 /**
  * Reads a text file in the session's directory, answering with its contents: all of it, or

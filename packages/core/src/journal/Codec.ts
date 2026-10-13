@@ -7,8 +7,9 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
-import { SchemaBinary } from "effect/encoding";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as SchemaBinary from "effect/encoding/SchemaBinary";
 import type * as Fact from "./Fact.ts";
 import type * as Store from "./Store.ts";
 

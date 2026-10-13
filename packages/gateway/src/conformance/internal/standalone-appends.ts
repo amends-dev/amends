@@ -1,6 +1,9 @@
 import { Entry, Occurrence, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Option } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Option from "effect/Option";
 import type { Fixture } from "../Fixture.ts";
 import { type Bound, forWorkspace, workspaceId } from "../Support.ts";
 

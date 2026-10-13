@@ -8,8 +8,9 @@
  */
 import * as Api from "./Api.ts";
 import { SignIn } from "@amends-dev/gateway";
-import { Effect, Option } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register session handlers over the host's sign-in service, which limits codes by the address a

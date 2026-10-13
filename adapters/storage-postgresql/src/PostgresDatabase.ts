@@ -8,11 +8,13 @@
  *
  * @since 0.1.0
  */
-import { PgClient } from "@effect/sql-pg";
+import * as PgClient from "@effect/sql-pg/PgClient";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
 import { migrate } from "drizzle-orm/effect-postgres/migrator";
-import { Context, Effect, Layer } from "effect";
-import { SqlClient } from "effect/sql";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as SqlClient from "effect/sql/SqlClient";
 import { fileURLToPath } from "node:url";
 import * as PostgresNotices from "./PostgresNotices.ts";
 import * as PostgresReads from "./PostgresReads.ts";

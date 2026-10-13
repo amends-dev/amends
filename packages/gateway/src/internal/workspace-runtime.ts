@@ -12,19 +12,17 @@ import { TurnJobs } from "@amends-dev/core/turn";
 import { type Integration, Integrations } from "@amends-dev/connection";
 import { Journal } from "@amends-dev/core/journal";
 import { Workspace } from "@amends-dev/core/workspace";
-import {
-  Context,
-  Crypto,
-  Duration,
-  Effect,
-  Exit,
-  Layer,
-  LayerMap,
-  RcMap,
-  Schema,
-  Schedule,
-  Scope,
-} from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as LayerMap from "effect/LayerMap";
+import * as RcMap from "effect/RcMap";
+import * as Schema from "effect/Schema";
+import * as Schedule from "effect/Schedule";
+import * as Scope from "effect/Scope";
 import * as WorkspaceStorage from "../WorkspaceStorage.ts";
 
 /**

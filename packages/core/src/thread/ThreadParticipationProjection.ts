@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Effect, Option } from "effect";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts";
 import * as Projection from "../journal/Projection.ts";
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts";

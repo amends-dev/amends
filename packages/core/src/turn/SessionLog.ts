@@ -8,8 +8,8 @@
  * @since 0.1.0
  */
 import { Session, StreamPart } from "@amends-dev/harness";
-import { Schema } from "effect";
-import { Prompt } from "effect/ai";
+import * as Schema from "effect/Schema";
+import * as Prompt from "effect/ai/Prompt";
 import type * as ThreadMessageId from "../thread/ThreadMessageId.ts";
 import * as Turn from "./Turn.ts";
 

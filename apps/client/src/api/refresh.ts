@@ -1,5 +1,8 @@
-import { Effect, Exit } from "effect";
-import { AsyncResult, AtomRegistry, type Atom } from "effect/reactivity";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import type * as Atom from "effect/reactivity/Atom";
 
 /**
  * Refresh a read from inside an operation and wait for the result that refresh produces. Reads

@@ -10,7 +10,10 @@
  *
  * @since 0.1.0
  */
-import { Array as Arr, Effect, Schema, Struct } from "effect";
+import * as Arr from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as Struct from "effect/Struct";
 import type { ToolDefinition } from "./ToolDefinition.ts";
 import { toolkit as toolkitOfSource, type ToolSource } from "./ToolSource.ts";
 import { NotFoundError, ToolSourceError } from "./ToolSourceError.ts";

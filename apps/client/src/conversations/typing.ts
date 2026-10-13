@@ -1,6 +1,6 @@
-import { useAtomValue } from "@effect/atom-solid";
-import { DateTime } from "effect";
-import { Atom } from "effect/reactivity";
+import { useAtomValue } from "@effect/atom-solid/Hooks";
+import * as DateTime from "effect/DateTime";
+import * as Atom from "effect/reactivity/Atom";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { useWorkspace } from "../session/directory.tsx";
 

@@ -10,7 +10,11 @@ import {
 } from "@amends-dev/core/workspace";
 import { Gateway } from "../../index.ts";
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Option, Stream } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Option from "effect/Option";
+import * as Stream from "effect/Stream";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import { alice, boundTo, forWorkspace } from "../Support.ts";

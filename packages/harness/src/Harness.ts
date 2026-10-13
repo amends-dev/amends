@@ -12,8 +12,12 @@
  * @since 0.1.0
  */
 import { Sandbox } from "@amends-dev/sandbox";
-import { Context, Effect, FileSystem, Layer, Path } from "effect";
-import { Prompt } from "effect/ai";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
+import * as Prompt from "effect/ai/Prompt";
 import type { Agent, SessionId, Workspace } from "./Agent.ts";
 import { HarnessError, UnknownError, UnsupportedError } from "./HarnessError.ts";
 import { makeSession } from "./internal/session.ts";

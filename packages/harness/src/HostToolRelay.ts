@@ -18,27 +18,27 @@
  *
  * @since 0.1.0
  */
-import {
-  type Cause,
-  Context,
-  Crypto,
-  Data,
-  Deferred,
-  type Duration,
-  Effect,
-  HashMap,
-  Layer,
-  Option,
-  Queue,
-  Redacted,
-  Ref,
-  Schema,
-  type Scope,
-  Stream,
-} from "effect";
-import { Hex } from "effect/encoding";
-import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http";
-import { NetAddress } from "effect/net";
+import type * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Data from "effect/Data";
+import * as Deferred from "effect/Deferred";
+import type * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as HashMap from "effect/HashMap";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
+import * as Redacted from "effect/Redacted";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
+import * as Stream from "effect/Stream";
+import * as Hex from "effect/encoding/Hex";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServer from "effect/http/HttpServer";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as NetAddress from "effect/net/NetAddress";
 import type { AgentSession, SessionId } from "./Agent.ts";
 import type { ToolDefinition } from "./Bridge.ts";
 import { isPresented } from "./internal/bearer.ts";

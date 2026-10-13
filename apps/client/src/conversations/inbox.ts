@@ -1,6 +1,6 @@
 import type { ConversationStatus } from "@amends-dev/ui/screens/group";
 import type { InboxItem } from "@amends-dev/ui/screens/inbox";
-import { Exit } from "effect";
+import * as Exit from "effect/Exit";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import {
   markSeen,

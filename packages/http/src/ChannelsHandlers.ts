@@ -10,9 +10,10 @@
 import * as Api from "./Api.ts";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
 import { Gateway } from "@amends-dev/gateway";
-import { Effect, Layer } from "effect";
-import { HttpServerRequest } from "effect/http";
-import { HttpApiBuilder } from "effect/http-api";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register channel handlers.

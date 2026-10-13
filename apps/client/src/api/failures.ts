@@ -1,4 +1,7 @@
-import { Cause, Effect, Record, Schema } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
 import type { ApiClient } from "./client.ts";
 
 /**

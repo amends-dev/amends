@@ -13,7 +13,11 @@
  */
 import { Group, GroupMembership, GroupMembershipStore } from "@amends-dev/core/group";
 import { and, eq, sql } from "drizzle-orm";
-import { Array, DateTime, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import { inIds } from "./internal/id-list.ts";
 import { storeError } from "./internal/errors.ts";

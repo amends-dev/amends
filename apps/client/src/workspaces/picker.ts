@@ -5,7 +5,7 @@ import type {
   PickerWorkspace,
 } from "@amends-dev/ui/screens/workspaces";
 import type { WorkspaceAccess } from "@amends-dev/ui/screens/standalone";
-import { Exit } from "effect";
+import * as Exit from "effect/Exit";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import { directoryQuery } from "../api/directory.ts";
 import { workspaceFailure } from "../api/failures.ts";

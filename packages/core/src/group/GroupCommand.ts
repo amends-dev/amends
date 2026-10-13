@@ -9,16 +9,14 @@
  *
  * @since 0.1.0
  */
-import {
-  Context,
-  Crypto,
-  Effect,
-  Layer,
-  Option,
-  type Schema,
-  type DateTime,
-  type PlatformError,
-} from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import type * as Schema from "effect/Schema";
+import type * as DateTime from "effect/DateTime";
+import type * as PlatformError from "effect/PlatformError";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
 import type * as Log from "../journal/Log.ts";

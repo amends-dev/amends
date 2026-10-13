@@ -7,7 +7,10 @@
  */
 import { Accounts } from "@amends-dev/gateway";
 import { inArray } from "drizzle-orm";
-import { Crypto, Effect, Layer, Schema } from "effect";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as PostgresDatabase from "./PostgresDatabase.ts";
 import { accounts } from "./internal/schema.ts";
 

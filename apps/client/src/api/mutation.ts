@@ -1,6 +1,9 @@
-import { useAtomSet } from "@effect/atom-solid";
-import { Effect, type Exit } from "effect";
-import { Atom, type AtomRegistry, type Reactivity } from "effect/reactivity";
+import { useAtomSet } from "@effect/atom-solid/Hooks";
+import * as Effect from "effect/Effect";
+import type * as Exit from "effect/Exit";
+import * as Atom from "effect/reactivity/Atom";
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry";
+import type * as Reactivity from "effect/reactivity/Reactivity";
 import { createSignal, onCleanup, type Accessor } from "solid-js";
 import { useApiClient, useWorkspaceClient } from "../provider.tsx";
 import type { Api, ApiClient, WorkspaceApi } from "./client.ts";

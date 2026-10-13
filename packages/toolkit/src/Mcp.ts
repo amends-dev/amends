@@ -9,8 +9,11 @@
  *
  * @since 0.1.0
  */
-import { Effect, Ref, Result, Schema } from "effect";
-import { McpSchema } from "effect/ai";
+import * as Effect from "effect/Effect";
+import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as McpSchema from "effect/ai/McpSchema";
 import type { ToolDefinition } from "./ToolDefinition.ts";
 import type { ToolSource } from "./ToolSource.ts";
 import {

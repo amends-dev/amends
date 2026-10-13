@@ -25,9 +25,13 @@
  * @since 0.1.0
  */
 import { Network, Sandbox } from "@amends-dev/sandbox";
-import { type Effect, Schema, type Scope, type Stream } from "effect";
-import { Prompt } from "effect/ai";
-import { Rpc, RpcGroup } from "effect/rpc";
+import type * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
+import type * as Stream from "effect/Stream";
+import * as Prompt from "effect/ai/Prompt";
+import * as Rpc from "effect/rpc/Rpc";
+import * as RpcGroup from "effect/rpc/RpcGroup";
 import { type AgentSession, SessionId } from "./Agent.ts";
 import { HarnessError } from "./HarnessError.ts";
 import { CompactionPart, StreamPart } from "./StreamPart.ts";

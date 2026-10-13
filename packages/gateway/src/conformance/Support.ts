@@ -76,7 +76,14 @@ import {
   TurnTimeline,
 } from "@amends-dev/core/turn";
 import { Gateway, WorkspaceStorage } from "../index.ts";
-import { Clock, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import * as Clock from "effect/Clock";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import type { Host, Storage } from "./Fixture.ts";
 
 /**

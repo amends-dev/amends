@@ -9,7 +9,8 @@
  */
 import * as Authentication from "./Authentication.ts";
 import { SessionTokens } from "@amends-dev/gateway";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 const messages: Record<SessionTokens.Rejected["reason"], string> = {
   malformed: "The bearer token is malformed",

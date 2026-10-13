@@ -18,8 +18,13 @@
  * @since 0.1.0
  */
 import type { ModelEndpoint } from "@amends-dev/harness";
-import { Effect, Redacted, Result, Schema } from "effect";
-import { HttpClient, HttpClientRequest, type HttpClientResponse } from "effect/http";
+import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { type Health, healthOf, UnsupportedError } from "./Connection.ts";
 import * as Integration from "./Integration.ts";
 import * as ModelCatalog from "./ModelCatalog.ts";

@@ -10,9 +10,11 @@
  * @since 0.1.0
  */
 import type { Identity } from "@amends-dev/core/identity";
-import { Context, Schema } from "effect";
-import type { Redacted } from "effect";
-import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
+import * as Context from "effect/Context";
+import * as Schema from "effect/Schema";
+import type * as Redacted from "effect/Redacted";
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
+import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity";
 
 /**
  * The authenticated human or agent, supplied by middleware for each request.

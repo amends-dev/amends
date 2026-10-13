@@ -10,7 +10,7 @@
  *
  * @since 0.1.0
  */
-import { Prompt } from "effect/ai";
+import * as Prompt from "effect/ai/Prompt";
 import type * as Identity from "../identity/Identity.ts";
 import * as Task from "../task/Task.ts";
 import type * as Thread from "../thread/Thread.ts";

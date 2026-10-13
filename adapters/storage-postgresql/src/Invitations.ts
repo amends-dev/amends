@@ -13,7 +13,11 @@
  */
 import { Invitation, InvitationStore, type Workspace } from "@amends-dev/core/workspace";
 import { and, asc, eq, type SQL } from "drizzle-orm";
-import { Array, DateTime, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Binding from "./Binding.ts";
 import type * as PostgresDatabase from "./PostgresDatabase.ts";
 import { storeError } from "./internal/errors.ts";

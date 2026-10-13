@@ -6,7 +6,10 @@
  *
  * @since 0.1.0
  */
-import { Context, Deferred, Effect, Layer } from "effect";
+import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 /**
  * The signal that the server has begun to shut down: a `Deferred` that completes as draining

@@ -5,8 +5,8 @@
  * message as who wrote it and what it said, the tools called with their results, and the files
  * the user gave attached as they were.
  */
-import type { Prompt } from "effect/ai";
-import { Base64 } from "effect/encoding";
+import type * as Prompt from "effect/ai/Prompt";
+import * as Base64 from "effect/encoding/Base64";
 import type { PromptPart } from "./Api.ts";
 
 /** The parts of a user message, as opencode 1 takes them: its texts, and its files by URL. */

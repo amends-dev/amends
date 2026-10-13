@@ -195,6 +195,9 @@ to verify APIs rather than guessing from prior versions or web snippets.
 - Bun integration: `repos/effect/packages/platform/bun`.
 - Domain design: `docs/core-model.md`.
 
+Source imports Effect by module, `import * as Effect from "effect/Effect"`, as Effect's packages
+do; tests, scripts, and documentation examples may use the `effect` barrel.
+
 Name a variable that holds a service after the service, so a call says who it calls:
 `const threadStore = yield* ThreadStore.ThreadStore`,
 `const threadQuery = yield* ThreadQuery.ThreadQuery`, and `(threadService) => threadService.get(id)`

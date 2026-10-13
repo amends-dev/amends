@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Record, Schema } from "effect";
+import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
 import * as ChannelId from "../channel/ChannelId.ts";
 import * as Connection from "../connection/Connection.ts";
 import * as ThreadId from "../thread/ThreadId.ts";

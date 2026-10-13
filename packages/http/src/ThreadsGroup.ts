@@ -18,8 +18,10 @@ import {
   ThreadTimeline,
 } from "@amends-dev/core/thread";
 import { ReadState } from "@amends-dev/core/read-state";
-import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
+import * as Schema from "effect/Schema";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import { Authentication } from "./Authentication.ts";
 import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";

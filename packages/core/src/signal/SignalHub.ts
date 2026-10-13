@@ -6,8 +6,11 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer } from "effect";
-import type { Scope, Stream } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type * as Scope from "effect/Scope";
+import type * as Stream from "effect/Stream";
 import * as Store from "../journal/Store.ts";
 import type * as Signal from "./Signal.ts";
 

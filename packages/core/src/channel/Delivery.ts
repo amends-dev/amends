@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 import { ChannelTransport } from "@amends-dev/channel";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as GroupId from "../group/GroupId.ts";
 import * as ThreadId from "../thread/ThreadId.ts";
 import * as ThreadMessageId from "../thread/ThreadMessageId.ts";

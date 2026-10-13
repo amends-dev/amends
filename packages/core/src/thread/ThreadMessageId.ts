@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * Names a message. A publication names its message itself, so a keyed reply names the same message

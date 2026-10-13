@@ -7,7 +7,11 @@
  *
  * @since 0.1.0
  */
-import { Context, DateTime, Effect, Layer, Option } from "effect";
+import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
 import type * as Projection from "../journal/Projection.ts";

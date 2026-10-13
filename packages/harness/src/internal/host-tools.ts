@@ -5,19 +5,20 @@
  * for `approve`, and a refusal is answered as `execution-denied`. `makeSession` makes these for
  * each session; the package does not export this module.
  */
-import {
-  type Cause,
-  Deferred,
-  Effect,
-  HashMap,
-  Option,
-  Queue,
-  Ref,
-  Schema,
-  Stream,
-  SubscriptionRef,
-} from "effect";
-import type { Prompt, Response, Tool, Toolkit } from "effect/ai";
+import type * as Cause from "effect/Cause";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as HashMap from "effect/HashMap";
+import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as SubscriptionRef from "effect/SubscriptionRef";
+import type * as Prompt from "effect/ai/Prompt";
+import type * as Response from "effect/ai/Response";
+import type * as Tool from "effect/ai/Tool";
+import type * as Toolkit from "effect/ai/Toolkit";
 import type { AgentSession } from "../Agent.ts";
 import { AgentContractError, HarnessError, type HarnessErrorReason } from "../HarnessError.ts";
 import type { TurnError, TurnServices } from "../Session.ts";

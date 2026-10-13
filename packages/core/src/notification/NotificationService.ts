@@ -7,7 +7,12 @@
  *
  * @since 0.1.0
  */
-import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Event from "../journal/Event.ts";

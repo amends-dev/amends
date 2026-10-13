@@ -14,17 +14,16 @@
  *
  * @since 0.1.0
  */
-import {
-  Cause,
-  Context,
-  Effect,
-  ErrorReporter,
-  JsonSchema,
-  Option,
-  Schema,
-  SchemaRepresentation,
-} from "effect";
-import { Tool, Toolkit } from "effect/ai";
+import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as ErrorReporter from "effect/ErrorReporter";
+import * as JsonSchema from "effect/JsonSchema";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as SchemaRepresentation from "effect/SchemaRepresentation";
+import * as Tool from "effect/ai/Tool";
+import * as Toolkit from "effect/ai/Toolkit";
 import type { Annotations, ToolDefinition } from "./ToolDefinition.ts";
 import {
   InvalidInputError,

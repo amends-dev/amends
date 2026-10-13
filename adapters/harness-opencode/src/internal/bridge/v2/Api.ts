@@ -6,9 +6,15 @@
  * reports.
  */
 import { HarnessError } from "@amends-dev/harness";
-import { Effect, Schedule, Schema, type Scope, Stream } from "effect";
-import { Sse } from "effect/encoding";
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import * as Effect from "effect/Effect";
+import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
+import * as Stream from "effect/Stream";
+import * as Sse from "effect/encoding/Sse";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import type { ModelRef } from "../Driver.ts";
 import type { RemoteMcpServer } from "../HostTools.ts";
 import * as Server from "../Server.ts";

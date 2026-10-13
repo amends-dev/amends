@@ -8,7 +8,7 @@
  * The schemas are opencode 2.0's, with only the fields this adapter reads, so that fields opencode
  * adds do not stop an event from decoding.
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { ModelRef } from "../Driver.ts";
 import { Tokens } from "../Steps.ts";
 

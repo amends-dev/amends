@@ -14,8 +14,13 @@
  *
  * @since 0.1.0
  */
-import { type Effect, Schema, type Stream } from "effect";
-import { type AiError, type Toolkit, Prompt, type Tool } from "effect/ai";
+import type * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import type * as Stream from "effect/Stream";
+import type * as AiError from "effect/ai/AiError";
+import type * as Toolkit from "effect/ai/Toolkit";
+import * as Prompt from "effect/ai/Prompt";
+import type * as Tool from "effect/ai/Tool";
 import { type AgentSession, SessionId } from "./Agent.ts";
 import type { GenerateObjectResult, GenerateResult } from "./GenerateResult.ts";
 import type { HarnessError } from "./HarnessError.ts";

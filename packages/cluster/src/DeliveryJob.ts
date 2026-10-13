@@ -14,9 +14,13 @@ import { DeliveryJobs } from "@amends-dev/core/channel";
 import { Store, StoreError } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
 import { Workspace } from "@amends-dev/core/workspace";
-import { Effect, Layer, PrimaryKey, Schema } from "effect";
-import { ClusterSchema, Entity } from "effect/cluster";
-import { Rpc } from "effect/rpc";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as PrimaryKey from "effect/PrimaryKey";
+import * as Schema from "effect/Schema";
+import * as ClusterSchema from "effect/cluster/ClusterSchema";
+import * as Entity from "effect/cluster/Entity";
+import * as Rpc from "effect/rpc/Rpc";
 import * as DeliveryRunner from "./DeliveryRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
 

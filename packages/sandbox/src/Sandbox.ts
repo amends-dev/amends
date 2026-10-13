@@ -12,8 +12,13 @@
  *
  * @since 0.1.0
  */
-import { Context, type Effect, FileSystem, Layer, Path, Schema } from "effect";
-import { ChildProcessSpawner } from "effect/process";
+import * as Context from "effect/Context";
+import type * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type {
   Endpoint,
   EndpointProtocol,

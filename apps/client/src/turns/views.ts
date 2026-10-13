@@ -6,9 +6,12 @@ import type {
   TurnLogTurn,
   TurnProblem,
 } from "@amends-dev/ui/screens/turns";
-import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Effect, Exit, Option } from "effect";
-import { AsyncResult, type Atom } from "effect/reactivity";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-solid/Hooks";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import type * as Atom from "effect/reactivity/Atom";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import { connectionsReads } from "../connections/api.ts";
 import { timelineRead } from "../conversations/api.ts";

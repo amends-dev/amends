@@ -13,9 +13,17 @@
  * program installs without downloading the programs again.
  */
 import { Template } from "@amends-dev/sandbox";
-import { Crypto, Effect, FileSystem, Path, PlatformError, Result, Stream } from "effect";
-import { Base64, Hex } from "effect/encoding";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as PlatformError from "effect/PlatformError";
+import * as Result from "effect/Result";
+import * as Stream from "effect/Stream";
+import * as Base64 from "effect/encoding/Base64";
+import * as Hex from "effect/encoding/Hex";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 /** The platforms the bridge installs on, as `platformOf` names them. */
 export type Platform = `${"darwin" | "linux"}-${"arm64" | "x64"}`;

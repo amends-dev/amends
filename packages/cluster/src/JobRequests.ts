@@ -9,8 +9,12 @@
  * @since 0.1.0
  */
 import { Store, type StoreError } from "@amends-dev/core/journal";
-import { Context, Effect, Layer, Predicate, Schedule } from "effect";
-import { Sharding } from "effect/cluster";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
+import * as Schedule from "effect/Schedule";
+import * as Sharding from "effect/cluster/Sharding";
 
 /**
  * Wakes the runners once a commit that stored job requests is done, so the runner that owns each

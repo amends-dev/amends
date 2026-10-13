@@ -8,7 +8,9 @@
  *
  * @since 0.1.0
  */
-import { type Effect, type PlatformError, Schema } from "effect";
+import type * as Effect from "effect/Effect";
+import type * as PlatformError from "effect/PlatformError";
+import * as Schema from "effect/Schema";
 import { isName, type SandboxServices } from "./Sandbox.ts";
 
 /**

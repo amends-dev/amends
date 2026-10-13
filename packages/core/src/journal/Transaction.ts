@@ -10,8 +10,15 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Exit, Layer, Option, Schema, Semaphore } from "effect";
-import type { Cause, Scope } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
+import type * as Cause from "effect/Cause";
+import type * as Scope from "effect/Scope";
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as Store from "./Store.ts";
 import type * as StoreError from "./StoreError.ts";

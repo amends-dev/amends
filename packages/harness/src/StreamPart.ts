@@ -12,8 +12,11 @@
  *
  * @since 0.1.0
  */
-import { Predicate, Schema, Stream } from "effect";
-import { Prompt, Response } from "effect/ai";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as Prompt from "effect/ai/Prompt";
+import * as Response from "effect/ai/Response";
 
 /** A call to any tool. The agent's own tools run inside the agent and are `providerExecuted`. */
 const ToolCallPart = Schema.Struct({

@@ -14,9 +14,9 @@
 import type * as Core from "@amends-dev/core";
 import type { Actor } from "@amends-dev/core/identity";
 import type { Workspace } from "@amends-dev/core/workspace";
-import { Effect } from "effect";
-import { HttpClientRequest } from "effect/http";
-import { HttpApiMiddleware } from "effect/http-api";
+import * as Effect from "effect/Effect";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
 import * as ApiErrors from "./ApiErrors.ts";
 import type { Principal } from "./Authentication.ts";
 

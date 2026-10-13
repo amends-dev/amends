@@ -9,8 +9,10 @@
  */
 import * as Accounts from "@amends-dev/gateway/Accounts";
 import * as SignIn from "@amends-dev/gateway/SignIn";
-import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
+import * as Schema from "effect/Schema";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 
 /**
  * Signing in: the ways this host offers, then an email code to request and exchange for a session.

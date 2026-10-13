@@ -12,8 +12,9 @@ import { Connection, Integration } from "@amends-dev/connection";
 import { type Agent, Harness } from "@amends-dev/harness";
 import { AmendsAgent, Models } from "@amends-dev/harness-amends";
 import { Opencode2Agent, OpencodeAgent } from "@amends-dev/harness-opencode";
-import { type Crypto, Effect } from "effect";
-import type { Socket } from "effect/socket";
+import type * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import type * as Socket from "effect/socket/Socket";
 
 /** The health of a connection to an agent, which reaches nothing. */
 const healthy = () => Effect.succeed<Connection.Health>({ status: "healthy" });

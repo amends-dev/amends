@@ -10,8 +10,9 @@
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import { Layer } from "effect";
-import { HttpApiBuilder, HttpApiScalar } from "effect/http-api";
+import * as Layer from "effect/Layer";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as HttpApiScalar from "effect/http-api/HttpApiScalar";
 import * as AccountsHandlers from "./AccountsHandlers.ts";
 import * as BearerAuthentication from "./BearerAuthentication.ts";
 import * as WorkspaceMember from "./internal/workspace-member.ts";

@@ -7,7 +7,7 @@
  * @since 0.1.0
  */
 import * as Target from "./Target.ts";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Permission from "./Permission.ts";
 import type * as Requirement from "./Requirement.ts";
 import * as Scope from "./Scope.ts";

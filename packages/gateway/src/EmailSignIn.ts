@@ -7,8 +7,15 @@
  * @since 0.1.0
  */
 import { Identity } from "@amends-dev/core/identity";
-import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Redacted } from "effect";
-import { Base64Url } from "effect/encoding";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Accounts from "./Accounts.ts";
 import * as EmailSender from "./EmailSender.ts";
 import * as SessionTokens from "./SessionTokens.ts";

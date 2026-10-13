@@ -11,8 +11,15 @@
  */
 import * as Identity from "../identity/Identity.ts";
 import * as Notification from "../notification/Notification.ts";
-import { Context, Crypto, Effect, Layer, Option, Schema, Predicate } from "effect";
-import type { DateTime, PlatformError } from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Predicate from "effect/Predicate";
+import type * as DateTime from "effect/DateTime";
+import type * as PlatformError from "effect/PlatformError";
 import * as Group from "../group/Group.ts";
 import type * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";

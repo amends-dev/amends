@@ -7,7 +7,8 @@
  *
  * @since 0.1.0
  */
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as Audience from "./Audience.ts";
 import * as Occurrence from "./Occurrence.ts";
 import * as Subject from "./Subject.ts";

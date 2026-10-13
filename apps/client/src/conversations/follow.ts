@@ -1,6 +1,9 @@
-import { useAtomValue } from "@effect/atom-solid";
-import { Effect, Exit, Option } from "effect";
-import { AsyncResult, type Atom } from "effect/reactivity";
+import { useAtomValue } from "@effect/atom-solid/Hooks";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import type * as Atom from "effect/reactivity/Atom";
 import { createSignal, type Accessor } from "solid-js";
 import {
   changeFollow,

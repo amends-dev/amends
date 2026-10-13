@@ -9,7 +9,15 @@
  * @since 0.1.0
  */
 import { ChannelTransport } from "@amends-dev/channel";
-import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import * as Connection from "../connection/Connection.ts";
 import * as Performer from "../identity/Performer.ts";
 import * as Journal from "../journal/Journal.ts";

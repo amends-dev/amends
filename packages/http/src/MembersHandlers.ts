@@ -7,7 +7,7 @@
  */
 import * as Api from "./Api.ts";
 import { MemberService } from "@amends-dev/core/workspace";
-import { HttpApiBuilder } from "effect/http-api";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 /**
  * Register member handlers.

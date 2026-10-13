@@ -11,8 +11,10 @@
 import { Group } from "@amends-dev/core/group";
 import { Task } from "@amends-dev/core/task";
 import { Thread } from "@amends-dev/core/thread";
-import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
+import * as Schema from "effect/Schema";
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import { Authentication } from "./Authentication.ts";
 import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";

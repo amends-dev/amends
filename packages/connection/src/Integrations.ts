@@ -5,7 +5,8 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
 import { ConnectionError, NotFoundError } from "./Connection.ts";
 import type { Integration } from "./Integration.ts";
 

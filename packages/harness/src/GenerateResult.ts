@@ -7,7 +7,7 @@
  *
  * @since 0.1.0
  */
-import type { Response } from "effect/ai";
+import type * as Response from "effect/ai/Response";
 import { type FileChangePart, type Step, type StreamPart, stepsOf } from "./StreamPart.ts";
 
 /**

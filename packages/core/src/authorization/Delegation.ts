@@ -10,7 +10,12 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Option, Predicate, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import * as Actor from "../identity/Actor.ts";
 import type * as Member from "../workspace/Member.ts";
 import type * as Workspace from "../workspace/Workspace.ts";

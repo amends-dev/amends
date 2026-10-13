@@ -15,7 +15,9 @@ import {
 import { Turn } from "@amends-dev/core/turn";
 import { Member, MemberPermissions, type Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
-import { DateTime, Effect, Option } from "effect";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";
 import {

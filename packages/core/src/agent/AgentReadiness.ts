@@ -12,7 +12,11 @@ import type {
   Integration,
   Integrations,
 } from "@amends-dev/connection";
-import { Array, DateTime, Effect, Option, Order } from "effect";
+import * as Array from "effect/Array";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Order from "effect/Order";
 import * as Connection from "../connection/Connection.ts";
 import type * as Agent from "./Agent.ts";
 

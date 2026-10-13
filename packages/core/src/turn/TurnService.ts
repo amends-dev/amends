@@ -8,21 +8,19 @@
  *
  * @since 0.1.0
  */
-import {
-  Context,
-  Crypto,
-  Data,
-  DateTime,
-  Effect,
-  Layer,
-  Option,
-  Predicate,
-  Ref,
-  Schema,
-  Stream,
-  Struct,
-  type Scope,
-} from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as Data from "effect/Data";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as Struct from "effect/Struct";
+import type * as Scope from "effect/Scope";
 import * as AgentPermissions from "../agent/AgentPermissions.ts";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";

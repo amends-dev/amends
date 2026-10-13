@@ -6,7 +6,8 @@
  *
  * @since 0.1.0
  */
-import { DateTime, Schema } from "effect";
+import * as DateTime from "effect/DateTime";
+import * as Schema from "effect/Schema";
 import * as GroupId from "../group/GroupId.ts";
 import * as Text from "../text/Text.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";

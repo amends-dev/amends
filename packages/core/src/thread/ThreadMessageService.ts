@@ -8,7 +8,14 @@
  * @since 0.1.0
  */
 import * as Identity from "../identity/Identity.ts";
-import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as AgentPermissions from "../agent/AgentPermissions.ts";

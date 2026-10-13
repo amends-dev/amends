@@ -18,19 +18,21 @@
  * @since 0.1.0
  */
 import { type Agent, HarnessError, type ModelEndpoint, type StreamPart } from "@amends-dev/harness";
-import {
-  Deferred,
-  type Duration,
-  Effect,
-  Layer,
-  Queue,
-  Ref,
-  Result,
-  Schema,
-  Semaphore,
-  Stream,
-} from "effect";
-import { LanguageModel, Prompt, type Response, Tool, Toolkit } from "effect/ai";
+import * as Deferred from "effect/Deferred";
+import type * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Queue from "effect/Queue";
+import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
+import * as LanguageModel from "effect/ai/LanguageModel";
+import * as Prompt from "effect/ai/Prompt";
+import type * as Response from "effect/ai/Response";
+import * as Tool from "effect/ai/Tool";
+import * as Toolkit from "effect/ai/Toolkit";
 import {
   compactAt,
   compactMessages,

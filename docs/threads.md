@@ -237,6 +237,10 @@ documentation is generated from them.
   Effect's codegen writes its own: every module beside it, with the module's `@since`. A module does
   not re-export itself: the barrel exports it with `export * as`, and modules import one another
   with `import * as`, so a module's class can carry its name.
+- **Effect by module.** Source imports each Effect module it uses, `import * as Effect from
+"effect/Effect"` and `import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"`, as
+  Effect's own packages do, never the `effect` barrel. Tests, scripts, and documentation examples
+  may import from the barrel. Oxlint enforces it, and the language service writes auto-imports so.
 - **A header on every module**: a paragraph saying what the module is for and how it relates to its
   neighbours, then `@since`.
 - **`@category` and `@since` on every export**, with a sentence or more on what it is, except a

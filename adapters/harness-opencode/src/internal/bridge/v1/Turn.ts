@@ -17,7 +17,7 @@
  * or took no step.
  */
 import type { StreamPart } from "@amends-dev/harness";
-import type { Response } from "effect/ai";
+import type * as Response from "effect/ai/Response";
 import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts";
 import {
   type AssistantMessage,

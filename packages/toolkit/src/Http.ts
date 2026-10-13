@@ -10,13 +10,13 @@
  *
  * @since 0.1.0
  */
-import { Effect, Result, Schema } from "effect";
-import {
-  type HttpClient,
-  type HttpClientError,
-  HttpClientRequest,
-  type HttpClientResponse,
-} from "effect/http";
+import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import type * as HttpClient from "effect/http/HttpClient";
+import type * as HttpClientError from "effect/http/HttpClientError";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { ToolDefinition } from "./ToolDefinition.ts";
 import type { ToolSource } from "./ToolSource.ts";
 import {

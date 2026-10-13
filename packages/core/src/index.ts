@@ -53,7 +53,7 @@ import * as ChannelService from "./channel/ChannelService.ts";
 import * as DeliveryExecution from "./channel/DeliveryExecution.ts";
 import * as DeliveryJobs from "./channel/DeliveryJobs.ts";
 import * as DeliveryProjection from "./channel/DeliveryProjection.ts";
-import { Layer } from "effect";
+import * as Layer from "effect/Layer";
 import * as ChangeFeedService from "./change-feed/ChangeFeedService.ts";
 import * as ChangeFeedSource from "./change-feed/ChangeFeedSource.ts";
 import * as GroupService from "./group/GroupService.ts";

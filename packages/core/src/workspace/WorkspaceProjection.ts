@@ -4,7 +4,7 @@
  *
  * @since 0.1.0
  */
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import * as Projection from "../journal/Projection.ts";
 import * as WorkspaceFacts from "./WorkspaceFacts.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";

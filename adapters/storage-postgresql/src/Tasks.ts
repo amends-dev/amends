@@ -12,7 +12,11 @@
  */
 import { Task, TaskStore } from "@amends-dev/core/task";
 import { ThreadMessage } from "@amends-dev/core/thread";
-import { Array, DateTime, Effect, Layer, Schema } from "effect";
+import * as Array from "effect/Array";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { tasks } from "./internal/schema.ts";

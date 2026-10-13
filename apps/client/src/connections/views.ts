@@ -8,9 +8,12 @@ import type {
   IntegrationCapability,
   IntegrationOption,
 } from "@amends-dev/ui/screens/connections";
-import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { type Cause, Effect, Exit, Option } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-solid/Hooks";
+import type * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useChanges } from "../api/changes.ts";
 import { workspaceFailure } from "../api/failures.ts";

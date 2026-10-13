@@ -7,7 +7,7 @@
  *
  * @since 0.1.0
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as GroupId from "../group/GroupId.ts";
 import * as ThreadId from "./ThreadId.ts";
 import * as ThreadMessageId from "./ThreadMessageId.ts";

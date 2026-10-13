@@ -21,20 +21,18 @@ import {
 } from "@amends-dev/core/turn";
 import { Gateway } from "@amends-dev/gateway";
 import { Agent, type Session, StreamPart } from "@amends-dev/harness";
-import {
-  Array,
-  Cause,
-  Clock,
-  Data,
-  Deferred,
-  Effect,
-  Option,
-  Predicate,
-  Ref,
-  type Scope,
-  Semaphore,
-  Stream,
-} from "effect";
+import * as Array from "effect/Array";
+import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
+import * as Data from "effect/Data";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Ref from "effect/Ref";
+import type * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
 import * as TurnAgent from "./internal/turn-agent.ts";
 import * as SessionLogWriter from "./internal/session-log-writer.ts";
 

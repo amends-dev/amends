@@ -12,7 +12,10 @@ import {
   type Integration,
   Integrations,
 } from "@amends-dev/connection";
-import { Context, Effect, Layer, Option } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Connection from "../connection/Connection.ts";
 import * as ConnectionCredentialStore from "../connection/ConnectionCredentialStore.ts";
 import * as ConnectionStore from "../connection/ConnectionStore.ts";

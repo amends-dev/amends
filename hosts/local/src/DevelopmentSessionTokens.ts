@@ -7,7 +7,10 @@
  */
 import { Identity } from "@amends-dev/core/identity";
 import { SessionTokens } from "@amends-dev/gateway";
-import { Effect, Layer, Redacted, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 
 /**
  * Construct development session tokens that trust a nonempty bearer token as a human ID. Such a

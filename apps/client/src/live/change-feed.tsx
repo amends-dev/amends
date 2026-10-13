@@ -1,5 +1,5 @@
-import { useAtomValue } from "@effect/atom-solid";
-import { AsyncResult } from "effect/reactivity";
+import { useAtomValue } from "@effect/atom-solid/Hooks";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import {
   createContext,
   createMemo,

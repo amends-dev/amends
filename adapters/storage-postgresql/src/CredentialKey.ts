@@ -7,9 +7,14 @@
  *
  * @since 0.1.0
  */
-import { Context, Data, Effect, Layer, Redacted, Result } from "effect";
-import { Base64 } from "effect/encoding";
-import type { Option } from "effect";
+import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Result from "effect/Result";
+import * as Base64 from "effect/encoding/Base64";
+import type * as Option from "effect/Option";
 
 /**
  * The key is malformed, or a secret failed to seal or open.

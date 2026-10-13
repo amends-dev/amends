@@ -6,7 +6,9 @@
  *
  * @since 0.1.0
  */
-import type { Effect, Scope, Schema } from "effect";
+import type * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
+import type * as Schema from "effect/Schema";
 import type { ToolSource } from "../ToolSource.ts";
 
 /**

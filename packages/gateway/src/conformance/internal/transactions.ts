@@ -6,7 +6,12 @@ import { WorkspaceInitialization } from "@amends-dev/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 
-import { Context, Deferred, Effect, Fiber, Option, Result } from "effect";
+import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 
 import type { Fixture } from "../Fixture.ts";
 import * as Support from "../Support.ts";

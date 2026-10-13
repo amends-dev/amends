@@ -10,8 +10,13 @@ import {
   ThreadTimeline,
 } from "@amends-dev/core/thread";
 import { Member, Workspace } from "@amends-dev/core/workspace";
-import { DateTime, Effect, Option, Schema } from "effect";
-import { AsyncResult, Atom, Reactivity } from "effect/reactivity";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import * as Atom from "effect/reactivity/Atom";
+import * as Reactivity from "effect/reactivity/Reactivity";
 import type { ApiClient, WorkspaceApi } from "../api/client.ts";
 import { command } from "../api/failures.ts";
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "../api/keys.ts";

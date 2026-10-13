@@ -13,8 +13,13 @@
  * does without instructions.
  */
 import { type Bridge, HarnessError, type HostToolRelay } from "@amends-dev/harness";
-import { Effect, FileSystem, Ref, Schedule, Schema, Stream } from "effect";
-import type { Prompt } from "effect/ai";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import type * as Prompt from "effect/ai/Prompt";
 import type * as Driver from "../Driver.ts";
 import * as HostTools from "../HostTools.ts";
 import * as Server from "../Server.ts";

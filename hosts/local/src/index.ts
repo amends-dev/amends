@@ -9,8 +9,10 @@
  *
  * @since 0.1.0
  */
-import { BunRuntime } from "@effect/platform-bun";
-import { ConfigProvider, Effect, Layer } from "effect";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as ConfigProvider from "effect/ConfigProvider";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as DevelopmentAuthentication from "./DevelopmentAuthentication.ts";
 import * as EmailAuthentication from "./EmailAuthentication.ts";
 import * as LocalConfig from "./LocalConfig.ts";

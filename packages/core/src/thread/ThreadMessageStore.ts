@@ -5,7 +5,11 @@
  *
  * @since 0.1.0
  */
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Store from "../journal/Store.ts";
 import * as ThreadMessage from "./ThreadMessage.ts";
 import * as ThreadId from "./ThreadId.ts";

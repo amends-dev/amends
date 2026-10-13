@@ -6,8 +6,11 @@
  *
  * @since 0.1.0
  */
-import { Crypto, Effect, Result, Schema } from "effect";
-import { Hex } from "effect/encoding";
+import * as Crypto from "effect/Crypto";
+import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as Hex from "effect/encoding/Hex";
 
 /**
  * A key the client chooses once for one logical request, such as a UUID, and repeats on every

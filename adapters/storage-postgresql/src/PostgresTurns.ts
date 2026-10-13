@@ -6,8 +6,8 @@
  *
  * @since 0.1.0
  */
-import { Effect } from "effect";
-import type { Duration } from "effect";
+import * as Effect from "effect/Effect";
+import type * as Duration from "effect/Duration";
 import * as Lanes from "./internal/lanes.ts";
 
 /**

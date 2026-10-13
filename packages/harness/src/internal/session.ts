@@ -4,8 +4,15 @@
  * host's tools the agent calls. `Harness` makes sessions with `makeSession`; the package does not
  * export this module.
  */
-import { Data, Effect, Ref, Schema, Stream } from "effect";
-import { AiError, Prompt, type Tool, type Response } from "effect/ai";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as AiError from "effect/ai/AiError";
+import * as Prompt from "effect/ai/Prompt";
+import type * as Tool from "effect/ai/Tool";
+import type * as Response from "effect/ai/Response";
 import type { AgentSession, SessionId, TurnOptions } from "../Agent.ts";
 import { GenerateObjectResult, GenerateResult } from "../GenerateResult.ts";
 import {

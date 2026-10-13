@@ -10,8 +10,9 @@
 import * as Api from "./Api.ts";
 import * as Authentication from "./Authentication.ts";
 import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway";
-import { Array, Effect } from "effect";
-import { HttpApiBuilder } from "effect/http-api";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { requireHuman } from "./internal/human.ts";
 
 /**

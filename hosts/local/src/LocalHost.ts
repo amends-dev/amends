@@ -31,17 +31,22 @@ import {
   PostgresDatabase,
   PostgresStorage,
 } from "@amends-dev/storage-postgresql";
-import { BunClusterSocket, BunCrypto, BunServices, BunSocket } from "@effect/platform-bun";
-import { Duration, Effect, Layer, Option, Redacted } from "effect";
-import {
-  type MessageStorage,
-  RunnerAddress,
-  type Runners,
-  type Sharding,
-  SingleRunner,
-} from "effect/cluster";
-import { FetchHttpClient } from "effect/http";
-import type { SqlClient } from "effect/sql";
+import * as BunClusterSocket from "@effect/platform-bun/BunClusterSocket";
+import * as BunCrypto from "@effect/platform-bun/BunCrypto";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import * as BunSocket from "@effect/platform-bun/BunSocket";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
+import type * as MessageStorage from "effect/cluster/MessageStorage";
+import * as RunnerAddress from "effect/cluster/RunnerAddress";
+import type * as Runners from "effect/cluster/Runners";
+import type * as Sharding from "effect/cluster/Sharding";
+import * as SingleRunner from "effect/cluster/SingleRunner";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import type * as SqlClient from "effect/sql/SqlClient";
 import * as HarnessIntegrations from "./HarnessIntegrations.ts";
 import * as LocalConfig from "./LocalConfig.ts";
 import * as SandboxIntegrations from "./SandboxIntegrations.ts";

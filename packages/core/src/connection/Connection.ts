@@ -13,7 +13,7 @@ import {
   Integration,
   ModelCatalog,
 } from "@amends-dev/connection";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Text from "../text/Text.ts";
 import * as WorkspaceId from "../workspace/WorkspaceId.ts";
 import * as MemberId from "../workspace/MemberId.ts";
