@@ -94,7 +94,7 @@ export class NotificationService extends Context.Service<
     ) => Effect.Effect<ReadonlyArray<NotificationInbox.Item>, InboxError, Actor.Actor>
     /** Record that the acting person saw their notification; source access is independent. */
     readonly markSeen: (
-      notificationId: Notification.Id
+      notificationId: Notification.NotificationId
     ) => Effect.Effect<Notification.Notification, MarkSeenError, Actor.Actor>
     /**
      * Record that the acting person saw every notification still pending for them up to and
@@ -160,9 +160,9 @@ export const make: Effect.Effect<
   })
 
   /** The acting member's own notification; another recipient's reads as missing. */
-  const requireOwn = Effect.fnUntraced(function* (notificationId: Notification.Id) {
+  const requireOwn = Effect.fnUntraced(function* (notificationId: Notification.NotificationId) {
     const target = yield* requireRecipient()
-    const id = yield* Schema.decodeEffect(Notification.Id)(notificationId)
+    const id = yield* Schema.decodeEffect(Notification.NotificationId)(notificationId)
     const found = yield* notificationStore.get(id)
     if (Option.isNone(found) || !sameRecipient(found.value.recipient, target))
       return yield* new CoreError.NotFound({ resource: "Notification", id })
@@ -214,7 +214,7 @@ export const make: Effect.Effect<
       )
     )
   }, Operation.report)
-  const markSeen = Effect.fn("NotificationService.markSeen")(function* (notificationId: Notification.Id) {
+  const markSeen = Effect.fn("NotificationService.markSeen")(function* (notificationId: Notification.NotificationId) {
     const notification = yield* requireOwn(notificationId)
     if (!Notification.Recipient.isAnyOf(["Human"])(notification.recipient))
       return yield* new CoreError.Denied({ reason: new CoreError.HumanRequired() })

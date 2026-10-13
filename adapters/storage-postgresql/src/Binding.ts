@@ -11,7 +11,7 @@
  */
 
 import { Commit, Store, type Entry, StoreError } from "@amends-dev/core/journal"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Cause from "effect/Cause"
 import * as Clock from "effect/Clock"
 import * as Context from "effect/Context"
@@ -133,7 +133,7 @@ export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>
 export interface TransactionState {
   /** The database the transaction runs on; a binding over another database refuses it. */
   readonly owner: PostgresDatabase.PostgresDatabase["Service"]
-  readonly workspaceId: Workspace.Id
+  readonly workspaceId: WorkspaceId.WorkspaceId
   /** The commit the transaction records, timed once the writer's turn has come. */
   readonly commit: Commit.Commit
   /** False once the program ends, after which a handle to the transaction is expired. */
@@ -187,7 +187,7 @@ export class Binding extends Context.Service<
   Binding,
   {
     /** The workspace every statement through the binding is scoped to. */
-    readonly workspaceId: Workspace.Id
+    readonly workspaceId: WorkspaceId.WorkspaceId
     /** The connected database, shared by every workspace's binding in the process. */
     readonly database: PostgresDatabase.PostgresDatabase["Service"]
     /** How often a reader waiting for an append checks again without a notification. */
@@ -233,7 +233,7 @@ const isCommitted = Schema.is(Schema.Struct({ command: Schema.Literal("COMMIT") 
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id, options: Options = {}) {
+export const make = Effect.fnUntraced(function* (workspaceId: WorkspaceId.WorkspaceId, options: Options = {}) {
   const postgresDatabase = yield* PostgresDatabase.PostgresDatabase
   const crypto = yield* Crypto.Crypto
   const { sql, turns, reads } = postgresDatabase
@@ -275,7 +275,7 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id, opti
     yield* check(false)
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* StoreError.failed("Store", "transaction")("Native transactions cannot nest; use journal.commit")
-    const commitId = Commit.Id.make(
+    const commitId = Commit.CommitId.make(
       yield* crypto.randomUUIDv4.pipe(Effect.mapError(StoreError.failed("Store", "transaction")))
     )
     const standalone = options.log !== undefined
@@ -427,5 +427,5 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id, opti
  * @category layers
  * @since 0.1.0
  */
-export const layer = (workspaceId: Workspace.Id, options: Options = {}) =>
+export const layer = (workspaceId: WorkspaceId.WorkspaceId, options: Options = {}) =>
   Layer.effect(Binding, make(workspaceId, options))

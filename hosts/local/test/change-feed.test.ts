@@ -2,8 +2,8 @@ import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { ChangeFeed } from "@amends-dev/core/change-feed"
 import { GroupFacts } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
-import { Thread, ThreadService } from "@amends-dev/core/thread"
-import { InvitationFacts, Member, MemberFacts, type Workspace } from "@amends-dev/core/workspace"
+import { ThreadService, ThreadId } from "@amends-dev/core/thread"
+import { InvitationFacts, Member, MemberFacts, type WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { Streams } from "@amends-dev/http"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
@@ -36,7 +36,11 @@ const server = (url: string, limits?: Context.Service.Shape<typeof Streams.Limit
     ),
     Layer.provideMerge(BunHttpServer.layerTest)
   )
-const listen = (api: Effect.Success<ReturnType<typeof client>>, workspaceId: Workspace.Id, after?: ChangeFeed.Cursor) =>
+const listen = (
+  api: Effect.Success<ReturnType<typeof client>>,
+  workspaceId: WorkspaceId.WorkspaceId,
+  after?: ChangeFeed.Cursor
+) =>
   Effect.gen(function* () {
     const scope = yield* Scope.fork(yield* Scope.Scope)
     const queue = yield* Queue.unbounded<ChangeFeed.Message>()
@@ -74,7 +78,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const first = yield* listen(alice, workspace.id)
           const second = yield* listen(alice, workspace.id)
           const foreign = yield* listen(yield* client("alice", other.id), other.id)
-          const issue = (workspaceId: Workspace.Id, name = "bob") =>
+          const issue = (workspaceId: WorkspaceId.WorkspaceId, name = "bob") =>
             Effect.flatMap(client("alice", workspaceId), (inviter) =>
               inviter.invitations.issue({
                 headers: {},
@@ -239,7 +243,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(
           yield* alice.threads
             .typing({
-              params: { threadId: Thread.Id.make("missing") }
+              params: { threadId: ThreadId.ThreadId.make("missing") }
             })
             .pipe(Effect.flip)
         ).toMatchObject({ _tag: "CoreError.NotFound", resource: "Thread", id: "missing" })

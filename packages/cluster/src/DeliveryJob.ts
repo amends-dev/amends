@@ -14,7 +14,7 @@
 import { DeliveryJobs } from "@amends-dev/core/channel"
 import { Store, StoreError } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
-import { Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as ClusterSchema from "effect/cluster/ClusterSchema"
 import * as Entity from "effect/cluster/Entity"
 import * as Effect from "effect/Effect"
@@ -62,7 +62,7 @@ export const entity = Entity.make("amends/DeliveryJob", [
 export const entityId = (job: DeliveryJobs.Job) => encodeEntityId([job.workspaceId, job.threadId])
 
 /** An entity's ID, written and read back by the one codec. */
-const EntityId = Schema.fromJsonString(Schema.Tuple([Workspace.Id, ThreadId.Id]))
+const EntityId = Schema.fromJsonString(Schema.Tuple([WorkspaceId.WorkspaceId, ThreadId.ThreadId]))
 const encodeEntityId = Schema.encodeSync(EntityId)
 const decodeEntityId = Schema.decodeUnknownSync(EntityId)
 

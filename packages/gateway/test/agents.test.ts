@@ -1,12 +1,14 @@
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Agent, AgentPermissions, AgentService } from "@amends-dev/core/agent"
 import { Assignment, AssignmentFacts, AssignmentPermissions, BuiltinRoles, Grant } from "@amends-dev/core/authorization"
-import { Connection, ConnectionPermissions, ConnectionService } from "@amends-dev/core/connection"
+import { type Connection, ConnectionPermissions, ConnectionService } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
 import { Group } from "@amends-dev/core/group"
-import type { Actor, Identity } from "@amends-dev/core/identity"
+import { type Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication, StoreError } from "@amends-dev/core/journal"
 import { Request } from "@amends-dev/core/request"
-import { Member, type Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
+import { MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Redacted } from "effect"
@@ -19,16 +21,16 @@ import {
   boundTo,
   future,
   goodKey,
-  installed,
   journalLog,
   request,
   testIntegrations,
   testProvenance,
-  type Bound
+  type Bound,
+  installed
 } from "./support.ts"
 
 const as = <A, E>(
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
   use: (agentService: AgentService.AgentService["Service"]) => Effect.Effect<A, E, Actor.Actor>
 ) =>
@@ -37,7 +39,7 @@ const as = <A, E>(
   )
 
 /** A connection alice creates in the workspace. */
-const connect = (workspaceId: Workspace.Id, input: Connection.CreateInput) =>
+const connect = (workspaceId: WorkspaceId.WorkspaceId, input: Connection.CreateInput) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       workspaceId,
@@ -47,7 +49,7 @@ const connect = (workspaceId: Workspace.Id, input: Connection.CreateInput) =>
   )
 
 /** A connection alice removes from the workspace. */
-const disconnect = (workspaceId: Workspace.Id, connectionId: Connection.Id) =>
+const disconnect = (workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       workspaceId,
@@ -132,7 +134,7 @@ const changed = (input: Agent.CreateInput, changes: Partial<Agent.CreateInput>):
   Object.assign({}, input, changes)
 
 /** How an agent created from `input` is set up, to configure it as `input` says. */
-const configurationOf = (agentId: Agent.Id, input: Agent.CreateInput) => ({
+const configurationOf = (agentId: Identity.AgentId, input: Agent.CreateInput) => ({
   agentId,
   instructions: input.instructions,
   harness: input.harness,
@@ -146,14 +148,14 @@ type Operation = (agentService: AgentService.AgentService["Service"]) => Effect.
 const { core, gateway, runGateway } = Support
 let directGrants = 0
 /** Give the member each of `grants` directly, which no operation does. */
-const grant = (bound: Bound, memberId: Member.Id, grants: ReadonlyArray<Grant.Grant>) =>
+const grant = (bound: Bound, memberId: MemberId.MemberId, grants: ReadonlyArray<Grant.Grant>) =>
   Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
       Effect.forEach(
         grants,
         (value) =>
           journal.publish(AssignmentFacts.Created, {
-            assignmentId: Assignment.Id.make(`direct-${(directGrants += 1)}`),
+            assignmentId: Assignment.AssignmentId.make(`direct-${(directGrants += 1)}`),
             workspaceId: bound.store.workspaceId,
             memberId,
             source: { _tag: "Direct", grant: value }
@@ -166,7 +168,7 @@ const grant = (bound: Bound, memberId: Member.Id, grants: ReadonlyArray<Grant.Gr
     Effect.provide(core(bound))
   )
 /** Take every role the member has away, as alice. */
-const revokeRoles = (bound: Bound, memberId: Member.Id) =>
+const revokeRoles = (bound: Bound, memberId: MemberId.MemberId) =>
   Effect.flatMap(bound.assignments.listActiveByMember(memberId), (assignments) =>
     Effect.forEach(
       assignments,
@@ -291,7 +293,7 @@ describe("agents", () => {
             const refused = (refusedInput: Agent.CreateInput) =>
               Effect.flip(as(workspace.id, alice, (agentService) => agentService.create(refusedInput)))
 
-            const missing = Connection.Id.make("missing")
+            const missing = ConnectionContract.ConnectionId.make("missing")
             expect(yield* refused(changed(input, { model: { connectionId: missing, id: "test-model" } }))).toEqual(
               new CoreError.Invalid({
                 reason: new CoreError.ConnectionUnusable({ part: "model", connectionId: missing })
@@ -387,7 +389,7 @@ describe("agents", () => {
             const bound = yield* boundTo(workspace.id)
             yield* revokeRoles(bound, bobMemberId)
             const inWorkspace = { _tag: "Workspace", workspaceId: workspace.id } as const
-            const onConnection = (connectionId: Connection.Id) =>
+            const onConnection = (connectionId: ConnectionContract.ConnectionId) =>
               ({
                 _tag: "Target",
                 target: { _tag: "Connection", workspaceId: workspace.id, connectionId }
@@ -454,12 +456,12 @@ describe("agents", () => {
           const storedPlanner = Option.getOrThrow(yield* bound.agents.get(planner.id))
           const writes = [
             bound.agents.insert(stored),
-            bound.agents.insert(Agent.change(stored, { id: Agent.Id.make("second") })),
+            bound.agents.insert(Agent.change(stored, { id: Identity.AgentId.make("second") })),
             bound.agents.update(Agent.change(stored, { memberId: planner.memberId })),
             bound.agents.update(
               Agent.change(stored, {
-                id: Agent.Id.make("missing"),
-                memberId: Member.Id.make("missing-member")
+                id: Identity.AgentId.make("missing"),
+                memberId: MemberId.MemberId.make("missing-member")
               })
             )
           ]
@@ -546,7 +548,7 @@ describe("agents", () => {
           // Renaming to the name it has is done already, whatever name was expected.
           expect(yield* rename("Answerer", "Reviewer")).toEqual(renamed)
 
-          const unknown = Agent.Id.make("unknown")
+          const unknown = Identity.AgentId.make("unknown")
           const operations: ReadonlyArray<Operation> = [
             (agentService) => agentService.get(unknown),
             (agentService) => agentService.configure(configurationOf(unknown, inProcess)),

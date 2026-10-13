@@ -43,7 +43,7 @@ export type Connections = ReadonlyArray<Connection.Connection>
  */
 export interface Named {
   readonly part: Agent.Part
-  readonly connectionId: Connection.Id
+  readonly connectionId: ConnectionContract.ConnectionId
 }
 
 /**
@@ -125,7 +125,7 @@ export const Resolved = Data.taggedEnum<Resolved>()
  * @since 0.1.0
  */
 export const resolveConnection = Effect.fnUntraced(function* (
-  connectionId: Connection.Id,
+  connectionId: ConnectionContract.ConnectionId,
   connections: Connections,
   integrations: Integrations.Integrations["Service"]
 ): Effect.fn.Return<Resolved> {
@@ -143,7 +143,7 @@ export const resolveConnection = Effect.fnUntraced(function* (
  */
 const issueOf = Effect.fnUntraced(function* (
   part: Agent.Part,
-  connectionId: Connection.Id,
+  connectionId: ConnectionContract.ConnectionId,
   setup: Setup,
   connections: Connections,
   integrations: Integrations.Integrations["Service"]
@@ -224,6 +224,7 @@ export const harnessesToChoose = Effect.fnUntraced(function* (
  * @since 0.1.0
  */
 export const chooseHarness = (
-  harnesses: ReadonlyArray<Connection.Id>,
-  previous: Connection.Id | undefined
-): Connection.Id | undefined => (previous !== undefined && harnesses.includes(previous) ? previous : harnesses[0])
+  harnesses: ReadonlyArray<ConnectionContract.ConnectionId>,
+  previous: ConnectionContract.ConnectionId | undefined
+): ConnectionContract.ConnectionId | undefined =>
+  previous !== undefined && harnesses.includes(previous) ? previous : harnesses[0]

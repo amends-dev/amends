@@ -20,7 +20,7 @@ import { make, type Fixture } from "../memory.ts"
 import { testCrypto, testProvenance } from "../publication.ts"
 
 const testSubject = () => Subject.make("test", "entity")
-const workspaceId = WorkspaceId.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("journal")
 const Changed = Fact.make("example.changed", {
   subject: testSubject,
@@ -46,7 +46,7 @@ it.effect("root operations have independent correlations and attribute an agent'
       Effect.gen(function* () {
         const actor = Actor.Actor.of({
           workspaceId,
-          memberId: MemberId.Id.make("agent-membership"),
+          memberId: MemberId.MemberId.make("agent-membership"),
           identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("agent") })
         })
         const occurredAt = DateTime.makeUnsafe("2025-01-01T00:00:00Z")
@@ -118,7 +118,7 @@ it.effect("publication requires invocation context even if an actor or construct
     const publish = journal.publish(Changed, 0).pipe(
       Effect.provideService(Actor.Actor, {
         workspaceId,
-        memberId: MemberId.Id.make("alice"),
+        memberId: MemberId.MemberId.make("alice"),
         identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
       })
     )
@@ -146,12 +146,12 @@ it.effect("foreign workspaces, dangling causes and changed correlations reject w
         const next = yield* Publication.makeCausedBy(parent)
         const cause = Event.makeReference(parent)
         const invalid = [
-          Object.assign({}, next, { workspaceId: WorkspaceId.Id.make("other") }),
+          Object.assign({}, next, { workspaceId: WorkspaceId.WorkspaceId.make("other") }),
           Object.assign({}, next, {
-            causedBy: Object.assign({}, cause, { workspaceId: WorkspaceId.Id.make("other") })
+            causedBy: Object.assign({}, cause, { workspaceId: WorkspaceId.WorkspaceId.make("other") })
           }),
           Object.assign({}, next, {
-            causedBy: Object.assign({}, cause, { id: Entry.Id.make("missing") })
+            causedBy: Object.assign({}, cause, { id: Entry.EntryId.make("missing") })
           }),
           Object.assign({}, next, { correlationId: Event.CorrelationId.make("unrelated") })
         ]
@@ -172,7 +172,7 @@ it.effect("foreign workspaces, dangling causes and changed correlations reject w
                 Effect.provideService(
                   Publication.Publication,
                   Object.assign({}, next, {
-                    causedBy: Object.assign({}, cause, { id: Entry.Id.make("missing") })
+                    causedBy: Object.assign({}, cause, { id: Entry.EntryId.make("missing") })
                   })
                 ),
                 Effect.ignore
@@ -258,12 +258,12 @@ it.effect("concurrent operation contexts keep their actors and correlations thro
         const journal = yield* setup
         const alice = Actor.Actor.of({
           workspaceId,
-          memberId: MemberId.Id.make("alice"),
+          memberId: MemberId.MemberId.make("alice"),
           identity: { _tag: "Human", id: Identity.HumanId.make("alice") }
         })
         const bob = Actor.Actor.of({
           workspaceId,
-          memberId: MemberId.Id.make("bob"),
+          memberId: MemberId.MemberId.make("bob"),
           identity: { _tag: "Agent", id: Identity.AgentId.make("bob") }
         })
         const aliceReady = yield* Deferred.make<void>()
@@ -320,7 +320,7 @@ it.effect("causal and field overrides retain the current performer and restore c
           .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)))
         const actor = Actor.Actor.of({
           workspaceId,
-          memberId: MemberId.Id.make("worker"),
+          memberId: MemberId.MemberId.make("worker"),
           identity: { _tag: "Agent", id: Identity.AgentId.make("worker") }
         })
         const time = DateTime.makeUnsafe("2025-01-01T00:00:00Z")
@@ -373,7 +373,7 @@ it.effect("a scoped cause cannot switch the current publication workspace", () =
           .publish(Changed, 2)
           .pipe(
             Publication.withCause(parent),
-            Effect.provideService(Publication.Publication, testProvenance(WorkspaceId.Id.make("other"))),
+            Effect.provideService(Publication.Publication, testProvenance(WorkspaceId.WorkspaceId.make("other"))),
             Effect.flip
           )
         expect(failure._tag).toBe("SchemaError")

@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import { WorkspaceStorage } from "@amends-dev/gateway"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
@@ -105,7 +105,7 @@ const layerStores = Layer.mergeAll(
  * @since 0.1.0
  */
 export const layerWorkspace = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   options: Options = {},
   credentialKey: Option.Option<CredentialKey.Cipher> = Option.none()
 ) =>
@@ -132,7 +132,7 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const forWorkspace: WorkspaceStorage.WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn(
     "PostgresWorkspaceStorage.forWorkspace"
   )(
-    function* (workspaceId: Workspace.Id) {
+    function* (workspaceId: WorkspaceId.WorkspaceId) {
       return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options, credentialKey)))
     },
     Effect.provideService(PostgresDatabase.PostgresDatabase, postgresDatabase),

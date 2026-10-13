@@ -36,7 +36,7 @@ import * as TurnFacts from "./TurnFacts.ts"
  * @since 0.1.0
  */
 export type Ending =
-  | { readonly outcome: "completed"; readonly messageIds: ReadonlyArray<ThreadMessageId.Id> }
+  | { readonly outcome: "completed"; readonly messageIds: ReadonlyArray<ThreadMessageId.ThreadMessageId> }
   | { readonly outcome: "failed"; readonly reason: string }
   | { readonly outcome: "cancelled"; readonly cancelReason: Turn.CancelReason }
 
@@ -88,7 +88,7 @@ export class TurnCommand extends Context.Service<
      * fact that reports it. It informs no one.
      */
     readonly recordActivity: <K extends ActivityKind>(
-      threadId: ThreadId.Id,
+      threadId: ThreadId.ThreadId,
       kind: K,
       details: K["details"]["Type"],
       cause: Event.Event

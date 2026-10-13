@@ -6,7 +6,8 @@ import {
   MemberFacts,
   MemberPermissions,
   OwnershipService,
-  OwnershipPermissions
+  OwnershipPermissions,
+  MemberId
 } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Result } from "effect"
@@ -45,7 +46,7 @@ describe("ownership", () => {
               memberId: recipient.id,
               roleId: BuiltinRoles.AdministratorId
             })
-            const preservedId = Assignment.Id.make("separate-access")
+            const preservedId = Assignment.AssignmentId.make("separate-access")
             yield* Effect.flatMap(Journal.Journal, (journal) =>
               journal
                 .publish(AssignmentFacts.Created, {
@@ -121,7 +122,7 @@ describe("ownership", () => {
         storage,
         Effect.gen(function* () {
           const { workspace, recipient, other, view, bound } = yield* setup
-          const agentId = Member.Id.make("agent")
+          const agentId = MemberId.MemberId.make("agent")
           yield* Effect.flatMap(Journal.Journal, (journal) =>
             journal
               .publish(MemberFacts.Added, {
@@ -167,7 +168,7 @@ describe("ownership", () => {
             journal
               .publish(AssignmentFacts.Created, {
                 workspaceId: workspace.id,
-                assignmentId: Assignment.Id.make("transfer-permission"),
+                assignmentId: Assignment.AssignmentId.make("transfer-permission"),
                 memberId: recipient.id,
                 source: {
                   _tag: "Direct",

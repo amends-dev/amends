@@ -1,5 +1,5 @@
 import { Entry, Store } from "@amends-dev/core/journal"
-import { Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Clock, Context, DateTime, Deferred, Duration, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { SqlClient, SqlError } from "effect/sql"
@@ -10,8 +10,8 @@ import { database, initialized, inDatabase, setup, views, workspaceId } from "./
 
 const { available, withDatabase } = setup()
 const execution = Entry.LogId.make("execution")
-const first = Workspace.Id.make("workspace-first")
-const second = Workspace.Id.make("workspace-second")
+const first = WorkspaceId.WorkspaceId.make("workspace-first")
+const second = WorkspaceId.WorkspaceId.make("workspace-second")
 
 /** One process: a pool of `size` connections, and views of workspaces over it. */
 const process = Effect.fnUntraced(function* (
@@ -169,7 +169,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
       Effect.gen(function* () {
         const pool = yield* Layer.build(database(url))
         const { sql } = Context.get(pool, PostgresDatabase.PostgresDatabase)
-        const binding = (id: Workspace.Id) => Binding.make(id, { readConnections: 2 }).pipe(Effect.provide(pool))
+        const binding = (id: WorkspaceId.WorkspaceId) =>
+          Binding.make(id, { readConnections: 2 }).pipe(Effect.provide(pool))
         const busy = yield* binding(first)
         const other = yield* binding(second)
         const sleeping = yield* Effect.forkChild(

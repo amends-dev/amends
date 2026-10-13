@@ -1,4 +1,5 @@
 import { GroupCommand } from "@amends-dev/core/group"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Crypto, Effect, Layer, Option } from "effect"
 import * as Assignment from "../../../src/authorization/Assignment.ts"
@@ -30,37 +31,36 @@ import * as MemberPermissions from "../../../src/workspace/MemberPermissions.ts"
 import * as MemberProjection from "../../../src/workspace/MemberProjection.ts"
 import * as MemberService from "../../../src/workspace/MemberService.ts"
 import * as MemberStore from "../../../src/workspace/MemberStore.ts"
-import * as Workspace from "../../../src/workspace/Workspace.ts"
 import * as WorkspaceStore from "../../../src/workspace/WorkspaceStore.ts"
 import { make, type Fixture } from "../../memory.ts"
 import { testCrypto, testProvenance } from "../../publication.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
-const foreignWorkspaceId = Workspace.Id.make("workspace-two")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
+const foreignWorkspaceId = WorkspaceId.WorkspaceId.make("workspace-two")
 const alice = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("alice"),
+  memberId: MemberId.MemberId.make("alice"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
 })
 const agent = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("agent"),
+  memberId: MemberId.MemberId.make("agent"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("agent") })
 })
 const bob = Member.Member.make({
-  id: Member.Id.make("bob"),
+  id: MemberId.MemberId.make("bob"),
   workspaceId,
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") }),
   name: Member.Name.make("bob"),
   status: "active"
 })
-const missingId = Member.Id.make("missing")
+const missingId = MemberId.MemberId.make("missing")
 const bobScope = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Member.make({ workspaceId, memberId: bob.id })
 })
 const assignment = (id: string, scope: Scope.Scope = bobScope, permission = MemberPermissions.Read) =>
   Assignment.Assignment.make({
-    id: Assignment.Id.make(id),
+    id: Assignment.AssignmentId.make(id),
     workspaceId,
     memberId: alice.memberId,
     source: Assignment.Source.cases.Direct.make({
@@ -144,10 +144,10 @@ const configured = (
     Layer.provide(members)
   )
 }
-const get = Effect.fn("MemberApplicationTest.get")(function* (id: Member.Id) {
+const get = Effect.fn("MemberApplicationTest.get")(function* (id: MemberId.MemberId) {
   return yield* (yield* MemberService.MemberService).get(id)
 })
-const remove = Effect.fn("MemberApplicationTest.remove")(function* (id: Member.Id) {
+const remove = Effect.fn("MemberApplicationTest.remove")(function* (id: MemberId.MemberId) {
   return yield* (yield* MemberService.MemberService).remove(id)
 })
 const run = <A, E>(
@@ -229,9 +229,9 @@ it.effect("authorization precedes the target lookup and NotFound is only exposed
   Effect.gen(function* () {
     const fixture = yield* make()
     yield* seed(fixture, [assignment("read-bob")])
-    const lookedUp: Array<Member.Id> = []
+    const lookedUp: Array<MemberId.MemberId> = []
     const overrides = {
-      get: Effect.fn("MemberApplicationTest.observeGet")(function* (id: Member.Id) {
+      get: Effect.fn("MemberApplicationTest.observeGet")(function* (id: MemberId.MemberId) {
         lookedUp.push(id)
         return yield* fixture.members.get(id)
       })
@@ -441,7 +441,7 @@ it.effect("removal checks permission before disclosing a missing target and prot
       Effect.gen(function* () {
         yield* fixture.assignments.insert(ownerGrant)
         yield* fixture.assignments.insert({
-          id: Assignment.Id.make("agent-remove-workspace"),
+          id: Assignment.AssignmentId.make("agent-remove-workspace"),
           workspaceId,
           memberId: agent.memberId,
           source: ownerGrant.source,

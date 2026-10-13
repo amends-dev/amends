@@ -19,7 +19,7 @@ import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
-import type * as Group from "../group/Group.ts"
+import type * as GroupId from "../group/GroupId.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Journal from "../journal/Journal.ts"
@@ -28,10 +28,11 @@ import * as Store from "../journal/Store.ts"
 import type * as StoreError from "../journal/StoreError.ts"
 import * as Operation from "../operation/Operation.ts"
 import type * as Thread from "../thread/Thread.ts"
+import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessage from "../thread/ThreadMessage.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as Task from "./Task.ts"
 import * as TaskCommand from "./TaskCommand.ts"
 import * as TaskPermissions from "./TaskPermissions.ts"
@@ -104,14 +105,14 @@ export class TaskService extends Context.Service<
      * The thread's task, under current group audience and `thread.read`; a thread without one is
      * `CoreError.NotFound`.
      */
-    readonly get: (threadId: Thread.Id) => Effect.Effect<Task.Task, ReadError, Actor.Actor>
+    readonly get: (threadId: ThreadId.ThreadId) => Effect.Effect<Task.Task, ReadError, Actor.Actor>
     /**
      * One page of a group's tasks the actor can read, newest created first, of one status when the
      * options name one: each thread with its task, latest activity, and the actor's position and
      * unread state, under the rules of `ThreadService.listInGroup`.
      */
     readonly listInGroup: (
-      groupId: Group.Id,
+      groupId: GroupId.GroupId,
       options: Task.ListOptions
     ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Actor>
   }
@@ -144,7 +145,7 @@ export const make = Effect.gen(function* () {
    * Require the assignee to be able to take part in the thread, and the actor's agent use when
    * the assignee is an agent, since assigning one directs it.
    */
-  const requireAssignable = Effect.fnUntraced(function* (thread: Thread.Thread, memberId: Member.Id) {
+  const requireAssignable = Effect.fnUntraced(function* (thread: Thread.Thread, memberId: MemberId.MemberId) {
     const eligible = yield* threadQuery.eligibleMembers(thread.groupId, [memberId])
     const entry = eligible.get(memberId)
     if (entry === undefined)
@@ -225,12 +226,15 @@ export const make = Effect.gen(function* () {
   )
 
   // Reads are outside journal.commit; an enclosing caller transaction remains authoritative.
-  const get = Effect.fn("TaskService.get")(function* (threadId: Thread.Id) {
+  const get = Effect.fn("TaskService.get")(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* threadQuery.requireReadable(threadId)
     return yield* requireTask(thread)
   }, Operation.report)
 
-  const listInGroup = Effect.fn("TaskService.listInGroup")(function* (groupId: Group.Id, input: Task.ListOptions) {
+  const listInGroup = Effect.fn("TaskService.listInGroup")(function* (
+    groupId: GroupId.GroupId,
+    input: Task.ListOptions
+  ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Task.ListOptions))(input)
     /** A page of the group's tasks, each with its thread, which a task cannot outlive. */
     const page = Effect.fnUntraced(function* (

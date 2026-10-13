@@ -24,7 +24,7 @@ export const Published = Fact.make("thread.message.published", {
   subject: (payload) => Subject.make("thread-message", payload.id),
   occurrence: (payload) => [payload.id],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: Schema.Struct({ ...ThreadMessage.ThreadMessage.fields, groupId: GroupId.Id })
+  payload: Schema.Struct({ ...ThreadMessage.ThreadMessage.fields, groupId: GroupId.GroupId })
 })
 
 /**

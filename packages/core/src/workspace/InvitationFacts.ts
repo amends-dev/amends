@@ -11,7 +11,7 @@ import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Invitation from "./Invitation.ts"
-import * as Workspace from "./Workspace.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * An invitation was issued, as its issuance says. Every member may learn of it.
@@ -39,8 +39,8 @@ export const Accepted = Fact.make("workspace.invitation.accepted", {
   subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({
-    workspaceId: Workspace.Id,
-    invitationId: Invitation.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
+    invitationId: Invitation.InvitationId,
     ...Invitation.State.cases.Accepted.fields
   }),
   occurrence: (payload) => [payload.invitationId]
@@ -58,8 +58,8 @@ export const Revoked = Fact.make("workspace.invitation.revoked", {
   subject: (payload) => Subject.make("invitation", payload.invitationId),
   version: 1,
   payload: Schema.Struct({
-    workspaceId: Workspace.Id,
-    invitationId: Invitation.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
+    invitationId: Invitation.InvitationId,
     ...Invitation.State.cases.Revoked.fields
   }),
   occurrence: (payload) => [payload.invitationId]

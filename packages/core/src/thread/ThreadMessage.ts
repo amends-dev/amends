@@ -20,20 +20,6 @@ import * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessageId from "./ThreadMessageId.ts"
 
 /**
- * Names a message; `ThreadMessageId.Id`, where models that only refer to messages import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = ThreadMessageId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = ThreadMessageId.Id
-
-/**
  * Markdown, preserved as submitted, including indentation; whitespace-only text and characters
  * storage cannot keep as given are rejected. A mention in it is a link to the member, written by
  * `mentionText`.
@@ -95,7 +81,7 @@ export const mentionedIn = (text: string): ReadonlyArray<string> => [
  * @since 0.1.0
  */
 export const Author = Schema.TaggedUnion({
-  Member: { memberId: MemberId.Id },
+  Member: { memberId: MemberId.MemberId },
   Contact: { contactId: Identity.ContactId }
 })
 
@@ -114,8 +100,8 @@ export type Author = typeof Author.Type
  * @since 0.1.0
  */
 export const Via = Schema.TaggedUnion({
-  Turn: { turnId: TurnId.Id },
-  Channel: { channelId: ChannelId.Id, externalMessageId: Schema.NonEmptyString }
+  Turn: { turnId: TurnId.TurnId },
+  Channel: { channelId: ChannelId.ChannelId, externalMessageId: Schema.NonEmptyString }
 })
 
 /**
@@ -148,7 +134,7 @@ export type Revision = typeof Revision.Type
 export const Content = Schema.TaggedUnion({
   Text: {
     text: Text,
-    mentions: Schema.UniqueArray(MemberId.Id),
+    mentions: Schema.UniqueArray(MemberId.MemberId),
     revision: Revision,
     /** When it was last edited, or null as published. */
     editedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
@@ -170,9 +156,9 @@ export type Content = typeof Content.Type
  * @since 0.1.0
  */
 export const ThreadMessage = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
+  id: ThreadMessageId.ThreadMessageId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
   author: Author,
   /** How it came about, or null for one written in amends. */
   via: Schema.NullOr(Via),
@@ -192,7 +178,7 @@ export interface ThreadMessage extends Schema.Schema.Type<typeof ThreadMessage> 
  * @category utils
  * @since 0.1.0
  */
-export const published = (text: Text, mentions: ReadonlyArray<MemberId.Id>): Content =>
+export const published = (text: Text, mentions: ReadonlyArray<MemberId.MemberId>): Content =>
   Content.cases.Text.make({ text, mentions, revision: 1, editedAt: null })
 
 /**
@@ -203,9 +189,9 @@ export const published = (text: Text, mentions: ReadonlyArray<MemberId.Id>): Con
  * @since 0.1.0
  */
 export const PublishInput = Schema.Struct({
-  threadId: ThreadId.Id,
+  threadId: ThreadId.ThreadId,
   text: Text,
-  mentions: Schema.UniqueArray(MemberId.Id)
+  mentions: Schema.UniqueArray(MemberId.MemberId)
 })
 
 /**
@@ -222,9 +208,9 @@ export interface PublishInput extends Schema.Schema.Type<typeof PublishInput> {}
  * @since 0.1.0
  */
 export const EditInput = Schema.Struct({
-  messageId: Id,
+  messageId: ThreadMessageId.ThreadMessageId,
   text: Text,
-  mentions: Schema.UniqueArray(MemberId.Id),
+  mentions: Schema.UniqueArray(MemberId.MemberId),
   expectedRevision: Revision
 })
 
@@ -242,13 +228,13 @@ export interface EditInput extends Schema.Schema.Type<typeof EditInput> {}
  * @since 0.1.0
  */
 export const Edited = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
-  messageId: Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
+  messageId: ThreadMessageId.ThreadMessageId,
   revision: Revision,
   text: Text,
-  mentions: Schema.UniqueArray(MemberId.Id),
+  mentions: Schema.UniqueArray(MemberId.MemberId),
   editedAt: Schema.DateTimeUtcFromString
 })
 
@@ -265,10 +251,10 @@ export interface Edited extends Schema.Schema.Type<typeof Edited> {}
  * @since 0.1.0
  */
 export const Deleted = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
-  messageId: Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
+  messageId: ThreadMessageId.ThreadMessageId,
   deletedAt: Schema.DateTimeUtcFromString
 })
 

@@ -1,9 +1,16 @@
 export { Identity }
-import { Group, GroupMembership } from "@amends-dev/core/group"
+import { Group, GroupMembership, GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Notification, NotificationInbox } from "@amends-dev/core/notification"
-import { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@amends-dev/core/thread"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import {
+  Thread,
+  ThreadMessage,
+  ThreadParticipation,
+  ThreadTimeline,
+  ThreadId,
+  ThreadParticipationId
+} from "@amends-dev/core/thread"
+import { Member, WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -46,7 +53,7 @@ const split = (key: string) => {
   return { workspaceId, id }
 }
 const joined = (workspaceId: string, id: string) => `${workspaceId}\u0000${id}`
-const valid = (workspaceId: string) => Option.isSome(Schema.decodeOption(Workspace.Id)(workspaceId))
+const valid = (workspaceId: string) => Option.isSome(Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId))
 
 /** Every group the reader belongs to, read page by page, in group-ID order. */
 const groupsOf = perClient((client: ApiClient, workspaceId: string) =>
@@ -55,7 +62,7 @@ const groupsOf = perClient((client: ApiClient, workspaceId: string) =>
       Effect.gen(function* () {
         const api = yield* client
         const groups: Array<Group.ListItem> = []
-        let after: Group.Id | undefined
+        let after: GroupId.GroupId | undefined
         while (true) {
           const page = yield* api.groups.list({
             query: after === undefined ? { limit: 100 } : { limit: 100, after }
@@ -79,7 +86,7 @@ const publicGroupsOf = perClient((client: ApiClient, workspaceId: string) =>
       Effect.gen(function* () {
         const api = yield* client
         const groups: Array<Group.PublicItem> = []
-        let after: Group.Id | undefined
+        let after: GroupId.GroupId | undefined
         while (true) {
           const page = yield* api.groups.listPublic({
             query: after === undefined ? { limit: 100 } : { limit: 100, after }
@@ -103,9 +110,9 @@ const rosterOf = perClient((client: ApiClient, key: string) => {
     .atom(
       Effect.gen(function* () {
         const api = yield* client
-        const params = { groupId: Group.Id.make(id) }
+        const params = { groupId: GroupId.GroupId.make(id) }
         const admissions: Array<GroupMembership.GroupMembership> = []
-        let after: GroupMembership.Id | undefined
+        let after: GroupMembership.GroupMembershipId | undefined
         while (true) {
           const page = yield* api.groups.members({
             params,
@@ -121,7 +128,7 @@ const rosterOf = perClient((client: ApiClient, key: string) => {
     .pipe(Atom.withReactivity(itemKeys(workspaceId, "rosters", id)))
 })
 export const rosterRead = (client: ApiClient, workspaceId: string, groupId: string) =>
-  valid(workspaceId) && Option.isSome(Schema.decodeOption(Group.Id)(groupId))
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(GroupId.GroupId)(groupId))
     ? rosterOf(client, joined(workspaceId, groupId))
     : undefined
 
@@ -132,13 +139,13 @@ const threadOf = perClient((client: ApiClient, key: string) => {
     .atom(
       Effect.gen(function* () {
         const api = yield* client
-        return yield* api.threads.get({ params: { threadId: Thread.Id.make(id) } })
+        return yield* api.threads.get({ params: { threadId: ThreadId.ThreadId.make(id) } })
       })
     )
     .pipe(Atom.withReactivity(itemKeys(workspaceId, "threads", id)))
 })
 export const threadRead = (client: ApiClient, workspaceId: string, threadId: string) =>
-  valid(workspaceId) && Option.isSome(Schema.decodeOption(Thread.Id)(threadId))
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(ThreadId.ThreadId)(threadId))
     ? threadOf(client, joined(workspaceId, threadId))
     : undefined
 
@@ -149,9 +156,9 @@ const participantsOf = perClient((client: ApiClient, key: string) => {
     .atom(
       Effect.gen(function* () {
         const api = yield* client
-        const params = { threadId: Thread.Id.make(id) }
+        const params = { threadId: ThreadId.ThreadId.make(id) }
         const participants: Array<ThreadParticipation.Summary> = []
-        let after: ThreadParticipation.Id | undefined
+        let after: ThreadParticipationId.ThreadParticipationId | undefined
         while (true) {
           const page = yield* api.threads.participants({
             params,
@@ -167,7 +174,7 @@ const participantsOf = perClient((client: ApiClient, key: string) => {
     .pipe(Atom.withReactivity(itemKeys(workspaceId, "participants", id)))
 })
 export const participantsRead = (client: ApiClient, workspaceId: string, threadId: string) =>
-  valid(workspaceId) && Option.isSome(Schema.decodeOption(Thread.Id)(threadId))
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(ThreadId.ThreadId)(threadId))
     ? participantsOf(client, joined(workspaceId, threadId))
     : undefined
 
@@ -222,7 +229,7 @@ const streamOf = perClient((client: ApiClient, key: string): PagedRead<Thread.Op
         // more reads one page past it. New threads arrive at the newest end.
         const reach = Option.flatMap(previous, (view) => Option.fromUndefinedOr(view.items[0]))
         const more = Option.isNone(previous) || requested > previous.value.earlier
-        const params = { groupId: Group.Id.make(id) }
+        const params = { groupId: GroupId.GroupId.make(id) }
         const newestFirst: Array<Thread.Opening> = []
         let before: Thread.OpeningCursor | undefined
         let complete = false
@@ -254,7 +261,7 @@ const streamOf = perClient((client: ApiClient, key: string): PagedRead<Thread.Op
 })
 /** A group's stream: its readable threads by when they started, oldest shown first. */
 export const streamRead = (client: ApiClient, workspaceId: string, groupId: string) =>
-  valid(workspaceId) && Option.isSome(Schema.decodeOption(Group.Id)(groupId))
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(GroupId.GroupId)(groupId))
     ? streamOf(client, joined(workspaceId, groupId))
     : undefined
 
@@ -267,7 +274,7 @@ const timelineOf = perClient((client: ApiClient, key: string): PagedRead<ThreadT
         const api = yield* client
         const requested = get(earlier)
         const previous = previousOf<ThreadTimeline.Item>(get)
-        const params = { threadId: Thread.Id.make(id) }
+        const params = { threadId: ThreadId.ThreadId.make(id) }
         const read = (query: {
           readonly afterSequence?: number
           readonly beforeSequence?: number
@@ -299,7 +306,7 @@ const timelineOf = perClient((client: ApiClient, key: string): PagedRead<ThreadT
 })
 /** A thread's timeline from its newest activity, oldest shown first. */
 export const timelineRead = (client: ApiClient, workspaceId: string, threadId: string) =>
-  valid(workspaceId) && Option.isSome(Schema.decodeOption(Thread.Id)(threadId))
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(ThreadId.ThreadId)(threadId))
     ? timelineOf(client, joined(workspaceId, threadId))
     : undefined
 
@@ -388,7 +395,7 @@ export const markSeenThrough = (api: WorkspaceApi, through: Pick<Notification.No
 export const markSeen = (api: WorkspaceApi, notificationId: string) =>
   Effect.gen(function* () {
     yield* api.notifications.markSeen({
-      params: { notificationId: yield* command(Notification.Id)(notificationId) }
+      params: { notificationId: yield* command(Notification.NotificationId)(notificationId) }
     })
   })
 
@@ -436,7 +443,7 @@ export const renameGroup = (workspace: string) => (api: WorkspaceApi, rename: Gr
   Effect.gen(function* () {
     const renamed = yield* api.groups
       .rename({
-        params: { groupId: yield* command(Group.Id)(rename.groupId) },
+        params: { groupId: yield* command(GroupId.GroupId)(rename.groupId) },
         payload: {
           name: yield* command(Group.NewName)(rename.name.trim()),
           expectedName: yield* command(Group.Name)(rename.expectedName)
@@ -458,7 +465,7 @@ export const renameGroup = (workspace: string) => (api: WorkspaceApi, rename: Gr
 export const joinGroup = (workspace: string) => (api: WorkspaceApi, groupId: string) =>
   Effect.gen(function* () {
     const admission = yield* api.groups.join({
-      params: { groupId: yield* command(Group.Id)(groupId) }
+      params: { groupId: yield* command(GroupId.GroupId)(groupId) }
     })
     yield* Reactivity.invalidate([
       workspaceKey(workspace, "groups"),
@@ -480,7 +487,7 @@ export type MembershipChange =
  */
 export const changeMembership = (workspace: string) => (api: WorkspaceApi, change: MembershipChange) =>
   Effect.gen(function* () {
-    const params = { groupId: yield* command(Group.Id)(change.groupId) }
+    const params = { groupId: yield* command(GroupId.GroupId)(change.groupId) }
     const invalidate = Reactivity.invalidate([
       itemKey(workspace, "rosters", change.groupId),
       itemKey(workspace, "streams", change.groupId),
@@ -492,7 +499,7 @@ export const changeMembership = (workspace: string) => (api: WorkspaceApi, chang
       case "add":
         // What was added before a failure stays added, so the reads refresh either way.
         yield* Effect.forEach(change.memberIds, (memberId) =>
-          Effect.flatMap(command(Member.Id)(memberId), (id) =>
+          Effect.flatMap(command(MemberId.MemberId)(memberId), (id) =>
             api.groups.addMember({ params, payload: { memberId: id } })
           ).pipe(
             Effect.asVoid,
@@ -504,7 +511,7 @@ export const changeMembership = (workspace: string) => (api: WorkspaceApi, chang
       case "leave": {
         const admission = {
           ...params,
-          membershipId: yield* command(GroupMembership.Id)(change.membershipId)
+          membershipId: yield* command(GroupMembership.GroupMembershipId)(change.membershipId)
         }
         if (change.kind === "remove") yield* api.groups.removeMember({ params: admission })
         else yield* api.groups.leave({ params: admission })
@@ -550,7 +557,7 @@ export const postMessage = (workspace: string) => (api: WorkspaceApi, post: Post
     const headers = { "idempotency-key": post.key }
     switch (post.kind) {
       case "start": {
-        const groupId = yield* command(Group.Id)(post.groupId)
+        const groupId = yield* command(GroupId.GroupId)(post.groupId)
         const started = yield* api.threads.start({
           params: { groupId },
           headers,
@@ -572,7 +579,7 @@ export const postMessage = (workspace: string) => (api: WorkspaceApi, post: Post
         return { groupId, threadId: started.thread.id }
       }
       case "reply": {
-        const threadId = yield* command(Thread.Id)(post.threadId)
+        const threadId = yield* command(ThreadId.ThreadId)(post.threadId)
         yield* api.threads.publish({ params: { threadId }, headers, payload })
         // A reply changes its group's stream, whichever group that is.
         yield* Reactivity.invalidate([itemKey(workspace, "timelines", threadId), collectionKey(workspace, "streams")])
@@ -594,14 +601,14 @@ export const markRead = (api: WorkspaceApi, mark: ReadMark) =>
   Effect.gen(function* () {
     if (mark.kind === "thread")
       yield* api.threads.markRead({
-        params: { threadId: yield* command(Thread.Id)(mark.threadId) },
+        params: { threadId: yield* command(ThreadId.ThreadId)(mark.threadId) },
         payload: {
           throughSequence: yield* command(Thread.Latest.fields.sequence)(mark.through)
         }
       })
     else
       yield* api.groups.markRead({
-        params: { groupId: yield* command(Group.Id)(mark.groupId) }
+        params: { groupId: yield* command(GroupId.GroupId)(mark.groupId) }
       })
   })
 
@@ -621,21 +628,21 @@ export const changeFollow = (api: WorkspaceApi, follow: Follow) =>
     switch (follow.kind) {
       case "follow-thread":
       case "unfollow-thread": {
-        const threadId = yield* command(Thread.Id)(follow.threadId)
+        const threadId = yield* command(ThreadId.ThreadId)(follow.threadId)
         if (follow.kind === "follow-thread") yield* api.threads.follow({ params: { threadId } })
         else
           yield* api.threads.unfollow({
             params: { threadId },
             payload: {
-              participationId: yield* command(ThreadParticipation.Id)(follow.participationId)
+              participationId: yield* command(ThreadParticipationId.ThreadParticipationId)(follow.participationId)
             }
           })
         return
       }
       case "follow-group":
       case "unfollow-group": {
-        const params = { groupId: yield* command(Group.Id)(follow.groupId) }
-        const payload = { memberId: yield* command(Member.Id)(follow.memberId) }
+        const params = { groupId: yield* command(GroupId.GroupId)(follow.groupId) }
+        const payload = { memberId: yield* command(MemberId.MemberId)(follow.memberId) }
         if (follow.kind === "follow-group") yield* api.groups.follow({ params, payload })
         else yield* api.groups.unfollow({ params, payload })
         return
@@ -646,5 +653,5 @@ export const changeFollow = (api: WorkspaceApi, follow: Follow) =>
 /** Tell a thread's readers that the reader is typing there, for the next few seconds. */
 export const sendTyping = (api: WorkspaceApi, threadId: string) =>
   Effect.gen(function* () {
-    yield* api.threads.typing({ params: { threadId: yield* command(Thread.Id)(threadId) } })
+    yield* api.threads.typing({ params: { threadId: yield* command(ThreadId.ThreadId)(threadId) } })
   })

@@ -16,13 +16,13 @@ import * as Schema from "effect/Schema"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("JournalCommitId"))
+export const CommitId = Schema.NonEmptyString.pipe(Schema.brand("JournalCommitId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type CommitId = typeof CommitId.Type
 
 /**
  * A commit as each of its log batches carries it: its ID, how many entries it appended across
@@ -32,7 +32,7 @@ export type Id = typeof Id.Type
  * @since 0.1.0
  */
 export const Commit = Schema.Struct({
-  id: Id,
+  id: CommitId,
   /** Total entries appended across every log in this commit. */
   entryCount: Schema.Natural,
   recordedAt: Schema.DateTimeUtcFromString

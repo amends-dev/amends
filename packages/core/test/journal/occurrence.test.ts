@@ -16,7 +16,7 @@ import { Counter, make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
 const testSubject = () => Subject.make("test", "entity")
-const workspaceId = WorkspaceId.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("journal")
 const Payload = Schema.Struct({
   source: Schema.NonEmptyString,

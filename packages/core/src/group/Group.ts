@@ -16,20 +16,6 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as GroupId from "./GroupId.ts"
 
 /**
- * Names a group; `GroupId.Id`, where models that only refer to groups import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = GroupId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = GroupId.Id
-
-/**
  * A team group's name as recorded; names chosen now are `NewName`.
  *
  * @category schemas
@@ -73,12 +59,12 @@ export type Visibility = typeof Visibility.Type
  * @since 0.1.0
  */
 export const Team = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: GroupId.GroupId,
+  workspaceId: WorkspaceId.WorkspaceId,
   kind: Schema.Literal("Team"),
   visibility: Visibility,
   name: Name,
-  createdBy: MemberId.Id,
+  createdBy: MemberId.MemberId,
   createdAt: Schema.DateTimeUtcFromString
 })
 
@@ -97,7 +83,7 @@ export interface Team extends Schema.Schema.Type<typeof Team> {}
  * @category utils
  * @since 0.1.0
  */
-export const GeneralId = Id.make("general")
+export const GeneralId = GroupId.GroupId.make("general")
 
 /**
  * The general group's name when a workspace is created.
@@ -124,7 +110,7 @@ const ascending = (left: string, right: string) => (left < right ? -1 : left > r
  * @category schemas
  * @since 0.1.0
  */
-export const DirectMembers = Schema.Array(MemberId.Id).check(
+export const DirectMembers = Schema.Array(MemberId.MemberId).check(
   Schema.makeFilter(
     (ids) =>
       (ids.length >= 2 && ids.every((id, index) => index === 0 || ascending(ids[index - 1]!, id) < 0)) ||
@@ -139,11 +125,11 @@ export const DirectMembers = Schema.Array(MemberId.Id).check(
  * @since 0.1.0
  */
 export const Direct = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: GroupId.GroupId,
+  workspaceId: WorkspaceId.WorkspaceId,
   kind: Schema.Literal("Direct"),
   memberIds: DirectMembers,
-  createdBy: MemberId.Id,
+  createdBy: MemberId.MemberId,
   createdAt: Schema.DateTimeUtcFromString
 }).check(
   Schema.makeFilter(
@@ -197,7 +183,7 @@ export const directKey = (memberIds: ReadonlyArray<string>): string => JSON.stri
  * @since 0.1.0
  */
 export const Latest = Schema.Struct({
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   occurredAt: Schema.DateTimeUtcFromString
 })
 
@@ -215,7 +201,7 @@ export interface Latest extends Schema.Schema.Type<typeof Latest> {}
  * @since 0.1.0
  */
 export const ListOptions = Schema.Struct({
-  after: Schema.optionalKey(GroupId.Id),
+  after: Schema.optionalKey(GroupId.GroupId),
   limit: Schema.Int.check(Schema.isGreaterThan(0))
 })
 
@@ -327,7 +313,7 @@ export const listItem = (group: Group, admittedAt: DateTime.Utc, activity: Activ
  * @category options
  * @since 0.1.0
  */
-export const RenameInput = Schema.Struct({ groupId: Id, name: NewName, expectedName: Name })
+export const RenameInput = Schema.Struct({ groupId: GroupId.GroupId, name: NewName, expectedName: Name })
 
 /**
  * @category options
@@ -341,7 +327,7 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name })
+export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, groupId: GroupId.GroupId, name: Name })
 
 /**
  * @category schemas
@@ -358,7 +344,7 @@ export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
  */
 export const CreateTeamInput = Schema.Struct({
   name: NewName,
-  memberIds: Schema.UniqueArray(MemberId.Id),
+  memberIds: Schema.UniqueArray(MemberId.MemberId),
   visibility: Schema.optionalKey(Visibility)
 })
 
@@ -395,7 +381,7 @@ export interface PublicItem extends Schema.Schema.Type<typeof PublicItem> {}
  * @since 0.1.0
  */
 export const Summary = Schema.Struct({
-  groupId: Id,
+  groupId: GroupId.GroupId,
   members: Schema.Int.check(Schema.isGreaterThan(0)),
   joined: Schema.Boolean
 })
@@ -413,4 +399,4 @@ export interface Summary extends Schema.Schema.Type<typeof Summary> {}
  * @category utils
  * @since 0.1.0
  */
-export const audienceOf = (groupId: Id): Audience.Scope => Audience.make("group", groupId)
+export const audienceOf = (groupId: GroupId.GroupId): Audience.Scope => Audience.make("group", groupId)

@@ -10,7 +10,7 @@
  */
 
 import { CoreError } from "@amends-dev/core/error"
-import { Turn } from "@amends-dev/core/turn"
+import { Turn, TurnId } from "@amends-dev/core/turn"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
@@ -20,7 +20,7 @@ import * as Authentication from "./Authentication.ts"
 import { limit } from "./internal/paging.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const turn = { turnId: Turn.Id }
+const turn = { turnId: TurnId.TurnId }
 const view = Turn.View.annotate({ identifier: "Turn" })
 
 /**

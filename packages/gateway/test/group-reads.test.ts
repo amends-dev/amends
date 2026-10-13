@@ -17,12 +17,13 @@ import {
   GroupMembershipService,
   GroupMembershipPermissions,
   GroupPermissions,
-  GroupStore
+  GroupStore,
+  GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Checkpoint, Entry, Journal, Publication, Store, StoreError } from "@amends-dev/core/journal"
 import { ThreadService } from "@amends-dev/core/thread"
-import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { Context, Effect, Option } from "effect"
@@ -34,13 +35,13 @@ import { type Bound, boundTo, otherWorkspaceId, runHost, testProvenance, workspa
 
 const { core, initialized, runGateway } = Support
 describe("group reads", () => {
-  const readerId = Member.Id.make("reader")
-  const otherId = Member.Id.make("other")
-  const agentId = Member.Id.make("agent")
+  const readerId = MemberId.MemberId.make("reader")
+  const otherId = MemberId.MemberId.make("other")
+  const agentId = MemberId.MemberId.make("agent")
   const readerIdentity = Identity.MemberReference.cases.Human.make({
     id: Identity.HumanId.make("reader")
   })
-  const actorFor = (memberId: Member.Id, ws = workspaceId) =>
+  const actorFor = (memberId: MemberId.MemberId, ws = workspaceId) =>
     Actor.Actor.of({
       workspaceId: ws,
       memberId,
@@ -58,8 +59,8 @@ describe("group reads", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound))
     )
-  const get = (id: Group.Id) => Effect.flatMap(GroupService.GroupService, (groupService) => groupService.get(id))
-  const rename = (id: Group.Id, name: string, expectedName: string) =>
+  const get = (id: GroupId.GroupId) => Effect.flatMap(GroupService.GroupService, (groupService) => groupService.get(id))
+  const rename = (id: GroupId.GroupId, name: string, expectedName: string) =>
     Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.rename({ groupId: id, name, expectedName })
     )
@@ -70,21 +71,21 @@ describe("group reads", () => {
   const mine = Effect.flatMap(GroupService.GroupService, (groupService) =>
     Effect.map(groupService.listMine({ limit: 100 }), (items) => items.map((item) => item.group))
   )
-  const roster = (id: Group.Id) =>
+  const roster = (id: GroupId.GroupId) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.listCurrent(id, { limit: 100 })
     )
-  const join = (id: Group.Id) =>
+  const join = (id: GroupId.GroupId) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.join(id)
     )
-  const removeMember = (groupId: Group.Id, membershipId: GroupMembership.Id) =>
+  const removeMember = (groupId: GroupId.GroupId, membershipId: GroupMembership.GroupMembershipId) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.remove({ groupId, membershipId })
     )
-  const create = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
+  const create = (name: string, memberIds: ReadonlyArray<MemberId.MemberId>) =>
     Effect.flatMap(GroupService.GroupService, (groupService) => groupService.createTeam({ name, memberIds }))
-  const add = (groupId: Group.Id, memberId: Member.Id) =>
+  const add = (groupId: GroupId.GroupId, memberId: MemberId.MemberId) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.add({ groupId, memberId })
     )
@@ -113,13 +114,18 @@ describe("group reads", () => {
         )
       )
     )
-  const grant = (bound: Bound, memberId: Member.Id, permission: Permission.Definition, groupId?: Group.Id) =>
+  const grant = (
+    bound: Bound,
+    memberId: MemberId.MemberId,
+    permission: Permission.Definition,
+    groupId?: GroupId.GroupId
+  ) =>
     publish(
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
-          assignmentId: Assignment.Id.make(`${memberId}-${permission.name}-${groupId ?? "workspace"}`),
+          assignmentId: Assignment.AssignmentId.make(`${memberId}-${permission.name}-${groupId ?? "workspace"}`),
           memberId,
           source: {
             _tag: "Direct",
@@ -172,7 +178,7 @@ describe("group reads", () => {
               Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
-                  assignmentId: Assignment.Id.make("viewer"),
+                  assignmentId: Assignment.AssignmentId.make("viewer"),
                   memberId: readerId,
                   source: {
                     _tag: "Role",
@@ -251,7 +257,7 @@ describe("group reads", () => {
           ])
             yield* grant(bound, readerId, permission)
           const direct = {
-            id: Group.Id.make("direct-others"),
+            id: GroupId.GroupId.make("direct-others"),
             workspaceId,
             kind: "Direct",
             memberIds: Group.directMembers([otherId, agentId]),
@@ -353,7 +359,7 @@ describe("group reads", () => {
             foreignIdentity,
             create("Foreign", [foreign.ownerMemberId])
           )
-          for (const id of [hidden.id, foreignGroup.id, Group.Id.make("missing")]) {
+          for (const id of [hidden.id, foreignGroup.id, GroupId.GroupId.make("missing")]) {
             expect(yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, get(id)))).toEqual(
               new CoreError.NotFound({ resource: "Group", id })
             )
@@ -362,7 +368,7 @@ describe("group reads", () => {
             )
           }
           // The owner, outside all three, finds none of them either.
-          for (const id of [hidden.id, foreignGroup.id, Group.Id.make("missing")])
+          for (const id of [hidden.id, foreignGroup.id, GroupId.GroupId.make("missing")])
             expect(yield* Effect.flip(gateway.asMember(workspace.id, ownerIdentity, get(id)))).toEqual(
               new CoreError.NotFound({ resource: "Group", id })
             )
@@ -379,7 +385,7 @@ describe("group reads", () => {
           const { bound, reader, owner, first, second } = yield* prepare()
           // The agent, a member of the group, readmits the reader; only members manage it.
           yield* grant(bound, agentId, GroupMembershipPermissions.Manage, first.id)
-          const roleId = Role.Id.make("group-reader")
+          const roleId = Role.RoleId.make("group-reader")
           yield* publish(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
@@ -393,7 +399,7 @@ describe("group reads", () => {
                   })
                   yield* journal.publish(AssignmentFacts.Created, {
                     workspaceId,
-                    assignmentId: Assignment.Id.make("reader-role"),
+                    assignmentId: Assignment.AssignmentId.make("reader-role"),
                     memberId: readerId,
                     source: { _tag: "Role", roleId, scope: { _tag: "Workspace", workspaceId } }
                   })
@@ -556,7 +562,9 @@ describe("group reads", () => {
                         journal
                           .publish(AssignmentFacts.Revoked, {
                             workspaceId,
-                            assignmentId: Assignment.Id.make(`${readerId}-${GroupPermissions.Read.name}-workspace`),
+                            assignmentId: Assignment.AssignmentId.make(
+                              `${readerId}-${GroupPermissions.Read.name}-workspace`
+                            ),
                             memberId: readerId
                           })
                           .pipe(Publication.withActor),
@@ -700,7 +708,7 @@ describe("group reads", () => {
                 Effect.flatMap(Journal.Journal, (journal) =>
                   journal.publish(AssignmentFacts.Revoked, {
                     workspaceId,
-                    assignmentId: Assignment.Id.make(`${readerId}-${GroupPermissions.Read.name}-${first.id}`),
+                    assignmentId: Assignment.AssignmentId.make(`${readerId}-${GroupPermissions.Read.name}-${first.id}`),
                     memberId: readerId
                   })
                 )

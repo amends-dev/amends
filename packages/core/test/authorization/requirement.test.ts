@@ -1,14 +1,13 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Effect, Schema, SchemaIssue } from "effect"
 import * as Permission from "../../src/authorization/Permission.ts"
 import * as Requirement from "../../src/authorization/Requirement.ts"
 import * as Target from "../../src/authorization/Target.ts"
-import * as Member from "../../src/workspace/Member.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 
-const workspaceId = Workspace.Id.make("workspace-1")
-const memberId = Member.Id.make("member-1")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
+const memberId = MemberId.MemberId.make("member-1")
 const workspace = Target.Reference.cases.Workspace.make({ workspaceId })
 const member = Target.Reference.cases.Member.make({ workspaceId, memberId })
 const ManageWorkspace = Permission.make("test.workspace.manage", {

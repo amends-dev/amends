@@ -1,4 +1,4 @@
-import { Thread, ThreadActivity, ThreadActivityKind } from "@amends-dev/core/thread"
+import { ThreadActivity, ThreadActivityKind, ThreadId } from "@amends-dev/core/thread"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Schema } from "effect"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
@@ -20,9 +20,9 @@ const Pinged = ThreadActivityKind.make("test.pinged", {
   newActivity: false
 })
 const common = {
-  id: ThreadActivity.Id.make("activity-1"),
-  workspaceId: WorkspaceId.Id.make("workspace-one"),
-  threadId: Thread.Id.make("thread-1"),
+  id: ThreadActivity.ThreadActivityId.make("activity-1"),
+  workspaceId: WorkspaceId.WorkspaceId.make("workspace-one"),
+  threadId: ThreadId.ThreadId.make("thread-1"),
   sequence: 1,
   occurredAt: DateTime.makeUnsafe("2026-10-10T12:00:00.000Z")
 }

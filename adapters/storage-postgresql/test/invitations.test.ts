@@ -16,7 +16,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const issuedAt = yield* DateTime.now
           const pending = (id: string): Invitation.Invitation => ({
             details: {
-              id: Invitation.Id.make(id),
+              id: Invitation.InvitationId.make(id),
               workspaceId,
               recipientId: bob.id,
               inviterMemberId: workspace.ownerMemberId,
@@ -44,7 +44,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             operation: "commit",
             reason: { _tag: "Failed" }
           })
-          expect(yield* bound.invitations.get(Invitation.Id.make("second"))).toEqual(Option.none())
+          expect(yield* bound.invitations.get(Invitation.InvitationId.make("second"))).toEqual(Option.none())
         })
       )
     )

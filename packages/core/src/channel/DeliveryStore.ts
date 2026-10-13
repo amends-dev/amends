@@ -20,6 +20,7 @@ import * as ThreadId from "../thread/ThreadId.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ChannelId from "./ChannelId.ts"
 import * as Delivery from "./Delivery.ts"
+import * as DeliveryId from "./DeliveryId.ts"
 
 /**
  * The delivery store, bound to one workspace by the host.
@@ -36,10 +37,10 @@ import * as Delivery from "./Delivery.ts"
 export class DeliveryStore extends Context.Service<
   DeliveryStore,
   {
-    readonly get: (id: Delivery.Id) => Effect.Effect<Option.Option<Delivery.Delivery>, StoreError.StoreError>
+    readonly get: (id: DeliveryId.DeliveryId) => Effect.Effect<Option.Option<Delivery.Delivery>, StoreError.StoreError>
     /** The thread's deliveries not yet sent or failed, by their messages' positions, then by id. */
     readonly listRequestedByThread: (
-      threadId: ThreadId.Id
+      threadId: ThreadId.ThreadId
     ) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, StoreError.StoreError>
     /**
      * The delivery that posted the message the external system knows as `externalMessageId` in a
@@ -47,7 +48,7 @@ export class DeliveryStore extends Context.Service<
      * message to take in.
      */
     readonly findByExternalMessage: (
-      channelId: ChannelId.Id,
+      channelId: ChannelId.ChannelId,
       conversationId: ChannelTransport.ExternalId,
       externalMessageId: ChannelTransport.ExternalId
     ) => Effect.Effect<Option.Option<Delivery.Delivery>, StoreError.StoreError>
@@ -65,17 +66,20 @@ export class DeliveryStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: DeliveryStore["Service"]): DeliveryStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: DeliveryStore["Service"]
+): DeliveryStore["Service"] => {
   const read = StoreInput.read("DeliveryStore")
   const write = StoreInput.write("DeliveryStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Delivery.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", DeliveryId.DeliveryId, id), driver.get),
     listRequestedByThread: (threadId) =>
-      Effect.flatMap(read("listRequestedByThread", ThreadId.Id, threadId), driver.listRequestedByThread),
+      Effect.flatMap(read("listRequestedByThread", ThreadId.ThreadId, threadId), driver.listRequestedByThread),
     findByExternalMessage: Effect.fn("DeliveryStore.findByExternalMessage")(
       function* (channelId, conversationId, externalMessageId) {
         return yield* driver.findByExternalMessage(
-          yield* read("findByExternalMessage", ChannelId.Id, channelId),
+          yield* read("findByExternalMessage", ChannelId.ChannelId, channelId),
           yield* read("findByExternalMessage", ChannelTransport.ExternalId, conversationId),
           yield* read("findByExternalMessage", ChannelTransport.ExternalId, externalMessageId)
         )

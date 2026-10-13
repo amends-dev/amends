@@ -22,6 +22,7 @@ import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
 import * as Group from "../group/Group.ts"
 import * as GroupCommand from "../group/GroupCommand.ts"
+import type * as GroupId from "../group/GroupId.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
 import * as GroupStore from "../group/GroupStore.ts"
 import * as Actor from "../identity/Actor.ts"
@@ -36,14 +37,16 @@ import * as Task from "../task/Task.ts"
 import * as TaskCommand from "../task/TaskCommand.ts"
 import * as TaskPermissions from "../task/TaskPermissions.ts"
 import * as TaskStore from "../task/TaskStore.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as Thread from "./Thread.ts"
 import * as ThreadActivityKind from "./ThreadActivityKind.ts"
 import * as ThreadActivityStore from "./ThreadActivityStore.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
 import * as ThreadFacts from "./ThreadFacts.ts"
+import * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
 import * as ThreadMessageActivity from "./ThreadMessageActivity.ts"
+import * as ThreadMessageId from "./ThreadMessageId.ts"
 import * as ThreadMessageStore from "./ThreadMessageStore.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadPermissions from "./ThreadPermissions.ts"
@@ -131,14 +134,14 @@ export class ThreadService extends Context.Service<
      * The thread, under current group audience and `thread.read`. Reading creates no participation
      * and marks nothing seen.
      */
-    readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Thread, ReadError, Actor.Actor>
+    readonly get: (threadId: ThreadId.ThreadId) => Effect.Effect<Thread.Thread, ReadError, Actor.Actor>
     /**
      * One page of a group's threads the actor can read, newest latest activity first, each with the
      * actor's read position and unread state. Requires current group membership; `thread.read` is
      * checked for the whole page at once, and threads it does not cover are skipped.
      */
     readonly listInGroup: (
-      groupId: Group.Id,
+      groupId: GroupId.GroupId,
       options: Thread.ListOptions
     ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Actor>
     /**
@@ -148,12 +151,12 @@ export class ThreadService extends Context.Service<
      * many threads it holds.
      */
     readonly listOpenings: (
-      groupId: Group.Id,
+      groupId: GroupId.GroupId,
       options: Thread.OpeningOptions
     ) => Effect.Effect<ReadonlyArray<Thread.Opening>, ReadError, Actor.Actor>
     /** Bounded activity page with resolved subjects, ordered by sequence. The cursor is exclusive. */
     readonly readTimeline: (
-      threadId: Thread.Id,
+      threadId: ThreadId.ThreadId,
       options: ThreadActivityStore.ReadOptions
     ) => Effect.Effect<ReadonlyArray<Thread.TimelineItem>, ReadError, Actor.Actor>
     /**
@@ -162,7 +165,7 @@ export class ThreadService extends Context.Service<
      * references only.
      */
     readonly listParticipants: (
-      threadId: Thread.Id,
+      threadId: ThreadId.ThreadId,
       options: ThreadParticipation.ListOptions
     ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Summary>, ReadError, Actor.Actor>
   }
@@ -198,15 +201,15 @@ export const make = Effect.gen(function* () {
   const deriveStartIds = Effect.fnUntraced(function* (operation: string, key: Request.Key | undefined) {
     const actor = yield* Actor.Actor
     const parts = [operation, workspaceId, actor.memberId]
-    const threadId = Thread.Id.make(yield* Request.idFor(key, [...parts, "thread"]))
-    const messageId = ThreadMessage.Id.make(yield* Request.idFor(key, [...parts, "message"]))
+    const threadId = ThreadId.ThreadId.make(yield* Request.idFor(key, [...parts, "thread"]))
+    const messageId = ThreadMessageId.ThreadMessageId.make(yield* Request.idFor(key, [...parts, "message"]))
     return { threadId, messageId }
   })
 
   /** What an earlier attempt of this keyed start created, so a retry returns it; None otherwise. */
   const findRetriedStart = Effect.fnUntraced(function* (
     key: Request.Key | undefined,
-    ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id }
+    ids: { readonly threadId: ThreadId.ThreadId; readonly messageId: ThreadMessageId.ThreadMessageId }
   ) {
     if (key === undefined) return Option.none<Thread.Started>()
     const thread = yield* threadStore.get(ids.threadId)
@@ -226,9 +229,9 @@ export const make = Effect.gen(function* () {
    * for each agent the author names. Agents that take part without being named need none.
    */
   const authorizeParticipants = Effect.fnUntraced(function* (
-    participants: ReadonlyArray<Member.Id>,
-    named: ReadonlyArray<Member.Id>,
-    eligible: ReadonlyMap<Member.Id, ThreadQuery.Eligible>
+    participants: ReadonlyArray<MemberId.MemberId>,
+    named: ReadonlyArray<MemberId.MemberId>,
+    eligible: ReadonlyMap<MemberId.MemberId, ThreadQuery.Eligible>
   ) {
     for (const memberId of participants)
       if (!eligible.has(memberId))
@@ -252,7 +255,7 @@ export const make = Effect.gen(function* () {
    * Require `task.create` on the group, and the assignee, if one, to be able to take part there,
    * with the author's agent use when the assignee is an agent, since assigning one directs it.
    */
-  const authorizeTask = Effect.fnUntraced(function* (groupId: Group.Id, task: Task.Options) {
+  const authorizeTask = Effect.fnUntraced(function* (groupId: GroupId.GroupId, task: Task.Options) {
     yield* authorization.require([
       Requirement.make(TaskPermissions.Create, Target.Reference.cases.Group.make({ workspaceId, groupId }))
     ])
@@ -266,17 +269,17 @@ export const make = Effect.gen(function* () {
    * task at its second position when the start asks for one, so a task never lacks a description.
    */
   const createThread = Effect.fnUntraced(function* (
-    authorId: Member.Id,
-    groupId: Group.Id,
-    participants: ReadonlyArray<Member.Id>,
+    authorId: MemberId.MemberId,
+    groupId: GroupId.GroupId,
+    participants: ReadonlyArray<MemberId.MemberId>,
     opening: {
       readonly title?: Thread.Title
-      readonly origin?: Thread.Id
+      readonly origin?: ThreadId.ThreadId
       readonly text: ThreadMessage.Text
-      readonly mentions: ReadonlyArray<Member.Id>
+      readonly mentions: ReadonlyArray<MemberId.MemberId>
       readonly task?: Task.Options
     },
-    ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id }
+    ids: { readonly threadId: ThreadId.ThreadId; readonly messageId: ThreadMessageId.ThreadMessageId }
   ) {
     const occurredAt = yield* DateTime.now
     const started = yield* threadCommand.create({
@@ -332,9 +335,9 @@ export const make = Effect.gen(function* () {
    * of the group sees it as unread, so only these members' admissions are read.
    */
   const teamStarters = Effect.fnUntraced(function* (
-    groupId: Group.Id,
-    authorId: Member.Id,
-    mentions: ReadonlyArray<Member.Id>
+    groupId: GroupId.GroupId,
+    authorId: MemberId.MemberId,
+    mentions: ReadonlyArray<MemberId.MemberId>
   ) {
     const followers = yield* threadQuery.followers(groupId)
     const named = yield* threadQuery.eligibleMembers(groupId, [authorId, ...mentions])
@@ -472,11 +475,14 @@ export const make = Effect.gen(function* () {
   // Reads are deliberately outside journal.commit; an enclosing caller transaction remains
   // authoritative when present.
   const get = Effect.fn("ThreadService.get")(
-    (threadId: Thread.Id) => threadQuery.requireReadable(threadId),
+    (threadId: ThreadId.ThreadId) => threadQuery.requireReadable(threadId),
     Operation.report
   )
 
-  const listInGroup = Effect.fn("ThreadService.listInGroup")(function* (groupId: Group.Id, input: Thread.ListOptions) {
+  const listInGroup = Effect.fn("ThreadService.listInGroup")(function* (
+    groupId: GroupId.GroupId,
+    input: Thread.ListOptions
+  ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input)
     return yield* threadQuery.listReadable(groupId, {
       limit: options.limit,
@@ -495,7 +501,7 @@ export const make = Effect.gen(function* () {
   }, Operation.report)
 
   const listOpenings = Effect.fn("ThreadService.listOpenings")(function* (
-    groupId: Group.Id,
+    groupId: GroupId.GroupId,
     input: Thread.OpeningOptions
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input)
@@ -516,7 +522,7 @@ export const make = Effect.gen(function* () {
     if (items.length === 0) return []
     // A start publishes its opening message as the thread's first activity.
     const ids = items.map((item) => item.thread.id)
-    const openings = new Map<Thread.Id, ThreadMessage.Id>()
+    const openings = new Map<ThreadId.ThreadId, ThreadMessageId.ThreadMessageId>()
     for (const activity of yield* threadActivityStore.getFirst(ids)) {
       const opening = yield* Effect.orDie(ThreadActivityKind.decode(ThreadMessageActivity.Published, activity))
       openings.set(activity.threadId, opening.details.messageId)
@@ -541,12 +547,13 @@ export const make = Effect.gen(function* () {
   }, Operation.report)
 
   const readTimeline = Effect.fn("ThreadService.readTimeline")(
-    (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) => threadQuery.readTimeline(threadId, options),
+    (threadId: ThreadId.ThreadId, options: ThreadActivityStore.ReadOptions) =>
+      threadQuery.readTimeline(threadId, options),
     Operation.report
   )
 
   const listParticipants = Effect.fn("ThreadService.listParticipants")(function* (
-    threadId: Thread.Id,
+    threadId: ThreadId.ThreadId,
     options: ThreadParticipation.ListOptions
   ) {
     const thread = yield* threadQuery.requireReadable(threadId)

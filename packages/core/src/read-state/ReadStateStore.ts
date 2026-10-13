@@ -44,8 +44,8 @@ export class ReadStateStore extends Context.Service<
   {
     /** One member's read positions for several threads; unread threads are omitted. */
     readonly getThreadPositions: (
-      memberId: MemberId.Id,
-      threadIds: ReadonlyArray<ThreadId.Id>
+      memberId: MemberId.MemberId,
+      threadIds: ReadonlyArray<ThreadId.ThreadId>
     ) => Effect.Effect<ReadonlyArray<ReadState.ThreadPosition>, StoreError.StoreError>
     /**
      * Mark a thread read through a position, in one write: the member's read position advances,
@@ -59,8 +59,8 @@ export class ReadStateStore extends Context.Service<
     ) => Effect.Effect<void, StoreError.StoreError>
     /** One member's read times for several groups; groups never read are omitted. */
     readonly getGroupReads: (
-      memberId: MemberId.Id,
-      groupIds: ReadonlyArray<GroupId.Id>
+      memberId: MemberId.MemberId,
+      groupIds: ReadonlyArray<GroupId.GroupId>
     ) => Effect.Effect<ReadonlyArray<ReadState.GroupRead>, StoreError.StoreError>
     /** Advance when a member last read a group; a time at or before the stored one is kept. */
     readonly advanceGroup: (read: ReadState.GroupRead) => Effect.Effect<void, StoreError.StoreError>
@@ -74,14 +74,17 @@ export class ReadStateStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: ReadStateStore["Service"]): ReadStateStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: ReadStateStore["Service"]
+): ReadStateStore["Service"] => {
   const read = StoreInput.read("ReadStateStore")
   const write = StoreInput.write("ReadStateStore", workspaceId)
   return {
     getThreadPositions: Effect.fn("ReadStateStore.getThreadPositions")(function* (memberId, threadIds) {
       return yield* driver.getThreadPositions(
-        yield* read("getThreadPositions", MemberId.Id, memberId),
-        yield* read("getThreadPositions", Schema.Array(ThreadId.Id), threadIds)
+        yield* read("getThreadPositions", MemberId.MemberId, memberId),
+        yield* read("getThreadPositions", Schema.Array(ThreadId.ThreadId), threadIds)
       )
     }),
     markThreadRead: Effect.fn("ReadStateStore.markThreadRead")(function* (position, seenAt) {
@@ -92,8 +95,8 @@ export const make = (workspaceId: WorkspaceId.Id, driver: ReadStateStore["Servic
     }),
     getGroupReads: Effect.fn("ReadStateStore.getGroupReads")(function* (memberId, groupIds) {
       return yield* driver.getGroupReads(
-        yield* read("getGroupReads", MemberId.Id, memberId),
-        yield* read("getGroupReads", Schema.Array(GroupId.Id), groupIds)
+        yield* read("getGroupReads", MemberId.MemberId, memberId),
+        yield* read("getGroupReads", Schema.Array(GroupId.GroupId), groupIds)
       )
     }),
     advanceGroup: (groupRead) =>

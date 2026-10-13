@@ -34,6 +34,7 @@ import * as Thread from "../thread/Thread.ts"
 import * as ThreadCommand from "../thread/ThreadCommand.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessage from "../thread/ThreadMessage.ts"
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts"
 import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
@@ -42,6 +43,7 @@ import type * as Channel from "./Channel.ts"
 import type * as ChannelBinding from "./ChannelBinding.ts"
 import * as ChannelBindingStore from "./ChannelBindingStore.ts"
 import * as ChannelFacts from "./ChannelFacts.ts"
+import type * as ChannelId from "./ChannelId.ts"
 import * as ChannelQuery from "./ChannelQuery.ts"
 import * as Contact from "./Contact.ts"
 import * as ContactStore from "./ContactStore.ts"
@@ -57,10 +59,10 @@ import * as DeliveryStore from "./DeliveryStore.ts"
  * @since 0.1.0
  */
 export const Intake = Schema.TaggedUnion({
-  Opened: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
-  Replied: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
-  Edited: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
-  Deleted: { threadId: ThreadId.Id, messageId: ThreadMessage.Id },
+  Opened: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
+  Replied: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
+  Edited: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
+  Deleted: { threadId: ThreadId.ThreadId, messageId: ThreadMessageId.ThreadMessageId },
   Ignored: { reason: Schema.Literals(["echo", "duplicate", "empty", "unknown", "unchanged"]) }
 })
 
@@ -123,11 +125,14 @@ export class ChannelIntake extends Context.Service<
      * a channel missing or removed is `CoreError.NotFound`.
      */
     readonly receive: (
-      channelId: Channel.Id,
+      channelId: ChannelId.ChannelId,
       inbound: ChannelTransport.Inbound
     ) => Effect.Effect<Received, ReceiveError>
     /** Take in one event the channel's system sent, in a commit of its own. */
-    readonly intake: (channelId: Channel.Id, event: ChannelTransport.Event) => Effect.Effect<Intake, IntakeError>
+    readonly intake: (
+      channelId: ChannelId.ChannelId,
+      event: ChannelTransport.Event
+    ) => Effect.Effect<Intake, IntakeError>
   }
 >()("@amends-dev/core/channel/ChannelIntake") {}
 
@@ -157,7 +162,7 @@ export const make = Effect.gen(function* () {
   const { workspaceId } = yield* Store.Store
 
   /** Run `step` in its own commit, attributed to the contact `contactId`. */
-  const asContact = <A, E, R>(contactId: Contact.Id, step: Effect.Effect<A, E, R>) =>
+  const asContact = <A, E, R>(contactId: Identity.ContactId, step: Effect.Effect<A, E, R>) =>
     Effect.flatMap(
       Publication.make(
         workspaceId,
@@ -182,7 +187,7 @@ export const make = Effect.gen(function* () {
   /** The contact the sender is on the channel, created when first heard from, renamed when called otherwise. */
   const resolveContact = Effect.fnUntraced(function* (
     channel: Channel.Channel,
-    contactId: Contact.Id,
+    contactId: Identity.ContactId,
     sender: ChannelTransport.Sender,
     occurredAt: DateTime.Utc
   ) {
@@ -211,10 +216,10 @@ export const make = Effect.gen(function* () {
     contact: Contact.Contact,
     event: Extract<ChannelTransport.Event, { readonly _tag: "MessageReceived" }>,
     text: ThreadMessage.Text,
-    messageId: ThreadMessage.Id,
+    messageId: ThreadMessageId.ThreadMessageId,
     occurredAt: DateTime.Utc
   ) {
-    const threadId = Thread.Id.make(
+    const threadId = ThreadId.ThreadId.make(
       yield* Request.derivedId(["channel.thread", workspaceId, channel.id, event.conversation.id])
     )
     const title =
@@ -276,7 +281,7 @@ export const make = Effect.gen(function* () {
     binding: ChannelBinding.ChannelBinding,
     event: Extract<ChannelTransport.Event, { readonly _tag: "MessageReceived" }>,
     text: ThreadMessage.Text,
-    messageId: ThreadMessage.Id,
+    messageId: ThreadMessageId.ThreadMessageId,
     occurredAt: DateTime.Utc
   ) {
     if (Option.isSome(yield* threadMessageStore.get(messageId))) return ignored("duplicate")
@@ -307,7 +312,10 @@ export const make = Effect.gen(function* () {
   })
 
   /** The contact's own message with text, as intake took it in; anything else is unknown. */
-  const ownMessage = Effect.fnUntraced(function* (contact: Contact.Contact, messageId: ThreadMessage.Id) {
+  const ownMessage = Effect.fnUntraced(function* (
+    contact: Contact.Contact,
+    messageId: ThreadMessageId.ThreadMessageId
+  ) {
     const found = yield* threadMessageStore.get(messageId)
     if (Option.isNone(found)) return undefined
     const message = found.value
@@ -320,7 +328,7 @@ export const make = Effect.gen(function* () {
   const edit = Effect.fnUntraced(function* (
     contact: Contact.Contact,
     text: ThreadMessage.Text,
-    messageId: ThreadMessage.Id,
+    messageId: ThreadMessageId.ThreadMessageId,
     occurredAt: DateTime.Utc
   ) {
     const own = yield* ownMessage(contact, messageId)
@@ -339,7 +347,7 @@ export const make = Effect.gen(function* () {
 
   const remove = Effect.fnUntraced(function* (
     contact: Contact.Contact,
-    messageId: ThreadMessage.Id,
+    messageId: ThreadMessageId.ThreadMessageId,
     occurredAt: DateTime.Utc
   ) {
     const own = yield* ownMessage(contact, messageId)
@@ -360,10 +368,10 @@ export const make = Effect.gen(function* () {
       if (self !== undefined && event.sender.id === self) return ignored("echo")
       const posted = yield* deliveryStore.findByExternalMessage(channel.id, event.conversation.id, event.messageId)
       if (Option.isSome(posted)) return ignored("echo")
-      const contactId = Contact.Id.make(
+      const contactId = Identity.ContactId.make(
         yield* Request.derivedId(["channel.contact", workspaceId, channel.id, event.sender.id])
       )
-      const messageId = ThreadMessage.Id.make(
+      const messageId = ThreadMessageId.ThreadMessageId.make(
         yield* Request.derivedId(["channel.message", workspaceId, channel.id, event.messageId])
       )
       return yield* asContact(

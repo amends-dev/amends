@@ -24,7 +24,7 @@ export const Created = ThreadActivityKind.make("task.created", {
   details: Schema.Struct({
     status: Task.Status,
     priority: Task.Priority,
-    assignee: Schema.NullOr(MemberId.Id),
+    assignee: Schema.NullOr(MemberId.MemberId),
     createdBy: ThreadMessage.Author
   }),
   newActivity: false

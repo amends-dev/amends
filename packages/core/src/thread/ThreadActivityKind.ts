@@ -81,9 +81,9 @@ export interface Definition<
   /** The activity with its details decoded, as timelines and handlers read it. */
   readonly Activity: ReturnType<typeof activitySchema<Name, Version, D>>
   /** Pure: what the activity is about, given its details and the thread it is in. */
-  subject(details: D["Type"], threadId: ThreadId.Id): Subject.Subject
+  subject(details: D["Type"], threadId: ThreadId.ThreadId): Subject.Subject
   /** Pure: the activity's identity within the workspace, or null to leave it repeatable. */
-  occurrence(details: D["Type"], threadId: ThreadId.Id): ReadonlyArray<string> | null
+  occurrence(details: D["Type"], threadId: ThreadId.ThreadId): ReadonlyArray<string> | null
 }
 
 /**
@@ -115,7 +115,7 @@ export const make = <const Name extends string, const Version extends number, D 
   ThreadActivity.Kind.make(name)
   const subject =
     options.subject === undefined
-      ? (_: D["Type"], threadId: ThreadId.Id) => Subject.make("thread", threadId)
+      ? (_: D["Type"], threadId: ThreadId.ThreadId) => Subject.make("thread", threadId)
       : options.subject
   return Object.freeze({
     name,
@@ -124,7 +124,8 @@ export const make = <const Name extends string, const Version extends number, D 
     newActivity: options.newActivity,
     Activity: activitySchema(name, options.version, options.details),
     subject,
-    occurrence: options.occurrence ?? ((details: D["Type"], threadId: ThreadId.Id) => [subject(details, threadId)])
+    occurrence:
+      options.occurrence ?? ((details: D["Type"], threadId: ThreadId.ThreadId) => [subject(details, threadId)])
   })
 }
 
@@ -153,7 +154,7 @@ const occurrenceKey = (name: string, parts: ReadonlyArray<string> | null) =>
 export const prepare = Effect.fn("ThreadActivityKind.prepare")(function* <K extends Definition>(
   kind: K,
   details: K["details"]["Type"],
-  threadId: ThreadId.Id
+  threadId: ThreadId.ThreadId
 ) {
   return {
     kind: ThreadActivity.Kind.make(kind.name),
@@ -185,7 +186,7 @@ export const is =
 export class Mismatch extends Schema.TaggedError<Mismatch>()("ThreadActivityKind.Mismatch", {
   kind: Schema.String,
   version: Schema.Int,
-  activityId: ThreadActivity.Id
+  activityId: ThreadActivity.ThreadActivityId
 }) {}
 
 /**

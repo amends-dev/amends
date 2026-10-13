@@ -64,7 +64,9 @@ export class SessionLogStore extends Context.Service<
   SessionLogStore,
   {
     /** The position of the log's latest entry, or 0 while it has none. */
-    readonly head: (participationId: ThreadParticipationId.Id) => Effect.Effect<number, StoreError.StoreError>
+    readonly head: (
+      participationId: ThreadParticipationId.ThreadParticipationId
+    ) => Effect.Effect<number, StoreError.StoreError>
     /**
      * Append `entries` in order after the entry at `after`, the log's latest as the writer read it,
      * or 0 for an empty log. A log that holds an entry past `after` takes none of them and fails
@@ -72,18 +74,18 @@ export class SessionLogStore extends Context.Service<
      * it.
      */
     readonly append: (
-      participationId: ThreadParticipationId.Id,
+      participationId: ThreadParticipationId.ThreadParticipationId,
       entries: Array.NonEmptyReadonlyArray<SessionLog.Entry>,
       after: number
     ) => Effect.Effect<Array.NonEmptyReadonlyArray<SessionLog.Recorded>, StoreError.StoreError | Overtaken>
     /** The log's entries past `after`, oldest first, at most `limit` of them. */
     readonly read: (
-      participationId: ThreadParticipationId.Id,
+      participationId: ThreadParticipationId.ThreadParticipationId,
       options: ReadOptions
     ) => Effect.Effect<ReadonlyArray<SessionLog.Recorded>, StoreError.StoreError>
     /** Completes once the log holds an entry past `after`. */
     readonly waitForAppend: (
-      participationId: ThreadParticipationId.Id,
+      participationId: ThreadParticipationId.ThreadParticipationId,
       after: number
     ) => Effect.Effect<void, StoreError.StoreError>
   }
@@ -98,23 +100,24 @@ export class SessionLogStore extends Context.Service<
 export const make = (driver: SessionLogStore["Service"]): SessionLogStore["Service"] => {
   const read = StoreInput.read("SessionLogStore")
   return {
-    head: (participationId) => Effect.flatMap(read("head", ThreadParticipationId.Id, participationId), driver.head),
+    head: (participationId) =>
+      Effect.flatMap(read("head", ThreadParticipationId.ThreadParticipationId, participationId), driver.head),
     append: Effect.fn("SessionLogStore.append")(function* (participationId, entries, after) {
       return yield* driver.append(
-        yield* read("append", ThreadParticipationId.Id, participationId),
+        yield* read("append", ThreadParticipationId.ThreadParticipationId, participationId),
         yield* read("append", Schema.NonEmptyArray(SessionLog.Entry), entries),
         yield* read("append", Schema.Natural, after)
       )
     }),
     read: Effect.fn("SessionLogStore.read")(function* (participationId, options) {
       return yield* driver.read(
-        yield* read("read", ThreadParticipationId.Id, participationId),
+        yield* read("read", ThreadParticipationId.ThreadParticipationId, participationId),
         yield* read("read", ReadOptions, options)
       )
     }),
     waitForAppend: Effect.fn("SessionLogStore.waitForAppend")(function* (participationId, after) {
       return yield* driver.waitForAppend(
-        yield* read("waitForAppend", ThreadParticipationId.Id, participationId),
+        yield* read("waitForAppend", ThreadParticipationId.ThreadParticipationId, participationId),
         yield* read("waitForAppend", Schema.Natural, after)
       )
     })

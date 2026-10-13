@@ -9,8 +9,8 @@ import * as Schema from "effect/Schema"
 import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
-import * as Member from "../workspace/Member.ts"
-import * as Workspace from "../workspace/Workspace.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Assignment from "./Assignment.ts"
 
 /**
@@ -24,9 +24,9 @@ export const Created = Fact.make("workspace.assignment.created", {
   subject: (payload) => Subject.make("assignment", payload.assignmentId),
   version: 1,
   payload: Schema.Struct({
-    assignmentId: Assignment.Id,
-    workspaceId: Workspace.Id,
-    memberId: Member.Id,
+    assignmentId: Assignment.AssignmentId,
+    workspaceId: WorkspaceId.WorkspaceId,
+    memberId: MemberId.MemberId,
     source: Assignment.Source
   }).check(Assignment.SourceInWorkspace),
   occurrence: (payload) => [payload.assignmentId]
@@ -43,10 +43,10 @@ export const Revoked = Fact.make("workspace.assignment.revoked", {
   subject: (payload) => Subject.make("assignment", payload.assignmentId),
   version: 1,
   payload: Schema.Struct({
-    assignmentId: Assignment.Id,
-    workspaceId: Workspace.Id,
+    assignmentId: Assignment.AssignmentId,
+    workspaceId: WorkspaceId.WorkspaceId,
     /** The member whose access this ends, so readers need not look the assignment up. */
-    memberId: Member.Id
+    memberId: MemberId.MemberId
   }),
   occurrence: (payload) => [payload.assignmentId]
 })

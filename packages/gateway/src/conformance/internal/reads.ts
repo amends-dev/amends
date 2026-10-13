@@ -2,7 +2,7 @@ import { AssignmentService } from "@amends-dev/core/authorization"
 import { ChangeFeedService } from "@amends-dev/core/change-feed"
 import { Entry, Store } from "@amends-dev/core/journal"
 import { Notification, NotificationService } from "@amends-dev/core/notification"
-import { InvitationService, Member, MemberService, OwnershipService } from "@amends-dev/core/workspace"
+import { InvitationService, MemberService, OwnershipService, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -65,7 +65,7 @@ export const reads = (fixture: Fixture.Fixture) => {
                   expect(yield* notificationService.inbox({ limit: 10, pendingOnly: true })).toEqual([])
                   expect(yield* notificationService.countPending).toBe(0)
                   expect(
-                    yield* Effect.flip(notificationService.markSeen(Notification.Id.make("missing")))
+                    yield* Effect.flip(notificationService.markSeen(Notification.NotificationId.make("missing")))
                   ).toMatchObject({ _tag: "CoreError.NotFound" })
                   const stream = yield* (yield* ChangeFeedService.ChangeFeedService).watch()
                   expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
@@ -80,7 +80,7 @@ export const reads = (fixture: Fixture.Fixture) => {
                     workspace.id,
                     Support.alice,
                     Effect.flatMap(MemberService.MemberService, (memberService) =>
-                      memberService.remove(Member.Id.make("missing"))
+                      memberService.remove(MemberId.MemberId.make("missing"))
                     )
                   )
                 )

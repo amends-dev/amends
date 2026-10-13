@@ -1,18 +1,19 @@
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
-import { Group, GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group"
+import { type Group, GroupService, GroupFollowService, GroupMembershipService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Journal, Publication } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { type ReadState, ReadStateService } from "@amends-dev/core/read-state"
 import {
-  Thread,
+  type Thread,
   ThreadService,
   ThreadMessageService,
   ThreadParticipationService,
-  ThreadPermissions
+  ThreadPermissions,
+  ThreadId
 } from "@amends-dev/core/thread"
-import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Deferred, Effect, Fiber, Tracer } from "effect"
 import { TestClock } from "effect/testing"
@@ -24,16 +25,17 @@ import { type Bound, boundTo, otherWorkspaceId, placed, runHost, testProvenance,
 
 const { core, initialized } = Support
 describe("read state", () => {
-  const humanId = Member.Id.make("human")
-  const otherId = Member.Id.make("other")
-  const plainId = Member.Id.make("plain")
-  const outsiderId = Member.Id.make("outsider")
-  const agentId = Member.Id.make("agent")
-  const identityOf = (memberId: Member.Id): Identity.MemberReference =>
+  const humanId = MemberId.MemberId.make("human")
+  const otherId = MemberId.MemberId.make("other")
+  const plainId = MemberId.MemberId.make("plain")
+  const outsiderId = MemberId.MemberId.make("outsider")
+  const agentId = MemberId.MemberId.make("agent")
+  const identityOf = (memberId: MemberId.MemberId): Identity.MemberReference =>
     memberId === agentId
       ? { _tag: "Agent", id: Identity.AgentId.make(memberId) }
       : { _tag: "Human", id: Identity.HumanId.make(memberId) }
-  const actorFor = (memberId: Member.Id) => Actor.Actor.of({ workspaceId, memberId, identity: identityOf(memberId) })
+  const actorFor = (memberId: MemberId.MemberId) =>
+    Actor.Actor.of({ workspaceId, memberId, identity: identityOf(memberId) })
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
     program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
@@ -42,26 +44,26 @@ describe("read state", () => {
       Effect.provide(core(bound))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 })
-  const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id>) =>
+  const start = (groupId: GroupId.GroupId, mentions: ReadonlyArray<MemberId.MemberId>) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, text: "Opening", mentions })
     ).pipe(Effect.flatMap(placed))
-  const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
+  const reply = (threadId: ThreadId.ThreadId, mentions: ReadonlyArray<MemberId.MemberId>) =>
     Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
       threadMessageService.publish({ threadId, text: "Reply", mentions })
     ).pipe(Effect.flatMap((message) => placed({ message })))
-  const markRead = (threadId: Thread.Id, throughSequence: number) =>
+  const markRead = (threadId: ThreadId.ThreadId, throughSequence: number) =>
     Effect.flatMap(ReadStateService.ReadStateService, (readStateService) =>
       readStateService.markThreadRead({ threadId, throughSequence })
     )
-  const markGroupRead = (groupId: Group.Id) =>
+  const markGroupRead = (groupId: GroupId.GroupId) =>
     Effect.flatMap(ReadStateService.ReadStateService, (readStateService) => readStateService.markGroupRead({ groupId }))
-  const pending = (bound: Bound, memberId: Member.Id) =>
+  const pending = (bound: Bound, memberId: MemberId.MemberId) =>
     Effect.map(
       bound.notifications.listPendingByRecipient(Notification.ofMember(memberId, identityOf(memberId)), { limit: 100 }),
       (records) => records.map((record) => record.thread?.sequence ?? 0).toSorted((a, b) => a - b)
     )
-  const positionOf = (bound: Bound, memberId: Member.Id, threadId: Thread.Id) =>
+  const positionOf = (bound: Bound, memberId: MemberId.MemberId, threadId: ThreadId.ThreadId) =>
     Effect.map(bound.readStates.getThreadPositions(memberId, [threadId]), (positions) =>
       positions.map((position) => position.readThrough)
     )
@@ -93,7 +95,7 @@ describe("read state", () => {
                 ? Effect.void
                 : journal.publish(AssignmentFacts.Created, {
                     workspaceId,
-                    assignmentId: Assignment.Id.make(`viewer-${memberId}`),
+                    assignmentId: Assignment.AssignmentId.make(`viewer-${memberId}`),
                     memberId,
                     source: {
                       _tag: "Role",
@@ -166,7 +168,7 @@ describe("read state", () => {
             yield* Effect.flip(
               bound.store.transaction(
                 bound.threads.recordLatest({
-                  threadId: Thread.Id.make("missing"),
+                  threadId: ThreadId.ThreadId.make("missing"),
                   sequence: 1,
                   occurredAt: opened
                 })
@@ -181,7 +183,7 @@ describe("read state", () => {
             yield* Effect.flip(
               bound.store.transaction(
                 bound.groups.recordLatest({
-                  groupId: Group.Id.make("missing"),
+                  groupId: GroupId.GroupId.make("missing"),
                   occurredAt: opened
                 })
               )
@@ -191,7 +193,7 @@ describe("read state", () => {
             store: "GroupStore",
             reason: { _tag: "Rejected" }
           })
-          expect(yield* bound.threads.getLatest([started.thread.id, Thread.Id.make("missing")])).toHaveLength(1)
+          expect(yield* bound.threads.getLatest([started.thread.id, ThreadId.ThreadId.make("missing")])).toHaveLength(1)
           expect(yield* bound.threads.getLatest([])).toEqual([])
           expect(yield* bound.groups.getLatest([])).toEqual([])
         })
@@ -427,7 +429,7 @@ describe("read state", () => {
             Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Created, {
                 workspaceId,
-                assignmentId: Assignment.Id.make("plain-reads-own"),
+                assignmentId: Assignment.AssignmentId.make("plain-reads-own"),
                 memberId: plainId,
                 source: {
                   _tag: "Direct",
@@ -446,7 +448,7 @@ describe("read state", () => {
                 bound,
                 actorFor(outsiderId),
                 Effect.flatMap(ThreadService.ThreadService, (threadService) =>
-                  threadService.listInGroup(Group.Id.make("missing"), { limit: 1 })
+                  threadService.listInGroup(GroupId.GroupId.make("missing"), { limit: 1 })
                 )
               )
             )
@@ -627,7 +629,7 @@ describe("read state", () => {
               })
             )
           )
-          const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: Group.Id) =>
+          const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: GroupId.GroupId) =>
             items.find((item) => item.group.id === groupId)
           yield* TestClock.adjust("1 minute")
           yield* run(bound, owner, start(team.id, []))

@@ -20,6 +20,7 @@ import * as StoreInput from "../journal/StoreInput.ts"
 import type * as MemberId from "../workspace/MemberId.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Group from "./Group.ts"
+import * as GroupId from "./GroupId.ts"
 
 /**
  * The group store, bound to one workspace by the host.
@@ -37,17 +38,19 @@ export class GroupStore extends Context.Service<
   GroupStore,
   {
     /** The group, if stored. */
-    readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Group>, StoreError.StoreError>
+    readonly get: (id: GroupId.GroupId) => Effect.Effect<Option.Option<Group.Group>, StoreError.StoreError>
     /**
      * Find several groups in one read. Absent IDs are omitted and each found record appears once;
      * order is unspecified, so callers index results by ID. An empty request reads nothing.
      */
-    readonly getMany: (ids: ReadonlyArray<Group.Id>) => Effect.Effect<ReadonlyArray<Group.Group>, StoreError.StoreError>
+    readonly getMany: (
+      ids: ReadonlyArray<GroupId.GroupId>
+    ) => Effect.Effect<ReadonlyArray<Group.Group>, StoreError.StoreError>
     /** A page of the workspace's public team groups in binary group-ID order, after the cursor. */
     readonly pagePublic: (options: Group.ListOptions) => Effect.Effect<ReadonlyArray<Group.Team>, StoreError.StoreError>
     /** The direct group with exactly these members, in any order. */
     readonly findDirect: (
-      memberIds: ReadonlyArray<MemberId.Id>
+      memberIds: ReadonlyArray<MemberId.MemberId>
     ) => Effect.Effect<Option.Option<Group.Direct>, StoreError.StoreError>
     /**
      * Reject reused IDs and a second direct group for the same member set.
@@ -65,7 +68,7 @@ export class GroupStore extends Context.Service<
      * are omitted; order is unspecified.
      */
     readonly getLatest: (
-      ids: ReadonlyArray<Group.Id>
+      ids: ReadonlyArray<GroupId.GroupId>
     ) => Effect.Effect<ReadonlyArray<Group.Latest>, StoreError.StoreError>
     /**
      * Projection write that advances a group's latest activity time. A time at or before the
@@ -82,18 +85,18 @@ export class GroupStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: GroupStore["Service"]): GroupStore["Service"] => {
+export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: GroupStore["Service"]): GroupStore["Service"] => {
   const read = StoreInput.read("GroupStore")
   const write = StoreInput.write("GroupStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Group.Id, id), driver.get),
-    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Group.Id), ids), driver.getMany),
+    get: (id) => Effect.flatMap(read("get", GroupId.GroupId, id), driver.get),
+    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(GroupId.GroupId), ids), driver.getMany),
     pagePublic: (options) => Effect.flatMap(read("pagePublic", Group.ListOptions, options), driver.pagePublic),
     findDirect: (memberIds) =>
       Effect.flatMap(read("findDirect", Group.DirectMembers, Group.directMembers(memberIds)), driver.findDirect),
     insert: (record) => Effect.flatMap(write("insert", Group.Group, record), driver.insert),
     rename: (renamed) => Effect.flatMap(write("rename", Group.Renamed, renamed), driver.rename),
-    getLatest: (ids) => Effect.flatMap(read("getLatest", Schema.Array(Group.Id), ids), driver.getLatest),
+    getLatest: (ids) => Effect.flatMap(read("getLatest", Schema.Array(GroupId.GroupId), ids), driver.getLatest),
     recordLatest: (latest) => Effect.flatMap(write("recordLatest", Group.Latest, latest), driver.recordLatest)
   }
 }

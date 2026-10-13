@@ -8,9 +8,9 @@ import { ChannelTransport } from "@amends-dev/channel"
 import { Integration, Integrations, type ModelCatalog } from "@amends-dev/connection"
 import { DeliveryJobs } from "@amends-dev/core/channel"
 import { Store } from "@amends-dev/core/journal"
-import type { Thread } from "@amends-dev/core/thread"
-import { type Turn, TurnJobs } from "@amends-dev/core/turn"
-import type { Member, Workspace } from "@amends-dev/core/workspace"
+import type { ThreadId } from "@amends-dev/core/thread"
+import { TurnJobs, type TurnId } from "@amends-dev/core/turn"
+import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import type { Host, Storage } from "@amends-dev/gateway/conformance"
 import { Harness as AgentHarness } from "@amends-dev/harness"
 import { Context, Crypto, Effect, Layer, Redacted, Result, Schema } from "effect"
@@ -163,17 +163,17 @@ export const installed = { integrations: testIntegrations }
 
 /** A turn job request a commit made: to run an agent's work in a thread, or to stop its turn. */
 export type TurnJobRequest =
-  | { readonly kind: "run"; readonly memberId: Member.Id; readonly threadId: Thread.Id }
+  | { readonly kind: "run"; readonly memberId: MemberId.MemberId; readonly threadId: ThreadId.ThreadId }
   | {
       readonly kind: "stop"
-      readonly memberId: Member.Id
-      readonly threadId: Thread.Id
-      readonly turnId: Turn.Id
+      readonly memberId: MemberId.MemberId
+      readonly threadId: ThreadId.ThreadId
+      readonly turnId: TurnId.TurnId
     }
 
 /** The turn job requests each workspace's commits made and no suite has taken yet, in order. */
-const requestedTurnJobs = new Map<Workspace.Id, Array<TurnJobRequest>>()
-const keepOnceCommitted = (workspaceId: Workspace.Id, request: TurnJobRequest) =>
+const requestedTurnJobs = new Map<WorkspaceId.WorkspaceId, Array<TurnJobRequest>>()
+const keepOnceCommitted = (workspaceId: WorkspaceId.WorkspaceId, request: TurnJobRequest) =>
   Effect.flatMap(Store.Transaction, (storeTransaction) =>
     storeTransaction.afterCommit(
       Effect.sync(() => {
@@ -196,7 +196,7 @@ export const recordedTurnJobs = TurnJobs.TurnJobs.of({
 export const layerRecordedTurnJobs = Layer.succeed(TurnJobs.TurnJobs, recordedTurnJobs)
 
 /** The delivery job requests each workspace's commits made and no suite has taken yet, in order. */
-const requestedDeliveryJobs = new Map<Workspace.Id, Array<Thread.Id>>()
+const requestedDeliveryJobs = new Map<WorkspaceId.WorkspaceId, Array<ThreadId.ThreadId>>()
 
 /**
  * Delivery jobs the suites run themselves: a commit's requests are kept once it commits, and
@@ -217,7 +217,7 @@ export const recordedDeliveryJobs = DeliveryJobs.DeliveryJobs.of({
 export const layerRecordedDeliveryJobs = Layer.succeed(DeliveryJobs.DeliveryJobs, recordedDeliveryJobs)
 
 /** The threads whose delivery the workspace's commits requested since the last take, in order. */
-export const takeDeliveryJobs = (id: Workspace.Id) =>
+export const takeDeliveryJobs = (id: WorkspaceId.WorkspaceId) =>
   Effect.sync(() => {
     const requested = requestedDeliveryJobs.get(id) ?? []
     requestedDeliveryJobs.delete(id)
@@ -225,7 +225,7 @@ export const takeDeliveryJobs = (id: Workspace.Id) =>
   })
 
 /** The turn job requests the workspace's commits made since the last take, in order. */
-export const takeTurnJobs = (id: Workspace.Id) =>
+export const takeTurnJobs = (id: WorkspaceId.WorkspaceId) =>
   Effect.sync(() => {
     const requested = requestedTurnJobs.get(id) ?? []
     requestedTurnJobs.delete(id)
@@ -249,13 +249,13 @@ const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>, c
   )
 
 /** One workspace's stores and signals on a host, with the test integrations and recorded jobs. */
-export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
+export const forWorkspace = (host: Context.Context<Host>, id: WorkspaceId.WorkspaceId) =>
   Effect.flatMap(Context.get(host, WorkspaceStorage.WorkspaceStorage).forWorkspace(id), (context) =>
     withHostServices(context, Context.get(host, Crypto.Crypto))
   )
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
-export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
+export const boundTo = Effect.fnUntraced(function* (id: WorkspaceId.WorkspaceId) {
   const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage
   const crypto = yield* Crypto.Crypto
   return yield* withHostServices(yield* workspaceStorage.forWorkspace(id), crypto)

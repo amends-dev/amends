@@ -46,6 +46,7 @@ import * as Turn from "./Turn.ts"
 import * as TurnActivity from "./TurnActivity.ts"
 import * as TurnCommand from "./TurnCommand.ts"
 import * as TurnFacts from "./TurnFacts.ts"
+import * as TurnId from "./TurnId.ts"
 import * as TurnStore from "./TurnStore.ts"
 
 /**
@@ -132,7 +133,7 @@ export class TurnService extends Context.Service<
      * its timeline requires. Outside the audience it is `CoreError.NotFound`; without the
      * permission, Denied.
      */
-    readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Actor>
+    readonly get: (turnId: TurnId.TurnId) => Effect.Effect<Turn.View, ReadError, Actor.Actor>
     /**
      * The workspace's active turns in threads the reader may read, oldest first, among at most
      * `limit` active turns in the workspace.
@@ -147,14 +148,14 @@ export class TurnService extends Context.Service<
      * commit changes their groups or grants; following again starts from the items as they stand.
      */
     readonly watchLog: (
-      turnId: Turn.Id
+      turnId: TurnId.TurnId
     ) => Effect.Effect<Stream.Stream<Turn.LogMessage, CoreError.Unavailable>, WatchError, Actor.Actor | Scope.Scope>
     /**
      * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
      * queued turn stops at once, since nothing runs it yet; a running one stops once its job
      * confirms it. A turn already stopping stays as it is; a finished one is `CoreError.Conflict`.
      */
-    readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Actor>
+    readonly cancel: (turnId: TurnId.TurnId) => Effect.Effect<Turn.View, CancelError, Actor.Actor>
     /**
      * Run a failed or stopped turn again, for a reader who may open its thread and direct its
      * agent: a new turn for the same agent and input, which continues the session that turn left
@@ -163,7 +164,7 @@ export class TurnService extends Context.Service<
      * `CoreError.Conflict`. A turn is retried at most once, so asking again returns the turn its
      * retry created.
      */
-    readonly retry: (turnId: Turn.Id) => Effect.Effect<Turn.View, RetryError, Actor.Actor>
+    readonly retry: (turnId: TurnId.TurnId) => Effect.Effect<Turn.View, RetryError, Actor.Actor>
   }
 >()("@amends-dev/core/turn/TurnService") {}
 
@@ -178,7 +179,7 @@ const endings: ReadonlySet<string> = new Set([
 ])
 
 /** Whether a commit ends the turn: it holds a fact ending a turn, whose payload names this one. */
-const endsTurn = (delivery: ChangeFeedSource.Delivery, turnId: Turn.Id) =>
+const endsTurn = (delivery: ChangeFeedSource.Delivery, turnId: TurnId.TurnId) =>
   delivery.events.some(
     ({ event }) =>
       endings.has(event.name) && Predicate.hasProperty(event.payload, "turnId") && event.payload.turnId === turnId
@@ -204,19 +205,19 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
 
-  const readThreadRequirement = (threadId: ThreadId.Id) =>
+  const readThreadRequirement = (threadId: ThreadId.ThreadId) =>
     Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))
   /**
    * The thread, when the reader may open it and read it, as its timeline requires: every read of
    * its turns checks this. Outside its audience, it is missing to them.
    */
-  const requireReadableThread = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
+  const requireReadableThread = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* threadQuery.requireAccess(threadId)
     yield* authorization.require([readThreadRequirement(thread.id)])
     return thread
   })
   /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
-  const requireReadableTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
+  const requireReadableTurn = Effect.fnUntraced(function* (turnId: TurnId.TurnId) {
     const found = yield* turnStore.get(turnId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Turn", id: turnId })
     const turn = found.value
@@ -256,8 +257,8 @@ export const make = Effect.gen(function* () {
   })
   const toView = (turn: Turn.Turn) => Effect.map(toViews([turn]), (views) => views[0] as Turn.View)
 
-  const get = Effect.fn("TurnService.get")(function* (turnId: Turn.Id) {
-    const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId))
+  const get = Effect.fn("TurnService.get")(function* (turnId: TurnId.TurnId) {
+    const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(TurnId.TurnId)(turnId))
     return yield* toView(turn)
   }, Operation.report)
 
@@ -267,7 +268,7 @@ export const make = Effect.gen(function* () {
     const active = yield* turnStore.listActive(yield* decodeLimit(limit))
     // Each thread's audience is checked once, whatever number of its turns are active, then the
     // permission to read the threads in it, together.
-    const opened = new Map<ThreadId.Id, boolean>()
+    const opened = new Map<ThreadId.ThreadId, boolean>()
     for (const turn of active) {
       if (opened.has(turn.threadId)) continue
       const may = yield* threadQuery.requireAccess(turn.threadId).pipe(
@@ -285,8 +286,8 @@ export const make = Effect.gen(function* () {
 
   const logInterrupted = () => new CoreError.Unavailable({ reason: new CoreError.LogInterrupted() })
 
-  const watchLog = Effect.fn("TurnService.watchLog")(function* (turnId: Turn.Id) {
-    const id = yield* Schema.decodeEffect(Turn.Id)(turnId)
+  const watchLog = Effect.fn("TurnService.watchLog")(function* (turnId: TurnId.TurnId) {
+    const id = yield* Schema.decodeEffect(TurnId.TurnId)(turnId)
     // Register for drafts and commits before reading, so none that follows is missed: the turn's
     // end, or a change to the reader's access, committed after the reads below is delivered.
     const live = yield* signalHub.subscribe
@@ -406,8 +407,8 @@ export const make = Effect.gen(function* () {
   }, Operation.report)
 
   const cancel = Effect.fn("TurnService.cancel")(
-    function* (turnId: Turn.Id) {
-      const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId))
+    function* (turnId: TurnId.TurnId) {
+      const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(TurnId.TurnId)(turnId))
       yield* authorization.require([directAgentRequirement(turn)])
       if (!Turn.active(turn.status))
         return yield* new CoreError.Conflict({
@@ -423,13 +424,13 @@ export const make = Effect.gen(function* () {
   )
 
   const retry = Effect.fn("TurnService.retry")(
-    function* (turnId: Turn.Id) {
-      const id = yield* Schema.decodeEffect(Turn.Id)(turnId)
+    function* (turnId: TurnId.TurnId) {
+      const id = yield* Schema.decodeEffect(TurnId.TurnId)(turnId)
       const turn = yield* requireReadableTurn(id)
       yield* authorization.require([directAgentRequirement(turn)])
       // A turn is retried at most once, since its retry supersedes it, so the retry's ID comes from
       // the turn it retries and asking again returns that retry.
-      const retryId = Turn.Id.make(yield* Request.derivedId(["turn.retry", workspaceId, turn.id]))
+      const retryId = TurnId.TurnId.make(yield* Request.derivedId(["turn.retry", workspaceId, turn.id]))
       if (Option.isSome(yield* turnStore.get(retryId))) return yield* toView(yield* requireReadableTurn(retryId))
       const reason = yield* whyNotRetryable(turn)
       if (reason !== undefined)

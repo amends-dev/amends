@@ -1,20 +1,21 @@
+import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Subject } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
-  Thread,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
-  ThreadMessage,
   ThreadMessageActivity,
-  ThreadParticipation,
   ThreadParticipationActivity,
-  ThreadParticipationFacts
+  ThreadParticipationFacts,
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
+import { MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Schema } from "effect"
-import * as Group from "../../src/group/Group.ts"
 import * as GroupMembership from "../../src/group/GroupMembership.ts"
 import * as GroupMembershipFacts from "../../src/group/GroupMembershipFacts.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
@@ -26,13 +27,12 @@ import * as Publication from "../../src/journal/Publication.ts"
 import * as Store from "../../src/journal/Store.ts"
 import type * as Transaction from "../../src/journal/Transaction.ts"
 import * as NotificationProjection from "../../src/notification/NotificationProjection.ts"
-import * as Member from "../../src/workspace/Member.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
 const testSubject = () => Subject.make("test", "entity")
-const workspaceId = WorkspaceId.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("journal")
 const Source = Fact.make("notification-test.source", {
   subject: testSubject,
@@ -133,10 +133,10 @@ it.effect("participation domain facts publish without touching notifications", (
         // The fixture defects on every notification read or write.
         yield* journal.publish(ThreadParticipationFacts.Ended, {
           workspaceId,
-          groupId: Group.Id.make("group"),
-          threadId: Thread.Id.make("thread"),
-          participationId: ThreadParticipation.Id.make("participation"),
-          memberId: Member.Id.make("member"),
+          groupId: GroupId.GroupId.make("group"),
+          threadId: ThreadId.ThreadId.make("thread"),
+          participationId: ThreadParticipationId.ThreadParticipationId.make("participation"),
+          memberId: MemberId.MemberId.make("member"),
           reason: "unfollowed"
         })
         expect(yield* fixture.checkpoints.get(key)).toEqual(Option.none())
@@ -150,23 +150,23 @@ it.effect("notifications rebuild from recorded activity alone", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
     const inserted: Array<Notification.Notification> = []
-    const discarded: Array<ThreadParticipation.Id> = []
+    const discarded: Array<ThreadParticipationId.ThreadParticipationId> = []
     const notifications: NotificationStore.NotificationStore["Service"] = {
       ...refusing,
       insertMany: (records) => Effect.sync(() => void inserted.push(...records)),
       discardPendingForParticipation: (id) => Effect.sync(() => void discarded.push(id))
     }
-    const groupId = Group.Id.make("group")
-    const threadId = Thread.Id.make("thread")
+    const groupId = GroupId.GroupId.make("group")
+    const threadId = ThreadId.ThreadId.make("thread")
     const occurredAt = DateTime.makeUnsafe("2026-09-20T12:00:00.000Z")
-    const agent = ThreadParticipation.Id.make("agent-participation")
+    const agent = ThreadParticipationId.ThreadParticipationId.make("agent-participation")
     const recipients = [
       {
-        participationId: ThreadParticipation.Id.make("human-participation"),
+        participationId: ThreadParticipationId.ThreadParticipationId.make("human-participation"),
         recipient: {
           _tag: "Human" as const,
           id: Identity.HumanId.make("human"),
-          memberId: Member.Id.make("human-member")
+          memberId: MemberId.MemberId.make("human-member")
         },
         requestsWork: false
       },
@@ -175,15 +175,15 @@ it.effect("notifications rebuild from recorded activity alone", () =>
         recipient: {
           _tag: "Agent" as const,
           id: Identity.AgentId.make("agent"),
-          memberId: Member.Id.make("agent-member")
+          memberId: MemberId.MemberId.make("agent-member")
         },
         requestsWork: true
       }
     ]
     const published = ThreadActivityKind.makeRecordUnsafe(
       ThreadMessageActivity.Published,
-      { id: ThreadActivity.Id.make("published"), workspaceId, threadId, sequence: 1, occurredAt },
-      { messageId: ThreadMessage.Id.make("message") }
+      { id: ThreadActivity.ThreadActivityId.make("published"), workspaceId, threadId, sequence: 1, occurredAt },
+      { messageId: ThreadMessageId.ThreadMessageId.make("message") }
     )
     yield* run(
       fixture,
@@ -199,7 +199,7 @@ it.effect("notifications rebuild from recorded activity alone", () =>
           groupId,
           activity: ThreadActivityKind.makeRecordUnsafe(
             ThreadParticipationActivity.Ended,
-            { id: ThreadActivity.Id.make("ended"), workspaceId, threadId, sequence: 2, occurredAt },
+            { id: ThreadActivity.ThreadActivityId.make("ended"), workspaceId, threadId, sequence: 2, occurredAt },
             { participationId: agent, reason: "unfollowed" }
           ),
           recipients: []
@@ -226,9 +226,9 @@ it.effect("leaving a group settles what the member had pending from it, live and
   Effect.gen(function* () {
     const departure = (reason: "left" | "removed" | "workspace-removed", group: string) => ({
       workspaceId,
-      groupId: Group.Id.make(group),
-      membershipId: GroupMembership.Id.make(`${group}-admission`),
-      memberId: Member.Id.make("human-member"),
+      groupId: GroupId.GroupId.make(group),
+      membershipId: GroupMembership.GroupMembershipId.make(`${group}-admission`),
+      memberId: MemberId.MemberId.make("human-member"),
       reason
     })
     // Leaving, removal, and workspace removal all end access, so each settles.
@@ -240,7 +240,7 @@ it.effect("leaving a group settles what the member had pending from it, live and
     const expected = departures.map((value) => [value.memberId, value.groupId])
     for (const rebuild of [false, true]) {
       const fixture = yield* make()
-      const settled: Array<readonly [Member.Id, Group.Id]> = []
+      const settled: Array<readonly [MemberId.MemberId, GroupId.GroupId]> = []
       const notifications: NotificationStore.NotificationStore["Service"] = {
         ...refusing,
         discardPendingForGroup: (memberId, groupId) => Effect.sync(() => void settled.push([memberId, groupId]))

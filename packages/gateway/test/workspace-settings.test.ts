@@ -1,7 +1,7 @@
 import { BuiltinRoles, type Role } from "@amends-dev/core/authorization"
 import { Actor, type Identity, Identity as Identities } from "@amends-dev/core/identity"
 import { Journal, StoreError } from "@amends-dev/core/journal"
-import { Workspace, WorkspaceSettingsService } from "@amends-dev/core/workspace"
+import { WorkspaceSettingsService, WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway, WorkspaceDirectory } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Tracer } from "effect"
@@ -10,7 +10,7 @@ import * as Operations from "./operations.ts"
 import * as Support from "./support.ts"
 import { alice, bob, boundTo, charlie, failingLate, future, journalLog, request } from "./support.ts"
 
-const read = (id: Workspace.Id, identity: Identity.MemberReference) =>
+const read = (id: WorkspaceId.WorkspaceId, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       id,
@@ -21,7 +21,7 @@ const read = (id: Workspace.Id, identity: Identity.MemberReference) =>
       )
     )
   )
-const listing = (id: Workspace.Id, identity: Identity.MemberReference) =>
+const listing = (id: WorkspaceId.WorkspaceId, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       id,
@@ -32,7 +32,7 @@ const listing = (id: Workspace.Id, identity: Identity.MemberReference) =>
       )
     )
   )
-const rename = (id: Workspace.Id, identity: Identity.MemberReference, name: string, expectedName: string) =>
+const rename = (id: WorkspaceId.WorkspaceId, identity: Identity.MemberReference, name: string, expectedName: string) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     gateway.asMember(
       id,
@@ -129,7 +129,7 @@ describe("workspace settings", () => {
         storage,
         Effect.gen(function* () {
           const workspace = yield* Operations.createWorkspace(alice.id)
-          const join = Effect.fnUntraced(function* (identity: Identity.HumanId, roleId: Role.Id) {
+          const join = Effect.fnUntraced(function* (identity: Identity.HumanId, roleId: Role.RoleId) {
             const invitation = yield* Operations.invite(workspace.id, alice, request(yield* future, identity, roleId))
             return yield* Operations.acceptInvitation(workspace.id, identity, invitation.details.id)
           })
@@ -230,7 +230,7 @@ describe("workspace settings", () => {
             bound = yield* boundTo(workspace.id)
           for (const change of [
             {
-              workspaceId: Workspace.Id.make("foreign"),
+              workspaceId: WorkspaceId.WorkspaceId.make("foreign"),
               previousName: workspace.name,
               name: "Studio"
             },

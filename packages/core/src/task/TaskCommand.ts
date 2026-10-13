@@ -38,7 +38,7 @@ import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
 import * as TurnCommand from "../turn/TurnCommand.ts"
 import * as TurnStore from "../turn/TurnStore.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as Task from "./Task.ts"
 import * as TaskActivity from "./TaskActivity.ts"
 import * as TaskFacts from "./TaskFacts.ts"
@@ -127,7 +127,7 @@ export class TaskCommand extends Context.Service<
   }
 >()("@amends-dev/core/task/TaskCommand") {}
 
-const member = (memberId: Member.Id): ThreadParticipation.Reference =>
+const member = (memberId: MemberId.MemberId): ThreadParticipation.Reference =>
   ThreadParticipation.Reference.cases.Member.make({ memberId })
 
 /** Who takes part through a task in this state: triage while it is in triage, and its assignee. */
@@ -153,7 +153,7 @@ const admittedBy = (change: Task.Change, next: Task.Task) =>
   })
 
 /** Whom a change asks for work: the assignee while the task is being worked; a priority informs alone. */
-const askedBy = (change: Task.Change, next: Task.Task): Member.Id | null =>
+const askedBy = (change: Task.Change, next: Task.Task): MemberId.MemberId | null =>
   Task.Change.isAnyOf(["Priority"])(change) ? null : Task.asked(next)
 
 /** Whether a change reaches every participant, rather than those it admits alone. */
@@ -161,7 +161,7 @@ const reachesEveryone = (change: Task.Change) =>
   !Task.Change.isAnyOf(["Assignee"])(change) && !(Task.Change.isAnyOf(["Status"])(change) && change.to === "triage")
 
 /** The agent a change takes off the task: the former assignee, or the assignee as work stops. */
-const leftBy = (task: Task.Task, change: Task.Change): Member.Id | null =>
+const leftBy = (task: Task.Task, change: Task.Change): MemberId.MemberId | null =>
   Task.Change.match(change, {
     Assignee: ({ from }) => from,
     Status: ({ to }) => (to === "held" || to === "done" || to === "dismissed" ? task.assignee : null),
@@ -233,7 +233,7 @@ export const make = Effect.gen(function* () {
   })
 
   /** Ask the agent's active turn in the thread, if it has one, to stop. */
-  const stopTurnOf = Effect.fnUntraced(function* (memberId: Member.Id, thread: Thread.Thread) {
+  const stopTurnOf = Effect.fnUntraced(function* (memberId: MemberId.MemberId, thread: Thread.Thread) {
     const active = yield* turnStore.findActive(memberId, thread.id)
     if (Option.isSome(active) && active.value.status !== "cancelling")
       yield* turnCommand.requestStop(active.value, "task-changed")

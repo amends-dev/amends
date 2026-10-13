@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as Identity from "../identity/Identity.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
 import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
@@ -33,13 +34,13 @@ import * as Contact from "./Contact.ts"
 export class ContactStore extends Context.Service<
   ContactStore,
   {
-    readonly get: (id: Contact.Id) => Effect.Effect<Option.Option<Contact.Contact>, StoreError.StoreError>
+    readonly get: (id: Identity.ContactId) => Effect.Effect<Option.Option<Contact.Contact>, StoreError.StoreError>
     /**
      * Several contacts in one read. Absent ids are omitted and each contact appears once; order is
      * unspecified, so callers index results by id. An empty request reads nothing.
      */
     readonly getMany: (
-      ids: ReadonlyArray<Contact.Id>
+      ids: ReadonlyArray<Identity.ContactId>
     ) => Effect.Effect<ReadonlyArray<Contact.Contact>, StoreError.StoreError>
     /** Reject a reused id. Never upsert. */
     readonly insert: (record: Contact.Contact) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
@@ -55,12 +56,15 @@ export class ContactStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: ContactStore["Service"]): ContactStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: ContactStore["Service"]
+): ContactStore["Service"] => {
   const read = StoreInput.read("ContactStore")
   const write = StoreInput.write("ContactStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Contact.Id, id), driver.get),
-    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Contact.Id), ids), driver.getMany),
+    get: (id) => Effect.flatMap(read("get", Identity.ContactId, id), driver.get),
+    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Identity.ContactId), ids), driver.getMany),
     insert: (record) => Effect.flatMap(write("insert", Contact.Contact, record), driver.insert),
     update: (record) => Effect.flatMap(write("update", Contact.Contact, record), driver.update)
   }

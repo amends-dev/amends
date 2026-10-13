@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
+import * as Identity from "../identity/Identity.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
 import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
@@ -35,7 +36,7 @@ export class AgentStore extends Context.Service<
   AgentStore,
   {
     /** The agent, whether or not its membership ended. */
-    readonly get: (id: Agent.Id) => Effect.Effect<Option.Option<Agent.Agent>, StoreError.StoreError>
+    readonly get: (id: Identity.AgentId) => Effect.Effect<Option.Option<Agent.Agent>, StoreError.StoreError>
     /** The workspace's agents, those whose membership ended included, in no particular order. */
     readonly list: Effect.Effect<ReadonlyArray<Agent.Agent>, StoreError.StoreError>
     /** Reject a reused ID. Never upsert. */
@@ -52,11 +53,11 @@ export class AgentStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: AgentStore["Service"]): AgentStore["Service"] => {
+export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: AgentStore["Service"]): AgentStore["Service"] => {
   const read = StoreInput.read("AgentStore")
   const write = StoreInput.write("AgentStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Agent.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", Identity.AgentId, id), driver.get),
     list: driver.list,
     insert: (record) => Effect.flatMap(write("insert", Agent.Agent, record), driver.insert),
     update: (record) => Effect.flatMap(write("update", Agent.Agent, record), driver.update)

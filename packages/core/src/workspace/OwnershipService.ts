@@ -29,7 +29,7 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
-import type * as Member from "./Member.ts"
+import type * as MemberId from "./MemberId.ts"
 import * as MemberStore from "./MemberStore.ts"
 import * as Ownership from "./Ownership.ts"
 import * as OwnershipPermissions from "./OwnershipPermissions.ts"
@@ -111,7 +111,7 @@ export const make: Effect.Effect<
     OwnershipPermissions.Transfer,
     Target.Reference.cases.Workspace.make({ workspaceId })
   )
-  const requireMember = Effect.fn("OwnershipService.requireMember")(function* (memberId: Member.Id) {
+  const requireMember = Effect.fn("OwnershipService.requireMember")(function* (memberId: MemberId.MemberId) {
     const found = yield* memberStore.get(memberId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id: memberId })
     return found.value

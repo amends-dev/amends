@@ -19,20 +19,6 @@ import * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
 
 /**
- * Names a thread; `ThreadId.Id`, where models that only refer to threads import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = ThreadId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = ThreadId.Id
-
-/**
  * A thread's title: a trimmed line of 1 to 200 characters without hidden ones. It is the thread's
  * own text, independent of every message in it.
  *
@@ -55,16 +41,16 @@ export type Title = typeof Title.Type
  * @since 0.1.0
  */
 export const Thread = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
+  id: ThreadId.ThreadId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
   /** Its title, or null, when readers show its opening message instead. */
   title: Schema.NullOr(Title),
   /**
    * The thread this one was derived from, or null. Set at creation, never changed, and no grant
    * of access to either thread: the originating thread may be in another group.
    */
-  origin: Schema.NullOr(Id),
+  origin: Schema.NullOr(ThreadId.ThreadId),
   /** Who started the conversation: a member, or the contact whose message a channel received. */
   createdBy: ThreadMessage.Author,
   createdAt: Schema.DateTimeUtcFromString
@@ -84,7 +70,7 @@ export interface Thread extends Schema.Schema.Type<typeof Thread> {}
  * @since 0.1.0
  */
 export const Latest = Schema.Struct({
-  threadId: ThreadId.Id,
+  threadId: ThreadId.ThreadId,
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
   occurredAt: Schema.DateTimeUtcFromString
 })
@@ -104,7 +90,7 @@ export interface Latest extends Schema.Schema.Type<typeof Latest> {}
  */
 export const ListCursor = Schema.Struct({
   latestActivityAt: Latest.fields.occurredAt,
-  threadId: ThreadId.Id
+  threadId: ThreadId.ThreadId
 })
 
 /**
@@ -194,7 +180,7 @@ export const listItem = (
  */
 export const OpeningCursor = Schema.Struct({
   createdAt: Thread.fields.createdAt,
-  threadId: ThreadId.Id
+  threadId: ThreadId.ThreadId
 })
 
 /**
@@ -269,7 +255,7 @@ export const opening = (item: ListItem, message: ThreadMessage.ThreadMessage, re
  * @since 0.1.0
  */
 export const RenameInput = Schema.Struct({
-  threadId: Id,
+  threadId: ThreadId.ThreadId,
   title: Title,
   expectedTitle: Schema.NullOr(Title)
 })
@@ -287,9 +273,9 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
  * @since 0.1.0
  */
 export const Renamed = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  threadId: Id,
-  groupId: GroupId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   title: Title
 })
 
@@ -307,12 +293,12 @@ export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
  * @since 0.1.0
  */
 export const StartInGroupInput = Schema.Struct({
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   text: ThreadMessage.Text,
-  mentions: Schema.UniqueArray(MemberId.Id),
+  mentions: Schema.UniqueArray(MemberId.MemberId),
   title: Schema.optionalKey(Title),
   /** The thread this one splits work out of, which the author can read. */
-  origin: Schema.optionalKey(Id),
+  origin: Schema.optionalKey(ThreadId.ThreadId),
   /** Create the thread as a task, with these options, at its second position. */
   task: Schema.optionalKey(Task.Options)
 })
@@ -331,9 +317,9 @@ export interface StartInGroupInput extends Schema.Schema.Type<typeof StartInGrou
  * @since 0.1.0
  */
 export const StartDirectInput = Schema.Struct({
-  memberIds: Schema.UniqueArray(MemberId.Id).check(Schema.isMinLength(1)),
+  memberIds: Schema.UniqueArray(MemberId.MemberId).check(Schema.isMinLength(1)),
   text: ThreadMessage.Text,
-  mentions: Schema.UniqueArray(MemberId.Id),
+  mentions: Schema.UniqueArray(MemberId.MemberId),
   title: Schema.optionalKey(Title)
 })
 

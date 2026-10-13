@@ -4,7 +4,7 @@ import * as Event from "../src/journal/Event.ts"
 import * as WorkspaceId from "../src/workspace/WorkspaceId.ts"
 
 /** Explicit attribution for low-level fixture publications that bypass application operations. */
-export const testProvenance = (workspaceId = WorkspaceId.Id.make("workspace-one")): Event.Provenance => ({
+export const testProvenance = (workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")): Event.Provenance => ({
   workspaceId,
   performedBy: { _tag: "System", id: Performer.SystemId.make("test-fixture") },
   causedBy: null,

@@ -32,8 +32,10 @@ import * as Request from "../request/Request.ts"
 import type * as Thread from "../thread/Thread.ts"
 import * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
 import * as ThreadActivityStore from "../thread/ThreadActivityStore.ts"
+import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessage from "../thread/ThreadMessage.ts"
 import * as ThreadMessageActivity from "../thread/ThreadMessageActivity.ts"
+import type * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts"
 import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
@@ -46,6 +48,7 @@ import * as ChannelQuery from "./ChannelQuery.ts"
 import * as ChannelStore from "./ChannelStore.ts"
 import * as Delivery from "./Delivery.ts"
 import * as DeliveryFacts from "./DeliveryFacts.ts"
+import * as DeliveryId from "./DeliveryId.ts"
 import * as DeliveryStore from "./DeliveryStore.ts"
 
 /**
@@ -136,18 +139,18 @@ export class DeliveryExecution extends Context.Service<
      * for each message, settling their notifications, in one commit; then the thread's deliveries
      * still requested, in the order of their messages. A thread bound to no conversation has none.
      */
-    readonly accept: (threadId: Thread.Id) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, AcceptError>
+    readonly accept: (threadId: ThreadId.ThreadId) => Effect.Effect<ReadonlyArray<Delivery.Delivery>, AcceptError>
     /**
      * Ready the delivery: `Ready` with what to post and how to reach the system, or `Idle` for a
      * delivery no longer requested, or one failed here and now because its message was deleted
      * before it was sent, its channel was removed, or the channel's system cannot be reached as the
      * channel stands.
      */
-    readonly start: (deliveryId: Delivery.Id) => Effect.Effect<Start, StartError>
+    readonly start: (deliveryId: DeliveryId.DeliveryId) => Effect.Effect<Start, StartError>
     /** Record that the message was posted; a delivery no longer requested is left as it is. */
-    readonly recordSent: (deliveryId: Delivery.Id, sent: SentInput) => Effect.Effect<void, RecordError>
+    readonly recordSent: (deliveryId: DeliveryId.DeliveryId, sent: SentInput) => Effect.Effect<void, RecordError>
     /** Record that the job gave the delivery up; one no longer requested is left as it is. */
-    readonly recordFailed: (deliveryId: Delivery.Id, failed: FailedInput) => Effect.Effect<void, RecordError>
+    readonly recordFailed: (deliveryId: DeliveryId.DeliveryId, failed: FailedInput) => Effect.Effect<void, RecordError>
   }
 >()("@amends-dev/core/channel/DeliveryExecution") {}
 
@@ -187,8 +190,8 @@ export const make = Effect.gen(function* () {
     ).pipe(Effect.provideService(Crypto.Crypto, crypto), journal.commit)
 
   /** The messages published at these positions of the thread, by position. */
-  const readPublished = Effect.fnUntraced(function* (threadId: Thread.Id, sequences: ReadonlyArray<number>) {
-    const published = new Map<number, ThreadMessage.Id>()
+  const readPublished = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId, sequences: ReadonlyArray<number>) {
+    const published = new Map<number, ThreadMessageId.ThreadMessageId>()
     if (sequences.length === 0) return published
     const through = Math.max(...sequences)
     let after = Math.min(...sequences) - 1
@@ -221,7 +224,7 @@ export const make = Effect.gen(function* () {
     channel: Channel.Channel
   ) {
     const participants = yield* threadQuery.currentParticipants(thread)
-    const pending: Array<{ readonly id: Notification.Id; readonly sequence: number }> = []
+    const pending: Array<{ readonly id: Notification.NotificationId; readonly sequence: number }> = []
     for (const { participant } of participants) {
       if (!ThreadParticipation.Participant.isAnyOf(["Contact"])(participant)) continue
       const records = yield* notificationStore.listPendingByThread(
@@ -238,8 +241,8 @@ export const make = Effect.gen(function* () {
       pending.map(({ sequence }) => sequence)
     )
     const byMessage = new Map<
-      ThreadMessage.Id,
-      { readonly sequence: number; readonly notificationIds: Array<Notification.Id> }
+      ThreadMessageId.ThreadMessageId,
+      { readonly sequence: number; readonly notificationIds: Array<Notification.NotificationId> }
     >()
     for (const { id, sequence } of pending) {
       const messageId = messages.get(sequence)
@@ -252,7 +255,7 @@ export const make = Effect.gen(function* () {
     const requestedAt = yield* DateTime.now
     for (const [messageId, { sequence, notificationIds }] of byMessage) {
       if (!Array.isReadonlyArrayNonEmpty(notificationIds)) continue
-      const id = Delivery.Id.make(
+      const id = DeliveryId.DeliveryId.make(
         yield* Request.derivedId(["channel.delivery", workspaceId, channel.id, binding.conversation.id, messageId])
       )
       if (Option.isSome(yield* deliveryStore.get(id))) continue

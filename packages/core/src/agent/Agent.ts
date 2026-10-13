@@ -10,29 +10,15 @@
  * @since 0.1.0
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { ModelEndpoint } from "@amends-dev/harness"
 import * as Schema from "effect/Schema"
 import * as Role from "../authorization/Role.ts"
-import * as Connection from "../connection/Connection.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Text from "../text/Text.ts"
 import * as Member from "../workspace/Member.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
-
-/**
- * An agent's identity, which its membership refers to: `Identity.AgentId`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = Identity.AgentId
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = Identity.AgentId
 
 /**
  * What an agent works by, its system prompt: up to 20,000 characters.
@@ -66,7 +52,7 @@ export const NewInstructions = Schema.Trimmed.check(Schema.isMaxLength(20_000), 
  */
 export const Harness = Schema.TaggedUnion({
   Auto: {},
-  Connection: { connectionId: Connection.Id }
+  Connection: { connectionId: ConnectionContract.ConnectionId }
 })
 
 /**
@@ -85,7 +71,7 @@ export type Harness = typeof Harness.Type
  * @since 0.1.0
  */
 export const Model = Schema.Struct({
-  connectionId: Connection.Id,
+  connectionId: ConnectionContract.ConnectionId,
   id: Schema.NonEmptyString,
   effort: Schema.optionalKey(ModelEndpoint.Effort)
 })
@@ -116,7 +102,7 @@ export const NewModel = Schema.Struct({
  * @category schemas
  * @since 0.1.0
  */
-export const Sandbox = Schema.Struct({ connectionId: Connection.Id })
+export const Sandbox = Schema.Struct({ connectionId: ConnectionContract.ConnectionId })
 
 /**
  * @category schemas
@@ -133,7 +119,7 @@ export interface Sandbox extends Schema.Schema.Type<typeof Sandbox> {}
  * @since 0.1.0
  */
 export const Selection = Schema.Struct({
-  harness: Schema.Struct({ connectionId: Connection.Id }),
+  harness: Schema.Struct({ connectionId: ConnectionContract.ConnectionId }),
   model: Model,
   sandbox: Schema.NullOr(Sandbox)
 })
@@ -153,18 +139,18 @@ export interface Selection extends Schema.Schema.Type<typeof Selection> {}
  * @since 0.1.0
  */
 export const Agent = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: Identity.AgentId,
+  workspaceId: WorkspaceId.WorkspaceId,
 
   /** The agent's membership, which names it and gives it its role. */
-  memberId: MemberId.Id,
+  memberId: MemberId.MemberId,
   instructions: Instructions,
   harness: Harness,
   model: Model,
 
   /** Where it works, or nowhere, for an agent that answers from its model alone. */
   sandbox: Schema.NullOr(Sandbox),
-  createdBy: MemberId.Id,
+  createdBy: MemberId.MemberId,
   createdAt: Schema.DateTimeUtcFromString
 })
 /**
@@ -210,7 +196,7 @@ export interface Configuration extends Schema.Schema.Type<typeof Configuration> 
  */
 export const CreateInput = Schema.Struct({
   name: Member.NewName,
-  roleId: Role.Id,
+  roleId: Role.RoleId,
   ...Configuration.fields
 })
 
@@ -226,7 +212,7 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category options
  * @since 0.1.0
  */
-export const ConfigureInput = Schema.Struct({ agentId: Id, ...Configuration.fields })
+export const ConfigureInput = Schema.Struct({ agentId: Identity.AgentId, ...Configuration.fields })
 
 /**
  * @category options
@@ -241,7 +227,7 @@ export interface ConfigureInput extends Schema.Schema.Type<typeof ConfigureInput
  * @since 0.1.0
  */
 export const RenameInput = Schema.Struct({
-  agentId: Id,
+  agentId: Identity.AgentId,
   name: Member.NewName,
   expectedName: Member.Name
 })
@@ -260,9 +246,9 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
  * @since 0.1.0
  */
 export const Configured = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  agentId: Id,
-  memberId: MemberId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  agentId: Identity.AgentId,
+  memberId: MemberId.MemberId,
   instructions: Instructions,
   harness: Harness,
   model: Model,
@@ -339,8 +325,8 @@ export type Readiness = typeof Readiness.Type
  * @since 0.1.0
  */
 export const View = Schema.Struct({
-  id: Id,
-  memberId: MemberId.Id,
+  id: Identity.AgentId,
+  memberId: MemberId.MemberId,
 
   /** Its membership's name. */
   name: Member.Name,
@@ -354,7 +340,7 @@ export const View = Schema.Struct({
   configurable: Schema.Boolean,
   /** Whether the reader may direct it: ask it for work, and stop or retry its turns. */
   usable: Schema.Boolean,
-  createdBy: MemberId.Id,
+  createdBy: MemberId.MemberId,
   createdAt: Schema.DateTimeUtcFromString
 })
 /**

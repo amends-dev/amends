@@ -17,7 +17,7 @@ import * as WorkspaceMember from "./WorkspaceMember.ts"
 
 const record = Notification.Notification.annotate({ identifier: "Notification" })
 
-const params = { notificationId: Notification.Id }
+const params = { notificationId: Notification.NotificationId }
 const cursor = Schema.fromJsonString(NotificationStore.Cursor)
 
 /**

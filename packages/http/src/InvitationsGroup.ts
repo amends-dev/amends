@@ -50,7 +50,7 @@ export class InvitationsGroup extends HttpApiGroup.make("invitations")
       error: [...ApiErrors.workspace, ...ApiErrors.delegation]
     }),
     HttpApiEndpoint.post("revoke", "/:invitationId/revoke", {
-      params: { invitationId: Invitation.Id },
+      params: { invitationId: Invitation.InvitationId },
       success: Invitation.Invitation,
       error: [...ApiErrors.workspace, ...ApiErrors.delegation]
     })

@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 
-import { type Connection as ConnectionContract, Integrations } from "@amends-dev/connection"
+import { Connection as ConnectionContract, Integrations } from "@amends-dev/connection"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
@@ -152,13 +152,17 @@ export class ConnectionService extends Context.Service<
      * The connection, under `connection.read`; a missing, removed, or unreadable one is
      * `CoreError.NotFound`.
      */
-    readonly get: (connectionId: Connection.Id) => Effect.Effect<Connection.View, ReadError, Actor.Actor>
+    readonly get: (
+      connectionId: ConnectionContract.ConnectionId
+    ) => Effect.Effect<Connection.View, ReadError, Actor.Actor>
     /**
      * The models the connection offers an agent, to set an agent up with one: those its integration
      * lists, and whether it also offers others by any id. A connection whose integration this host
      * no longer installs offers nothing, and fails with `CoreError.Invalid` (`UnknownIntegration`).
      */
-    readonly models: (connectionId: Connection.Id) => Effect.Effect<Connection.Models, ModelsError, Actor.Actor>
+    readonly models: (
+      connectionId: ConnectionContract.ConnectionId
+    ) => Effect.Effect<Connection.Models, ModelsError, Actor.Actor>
     /**
      * Connect the workspace to an installed integration, with settings and a way of authenticating
      * the integration takes, and its key when it authenticates with one, stored in the same commit.
@@ -194,9 +198,11 @@ export class ConnectionService extends Context.Service<
      * checks it. It changes nothing, and holds no commit open while the system answers. Needs
      * `connection.manage`, since it sends the key.
      */
-    readonly check: (connectionId: Connection.Id) => Effect.Effect<ConnectionContract.Health, CheckError, Actor.Actor>
+    readonly check: (
+      connectionId: ConnectionContract.ConnectionId
+    ) => Effect.Effect<ConnectionContract.Health, CheckError, Actor.Actor>
     /** Stop its use and delete its key, under `connection.manage`; its record remains. */
-    readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, RemoveError, Actor.Actor>
+    readonly remove: (connectionId: ConnectionContract.ConnectionId) => Effect.Effect<void, RemoveError, Actor.Actor>
   }
 >()("@amends-dev/core/connection/ConnectionService") {}
 
@@ -216,7 +222,7 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
 
-  const connectionTarget = (connectionId: Connection.Id) =>
+  const connectionTarget = (connectionId: ConnectionContract.ConnectionId) =>
     Target.Reference.cases.Connection.make({ workspaceId, connectionId })
 
   /** The integration this host installs as `integration`, or `UnknownIntegration`. */
@@ -263,7 +269,7 @@ export const make = Effect.gen(function* () {
   })
 
   /** The active connection by ID, or `CoreError.NotFound`. */
-  const requireActiveConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
+  const requireActiveConnection = Effect.fnUntraced(function* (connectionId: ConnectionContract.ConnectionId) {
     const found = yield* connectionStore.get(connectionId)
     if (Option.isNone(found) || found.value.status !== "active")
       return yield* new CoreError.NotFound({ resource: "Connection", id: connectionId })
@@ -272,7 +278,7 @@ export const make = Effect.gen(function* () {
 
   /** A connection the actor may act on with `permission`; to anyone else it is missing. */
   const requirePermittedConnection = Effect.fnUntraced(function* (
-    connectionId: Connection.Id,
+    connectionId: ConnectionContract.ConnectionId,
     permission: Permission.Definition<"Connection">
   ) {
     const record = yield* requireActiveConnection(connectionId)
@@ -286,7 +292,7 @@ export const make = Effect.gen(function* () {
   })
 
   /** Store `apiKey` as the connection's key, in place of any it had. */
-  const setKey = (connectionId: Connection.Id, apiKey: Connection.ApiKey) =>
+  const setKey = (connectionId: ConnectionContract.ConnectionId, apiKey: Connection.ApiKey) =>
     connectionCredentialStore.set(connectionId, { apiKey })
 
   /** The connection's key, read for using it, or nothing for one that authenticates with none. */
@@ -323,13 +329,13 @@ export const make = Effect.gen(function* () {
     return views.toSorted(byName)
   }).pipe(Operation.report)
 
-  const get = Effect.fn("ConnectionService.get")(function* (connectionId: Connection.Id) {
-    const id = yield* Schema.decodeEffect(Connection.Id)(connectionId)
+  const get = Effect.fn("ConnectionService.get")(function* (connectionId: ConnectionContract.ConnectionId) {
+    const id = yield* Schema.decodeEffect(ConnectionContract.ConnectionId)(connectionId)
     return yield* viewForActor(yield* requirePermittedConnection(id, ConnectionPermissions.Read))
   }, Operation.report)
 
-  const models = Effect.fn("ConnectionService.models")(function* (connectionId: Connection.Id) {
-    const id = yield* Schema.decodeEffect(Connection.Id)(connectionId)
+  const models = Effect.fn("ConnectionService.models")(function* (connectionId: ConnectionContract.ConnectionId) {
+    const id = yield* Schema.decodeEffect(ConnectionContract.ConnectionId)(connectionId)
     const record = yield* requirePermittedConnection(id, ConnectionPermissions.Read)
     const integration = yield* requireIntegration(record.integration)
     return integration.models
@@ -342,7 +348,7 @@ export const make = Effect.gen(function* () {
         Requirement.make(ConnectionPermissions.Create, Target.Reference.cases.Workspace.make({ workspaceId }))
       ])
       const actor = yield* Actor.Actor
-      const connectionId = Connection.Id.make(
+      const connectionId = ConnectionContract.ConnectionId.make(
         yield* Request.idFor(options.requestKey, ["connection.create", workspaceId, actor.memberId])
       )
       // A retry returns the connection its first attempt created, unless it was removed since.
@@ -430,8 +436,8 @@ export const make = Effect.gen(function* () {
     Operation.report
   )
 
-  const check = Effect.fn("ConnectionService.check")(function* (connectionId: Connection.Id) {
-    const id = yield* Schema.decodeEffect(Connection.Id)(connectionId)
+  const check = Effect.fn("ConnectionService.check")(function* (connectionId: ConnectionContract.ConnectionId) {
+    const id = yield* Schema.decodeEffect(ConnectionContract.ConnectionId)(connectionId)
     const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage)
     const integration = yield* requireIntegration(record.integration)
     const credential = yield* credentialOf(record)
@@ -439,8 +445,8 @@ export const make = Effect.gen(function* () {
   }, Operation.report)
 
   const remove = Effect.fn("ConnectionService.remove")(
-    function* (connectionId: Connection.Id) {
-      const id = yield* Schema.decodeEffect(Connection.Id)(connectionId)
+    function* (connectionId: ConnectionContract.ConnectionId) {
+      const id = yield* Schema.decodeEffect(ConnectionContract.ConnectionId)(connectionId)
       const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage)
       if (record.auth === "apiKey") yield* connectionCredentialStore.remove(record.id)
       yield* journal.publish(ConnectionFacts.Removed, { workspaceId, connectionId: id })

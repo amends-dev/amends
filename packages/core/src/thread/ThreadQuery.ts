@@ -17,8 +17,8 @@ import * as Authorization from "../authorization/Authorization.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Target from "../authorization/Target.ts"
 import * as CoreError from "../error/CoreError.ts"
-import * as Group from "../group/Group.ts"
 import * as GroupFollowStore from "../group/GroupFollowStore.ts"
+import * as GroupId from "../group/GroupId.ts"
 import type * as GroupMembership from "../group/GroupMembership.ts"
 import * as GroupMembershipStore from "../group/GroupMembershipStore.ts"
 import * as GroupQuery from "../group/GroupQuery.ts"
@@ -28,12 +28,15 @@ import type * as StoreError from "../journal/StoreError.ts"
 import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as TaskStore from "../task/TaskStore.ts"
 import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as Thread from "./Thread.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
 import * as ThreadActivityResolvers from "./ThreadActivityResolvers.ts"
 import * as ThreadActivityStore from "./ThreadActivityStore.ts"
+import * as ThreadId from "./ThreadId.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
+import type * as ThreadParticipationId from "./ThreadParticipationId.ts"
 import * as ThreadParticipationStore from "./ThreadParticipationStore.ts"
 import * as ThreadPermissions from "./ThreadPermissions.ts"
 import * as ThreadStore from "./ThreadStore.ts"
@@ -106,23 +109,23 @@ export class ThreadQuery extends Context.Service<
      * The thread, under its audience alone. Operations check their action permission separately,
      * inside the commit for writes.
      */
-    readonly requireAccess: (threadId: Thread.Id) => Effect.Effect<Thread.Thread, AccessError, Actor.Actor>
+    readonly requireAccess: (threadId: ThreadId.ThreadId) => Effect.Effect<Thread.Thread, AccessError, Actor.Actor>
 
     /** The thread, under its audience and `thread.read`, as every read of its conversation needs. */
-    readonly requireReadable: (threadId: Thread.Id) => Effect.Effect<Thread.Thread, AccessError, Actor.Actor>
+    readonly requireReadable: (threadId: ThreadId.ThreadId) => Effect.Effect<Thread.Thread, AccessError, Actor.Actor>
     /**
      * Those of the given members with a current admission to the group and active workspace
      * membership, with both records. Reads only the members asked about.
      */
     readonly eligibleMembers: (
-      groupId: Group.Id,
-      memberIds: ReadonlyArray<Member.Id>
-    ) => Effect.Effect<ReadonlyMap<Member.Id, Eligible>, StoreError.StoreError>
+      groupId: GroupId.GroupId,
+      memberIds: ReadonlyArray<MemberId.MemberId>
+    ) => Effect.Effect<ReadonlyMap<MemberId.MemberId, Eligible>, StoreError.StoreError>
     /**
      * The group's followers whose follow is through their current admission, with both records, in
      * follow order: those a new thread in the group admits.
      */
-    readonly followers: (groupId: Group.Id) => Effect.Effect<ReadonlyArray<Eligible>, StoreError.StoreError>
+    readonly followers: (groupId: GroupId.GroupId) => Effect.Effect<ReadonlyArray<Eligible>, StoreError.StoreError>
     /**
      * Every current participant: an active participation whose member, if any, still has a current
      * group admission. Read in pages; a reply that addresses everyone needs them all.
@@ -154,12 +157,12 @@ export class ThreadQuery extends Context.Service<
      * are skipped. A page reads a fixed number of times, however many threads it holds.
      */
     readonly listReadable: <R, Cursor, E>(
-      groupId: Group.Id,
+      groupId: GroupId.GroupId,
       options: ListOptions<R, Cursor, E>
     ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ListError | E, Actor.Actor>
     /** A page of the thread's timeline with resolved subjects, under access and `thread.read`. */
     readonly readTimeline: (
-      threadId: Thread.Id,
+      threadId: ThreadId.ThreadId,
       options: ThreadActivityStore.ReadOptions
     ) => Effect.Effect<ReadonlyArray<Thread.TimelineItem>, TimelineError, Actor.Actor>
     /**
@@ -167,7 +170,7 @@ export class ThreadQuery extends Context.Service<
      * `thread.read`. A recorded activity that is missing is a defect.
      */
     readonly readTimelineItem: (
-      activityId: ThreadActivity.Id
+      activityId: ThreadActivity.ThreadActivityId
     ) => Effect.Effect<Thread.TimelineItem, TimelineError, Actor.Actor>
   }
 >()("@amends-dev/core/thread/ThreadQuery") {}
@@ -192,8 +195,8 @@ export const make = Effect.gen(function* () {
   const taskStore = yield* TaskStore.TaskStore
   const { workspaceId } = yield* Store.Store
 
-  const requireAccess = Effect.fn("ThreadQuery.requireAccess")(function* (threadId: Thread.Id) {
-    const id = yield* Schema.decodeEffect(Thread.Id)(threadId)
+  const requireAccess = Effect.fn("ThreadQuery.requireAccess")(function* (threadId: ThreadId.ThreadId) {
+    const id = yield* Schema.decodeEffect(ThreadId.ThreadId)(threadId)
     yield* authorization.require([])
     const found = yield* threadStore.get(id)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Thread", id })
@@ -204,7 +207,7 @@ export const make = Effect.gen(function* () {
     return thread
   })
 
-  const requireReadable = Effect.fn("ThreadQuery.requireReadable")(function* (threadId: Thread.Id) {
+  const requireReadable = Effect.fn("ThreadQuery.requireReadable")(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* requireAccess(threadId)
     yield* authorization.require([
       Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId: thread.id }))
@@ -212,13 +215,13 @@ export const make = Effect.gen(function* () {
     return thread
   })
 
-  const getMembersById = (ids: ReadonlyArray<Member.Id>) =>
+  const getMembersById = (ids: ReadonlyArray<MemberId.MemberId>) =>
     Effect.map(memberStore.getMany(ids), (found) => new Map(found.map((member) => [member.id, member] as const)))
   const eligibleMembers = Effect.fn("ThreadQuery.eligibleMembers")(function* (
-    groupId: Group.Id,
-    memberIds: ReadonlyArray<Member.Id>
+    groupId: GroupId.GroupId,
+    memberIds: ReadonlyArray<MemberId.MemberId>
   ) {
-    const result = new Map<Member.Id, Eligible>()
+    const result = new Map<MemberId.MemberId, Eligible>()
     if (memberIds.length === 0) return result
     const admissions = yield* groupMembershipStore.findActiveMany(groupId, memberIds)
     const found = yield* getMembersById(admissions.map((admission) => admission.memberId))
@@ -229,7 +232,7 @@ export const make = Effect.gen(function* () {
     return result
   })
 
-  const followers = Effect.fn("ThreadQuery.followers")(function* (groupId: Group.Id) {
+  const followers = Effect.fn("ThreadQuery.followers")(function* (groupId: GroupId.GroupId) {
     const follows = yield* groupFollowStore.listActiveByGroup(groupId)
     const eligible = yield* eligibleMembers(
       groupId,
@@ -276,7 +279,7 @@ export const make = Effect.gen(function* () {
   const pageSize = 500
   const currentParticipants = Effect.fn("ThreadQuery.currentParticipants")(function* (thread: Thread.Thread) {
     const result: Array<ThreadParticipation.ThreadParticipation> = []
-    let after: ThreadParticipation.Id | undefined
+    let after: ThreadParticipationId.ThreadParticipationId | undefined
     do {
       const read = yield* readParticipationPage(
         thread,
@@ -316,10 +319,10 @@ export const make = Effect.gen(function* () {
   })
 
   const listReadable = Effect.fn("ThreadQuery.listReadable")(function* <R, Cursor, E>(
-    groupId: Group.Id,
+    groupId: GroupId.GroupId,
     options: ListOptions<R, Cursor, E>
   ) {
-    const id = yield* Schema.decodeEffect(Group.Id)(groupId)
+    const id = yield* Schema.decodeEffect(GroupId.GroupId)(groupId)
     const admission = yield* groupQuery.requireAudience(id)
     const actor = yield* Actor.Actor
     const items: Array<Thread.ListItem> = []
@@ -357,7 +360,7 @@ export const make = Effect.gen(function* () {
   })
 
   const readTimeline = Effect.fn("ThreadQuery.readTimeline")(function* (
-    threadId: Thread.Id,
+    threadId: ThreadId.ThreadId,
     options: ThreadActivityStore.ReadOptions
   ) {
     const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options)
@@ -365,8 +368,10 @@ export const make = Effect.gen(function* () {
     return yield* threadActivityResolvers.resolve(thread, yield* threadActivityStore.readPage(thread.id, request))
   })
 
-  const readTimelineItem = Effect.fn("ThreadQuery.readTimelineItem")(function* (activityId: ThreadActivity.Id) {
-    const id = yield* Schema.decodeEffect(ThreadActivity.Id)(activityId)
+  const readTimelineItem = Effect.fn("ThreadQuery.readTimelineItem")(function* (
+    activityId: ThreadActivity.ThreadActivityId
+  ) {
+    const id = yield* Schema.decodeEffect(ThreadActivity.ThreadActivityId)(activityId)
     yield* authorization.require([])
     const found = yield* threadActivityStore.get(id)
     if (Option.isNone(found)) return yield* Effect.die("A recorded activity is missing from the timeline")

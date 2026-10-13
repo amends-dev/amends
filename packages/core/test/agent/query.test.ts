@@ -1,25 +1,20 @@
-import {
-  type Connection as ConnectionContract,
-  Integration,
-  Integrations,
-  type ModelCatalog
-} from "@amends-dev/connection"
+import { Connection as ConnectionContract, Integration, Integrations, type ModelCatalog } from "@amends-dev/connection"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { Harness } from "@amends-dev/harness"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Option, Redacted, Result } from "effect"
-import * as Agent from "../../src/agent/Agent.ts"
+import type * as Agent from "../../src/agent/Agent.ts"
 import * as AgentQuery from "../../src/agent/AgentQuery.ts"
 import * as AgentStore from "../../src/agent/AgentStore.ts"
-import * as Connection from "../../src/connection/Connection.ts"
+import type * as Connection from "../../src/connection/Connection.ts"
 import * as ConnectionCredentialStore from "../../src/connection/ConnectionCredentialStore.ts"
 import * as ConnectionStore from "../../src/connection/ConnectionStore.ts"
 import * as CoreError from "../../src/error/CoreError.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Member from "../../src/workspace/Member.ts"
 import * as MemberStore from "../../src/workspace/MemberStore.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 
 const listed: ModelCatalog.Model = {
   id: "model-one",
@@ -92,14 +87,14 @@ const connection = (
   createdAt: string,
   auth: ConnectionContract.AuthMethod = "none"
 ): Connection.Connection => ({
-  id: Connection.Id.make(id),
+  id: ConnectionContract.ConnectionId.make(id),
   workspaceId,
   integration,
   name: id,
   settings: {},
   auth,
   status: "active",
-  createdBy: Member.Id.make("member-owner"),
+  createdBy: MemberId.MemberId.make("member-owner"),
   createdAt: DateTime.makeUnsafe(createdAt)
 })
 
@@ -109,8 +104,8 @@ const boxed = connection("conn-boxed", "boxed", "2026-10-06T11:00:00.000Z")
 const models = connection("conn-models", "models", "2026-10-06T12:00:00.000Z", "apiKey")
 const boxes = connection("conn-boxes", "boxes", "2026-10-06T12:00:00.000Z")
 
-const agentMemberId = Member.Id.make("member-agent")
-const agentId = Agent.Id.make("agent-one")
+const agentMemberId = MemberId.MemberId.make("member-agent")
+const agentId = Identity.AgentId.make("agent-one")
 
 const agent = (fields: Partial<Agent.Agent> = {}): Agent.Agent => ({
   id: agentId,
@@ -120,7 +115,7 @@ const agent = (fields: Partial<Agent.Agent> = {}): Agent.Agent => ({
   harness: { _tag: "Connection", connectionId: inProcess.id },
   model: { connectionId: models.id, id: "model-one", effort: "high" },
   sandbox: null,
-  createdBy: Member.Id.make("member-owner"),
+  createdBy: MemberId.MemberId.make("member-owner"),
   createdAt: DateTime.makeUnsafe("2026-10-06T12:00:00.000Z"),
   ...fields
 })
@@ -129,7 +124,7 @@ interface World {
   readonly agent?: Agent.Agent
   readonly members?: ReadonlyArray<Member.Member>
   readonly connections?: ReadonlyArray<Connection.Connection>
-  readonly keys?: ReadonlyMap<Connection.Id, string>
+  readonly keys?: ReadonlyMap<ConnectionContract.ConnectionId, string>
   /** Why this host keeps no credentials, when it keeps none. */
   readonly credentialsUnavailable?: string
 }
@@ -253,7 +248,7 @@ describe("what an agent runs a turn on", () => {
   it.effect("is not found for a person, or an agent whose membership ended", () =>
     Effect.gen(function* () {
       const person: Member.Member = {
-        id: Member.Id.make("member-person"),
+        id: MemberId.MemberId.make("member-person"),
         workspaceId,
         identity: { _tag: "Human", id: Identity.HumanId.make("alice") },
         name: Member.Name.make("alice"),

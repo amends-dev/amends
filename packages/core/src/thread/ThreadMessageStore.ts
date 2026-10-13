@@ -16,9 +16,9 @@ import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
-import type * as Thread from "./Thread.ts"
 import * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
+import * as ThreadMessageId from "./ThreadMessageId.ts"
 
 /**
  * How many messages a thread holds whose content remains.
@@ -27,7 +27,7 @@ import * as ThreadMessage from "./ThreadMessage.ts"
  * @since 0.1.0
  */
 export const Count = Schema.Struct({
-  threadId: ThreadId.Id,
+  threadId: ThreadId.ThreadId,
   count: Schema.Int.check(Schema.isGreaterThan(0))
 })
 
@@ -53,21 +53,21 @@ export class ThreadMessageStore extends Context.Service<
   ThreadMessageStore,
   {
     readonly get: (
-      id: ThreadMessage.Id
+      id: ThreadMessageId.ThreadMessageId
     ) => Effect.Effect<Option.Option<ThreadMessage.ThreadMessage>, StoreError.StoreError>
     /**
      * Find several messages in one read. Absent IDs are omitted and each found record appears once;
      * order is unspecified, so callers index results by ID. An empty request reads nothing.
      */
     readonly getMany: (
-      ids: ReadonlyArray<ThreadMessage.Id>
+      ids: ReadonlyArray<ThreadMessageId.ThreadMessageId>
     ) => Effect.Effect<ReadonlyArray<ThreadMessage.ThreadMessage>, StoreError.StoreError>
     /**
      * How many messages whose content remains each of several threads holds, in one read. Threads
      * with none, and absent IDs, are omitted; order is unspecified.
      */
     readonly countByThread: (
-      ids: ReadonlyArray<ThreadId.Id>
+      ids: ReadonlyArray<ThreadId.ThreadId>
     ) => Effect.Effect<ReadonlyArray<Count>, StoreError.StoreError>
     /**
      * Reject reused IDs. The author and mentions are recorded as
@@ -98,15 +98,17 @@ export class ThreadMessageStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   driver: ThreadMessageStore["Service"]
 ): ThreadMessageStore["Service"] => {
   const read = StoreInput.read("ThreadMessageStore")
   const write = StoreInput.write("ThreadMessageStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", ThreadMessage.Id, id), driver.get),
-    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(ThreadMessage.Id), ids), driver.getMany),
-    countByThread: (ids) => Effect.flatMap(read("countByThread", Schema.Array(ThreadId.Id), ids), driver.countByThread),
+    get: (id) => Effect.flatMap(read("get", ThreadMessageId.ThreadMessageId, id), driver.get),
+    getMany: (ids) =>
+      Effect.flatMap(read("getMany", Schema.Array(ThreadMessageId.ThreadMessageId), ids), driver.getMany),
+    countByThread: (ids) =>
+      Effect.flatMap(read("countByThread", Schema.Array(ThreadId.ThreadId), ids), driver.countByThread),
     insert: (record) => Effect.flatMap(write("insert", ThreadMessage.ThreadMessage, record), driver.insert),
     edit: (edited) => Effect.flatMap(write("edit", ThreadMessage.Edited, edited), driver.edit),
     delete: (deleted) => Effect.flatMap(write("delete", ThreadMessage.Deleted, deleted), driver.delete)
@@ -137,7 +139,7 @@ const makeMemory = Effect.fn("ThreadMessageStore.makeMemory")(function* () {
     countByThread: Effect.fn("ThreadMessageStore.memory.countByThread")(
       function* (ids) {
         const wanted = new Set(ids)
-        const counts = new Map<Thread.Id, number>()
+        const counts = new Map<ThreadId.ThreadId, number>()
         for (const record of yield* rows.all((yield* read).records.of("threadMessages")))
           if (wanted.has(record.threadId) && hasText(record))
             counts.set(record.threadId, (counts.get(record.threadId) ?? 0) + 1)

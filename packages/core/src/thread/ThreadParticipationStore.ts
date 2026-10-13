@@ -20,6 +20,7 @@ import * as StoreInput from "../journal/StoreInput.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ThreadId from "./ThreadId.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
+import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 
 /**
  * The participation store, bound to one workspace by the host.
@@ -37,7 +38,7 @@ export class ThreadParticipationStore extends Context.Service<
   ThreadParticipationStore,
   {
     readonly get: (
-      id: ThreadParticipation.Id
+      id: ThreadParticipationId.ThreadParticipationId
     ) => Effect.Effect<Option.Option<ThreadParticipation.ThreadParticipation>, StoreError.StoreError>
     /**
      * Find several participations, active or ended, in one read. Absent IDs are omitted and each
@@ -45,21 +46,21 @@ export class ThreadParticipationStore extends Context.Service<
      * request reads nothing.
      */
     readonly getMany: (
-      ids: ReadonlyArray<ThreadParticipation.Id>
+      ids: ReadonlyArray<ThreadParticipationId.ThreadParticipationId>
     ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, StoreError.StoreError>
     /**
      * Every participation the thread has had, active or ended, in stable ID order. A history read
      * for inspection; operations use the bounded reads below.
      */
     readonly listByThread: (
-      id: ThreadId.Id
+      id: ThreadId.ThreadId
     ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, StoreError.StoreError>
     /**
      * A page of the thread's active participations in binary participation-ID order, after the
      * exclusive cursor.
      */
     readonly pageActiveByThread: (
-      id: ThreadId.Id,
+      id: ThreadId.ThreadId,
       options: ThreadParticipation.ListOptions
     ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, StoreError.StoreError>
     /**
@@ -68,7 +69,7 @@ export class ThreadParticipationStore extends Context.Service<
      * request reads nothing.
      */
     readonly findActive: (
-      id: ThreadId.Id,
+      id: ThreadId.ThreadId,
       participants: ReadonlyArray<ThreadParticipation.Reference>
     ) => Effect.Effect<ReadonlyArray<ThreadParticipation.ThreadParticipation>, StoreError.StoreError>
     /**
@@ -76,7 +77,7 @@ export class ThreadParticipationStore extends Context.Service<
      * there are, in one write; ended ones keep their time. A departure from the group ends them all.
      */
     readonly endByAdmission: (
-      id: GroupMembership.Id,
+      id: GroupMembership.GroupMembershipId,
       endedAt: DateTime.Utc
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
     /** End exactly the addressed active participation; mismatched or terminal records conflict. */
@@ -103,30 +104,31 @@ export class ThreadParticipationStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   driver: ThreadParticipationStore["Service"]
 ): ThreadParticipationStore["Service"] => {
   const read = StoreInput.read("ThreadParticipationStore")
   const write = StoreInput.write("ThreadParticipationStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", ThreadParticipation.Id, id), driver.get),
-    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(ThreadParticipation.Id), ids), driver.getMany),
-    listByThread: (id) => Effect.flatMap(read("listByThread", ThreadId.Id, id), driver.listByThread),
+    get: (id) => Effect.flatMap(read("get", ThreadParticipationId.ThreadParticipationId, id), driver.get),
+    getMany: (ids) =>
+      Effect.flatMap(read("getMany", Schema.Array(ThreadParticipationId.ThreadParticipationId), ids), driver.getMany),
+    listByThread: (id) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, id), driver.listByThread),
     pageActiveByThread: Effect.fn("ThreadParticipationStore.pageActiveByThread")(function* (id, options) {
       return yield* driver.pageActiveByThread(
-        yield* read("pageActiveByThread", ThreadId.Id, id),
+        yield* read("pageActiveByThread", ThreadId.ThreadId, id),
         yield* read("pageActiveByThread", ThreadParticipation.ListOptions, options)
       )
     }),
     findActive: Effect.fn("ThreadParticipationStore.findActive")(function* (id, participants) {
       return yield* driver.findActive(
-        yield* read("findActive", ThreadId.Id, id),
+        yield* read("findActive", ThreadId.ThreadId, id),
         yield* read("findActive", Schema.Array(ThreadParticipation.Reference), participants)
       )
     }),
     endByAdmission: Effect.fn("ThreadParticipationStore.endByAdmission")(function* (id, endedAt) {
       return yield* driver.endByAdmission(
-        yield* write("endByAdmission", GroupMembership.Id, id),
+        yield* write("endByAdmission", GroupMembership.GroupMembershipId, id),
         yield* write("endByAdmission", Schema.DateTimeUtc, endedAt)
       )
     }),

@@ -1,14 +1,15 @@
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import type * as Core from "@amends-dev/core"
 import { BuiltinRoles, Requirement, Target } from "@amends-dev/core/authorization"
-import { Channel, ChannelIntake, ChannelService } from "@amends-dev/core/channel"
-import { Connection } from "@amends-dev/core/connection"
+import { ChannelIntake, ChannelService, ChannelId } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
 import {
-  Group,
+  type Group,
   GroupService,
   GroupFollowService,
   GroupMembership,
-  GroupMembershipService
+  GroupMembershipService,
+  GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry } from "@amends-dev/core/journal"
@@ -17,12 +18,12 @@ import { ReadStateService } from "@amends-dev/core/read-state"
 import { Request } from "@amends-dev/core/request"
 import { TaskService } from "@amends-dev/core/task"
 import {
-  Thread,
   ThreadService,
   ThreadMessageService,
-  ThreadParticipation,
   ThreadParticipationService,
-  ThreadMessage
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
 import {
   Invitation,
@@ -30,7 +31,9 @@ import {
   Member,
   MemberService,
   MemberPermissions,
-  Workspace
+  type Workspace,
+  WorkspaceId,
+  MemberId
 } from "@amends-dev/core/workspace"
 import { Accounts, SessionTokens, Gateway, SignIn, WorkspaceDirectory } from "@amends-dev/gateway"
 import { expect, it } from "@effect/vitest"
@@ -42,8 +45,8 @@ import { Api, Authentication, Routes, WorkspaceMember } from "../src/index.ts"
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
 const bob = Identity.HumanId.make("bob")
-const workspaceId = Workspace.Id.make("workspace-one")
-const memberId = Member.Id.make("member-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
+const memberId = MemberId.MemberId.make("member-one")
 const member: Member.Member = {
   id: memberId,
   workspaceId,
@@ -78,7 +81,7 @@ const pending = ({ recipientId, roleId, expiresAt }: Invitation.IssueInput): Inv
     recipientId,
     roleId,
     expiresAt,
-    id: Invitation.Id.make("invitation-one"),
+    id: Invitation.InvitationId.make("invitation-one"),
     workspaceId,
     inviterMemberId: memberId,
     issuedAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z")
@@ -86,14 +89,14 @@ const pending = ({ recipientId, roleId, expiresAt }: Invitation.IssueInput): Inv
   state: { _tag: "Pending" }
 })
 const notification: Notification.Notification = {
-  id: Notification.Id.make("pending"),
+  id: Notification.NotificationId.make("pending"),
   workspaceId,
-  source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("entry-one") },
+  source: { logId: Entry.LogId.make("journal"), entryId: Entry.EntryId.make("entry-one") },
   recipient: Notification.ofMember(memberId, alice),
   recordedAt: DateTime.makeUnsafe("2026-01-01T00:00:00.123Z"),
   state: { _tag: "Pending" }
 }
-const groupId = Group.Id.make("group-one")
+const groupId = GroupId.GroupId.make("group-one")
 const team: Group.Team = {
   id: groupId,
   workspaceId,
@@ -103,8 +106,8 @@ const team: Group.Team = {
   createdBy: memberId,
   createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z")
 }
-const threadId = Thread.Id.make("thread-one")
-const messageId = ThreadMessage.Id.make("message-one")
+const threadId = ThreadId.ThreadId.make("thread-one")
+const messageId = ThreadMessageId.ThreadMessageId.make("message-one")
 /** Conversation services record their inputs; failures show that each tag keeps its status. */
 const conversations = Layer.mergeAll(
   Layer.succeed(
@@ -237,7 +240,7 @@ const conversations = Layer.mergeAll(
   )
 )
 /** Channel services record their inputs; intake answers what the system is to be told. */
-const channelId = Channel.Id.make("channel-one")
+const channelId = ChannelId.ChannelId.make("channel-one")
 const channels = Layer.mergeAll(
   Layer.succeed(
     ChannelService.ChannelService,
@@ -329,12 +332,12 @@ const gateway = Layer.succeed(
   Gateway.Gateway,
   Gateway.Gateway.of({
     createWorkspace: record("createWorkspace", () => Effect.succeed(workspace)),
-    inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, unknown>) => {
+    inWorkspace: <A, E>(id: WorkspaceId.WorkspaceId, program: Effect.Effect<A, E, unknown>) => {
       calls.push({ operation: "inWorkspace", arguments: [id] })
       return Effect.provide(program as Effect.Effect<A, E, Layer.Success<typeof operations>>, operations)
     },
     asMember: <A, E>(
-      id: Workspace.Id,
+      id: WorkspaceId.WorkspaceId,
       identity: Identity.MemberReference,
       program: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope>
     ) => {
@@ -454,7 +457,7 @@ const makeClient = HttpApiTest.groups(Api.Api, [
 it.effect("the inbox route decodes its cursor and passes the page to the application", () =>
   Effect.gen(function* () {
     calls.length = 0
-    const before = { recordedAt: notification.recordedAt, id: Notification.Id.make("a + & é") }
+    const before = { recordedAt: notification.recordedAt, id: Notification.NotificationId.make("a + & é") }
     const pages = yield* run("alice", (client) =>
       Effect.gen(function* () {
         const first = yield* client.notifications.inbox({
@@ -482,7 +485,7 @@ it.effect("marking a missing notification seen exposes a typed 404", () =>
     const missing = yield* run("alice", (client) =>
       client.notifications
         .markSeen({
-          params: { notificationId: Notification.Id.make("missing") }
+          params: { notificationId: Notification.NotificationId.make("missing") }
         })
         .pipe(Effect.flip)
     )
@@ -509,7 +512,7 @@ it.effect("member reads pass the bearer principal and path parameters to the gat
 it.effect("domain outcomes keep their tags and statuses", () =>
   Effect.gen(function* () {
     const missing = yield* run("alice", (client) =>
-      client.members.get({ params: { memberId: Member.Id.make("missing") } }).pipe(Effect.flip)
+      client.members.get({ params: { memberId: MemberId.MemberId.make("missing") } }).pipe(Effect.flip)
     )
     expect(missing).toMatchObject({
       _tag: "CoreError.NotFound",
@@ -532,7 +535,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
       Effect.all([
         client.members.get({ params: { memberId }, responseMode: "response-only" }),
         client.members.get({
-          params: { memberId: Member.Id.make("missing") },
+          params: { memberId: MemberId.MemberId.make("missing") },
           responseMode: "response-only"
         }),
         client.members.remove({ params: { memberId }, responseMode: "response-only" }),
@@ -623,7 +626,7 @@ it.effect("workspace creation and acceptance require a human principal", () =>
     expect(refused).toMatchObject({ _tag: "CoreError.Denied", reason: { _tag: "HumanRequired" } })
     const accepted = yield* run("alice", (client) =>
       client.workspaces.acceptInvitation({
-        params: { workspaceId, invitationId: Invitation.Id.make("invitation-one") },
+        params: { workspaceId, invitationId: Invitation.InvitationId.make("invitation-one") },
         payload: { name: member.name }
       })
     )
@@ -749,11 +752,11 @@ it.effect("conversation routes pass path parameters, cursors, and request keys i
     calls.length = 0
     const before = {
       latestActivityAt: DateTime.makeUnsafe("2026-01-02T03:04:05.678Z"),
-      threadId: Thread.Id.make("a + & é")
+      threadId: ThreadId.ThreadId.make("a + & é")
     }
     const opened = { createdAt: before.latestActivityAt, threadId: before.threadId }
-    const membershipId = GroupMembership.Id.make("admission-one")
-    const participationId = ThreadParticipation.Id.make("participation-one")
+    const membershipId = GroupMembership.GroupMembershipId.make("admission-one")
+    const participationId = ThreadParticipationId.ThreadParticipationId.make("participation-one")
     const key = Request.Key.make("start-1")
     const statuses = yield* run("alice", (client) =>
       Effect.all([
@@ -964,7 +967,7 @@ it.effect(
   () =>
     Effect.gen(function* () {
       calls.length = 0
-      const connectionId = Connection.Id.make("connection-one")
+      const connectionId = ConnectionContract.ConnectionId.make("connection-one")
       const key = Request.Key.make("channel-1")
       const statuses = yield* run("alice", (client) =>
         Effect.all([

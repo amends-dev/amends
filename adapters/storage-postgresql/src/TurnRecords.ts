@@ -12,9 +12,9 @@
  */
 
 import { StoreError } from "@amends-dev/core/journal"
-import type { Thread } from "@amends-dev/core/thread"
+import type { ThreadId } from "@amends-dev/core/thread"
 import { Turn, TurnStore } from "@amends-dev/core/turn"
-import type { Member } from "@amends-dev/core/workspace"
+import type { MemberId } from "@amends-dev/core/workspace"
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
@@ -108,7 +108,7 @@ export const make = Effect.gen(function* () {
   const { db } = database
   const inWorkspace = eq(turns.workspaceId, workspaceId)
   const orderedId = sql`${turns.id} COLLATE "C"`
-  const ofAgent = (memberId: Member.Id, threadId: Thread.Id) =>
+  const ofAgent = (memberId: MemberId.MemberId, threadId: ThreadId.ThreadId) =>
     and(inWorkspace, eq(turns.memberId, memberId), eq(turns.threadId, threadId))
   const driver: TurnStore.TurnStore["Service"] = {
     get: Effect.fn("TurnRecords.get")(

@@ -12,7 +12,14 @@ import {
 } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
-import { InvitationService, Member, MemberFacts, MemberPermissions, WorkspaceFacts } from "@amends-dev/core/workspace"
+import {
+  InvitationService,
+  Member,
+  MemberFacts,
+  MemberPermissions,
+  WorkspaceFacts,
+  MemberId
+} from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Clock, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect"
@@ -46,7 +53,7 @@ const later: BuiltinRoleUpgrade.Options = {
 }
 /** Earlier declarations, before agent use existed. */
 const older = Core.permissions.filter(({ name }) => name !== AgentPermissions.Use.name)
-const ownerMemberId = Member.Id.make("owner")
+const ownerMemberId = MemberId.MemberId.make("owner")
 
 /** Built-in role bundles: recorded at creation, and upgraded through facts to later revisions. */
 const { core, initialized, gateway } = Support
@@ -87,7 +94,7 @@ const recordedBeforeRevisions = (bound: Bound) =>
             })
         yield* journal.publish(AssignmentFacts.Created, {
           workspaceId,
-          assignmentId: Assignment.Id.make("owner"),
+          assignmentId: Assignment.AssignmentId.make("owner"),
           memberId: ownerMemberId,
           source: Assignment.Source.cases.Role.make({
             roleId: BuiltinRoles.OwnerId,

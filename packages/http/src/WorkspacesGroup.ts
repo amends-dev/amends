@@ -11,7 +11,7 @@
  * @since 0.1.0
  */
 
-import { Invitation, Member, Workspace } from "@amends-dev/core/workspace"
+import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
@@ -37,7 +37,7 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       error: [ApiErrors.Denied, ApiErrors.Unavailable, ApiErrors.Uncertain, ApiErrors.Invalid]
     }),
     HttpApiEndpoint.post("acceptInvitation", "/:workspaceId/invitations/:invitationId/accept", {
-      params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
+      params: { workspaceId: WorkspaceId.WorkspaceId, invitationId: Invitation.InvitationId },
       // What the recipient wants people in the workspace to call them.
       payload: Schema.Struct({ name: Member.NewName }),
       success: Member.Member,

@@ -8,7 +8,7 @@
  */
 
 import { Scope, Target } from "@amends-dev/core/authorization"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import type { scopeKinds, targetKinds } from "./internal/schema.ts"
 
 /**
@@ -86,7 +86,7 @@ const onlySet = (columns: Columns, kept?: TargetIdColumn) =>
  * @category utils
  * @since 0.1.0
  */
-export const decode = (workspaceId: Workspace.Id, columns: Columns): unknown => {
+export const decode = (workspaceId: WorkspaceId.WorkspaceId, columns: Columns): unknown => {
   if (columns.scopeKind === "Workspace")
     return columns.targetKind === null && onlySet(columns) ? { _tag: "Workspace", workspaceId } : undefined
   if (columns.scopeKind !== "Target" || columns.targetKind === null) return undefined

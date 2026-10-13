@@ -1,6 +1,6 @@
 import type * as Core from "@amends-dev/core"
 import { Assignment, AssignmentFacts, Grant, type Permission, type Target } from "@amends-dev/core/authorization"
-import { type Group, GroupService, GroupMembershipService } from "@amends-dev/core/group"
+import { GroupService, GroupMembershipService, type GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Journal, Publication, Store, StoreError } from "@amends-dev/core/journal"
 import {
@@ -10,7 +10,6 @@ import {
   NotificationStore
 } from "@amends-dev/core/notification"
 import {
-  type Thread,
   ThreadService,
   ThreadMessageStore,
   ThreadMessageService,
@@ -20,9 +19,11 @@ import {
   ThreadParticipationService,
   ThreadPermissions,
   ThreadCommand,
-  type ThreadQuery
+  type ThreadQuery,
+  type ThreadId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
-import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { Context, DateTime, Effect, Layer, Option } from "effect"
@@ -52,14 +53,15 @@ describe("notification sources", () => {
     return record.participant
   }
 
-  const humanId = Member.Id.make("human")
-  const otherId = Member.Id.make("other")
-  const agentId = Member.Id.make("agent")
-  const identityFor = (id: Member.Id): Identity.MemberReference =>
+  const humanId = MemberId.MemberId.make("human")
+  const otherId = MemberId.MemberId.make("other")
+  const agentId = MemberId.MemberId.make("agent")
+  const identityFor = (id: MemberId.MemberId): Identity.MemberReference =>
     id === agentId
       ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
       : { _tag: "Human", id: Identity.HumanId.make(id) }
-  const actorFor = (memberId: Member.Id) => Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) })
+  const actorFor = (memberId: MemberId.MemberId) =>
+    Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) })
   const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor))
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], effect: Effect.Effect<A, E, R>) =>
@@ -70,34 +72,41 @@ describe("notification sources", () => {
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound))))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
-  const notifications = (bound: Bound, id: Member.Id) =>
+  const notifications = (bound: Bound, id: MemberId.MemberId) =>
     listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
       limit: 100
     })
-  const create = (memberIds: ReadonlyArray<Member.Id>) =>
+  const create = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
     Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name: "Engineering", memberIds })
     )
-  const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+  const start = (groupId: GroupId.GroupId, mentions: ReadonlyArray<MemberId.MemberId> = []) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, mentions, text: "Opening" })
     ).pipe(Effect.flatMap(placed))
-  const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
+  const reply = (threadId: ThreadId.ThreadId, mentions: ReadonlyArray<MemberId.MemberId> = [], text = "Reply") =>
     Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
       threadMessageService.publish({ threadId, mentions, text })
     ).pipe(Effect.flatMap((message) => placed({ message })))
-  const threadTarget = (threadId: Thread.Id): Target.Reference => ({
+  const threadTarget = (threadId: ThreadId.ThreadId): Target.Reference => ({
     _tag: "Thread",
     workspaceId,
     threadId
   })
-  const grant = (bound: Bound, memberId: Member.Id, permission: Permission.Definition, target?: Target.Reference) =>
+  const grant = (
+    bound: Bound,
+    memberId: MemberId.MemberId,
+    permission: Permission.Definition,
+    target?: Target.Reference
+  ) =>
     facts(
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
-          assignmentId: Assignment.Id.make(`${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`),
+          assignmentId: Assignment.AssignmentId.make(
+            `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`
+          ),
           memberId,
           source: {
             _tag: "Direct",
@@ -145,17 +154,17 @@ describe("notification sources", () => {
 
   const changed = <A extends object>(record: A, changes: Partial<A>): A => Object.assign({}, record, changes)
   /** The actor's inbox entry for a notification, if their inbox holds it. */
-  const entryOf = (id: Notification.Id) =>
+  const entryOf = (id: Notification.NotificationId) =>
     Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
       Effect.map(notificationService.inbox({ limit: 50 }), (items) => items.find((item) => item.notification.id === id))
     )
   /** What the actor's inbox shows their notification pointing to; undefined when it shows none. */
-  const sourceOf = (id: Notification.Id) =>
+  const sourceOf = (id: Notification.NotificationId) =>
     Effect.flatMap(entryOf(id), (entry) =>
       entry === undefined ? Effect.die(`${id} is not in the inbox`) : Effect.succeed(entry.source)
     )
-  const inboxGet = (id: Notification.Id) => Effect.map(entryOf(id), (entry) => entry?.notification)
-  const noteFor = Effect.fnUntraced(function* (bound: Bound, id: Member.Id) {
+  const inboxGet = (id: Notification.NotificationId) => Effect.map(entryOf(id), (entry) => entry?.notification)
+  const noteFor = Effect.fnUntraced(function* (bound: Bound, id: MemberId.MemberId) {
     const note = (yield* notifications(bound, id))[0]
     if (!note) return yield* Effect.die("Missing notification")
     return note
@@ -167,7 +176,7 @@ describe("notification sources", () => {
       listLatestByRecipient: () => Effect.succeed([note])
     })
   })
-  const snapshot = Effect.fnUntraced(function* (bound: Bound, threadId: Thread.Id) {
+  const snapshot = Effect.fnUntraced(function* (bound: Bound, threadId: ThreadId.ThreadId) {
     return {
       history: yield* history(bound),
       participants: yield* bound.participations.listByThread(threadId),
@@ -273,7 +282,9 @@ describe("notification sources", () => {
           const assignment = yield* grant(bound, humanId, ThreadPermissions.Read, threadTarget(first.thread.id))
           const service = yield* NotificationService.NotificationService.pipe(Effect.provide(core(bound)))
           const part = Option.getOrThrow(
-            yield* bound.participations.get(note.participationId ?? ThreadParticipation.Id.make("missing"))
+            yield* bound.participations.get(
+              note.participationId ?? ThreadParticipationId.ThreadParticipationId.make("missing")
+            )
           )
           yield* run(
             bound,
@@ -408,7 +419,9 @@ describe("notification sources", () => {
           // Leaving the group keeps the notifications without what they point to, and settles
           // the pending one: the reader no longer waits on a thread they cannot open.
           const part = Option.getOrThrow(
-            yield* bound.participations.get(newer.participationId ?? ThreadParticipation.Id.make("missing"))
+            yield* bound.participations.get(
+              newer.participationId ?? ThreadParticipationId.ThreadParticipationId.make("missing")
+            )
           )
           yield* run(
             bound,
@@ -492,7 +505,7 @@ describe("notification sources", () => {
             .find((e) => e.fact?.name === MemberFacts.Added.name)
           if (!nonActivity) return yield* Effect.die("Missing fixture fact")
           for (const source of [
-            { logId: note.source.logId, entryId: Entry.Id.make("missing") },
+            { logId: note.source.logId, entryId: Entry.EntryId.make("missing") },
             { logId: Entry.LogId.make("another-log"), entryId: note.source.entryId },
             { logId: nonActivity.logId, entryId: nonActivity.id }
           ])
@@ -738,8 +751,8 @@ describe("notification sources", () => {
             })
             const bound = yield* boundTo(workspaceId)
             const unavailable = changed(saved.note, {
-              id: Notification.Id.make("missing-source"),
-              source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("missing") }
+              id: Notification.NotificationId.make("missing-source"),
+              source: { logId: Entry.LogId.make("journal"), entryId: Entry.EntryId.make("missing") }
             })
             yield* bound.store.transaction(bound.notifications.insert(unavailable))
             expect(yield* gateway.asMember(workspaceId, saved.human.identity, sourceOf(unavailable.id))).toBeUndefined()

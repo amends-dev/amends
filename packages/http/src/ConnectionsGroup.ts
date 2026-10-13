@@ -20,7 +20,7 @@ import * as ApiErrors from "./ApiErrors.ts"
 import * as Authentication from "./Authentication.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const connection = { connectionId: Connection.Id }
+const connection = { connectionId: ConnectionContract.ConnectionId }
 const view = Connection.View.annotate({ identifier: "Connection" })
 
 /**

@@ -1,10 +1,12 @@
+import { GroupId } from "@amends-dev/core/group"
+import { ThreadId } from "@amends-dev/core/thread"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { type Context, Crypto, DateTime, Effect, Layer } from "effect"
 import { TestClock } from "effect/testing"
 import * as Authorization from "../../src/authorization/Authorization.ts"
 import type * as Requirement from "../../src/authorization/Requirement.ts"
 import * as CoreError from "../../src/error/CoreError.ts"
-import * as Group from "../../src/group/Group.ts"
 import * as Actor from "../../src/identity/Actor.ts"
 import * as Identity from "../../src/identity/Identity.ts"
 import * as Journal from "../../src/journal/Journal.ts"
@@ -12,24 +14,22 @@ import * as Store from "../../src/journal/Store.ts"
 import * as ReadStateStore from "../../src/read-state/ReadStateStore.ts"
 import * as Signal from "../../src/signal/Signal.ts"
 import * as SignalHub from "../../src/signal/SignalHub.ts"
-import * as Thread from "../../src/thread/Thread.ts"
+import type * as Thread from "../../src/thread/Thread.ts"
 import * as ThreadCommand from "../../src/thread/ThreadCommand.ts"
 import * as ThreadMessageService from "../../src/thread/ThreadMessageService.ts"
 import * as ThreadMessageStore from "../../src/thread/ThreadMessageStore.ts"
 import * as ThreadQuery from "../../src/thread/ThreadQuery.ts"
-import * as Member from "../../src/workspace/Member.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 import { make } from "../memory.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
-const groupId = Group.Id.make("group")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
+const groupId = GroupId.GroupId.make("group")
 const actor = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("alice-member"),
+  memberId: MemberId.MemberId.make("alice-member"),
   identity: { _tag: "Human", id: Identity.HumanId.make("alice") }
 })
 const thread = (id: string): Thread.Thread => ({
-  id: Thread.Id.make(id),
+  id: ThreadId.ThreadId.make(id),
   workspaceId,
   groupId,
   title: null,
@@ -117,7 +117,7 @@ const run = <A, E>(
   })
 const typing = (threadId: string) =>
   Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
-    threadMessageService.typing(Thread.Id.make(threadId))
+    threadMessageService.typing(ThreadId.ThreadId.make(threadId))
   )
 
 it.effect("typing tells the thread's readers for the next few seconds, and needs permission to post", () =>
@@ -130,7 +130,7 @@ it.effect("typing tells the thread's readers for the next few seconds, and needs
           Signal.Signal.cases.Typing.make({
             workspaceId,
             groupId,
-            threadId: Thread.Id.make("open"),
+            threadId: ThreadId.ThreadId.make("open"),
             memberId: actor.memberId,
             until: DateTime.add(now, { seconds: 6 })
           })
@@ -163,7 +163,7 @@ it.effect("inaccessible threads and missing permission publish nothing", () =>
     yield* run((published) =>
       Effect.gen(function* () {
         expect(yield* Effect.flip(typing("hidden"))).toEqual(
-          new CoreError.NotFound({ resource: "Thread", id: Thread.Id.make("hidden") })
+          new CoreError.NotFound({ resource: "Thread", id: ThreadId.ThreadId.make("hidden") })
         )
         expect(published).toEqual([])
       })

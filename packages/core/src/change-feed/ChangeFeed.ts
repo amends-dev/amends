@@ -56,7 +56,7 @@ export const positionOf = (cursor: Cursor): Entry.Position => Entry.Position.mak
  * @since 0.1.0
  */
 export const Event = Schema.Struct({
-  id: Entry.Id,
+  id: Entry.EntryId,
   name: Schema.NonEmptyString,
   version: Schema.Finite,
   recordedAt: Schema.DateTimeUtcFromString,
@@ -83,19 +83,19 @@ export interface Event extends Schema.Schema.Type<typeof Event> {}
  */
 export const Message = Schema.TaggedUnion({
   Ready: {
-    workspaceId: WorkspaceId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     cursor: Schema.NullOr(Cursor),
     reset: Schema.Boolean
   },
   Committed: {
-    workspaceId: WorkspaceId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     cursor: Cursor,
-    commitId: Commit.Id,
+    commitId: Commit.CommitId,
     events: Schema.Array(Event),
     notifications: Schema.Array(Notification.Notification)
   },
   Signal: {
-    workspaceId: WorkspaceId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     signal: Signal.Signal
   }
 }).annotate({ identifier: "ChangeFeedMessage" })

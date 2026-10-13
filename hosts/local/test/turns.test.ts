@@ -1,8 +1,8 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
-import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
-import type { Member } from "@amends-dev/core/workspace"
+import { ThreadMessage, type ThreadId } from "@amends-dev/core/thread"
+import type { MemberId } from "@amends-dev/core/workspace"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Redacted, Schedule } from "effect"
@@ -133,7 +133,12 @@ const workspaceWithAgent = (modelsUrl: string) =>
   })
 
 /** The thread's messages the agent `memberId` posted, once it posted `count`, read every 100 ms. */
-const agentMessages = (asAlice: Client, params: { readonly threadId: Thread.Id }, memberId: Member.Id, count: number) =>
+const agentMessages = (
+  asAlice: Client,
+  params: { readonly threadId: ThreadId.ThreadId },
+  memberId: MemberId.MemberId,
+  count: number
+) =>
   asAlice.threads.timeline({ params, query: { limit: 50 } }).pipe(
     Effect.map((timeline) =>
       timeline.flatMap((item) =>

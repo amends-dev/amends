@@ -10,7 +10,7 @@
 
 import { Performer } from "@amends-dev/core/identity"
 import { Event, Store } from "@amends-dev/core/journal"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Predicate from "effect/Predicate"
@@ -113,7 +113,10 @@ const Row = Schema.Struct({
  * @category utils
  * @since 0.1.0
  */
-export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (workspaceId: Workspace.Id, input: unknown) {
+export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
+  workspaceId: WorkspaceId.WorkspaceId,
+  input: unknown
+) {
   const rows = yield* Schema.decodeUnknownEffect(Schema.Array(Row))(input)
   return yield* Effect.forEach(rows, (row) => {
     const identity = { _tag: row.performerIdentityKind, id: row.performerIdentityId }

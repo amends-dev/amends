@@ -18,7 +18,6 @@ import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
-import type * as Thread from "./Thread.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
 import * as ThreadId from "./ThreadId.ts"
 
@@ -69,32 +68,32 @@ export class ThreadActivityStore extends Context.Service<
   ThreadActivityStore,
   {
     readonly get: (
-      id: ThreadActivity.Id
+      id: ThreadActivity.ThreadActivityId
     ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, StoreError.StoreError>
     /**
      * A thread's whole timeline in sequence order. A history read for inspection; operations read
      * pages.
      */
     readonly listByThread: (
-      id: ThreadId.Id
+      id: ThreadId.ThreadId
     ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>
     /** Latest activity in this thread, using the caller's transaction when present. */
     readonly latest: (
-      id: ThreadId.Id
+      id: ThreadId.ThreadId
     ) => Effect.Effect<Option.Option<ThreadActivity.ThreadActivity>, StoreError.StoreError>
     /**
      * The first activity of several threads in one read. Absent IDs are omitted and each thread
      * appears once; order is unspecified.
      */
     readonly getFirst: (
-      ids: ReadonlyArray<ThreadId.Id>
+      ids: ReadonlyArray<ThreadId.ThreadId>
     ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>
     /**
      * At most limit activities of the requested range, from its requested end, in ascending
      * sequence order. No shared snapshot across pages.
      */
     readonly readPage: (
-      id: ThreadId.Id,
+      id: ThreadId.ThreadId,
       options: ReadOptions
     ) => Effect.Effect<ReadonlyArray<ThreadActivity.ThreadActivity>, StoreError.StoreError>
     /**
@@ -116,19 +115,19 @@ export class ThreadActivityStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   driver: ThreadActivityStore["Service"]
 ): ThreadActivityStore["Service"] => {
   const read = StoreInput.read("ThreadActivityStore")
   const write = StoreInput.write("ThreadActivityStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", ThreadActivity.Id, id), driver.get),
-    listByThread: (id) => Effect.flatMap(read("listByThread", ThreadId.Id, id), driver.listByThread),
-    latest: (id) => Effect.flatMap(read("latest", ThreadId.Id, id), driver.latest),
-    getFirst: (ids) => Effect.flatMap(read("getFirst", Schema.Array(ThreadId.Id), ids), driver.getFirst),
+    get: (id) => Effect.flatMap(read("get", ThreadActivity.ThreadActivityId, id), driver.get),
+    listByThread: (id) => Effect.flatMap(read("listByThread", ThreadId.ThreadId, id), driver.listByThread),
+    latest: (id) => Effect.flatMap(read("latest", ThreadId.ThreadId, id), driver.latest),
+    getFirst: (ids) => Effect.flatMap(read("getFirst", Schema.Array(ThreadId.ThreadId), ids), driver.getFirst),
     readPage: Effect.fn("ThreadActivityStore.readPage")(function* (id, options) {
       return yield* driver.readPage(
-        yield* read("readPage", ThreadId.Id, id),
+        yield* read("readPage", ThreadId.ThreadId, id),
         yield* read("readPage", ReadOptions, options)
       )
     }),
@@ -146,7 +145,7 @@ const bySequence = (left: ThreadActivity.ThreadActivity, right: ThreadActivity.T
  */
 const makeMemory = Effect.fn("ThreadActivityStore.makeMemory")(function* () {
   const { workspaceId, read, write } = yield* Store.MemoryBinding
-  const inThread = Effect.fnUntraced(function* (threadId: Thread.Id) {
+  const inThread = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId) {
     const records = yield* rows.all((yield* read).records.of("threadActivities"))
     return records.filter((record) => record.threadId === threadId).toSorted(bySequence)
   })

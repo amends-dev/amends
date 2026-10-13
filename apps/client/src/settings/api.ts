@@ -1,6 +1,6 @@
 import { Assignment, Scope } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
-import { Invitation, Member, Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/workspace"
+import { Invitation, Ownership, WorkspaceSettings, WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import type { SettingsTab } from "@amends-dev/ui/screens/settings"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -53,7 +53,7 @@ export const invitationIntent = (email: string, roleId: string) => ({
 /** A read left unmounted: it reports nothing and makes no request. */
 const idle = <A>(atom: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>) =>
   Atom.make(AsyncResult.success([])) as unknown as typeof atom
-const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
+const reads = (client: ApiClient, workspaceId: WorkspaceId.WorkspaceId) => {
   const members = client.query("settings", "members", {
     reactivityKeys: [workspaceKey(workspaceId, "members")]
   })
@@ -85,7 +85,9 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
  * Undefined for an invalid workspace ID.
  */
 export const settingsReads = (client: ApiClient, workspaceId: string) =>
-  Option.getOrUndefined(Option.map(Schema.decodeOption(Workspace.Id)(workspaceId), (id) => reads(client, id)))
+  Option.getOrUndefined(
+    Option.map(Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId), (id) => reads(client, id))
+  )
 export type SettingsReads = ReturnType<typeof reads>
 
 /** Make one change to the workspace's settings, answering with the invitation it issued, if any. */
@@ -109,7 +111,7 @@ export const changeSettings = (api: WorkspaceApi, change: SettingsCommand) =>
         return undefined
       case "remove":
         yield* api.members.remove({
-          params: { memberId: yield* command(Member.Id)(change.memberId) }
+          params: { memberId: yield* command(MemberId.MemberId)(change.memberId) }
         })
         return undefined
       case "invite": {
@@ -125,7 +127,7 @@ export const changeSettings = (api: WorkspaceApi, change: SettingsCommand) =>
       }
       case "revoke":
         yield* api.invitations.revoke({
-          params: { invitationId: yield* command(Invitation.Id)(change.invitationId) }
+          params: { invitationId: yield* command(Invitation.InvitationId)(change.invitationId) }
         })
         return undefined
     }

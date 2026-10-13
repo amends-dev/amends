@@ -8,7 +8,7 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Workspace from "../workspace/Workspace.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Target from "./Target.ts"
 
 /**
@@ -18,7 +18,7 @@ import * as Target from "./Target.ts"
  * @since 0.1.0
  */
 export const Scope = Schema.TaggedUnion({
-  Workspace: { workspaceId: Workspace.Id },
+  Workspace: { workspaceId: WorkspaceId.WorkspaceId },
   Target: { target: Target.Reference }
 })
 

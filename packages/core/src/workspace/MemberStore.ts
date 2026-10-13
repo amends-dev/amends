@@ -18,6 +18,7 @@ import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
 import * as Member from "./Member.ts"
+import * as MemberId from "./MemberId.ts"
 import type * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
@@ -40,7 +41,7 @@ export class MemberStore extends Context.Service<
   MemberStore,
   {
     /** Find an active or removed membership in this workspace; None if absent. */
-    readonly get: (memberId: Member.Id) => Effect.Effect<Option.Option<Member.Member>, StoreError.StoreError>
+    readonly get: (memberId: MemberId.MemberId) => Effect.Effect<Option.Option<Member.Member>, StoreError.StoreError>
 
     /**
      * Find several active or removed memberships in one read. Absent IDs are omitted and each found
@@ -48,7 +49,7 @@ export class MemberStore extends Context.Service<
      * reads nothing.
      */
     readonly getMany: (
-      memberIds: ReadonlyArray<Member.Id>
+      memberIds: ReadonlyArray<MemberId.MemberId>
     ) => Effect.Effect<ReadonlyArray<Member.Member>, StoreError.StoreError>
 
     /** Match both the identity kind and ID, returning only an active membership. */
@@ -70,7 +71,7 @@ export class MemberStore extends Context.Service<
      * removed; the same name again changes nothing.
      */
     readonly rename: (
-      memberId: Member.Id,
+      memberId: MemberId.MemberId,
       name: Member.Name
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
 
@@ -79,7 +80,7 @@ export class MemberStore extends Context.Service<
      * identity. Rejected if absent or already removed. A later admission
      * for this identity must use a fresh member ID.
      */
-    readonly markRemoved: (memberId: Member.Id) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
+    readonly markRemoved: (memberId: MemberId.MemberId) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/workspace/MemberStore") {}
 
@@ -90,12 +91,12 @@ export class MemberStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: MemberStore["Service"]): MemberStore["Service"] => {
+export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: MemberStore["Service"]): MemberStore["Service"] => {
   const read = StoreInput.read("MemberStore")
   const write = StoreInput.write("MemberStore", workspaceId)
   return {
-    get: (memberId) => Effect.flatMap(read("get", Member.Id, memberId), driver.get),
-    getMany: (memberIds) => Effect.flatMap(read("getMany", Schema.Array(Member.Id), memberIds), driver.getMany),
+    get: (memberId) => Effect.flatMap(read("get", MemberId.MemberId, memberId), driver.get),
+    getMany: (memberIds) => Effect.flatMap(read("getMany", Schema.Array(MemberId.MemberId), memberIds), driver.getMany),
     findActive: (identity) => Effect.flatMap(read("findActive", Identity.MemberReference, identity), driver.findActive),
     list: driver.list,
     insert: (record) =>
@@ -108,11 +109,11 @@ export const make = (workspaceId: WorkspaceId.Id, driver: MemberStore["Service"]
       ),
     rename: Effect.fn("MemberStore.rename")(function* (memberId, name) {
       return yield* driver.rename(
-        yield* write("rename", Member.Id, memberId),
+        yield* write("rename", MemberId.MemberId, memberId),
         yield* write("rename", Member.Name, name)
       )
     }),
-    markRemoved: (memberId) => Effect.flatMap(write("markRemoved", Member.Id, memberId), driver.markRemoved)
+    markRemoved: (memberId) => Effect.flatMap(write("markRemoved", MemberId.MemberId, memberId), driver.markRemoved)
   }
 }
 

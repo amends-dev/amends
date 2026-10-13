@@ -15,7 +15,7 @@ import { Counter, make } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
 const testSubject = () => Subject.make("test", "entity")
-const workspaceId = WorkspaceId.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const Changed = Fact.make("counter.changed", {
   subject: testSubject,
   version: 1,

@@ -1,6 +1,7 @@
+import * as ConnectionContract from "@amends-dev/connection/Connection"
 import { Connection } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
-import { Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import type { ConnectionsFailure } from "@amends-dev/ui/screens/connections"
 import * as Cause from "effect/Cause"
@@ -17,7 +18,7 @@ import type { Settings } from "./settings.ts"
 
 export { Connection }
 
-const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
+const reads = (client: ApiClient, workspaceId: WorkspaceId.WorkspaceId) => {
   const reactivityKeys = [workspaceKey(workspaceId, "connections")]
   return {
     /** The integrations this host installs; any member may read them. */
@@ -31,7 +32,9 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
  * key that writes and the workspace change feed refresh. Undefined for an invalid workspace ID.
  */
 export const connectionsReads = (client: ApiClient, workspaceId: string) =>
-  Option.getOrUndefined(Option.map(Schema.decodeOption(Workspace.Id)(workspaceId), (id) => reads(client, id)))
+  Option.getOrUndefined(
+    Option.map(Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId), (id) => reads(client, id))
+  )
 export type ConnectionsReads = ReturnType<typeof reads>
 
 export type ConnectionCommand =
@@ -63,7 +66,7 @@ const apiKeyOf = command(Schema.toType(Connection.ApiKey))
 export const changeConnection = (api: WorkspaceApi, change: ConnectionCommand) =>
   Effect.gen(function* () {
     const connection = (connectionId: string) =>
-      Effect.map(command(Connection.Id)(connectionId), (id) => ({ connectionId: id }))
+      Effect.map(command(ConnectionContract.ConnectionId)(connectionId), (id) => ({ connectionId: id }))
     switch (change.kind) {
       case "create": {
         const created = yield* api.connections.create({
@@ -111,7 +114,7 @@ export const changeConnection = (api: WorkspaceApi, change: ConnectionCommand) =
 export const checkConnection = (api: WorkspaceApi, connectionId: string) =>
   Effect.gen(function* () {
     return yield* api.connections.check({
-      params: { connectionId: yield* command(Connection.Id)(connectionId) }
+      params: { connectionId: yield* command(ConnectionContract.ConnectionId)(connectionId) }
     })
   })
 

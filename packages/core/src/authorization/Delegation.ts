@@ -21,8 +21,8 @@ import * as CoreError from "../error/CoreError.ts"
 import * as Actor from "../identity/Actor.ts"
 import * as Store from "../journal/Store.ts"
 import type * as StoreError from "../journal/StoreError.ts"
-import type * as Member from "../workspace/Member.ts"
-import type * as Workspace from "../workspace/Workspace.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as WorkspaceStore from "../workspace/WorkspaceStore.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentPermissions from "./AssignmentPermissions.ts"
@@ -68,25 +68,25 @@ export class Delegation extends Context.Service<
      * a workspace-wide grant; one it does not declare is kept and grants nothing. Any other role
      * is `CoreError.Invalid` (`UnsupportedRole`).
      */
-    readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Role, Error>
+    readonly loadRole: (roleId: Role.RoleId) => Effect.Effect<Role.Role, Error>
     /** The member's active assignments, by role and direct grant alike. */
-    readonly assignmentsFor: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, Error>
+    readonly assignmentsFor: (memberId: MemberId.MemberId) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, Error>
     /**
      * The role the actor may give, under `assignment.manage` on the workspace. Owner is never given
      * here, and only the current owner gives Administrator.
      */
-    readonly requireGrant: (roleId: Role.Id) => Effect.Effect<Role.Role, Error, Actor.Actor>
+    readonly requireGrant: (roleId: Role.RoleId) => Effect.Effect<Role.Role, Error, Actor.Actor>
     /**
      * That the actor may change this member's roles, by `recipientDenial`. The caller checks the
      * operation's own permission; the owner is always protected.
      */
-    readonly requireRecipient: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Actor>
+    readonly requireRecipient: (memberId: MemberId.MemberId) => Effect.Effect<void, Error, Actor.Actor>
     /**
      * That the actor may remove this member: as `requireRecipient`, except that a member other
      * than the owner may remove themself whatever roles they hold, without thereby gaining
      * authority over their own roles.
      */
-    readonly requireRemoval: (memberId: Member.Id) => Effect.Effect<void, Error, Actor.Actor>
+    readonly requireRemoval: (memberId: MemberId.MemberId) => Effect.Effect<void, Error, Actor.Actor>
   }
 >()("@amends-dev/core/authorization/Delegation") {}
 
@@ -97,10 +97,10 @@ export class Delegation extends Context.Service<
  * @since 0.1.0
  */
 export interface Recipient {
-  readonly workspaceId: Workspace.Id
-  readonly memberId: Member.Id
-  readonly ownerId: Member.Id
-  readonly actorId: Member.Id
+  readonly workspaceId: WorkspaceId.WorkspaceId
+  readonly memberId: MemberId.MemberId
+  readonly ownerId: MemberId.MemberId
+  readonly actorId: MemberId.MemberId
   readonly selfRemoval: boolean
 }
 
@@ -165,8 +165,8 @@ export const make: Effect.Effect<
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing")
     return found.value.ownerMemberId
   })
-  const loadRole = Effect.fn("Delegation.loadRole")(function* (roleId: Role.Id) {
-    const id = yield* Schema.decodeEffect(Role.Id)(roleId)
+  const loadRole = Effect.fn("Delegation.loadRole")(function* (roleId: Role.RoleId) {
+    const id = yield* Schema.decodeEffect(Role.RoleId)(roleId)
     if (![BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
       return yield* new CoreError.Invalid({
         reason: new CoreError.UnsupportedRole({ roleId: id })
@@ -193,10 +193,10 @@ export const make: Effect.Effect<
     }
     return role
   })
-  const assignmentsFor = Effect.fn("Delegation.assignmentsFor")((memberId: Member.Id) =>
+  const assignmentsFor = Effect.fn("Delegation.assignmentsFor")((memberId: MemberId.MemberId) =>
     assignmentStore.listActiveByMember(memberId)
   )
-  const requireGrant = Effect.fn("Delegation.requireGrant")(function* (roleId: Role.Id) {
+  const requireGrant = Effect.fn("Delegation.requireGrant")(function* (roleId: Role.RoleId) {
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId }))
     ])
@@ -210,7 +210,7 @@ export const make: Effect.Effect<
     return role
   })
   const requireRecipient = Effect.fn("Delegation.requireRecipient")(function* (
-    memberId: Member.Id,
+    memberId: MemberId.MemberId,
     selfRemoval = false
   ) {
     yield* authorization.require([])
@@ -227,7 +227,7 @@ export const make: Effect.Effect<
     )
     if (denial) return yield* denial
   })
-  const requireRemoval = Effect.fn("Delegation.requireRemoval")(function* (memberId: Member.Id) {
+  const requireRemoval = Effect.fn("Delegation.requireRemoval")(function* (memberId: MemberId.MemberId) {
     yield* requireRecipient(memberId, true)
   })
   return Delegation.of({

@@ -2,18 +2,18 @@ import { AgentPermissions } from "@amends-dev/core/agent"
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
 import {
-  type Group,
   GroupService,
   GroupFollow,
   GroupFollowService,
   GroupMembershipService,
-  GroupPermissions
+  GroupPermissions,
+  type GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Journal, Publication } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { type Thread, ThreadService, ThreadParticipation, ThreadPermissions } from "@amends-dev/core/thread"
-import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -32,15 +32,16 @@ import {
 
 const { core, initialized } = Support
 describe("group follows", () => {
-  const humanId = Member.Id.make("human")
-  const plainId = Member.Id.make("plain")
-  const outsiderId = Member.Id.make("outsider")
-  const agentId = Member.Id.make("agent")
-  const identityOf = (memberId: Member.Id): Identity.MemberReference =>
+  const humanId = MemberId.MemberId.make("human")
+  const plainId = MemberId.MemberId.make("plain")
+  const outsiderId = MemberId.MemberId.make("outsider")
+  const agentId = MemberId.MemberId.make("agent")
+  const identityOf = (memberId: MemberId.MemberId): Identity.MemberReference =>
     memberId === agentId
       ? { _tag: "Agent", id: Identity.AgentId.make(memberId) }
       : { _tag: "Human", id: Identity.HumanId.make(memberId) }
-  const actorFor = (memberId: Member.Id) => Actor.Actor.of({ workspaceId, memberId, identity: identityOf(memberId) })
+  const actorFor = (memberId: MemberId.MemberId) =>
+    Actor.Actor.of({ workspaceId, memberId, identity: identityOf(memberId) })
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
     program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
@@ -49,15 +50,15 @@ describe("group follows", () => {
       Effect.provide(core(bound))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 500 })
-  const follow = (groupId: Group.Id, memberId: Member.Id) =>
+  const follow = (groupId: GroupId.GroupId, memberId: MemberId.MemberId) =>
     Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
       groupFollowService.follow({ groupId, memberId })
     )
-  const unfollow = (groupId: Group.Id, memberId: Member.Id) =>
+  const unfollow = (groupId: GroupId.GroupId, memberId: MemberId.MemberId) =>
     Effect.flatMap(GroupFollowService.GroupFollowService, (groupFollowService) =>
       groupFollowService.unfollow({ groupId, memberId })
     )
-  const post = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+  const post = (groupId: GroupId.GroupId, mentions: ReadonlyArray<MemberId.MemberId> = []) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, text: "Update", mentions })
     )
@@ -68,7 +69,7 @@ describe("group follows", () => {
         .flatMap((record) => ThreadParticipation.memberOf(record.participant) ?? [])
         .sort()
     )
-  const inbox = (bound: Bound, memberId: Member.Id) =>
+  const inbox = (bound: Bound, memberId: MemberId.MemberId) =>
     listOldestFirst(bound.notifications, Notification.ofMember(memberId, identityOf(memberId)), {
       limit: 100
     })
@@ -99,7 +100,7 @@ describe("group follows", () => {
               memberId === humanId || memberId === outsiderId
                 ? journal.publish(AssignmentFacts.Created, {
                     workspaceId,
-                    assignmentId: Assignment.Id.make(`viewer-${memberId}`),
+                    assignmentId: Assignment.AssignmentId.make(`viewer-${memberId}`),
                     memberId,
                     source: {
                       _tag: "Role",
@@ -128,7 +129,7 @@ describe("group follows", () => {
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId,
-          assignmentId: Assignment.Id.make("plain-start"),
+          assignmentId: Assignment.AssignmentId.make("plain-start"),
           memberId: plainId,
           source: {
             _tag: "Direct",
@@ -305,7 +306,7 @@ describe("group follows", () => {
           const record = (id: string, changes: Partial<GroupFollow.GroupFollow> = {}) =>
             Object.assign(
               {
-                id: GroupFollow.Id.make(id),
+                id: GroupFollow.GroupFollowId.make(id),
                 workspaceId,
                 groupId: team.id,
                 memberId: humanId,
@@ -334,12 +335,12 @@ describe("group follows", () => {
           const ending: GroupFollow.Ending = {
             workspaceId,
             groupId: team.id,
-            followId: GroupFollow.Id.make("first"),
+            followId: GroupFollow.GroupFollowId.make("first"),
             memberId: humanId
           }
           for (const bad of [
             Object.assign({}, ending, { memberId: plainId }),
-            Object.assign({}, ending, { followId: GroupFollow.Id.make("missing") }),
+            Object.assign({}, ending, { followId: GroupFollow.GroupFollowId.make("missing") }),
             Object.assign({}, ending, { workspaceId: otherWorkspaceId })
           ])
             expect(yield* Effect.flip(write(bound.groupFollows.end(bad, followedAt)))).toMatchObject({

@@ -19,7 +19,6 @@ import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
 import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
-import * as Connection from "./Connection.ts"
 
 /**
  * Protected storage for connections' credentials, one for each connection that authenticates with
@@ -39,15 +38,17 @@ export class ConnectionCredentialStore extends Context.Service<
   {
     /** Store the connection's credential, in place of any it had. */
     readonly set: (
-      connectionId: Connection.Id,
+      connectionId: ConnectionContract.ConnectionId,
       credential: ConnectionContract.Credential
     ) => Effect.Effect<void, StoreError.StoreError | CoreError.Unavailable, Store.Transaction>
     /** The connection's credential, for using it. No operation returns one to a reader. */
     readonly get: (
-      connectionId: Connection.Id
+      connectionId: ConnectionContract.ConnectionId
     ) => Effect.Effect<Option.Option<ConnectionContract.Credential>, StoreError.StoreError | CoreError.Unavailable>
     /** Delete the connection's credential; one already gone is left so. */
-    readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
+    readonly remove: (
+      connectionId: ConnectionContract.ConnectionId
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/connection/ConnectionCredentialStore") {}
 
@@ -62,12 +63,13 @@ export const make = (driver: ConnectionCredentialStore["Service"]): ConnectionCr
   return {
     set: Effect.fn("ConnectionCredentialStore.set")(function* (connectionId, credential) {
       return yield* driver.set(
-        yield* read("set", Connection.Id, connectionId),
+        yield* read("set", ConnectionContract.ConnectionId, connectionId),
         yield* read("set", ConnectionContract.Credential, credential)
       )
     }),
-    get: (connectionId) => Effect.flatMap(read("get", Connection.Id, connectionId), driver.get),
-    remove: (connectionId) => Effect.flatMap(read("remove", Connection.Id, connectionId), driver.remove)
+    get: (connectionId) => Effect.flatMap(read("get", ConnectionContract.ConnectionId, connectionId), driver.get),
+    remove: (connectionId) =>
+      Effect.flatMap(read("remove", ConnectionContract.ConnectionId, connectionId), driver.remove)
   }
 }
 

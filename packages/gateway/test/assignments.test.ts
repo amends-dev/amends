@@ -192,7 +192,7 @@ describe("assignments", () => {
             Operations.removeMember(workspace.id, charlie, workspace.ownerMemberId),
             Operations.assign(workspace.id, alice, {
               memberId: viewer.id,
-              roleId: Role.Id.make("invented")
+              roleId: Role.RoleId.make("invented")
             })
           ]
           const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 30 })

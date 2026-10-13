@@ -18,7 +18,7 @@ import type * as Log from "../journal/Log.ts"
 import type * as Projection from "../journal/Projection.ts"
 import type * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentFacts from "./AssignmentFacts.ts"
 import type * as Role from "./Role.ts"
@@ -49,8 +49,8 @@ export class AssignmentCommand extends Context.Service<
      * and delegation, and anything the member held before.
      */
     readonly assignRole: (
-      memberId: Member.Id,
-      roleId: Role.Id
+      memberId: MemberId.MemberId,
+      roleId: Role.RoleId
     ) => Effect.Effect<Assignment.Assignment, Error, Store.Transaction | Publication.Publication>
     /** End an assignment, returning it as revoked. The caller owns authorization and delegation. */
     readonly revokeAssignment: (
@@ -70,9 +70,12 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
 
-  const assignRole = Effect.fn("AssignmentCommand.assignRole")(function* (memberId: Member.Id, roleId: Role.Id) {
+  const assignRole = Effect.fn("AssignmentCommand.assignRole")(function* (
+    memberId: MemberId.MemberId,
+    roleId: Role.RoleId
+  ) {
     const assignment = Assignment.Assignment.make({
-      id: Assignment.Id.make(yield* crypto.randomUUIDv4),
+      id: Assignment.AssignmentId.make(yield* crypto.randomUUIDv4),
       workspaceId,
       memberId,
       status: "active",

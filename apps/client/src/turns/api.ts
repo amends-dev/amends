@@ -1,6 +1,6 @@
 import { CoreError } from "@amends-dev/core/error"
-import { Turn } from "@amends-dev/core/turn"
-import { Workspace } from "@amends-dev/core/workspace"
+import { Turn, TurnId } from "@amends-dev/core/turn"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import type { TurnProblem } from "@amends-dev/ui/screens/turns"
 import * as Cause from "effect/Cause"
@@ -25,7 +25,7 @@ export { Turn }
  * Undefined for an invalid workspace ID.
  */
 export const activeTurnsRead = (client: ApiClient, workspaceId: string) => {
-  const workspace = Schema.decodeOption(Workspace.Id)(workspaceId)
+  const workspace = Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId)
   if (Option.isNone(workspace)) return undefined
   return client.query("turns", "listActive", {
     query: { limit: 100 },
@@ -38,8 +38,8 @@ export const activeTurnsRead = (client: ApiClient, workspaceId: string) => {
  * Its log is followed apart, by `turnLogFeed`. Undefined for invalid IDs.
  */
 export const turnRead = (client: ApiClient, workspaceId: string, turnId: string) => {
-  const workspace = Schema.decodeOption(Workspace.Id)(workspaceId)
-  const turn = Schema.decodeOption(Turn.Id)(turnId)
+  const workspace = Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId)
+  const turn = Schema.decodeOption(TurnId.TurnId)(turnId)
   if (Option.isNone(workspace) || Option.isNone(turn)) return undefined
   return client.query("turns", "get", {
     params: { turnId: turn.value },
@@ -55,7 +55,7 @@ export interface TurnCommand {
 /** Stop or retry a turn, answering with the turn it acted on, or for a retry, the new turn. */
 export const controlTurn = (api: WorkspaceApi, input: TurnCommand) =>
   Effect.gen(function* () {
-    const params = { turnId: yield* command(Turn.Id)(input.turnId) }
+    const params = { turnId: yield* command(TurnId.TurnId)(input.turnId) }
     return input.kind === "stop" ? yield* api.turns.cancel({ params }) : yield* api.turns.retry({ params })
   })
 
@@ -156,7 +156,7 @@ const run = Effect.fnUntraced(function* (
     state = { ...state, ...next }
     Queue.offerUnsafe(states, state)
   }
-  const turn = Schema.decodeOption(Turn.Id)(turnId)
+  const turn = Schema.decodeOption(TurnId.TurnId)(turnId)
   if (Option.isNone(turn)) return set({ connection: "gone" })
   const params = { turnId: turn.value }
   const wake = yield* Queue.sliding<void>(1)

@@ -1,27 +1,29 @@
 import {
-  Group,
   GroupFacts,
   GroupFollow,
   GroupFollowFacts,
   GroupMembership,
   GroupMembershipFacts,
   GroupMembershipStore,
-  GroupPermissions
+  GroupPermissions,
+  GroupId
 } from "@amends-dev/core/group"
 import { Subject } from "@amends-dev/core/journal"
 import {
-  Thread,
   ThreadFacts,
   ThreadMessage,
   ThreadMessageFacts,
-  ThreadParticipation,
   ThreadParticipationFacts,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
   ThreadMessageActivity,
-  ThreadPermissions
+  ThreadPermissions,
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Exit, Fiber, Layer, Option, Queue, Schema, type Scope, Stream } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -59,36 +61,35 @@ import * as Member from "../../src/workspace/Member.ts"
 import * as MemberFacts from "../../src/workspace/MemberFacts.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
 import * as MemberStore from "../../src/workspace/MemberStore.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 import * as WorkspaceFacts from "../../src/workspace/WorkspaceFacts.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 import * as TestSignalHub from "../signal-hub.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const at = DateTime.makeUnsafe("2026-09-20T12:00:00.123Z")
 const alice: Identity.MemberReference = { _tag: "Human", id: Identity.HumanId.make("alice") }
 const actor = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("alice-member"),
+  memberId: MemberId.MemberId.make("alice-member"),
   identity: alice
 })
-const bobMember = Member.Id.make("bob-member")
-const groupId = Group.Id.make("group")
-const otherGroupId = Group.Id.make("other-group")
-const threadId = Thread.Id.make("thread")
-const otherThreadId = Thread.Id.make("other-thread")
+const bobMember = MemberId.MemberId.make("bob-member")
+const groupId = GroupId.GroupId.make("group")
+const otherGroupId = GroupId.GroupId.make("other-group")
+const threadId = ThreadId.ThreadId.make("thread")
+const otherThreadId = ThreadId.ThreadId.make("other-thread")
 
 const invitation = (id: string): Invitation.Issuance => ({
-  id: Invitation.Id.make(id),
+  id: Invitation.InvitationId.make(id),
   workspaceId,
   inviterMemberId: actor.memberId,
   recipientId: Identity.HumanId.make("bob"),
-  roleId: Role.Id.make("viewer"),
+  roleId: Role.RoleId.make("viewer"),
   issuedAt: at,
   expiresAt: DateTime.makeUnsafe("2026-09-21T12:00:00.456Z")
 })
-const group = (id: Group.Id) => ({
+const group = (id: GroupId.GroupId) => ({
   id,
   workspaceId,
   kind: "Team" as const,
@@ -97,15 +98,15 @@ const group = (id: Group.Id) => ({
   createdBy: actor.memberId,
   createdAt: at
 })
-const admission = (group: Group.Id, memberId = actor.memberId) => ({
-  id: GroupMembership.Id.make(`${group}:${memberId}`),
+const admission = (group: GroupId.GroupId, memberId = actor.memberId) => ({
+  id: GroupMembership.GroupMembershipId.make(`${group}:${memberId}`),
   workspaceId,
   groupId: group,
   memberId,
   admittedAt: at,
   status: "active" as const
 })
-const thread = (id: Thread.Id, group: Group.Id) => ({
+const thread = (id: ThreadId.ThreadId, group: GroupId.GroupId) => ({
   id,
   workspaceId,
   groupId: group,
@@ -114,8 +115,8 @@ const thread = (id: Thread.Id, group: Group.Id) => ({
   createdBy: { _tag: "Member" as const, memberId: bobMember },
   createdAt: at
 })
-const message = (id: string, thread: Thread.Id, group: Group.Id) => ({
-  id: ThreadMessage.Id.make(id),
+const message = (id: string, thread: ThreadId.ThreadId, group: GroupId.GroupId) => ({
+  id: ThreadMessageId.ThreadMessageId.make(id),
   workspaceId,
   groupId: group,
   threadId: thread,
@@ -131,7 +132,7 @@ const workspaceGrant = (permission: Permission.Definition) =>
       scope: GrantScope.Scope.cases.Workspace.make({ workspaceId })
     }
   })
-const threadGrant = (id: Thread.Id) =>
+const threadGrant = (id: ThreadId.ThreadId) =>
   Assignment.Source.cases.Direct.make({
     grant: {
       permission: ThreadPermissions.Read.name,
@@ -157,7 +158,7 @@ interface Options {
 interface World {
   readonly fixture: Fixture
   /** The groups the actor currently belongs to, as the membership projection would report. */
-  readonly admitted: Set<Group.Id>
+  readonly admitted: Set<GroupId.GroupId>
   /** Run a program once, just after the next read of the reader's workspace membership. */
   readonly afterMemberRead: (program: Effect.Effect<void>) => void
   /** Run a program once, just after the next read of the reader's group admissions. */
@@ -203,7 +204,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
         })
         for (const [index, source] of grants.entries())
           yield* fixture.assignments.insert({
-            id: Assignment.Id.make(`grant-${index}`),
+            id: Assignment.AssignmentId.make(`grant-${index}`),
             workspaceId,
             memberId: actor.memberId,
             source,
@@ -211,7 +212,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
           })
       })
     )
-    const admitted = new Set<Group.Id>()
+    const admitted = new Set<GroupId.GroupId>()
     const memberRead = racing()
     const accessRead = racing()
     const members = fixture.members
@@ -237,7 +238,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
       Layer.succeed(
         MemberStore.MemberStore,
-        Object.assign({}, members, { get: (id: Member.Id) => memberRead.after(members.get(id)) })
+        Object.assign({}, members, { get: (id: MemberId.MemberId) => memberRead.after(members.get(id)) })
       ),
       Layer.succeed(RoleStore.RoleStore, fixture.roles),
       Layer.succeed(AssignmentStore.AssignmentStore, fixture.assignments),
@@ -296,7 +297,7 @@ const committed = (message: ChangeFeed.Message) => {
   return message
 }
 const signal = (value: Signal.Signal) => Effect.flatMap(SignalHub.SignalHub, (signalHub) => signalHub.publish(value))
-const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
+const typing = (thread: ThreadId.ThreadId, group: GroupId.GroupId, memberId = bobMember) =>
   Signal.Signal.cases.Typing.make({
     workspaceId,
     groupId: group,
@@ -304,7 +305,7 @@ const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
     memberId,
     until: at
   })
-const groupRead = (memberId: Member.Id, group = groupId) =>
+const groupRead = (memberId: MemberId.MemberId, group = groupId) =>
   Signal.Signal.cases.GroupRead.make({ workspaceId, memberId, groupId: group, readAt: at })
 const sameSignal = Schema.toEquivalence(Signal.Signal)
 /** The signals delivered before a marker the reader is known to receive. */
@@ -493,8 +494,8 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
       admitted.add(groupId)
       const feed = yield* listen()
       yield* feed.next
-      const follow = (memberId: Member.Id) => ({
-        id: GroupFollow.Id.make(`follow-${memberId}`),
+      const follow = (memberId: MemberId.MemberId) => ({
+        id: GroupFollow.GroupFollowId.make(`follow-${memberId}`),
         workspaceId,
         groupId,
         memberId,
@@ -509,7 +510,7 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
           yield* publish(GroupFollowFacts.Started, follow(bobMember))
           yield* publish(GroupFollowFacts.Started, follow(actor.memberId))
           yield* publish(ThreadParticipationFacts.Added, {
-            id: ThreadParticipation.Id.make("participation"),
+            id: ThreadParticipationId.ThreadParticipationId.make("participation"),
             workspaceId,
             groupId,
             threadId,
@@ -529,17 +530,17 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
             activity: ThreadActivityKind.makeRecordUnsafe(
               ThreadMessageActivity.Published,
               {
-                id: ThreadActivity.Id.make("activity"),
+                id: ThreadActivity.ThreadActivityId.make("activity"),
                 workspaceId,
                 threadId,
                 sequence: 1,
                 occurredAt: at
               },
-              { messageId: ThreadMessage.Id.make("message") }
+              { messageId: ThreadMessageId.ThreadMessageId.make("message") }
             ),
             recipients: [
               {
-                participationId: ThreadParticipation.Id.make("participation"),
+                participationId: ThreadParticipationId.ThreadParticipationId.make("participation"),
                 recipient: Notification.ofMember(bobMember, bob),
                 requestsWork: false
               }
@@ -592,22 +593,22 @@ const notifying = publish(ThreadActivityFacts.Recorded, {
   activity: ThreadActivityKind.makeRecordUnsafe(
     ThreadMessageActivity.Published,
     {
-      id: ThreadActivity.Id.make("reply-activity"),
+      id: ThreadActivity.ThreadActivityId.make("reply-activity"),
       workspaceId,
       threadId,
       sequence: 3,
       occurredAt: at
     },
-    { messageId: ThreadMessage.Id.make("reply") }
+    { messageId: ThreadMessageId.ThreadMessageId.make("reply") }
   ),
   recipients: [
     {
-      participationId: ThreadParticipation.Id.make("alice-participation"),
+      participationId: ThreadParticipationId.ThreadParticipationId.make("alice-participation"),
       recipient: Notification.ofMember(actor.memberId, alice),
       requestsWork: false
     },
     {
-      participationId: ThreadParticipation.Id.make("bob-participation"),
+      participationId: ThreadParticipationId.ThreadParticipationId.make("bob-participation"),
       recipient: Notification.ofMember(bobMember, {
         _tag: "Human",
         id: Identity.HumanId.make("bob")
@@ -615,7 +616,7 @@ const notifying = publish(ThreadActivityFacts.Recorded, {
       requestsWork: false
     },
     {
-      participationId: ThreadParticipation.Id.make("triage"),
+      participationId: ThreadParticipationId.ThreadParticipationId.make("triage"),
       recipient: { _tag: "Triage" },
       requestsWork: false
     }
@@ -698,7 +699,7 @@ it.effect("typing reaches the thread's readers, and private read state reaches i
         const seen = Signal.Signal.cases.NotificationsSeen.make({
           workspaceId,
           memberId: bobMember,
-          notificationIds: [Notification.Id.make("notification")]
+          notificationIds: [Notification.NotificationId.make("notification")]
         })
         yield* signal(typing(threadId, groupId))
         // Withheld: a thread the reader may not read, and a group they do not belong to.
@@ -754,12 +755,12 @@ it.effect("signals follow the reader's access as commits change it, and are neve
 /** A role every member may see, as a marker that everything before it was withheld. */
 const roleMarker = (id: string) =>
   publish(RoleFacts.Created, {
-    roleId: Role.Id.make(id),
+    roleId: Role.RoleId.make(id),
     workspaceId,
     name: `Role ${id}`,
     permissions: []
   })
-const charlieMember = Member.Id.make("charlie-member")
+const charlieMember = MemberId.MemberId.make("charlie-member")
 
 it.effect("workspace facts reach readers who may read them, and the member they concern", () =>
   run(
@@ -773,7 +774,7 @@ it.effect("workspace facts reach readers who may read them, and the member they 
           publish(InvitationFacts.Revoked, {
             _tag: "Revoked",
             workspaceId,
-            invitationId: Invitation.Id.make("hidden"),
+            invitationId: Invitation.InvitationId.make("hidden"),
             revokedBy: actor.memberId,
             revokedAt: at
           })
@@ -789,7 +790,7 @@ it.effect("workspace facts reach readers who may read them, and the member they 
         yield* commit(
           publish(AssignmentFacts.Created, {
             workspaceId,
-            assignmentId: Assignment.Id.make("bob-access"),
+            assignmentId: Assignment.AssignmentId.make("bob-access"),
             memberId: bobMember,
             source: workspaceGrant(ThreadPermissions.Read)
           })
@@ -800,7 +801,7 @@ it.effect("workspace facts reach readers who may read them, and the member they 
         yield* commit(
           publish(AssignmentFacts.Created, {
             workspaceId,
-            assignmentId: Assignment.Id.make("own-access"),
+            assignmentId: Assignment.AssignmentId.make("own-access"),
             memberId: actor.memberId,
             source: workspaceGrant(GroupPermissions.Read)
           })
@@ -809,7 +810,7 @@ it.effect("workspace facts reach readers who may read them, and the member they 
         yield* commit(
           publish(AssignmentFacts.Revoked, {
             workspaceId,
-            assignmentId: Assignment.Id.make("own-access"),
+            assignmentId: Assignment.AssignmentId.make("own-access"),
             memberId: actor.memberId
           })
         )
@@ -874,7 +875,7 @@ it.effect("the reader's removal from the workspace is delivered, then the stream
     Effect.gen(function* () {
       const feed = yield* listen()
       yield* feed.next
-      yield* commit(publish(MemberFacts.Removed, { workspaceId, memberId: Member.Id.make("someone-else") }))
+      yield* commit(publish(MemberFacts.Removed, { workspaceId, memberId: MemberId.MemberId.make("someone-else") }))
       expect(committed(yield* feed.next).events[0]?.name).toBe(MemberFacts.Removed.name)
       yield* commit(publish(MemberFacts.Removed, { workspaceId, memberId: actor.memberId }))
       expect(committed(yield* feed.next).events[0]?.payload).toEqual({

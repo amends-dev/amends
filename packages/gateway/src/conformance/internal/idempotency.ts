@@ -51,7 +51,7 @@ export const idempotency = (fixture: Fixture.Fixture) => {
                 const journal = yield* Journal.Journal
                 const payload = {
                   workspaceId: Support.workspaceId,
-                  roleId: Role.Id.make("keyed-role"),
+                  roleId: Role.RoleId.make("keyed-role"),
                   name: "Keyed",
                   permissions: []
                 }

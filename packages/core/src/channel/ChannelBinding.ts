@@ -21,11 +21,11 @@ import * as ChannelId from "./ChannelId.ts"
  * @since 0.1.0
  */
 export const ChannelBinding = Schema.Struct({
-  threadId: ThreadId.Id,
-  workspaceId: WorkspaceId.Id,
-  channelId: ChannelId.Id,
+  threadId: ThreadId.ThreadId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  channelId: ChannelId.ChannelId,
   /** The thread's group, copied so that the fact's audience follows from its payload. */
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   /**
    * The external conversation, as the channel's transport identifies it and with what the
    * transport needs to post there, kept as the transport gave it.

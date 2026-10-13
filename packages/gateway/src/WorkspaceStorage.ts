@@ -24,7 +24,7 @@ import { TaskStore } from "@amends-dev/core/task"
 import { ThreadActivityStore, ThreadMessageStore, ThreadParticipationStore, ThreadStore } from "@amends-dev/core/thread"
 import { SessionLogStore, SessionStateStore, TurnStore } from "@amends-dev/core/turn"
 import type { TurnJobs } from "@amends-dev/core/turn"
-import { InvitationStore, MemberStore, type Workspace, WorkspaceStore } from "@amends-dev/core/workspace"
+import { InvitationStore, MemberStore, WorkspaceStore, type WorkspaceId } from "@amends-dev/core/workspace"
 import * as Context from "effect/Context"
 import type * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
@@ -57,7 +57,7 @@ export class WorkspaceStorage extends Context.Service<
      * views for different workspaces must never observe each other's rows or signals. The hub
      * reaches every process over the same storage.
      */
-    readonly forWorkspace: (workspaceId: Workspace.Id) => Effect.Effect<Context.Context<Bindings>>
+    readonly forWorkspace: (workspaceId: WorkspaceId.WorkspaceId) => Effect.Effect<Context.Context<Bindings>>
   }
 >()("@amends-dev/gateway/WorkspaceStorage") {}
 
@@ -100,7 +100,7 @@ const layerMemoryStores = Layer.mergeAll(
 const makeMemory = Effect.fn("WorkspaceStorage.makeMemory")(function* () {
   const connection = yield* MemoryDatabase.Connection
   const forWorkspace: WorkspaceStorage["Service"]["forWorkspace"] = Effect.fn("WorkspaceStorage.memory.forWorkspace")(
-    function* (workspaceId: Workspace.Id) {
+    function* (workspaceId: WorkspaceId.WorkspaceId) {
       return yield* Effect.scoped(
         Layer.build(layerMemoryStores.pipe(Layer.provideMerge(Store.layerMemory(workspaceId))))
       )

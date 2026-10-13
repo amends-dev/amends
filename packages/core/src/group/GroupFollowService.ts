@@ -141,7 +141,7 @@ export const make = Effect.gen(function* () {
       const followedAt = yield* DateTime.now
       yield* journal
         .publish(GroupFollowFacts.Started, {
-          id: GroupFollow.Id.make(yield* crypto.randomUUIDv4),
+          id: GroupFollow.GroupFollowId.make(yield* crypto.randomUUIDv4),
           workspaceId,
           groupId: admission.groupId,
           memberId: admission.memberId,

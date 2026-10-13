@@ -1,3 +1,5 @@
+import { GroupId } from "@amends-dev/core/group"
+import { MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Schema } from "effect"
 import * as Scope from "../../src/authorization/Scope.ts"
@@ -5,7 +7,6 @@ import * as Target from "../../src/authorization/Target.ts"
 import * as Group from "../../src/group/Group.ts"
 import * as GroupMembership from "../../src/group/GroupMembership.ts"
 import * as ThreadId from "../../src/thread/ThreadId.ts"
-import * as Member from "../../src/workspace/Member.ts"
 import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 
 it("creation accepts an explicit empty audience but rejects duplicate members and blank or untrimmed names", () => {
@@ -64,13 +65,13 @@ it("direct groups hold two or more ordered members, including their creator, and
 })
 
 it("a direct group's key depends only on its member set", () => {
-  const [alice, bob, carol] = ["alice", "bob", "carol"].map((id) => Member.Id.make(id))
+  const [alice, bob, carol] = ["alice", "bob", "carol"].map((id) => MemberId.MemberId.make(id))
   expect(Group.directMembers([carol!, alice!, bob!, alice!])).toEqual([alice, bob, carol])
   expect(Group.directKey([bob!, alice!])).toBe(Group.directKey([alice!, bob!, bob!]))
   expect(Group.directKey([alice!, bob!])).not.toBe(Group.directKey([alice!, bob!, carol!]))
   // IDs containing separators cannot make two member sets share a key.
-  expect(Group.directKey([Member.Id.make("a,b"), Member.Id.make("c")])).not.toBe(
-    Group.directKey([Member.Id.make("a"), Member.Id.make("b,c")])
+  expect(Group.directKey([MemberId.MemberId.make("a,b"), MemberId.MemberId.make("c")])).not.toBe(
+    Group.directKey([MemberId.MemberId.make("a"), MemberId.MemberId.make("b,c")])
   )
 })
 
@@ -88,15 +89,15 @@ it("adding a member requires both nonempty membership and group IDs", () => {
 })
 
 it("exact group grants stay separate from other groups, workspaces, and same-ID threads", () => {
-  const workspaceId = WorkspaceId.Id.make("workspace")
-  const group = Target.Reference.cases.Group.make({ workspaceId, groupId: Group.Id.make("same") })
+  const workspaceId = WorkspaceId.WorkspaceId.make("workspace")
+  const group = Target.Reference.cases.Group.make({ workspaceId, groupId: GroupId.GroupId.make("same") })
   const exact = Scope.Scope.cases.Target.make({ target: group })
   expect(Scope.covers(exact, group)).toBe(true)
   expect(Scope.covers(Scope.Scope.cases.Workspace.make({ workspaceId }), group)).toBe(true)
   for (const other of [
-    { ...group, groupId: Group.Id.make("other") },
-    { ...group, workspaceId: WorkspaceId.Id.make("other") },
-    Target.Reference.cases.Thread.make({ workspaceId, threadId: ThreadId.Id.make("same") })
+    { ...group, groupId: GroupId.GroupId.make("other") },
+    { ...group, workspaceId: WorkspaceId.WorkspaceId.make("other") },
+    Target.Reference.cases.Thread.make({ workspaceId, threadId: ThreadId.ThreadId.make("same") })
   ])
     expect(Scope.covers(exact, other)).toBe(false)
 })
@@ -107,20 +108,20 @@ it("lists a group with what is new to its reader and what their grants let them 
     return DateTime.makeUnsafe(`2026-10-09T12:${minutes}:00.000Z`)
   }
   const team: Group.Group = {
-    id: Group.Id.make("team"),
-    workspaceId: WorkspaceId.Id.make("workspace"),
+    id: GroupId.GroupId.make("team"),
+    workspaceId: WorkspaceId.WorkspaceId.make("workspace"),
     kind: "Team",
     visibility: "Public",
     name: "Team",
-    createdBy: Member.Id.make("alice"),
+    createdBy: MemberId.MemberId.make("alice"),
     createdAt: at(0)
   }
   const direct: Group.Group = {
-    id: Group.Id.make("direct"),
+    id: GroupId.GroupId.make("direct"),
     workspaceId: team.workspaceId,
     kind: "Direct",
-    memberIds: [Member.Id.make("alice"), Member.Id.make("bob")],
-    createdBy: Member.Id.make("alice"),
+    memberIds: [MemberId.MemberId.make("alice"), MemberId.MemberId.make("bob")],
+    createdBy: MemberId.MemberId.make("alice"),
     createdAt: at(0)
   }
   const quiet = { latestActivityAt: null, readAt: null, following: false, pending: 0 }

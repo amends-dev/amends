@@ -10,10 +10,11 @@ import * as Option from "effect/Option"
 import * as Projection from "../journal/Projection.ts"
 import * as Turn from "./Turn.ts"
 import * as TurnFacts from "./TurnFacts.ts"
+import type * as TurnId from "./TurnId.ts"
 import * as TurnStore from "./TurnStore.ts"
 
 /** Change the stored turn a fact names, as `changes` says of it as it stands. */
-const update = Effect.fnUntraced(function* (turnId: Turn.Id, changes: (turn: Turn.Turn) => Partial<Turn.Turn>) {
+const update = Effect.fnUntraced(function* (turnId: TurnId.TurnId, changes: (turn: Turn.Turn) => Partial<Turn.Turn>) {
   const turnStore = yield* TurnStore.TurnStore
   const found = yield* turnStore.get(turnId)
   if (Option.isNone(found)) return yield* Effect.die("A changed turn is missing")

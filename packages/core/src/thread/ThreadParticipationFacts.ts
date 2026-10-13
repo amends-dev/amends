@@ -25,7 +25,7 @@ export const Added = Fact.make("thread.participation.added", {
   subject: (payload) => Subject.make("thread-participation", payload.id),
   occurrence: (payload) => [payload.id],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  payload: Schema.Struct({ ...ThreadParticipation.Admission.fields, groupId: GroupId.Id })
+  payload: Schema.Struct({ ...ThreadParticipation.Admission.fields, groupId: GroupId.GroupId })
 })
 
 /**
@@ -42,9 +42,9 @@ export const Ended = Fact.make("thread.participation.ended", {
   audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Schema.Struct({
     ...ThreadParticipation.Departure.fields,
-    groupId: GroupId.Id,
+    groupId: GroupId.GroupId,
     /** The member who took part, whose work may stop with it. */
-    memberId: MemberId.Id,
+    memberId: MemberId.MemberId,
     reason: ThreadParticipation.EndReason
   })
 })

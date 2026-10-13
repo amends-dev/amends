@@ -7,6 +7,7 @@
  * @since 0.1.0
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -35,7 +36,9 @@ export class ConnectionStore extends Context.Service<
   ConnectionStore,
   {
     /** The connection, removed or not. */
-    readonly get: (id: Connection.Id) => Effect.Effect<Option.Option<Connection.Connection>, StoreError.StoreError>
+    readonly get: (
+      id: ConnectionContract.ConnectionId
+    ) => Effect.Effect<Option.Option<Connection.Connection>, StoreError.StoreError>
     /** The workspace's connections that are not removed, in no particular order. */
     readonly listActive: Effect.Effect<ReadonlyArray<Connection.Connection>, StoreError.StoreError>
     /** Reject a reused ID. Never upsert. */
@@ -52,11 +55,14 @@ export class ConnectionStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: ConnectionStore["Service"]): ConnectionStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: ConnectionStore["Service"]
+): ConnectionStore["Service"] => {
   const read = StoreInput.read("ConnectionStore")
   const write = StoreInput.write("ConnectionStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Connection.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", ConnectionContract.ConnectionId, id), driver.get),
     listActive: driver.listActive,
     insert: (record) => Effect.flatMap(write("insert", Connection.Connection, record), driver.insert),
     update: (record) => Effect.flatMap(write("update", Connection.Connection, record), driver.update)

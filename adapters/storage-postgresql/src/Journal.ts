@@ -33,7 +33,7 @@ import * as PostgresNotices from "./PostgresNotices.ts"
 const BatchHeaderRow = Schema.Struct({
   logId: Entry.LogId,
   position: Entry.Position,
-  commitId: Commit.Id,
+  commitId: Commit.CommitId,
   recordedAt: Schema.DateTimeUtcFromDate,
   entryCount: Schema.Natural
 })
@@ -41,7 +41,7 @@ const AppendHeaderRows = Schema.Array(
   Schema.Struct({
     logId: Entry.LogId,
     key: Occurrence.Key,
-    commitId: Commit.Id,
+    commitId: Commit.CommitId,
     firstIndex: Schema.Natural,
     entryCount: Schema.Int.check(Schema.isGreaterThan(0))
   })
@@ -338,7 +338,7 @@ export const make = Effect.gen(function* () {
     if (request.entries.length === 0) return []
     // Named before anything is staged, so a failure leaves the commit as it was.
     const named = yield* Effect.forEach(request.entries, (content) =>
-      Effect.map(crypto.randomUUIDv4, (id) => ({ id: Entry.Id.make(id), content }))
+      Effect.map(crypto.randomUUIDv4, (id) => ({ id: Entry.EntryId.make(id), content }))
     ).pipe(Effect.mapError(StoreError.failed("Store", "append")))
     const batch =
       opened ??

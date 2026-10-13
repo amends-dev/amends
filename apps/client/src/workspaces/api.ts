@@ -1,4 +1,4 @@
-import { Invitation, Member, Workspace } from "@amends-dev/core/workspace"
+import { Invitation, Member, Workspace, WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
@@ -75,8 +75,8 @@ export const acceptInvitation = (api: Api, acceptance: Acceptance) =>
   Effect.gen(function* () {
     yield* api.workspaces.acceptInvitation({
       params: {
-        workspaceId: yield* command(Workspace.Id)(acceptance.workspaceId),
-        invitationId: yield* command(Invitation.Id)(acceptance.invitationId)
+        workspaceId: yield* command(WorkspaceId.WorkspaceId)(acceptance.workspaceId),
+        invitationId: yield* command(Invitation.InvitationId)(acceptance.invitationId)
       },
       payload: { name: yield* command(Member.NewName)(acceptance.name) }
     })

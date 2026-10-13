@@ -1,18 +1,19 @@
-import { Group, GroupFacts, GroupProjection, GroupStore } from "@amends-dev/core/group"
+import { type Group, GroupFacts, GroupProjection, GroupStore, GroupId } from "@amends-dev/core/group"
 import {
-  Thread,
+  type Thread,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
   ThreadFacts,
-  ThreadMessage,
   ThreadMessageActivity,
-  ThreadParticipation,
   ThreadParticipationActivity,
   ThreadProjection,
-  ThreadStore
+  ThreadStore,
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
-import { Member } from "@amends-dev/core/workspace"
+import { MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect } from "effect"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
@@ -25,14 +26,14 @@ import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { make } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
-const workspaceId = WorkspaceId.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("journal")
-const groupId = Group.Id.make("group")
-const threadId = Thread.Id.make("thread")
-const memberId = Member.Id.make("member")
+const groupId = GroupId.GroupId.make("group")
+const threadId = ThreadId.ThreadId.make("thread")
+const memberId = MemberId.MemberId.make("member")
 const at = (minute: number) => DateTime.makeUnsafe(`2026-09-20T12:${String(minute).padStart(2, "0")}:00.000Z`)
 const common = (sequence: number) => ({
-  id: ThreadActivity.Id.make(`activity-${sequence}`),
+  id: ThreadActivity.ThreadActivityId.make(`activity-${sequence}`),
   workspaceId,
   threadId,
   sequence,
@@ -40,7 +41,7 @@ const common = (sequence: number) => ({
 })
 const published = (sequence: number, messageId: string) =>
   ThreadActivityKind.makeRecordUnsafe(ThreadMessageActivity.Published, common(sequence), {
-    messageId: ThreadMessage.Id.make(messageId)
+    messageId: ThreadMessageId.ThreadMessageId.make(messageId)
   })
 
 it.effect("threads and groups each rebuild their latest activity from recorded activity alone", () =>
@@ -102,7 +103,7 @@ it.effect("threads and groups each rebuild their latest activity from recorded a
         const activities = [
           published(1, "first"),
           ThreadActivityKind.makeRecordUnsafe(ThreadParticipationActivity.Followed, common(2), {
-            participationId: ThreadParticipation.Id.make("p")
+            participationId: ThreadParticipationId.ThreadParticipationId.make("p")
           }),
           published(3, "second")
         ]

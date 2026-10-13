@@ -140,11 +140,11 @@ export interface Handle<S extends Schema.Constraint> {
    * The batch commit `commitId` appended to this log, or None when that commit did not touch it.
    */
   readonly get: (
-    commitId: Commit.Id
+    commitId: Commit.CommitId
   ) => Effect.Effect<Option.Option<Batch<S["Type"]>>, ReadError, S["DecodingServices"]>
   /** Resolve one entry by ID within this log, honoring an enclosing transaction. */
   readonly getEntry: (
-    entryId: StoredEntry.Id
+    entryId: StoredEntry.EntryId
   ) => Effect.Effect<Option.Option<Entry<S["Type"]>>, ReadError, S["DecodingServices"]>
   /**
    * Complete batches after the exclusive `after` position, in position order and at most `limit`;
@@ -229,7 +229,7 @@ const batchSchema = Schema.toType(Store.Batch).check(
 )
 const validateRead = Schema.decodeEffect(Store.ReadOptions)
 const validateAppend = Schema.decodeEffect(Store.AppendOptions)
-const validateCommitId = Schema.decodeEffect(Commit.Id)
+const validateCommitId = Schema.decodeEffect(Commit.CommitId)
 
 /**
  * Construct typed logs over host storage and the supplied transaction coordinator, which the
@@ -304,7 +304,7 @@ export const make: Effect.Effect<Log["Service"], never, Store.Store | Transactio
       const write = Effect.fnUntraced(function* (
         values: ReadonlyArray<S["Type"]>,
         options: Store.AppendOptions,
-        commitId: Commit.Id | undefined,
+        commitId: Commit.CommitId | undefined,
         store: (request: Store.AppendInput) => Effect.Effect<ReadonlyArray<Store.Entry>, WriteError>
       ) {
         const request = yield* validateAppend(options)
@@ -369,8 +369,8 @@ export const make: Effect.Effect<Log["Service"], never, Store.Store | Transactio
         return yield* new InvalidResponse({ message: "Append returned no entry" })
       })
 
-      const getEntry = Effect.fn("Log.getEntry")(function* (entryId: StoredEntry.Id) {
-        const requestedId = yield* Schema.decodeEffect(StoredEntry.Id)(entryId)
+      const getEntry = Effect.fn("Log.getEntry")(function* (entryId: StoredEntry.EntryId) {
+        const requestedId = yield* Schema.decodeEffect(StoredEntry.EntryId)(entryId)
         const found = yield* Schema.decodeEffect(
           Schema.Option(
             Schema.toType(Store.Entry).check(
@@ -383,7 +383,7 @@ export const make: Effect.Effect<Log["Service"], never, Store.Store | Transactio
         if (Option.isNone(found)) return Option.none<Entry<S["Type"]>>()
         return Option.some(yield* decodeEntry(found.value))
       })
-      const get = Effect.fn("Log.get")(function* (commitId: Commit.Id) {
+      const get = Effect.fn("Log.get")(function* (commitId: Commit.CommitId) {
         const requestedId = yield* validateCommitId(commitId)
         const resultSchema = Schema.Option(
           ownedBatch.check(

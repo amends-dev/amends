@@ -8,7 +8,7 @@
  * @since 0.1.0
  */
 
-import { Channel, ChannelStore } from "@amends-dev/core/channel"
+import { Channel, ChannelStore, type ChannelId } from "@amends-dev/core/channel"
 import { StoreError } from "@amends-dev/core/journal"
 import { and, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
@@ -45,7 +45,7 @@ const toRow = (record: Channel.Channel): typeof channels.$inferInsert => ({
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
-  const inWorkspace = (id: Channel.Id) => and(eq(channels.workspaceId, workspaceId), eq(channels.id, id))
+  const inWorkspace = (id: ChannelId.ChannelId) => and(eq(channels.workspaceId, workspaceId), eq(channels.id, id))
   const driver: ChannelStore.ChannelStore["Service"] = {
     get: Effect.fn("Channels.get")(
       function* (id) {

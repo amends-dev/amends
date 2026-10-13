@@ -43,7 +43,7 @@ export class Publication extends Context.Service<Publication, Event.Provenance>(
  * @since 0.1.0
  */
 export const make = Effect.fnUntraced(function* (
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   performedBy: Performer.Reference,
   occurredAt?: DateTime.Utc
 ) {

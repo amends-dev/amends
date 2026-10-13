@@ -10,6 +10,7 @@ import * as Schema from "effect/Schema"
 import * as Assignment from "../authorization/Assignment.ts"
 import * as Member from "./Member.ts"
 import * as Workspace from "./Workspace.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * A new name for the workspace, and the name the renamer last saw, which
@@ -37,7 +38,7 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
  * @since 0.1.0
  */
 export const NameChange = Schema.Struct({
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   previousName: Workspace.Name,
   name: Workspace.Name
 })

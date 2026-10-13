@@ -8,7 +8,7 @@
  * @since 0.1.0
  */
 
-import { Integrations } from "@amends-dev/connection"
+import { Integrations, type Connection as ConnectionContract } from "@amends-dev/connection"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
@@ -22,7 +22,6 @@ import * as Delegation from "../authorization/Delegation.ts"
 import type * as Permission from "../authorization/Permission.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Target from "../authorization/Target.ts"
-import type * as Connection from "../connection/Connection.ts"
 import * as ConnectionPermissions from "../connection/ConnectionPermissions.ts"
 import * as ConnectionStore from "../connection/ConnectionStore.ts"
 import * as CoreError from "../error/CoreError.ts"
@@ -36,6 +35,7 @@ import * as Request from "../request/Request.ts"
 import type * as Member from "../workspace/Member.ts"
 import * as MemberCommand from "../workspace/MemberCommand.ts"
 import * as MemberFacts from "../workspace/MemberFacts.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as Agent from "./Agent.ts"
 import * as AgentFacts from "./AgentFacts.ts"
@@ -127,7 +127,7 @@ export class AgentService extends Context.Service<
     /** The workspace's agents the actor may read, by name; those whose membership ended are gone. */
     readonly list: Effect.Effect<ReadonlyArray<Agent.View>, ListError, Actor.Actor>
     /** The agent by ID, as the actor sees it; one they may not read is missing. */
-    readonly get: (agentId: Agent.Id) => Effect.Effect<Agent.View, ReadError, Actor.Actor>
+    readonly get: (agentId: Identity.AgentId) => Effect.Effect<Agent.View, ReadError, Actor.Actor>
     /**
      * Add an agent: a membership, with its name and the role it starts with, which the actor must be
      * able to grant, and how it is set up. The actor must be able to read and use each connection
@@ -163,8 +163,8 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
 
-  const memberTarget = (memberId: Member.Id) => Target.Reference.cases.Member.make({ workspaceId, memberId })
-  const connectionTarget = (connectionId: Connection.Id) =>
+  const memberTarget = (memberId: MemberId.MemberId) => Target.Reference.cases.Member.make({ workspaceId, memberId })
+  const connectionTarget = (connectionId: ConnectionContract.ConnectionId) =>
     Target.Reference.cases.Connection.make({ workspaceId, connectionId })
 
   /** Whether the agent can run as it is set up, as the host's integrations find its connections. */
@@ -175,7 +175,7 @@ export const make = Effect.gen(function* () {
    * The agent by ID with its name while its membership lasts, and `CoreError.NotFound` once it
    * ended.
    */
-  const requireActiveAgent = Effect.fnUntraced(function* (agentId: Agent.Id) {
+  const requireActiveAgent = Effect.fnUntraced(function* (agentId: Identity.AgentId) {
     const found = yield* agentStore.get(agentId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Agent", id: agentId })
     const member = yield* memberStore.get(found.value.memberId)
@@ -186,7 +186,7 @@ export const make = Effect.gen(function* () {
 
   /** An agent the actor may act on with `permission`; to anyone else it is missing. */
   const requirePermittedAgent = Effect.fnUntraced(function* (
-    agentId: Agent.Id,
+    agentId: Identity.AgentId,
     permission: Permission.Definition<"Member">
   ) {
     const agent = yield* requireActiveAgent(agentId)
@@ -279,8 +279,8 @@ export const make = Effect.gen(function* () {
     return views.toSorted(byName)
   }).pipe(Effect.withSpan("AgentService.list"), Operation.report)
 
-  const get = Effect.fn("AgentService.get")(function* (agentId: Agent.Id) {
-    const id = yield* Schema.decodeEffect(Agent.Id)(agentId)
+  const get = Effect.fn("AgentService.get")(function* (agentId: Identity.AgentId) {
+    const id = yield* Schema.decodeEffect(Identity.AgentId)(agentId)
     const { record, name } = yield* requirePermittedAgent(id, AgentPermissions.Read)
     return yield* viewForActor(record, name)
   }, Operation.report)
@@ -293,7 +293,7 @@ export const make = Effect.gen(function* () {
       ])
       yield* delegation.requireGrant(request.roleId)
       const actor = yield* Actor.Actor
-      const agentId = Agent.Id.make(
+      const agentId = Identity.AgentId.make(
         yield* Request.idFor(options.requestKey, ["agent.create", workspaceId, actor.memberId])
       )
       // A retry returns the agent its first attempt created, unless its membership ended since.

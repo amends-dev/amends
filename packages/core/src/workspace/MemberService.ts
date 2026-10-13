@@ -32,6 +32,7 @@ import * as InvitationFacts from "./InvitationFacts.ts"
 import * as InvitationStore from "./InvitationStore.ts"
 import * as Member from "./Member.ts"
 import * as MemberFacts from "./MemberFacts.ts"
+import * as MemberId from "./MemberId.ts"
 import * as MemberPermissions from "./MemberPermissions.ts"
 import * as MemberStore from "./MemberStore.ts"
 import * as WorkspaceStore from "./WorkspaceStore.ts"
@@ -85,7 +86,7 @@ export class MemberService extends Context.Service<
      * lookup read current state without opening a transaction, and use an existing commit when
      * there is one. Only authorized callers can receive `CoreError.NotFound`.
      */
-    readonly get: (memberId: Member.Id) => Effect.Effect<Member.Member, Error, Actor.Actor>
+    readonly get: (memberId: MemberId.MemberId) => Effect.Effect<Member.Member, Error, Actor.Actor>
     /**
      * List the memberships the actor may read, active and removed. Active membership is required;
      * each record is then included only when `member.read` covers it, so a workspace-scoped grant
@@ -100,7 +101,7 @@ export class MemberService extends Context.Service<
      * person, revokes their pending invitations. The record and its grants remain for history;
      * authorization rejects the removed member, and rejoining needs a new invitation and member ID.
      */
-    readonly remove: (memberId: Member.Id) => Effect.Effect<Member.Member, RemoveError, Actor.Actor>
+    readonly remove: (memberId: MemberId.MemberId) => Effect.Effect<Member.Member, RemoveError, Actor.Actor>
     /**
      * Choose what people in the workspace call the acting member. Anyone active may name
      * themselves, and only themselves; the same name again records nothing.
@@ -109,7 +110,7 @@ export class MemberService extends Context.Service<
   }
 >()("@amends-dev/core/workspace/MemberService") {}
 
-const decodeId = Schema.decodeEffect(Member.Id)
+const decodeId = Schema.decodeEffect(MemberId.MemberId)
 
 /**
  * Construct member operations from workspace services; the caller supplies `Actor.Actor` per call.
@@ -142,13 +143,13 @@ export const make: Effect.Effect<
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
 
-  const requireMember = Effect.fnUntraced(function* (id: Member.Id) {
+  const requireMember = Effect.fnUntraced(function* (id: MemberId.MemberId) {
     const found = yield* memberStore.get(id)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id })
     return found.value
   })
 
-  const get = Effect.fn("MemberService.get")(function* (memberId: Member.Id) {
+  const get = Effect.fn("MemberService.get")(function* (memberId: MemberId.MemberId) {
     const id = yield* decodeId(memberId)
     yield* authorization.require([
       Requirement.make(MemberPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId: id }))
@@ -172,7 +173,7 @@ export const make: Effect.Effect<
   }).pipe(Effect.withSpan("MemberService.list"), Operation.report)
 
   const remove = Effect.fn("MemberService.remove")(
-    function* (memberId: Member.Id) {
+    function* (memberId: MemberId.MemberId) {
       const id = yield* decodeId(memberId)
       yield* authorization.require([
         Requirement.make(MemberPermissions.Remove, Target.Reference.cases.Member.make({ workspaceId, memberId: id }))

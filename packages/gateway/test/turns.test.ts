@@ -3,7 +3,7 @@ import { AgentService } from "@amends-dev/core/agent"
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel"
 import { ConnectionService } from "@amends-dev/core/connection"
-import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group"
+import { Group, GroupService, GroupMembershipService, type GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
 import { TaskService } from "@amends-dev/core/task"
@@ -16,8 +16,15 @@ import {
   type ThreadTimeline,
   ThreadParticipation
 } from "@amends-dev/core/thread"
-import { type SessionLog, type SessionStateStore, Turn, TurnExecution, TurnService } from "@amends-dev/core/turn"
-import type { Member, Workspace } from "@amends-dev/core/workspace"
+import {
+  type SessionLog,
+  type SessionStateStore,
+  Turn,
+  TurnExecution,
+  TurnService,
+  type TurnId
+} from "@amends-dev/core/turn"
+import type { MemberId, WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import type { StreamPart } from "@amends-dev/harness"
 import { describe, expect, it } from "@effect/vitest"
@@ -29,30 +36,30 @@ import * as Support from "./support.ts"
 import { alice, bob, boundTo, future, goodKey, placedIn, request, takeTurnJobs } from "./support.ts"
 
 const as = <A, E, R extends Core.Operations | Actor.Actor>(
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
   program: Effect.Effect<A, E, R>
 ) => Effect.flatMap(Gateway.Gateway, (gateway) => gateway.asMember(id, identity, program))
 /** Run a step of turn execution in the workspace, as a turn's job does. */
 const execute = <A, E>(
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   step: (turnExecution: TurnExecution.TurnExecution["Service"]) => Effect.Effect<A, E>
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(gateway.inWorkspace(id, Effect.flatMap(TurnExecution.TurnExecution, step)))
   )
-const timelineOf = (id: Workspace.Id, threadId: Turn.Turn["threadId"]) =>
+const timelineOf = (id: WorkspaceId.WorkspaceId, threadId: Turn.Turn["threadId"]) =>
   as(
     id,
     alice,
     Effect.flatMap(ThreadService.ThreadService, (threadService) => threadService.readTimeline(threadId, { limit: 50 }))
   )
 /** The turn as stored now. */
-const turnOf = (id: Workspace.Id, turnId: Turn.Id) =>
+const turnOf = (id: WorkspaceId.WorkspaceId, turnId: TurnId.TurnId) =>
   Effect.flatMap(boundTo(id), (bound) => Effect.map(bound.turns.get(turnId), Option.getOrThrow))
 /** Append to the participation's session log after its latest entry, as a turn's job does. */
 const appendToLog = (
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   participationId: Turn.Turn["participationId"],
   entries: readonly [SessionLog.Entry, ...Array<SessionLog.Entry>]
 ) =>
@@ -62,18 +69,18 @@ const appendToLog = (
     )
   )
 /** Log the prompt a turn started with, as its job does before running it. */
-const logPrompt = (id: Workspace.Id, ready: Ready) =>
+const logPrompt = (id: WorkspaceId.WorkspaceId, ready: Ready) =>
   appendToLog(id, ready.turn.participationId, [
     { _tag: "Prompted", turnId: ready.turn.id, prompt: ready.prompt, messages: ready.messages }
   ])
 /** Log a step the turn took, as its job does while running it. */
-const logStep = (id: Workspace.Id, turn: Turn.Turn, stepId: string, step: StreamPart.Step) =>
+const logStep = (id: WorkspaceId.WorkspaceId, turn: Turn.Turn, stepId: string, step: StreamPart.Step) =>
   appendToLog(id, turn.participationId, [{ _tag: "Step", turnId: turn.id, id: stepId, step }])
 /**
  * Follow a turn's log, as alice unless another reader is named, for the enclosing scope: each
  * message as it arrives, and whether the stream has finished or failed as unavailable.
  */
-const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberReference = alice) =>
+const followLog = (id: WorkspaceId.WorkspaceId, turnId: TurnId.TurnId, reader: Identity.MemberReference = alice) =>
   Effect.gen(function* () {
     const gateway = yield* Gateway.Gateway
     const stream = yield* gateway.asMember(
@@ -192,21 +199,23 @@ const workspaceWithAgent = Effect.gen(function* () {
   return { workspace, agent, identity, selection, models }
 })
 /** Bob joins the workspace as an ordinary member, and so its general group. */
-const joinAsBob = (id: Workspace.Id) =>
+const joinAsBob = (id: WorkspaceId.WorkspaceId) =>
   Effect.gen(function* () {
     const invitation = yield* Operations.invite(id, alice, request(yield* future))
     return yield* Operations.acceptInvitation(id, bob.id, invitation.details.id)
   })
 /** Alice revokes every role the member holds, leaving their memberships as they are. */
-const revokeRoles = (id: Workspace.Id, memberId: Member.Id) =>
+const revokeRoles = (id: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId) =>
   Effect.gen(function* () {
     const access = yield* Operations.access(id, alice, memberId)
     for (const assignment of access.assignments) yield* Operations.revokeAssignment(id, alice, memberId, assignment.id)
   })
 /** A post's result with the activity that placed its message, read through the workspace's stores. */
-const withPlace = <A extends { readonly message: ThreadMessage.ThreadMessage }>(id: Workspace.Id, result: A) =>
-  Effect.flatMap(boundTo(id), (bound) => placedIn(bound)(result))
-const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Member.Id>) =>
+const withPlace = <A extends { readonly message: ThreadMessage.ThreadMessage }>(
+  id: WorkspaceId.WorkspaceId,
+  result: A
+) => Effect.flatMap(boundTo(id), (bound) => placedIn(bound)(result))
+const start = (id: WorkspaceId.WorkspaceId, text: string, mentions: ReadonlyArray<MemberId.MemberId>) =>
   as(
     id,
     alice,
@@ -215,10 +224,10 @@ const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Member.Id
     )
   ).pipe(Effect.flatMap((started) => withPlace(id, started)))
 const reply = (
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   threadId: Turn.Turn["threadId"],
   text: string,
-  mentions: ReadonlyArray<Member.Id> = []
+  mentions: ReadonlyArray<MemberId.MemberId> = []
 ) =>
   as(
     id,
@@ -229,9 +238,9 @@ const reply = (
   ).pipe(Effect.flatMap((message) => withPlace(id, { message })))
 /** The agent stops taking part in the thread. */
 const unfollow = (
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  memberId: Member.Id,
+  memberId: MemberId.MemberId,
   threadId: Turn.Turn["threadId"]
 ) =>
   Effect.gen(function* () {
@@ -259,7 +268,7 @@ const unfollow = (
  * A channel over the test channels into the general group, which opens tasks, and what the contact
  * Dana Customer sends through it: each message received as the system's event.
  */
-const channelInto = (id: Workspace.Id) =>
+const channelInto = (id: WorkspaceId.WorkspaceId) =>
   Effect.gen(function* () {
     const connection = yield* as(
       id,
@@ -319,7 +328,7 @@ const idle = TurnExecution.Start.cases.Idle.make({})
  * Run the agent's job in the thread as far as core takes it: accept its work into a turn and start
  * the turn, or nothing when no work waits.
  */
-const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Turn["threadId"]) =>
+const runJob = (id: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, threadId: Turn.Turn["threadId"]) =>
   execute(id, (turnExecution) =>
     Effect.flatMap(turnExecution.accept(memberId, threadId), (accepted) =>
       Option.match(accepted, {
@@ -329,7 +338,7 @@ const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Turn["thre
     )
   )
 /** Run the agent's job in the thread, as its turn job does, expecting a turn ready to run. */
-const startReady = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Turn["threadId"]) =>
+const startReady = (id: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId, threadId: Turn.Turn["threadId"]) =>
   runJob(id, memberId, threadId).pipe(
     Effect.filterOrElse(TurnExecution.Start.isAnyOf(["Ready"]), (started) =>
       Effect.die(`Expected a turn ready to run, not ${started._tag}`)
@@ -344,7 +353,7 @@ const textsOf = (message: Prompt.Message) =>
  * The conversation the turn's agent joined, as its job reads it for a new session log: each
  * message's role and texts.
  */
-const joinedOf = (id: Workspace.Id, turnId: Turn.Id) =>
+const joinedOf = (id: WorkspaceId.WorkspaceId, turnId: TurnId.TurnId) =>
   Effect.map(
     execute(id, (turnExecution) => turnExecution.joinedConversation(turnId)),
     (conversation) => conversation.map((message) => ({ role: message.role, texts: textsOf(message) }))
@@ -602,7 +611,7 @@ describe("turns", () => {
               const started = yield* start(workspace.id, "Planner, draft the notes.", [agent.memberId])
               const threadId = started.thread.id
               const bound = yield* boundTo(workspace.id)
-              const cancel = (turnId: Turn.Id) =>
+              const cancel = (turnId: TurnId.TurnId) =>
                 as(
                   workspace.id,
                   alice,
@@ -719,7 +728,7 @@ describe("turns", () => {
           const { workspace, agent } = yield* workspaceWithAgent
           const started = yield* start(workspace.id, "Planner, draft the notes.", [agent.memberId])
           const threadId = started.thread.id
-          const retry = (turnId: Turn.Id) =>
+          const retry = (turnId: TurnId.TurnId) =>
             as(
               workspace.id,
               alice,
@@ -1246,7 +1255,7 @@ describe("turns", () => {
               })
             )
             /** A running turn in a new thread of `groupId`, which bob follows. */
-            const following = Effect.fnUntraced(function* (groupId: Group.Id) {
+            const following = Effect.fnUntraced(function* (groupId: GroupId.GroupId) {
               const started = yield* as(
                 workspace.id,
                 alice,

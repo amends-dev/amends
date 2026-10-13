@@ -5,12 +5,13 @@
  * transaction.
  */
 
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import { Context, Effect, Layer, Ref } from "effect"
 import { AssignmentStore, RoleStore } from "../src/authorization/index.ts"
 import type { Commit } from "../src/journal/index.ts"
 import { Checkpoint, MemoryDatabase, Store } from "../src/journal/index.ts"
 import type * as StoreError from "../src/journal/StoreError.ts"
-import { MemberStore, Workspace } from "../src/workspace/index.ts"
+import { MemberStore } from "../src/workspace/index.ts"
 
 /** A projection target: a number the transaction stages, like any projected record. */
 export class Counter extends Context.Service<
@@ -23,14 +24,14 @@ export class Counter extends Context.Service<
 
 /** New memory storage with one host over it, and the stores bound to `workspaceId`. */
 export const make = Effect.fn("JournalTest.memory")(function* (
-  workspaceId: Workspace.Id = Workspace.Id.make("workspace-one")
+  workspaceId: WorkspaceId.WorkspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 ) {
   const database = yield* MemoryDatabase.make
   const connection = yield* MemoryDatabase.makeConnection.pipe(
     Effect.provideService(MemoryDatabase.MemoryDatabase, database)
   )
   /** The stores bound to one workspace over this host's connection. */
-  const bind = Effect.fn("JournalTest.bind")(function* (id: Workspace.Id) {
+  const bind = Effect.fn("JournalTest.bind")(function* (id: WorkspaceId.WorkspaceId) {
     const context = yield* Layer.build(
       Layer.mergeAll(
         Checkpoint.layerMemory,
@@ -80,7 +81,7 @@ export const make = Effect.fn("JournalTest.memory")(function* (
       Effect.gen(function* () {
         yield* Ref.update(attempts, (count) => count + 1)
         const committed: Array<Effect.Effect<void>> = []
-        let commitId: Commit.Id | undefined
+        let commitId: Commit.CommitId | undefined
         const result = yield* inner.transaction(
           Effect.flatMap(Store.Transaction, (native) => {
             commitId = native.id

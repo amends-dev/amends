@@ -8,8 +8,8 @@
  */
 
 import * as Schema from "effect/Schema"
-import * as Member from "../workspace/Member.ts"
-import * as Workspace from "../workspace/Workspace.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Grant from "./Grant.ts"
 import * as Role from "./Role.ts"
 import * as Scope from "./Scope.ts"
@@ -20,13 +20,13 @@ import * as Scope from "./Scope.ts"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceAssignmentId"))
+export const AssignmentId = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceAssignmentId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type AssignmentId = typeof AssignmentId.Type
 
 /**
  * Whether the assignment still gives access: active, or revoked for good.
@@ -50,7 +50,7 @@ export type Status = typeof Status.Type
  * @since 0.1.0
  */
 export const Source = Schema.TaggedUnion({
-  Role: { roleId: Role.Id, scope: Scope.Scope },
+  Role: { roleId: Role.RoleId, scope: Scope.Scope },
   Direct: { grant: Grant.Grant }
 })
 
@@ -67,7 +67,7 @@ export type Source = typeof Source.Type
  * @since 0.1.0
  */
 export const SourceInWorkspace = Schema.makeFilter(
-  ({ workspaceId, source }: { readonly workspaceId: Workspace.Id; readonly source: Source }) => {
+  ({ workspaceId, source }: { readonly workspaceId: WorkspaceId.WorkspaceId; readonly source: Source }) => {
     const scope = Source.match(source, {
       Role: ({ scope }) => scope,
       Direct: ({ grant }) => grant.scope
@@ -91,9 +91,9 @@ export const SourceInWorkspace = Schema.makeFilter(
  * @since 0.1.0
  */
 export const Assignment = Schema.Struct({
-  id: Id,
-  workspaceId: Workspace.Id,
-  memberId: Member.Id,
+  id: AssignmentId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
   source: Source,
   status: Status
 }).check(SourceInWorkspace)
@@ -111,7 +111,7 @@ export interface Assignment extends Schema.Schema.Type<typeof Assignment> {}
  * @category options
  * @since 0.1.0
  */
-export const AssignInput = Schema.Struct({ memberId: Member.Id, roleId: Role.Id })
+export const AssignInput = Schema.Struct({ memberId: MemberId.MemberId, roleId: Role.RoleId })
 
 /**
  * @category options
@@ -129,7 +129,7 @@ export interface AssignInput extends Schema.Schema.Type<typeof AssignInput> {}
 export const ChangeInput = Schema.Struct({
   ...AssignInput.fields,
   /** The member's current workspace role assignments as the caller saw them, in any order. */
-  expectedAssignmentIds: Schema.UniqueArray(Id)
+  expectedAssignmentIds: Schema.UniqueArray(AssignmentId)
 })
 
 /**

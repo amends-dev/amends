@@ -11,7 +11,7 @@ import * as ThreadActivityKind from "./ThreadActivityKind.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 
-const subject = ({ participationId }: { readonly participationId: ThreadParticipationId.Id }) =>
+const subject = ({ participationId }: { readonly participationId: ThreadParticipationId.ThreadParticipationId }) =>
   Subject.make("participation", participationId)
 
 /**
@@ -23,7 +23,7 @@ const subject = ({ participationId }: { readonly participationId: ThreadParticip
  */
 export const Followed = ThreadActivityKind.make("participation.followed", {
   version: 1,
-  details: Schema.Struct({ participationId: ThreadParticipationId.Id }),
+  details: Schema.Struct({ participationId: ThreadParticipationId.ThreadParticipationId }),
   subject,
   newActivity: false
 })
@@ -43,7 +43,7 @@ export type Followed = ThreadActivityKind.Activity<typeof Followed>
 export const Ended = ThreadActivityKind.make("participation.ended", {
   version: 1,
   details: Schema.Struct({
-    participationId: ThreadParticipationId.Id,
+    participationId: ThreadParticipationId.ThreadParticipationId,
     reason: ThreadParticipation.EndReason
   }),
   subject,

@@ -6,7 +6,7 @@ import { Actor, Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
 import { NotificationService } from "@amends-dev/core/notification"
 import { ThreadMessageFacts, ThreadService } from "@amends-dev/core/thread"
-import { Member } from "@amends-dev/core/workspace"
+import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Queue, Stream } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -34,7 +34,7 @@ const human = (name: string) => Identity.HumanId.make(name)
 const memberActor = (name: string) =>
   Actor.Actor.of({
     workspaceId,
-    memberId: Member.Id.make(name),
+    memberId: MemberId.MemberId.make(name),
     identity: { _tag: "Human", id: human(name) }
   })
 
@@ -45,7 +45,7 @@ const marker = (bound: Bound) =>
   Effect.flatMap(Journal.Journal, (journal) =>
     journal.commit(
       journal.publish(RoleFacts.Created, {
-        roleId: Role.Id.make("marker"),
+        roleId: Role.RoleId.make("marker"),
         workspaceId,
         name: "Marker",
         permissions: []

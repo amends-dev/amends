@@ -20,9 +20,9 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts"
  * @since 0.1.0
  */
 export const ThreadPosition = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  memberId: MemberId.Id,
-  threadId: ThreadId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
+  threadId: ThreadId.ThreadId,
   readThrough: Schema.Int.check(Schema.isGreaterThan(0))
 })
 
@@ -39,9 +39,9 @@ export interface ThreadPosition extends Schema.Schema.Type<typeof ThreadPosition
  * @since 0.1.0
  */
 export const GroupRead = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  memberId: MemberId.Id,
-  groupId: GroupId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
+  groupId: GroupId.GroupId,
   readAt: Schema.DateTimeUtcFromString
 })
 
@@ -59,7 +59,7 @@ export interface GroupRead extends Schema.Schema.Type<typeof GroupRead> {}
  * @since 0.1.0
  */
 export const MarkThreadReadInput = Schema.Struct({
-  threadId: ThreadId.Id,
+  threadId: ThreadId.ThreadId,
   throughSequence: ThreadPosition.fields.readThrough
 })
 
@@ -75,7 +75,7 @@ export interface MarkThreadReadInput extends Schema.Schema.Type<typeof MarkThrea
  * @category options
  * @since 0.1.0
  */
-export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.Id })
+export const MarkGroupReadInput = Schema.Struct({ groupId: GroupId.GroupId })
 
 /**
  * @category options

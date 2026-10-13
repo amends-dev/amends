@@ -3,7 +3,7 @@ import { Integrations } from "@amends-dev/connection"
 import { Store } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
 import { SessionLogStore, TurnExecution, TurnJobs } from "@amends-dev/core/turn"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { PostgresClusterStorage, type PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql"
 import { BunCrypto } from "@effect/platform-bun"
@@ -15,16 +15,16 @@ import { setup } from "./database.ts"
 
 const { available, withDatabase } = setup()
 const job: TurnJobs.Job = {
-  workspaceId: Workspace.Id.make("workspace-one"),
-  memberId: Member.Id.make("agent-member"),
-  threadId: ThreadId.Id.make("thread-one")
+  workspaceId: WorkspaceId.WorkspaceId.make("workspace-one"),
+  memberId: MemberId.MemberId.make("agent-member"),
+  threadId: ThreadId.ThreadId.make("thread-one")
 }
 
 /**
  * A gateway through which a turn job finds no work, telling `ran` in which workspace it looked:
  * accepting gives no turn, and nothing else is reached.
  */
-const acceptingNothing = (ran: (workspaceId: Workspace.Id) => void) => {
+const acceptingNothing = (ran: (workspaceId: WorkspaceId.WorkspaceId) => void) => {
   const unexpected = () => Effect.die("Only accepting work is expected")
   return Gateway.Gateway.of({
     createWorkspace: unexpected,
@@ -86,7 +86,7 @@ const turnJobRequests = (database: ReturnType<typeof LocalHost.layerDatabase>) =
 /** A job that ran: which process ran it, in which workspace. */
 interface Ran {
   readonly runner: string
-  readonly workspaceId: Workspace.Id
+  readonly workspaceId: WorkspaceId.WorkspaceId
 }
 
 /** A gateway through which `runner`'s turn jobs find no work, recording in `runs` each that ran. */
@@ -101,7 +101,7 @@ const recordingRuns = (runs: Array<Ran>, runner: string) =>
 const commitAndAwait = Effect.fnUntraced(function* (
   context: Context.Context<TurnJobs.TurnJobs | PostgresDatabase.PostgresDatabase | Crypto.Crypto>,
   runs: ReadonlyArray<Ran>,
-  workspaceIds: ReadonlyArray<Workspace.Id>,
+  workspaceIds: ReadonlyArray<WorkspaceId.WorkspaceId>,
   within: number
 ) {
   const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provideContext(context))
@@ -124,7 +124,7 @@ const commitAndAwait = Effect.fnUntraced(function* (
 
 /** The workspaces of a round of requests, one for each of `count`. */
 const workspacesOf = (round: string, count: number) =>
-  Array.from({ length: count }, (_, index) => Workspace.Id.make(`${round}-${index}`))
+  Array.from({ length: count }, (_, index) => WorkspaceId.WorkspaceId.make(`${round}-${index}`))
 
 describe.skipIf(!available)("jobs on the local host", () => {
   // The host's database and cluster share one client, so Cluster stores a request on the connection
@@ -134,7 +134,7 @@ describe.skipIf(!available)("jobs on the local host", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const runs: Array<Workspace.Id> = []
+          const runs: Array<WorkspaceId.WorkspaceId> = []
           const context = yield* Layer.build(
             turnJobs(
               acceptingNothing((workspaceId) => runs.push(workspaceId)),

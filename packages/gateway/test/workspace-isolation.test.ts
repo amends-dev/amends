@@ -1,20 +1,20 @@
-import { Agent } from "@amends-dev/core/agent"
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import { BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization"
-import { Channel, Delivery } from "@amends-dev/core/channel"
-import { Connection } from "@amends-dev/core/connection"
+import { Delivery, ChannelId, DeliveryId } from "@amends-dev/core/channel"
 import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import type { Store } from "@amends-dev/core/journal"
 import {
-  Thread,
   ThreadActivity,
   ThreadActivityKind,
   ThreadMessage,
   ThreadMessageActivity,
-  ThreadParticipation
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
-import { Turn } from "@amends-dev/core/turn"
-import { Invitation, Member } from "@amends-dev/core/workspace"
+import { TurnId } from "@amends-dev/core/turn"
+import { Invitation, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -49,14 +49,16 @@ describe("workspace isolation", () => {
         const role = yield* bound.roles.get(BuiltinRoles.MemberId)
         if (assignment === undefined || Option.isNone(role))
           return yield* Effect.die("An initialized workspace has its owner and roles")
-        const threadId = Thread.Id.make("foreign-thread")
-        const messageId = ThreadMessage.Id.make("foreign-message")
+        const threadId = ThreadId.ThreadId.make("foreign-thread")
+        const messageId = ThreadMessageId.ThreadMessageId.make("foreign-message")
 
         const attempts: ReadonlyArray<Attempt> = [
           {
             store: "RoleStore",
-            write: bound.roles.insert(Object.assign({}, role.value, { id: Role.Id.make("foreign-role") }, elsewhere)),
-            kept: (on) => on.roles.get(Role.Id.make("foreign-role"))
+            write: bound.roles.insert(
+              Object.assign({}, role.value, { id: Role.RoleId.make("foreign-role") }, elsewhere)
+            ),
+            kept: (on) => on.roles.get(Role.RoleId.make("foreign-role"))
           },
           {
             store: "AssignmentStore",
@@ -76,7 +78,7 @@ describe("workspace isolation", () => {
             store: "InvitationStore",
             write: bound.invitations.insert({
               details: {
-                id: Invitation.Id.make("foreign-invitation"),
+                id: Invitation.InvitationId.make("foreign-invitation"),
                 workspaceId: otherWorkspaceId,
                 inviterMemberId: memberId,
                 issuedAt: now,
@@ -86,12 +88,12 @@ describe("workspace isolation", () => {
               },
               state: { _tag: "Pending" }
             }),
-            kept: (on) => on.invitations.get(Invitation.Id.make("foreign-invitation"))
+            kept: (on) => on.invitations.get(Invitation.InvitationId.make("foreign-invitation"))
           },
           {
             store: "ConnectionStore",
             write: bound.connections.insert({
-              id: Connection.Id.make("foreign-connection"),
+              id: ConnectionContract.ConnectionId.make("foreign-connection"),
               workspaceId: otherWorkspaceId,
               integration: "test-models",
               name: "Foreign",
@@ -101,33 +103,33 @@ describe("workspace isolation", () => {
               createdBy: memberId,
               createdAt: now
             }),
-            kept: (on) => on.connections.get(Connection.Id.make("foreign-connection"))
+            kept: (on) => on.connections.get(ConnectionContract.ConnectionId.make("foreign-connection"))
           },
           {
             store: "AgentStore",
             write: bound.agents.insert({
-              id: Agent.Id.make("foreign-agent"),
+              id: Identity.AgentId.make("foreign-agent"),
               workspaceId: otherWorkspaceId,
-              memberId: Member.Id.make("foreign-agent-member"),
+              memberId: MemberId.MemberId.make("foreign-agent-member"),
               instructions: "",
               harness: { _tag: "Auto" },
-              model: { connectionId: Connection.Id.make("foreign-connection"), id: "model" },
+              model: { connectionId: ConnectionContract.ConnectionId.make("foreign-connection"), id: "model" },
               sandbox: null,
               createdBy: memberId,
               createdAt: now
             }),
-            kept: (on) => on.agents.get(Agent.Id.make("foreign-agent"))
+            kept: (on) => on.agents.get(Identity.AgentId.make("foreign-agent"))
           },
           {
             store: "TurnStore",
             write: bound.turns.insert({
-              id: Turn.Id.make("foreign-turn"),
+              id: TurnId.TurnId.make("foreign-turn"),
               workspaceId: otherWorkspaceId,
               groupId: Group.GeneralId,
               threadId,
               agentId: Identity.AgentId.make("foreign-agent"),
-              memberId: Member.Id.make("foreign-agent-member"),
-              participationId: ThreadParticipation.Id.make("foreign-participation"),
+              memberId: MemberId.MemberId.make("foreign-agent-member"),
+              participationId: ThreadParticipationId.ThreadParticipationId.make("foreign-participation"),
               retry: null,
               status: "queued",
               acceptedThroughSequence: 1,
@@ -140,7 +142,7 @@ describe("workspace isolation", () => {
               startedAt: null,
               finishedAt: null
             }),
-            kept: (on) => on.turns.get(Turn.Id.make("foreign-turn"))
+            kept: (on) => on.turns.get(TurnId.TurnId.make("foreign-turn"))
           },
           {
             store: "TaskStore",
@@ -159,9 +161,9 @@ describe("workspace isolation", () => {
           {
             store: "ChannelStore",
             write: bound.channels.insert({
-              id: Channel.Id.make("foreign-channel"),
+              id: ChannelId.ChannelId.make("foreign-channel"),
               workspaceId: otherWorkspaceId,
-              connectionId: Connection.Id.make("connection"),
+              connectionId: ConnectionContract.ConnectionId.make("connection"),
               groupId: Group.GeneralId,
               name: "Foreign",
               opensTasks: true,
@@ -169,14 +171,14 @@ describe("workspace isolation", () => {
               createdBy: memberId,
               createdAt: now
             }),
-            kept: (on) => on.channels.get(Channel.Id.make("foreign-channel"))
+            kept: (on) => on.channels.get(ChannelId.ChannelId.make("foreign-channel"))
           },
           {
             store: "ChannelBindingStore",
             write: bound.channelBindings.insert({
               threadId,
               workspaceId: otherWorkspaceId,
-              channelId: Channel.Id.make("channel"),
+              channelId: ChannelId.ChannelId.make("channel"),
               groupId: Group.GeneralId,
               conversation: { id: "conversation", details: {} },
               boundAt: now
@@ -188,7 +190,7 @@ describe("workspace isolation", () => {
             write: bound.contacts.insert({
               id: Identity.ContactId.make("foreign-contact"),
               workspaceId: otherWorkspaceId,
-              channelId: Channel.Id.make("channel"),
+              channelId: ChannelId.ChannelId.make("channel"),
               externalId: "someone",
               name: "Someone",
               createdAt: now
@@ -199,9 +201,9 @@ describe("workspace isolation", () => {
             store: "DeliveryStore",
             write: bound.deliveries.insert(
               Delivery.requested({
-                id: Delivery.Id.make("foreign-delivery"),
+                id: DeliveryId.DeliveryId.make("foreign-delivery"),
                 workspaceId: otherWorkspaceId,
-                channelId: Channel.Id.make("channel"),
+                channelId: ChannelId.ChannelId.make("channel"),
                 threadId,
                 groupId: Group.GeneralId,
                 conversationId: "conversation",
@@ -210,7 +212,7 @@ describe("workspace isolation", () => {
                 requestedAt: now
               })
             ),
-            kept: (on) => on.deliveries.get(Delivery.Id.make("foreign-delivery"))
+            kept: (on) => on.deliveries.get(DeliveryId.DeliveryId.make("foreign-delivery"))
           },
           {
             store: "ThreadMessageStore",
@@ -231,7 +233,7 @@ describe("workspace isolation", () => {
               ThreadActivityKind.makeRecordUnsafe(
                 ThreadMessageActivity.Published,
                 {
-                  id: ThreadActivity.Id.make("foreign-activity"),
+                  id: ThreadActivity.ThreadActivityId.make("foreign-activity"),
                   workspaceId: otherWorkspaceId,
                   threadId,
                   sequence: 1,
@@ -240,7 +242,7 @@ describe("workspace isolation", () => {
                 { messageId }
               )
             ),
-            kept: (on) => on.activities.get(ThreadActivity.Id.make("foreign-activity"))
+            kept: (on) => on.activities.get(ThreadActivity.ThreadActivityId.make("foreign-activity"))
           }
         ]
         for (const attempt of attempts) {

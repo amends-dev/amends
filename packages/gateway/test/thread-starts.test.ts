@@ -4,9 +4,7 @@ import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Journal, Publication } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
-  Thread,
   ThreadService,
-  ThreadMessage,
   ThreadMessageService,
   ThreadParticipation,
   ThreadParticipationService,
@@ -14,9 +12,11 @@ import {
   ThreadParticipationStore,
   ThreadMessageStore,
   ThreadActivityStore,
-  ThreadCommand
+  ThreadCommand,
+  ThreadId,
+  ThreadMessageId
 } from "@amends-dev/core/thread"
-import { Member, MemberFacts, MemberStore } from "@amends-dev/core/workspace"
+import { Member, MemberFacts, MemberStore, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Option, Context } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -35,8 +35,8 @@ import {
 
 const { core, initialized } = Support
 describe("thread starts", () => {
-  const humanId = Member.Id.make("human")
-  const otherId = Member.Id.make("other")
+  const humanId = MemberId.MemberId.make("human")
+  const otherId = MemberId.MemberId.make("other")
   const contactId = Identity.ContactId.make("customer")
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], program: Effect.Effect<A, E, R>) =>
     program.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
@@ -46,11 +46,11 @@ describe("thread starts", () => {
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound))))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 200 })
-  const startDirect = (memberIds: ReadonlyArray<Member.Id>, mentions: ReadonlyArray<Member.Id> = []) =>
+  const startDirect = (memberIds: ReadonlyArray<MemberId.MemberId>, mentions: ReadonlyArray<MemberId.MemberId> = []) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startDirect({ memberIds, text: "Hello", mentions })
     )
-  const participantsOf = (bound: Bound, threadId: Thread.Id) =>
+  const participantsOf = (bound: Bound, threadId: ThreadId.ThreadId) =>
     Effect.map(bound.participations.listByThread(threadId), (records) =>
       records.map((record) => ThreadParticipation.referenceOf(record.participant))
     )
@@ -79,7 +79,7 @@ describe("thread starts", () => {
               }),
               journal.publish(AssignmentFacts.Created, {
                 workspaceId,
-                assignmentId: Assignment.Id.make(`viewer-${memberId}`),
+                assignmentId: Assignment.AssignmentId.make(`viewer-${memberId}`),
                 memberId,
                 source: {
                   _tag: "Role",
@@ -216,10 +216,12 @@ describe("thread starts", () => {
             _tag: "CoreError.Invalid",
             reason: { _tag: "DirectMembersRequired" }
           })
-          expect(yield* Effect.flip(run(bound, owner, startDirect([Member.Id.make("missing")])))).toMatchObject({
-            _tag: "CoreError.Conflict",
-            reason: { _tag: "ParticipantUnavailable", memberId: "missing" }
-          })
+          expect(yield* Effect.flip(run(bound, owner, startDirect([MemberId.MemberId.make("missing")])))).toMatchObject(
+            {
+              _tag: "CoreError.Conflict",
+              reason: { _tag: "ParticipantUnavailable", memberId: "missing" }
+            }
+          )
           expect(yield* Effect.flip(run(bound, owner, startDirect([humanId], [otherId])))).toMatchObject({
             _tag: "CoreError.Conflict",
             reason: { _tag: "ParticipantUnavailable", memberId: otherId }
@@ -254,13 +256,13 @@ describe("thread starts", () => {
                 Effect.flatMap(ThreadCommand.ThreadCommand, (threadCommand) =>
                   Effect.flatMap(DateTime.now, (occurredAt) =>
                     threadCommand.create({
-                      threadId: Thread.Id.make("late-order"),
+                      threadId: ThreadId.ThreadId.make("late-order"),
                       groupId: team.id,
                       title: null,
                       origin: null,
                       participants: [{ _tag: "Contact", contactId }, { _tag: "Triage" }],
                       message: {
-                        messageId: ThreadMessage.Id.make("late-order-opening"),
+                        messageId: ThreadMessageId.ThreadMessageId.make("late-order-opening"),
                         author: { _tag: "Contact", contactId },
                         text: "My order is late",
                         mentions: [],
@@ -331,7 +333,7 @@ describe("thread starts", () => {
         storage,
         Effect.gen(function* () {
           const { bound, owner } = yield* prepare()
-          const extra = Array.from({ length: 10 }, (_, index) => Member.Id.make(`member-${index}`))
+          const extra = Array.from({ length: 10 }, (_, index) => MemberId.MemberId.make(`member-${index}`))
           yield* trusted(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
@@ -411,7 +413,7 @@ describe("thread starts", () => {
         storage,
         Effect.gen(function* () {
           const { bound, owner } = yield* prepare()
-          const extra = Array.from({ length: 10 }, (_, index) => Member.Id.make(`member-${index}`))
+          const extra = Array.from({ length: 10 }, (_, index) => MemberId.MemberId.make(`member-${index}`))
           yield* trusted(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
@@ -427,13 +429,13 @@ describe("thread starts", () => {
               )
             )
           )
-          const as = (memberId: Member.Id) =>
+          const as = (memberId: MemberId.MemberId) =>
             Actor.Actor.of({
               workspaceId,
               memberId,
               identity: { _tag: "Human", id: Identity.HumanId.make(memberId) }
             })
-          const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
+          const reply = (threadId: ThreadId.ThreadId, mentions: ReadonlyArray<MemberId.MemberId>) =>
             Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
               threadMessageService.publish({ threadId, text: "Reply", mentions })
             )

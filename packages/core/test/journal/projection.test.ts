@@ -18,7 +18,7 @@ import { Counter, make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
 const testSubject = () => Subject.make("test", "entity")
-const workspaceId = WorkspaceId.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("domain")
 const Changed = Fact.make("counter.changed", {
   subject: testSubject,
@@ -460,7 +460,7 @@ it.effect("invalid or partial durable checkpoints fail before applying more even
         )
         const bound = yield* runner
         const checkpoint = yield* Checkpoint.Checkpoint
-        for (const entryId of [first.id, Entry.Id.make("missing-entry")]) {
+        for (const entryId of [first.id, Entry.EntryId.make("missing-entry")]) {
           yield* journal.commit(
             checkpoint.set(bound.key, {
               position: first.position,

@@ -10,6 +10,7 @@
  * @since 0.1.0
  */
 
+import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import { Connection, ConnectionStore } from "@amends-dev/core/connection"
 import { StoreError } from "@amends-dev/core/journal"
 import { and, eq } from "drizzle-orm"
@@ -47,7 +48,8 @@ const toRow = (record: Connection.Connection): typeof connections.$inferInsert =
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
-  const inWorkspace = (id: Connection.Id) => and(eq(connections.workspaceId, workspaceId), eq(connections.id, id))
+  const inWorkspace = (id: ConnectionContract.ConnectionId) =>
+    and(eq(connections.workspaceId, workspaceId), eq(connections.id, id))
   const driver: ConnectionStore.ConnectionStore["Service"] = {
     get: Effect.fn("Connections.get")(
       function* (id) {

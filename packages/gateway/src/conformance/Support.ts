@@ -47,9 +47,9 @@ import {
   Member,
   MemberFacts,
   MemberStore,
-  Workspace,
   WorkspaceInitialization,
-  WorkspaceStore
+  WorkspaceStore,
+  WorkspaceId
 } from "@amends-dev/core/workspace"
 import * as Clock from "effect/Clock"
 import * as Context from "effect/Context"
@@ -92,14 +92,14 @@ export const charlie = Identity.Reference.cases.Human.make({
  * @category utils
  * @since 0.1.0
  */
-export const workspaceId = Workspace.Id.make("workspace-one")
+export const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 /**
  * A second workspace, for tests that one workspace's storage never shows another's.
  *
  * @category utils
  * @since 0.1.0
  */
-export const otherWorkspaceId = Workspace.Id.make("workspace-two")
+export const otherWorkspaceId = WorkspaceId.WorkspaceId.make("workspace-two")
 /**
  * The journal's log ID, which core's `journalLog` also names, for reading its head directly.
  *
@@ -196,7 +196,7 @@ const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>, c
  * @category utils
  * @since 0.1.0
  */
-export const forWorkspace = (host: Context.Context<Fixture.Host>, id: Workspace.Id) =>
+export const forWorkspace = (host: Context.Context<Fixture.Host>, id: WorkspaceId.WorkspaceId) =>
   Effect.flatMap(Context.get(host, WorkspaceStorage.WorkspaceStorage).forWorkspace(id), (context) =>
     withHostServices(context, Context.get(host, Crypto.Crypto))
   )
@@ -207,7 +207,7 @@ export const forWorkspace = (host: Context.Context<Fixture.Host>, id: Workspace.
  * @category utils
  * @since 0.1.0
  */
-export const boundTo = Effect.fnUntraced(function* (id: Workspace.Id) {
+export const boundTo = Effect.fnUntraced(function* (id: WorkspaceId.WorkspaceId) {
   const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage
   const crypto = yield* Crypto.Crypto
   return yield* withHostServices(yield* workspaceStorage.forWorkspace(id), crypto)
@@ -299,7 +299,7 @@ export const seed = (
         for (const viewer of viewers)
           yield* journal.publish(AssignmentFacts.Created, {
             workspaceId: bound.store.workspaceId,
-            assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
+            assignmentId: Assignment.AssignmentId.make(`viewer:${viewer.memberId}`),
             memberId: viewer.memberId,
             source: {
               _tag: "Role",
@@ -439,7 +439,7 @@ export const at = <A, E, R>(time: DateTime.Utc, program: Effect.Effect<A, E, R>)
 export const request = (
   expiresAt: DateTime.Utc,
   recipientId = bob.id,
-  roleId: Role.Id = BuiltinRoles.MemberId
+  roleId: Role.RoleId = BuiltinRoles.MemberId
 ): Invitation.IssueInput => ({ recipientId, expiresAt, roleId })
 
 /**

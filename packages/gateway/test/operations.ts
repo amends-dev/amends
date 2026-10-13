@@ -7,7 +7,8 @@ import {
   MemberService,
   type Ownership,
   OwnershipService,
-  type Workspace
+  type WorkspaceId,
+  type MemberId
 } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { Effect } from "effect"
@@ -20,7 +21,11 @@ import { Effect } from "effect"
  */
 export const createWorkspace = (creator: Identity.HumanId, memberName: Member.Name = Member.Name.make(creator)) =>
   Effect.flatMap(Gateway.Gateway, (gateway) => gateway.createWorkspace(creator, { name: "Test workspace", memberName }))
-export const renameMember = (workspaceId: Workspace.Id, identity: Identity.MemberReference, name: Member.Name) =>
+export const renameMember = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  identity: Identity.MemberReference,
+  name: Member.Name
+) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -31,7 +36,11 @@ export const renameMember = (workspaceId: Workspace.Id, identity: Identity.Membe
     )
   )
 
-export const getMember = (workspaceId: Workspace.Id, identity: Identity.MemberReference, memberId: Member.Id) =>
+export const getMember = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  identity: Identity.MemberReference,
+  memberId: MemberId.MemberId
+) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -42,7 +51,11 @@ export const getMember = (workspaceId: Workspace.Id, identity: Identity.MemberRe
     )
   )
 
-export const removeMember = (workspaceId: Workspace.Id, identity: Identity.MemberReference, memberId: Member.Id) =>
+export const removeMember = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  identity: Identity.MemberReference,
+  memberId: MemberId.MemberId
+) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -53,7 +66,11 @@ export const removeMember = (workspaceId: Workspace.Id, identity: Identity.Membe
     )
   )
 
-export const invite = (workspaceId: Workspace.Id, identity: Identity.MemberReference, request: Invitation.IssueInput) =>
+export const invite = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  identity: Identity.MemberReference,
+  request: Invitation.IssueInput
+) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -65,9 +82,9 @@ export const invite = (workspaceId: Workspace.Id, identity: Identity.MemberRefer
   )
 
 export const acceptInvitation = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   recipient: Identity.HumanId,
-  invitationId: Invitation.Id,
+  invitationId: Invitation.InvitationId,
   name: Member.Name = Member.Name.make(recipient)
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
@@ -82,9 +99,9 @@ export const acceptInvitation = (
   )
 
 export const revokeInvitation = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  invitationId: Invitation.Id
+  invitationId: Invitation.InvitationId
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
@@ -98,7 +115,7 @@ export const revokeInvitation = (
     )
   )
 
-export const ownership = (workspaceId: Workspace.Id, identity: Identity.MemberReference) =>
+export const ownership = (workspaceId: WorkspaceId.WorkspaceId, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -109,7 +126,7 @@ export const ownership = (workspaceId: Workspace.Id, identity: Identity.MemberRe
     )
   )
 export const transferOwnership = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
   input: Ownership.TransferInput
 ) =>
@@ -123,7 +140,7 @@ export const transferOwnership = (
     )
   )
 
-export const permissions = (workspaceId: Workspace.Id, identity: Identity.MemberReference) =>
+export const permissions = (workspaceId: WorkspaceId.WorkspaceId, identity: Identity.MemberReference) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -133,7 +150,11 @@ export const permissions = (workspaceId: Workspace.Id, identity: Identity.Member
       )
     )
   )
-export const access = (workspaceId: Workspace.Id, identity: Identity.MemberReference, memberId: Member.Id) =>
+export const access = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  identity: Identity.MemberReference,
+  memberId: MemberId.MemberId
+) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -143,7 +164,11 @@ export const access = (workspaceId: Workspace.Id, identity: Identity.MemberRefer
       )
     )
   )
-export const assign = (workspaceId: Workspace.Id, identity: Identity.MemberReference, input: Assignment.AssignInput) =>
+export const assign = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  identity: Identity.MemberReference,
+  input: Assignment.AssignInput
+) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -153,7 +178,11 @@ export const assign = (workspaceId: Workspace.Id, identity: Identity.MemberRefer
       )
     )
   )
-export const change = (workspaceId: Workspace.Id, identity: Identity.MemberReference, input: Assignment.ChangeInput) =>
+export const change = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  identity: Identity.MemberReference,
+  input: Assignment.ChangeInput
+) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(
       gateway.asMember(
@@ -164,10 +193,10 @@ export const change = (workspaceId: Workspace.Id, identity: Identity.MemberRefer
     )
   )
 export const revokeAssignment = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
-  memberId: Member.Id,
-  assignmentId: Assignment.Id
+  memberId: MemberId.MemberId,
+  assignmentId: Assignment.AssignmentId
 ) =>
   Effect.flatMap(Gateway.Gateway, (gateway) =>
     Effect.scoped(

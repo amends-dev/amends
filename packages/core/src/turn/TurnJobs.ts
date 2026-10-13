@@ -26,8 +26,8 @@ import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadParticipationFacts from "../thread/ThreadParticipationFacts.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
-import type * as Turn from "./Turn.ts"
 import * as TurnFacts from "./TurnFacts.ts"
+import type * as TurnId from "./TurnId.ts"
 import * as TurnStore from "./TurnStore.ts"
 
 /**
@@ -37,9 +37,9 @@ import * as TurnStore from "./TurnStore.ts"
  * @since 0.1.0
  */
 export const Job = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  memberId: MemberId.Id,
-  threadId: ThreadId.Id
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
+  threadId: ThreadId.ThreadId
 })
 
 /**
@@ -73,7 +73,7 @@ export class TurnJobs extends Context.Service<
      * no longer takes part where it works. A turn the job is not running is stopped as it stands.
      */
     readonly requestStop: (
-      job: Job & { readonly turnId: Turn.Id }
+      job: Job & { readonly turnId: TurnId.TurnId }
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/turn/TurnJobs") {}

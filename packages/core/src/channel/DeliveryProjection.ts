@@ -11,10 +11,11 @@ import * as Option from "effect/Option"
 import * as Projection from "../journal/Projection.ts"
 import * as Delivery from "./Delivery.ts"
 import * as DeliveryFacts from "./DeliveryFacts.ts"
+import type * as DeliveryId from "./DeliveryId.ts"
 import * as DeliveryStore from "./DeliveryStore.ts"
 
 /** Change the stored delivery a fact names, as `changes` says. */
-const update = Effect.fnUntraced(function* (deliveryId: Delivery.Id, changes: Partial<Delivery.Delivery>) {
+const update = Effect.fnUntraced(function* (deliveryId: DeliveryId.DeliveryId, changes: Partial<Delivery.Delivery>) {
   const deliveryStore = yield* DeliveryStore.DeliveryStore
   const found = yield* deliveryStore.get(deliveryId)
   if (Option.isNone(found)) return yield* Effect.die("A changed delivery is missing")

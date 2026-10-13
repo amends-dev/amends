@@ -1,6 +1,6 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Identity } from "@amends-dev/core/identity"
-import { Member } from "@amends-dev/core/workspace"
+import { Member, MemberId } from "@amends-dev/core/workspace"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
@@ -132,7 +132,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const afterRemovalList = yield* asAlice.members.list()
           const afterRemoval = yield* Effect.flip(asBob.members.get({ params }))
           const missing = yield* asAlice.members.get({
-            params: { memberId: Member.Id.make("nobody") },
+            params: { memberId: MemberId.MemberId.make("nobody") },
             responseMode: "response-only"
           })
           return {

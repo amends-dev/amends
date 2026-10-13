@@ -8,14 +8,14 @@
  * @since 0.1.0
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import * as Record from "effect/Record"
 import * as Schema from "effect/Schema"
 import * as ChannelId from "../channel/ChannelId.ts"
-import * as Connection from "../connection/Connection.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
-import * as Member from "../workspace/Member.ts"
-import * as Workspace from "../workspace/Workspace.ts"
+import * as MemberId from "../workspace/MemberId.ts"
+import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
  * A concrete authorization target within a workspace, not a grant's scope.
@@ -24,12 +24,12 @@ import * as Workspace from "../workspace/Workspace.ts"
  * @since 0.1.0
  */
 export const Reference = Schema.TaggedUnion({
-  Workspace: { workspaceId: Workspace.Id },
-  Member: { workspaceId: Workspace.Id, memberId: Member.Id },
-  Thread: { workspaceId: Workspace.Id, threadId: ThreadId.Id },
-  Group: { workspaceId: Workspace.Id, groupId: GroupId.Id },
-  Connection: { workspaceId: Workspace.Id, connectionId: Connection.Id },
-  Channel: { workspaceId: Workspace.Id, channelId: ChannelId.Id }
+  Workspace: { workspaceId: WorkspaceId.WorkspaceId },
+  Member: { workspaceId: WorkspaceId.WorkspaceId, memberId: MemberId.MemberId },
+  Thread: { workspaceId: WorkspaceId.WorkspaceId, threadId: ThreadId.ThreadId },
+  Group: { workspaceId: WorkspaceId.WorkspaceId, groupId: GroupId.GroupId },
+  Connection: { workspaceId: WorkspaceId.WorkspaceId, connectionId: ConnectionContract.ConnectionId },
+  Channel: { workspaceId: WorkspaceId.WorkspaceId, channelId: ChannelId.ChannelId }
 })
 
 /**

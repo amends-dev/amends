@@ -14,6 +14,7 @@ import { constVoid } from "effect/Function"
 import * as Schema from "effect/Schema"
 import type * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as Turn from "./Turn.ts"
+import * as TurnId from "./TurnId.ts"
 
 /**
  * An entry of a session log: the conversation the agent joined, or, each naming its turn, what the
@@ -28,7 +29,7 @@ export const Entry = Schema.TaggedUnion({
   Joined: { conversation: Schema.Array(Prompt.Message) },
   /** A turn prompted the agent with `prompt`, which tells it `messages` of the thread's messages. */
   Prompted: {
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     prompt: Prompt.UserMessage,
     messages: Schema.Int
   },
@@ -39,17 +40,17 @@ export const Entry = Schema.TaggedUnion({
    * starts none.
    */
   Started: {
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     agent: Schema.String,
     agentState: Schema.optionalKey(Schema.Json)
   },
   /** A step of the turn finished, its parts added up. `id` names it, as its drafts do. */
-  Step: { turnId: Turn.Id, id: Schema.NonEmptyString, step: StreamPart.Step },
+  Step: { turnId: TurnId.TurnId, id: Schema.NonEmptyString, step: StreamPart.Step },
   /**
    * The turn's run stopped before the turn ended. The next run continues the turn from the steps
    * it finished when the agent still has it, and otherwise starts it again from its prompt.
    */
-  Interrupted: { turnId: Turn.Id, reason: Schema.NonEmptyString }
+  Interrupted: { turnId: TurnId.TurnId, reason: Schema.NonEmptyString }
 })
 
 /**
@@ -91,7 +92,7 @@ export interface Recorded extends Schema.Schema.Type<typeof Recorded> {}
  * @since 0.1.0
  */
 export const isOfTurn =
-  (turnId: Turn.Id) =>
+  (turnId: TurnId.TurnId) =>
   (entry: Entry): boolean =>
     !Entry.isAnyOf(["Joined"])(entry) && entry.turnId === turnId
 
@@ -159,7 +160,7 @@ export const answerOf = (entries: ReadonlyArray<Entry>): string =>
  */
 export interface Reader {
   readonly add: (recorded: ReadonlyArray<Recorded>) => void
-  readonly end: (messageIds: ReadonlyArray<ThreadMessageId.Id>) => void
+  readonly end: (messageIds: ReadonlyArray<ThreadMessageId.ThreadMessageId>) => void
   /** The latest position of the log the reader took, the turn's entry or another's. */
   readonly position: () => number
   readonly items: () => ReadonlyArray<Turn.LogItem>
@@ -174,7 +175,7 @@ export interface Reader {
  * @category constructors
  * @since 0.1.0
  */
-export const reader = (turnId: Turn.Id, after: number): Reader => {
+export const reader = (turnId: TurnId.TurnId, after: number): Reader => {
   const ofTurn = isOfTurn(turnId)
   const items: Array<Turn.LogItem> = []
   let position = after

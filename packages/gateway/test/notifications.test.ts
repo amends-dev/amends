@@ -1,12 +1,12 @@
 import type * as Core from "@amends-dev/core"
 import { BuiltinRoles } from "@amends-dev/core/authorization"
-import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group"
+import { Group, GroupService, GroupMembershipService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Journal, Store, StoreError } from "@amends-dev/core/journal"
 import { Notification, NotificationService, type NotificationStore } from "@amends-dev/core/notification"
-import { Thread, ThreadService, ThreadParticipation } from "@amends-dev/core/thread"
+import { ThreadService, ThreadId, ThreadParticipationId } from "@amends-dev/core/thread"
 import { TurnId } from "@amends-dev/core/turn"
-import { Member } from "@amends-dev/core/workspace"
+import { Member, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Array, Context, DateTime, Effect, Layer, Option } from "effect"
@@ -42,18 +42,18 @@ describe("notifications", () => {
     id: Identity.HumanId.make("another")
   })
   // People and agents are notified as a membership.
-  const human = Notification.ofMember(Member.Id.make("recipient-member"), humanIdentity)
-  const agent = Notification.ofMember(Member.Id.make("agent-member"), agentIdentity)
+  const human = Notification.ofMember(MemberId.MemberId.make("recipient-member"), humanIdentity)
+  const agent = Notification.ofMember(MemberId.MemberId.make("agent-member"), agentIdentity)
   const contact = Identity.Reference.cases.Contact.make({
     id: Identity.ContactId.make("recipient")
   })
   const triage = Notification.Recipient.cases.Triage.make({})
-  const another = Notification.ofMember(Member.Id.make("another-member"), anotherIdentity)
+  const another = Notification.ofMember(MemberId.MemberId.make("another-member"), anotherIdentity)
   const recordedAt = DateTime.makeUnsafe("2026-09-19T12:00:00.123Z")
   const record = (id: string, overrides: Partial<Notification.Notification> = {}): Notification.Notification => ({
-    id: Notification.Id.make(id),
+    id: Notification.NotificationId.make(id),
     workspaceId,
-    source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make(`source-${id}`) },
+    source: { logId: Entry.LogId.make("journal"), entryId: Entry.EntryId.make(`source-${id}`) },
     recipient: { ...human },
     recordedAt,
     state: { _tag: "Pending" },
@@ -91,7 +91,7 @@ describe("notifications", () => {
               expect(yield* a.notifications.get(one.id)).toEqual(Option.some(one))
               expect(yield* b.notifications.get(one.id)).toEqual(Option.some(foreign))
               expect(yield* b.notifications.get(two.id)).toEqual(Option.none())
-              expect(yield* a.notifications.get(Notification.Id.make("absent"))).toEqual(Option.none())
+              expect(yield* a.notifications.get(Notification.NotificationId.make("absent"))).toEqual(Option.none())
               expect(yield* listOldestFirst(a.notifications, human, page)).toEqual([one])
               expect(yield* a.notifications.listPendingByRecipient(agent, page)).toEqual([two])
               expect(yield* listOldestFirst(a.notifications, another, page)).toEqual([three])
@@ -113,10 +113,10 @@ describe("notifications", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId)
           yield* initialized(bound)
-          const [red, blue, green] = ["red", "blue", "green"].map((id) => Group.Id.make(id))
+          const [red, blue, green] = ["red", "blue", "green"].map((id) => GroupId.GroupId.make(id))
           if (!red || !blue || !green) return yield* Effect.die("Expected three groups")
-          const inGroup = (groupId: Group.Id, sequence = 1) => ({
-            thread: { threadId: Thread.Id.make(`thread-${groupId}`), groupId, sequence }
+          const inGroup = (groupId: GroupId.GroupId, sequence = 1) => ({
+            thread: { threadId: ThreadId.ThreadId.make(`thread-${groupId}`), groupId, sequence }
           })
           yield* bound.store.transaction(
             bound.notifications.insertMany([
@@ -131,7 +131,7 @@ describe("notifications", () => {
               record("unthreaded")
             ])
           )
-          yield* bound.notifications.markSeen([Notification.Id.make("red-seen")], recordedAt)
+          yield* bound.notifications.markSeen([Notification.NotificationId.make("red-seen")], recordedAt)
           const counts = yield* bound.notifications.countPendingByGroup(human, [red, blue])
           expect(counts.toSorted((a, b) => (a.groupId < b.groupId ? -1 : 1))).toEqual([
             { groupId: blue, count: 1 },
@@ -140,9 +140,9 @@ describe("notifications", () => {
           expect(yield* bound.notifications.countPendingByGroup(agent, [red, green])).toEqual([
             { groupId: red, count: 1 }
           ])
-          expect(yield* bound.notifications.countPendingByGroup(human, [Group.Id.make("empty")])).toEqual([])
+          expect(yield* bound.notifications.countPendingByGroup(human, [GroupId.GroupId.make("empty")])).toEqual([])
           expect(yield* bound.notifications.countPendingByGroup(human, [])).toEqual([])
-          yield* bound.notifications.markSeen([Notification.Id.make("red-1")], recordedAt)
+          yield* bound.notifications.markSeen([Notification.NotificationId.make("red-1")], recordedAt)
           expect(yield* bound.notifications.countPendingByGroup(human, [red])).toEqual([{ groupId: red, count: 1 }])
           expect(yield* (yield* boundTo(otherWorkspaceId)).notifications.countPendingByGroup(human, [red])).toEqual([])
         })
@@ -158,7 +158,7 @@ describe("notifications", () => {
           const bound = yield* boundTo(workspaceId)
           yield* initialized(bound)
           const from = (threadId: string, sequence: number, groupId = Group.GeneralId) => ({
-            thread: { threadId: Thread.Id.make(threadId), groupId, sequence }
+            thread: { threadId: ThreadId.ThreadId.make(threadId), groupId, sequence }
           })
           // One is accepted, and one, from a group the agent leaves, discarded.
           const told = [
@@ -166,7 +166,7 @@ describe("notifications", () => {
             record("second", { ...from("thread", 2), recipient: agent }),
             record("third-b", { ...from("thread", 3), recipient: agent }),
             record("third-a", {
-              ...from("thread", 3, Group.Id.make("left")),
+              ...from("thread", 3, GroupId.GroupId.make("left")),
               recipient: agent
             }),
             record("fourth", { ...from("thread", 4), recipient: agent })
@@ -181,13 +181,16 @@ describe("notifications", () => {
               yield* bound.notifications.insertMany([...told, ...others])
               yield* bound.notifications.accept(
                 [told[1]!.id],
-                { _tag: "Turn", turnId: TurnId.Id.make("turn") },
+                { _tag: "Turn", turnId: TurnId.TurnId.make("turn") },
                 recordedAt
               )
-              yield* bound.notifications.discardPendingForGroup(Member.Id.make("agent-member"), Group.Id.make("left"))
+              yield* bound.notifications.discardPendingForGroup(
+                MemberId.MemberId.make("agent-member"),
+                GroupId.GroupId.make("left")
+              )
             })
           )
-          const threadId = Thread.Id.make("thread")
+          const threadId = ThreadId.ThreadId.make("thread")
           const listed = (afterSequence: number, throughSequence: number) =>
             Effect.map(
               bound.notifications.listByThread(agent, threadId, {
@@ -284,13 +287,13 @@ describe("notifications", () => {
             expect(
               yield* read(human, {
                 limit: 2,
-                before: { recordedAt, id: Notification.Id.make("b") }
+                before: { recordedAt, id: Notification.NotificationId.make("b") }
               })
             ).toEqual([record("a"), record("A")])
           }
           // What the recipient saw stays in their inbox, and leaves what is pending.
           const seenAt = DateTime.add(recordedAt, { minutes: 1 })
-          yield* bound.notifications.markSeen([Notification.Id.make("é")], seenAt)
+          yield* bound.notifications.markSeen([Notification.NotificationId.make("é")], seenAt)
           const seen = record("é", {
             state: { _tag: "Seen", seenAt }
           })
@@ -330,7 +333,7 @@ describe("notifications", () => {
           })
           yield* bound.store.transaction(bound.notifications.insert(otherLog))
           expect(yield* bound.notifications.get(saved.id)).toEqual(Option.some(saved))
-          expect(yield* bound.notifications.get(Notification.Id.make("duplicate"))).toEqual(Option.none())
+          expect(yield* bound.notifications.get(Notification.NotificationId.make("duplicate"))).toEqual(Option.none())
           expect(yield* listOldestFirst(bound.notifications, human, page)).toHaveLength(2)
         })
       )
@@ -344,12 +347,12 @@ describe("notifications", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId)
           yield* initialized(bound)
-          const groupId = Group.Id.make("crowded")
-          const thread = { threadId: Thread.Id.make("crowded-thread"), groupId, sequence: 1 }
+          const groupId = GroupId.GroupId.make("crowded")
+          const thread = { threadId: ThreadId.ThreadId.make("crowded-thread"), groupId, sequence: 1 }
           // A reply without mentions notifies every participant of a crowded thread at once.
           const many = Array.makeBy(12_000, (index) => record(`many-${index}`, { thread }))
           yield* bound.store.transaction(bound.notifications.insertMany(many))
-          const groups = [groupId, ...Array.makeBy(40_000, (index) => Group.Id.make(`absent-${index}`))]
+          const groups = [groupId, ...Array.makeBy(40_000, (index) => GroupId.GroupId.make(`absent-${index}`))]
           expect(yield* bound.notifications.countPendingByGroup(human, groups)).toEqual([
             { groupId, count: many.length }
           ])
@@ -358,9 +361,11 @@ describe("notifications", () => {
             recordedAt
           )
           expect(yield* bound.notifications.countPendingByGroup(human, groups)).toEqual([])
-          const absent = Array.makeBy(40_000, (index) => Notification.Id.make(`absent-${index}`))
+          const absent = Array.makeBy(40_000, (index) => Notification.NotificationId.make(`absent-${index}`))
           expect(
-            yield* Effect.flip(bound.notifications.markSeen([...absent, Notification.Id.make("many-0")], recordedAt))
+            yield* Effect.flip(
+              bound.notifications.markSeen([...absent, Notification.NotificationId.make("many-0")], recordedAt)
+            )
           ).toMatchObject({
             _tag: "StoreError",
             store: "NotificationStore",
@@ -526,7 +531,7 @@ describe("notifications", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId)
           yield* initialized(bound)
-          const badCursor = { recordedAt, id: Notification.Id.make("cursor") }
+          const badCursor = { recordedAt, id: Notification.NotificationId.make("cursor") }
           Reflect.set(badCursor, "recordedAt", "not-a-date")
           const badRecipient = { ...human }
           Reflect.set(badRecipient, "_tag", "Unknown")
@@ -636,7 +641,7 @@ describe("notifications", () => {
           const workspace = yield* initialized(a, humanIdentity.id)
           const other = yield* initialized(b, humanIdentity.id)
           const owner = Notification.ofMember(workspace.ownerMemberId, humanIdentity)
-          const agentMemberId = Member.Id.make("notification-agent")
+          const agentMemberId = MemberId.MemberId.make("notification-agent")
           const first = record("a", { recipient: owner })
           const second = record("b", { recipient: owner })
           const forAgent = record("agent", {
@@ -645,7 +650,7 @@ describe("notifications", () => {
           const forAnother = record("another", { recipient: another })
           // The same person under an earlier membership: someone who left and was invited back.
           const earlier = record("earlier", {
-            recipient: Notification.ofMember(Member.Id.make("earlier-member"), humanIdentity)
+            recipient: Notification.ofMember(MemberId.MemberId.make("earlier-member"), humanIdentity)
           })
           const foreign = record("a", {
             workspaceId: otherWorkspaceId,
@@ -690,7 +695,7 @@ describe("notifications", () => {
           )
           expect(yield* gateway.asMember(workspaceId, agentIdentity, list)).toEqual(inboxOf(forAgent))
           expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual(inboxOf(foreign))
-          for (const id of [forAgent.id, forAnother.id, earlier.id, Notification.Id.make("missing")]) {
+          for (const id of [forAgent.id, forAnother.id, earlier.id, Notification.NotificationId.make("missing")]) {
             const markSeen = Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
               notificationService.markSeen(id)
             )
@@ -766,13 +771,13 @@ describe("notifications", () => {
         Effect.gen(function* () {
           const bound = yield* boundTo(workspaceId)
           yield* initialized(bound)
-          const participationId = ThreadParticipation.Id.make("ended")
+          const participationId = ThreadParticipationId.ThreadParticipationId.make("ended")
           const input = record("agent-input", { recipient: agent, participationId })
           const kept = [
             record("human-input", { recipient: human, participationId }),
             record("other-participation", {
               recipient: agent,
-              participationId: ThreadParticipation.Id.make("other")
+              participationId: ThreadParticipationId.ThreadParticipationId.make("other")
             }),
             record("unrelated", { recipient: agent })
           ]
@@ -807,8 +812,8 @@ describe("notifications", () => {
             yield* initialized(bound)
             const from = (groupId: string, sequence: number) => ({
               thread: {
-                threadId: Thread.Id.make(`thread-${groupId}`),
-                groupId: Group.Id.make(groupId),
+                threadId: ThreadId.ThreadId.make(`thread-${groupId}`),
+                groupId: GroupId.GroupId.make(groupId),
                 sequence
               }
             })
@@ -825,7 +830,10 @@ describe("notifications", () => {
             yield* bound.notifications.markSeen([seen.id], recordedAt)
             const before = yield* bound.notifications.get(seen.id)
             const leave = bound.store.transaction(
-              bound.notifications.discardPendingForGroup(Member.Id.make("recipient-member"), Group.Id.make("left"))
+              bound.notifications.discardPendingForGroup(
+                MemberId.MemberId.make("recipient-member"),
+                GroupId.GroupId.make("left")
+              )
             )
             yield* leave
             for (const note of settled)
@@ -845,7 +853,10 @@ describe("notifications", () => {
             expect(yield* bound.notifications.countPendingByRecipient(human)).toBe(2)
             // An agent's departure ends its participation there, and with it its pending input.
             yield* bound.store.transaction(
-              bound.notifications.discardPendingForGroup(Member.Id.make("agent-member"), Group.Id.make("left"))
+              bound.notifications.discardPendingForGroup(
+                MemberId.MemberId.make("agent-member"),
+                GroupId.GroupId.make("left")
+              )
             )
             const [agentThere, agentElsewhere] = kept.filter((note) =>
               Notification.Recipient.isAnyOf(["Agent"])(note.recipient)
@@ -890,7 +901,7 @@ describe("notifications", () => {
                 groups.createTeam({ name, memberIds: [workspace.ownerMemberId, member.id] })
               )
             )
-          const mention = (groupId: Group.Id) =>
+          const mention = (groupId: GroupId.GroupId) =>
             asAlice(
               ThreadService.ThreadService.use((threads) =>
                 threads.startInGroup({ groupId, text: "Bob?", mentions: [member.id] })
@@ -920,7 +931,7 @@ describe("notifications", () => {
               Effect.map(notifications.inbox(page), (items) => items.map((item) => item.notification))
             )
           )
-          const settledIn = (groupId: Group.Id) =>
+          const settledIn = (groupId: GroupId.GroupId) =>
             all.filter((note) => note.thread?.groupId === groupId).map((note) => note.state)
           expect(settledIn(left.id)).toEqual([
             { _tag: "Discarded", reason: "access-lost" },
@@ -955,7 +966,7 @@ describe("notifications", () => {
             })
             return yield* acceptInvitation(workspace.id, bob.id, invitation.details.id)
           })
-          const mention = (groupId: Group.Id, memberId: Member.Id) =>
+          const mention = (groupId: GroupId.GroupId, memberId: MemberId.MemberId) =>
             asAlice(
               ThreadService.ThreadService.use((threads) =>
                 threads.startInGroup({ groupId, text: "Bob?", mentions: [memberId] })

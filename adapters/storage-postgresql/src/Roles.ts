@@ -38,7 +38,7 @@ export const make = Effect.gen(function* () {
   /** Apply an edit to one role, reporting a conflict when it does not exist. */
   const edit = Effect.fn("Roles.edit")(function* (
     operation: string,
-    id: Role.Id,
+    id: Role.RoleId,
     change: Partial<typeof roles.$inferInsert>
   ) {
     const rows = yield* guard(

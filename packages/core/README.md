@@ -729,15 +729,16 @@ module's name, as Effect's `Entity.Entity` does: the complete record with its id
 Ordinary records use `Schema.Struct` and a same-name interface; unions and scalar schemas use a
 same-name type. Typed errors keep tagged error schemas.
 
-| Name                 | Meaning and examples                                                                                                                                            |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Reference`          | Enough to identify an entity or target: `Identity.Reference`, `Target.Reference`.                                                                               |
-| `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.                                                                             |
-| `<Operation>Input`   | Data supplied to one operation: `Invitation.IssueInput`, `Store.AppendInput`.                                                                                   |
-| `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`.                                                                                                       |
-| `State`              | A lifecycle variant with data: `Invitation.State`.                                                                                                              |
-| `Status`             | A simple lifecycle label: `Member.Status`.                                                                                                                      |
-| `Foo["Service"]`     | The shape of a context service, read off its class, which is named after its module: `MemberStore.MemberStore["Service"]` is what a storage adapter implements. |
+| Name                 | Meaning and examples                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<Entity>Id`         | The identity of an entity, named for it wherever it is declared: `ThreadId.ThreadId`, in a leaf module that others import without the record, or `Notification.NotificationId` beside its record. |
+| `Reference`          | Enough to identify an entity or target: `Identity.Reference`, `Target.Reference`.                                                                                                                 |
+| `Definition`         | A declaration: `Permission.Definition`, `Fact.Definition`, `Projection.Definition`.                                                                                                               |
+| `<Operation>Input`   | Data supplied to one operation: `Invitation.IssueInput`, `Store.AppendInput`.                                                                                                                     |
+| `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`.                                                                                                                                         |
+| `State`              | A lifecycle variant with data: `Invitation.State`.                                                                                                                                                |
+| `Status`             | A simple lifecycle label: `Member.Status`.                                                                                                                                                        |
+| `Foo["Service"]`     | The shape of a context service, read off its class, which is named after its module: `MemberStore.MemberStore["Service"]` is what a storage adapter implements.                                   |
 
 Inline payload structs can stay inside their fact declarations; read their types through
 `Fact.Payload<typeof MemberFacts.Added>`. Schemas used as public HTTP models carry stable
@@ -754,8 +755,9 @@ current database baseline, with no upgrade migrations, backfills, or legacy deco
 
 Core follows the [shared construction conventions](../README.md), which are Effect's: every service
 implementation exports `make`, which constructs it, and `layer`, which provides it by delegating to
-`make`. Core's constructors use `Effect.fn("Module.make")`, acquire their state and dependencies
-inside the Effect, so evaluating one twice builds two implementations, and return `Service.of(...)`.
+`make`. A constructor is an `Effect.gen` value, or `Effect.fnUntraced` when it takes arguments, as
+Effect's are; it acquires its state and dependencies inside the Effect, so evaluating one twice
+builds two implementations, and returns `Service.of(...)`.
 Actor identity and the active transaction are resolved during each operation, never at construction.
 Contracts implemented elsewhere, such as stores, `SignalHub.SignalHub`, `Actor.Actor`,
 `Publication.Publication`, and `Store.Transaction`, have no `layer` here: a store contract's `make`

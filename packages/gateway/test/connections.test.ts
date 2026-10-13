@@ -1,10 +1,10 @@
-import { Integration } from "@amends-dev/connection"
-import { Connection, ConnectionService } from "@amends-dev/core/connection"
+import { Integration, Connection as ConnectionContract } from "@amends-dev/connection"
+import { type Connection, ConnectionService } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
 import { Actor, type Identity } from "@amends-dev/core/identity"
 import { Journal, StoreError } from "@amends-dev/core/journal"
 import { Request } from "@amends-dev/core/request"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Redacted, Schema } from "effect"
@@ -25,7 +25,7 @@ import {
 } from "./support.ts"
 
 const as = <A, E>(
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
   use: (connectionService: ConnectionService.ConnectionService["Service"]) => Effect.Effect<A, E, Actor.Actor>
 ) =>
@@ -80,7 +80,7 @@ type Operation = (
 ) => Effect.Effect<unknown, unknown, Actor.Actor>
 
 /** The key stored for a connection, as it is. */
-const keyOf = (bound: Support.Bound, connectionId: Connection.Id) =>
+const keyOf = (bound: Support.Bound, connectionId: ConnectionContract.ConnectionId) =>
   Effect.map(bound.connectionCredentials.get(connectionId), (credential) =>
     Option.map(credential, ({ apiKey }) => Redacted.value(apiKey))
   )
@@ -216,12 +216,12 @@ describe("connections", () => {
           const workspace = yield* workspaceWithMember
           const offering = yield* as(workspace.id, alice, (connectionService) => connectionService.create(models))
           const offeringNone = yield* as(workspace.id, alice, (connectionService) => connectionService.create(tools))
-          const modelsOf = (connectionId: Connection.Id) =>
+          const modelsOf = (connectionId: ConnectionContract.ConnectionId) =>
             as(workspace.id, bob, (connectionService) => connectionService.models(connectionId))
 
           expect(yield* modelsOf(offering.id)).toEqual({ listed: [testModel], unlisted: true })
           expect(yield* modelsOf(offeringNone.id)).toEqual({ listed: [], unlisted: false })
-          const missing = Connection.Id.make("missing")
+          const missing = ConnectionContract.ConnectionId.make("missing")
           expect(yield* Effect.flip(modelsOf(missing))).toEqual(
             new CoreError.NotFound({ resource: "Connection", id: missing })
           )
@@ -243,7 +243,7 @@ describe("connections", () => {
           const bound = yield* boundTo(workspace.id)
           const keyed = yield* as(workspace.id, alice, (connectionService) => connectionService.create(models))
           const keyless = yield* as(workspace.id, alice, (connectionService) => connectionService.create(tools))
-          const check = (connectionId: Connection.Id) =>
+          const check = (connectionId: ConnectionContract.ConnectionId) =>
             as(workspace.id, alice, (connectionService) => connectionService.check(connectionId))
           expect(yield* check(keyed.id)).toEqual({ status: "healthy" })
           expect(yield* check(keyless.id)).toEqual({ status: "healthy" })

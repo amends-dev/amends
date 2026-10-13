@@ -1,7 +1,7 @@
 import { Identity } from "@amends-dev/core/identity"
 import { Entry, Store } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
-import { Member, MemberStore, type Workspace } from "@amends-dev/core/workspace"
+import { Member, MemberStore, type WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { SessionTokens } from "@amends-dev/gateway"
 import { PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
@@ -56,13 +56,13 @@ const server = (url: string) => {
   )
 }
 const record = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   id: string,
   recipient: Notification.Recipient
 ): Notification.Notification => ({
-  id: Notification.Id.make(id),
+  id: Notification.NotificationId.make(id),
   workspaceId,
-  source: { logId: Entry.LogId.make("fixture"), entryId: Entry.Id.make(id) },
+  source: { logId: Entry.LogId.make("fixture"), entryId: Entry.EntryId.make(id) },
   recipient,
   recordedAt: DateTime.makeUnsafe("2026-09-19T12:00:00.123Z"),
   state: { _tag: "Pending" }
@@ -88,8 +88,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         expect(yield* humanClient.notifications.inbox({ query: { limit: 10 } })).toEqual([])
         // Inboxes belong to memberships: the creator's in each workspace, and the seeded members'.
         const owner = Notification.ofMember(workspace.ownerMemberId, alice)
-        const bobMemberId = Member.Id.make("bob-member")
-        const agentMemberId = Member.Id.make("agent-member")
+        const bobMemberId = MemberId.MemberId.make("bob-member")
+        const agentMemberId = MemberId.MemberId.make("agent-member")
         const first = record(workspace.id, "a + & é", owner)
         const second = record(workspace.id, "pending", owner)
         const forBob = record(workspace.id, "bob", Notification.ofMember(bobMemberId, bob))
@@ -145,7 +145,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
             query: { limit: 10 }
           })
         ).toEqual([{ notification: foreign }])
-        for (const notificationId of [forBob.id, forAgent.id, foreign.id, Notification.Id.make("missing")]) {
+        for (const notificationId of [
+          forBob.id,
+          forAgent.id,
+          foreign.id,
+          Notification.NotificationId.make("missing")
+        ]) {
           const response = yield* humanClient.notifications.markSeen({
             params: { notificationId },
             responseMode: "response-only"

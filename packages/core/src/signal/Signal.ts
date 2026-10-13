@@ -32,10 +32,10 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 export const Signal = Schema.TaggedUnion({
   /** A member is composing a message in a thread; readers show it until `until`. */
   Typing: {
-    workspaceId: WorkspaceId.Id,
-    groupId: GroupId.Id,
-    threadId: ThreadId.Id,
-    memberId: MemberId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
+    groupId: GroupId.GroupId,
+    threadId: ThreadId.ThreadId,
+    memberId: MemberId.MemberId,
     until: Schema.DateTimeUtcFromString
   },
   /**
@@ -43,23 +43,23 @@ export const Signal = Schema.TaggedUnion({
    * thread at or before it are now seen, as each notification carries its thread and sequence.
    */
   ThreadRead: {
-    workspaceId: WorkspaceId.Id,
-    memberId: MemberId.Id,
-    threadId: ThreadId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
+    memberId: MemberId.MemberId,
+    threadId: ThreadId.ThreadId,
     readThrough: Schema.Int.check(Schema.isGreaterThan(0))
   },
   /** A member read a group: for their sessions. */
   GroupRead: {
-    workspaceId: WorkspaceId.Id,
-    memberId: MemberId.Id,
-    groupId: GroupId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
+    memberId: MemberId.MemberId,
+    groupId: GroupId.GroupId,
     readAt: Schema.DateTimeUtcFromString
   },
   /** A member saw notifications: for their sessions. */
   NotificationsSeen: {
-    workspaceId: WorkspaceId.Id,
-    memberId: MemberId.Id,
-    notificationIds: Schema.NonEmptyArray(Notification.Id)
+    workspaceId: WorkspaceId.WorkspaceId,
+    memberId: MemberId.MemberId,
+    notificationIds: Schema.NonEmptyArray(Notification.NotificationId)
   },
   /**
    * More of a response an agent's turn is writing, before it completes: `text` continues the
@@ -68,10 +68,10 @@ export const Signal = Schema.TaggedUnion({
    * start, or for the completed response in the turn's log, which replaces the draft.
    */
   TurnDraft: {
-    workspaceId: WorkspaceId.Id,
-    groupId: GroupId.Id,
-    threadId: ThreadId.Id,
-    turnId: TurnId.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
+    groupId: GroupId.GroupId,
+    threadId: ThreadId.ThreadId,
+    turnId: TurnId.TurnId,
     draft: Turn.Draft
   }
 }).annotate({ identifier: "Signal" })
@@ -94,9 +94,9 @@ export interface Reach {
 
 /** Readers of a thread: its group's audience, who may read the thread. */
 const threadReaders = (signal: {
-  readonly workspaceId: WorkspaceId.Id
-  readonly groupId: GroupId.Id
-  readonly threadId: ThreadId.Id
+  readonly workspaceId: WorkspaceId.WorkspaceId
+  readonly groupId: GroupId.GroupId
+  readonly threadId: ThreadId.ThreadId
 }): Reach => ({
   audience: [Group.audienceOf(signal.groupId)],
   requirement: Requirement.make(

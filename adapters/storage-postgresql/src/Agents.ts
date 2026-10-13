@@ -12,6 +12,7 @@
  */
 
 import { Agent, AgentStore } from "@amends-dev/core/agent"
+import type { Identity } from "@amends-dev/core/identity"
 import { StoreError } from "@amends-dev/core/journal"
 import { and, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
@@ -73,7 +74,7 @@ const toRow = (record: Agent.Agent): typeof agents.$inferInsert => ({
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
   const { db } = database
-  const inWorkspace = (id: Agent.Id) => and(eq(agents.workspaceId, workspaceId), eq(agents.id, id))
+  const inWorkspace = (id: Identity.AgentId) => and(eq(agents.workspaceId, workspaceId), eq(agents.id, id))
   const driver: AgentStore.AgentStore["Service"] = {
     get: Effect.fn("Agents.get")(
       function* (id) {

@@ -1,5 +1,6 @@
-import { ThreadParticipation } from "@amends-dev/core/thread"
-import { type SessionLog, Turn } from "@amends-dev/core/turn"
+import { ThreadParticipationId } from "@amends-dev/core/thread"
+import type { SessionLog } from "@amends-dev/core/turn"
+import { TurnId } from "@amends-dev/core/turn"
 import { describe, expect, it } from "@effect/vitest"
 import * as Prompt from "effect/ai/Prompt"
 import * as Effect from "effect/Effect"
@@ -8,8 +9,8 @@ import * as Result from "effect/Result"
 import type * as Fixture from "../Fixture.ts"
 import * as Support from "../Support.ts"
 
-const participation = ThreadParticipation.Id.make("participation-1")
-const turnId = Turn.Id.make("turn-1")
+const participation = ThreadParticipationId.ThreadParticipationId.make("participation-1")
+const turnId = TurnId.TurnId.make("turn-1")
 const usage = { inputTokens: { total: 10 }, outputTokens: { total: 5 } }
 
 const joined: SessionLog.Entry = {
@@ -135,11 +136,11 @@ export const sessionLogs = (fixture: Fixture.Fixture) => {
           const host = yield* storage.connect()
           const here = yield* Support.forWorkspace(host, Support.workspaceId)
           const there = yield* Support.forWorkspace(host, Support.otherWorkspaceId)
-          const another = ThreadParticipation.Id.make("participation-2")
+          const another = ThreadParticipationId.ThreadParticipationId.make("participation-2")
           yield* here.sessionLogs.append(participation, [prompted, step], 0)
           yield* here.sessionLogs.append(another, [joined], 0)
           yield* there.sessionLogs.append(participation, [interrupted], 0)
-          const entriesOf = (bound: typeof here, id: ThreadParticipation.Id) =>
+          const entriesOf = (bound: typeof here, id: ThreadParticipationId.ThreadParticipationId) =>
             Effect.map(bound.sessionLogs.read(id, { after: 0, limit: 10 }), (recorded) =>
               recorded.map(({ entry }) => entry._tag)
             )

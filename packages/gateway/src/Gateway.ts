@@ -19,9 +19,10 @@ import type { TurnJobs } from "@amends-dev/core/turn"
 import {
   type Member,
   MemberStore,
-  Workspace,
+  type Workspace,
   WorkspaceInitialization,
-  WorkspaceStore
+  WorkspaceStore,
+  WorkspaceId
 } from "@amends-dev/core/workspace"
 import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
@@ -63,7 +64,7 @@ export class Gateway extends Context.Service<
      * inside their transaction.
      */
     readonly asMember: <A, E, R extends Core.Operations | Actor.Actor | Scope.Scope>(
-      workspaceId: Workspace.Id,
+      workspaceId: WorkspaceId.WorkspaceId,
       identity: Identity.MemberReference,
       program: Effect.Effect<A, E, R>
     ) => Effect.Effect<A, E | CoreError.Denied, Scope.Scope>
@@ -75,7 +76,7 @@ export class Gateway extends Context.Service<
      * created returns `CoreError.NotFound` for the workspace without being prepared.
      */
     readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
-      workspaceId: Workspace.Id,
+      workspaceId: WorkspaceId.WorkspaceId,
       program: Effect.Effect<A, E, R>
     ) => Effect.Effect<A, E | CoreError.NotFound, Scope.Scope>
   }
@@ -131,7 +132,7 @@ export const make = Effect.fnUntraced(function* (
    * When another host changed the live projection versions, prepare the workspace again, which
    * replays it, for the next request; the failed one did not commit.
    */
-  const reloadWhenStale = <A, E, R>(workspaceId: Workspace.Id, effect: Effect.Effect<A, E, R>) =>
+  const reloadWhenStale = <A, E, R>(workspaceId: WorkspaceId.WorkspaceId, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(Effect.tapCause((cause) => (isStaleCause(cause) ? runtimes.invalidate(workspaceId) : Effect.void)))
   const workspaceStorage = yield* WorkspaceStorage.WorkspaceStorage
   // Admission reads storage as the host, never inside a request's actor or transaction.
@@ -143,7 +144,7 @@ export const make = Effect.fnUntraced(function* (
    * The runtime stays prepared until the caller's scope closes.
    */
   const runInWorkspace = Effect.fn("Gateway.runInWorkspace")(function* <A, E>(
-    workspaceId: Workspace.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     program: Effect.Effect<A, E, WorkspaceRuntime.Services | Scope.Scope>
   ) {
     const context = yield* runtimes.lease(workspaceId)
@@ -152,7 +153,7 @@ export const make = Effect.fnUntraced(function* (
 
   /** The admission check's reads, from a view of the workspace's stores. */
   const findMembershipInStorage = Effect.fnUntraced(function* (
-    workspaceId: Workspace.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     identity: Identity.MemberReference
   ) {
     const bindings = yield* workspaceStorage.forWorkspace(workspaceId)
@@ -173,14 +174,14 @@ export const make = Effect.fnUntraced(function* (
    * restores.
    */
   const checkAdmission = Effect.fn("Gateway.checkAdmission")(function* (
-    workspaceId: Workspace.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     identity: Identity.MemberReference
   ) {
     if (yield* runtimes.isPrepared(workspaceId)) return Admission.Prepare()
     return yield* findMembershipInStorage(workspaceId, identity).pipe(Effect.setContext(hostContext))
   })
   /** Whether the workspace has history, read as the host. */
-  const hasHistory = (workspaceId: Workspace.Id) =>
+  const hasHistory = (workspaceId: WorkspaceId.WorkspaceId) =>
     workspaceStorage.forWorkspace(workspaceId).pipe(
       Effect.flatMap((bindings) => Context.get(bindings, Store.Store).head(Core.journalLog)),
       Effect.map(Option.isSome),
@@ -188,13 +189,13 @@ export const make = Effect.fnUntraced(function* (
       Effect.setContext(hostContext)
     )
   /** A workspace that was never created has no history, and is refused before it is prepared. */
-  const requireCreated = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
+  const requireCreated = Effect.fnUntraced(function* (workspaceId: WorkspaceId.WorkspaceId) {
     if (!(yield* runtimes.isPrepared(workspaceId)) && !(yield* hasHistory(workspaceId)))
       return yield* new CoreError.NotFound({ resource: "Workspace", id: workspaceId })
   })
 
   const withActor = Effect.fn("Gateway.withActor")(function* <A, E, R>(
-    workspaceId: Workspace.Id,
+    workspaceId: WorkspaceId.WorkspaceId,
     identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
     admittedMember: Option.Option<Member.Member>
@@ -215,7 +216,7 @@ export const make = Effect.fnUntraced(function* (
    */
   const workspaceIdForKey = (creator: Identity.HumanId, key: Request.Key) =>
     Request.derivedId(["workspace.create", creator, key]).pipe(
-      Effect.map((id) => Workspace.Id.make(id)),
+      Effect.map((id) => WorkspaceId.WorkspaceId.make(id)),
       Effect.provideService(Crypto.Crypto, crypto),
       Effect.orDie
     )
@@ -227,7 +228,7 @@ export const make = Effect.fnUntraced(function* (
     const key = options.requestKey
     const id =
       key === undefined
-        ? Workspace.Id.make(yield* Effect.orDie(crypto.randomUUIDv4))
+        ? WorkspaceId.WorkspaceId.make(yield* Effect.orDie(crypto.randomUUIDv4))
         : yield* workspaceIdForKey(creator, key)
     if (key !== undefined) {
       // A completed first attempt answers its retry without preparing the workspace.
@@ -260,7 +261,7 @@ export const make = Effect.fnUntraced(function* (
     A,
     E,
     R extends Core.Operations | Actor.Actor | Scope.Scope
-  >(workspaceId: Workspace.Id, identity: Identity.MemberReference, program: Effect.Effect<A, E, R>) {
+  >(workspaceId: WorkspaceId.WorkspaceId, identity: Identity.MemberReference, program: Effect.Effect<A, E, R>) {
     const operation: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope> = program
     const admission = yield* checkAdmission(workspaceId, identity)
     if (Admission.$is("Refused")(admission))
@@ -275,7 +276,7 @@ export const make = Effect.fnUntraced(function* (
     A,
     E,
     R extends Core.Operations | Core.JobServices | Scope.Scope
-  >(workspaceId: Workspace.Id, program: Effect.Effect<A, E, R>) {
+  >(workspaceId: WorkspaceId.WorkspaceId, program: Effect.Effect<A, E, R>) {
     const operation: Effect.Effect<A, E, Core.Operations | Core.JobServices | Scope.Scope> = program
     yield* requireCreated(workspaceId)
     return yield* runInWorkspace(workspaceId, reloadWhenStale(workspaceId, operation))

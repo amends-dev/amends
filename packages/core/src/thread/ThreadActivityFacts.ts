@@ -27,7 +27,7 @@ export const Recorded = Fact.make("thread.activity.recorded", {
   occurrence: (payload) => [payload.activity.id],
   audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Schema.Struct({
-    groupId: GroupId.Id,
+    groupId: GroupId.GroupId,
     activity: ThreadActivity.ThreadActivity,
     recipients: Schema.Array(ThreadActivity.Recipient).check(
       Schema.makeFilter(

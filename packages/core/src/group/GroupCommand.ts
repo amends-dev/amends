@@ -26,10 +26,11 @@ import type * as Projection from "../journal/Projection.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
 import type * as StoreError from "../journal/StoreError.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as Group from "./Group.ts"
 import * as GroupFacts from "./GroupFacts.ts"
+import * as GroupId from "./GroupId.ts"
 import * as GroupMembership from "./GroupMembership.ts"
 import * as GroupMembershipFacts from "./GroupMembershipFacts.ts"
 import * as GroupStore from "./GroupStore.ts"
@@ -100,8 +101,8 @@ export class GroupCommand extends Context.Service<
      * and not already admitted, and owns authorization.
      */
     readonly admitMember: (
-      groupId: Group.Id,
-      memberId: Member.Id,
+      groupId: GroupId.GroupId,
+      memberId: MemberId.MemberId,
       admittedAt: DateTime.Utc
     ) => Effect.Effect<Admitted, AdmitError, Store.Transaction | Publication.Publication>
     /**
@@ -119,8 +120,8 @@ export class GroupCommand extends Context.Service<
      * to create; a reused group keeps its fixed members. The caller owns authorization.
      */
     readonly establishDirect: (
-      memberIds: ReadonlyArray<Member.Id>,
-      createdBy: Member.Id,
+      memberIds: ReadonlyArray<MemberId.MemberId>,
+      createdBy: MemberId.MemberId,
       occurredAt: DateTime.Utc
     ) => Effect.Effect<Established, EstablishError, Store.Transaction | Publication.Publication>
   }
@@ -141,13 +142,13 @@ export const make = Effect.gen(function* () {
   const { workspaceId } = yield* Store.Store
 
   const admitMember = Effect.fn("GroupCommand.admitMember")(function* (
-    groupId: Group.Id,
-    memberId: Member.Id,
+    groupId: GroupId.GroupId,
+    memberId: MemberId.MemberId,
     admittedAt: DateTime.Utc
   ) {
     yield* Store.Transaction
     const membership = {
-      id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
+      id: GroupMembership.GroupMembershipId.make(yield* crypto.randomUUIDv4),
       workspaceId,
       groupId,
       memberId,
@@ -169,8 +170,8 @@ export const make = Effect.gen(function* () {
   })
 
   const establishDirect = Effect.fn("GroupCommand.establishDirect")(function* (
-    memberIds: ReadonlyArray<Member.Id>,
-    createdBy: Member.Id,
+    memberIds: ReadonlyArray<MemberId.MemberId>,
+    createdBy: MemberId.MemberId,
     occurredAt: DateTime.Utc
   ) {
     yield* Store.Transaction
@@ -186,7 +187,7 @@ export const make = Effect.gen(function* () {
           reason: new CoreError.ParticipantUnavailable({ memberId })
         })
     const group: Group.Direct = {
-      id: Group.Id.make(yield* crypto.randomUUIDv4),
+      id: GroupId.GroupId.make(yield* crypto.randomUUIDv4),
       workspaceId,
       kind: "Direct",
       memberIds: requested,

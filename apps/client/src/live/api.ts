@@ -1,7 +1,7 @@
 import { ChangeFeed } from "@amends-dev/core/change-feed"
 import { CoreError } from "@amends-dev/core/error"
 import { Signal } from "@amends-dev/core/signal"
-import { Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import * as Cause from "effect/Cause"
 import * as Clock from "effect/Clock"
@@ -306,7 +306,7 @@ const run = Effect.fnUntraced(function* (
     ...workspaceResources.map(key(workspaceId)),
     ...workspaceCollections.map((collection) => collectionKey(workspaceId, collection))
   ]
-  const id = Schema.decodeOption(Workspace.Id)(workspaceId)
+  const id = Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId)
   if (Option.isNone(id)) {
     Queue.offerUnsafe(states, ChangeFeedState.Ended({ reason: "unavailable" }))
     return

@@ -14,20 +14,6 @@ import * as MemberId from "./MemberId.ts"
 import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
- * Names a workspace; `WorkspaceId.Id`, where models that only refer to workspaces import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = WorkspaceId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = WorkspaceId.Id
-
-/**
  * A workspace's name as recorded: trimmed and not empty. Names chosen now are `NewName`.
  *
  * @category schemas
@@ -78,10 +64,10 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @since 0.1.0
  */
 export const Workspace = Schema.Struct({
-  id: Id,
+  id: WorkspaceId.WorkspaceId,
   name: Name,
   createdBy: Identity.HumanId,
-  ownerMemberId: MemberId.Id
+  ownerMemberId: MemberId.MemberId
 }).annotate({ identifier: "Workspace" })
 
 /**

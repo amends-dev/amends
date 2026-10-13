@@ -46,13 +46,14 @@ import * as ThreadCommand from "../thread/ThreadCommand.ts"
 import type * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessage from "../thread/ThreadMessage.ts"
 import * as ThreadMessageActivity from "../thread/ThreadMessageActivity.ts"
+import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as ThreadMessagePermissions from "../thread/ThreadMessagePermissions.ts"
 import * as ThreadMessageStore from "../thread/ThreadMessageStore.ts"
 import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
 import * as ThreadParticipationStore from "../thread/ThreadParticipationStore.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as ThreadStore from "../thread/ThreadStore.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as SessionLogStore from "./SessionLogStore.ts"
 import * as SessionStateStore from "./SessionStateStore.ts"
@@ -60,6 +61,7 @@ import * as Turn from "./Turn.ts"
 import * as TurnActivity from "./TurnActivity.ts"
 import * as TurnCommand from "./TurnCommand.ts"
 import * as TurnFacts from "./TurnFacts.ts"
+import * as TurnId from "./TurnId.ts"
 import * as TurnPrompt from "./TurnPrompt.ts"
 import * as TurnStore from "./TurnStore.ts"
 
@@ -172,7 +174,7 @@ export type Start = typeof Start.Type
  * @since 0.1.0
  */
 export const Closing = Schema.TaggedUnion({
-  Closed: { messageIds: Schema.Array(ThreadMessage.Id) },
+  Closed: { messageIds: Schema.Array(ThreadMessageId.ThreadMessageId) },
   Stopped: {},
   Failed: { reason: Schema.String }
 })
@@ -204,8 +206,8 @@ export class TurnExecution extends Context.Service<
      * person's notification waits in their inbox.
      */
     readonly accept: (
-      memberId: Member.Id,
-      threadId: ThreadId.Id
+      memberId: MemberId.MemberId,
+      threadId: ThreadId.ThreadId
     ) => Effect.Effect<Option.Option<Turn.Turn>, AcceptError>
     /**
      * Start the turn: one asked to stop, or whose participation ended, ends as it stands; one that
@@ -213,20 +215,20 @@ export class TurnExecution extends Context.Service<
      * nothing to tell the agent completes. Otherwise it is ready to run, and a queued turn starts.
      * A turn that is no longer active is `Idle`.
      */
-    readonly start: (turnId: Turn.Id) => Effect.Effect<Start, StartError>
+    readonly start: (turnId: TurnId.TurnId) => Effect.Effect<Start, StartError>
     /**
      * The conversation the turn's agent joined in the thread: the thread's messages before its
      * participation, which its session starts with when its session log is new.
      */
     readonly joinedConversation: (
-      turnId: Turn.Id
+      turnId: TurnId.TurnId
     ) => Effect.Effect<ReadonlyArray<Prompt.Message>, JoinedConversationError>
     /**
      * Show the turn's readers more of a step before it finishes, as a signal: nothing is recorded,
      * and a turn no longer running shows nothing. A reader who starts following midway sees the step
      * from the next draft that starts at its beginning.
      */
-    readonly showDraft: (turnId: Turn.Id, draft: Turn.Draft) => Effect.Effect<void, Error>
+    readonly showDraft: (turnId: TurnId.TurnId, draft: Turn.Draft) => Effect.Effect<void, Error>
     /**
      * Close a turn whose harness turn finished: post `reply`, the text of its last step, as the
      * agent's message to the thread's current participants, keep what its session resumes from, and
@@ -234,12 +236,12 @@ export class TurnExecution extends Context.Service<
      * session.
      */
     readonly close: (
-      turnId: Turn.Id,
+      turnId: TurnId.TurnId,
       closing: { readonly reply: string; readonly resume: SessionStateStore.Resume }
     ) => Effect.Effect<Closing, CloseError>
     /** The turn could not go on, for `reason`; a session it started is kept as it was left. */
     readonly fail: (
-      turnId: Turn.Id,
+      turnId: TurnId.TurnId,
       failure: { readonly reason: string; readonly resume?: SessionStateStore.Resume | undefined }
     ) => Effect.Effect<void, Error>
     /**
@@ -247,7 +249,7 @@ export class TurnExecution extends Context.Service<
      * asked to stop, or whose participation ended. Any other turn is left as it is.
      */
     readonly confirmStopped: (
-      turnId: Turn.Id,
+      turnId: TurnId.TurnId,
       stopped: { readonly resume?: SessionStateStore.Resume | undefined }
     ) => Effect.Effect<void, Error>
   }
@@ -285,14 +287,18 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
 
-  const requireTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
+  const requireTurn = Effect.fnUntraced(function* (turnId: TurnId.TurnId) {
     const found = yield* turnStore.get(turnId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Turn", id: turnId })
     return found.value
   })
 
   /** `step`, attributed to the agent `identity` of membership `memberId`, which it runs as. */
-  const attributed = <A, E, R>(memberId: Member.Id, identity: Identity.MemberReference, step: Effect.Effect<A, E, R>) =>
+  const attributed = <A, E, R>(
+    memberId: MemberId.MemberId,
+    identity: Identity.MemberReference,
+    step: Effect.Effect<A, E, R>
+  ) =>
     Effect.flatMap(
       Publication.make(workspaceId, Performer.Reference.cases.Member.make({ memberId, identity })),
       (provenance) =>
@@ -302,10 +308,13 @@ export const make = Effect.gen(function* () {
         )
     )
   /** Run `step` in its own commit, as the agent `identity` of membership `memberId`. */
-  const asAgent = <A, E, R>(memberId: Member.Id, identity: Identity.MemberReference, step: Effect.Effect<A, E, R>) =>
-    attributed(memberId, identity, step).pipe(Effect.provideService(Crypto.Crypto, crypto), journal.commit)
+  const asAgent = <A, E, R>(
+    memberId: MemberId.MemberId,
+    identity: Identity.MemberReference,
+    step: Effect.Effect<A, E, R>
+  ) => attributed(memberId, identity, step).pipe(Effect.provideService(Crypto.Crypto, crypto), journal.commit)
   /** Run `step` with the turn as stored, in its own commit, as the turn's agent. */
-  const asTurnAgent = <A, E, R>(turnId: Turn.Id, step: (turn: Turn.Turn) => Effect.Effect<A, E, R>) =>
+  const asTurnAgent = <A, E, R>(turnId: TurnId.TurnId, step: (turn: Turn.Turn) => Effect.Effect<A, E, R>) =>
     Effect.flatMap(requireTurn(turnId), (turn) =>
       attributed(turn.memberId, Identity.MemberReference.cases.Agent.make({ id: turn.agentId }), step(turn))
     ).pipe(Effect.provideService(Crypto.Crypto, crypto), journal.commit)
@@ -341,7 +350,7 @@ export const make = Effect.gen(function* () {
 
   /** The thread's messages in a range of positions, oldest first, read a page at a time. */
   const readMessagesBetween = Effect.fnUntraced(function* (
-    threadId: ThreadId.Id,
+    threadId: ThreadId.ThreadId,
     range: { readonly after: number; readonly through: number }
   ) {
     if (range.through < 1 || range.after >= range.through) return []
@@ -378,7 +387,7 @@ export const make = Effect.gen(function* () {
    * "A member", and a contact no longer found "A contact".
    */
   const readNames = Effect.fnUntraced(function* (people: ReadonlyArray<ThreadMessage.Author>) {
-    const memberIds = new Set<Member.Id>()
+    const memberIds = new Set<MemberId.MemberId>()
     const contactIds = new Set<Identity.ContactId>()
     for (const person of people)
       if (ThreadMessage.Author.isAnyOf(["Member"])(person)) memberIds.add(person.memberId)
@@ -395,8 +404,8 @@ export const make = Effect.gen(function* () {
 
   /** The thread's messages in a range, as the agent `memberId` is told them. */
   const readInputs = Effect.fnUntraced(function* (
-    memberId: Member.Id,
-    threadId: ThreadId.Id,
+    memberId: MemberId.MemberId,
+    threadId: ThreadId.ThreadId,
     range: { readonly after: number; readonly through: number }
   ) {
     const messages = yield* readMessagesBetween(threadId, range)
@@ -447,7 +456,7 @@ export const make = Effect.gen(function* () {
   })
 
   /** The thread as it stands, for the agent: its title, and its task when it is one. */
-  const readContext = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
+  const readContext = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* threadStore.get(threadId)
     const task = yield* taskStore.get(threadId)
     return {
@@ -462,9 +471,9 @@ export const make = Effect.gen(function* () {
    * agent can no longer open the thread.
    */
   const acceptWork = Effect.fnUntraced(function* (
-    memberId: Member.Id,
+    memberId: MemberId.MemberId,
     identity: Extract<Identity.MemberReference, { readonly _tag: "Agent" }>,
-    threadId: ThreadId.Id
+    threadId: ThreadId.ThreadId
   ) {
     const pending = (yield* notificationStore.listPendingByThread(
       Notification.ofMember(memberId, identity),
@@ -494,7 +503,7 @@ export const make = Effect.gen(function* () {
     const notificationIds = accepted.map(({ id }) => id)
     if (!Array.isReadonlyArrayNonEmpty(notificationIds)) return undefined
     const created = Turn.queued({
-      id: Turn.Id.make(yield* crypto.randomUUIDv4),
+      id: TurnId.TurnId.make(yield* crypto.randomUUIDv4),
       workspaceId,
       groupId: thread.value.groupId,
       threadId,
@@ -745,7 +754,7 @@ export const make = Effect.gen(function* () {
         const text = Schema.decodeOption(ThreadMessage.Text)(reply)
         if (Option.isNone(text)) return yield* closeFailed(turn, "The agent's reply could not be posted.")
         const published = yield* threadCommand.publishMessage({
-          messageId: ThreadMessage.Id.make(yield* crypto.randomUUIDv4),
+          messageId: ThreadMessageId.ThreadMessageId.make(yield* crypto.randomUUIDv4),
           threadId: turn.threadId,
           author: ThreadMessage.Author.cases.Member.make({ memberId: turn.memberId }),
           text: text.value,

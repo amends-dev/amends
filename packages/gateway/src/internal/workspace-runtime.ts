@@ -12,7 +12,7 @@ import { BuiltinRoleUpgrade } from "@amends-dev/core/authorization"
 import { DeliveryJobs } from "@amends-dev/core/channel"
 import { Journal } from "@amends-dev/core/journal"
 import { TurnJobs } from "@amends-dev/core/turn"
-import { Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import * as Duration from "effect/Duration"
@@ -57,14 +57,14 @@ export interface Interface {
    * Lease the workspace's prepared runtime for the caller's scope, preparing it first if need be;
    * it stays prepared while any lease is open.
    */
-  readonly lease: (workspaceId: Workspace.Id) => Effect.Effect<Context.Context<Services>, never, Scope.Scope>
+  readonly lease: (workspaceId: WorkspaceId.WorkspaceId) => Effect.Effect<Context.Context<Services>, never, Scope.Scope>
   /** Whether the workspace is prepared or being prepared, so a lease on it would not prepare it. */
-  readonly isPrepared: (workspaceId: Workspace.Id) => Effect.Effect<boolean>
+  readonly isPrepared: (workspaceId: WorkspaceId.WorkspaceId) => Effect.Effect<boolean>
   /**
    * Stop sharing the workspace's prepared runtime: leases already open keep it until they close,
    * and the next lease prepares the workspace again from storage, replaying what it needs.
    */
-  readonly invalidate: (workspaceId: Workspace.Id) => Effect.Effect<void>
+  readonly invalidate: (workspaceId: WorkspaceId.WorkspaceId) => Effect.Effect<void>
 }
 
 /**
@@ -82,7 +82,9 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
   const hostContext = yield* Effect.context<never>()
   const integrations = yield* Integrations.make(options.integrations ?? [])
 
-  const prepareWorkspace = Effect.fn("WorkspaceRuntime.prepareWorkspace")(function* (workspaceId: Workspace.Id) {
+  const prepareWorkspace = Effect.fn("WorkspaceRuntime.prepareWorkspace")(function* (
+    workspaceId: WorkspaceId.WorkspaceId
+  ) {
     const bindings = yield* workspaceStorage.forWorkspace(workspaceId)
     const services = Core.layer.pipe(
       Layer.provideMerge(
@@ -118,8 +120,8 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
     return context
   })
 
-  const runtimes: LayerMap.LayerMap<Workspace.Id, Services> = yield* LayerMap.make(
-    (workspaceId: Workspace.Id) =>
+  const runtimes: LayerMap.LayerMap<WorkspaceId.WorkspaceId, Services> = yield* LayerMap.make(
+    (workspaceId: WorkspaceId.WorkspaceId) =>
       Layer.effectContext(
         Effect.gen(function* () {
           const scope = yield* Scope.fork(yield* Scope.Scope)
@@ -138,14 +140,14 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
     { idleTimeToLive: options.idleTimeToLive ?? Duration.minutes(5) }
   )
 
-  const lease = Effect.fn("WorkspaceRuntime.lease")(function* (workspaceId: Workspace.Id) {
-    const id = yield* Effect.orDie(Schema.decodeEffect(Workspace.Id)(workspaceId))
+  const lease = Effect.fn("WorkspaceRuntime.lease")(function* (workspaceId: WorkspaceId.WorkspaceId) {
+    const id = yield* Effect.orDie(Schema.decodeEffect(WorkspaceId.WorkspaceId)(workspaceId))
     return yield* runtimes.contextEffect(id)
   })
 
-  const isPrepared = (workspaceId: Workspace.Id) => RcMap.has(runtimes.rcMap, workspaceId)
+  const isPrepared = (workspaceId: WorkspaceId.WorkspaceId) => RcMap.has(runtimes.rcMap, workspaceId)
 
-  const invalidate = (workspaceId: Workspace.Id) => runtimes.invalidate(workspaceId)
+  const invalidate = (workspaceId: WorkspaceId.WorkspaceId) => runtimes.invalidate(workspaceId)
 
   return { lease, isPrepared, invalidate } satisfies Interface
 })

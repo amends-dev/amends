@@ -1,12 +1,12 @@
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
 import { CoreError } from "@amends-dev/core/error"
-import { Group, GroupService } from "@amends-dev/core/group"
+import { GroupService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { NotificationService } from "@amends-dev/core/notification"
 import { ReadStateService } from "@amends-dev/core/read-state"
 import { Signal, SignalHub } from "@amends-dev/core/signal"
-import { Thread, ThreadMessageService, ThreadService } from "@amends-dev/core/thread"
-import { Member } from "@amends-dev/core/workspace"
+import { ThreadMessageService, ThreadService, ThreadId } from "@amends-dev/core/thread"
+import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
@@ -21,7 +21,7 @@ import * as Support from "../Support.ts"
 const memberActor = (name: string) =>
   Actor.Actor.of({
     workspaceId: Support.workspaceId,
-    memberId: Member.Id.make(name),
+    memberId: MemberId.MemberId.make(name),
     identity: { _tag: "Human", id: Identity.HumanId.make(name) }
   })
 const reader = memberActor("reader")
@@ -57,11 +57,11 @@ const signalsOf = <E>(next: Effect.Effect<ChangeFeed.Message, E>) =>
       : Effect.die(new Error(`Expected a signal, got ${message._tag}`))
   )
 /** A marker only the member receives: their own read time for a group nobody reads. */
-const markerFor = (memberId: Member.Id) =>
+const markerFor = (memberId: MemberId.MemberId) =>
   Signal.Signal.cases.GroupRead.make({
     workspaceId: Support.workspaceId,
     memberId,
-    groupId: Group.Id.make("marker"),
+    groupId: GroupId.GroupId.make("marker"),
     readAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z")
   })
 /** A workspace's signal hub on a host, as storage binds it. */
@@ -146,7 +146,7 @@ export const signals = (fixture: Fixture.Fixture) => {
             Signal.Signal.cases.ThreadRead.make({
               workspaceId: Support.workspaceId,
               memberId: reader.memberId,
-              threadId: Thread.Id.make("thread"),
+              threadId: ThreadId.ThreadId.make("thread"),
               readThrough: n
             })
           const subscribe = (host: Context.Context<Fixture.Host>, id = Support.workspaceId) =>
@@ -162,7 +162,7 @@ export const signals = (fixture: Fixture.Fixture) => {
           const marker = Signal.Signal.cases.GroupRead.make({
             workspaceId: Support.otherWorkspaceId,
             memberId: reader.memberId,
-            groupId: Group.Id.make("marker"),
+            groupId: GroupId.GroupId.make("marker"),
             readAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z")
           })
           yield* (yield* hubOf(first, Support.otherWorkspaceId)).publish(marker)
@@ -228,9 +228,9 @@ export const signals = (fixture: Fixture.Fixture) => {
                 )
               )
             )
-          const notFound = (thread: Thread.Id) => new CoreError.NotFound({ resource: "Thread", id: thread })
+          const notFound = (thread: ThreadId.ThreadId) => new CoreError.NotFound({ resource: "Thread", id: thread })
           expect(yield* typing(outsider)).toEqual(notFound(threadId))
-          const missing = Thread.Id.make("missing")
+          const missing = ThreadId.ThreadId.make("missing")
           expect(yield* typing(reader, missing)).toEqual(notFound(missing))
           expect(yield* typing(unpermitted)).toMatchObject({
             _tag: "CoreError.Denied",

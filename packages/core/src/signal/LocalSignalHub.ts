@@ -27,7 +27,7 @@ const capacity = 256
  */
 export const make = Effect.gen(function* () {
   const workspaces = yield* RcMap.make({
-    lookup: (_workspaceId: WorkspaceId.Id) =>
+    lookup: (_workspaceId: WorkspaceId.WorkspaceId) =>
       Effect.acquireRelease(PubSub.sliding<Signal.Signal>(capacity), PubSub.shutdown)
   })
   /** Offer a signal to its workspace's subscribers in this process. */
@@ -38,7 +38,7 @@ export const make = Effect.gen(function* () {
       )
     )
   /** A workspace's signals published in this process after this registers, until the scope closes. */
-  const subscribe = (workspaceId: WorkspaceId.Id) =>
+  const subscribe = (workspaceId: WorkspaceId.WorkspaceId) =>
     Effect.flatMap(RcMap.get(workspaces, workspaceId), (pubsub) =>
       Effect.map(PubSub.subscribe(pubsub), Stream.fromSubscription)
     )

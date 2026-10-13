@@ -8,7 +8,8 @@ import {
   GroupMembershipFacts,
   GroupMembershipPermissions,
   GroupMembershipStore,
-  GroupPermissions
+  GroupPermissions,
+  GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal"
@@ -18,7 +19,8 @@ import {
   Member,
   MemberService,
   MemberFacts,
-  MemberPermissions
+  MemberPermissions,
+  MemberId
 } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
@@ -42,17 +44,17 @@ import {
 const { core, initialized, runGateway } = Support
 describe("group memberships", () => {
   const journalId = Entry.LogId.make("journal")
-  const managerId = Member.Id.make("manager")
-  const humanId = Member.Id.make("new-human")
-  const agentId = Member.Id.make("new-agent")
+  const managerId = MemberId.MemberId.make("manager")
+  const humanId = MemberId.MemberId.make("new-human")
+  const agentId = MemberId.MemberId.make("new-agent")
   const managerIdentity = Identity.MemberReference.cases.Human.make({
     id: Identity.HumanId.make("manager")
   })
-  const add = (groupId: Group.Id, memberId: Member.Id) =>
+  const add = (groupId: GroupId.GroupId, memberId: MemberId.MemberId) =>
     Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
       groupMembershipService.add({ groupId, memberId })
     )
-  const create = (name: string, memberIds: ReadonlyArray<Member.Id> = []) =>
+  const create = (name: string, memberIds: ReadonlyArray<MemberId.MemberId> = []) =>
     Effect.flatMap(GroupService.GroupService, (groupService) => groupService.createTeam({ name, memberIds }))
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], effect: Effect.Effect<A, E, R>) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
@@ -110,13 +112,13 @@ describe("group memberships", () => {
       manager: Actor.Actor.of({ workspaceId, memberId: managerId, identity: managerIdentity })
     }
   })
-  const grant = (bound: Bound, groupId: Group.Id) =>
+  const grant = (bound: Bound, groupId: GroupId.GroupId) =>
     publish(
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
-          assignmentId: Assignment.Id.make("group-management"),
+          assignmentId: Assignment.AssignmentId.make("group-management"),
           memberId: managerId,
           source: {
             _tag: "Direct",
@@ -143,9 +145,9 @@ describe("group memberships", () => {
         membershipId: membership.id
       })
     )
-  const removeWorkspaceMember = (id: Member.Id) =>
+  const removeWorkspaceMember = (id: MemberId.MemberId) =>
     Effect.flatMap(MemberService.MemberService, (memberService) => memberService.remove(id))
-  const memberActor = (memberId: Member.Id) =>
+  const memberActor = (memberId: MemberId.MemberId) =>
     Actor.Actor.of({
       workspaceId,
       memberId,
@@ -264,7 +266,7 @@ describe("group memberships", () => {
               Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
-                  assignmentId: Assignment.Id.make("creation-only"),
+                  assignmentId: Assignment.AssignmentId.make("creation-only"),
                   memberId: managerId,
                   source: {
                     _tag: "Direct",
@@ -283,7 +285,7 @@ describe("group memberships", () => {
               reason: { _tag: "NotGranted" }
             })
             expect(yield* history(bound)).toEqual(before)
-            const roleId = Role.Id.make("group-coordinator")
+            const roleId = Role.RoleId.make("group-coordinator")
             yield* publish(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>
@@ -297,7 +299,7 @@ describe("group memberships", () => {
                     })
                     yield* journal.publish(AssignmentFacts.Created, {
                       workspaceId,
-                      assignmentId: Assignment.Id.make("coordinator"),
+                      assignmentId: Assignment.AssignmentId.make("coordinator"),
                       memberId: managerId,
                       source: {
                         _tag: "Role",
@@ -371,9 +373,9 @@ describe("group memberships", () => {
             const membership = yield* run(bound, owner, add(group.id, humanId))
             const before = yield* history(bound)
             for (const [groupId, memberId, tag] of [
-              [Group.Id.make("missing"), humanId, "CoreError.NotFound"],
+              [GroupId.GroupId.make("missing"), humanId, "CoreError.NotFound"],
               [foreignGroup.id, humanId, "CoreError.NotFound"],
-              [group.id, Member.Id.make("missing"), "CoreError.NotFound"],
+              [group.id, MemberId.MemberId.make("missing"), "CoreError.NotFound"],
               [group.id, otherWorkspace.ownerMemberId, "CoreError.NotFound"],
               [group.id, agentId, "CoreError.Conflict"],
               [group.id, humanId, "CoreError.Conflict"]
@@ -400,7 +402,7 @@ describe("group memberships", () => {
             Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Created, {
                 workspaceId,
-                assignmentId: Assignment.Id.make("member-new-human"),
+                assignmentId: Assignment.AssignmentId.make("member-new-human"),
                 memberId: humanId,
                 source: {
                   _tag: "Role",
@@ -415,7 +417,7 @@ describe("group memberships", () => {
             Effect.flatMap(GroupService.GroupService, (groupService) =>
               groupService.createTeam({ name, memberIds: [humanId], visibility })
             )
-          const flags = (actor: Actor.Actor["Service"], groupId: Group.Id) =>
+          const flags = (actor: Actor.Actor["Service"], groupId: GroupId.GroupId) =>
             run(
               bound,
               actor,
@@ -480,7 +482,7 @@ describe("group memberships", () => {
             Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Created, {
                 workspaceId,
-                assignmentId: Assignment.Id.make("viewer-new-human"),
+                assignmentId: Assignment.AssignmentId.make("viewer-new-human"),
                 memberId: humanId,
                 source: {
                   _tag: "Role",
@@ -490,13 +492,13 @@ describe("group memberships", () => {
               })
             )
           )
-          const createPublic = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
+          const createPublic = (name: string, memberIds: ReadonlyArray<MemberId.MemberId>) =>
             Effect.flatMap(GroupService.GroupService, (groupService) =>
               groupService.createTeam({ name, memberIds, visibility: "Public" })
             )
           const listPublic = (options: Group.ListOptions) =>
             Effect.flatMap(GroupService.GroupService, (groupService) => groupService.listPublic(options))
-          const join = (groupId: Group.Id) =>
+          const join = (groupId: GroupId.GroupId) =>
             Effect.flatMap(GroupMembershipService.GroupMembershipService, (groupMembershipService) =>
               groupMembershipService.join(groupId)
             )
@@ -551,7 +553,7 @@ describe("group memberships", () => {
           })
           // Private, direct, and missing groups cannot be joined and say nothing of themselves.
           const direct = {
-            id: Group.Id.make("direct-pair"),
+            id: GroupId.GroupId.make("direct-pair"),
             workspaceId,
             kind: "Direct",
             memberIds: Group.directMembers([managerId, owner.memberId]),
@@ -559,7 +561,7 @@ describe("group memberships", () => {
             createdAt: group.createdAt
           } satisfies Group.Group
           yield* bound.store.transaction(bound.groups.insert(direct))
-          for (const id of [group.id, direct.id, Group.Id.make("missing")])
+          for (const id of [group.id, direct.id, GroupId.GroupId.make("missing")])
             expect(yield* Effect.flip(run(bound, human, join(id)))).toMatchObject({
               _tag: "CoreError.NotFound",
               resource: "Group",
@@ -632,7 +634,7 @@ describe("group memberships", () => {
                 Effect.gen(function* () {
                   yield* journal.publish(AssignmentFacts.Revoked, {
                     workspaceId,
-                    assignmentId: Assignment.Id.make("group-management"),
+                    assignmentId: Assignment.AssignmentId.make("group-management"),
                     memberId: managerId
                   })
                   return yield* add(group.id, humanId)
@@ -812,7 +814,8 @@ describe("group memberships", () => {
             id: workspace.createdBy
           })
           const group = yield* gateway.asMember(workspace.id, ownerIdentity, create("Managed", [managerId]))
-          const call = (memberId: Member.Id) => gateway.asMember(workspace.id, managerIdentity, add(group.id, memberId))
+          const call = (memberId: MemberId.MemberId) =>
+            gateway.asMember(workspace.id, managerIdentity, add(group.id, memberId))
           expect(yield* Effect.flip(call(humanId))).toMatchObject({
             _tag: "CoreError.Denied",
             reason: { _tag: "NotGranted" }
@@ -827,8 +830,8 @@ describe("group memberships", () => {
               })
             })
           )
-          expect(yield* Effect.flip(call(Member.Id.make("missing")))).toEqual(
-            new CoreError.NotFound({ resource: "Member", id: Member.Id.make("missing") })
+          expect(yield* Effect.flip(call(MemberId.MemberId.make("missing")))).toEqual(
+            new CoreError.NotFound({ resource: "Member", id: MemberId.MemberId.make("missing") })
           )
           yield* publish(
             bound,
@@ -844,7 +847,7 @@ describe("group memberships", () => {
               reason: new CoreError.InactiveMember({ memberId: agentId })
             })
           )
-          const missing = Group.Id.make("missing")
+          const missing = GroupId.GroupId.make("missing")
           expect(yield* Effect.flip(gateway.asMember(workspace.id, ownerIdentity, add(missing, humanId)))).toEqual(
             new CoreError.NotFound({ resource: "Group", id: missing })
           )
@@ -853,7 +856,7 @@ describe("group memberships", () => {
             Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Revoked, {
                 workspaceId: workspace.id,
-                assignmentId: Assignment.Id.make("group-management"),
+                assignmentId: Assignment.AssignmentId.make("group-management"),
                 memberId: managerId
               })
             )
@@ -1007,7 +1010,7 @@ describe("group memberships", () => {
         Effect.gen(function* () {
           const { bound, group, owner, manager } = yield* prepare()
           const membership = yield* run(bound, owner, add(group.id, humanId))
-          const roleId = Role.Id.make("coordinator")
+          const roleId = Role.RoleId.make("coordinator")
           yield* publish(
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
@@ -1021,7 +1024,7 @@ describe("group memberships", () => {
                   })
                   yield* journal.publish(AssignmentFacts.Created, {
                     workspaceId,
-                    assignmentId: Assignment.Id.make("coordinator"),
+                    assignmentId: Assignment.AssignmentId.make("coordinator"),
                     memberId: managerId,
                     source: { _tag: "Role", roleId, scope: { _tag: "Workspace", workspaceId } }
                   })
@@ -1112,7 +1115,7 @@ describe("group memberships", () => {
               reason: { _tag: "AlreadyEnded", resource: "GroupMembership" }
             })
             for (const input of [
-              { groupId: group.id, membershipId: GroupMembership.Id.make("missing") },
+              { groupId: group.id, membershipId: GroupMembership.GroupMembershipId.make("missing") },
               { groupId: otherGroup.id, membershipId: fresh.id },
               { groupId: group.id, membershipId: foreignAdmission.id }
             ]) {
@@ -1158,7 +1161,7 @@ describe("group memberships", () => {
             const untouched = Option.getOrThrow(yield* bound.groupMemberships.findActive(group.id, managerId))
             const issuedAt = yield* DateTime.now
             const invitation = {
-              id: Invitation.Id.make("pending-before-membership"),
+              id: Invitation.InvitationId.make("pending-before-membership"),
               workspaceId,
               inviterMemberId: owner.memberId,
               recipientId: Identity.HumanId.make("new-human"),
@@ -1339,7 +1342,7 @@ describe("group memberships", () => {
                     Effect.gen(function* () {
                       yield* journal.publish(AssignmentFacts.Revoked, {
                         workspaceId,
-                        assignmentId: Assignment.Id.make("group-management"),
+                        assignmentId: Assignment.AssignmentId.make("group-management"),
                         memberId: managerId
                       })
                       return yield* remove(admission)
@@ -1590,7 +1593,7 @@ describe("group memberships", () => {
             { ...removal, workspaceId: otherWorkspaceId },
             { ...removal, groupId: otherGroup.id },
             { ...removal, memberId: agentId },
-            { ...removal, membershipId: GroupMembership.Id.make("missing") }
+            { ...removal, membershipId: GroupMembership.GroupMembershipId.make("missing") }
           ]) {
             expect(
               yield* Effect.flip(bound.store.transaction(bound.groupMemberships.markRemoved(invalid)))
@@ -1685,13 +1688,13 @@ describe("group memberships", () => {
               gateway.asMember(
                 workspace.id,
                 ownerIdentity,
-                remove(Object.assign({}, admission, { id: GroupMembership.Id.make("missing") }))
+                remove(Object.assign({}, admission, { id: GroupMembership.GroupMembershipId.make("missing") }))
               )
             )
           ).toEqual(
             new CoreError.NotFound({
               resource: "GroupMembership",
-              id: GroupMembership.Id.make("missing")
+              id: GroupMembership.GroupMembershipId.make("missing")
             })
           )
           expect(yield* Effect.flip(gateway.asMember(workspace.id, ownerIdentity, remove(admission)))).toMatchObject({
@@ -1717,7 +1720,7 @@ describe("group memberships", () => {
               Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
-                  assignmentId: Assignment.Id.make("self-remove"),
+                  assignmentId: Assignment.AssignmentId.make("self-remove"),
                   memberId,
                   source: {
                     _tag: "Direct",
@@ -1735,7 +1738,7 @@ describe("group memberships", () => {
               Option.some(Object.assign({}, admission, { status: "removed" }))
             )
             expect(yield* bound.groupMemberships.listActiveByMember(memberId)).toEqual([])
-            const newMemberId = Member.Id.make(`${memberId}-readmitted`)
+            const newMemberId = MemberId.MemberId.make(`${memberId}-readmitted`)
             yield* publish(
               bound,
               Effect.flatMap(Journal.Journal, (journal) =>

@@ -37,21 +37,21 @@ export class TaskStore extends Context.Service<
   TaskStore,
   {
     /** The thread's task, if it has one. */
-    readonly get: (threadId: ThreadId.Id) => Effect.Effect<Option.Option<Task.Task>, StoreError.StoreError>
+    readonly get: (threadId: ThreadId.ThreadId) => Effect.Effect<Option.Option<Task.Task>, StoreError.StoreError>
     /**
      * Several threads' tasks in one read. Threads without one are omitted and each task appears
      * once; order is unspecified, so callers index results by thread. An empty request reads
      * nothing.
      */
     readonly getMany: (
-      threadIds: ReadonlyArray<ThreadId.Id>
+      threadIds: ReadonlyArray<ThreadId.ThreadId>
     ) => Effect.Effect<ReadonlyArray<Task.Task>, StoreError.StoreError>
     /**
      * A page of a group's tasks by creation, newest first, after the exclusive cursor, of one status
      * when the options name one.
      */
     readonly listByGroup: (
-      groupId: GroupId.Id,
+      groupId: GroupId.GroupId,
       options: Task.ListOptions
     ) => Effect.Effect<ReadonlyArray<Task.Task>, StoreError.StoreError>
     /** Reject a thread that has a task. */
@@ -61,7 +61,7 @@ export class TaskStore extends Context.Service<
      * the one the change replaces, is rejected.
      */
     readonly apply: (
-      threadId: ThreadId.Id,
+      threadId: ThreadId.ThreadId,
       change: Task.Change
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
@@ -74,22 +74,22 @@ export class TaskStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: TaskStore["Service"]): TaskStore["Service"] => {
+export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: TaskStore["Service"]): TaskStore["Service"] => {
   const read = StoreInput.read("TaskStore")
   const write = StoreInput.write("TaskStore", workspaceId)
   return {
-    get: (threadId) => Effect.flatMap(read("get", ThreadId.Id, threadId), driver.get),
-    getMany: (threadIds) => Effect.flatMap(read("getMany", Schema.Array(ThreadId.Id), threadIds), driver.getMany),
+    get: (threadId) => Effect.flatMap(read("get", ThreadId.ThreadId, threadId), driver.get),
+    getMany: (threadIds) => Effect.flatMap(read("getMany", Schema.Array(ThreadId.ThreadId), threadIds), driver.getMany),
     listByGroup: Effect.fn("TaskStore.listByGroup")(function* (groupId, options) {
       return yield* driver.listByGroup(
-        yield* read("listByGroup", GroupId.Id, groupId),
+        yield* read("listByGroup", GroupId.GroupId, groupId),
         yield* read("listByGroup", Task.ListOptions, options)
       )
     }),
     insert: (record) => Effect.flatMap(write("insert", Task.Task, record), driver.insert),
     apply: Effect.fn("TaskStore.apply")(function* (threadId, change) {
       return yield* driver.apply(
-        yield* write("apply", ThreadId.Id, threadId),
+        yield* write("apply", ThreadId.ThreadId, threadId),
         yield* write("apply", Task.Change, change)
       )
     })

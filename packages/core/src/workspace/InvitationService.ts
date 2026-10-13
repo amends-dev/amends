@@ -78,7 +78,7 @@ export class InvitationService extends Context.Service<
      * returns the member it made, even one removed since, and grants nothing.
      */
     readonly accept: (
-      id: Invitation.Id,
+      id: Invitation.InvitationId,
       recipient: Identity.HumanId,
       name: Member.Name
     ) => Effect.Effect<Member.Member, Error>
@@ -87,7 +87,7 @@ export class InvitationService extends Context.Service<
      * Revoking again returns it unchanged; an accepted invitation is `Unavailable`, since removal
      * is what ends that membership.
      */
-    readonly revoke: (id: Invitation.Id) => Effect.Effect<Invitation.Invitation, Error, Actor.Actor>
+    readonly revoke: (id: Invitation.InvitationId) => Effect.Effect<Invitation.Invitation, Error, Actor.Actor>
     /**
      * Every invitation in the workspace in issue order, whatever its state; requires
      * `invitation.manage`.
@@ -131,8 +131,8 @@ export const make: Effect.Effect<
     yield* delegation.requireGrant(input.roleId)
     return yield* Actor.Actor
   })
-  const requireInvitation = Effect.fnUntraced(function* (id: Invitation.Id) {
-    const validId = yield* Schema.decodeEffect(Invitation.Id)(id)
+  const requireInvitation = Effect.fnUntraced(function* (id: Invitation.InvitationId) {
+    const validId = yield* Schema.decodeEffect(Invitation.InvitationId)(id)
     const found = yield* invitationStore.get(validId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Invitation", id })
     return found.value
@@ -148,7 +148,7 @@ export const make: Effect.Effect<
     function* (input: Invitation.IssueInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input)
       const actor = yield* authorizeInvitation(request)
-      const invitationId = Invitation.Id.make(
+      const invitationId = Invitation.InvitationId.make(
         yield* Request.idFor(options.requestKey, ["invitation.issue", workspaceId, actor.memberId])
       )
       // A retry returns the invitation its first attempt issued, as it stands now.
@@ -177,7 +177,7 @@ export const make: Effect.Effect<
   )
 
   const accept = Effect.fn("InvitationService.accept")(
-    function* (id: Invitation.Id, authenticated: Identity.HumanId, chosenName: Member.Name) {
+    function* (id: Invitation.InvitationId, authenticated: Identity.HumanId, chosenName: Member.Name) {
       const recipient = yield* Schema.decodeEffect(Identity.HumanId)(authenticated)
       const name = yield* Schema.decodeEffect(Member.NewName)(chosenName)
       const invitation = yield* requireInvitation(id)
@@ -245,7 +245,7 @@ export const make: Effect.Effect<
   )
 
   const revoke = Effect.fn("InvitationService.revoke")(
-    function* (id: Invitation.Id) {
+    function* (id: Invitation.InvitationId) {
       // Managing invitations is checked first, so a caller who may not learns nothing of this one.
       yield* authorization.require([manage])
       const invitation = yield* requireInvitation(id)

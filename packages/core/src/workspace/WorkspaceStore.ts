@@ -63,7 +63,10 @@ export class WorkspaceStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: WorkspaceStore["Service"]): WorkspaceStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: WorkspaceStore["Service"]
+): WorkspaceStore["Service"] => {
   const write = StoreInput.write("WorkspaceStore", workspaceId)
   return {
     rename: (change) => Effect.flatMap(write("rename", WorkspaceSettings.NameChange, change), driver.rename),

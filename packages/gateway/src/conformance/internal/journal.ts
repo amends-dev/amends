@@ -20,7 +20,7 @@ import {
   ThreadParticipation,
   ThreadParticipationActivity
 } from "@amends-dev/core/thread"
-import { InvitationService, Member, MemberPermissions } from "@amends-dev/core/workspace"
+import { InvitationService, MemberPermissions, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
@@ -170,12 +170,12 @@ export const journal = (fixture: Fixture.Fixture) => {
           })
           const human = Actor.Actor.of({
             workspaceId: Support.workspaceId,
-            memberId: Member.Id.make("human"),
+            memberId: MemberId.MemberId.make("human"),
             identity: Support.bob
           })
           const agent = Actor.Actor.of({
             workspaceId: Support.workspaceId,
-            memberId: Member.Id.make("agent"),
+            memberId: MemberId.MemberId.make("agent"),
             identity: { _tag: "Agent", id: Identity.AgentId.make("agent") }
           })
           yield* seed(bound, [human, agent], [human, agent])
@@ -207,7 +207,7 @@ export const journal = (fixture: Fixture.Fixture) => {
               })
             )
           )
-          const reply = (mentions: ReadonlyArray<Member.Id>) =>
+          const reply = (mentions: ReadonlyArray<MemberId.MemberId>) =>
             as(
               owner,
               Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
@@ -355,7 +355,7 @@ export const journal = (fixture: Fixture.Fixture) => {
                 Effect.flatMap(Journal.Journal, (journal) =>
                   journal.publish(RoleFacts.Created, {
                     workspaceId: Support.workspaceId,
-                    roleId: Role.Id.make(id),
+                    roleId: Role.RoleId.make(id),
                     name: id,
                     permissions: []
                   })
@@ -381,10 +381,10 @@ export const journal = (fixture: Fixture.Fixture) => {
             })
             yield* replay
             expect(byName(yield* bound.checkpoints.listLive(Support.journalLog))).toEqual(live)
-            expect(yield* bound.roles.get(Role.Id.make("allowed"))).toMatchObject({ _tag: "Some" })
-            expect(yield* bound.roles.get(Role.Id.make("blocked"))).toEqual(Option.none())
+            expect(yield* bound.roles.get(Role.RoleId.make("allowed"))).toMatchObject({ _tag: "Some" })
+            expect(yield* bound.roles.get(Role.RoleId.make("blocked"))).toEqual(Option.none())
             yield* role("rebuilt")
-            expect(yield* bound.roles.get(Role.Id.make("rebuilt"))).toMatchObject({ _tag: "Some" })
+            expect(yield* bound.roles.get(Role.RoleId.make("rebuilt"))).toMatchObject({ _tag: "Some" })
           })
         )
     )

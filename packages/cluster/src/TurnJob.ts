@@ -13,8 +13,8 @@
 
 import { Store, StoreError } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
-import { Turn, TurnJobs } from "@amends-dev/core/turn"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import { TurnJobs, TurnId } from "@amends-dev/core/turn"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import * as ClusterSchema from "effect/cluster/ClusterSchema"
 import * as Entity from "effect/cluster/Entity"
 import * as Effect from "effect/Effect"
@@ -57,7 +57,7 @@ export class Run extends Schema.Class<Run>("amends/TurnJob/Run")({
 export class Stop extends Schema.Class<Stop>("amends/TurnJob/Stop")({
   ...TurnJobs.Job.fields,
   ...keyed,
-  turnId: Turn.Id
+  turnId: TurnId.TurnId
 }) {
   [PrimaryKey.symbol]() {
     return this.key
@@ -86,7 +86,7 @@ export const entity = Entity.make("amends/TurnJob", [
 export const entityId = (job: TurnJobs.Job) => encodeEntityId([job.workspaceId, job.memberId, job.threadId])
 
 /** An entity's ID, written and read back by the one codec. */
-const EntityId = Schema.fromJsonString(Schema.Tuple([Workspace.Id, Member.Id, ThreadId.Id]))
+const EntityId = Schema.fromJsonString(Schema.Tuple([WorkspaceId.WorkspaceId, MemberId.MemberId, ThreadId.ThreadId]))
 const encodeEntityId = Schema.encodeSync(EntityId)
 const decodeEntityId = Schema.decodeUnknownSync(EntityId)
 
@@ -166,7 +166,7 @@ export const layerWorker = entity.toLayer(
     const drop = (request: Request, error: unknown) => JobRequests.drop("Turn job", named(request), error)
 
     /** Give the turn up, as the request's runs kept failing to run it, trying until it holds. */
-    const giveUp = (request: Run, turnId: Turn.Id) =>
+    const giveUp = (request: Run, turnId: TurnId.TurnId) =>
       retrying(request, turnRunner.giveUp(turnId, "Its turn job kept failing to run it.")).pipe(
         Effect.catch((error) => drop(request, error))
       )
@@ -177,7 +177,7 @@ export const layerWorker = entity.toLayer(
      */
     const runNextTurn = Effect.fnUntraced(function* (request: Run) {
       /** The turn the runs accepted, once one did; a later run may fail before finding it again. */
-      const accepted = yield* Ref.make<Turn.Id | undefined>(undefined)
+      const accepted = yield* Ref.make<TurnId.TurnId | undefined>(undefined)
       const run = turnRunner.runNextTurn.pipe(
         Effect.tapError((error) => Ref.update(accepted, (turnId) => error.turnId ?? turnId))
       )

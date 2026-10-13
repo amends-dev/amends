@@ -10,11 +10,12 @@ import {
   GroupMembershipStore,
   GroupPermissions,
   GroupProjection,
-  GroupStore
+  GroupStore,
+  GroupId
 } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Journal, Publication, type Store, StoreError } from "@amends-dev/core/journal"
-import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Context, DateTime, Effect, Option, Ref } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -26,14 +27,14 @@ import { type Bound, boundTo, otherWorkspaceId, runHost, testProvenance, workspa
 const { core, initialized } = Support
 describe("groups", () => {
   const journalId = Entry.LogId.make("journal")
-  const memberId = Member.Id.make("group-member")
-  const agentId = Member.Id.make("group-agent")
+  const memberId = MemberId.MemberId.make("group-member")
+  const agentId = MemberId.MemberId.make("group-agent")
   const memberIdentity = Identity.MemberReference.cases.Human.make({
     id: Identity.HumanId.make("group-human")
   })
   const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     program.pipe(Effect.provideService(Actor.Actor, actor))
-  const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
+  const create = (memberIds: ReadonlyArray<MemberId.MemberId>, name = "Engineering") =>
     Effect.flatMap(GroupService.GroupService, (groupService) => groupService.createTeam({ name, memberIds }))
   const prepare = Effect.fnUntraced(function* () {
     const bound = yield* boundTo(workspaceId)
@@ -142,7 +143,7 @@ describe("groups", () => {
             }
           })
           expect(yield* history(bound)).toEqual(before)
-          const roleId = Role.Id.make("contributor")
+          const roleId = Role.RoleId.make("contributor")
           yield* publish(
             bound,
             Effect.gen(function* () {
@@ -156,7 +157,7 @@ describe("groups", () => {
                     permissions: [GroupPermissions.Create.name]
                   })
                   yield* journal.publish(AssignmentFacts.Created, {
-                    assignmentId: Assignment.Id.make("contributor-assignment"),
+                    assignmentId: Assignment.AssignmentId.make("contributor-assignment"),
                     workspaceId,
                     memberId,
                     source: { _tag: "Role", roleId, scope: { _tag: "Workspace", workspaceId } }
@@ -184,7 +185,7 @@ describe("groups", () => {
             bound,
             Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Created, {
-                assignmentId: Assignment.Id.make("direct-create"),
+                assignmentId: Assignment.AssignmentId.make("direct-create"),
                 workspaceId,
                 memberId,
                 source: {
@@ -234,7 +235,7 @@ describe("groups", () => {
           const before = yield* history(bound)
           const footprint = yield* storage.footprint
           for (const [ids, tag] of [
-            [[memberId, Member.Id.make("absent")], "CoreError.NotFound"],
+            [[memberId, MemberId.MemberId.make("absent")], "CoreError.NotFound"],
             [[memberId, other.ownerMemberId], "CoreError.NotFound"],
             [[memberId, agentId], "CoreError.Conflict"],
             [[memberId, memberId], "CoreError.Invalid"]
@@ -423,7 +424,7 @@ describe("groups", () => {
           const foreign = yield* boundTo(otherWorkspaceId)
           const other = yield* initialized(foreign)
           const group = {
-            id: Group.Id.make("stored-group"),
+            id: GroupId.GroupId.make("stored-group"),
             workspaceId,
             kind: "Team",
             visibility: "Private",
@@ -432,7 +433,7 @@ describe("groups", () => {
             createdAt: DateTime.makeUnsafe("2026-09-21T12:00:00.123Z")
           } satisfies Group.Group
           const admission = {
-            id: GroupMembership.Id.make("admission"),
+            id: GroupMembership.GroupMembershipId.make("admission"),
             workspaceId,
             groupId: group.id,
             memberId,
@@ -472,7 +473,10 @@ describe("groups", () => {
             store: "GroupStore",
             reason: { _tag: "Rejected" }
           })
-          for (const duplicate of [admission, { ...admission, id: GroupMembership.Id.make("another-admission") }])
+          for (const duplicate of [
+            admission,
+            { ...admission, id: GroupMembership.GroupMembershipId.make("another-admission") }
+          ])
             expect(yield* Effect.flip(bound.store.transaction(bound.groupMemberships.insert(duplicate)))).toMatchObject(
               {
                 _tag: "StoreError",
@@ -502,7 +506,7 @@ describe("groups", () => {
           const { bound, owner, actor } = yield* prepare()
           const createdAt = DateTime.makeUnsafe("2026-09-21T12:00:00.123Z")
           const direct = {
-            id: Group.Id.make("direct-group"),
+            id: GroupId.GroupId.make("direct-group"),
             workspaceId,
             kind: "Direct",
             memberIds: Group.directMembers([memberId, owner.memberId]),
@@ -510,7 +514,7 @@ describe("groups", () => {
             createdAt
           } satisfies Group.Group
           const admissions = direct.memberIds.map((id) => ({
-            id: GroupMembership.Id.make(`direct-${id}`),
+            id: GroupMembership.GroupMembershipId.make(`direct-${id}`),
             workspaceId,
             groupId: direct.id,
             memberId: id,
@@ -540,7 +544,7 @@ describe("groups", () => {
           // The same members cannot name a second direct group; a team with them is unrelated.
           expect(
             yield* Effect.flip(
-              bound.store.transaction(bound.groups.insert({ ...direct, id: Group.Id.make("second-direct") }))
+              bound.store.transaction(bound.groups.insert({ ...direct, id: GroupId.GroupId.make("second-direct") }))
             )
           ).toMatchObject({
             _tag: "StoreError",
@@ -595,7 +599,7 @@ describe("groups", () => {
           const group = yield* asActor(create([memberId, owner.memberId]), owner).pipe(Effect.provide(core(bound)))
           const rename = (
             by: Actor.Actor["Service"],
-            groupId: Group.Id,
+            groupId: GroupId.GroupId,
             name: string,
             expectedName: string = "Engineering"
           ) =>
@@ -641,12 +645,12 @@ describe("groups", () => {
           // A name must have text without surrounding space, and the group must exist.
           for (const name of ["", " Platform"])
             expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe("CoreError.Invalid")
-          expect(yield* Effect.flip(rename(owner, Group.Id.make("missing"), "Platform"))).toMatchObject({
+          expect(yield* Effect.flip(rename(owner, GroupId.GroupId.make("missing"), "Platform"))).toMatchObject({
             _tag: "CoreError.NotFound"
           })
           // A direct group is named by its members.
           const direct = {
-            id: Group.Id.make("direct-group"),
+            id: GroupId.GroupId.make("direct-group"),
             workspaceId,
             kind: "Direct",
             memberIds: Group.directMembers([memberId, owner.memberId]),
@@ -657,7 +661,7 @@ describe("groups", () => {
             Effect.all([
               bound.groups.insert(direct),
               bound.groupMemberships.insert({
-                id: GroupMembership.Id.make("direct-owner"),
+                id: GroupMembership.GroupMembershipId.make("direct-owner"),
                 workspaceId,
                 groupId: direct.id,
                 memberId: owner.memberId,
@@ -716,7 +720,7 @@ describe("groups", () => {
             groupId: group.id,
             occurredAt: DateTime.makeUnsafe(iso)
           })
-          const missing = Group.Id.make("missing")
+          const missing = GroupId.GroupId.make("missing")
           expect(yield* bound.groups.getLatest([group.id, missing])).toEqual([])
           const write = <A, E, R>(program: Effect.Effect<A, E, R>) => bound.store.transaction(program)
           yield* write(bound.groups.recordLatest(at("2026-09-23T12:00:00.000Z")))

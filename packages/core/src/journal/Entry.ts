@@ -16,13 +16,13 @@ import * as Commit from "./Commit.ts"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("LogEntryId"))
+export const EntryId = Schema.NonEmptyString.pipe(Schema.brand("LogEntryId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type EntryId = typeof EntryId.Type
 
 /**
  * Names a log within a workspace, such as the workspace journal's. Reopening the same ID addresses
@@ -61,10 +61,10 @@ export type Position = typeof Position.Type
  * @since 0.1.0
  */
 export const Metadata = Schema.Struct({
-  id: Id,
+  id: EntryId,
   logId: LogId,
   position: Position,
-  commitId: Commit.Id,
+  commitId: Commit.CommitId,
   /** Zero-based entry order within this commit's batch for this log. */
   index: Schema.Natural,
   recordedAt: Schema.DateTimeUtcFromString

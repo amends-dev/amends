@@ -8,7 +8,7 @@
  * @since 0.1.0
  */
 
-import { Member } from "@amends-dev/core/workspace"
+import { Member, MemberId } from "@amends-dev/core/workspace"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as Schema from "effect/Schema"
@@ -16,7 +16,7 @@ import * as ApiErrors from "./ApiErrors.ts"
 import * as Authentication from "./Authentication.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const params = { memberId: Member.Id }
+const params = { memberId: MemberId.MemberId }
 
 /**
  * Membership reads and removal, authorized by core for the principal's membership, and the

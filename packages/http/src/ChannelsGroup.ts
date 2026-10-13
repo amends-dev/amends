@@ -9,10 +9,10 @@
  * @since 0.1.0
  */
 
-import { Channel, ChannelBinding } from "@amends-dev/core/channel"
-import { Group } from "@amends-dev/core/group"
-import { Thread } from "@amends-dev/core/thread"
-import { Workspace } from "@amends-dev/core/workspace"
+import { Channel, ChannelBinding, ChannelId } from "@amends-dev/core/channel"
+import { GroupId } from "@amends-dev/core/group"
+import { ThreadId } from "@amends-dev/core/thread"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
@@ -21,8 +21,8 @@ import * as ApiErrors from "./ApiErrors.ts"
 import * as Authentication from "./Authentication.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const channel = { channelId: Channel.Id }
-const thread = { threadId: Thread.Id }
+const channel = { channelId: ChannelId.ChannelId }
+const thread = { threadId: ThreadId.ThreadId }
 const record = Channel.Channel.annotate({ identifier: "Channel" })
 /** The body an external system sends, and the answer it is given, as text: the transport reads it. */
 const text = Schema.String.pipe(HttpApiSchema.asText())
@@ -56,7 +56,7 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
     }),
     HttpApiEndpoint.post("redirect", "/channels/:channelId/redirect", {
       params: channel,
-      payload: Schema.Struct({ groupId: Group.Id }),
+      payload: Schema.Struct({ groupId: GroupId.GroupId }),
       success: record,
       error: [...ApiErrors.workspace, ...ApiErrors.channelRead]
     }),
@@ -84,7 +84,7 @@ export class ChannelsGroup extends HttpApiGroup.make("channels")
  */
 export class ChannelEventsGroup extends HttpApiGroup.make("channelEvents").add(
   HttpApiEndpoint.post("receive", "/workspaces/:workspaceId/channels/:channelId/events", {
-    params: { workspaceId: Workspace.Id, channelId: Channel.Id },
+    params: { workspaceId: WorkspaceId.WorkspaceId, channelId: ChannelId.ChannelId },
     payload: text,
     success: text,
     error: [...ApiErrors.workspace, ...ApiErrors.channelEvents]

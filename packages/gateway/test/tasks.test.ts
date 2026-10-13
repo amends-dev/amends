@@ -8,13 +8,14 @@ import { Notification } from "@amends-dev/core/notification"
 import { Request } from "@amends-dev/core/request"
 import { type Task, TaskPermissions, TaskService } from "@amends-dev/core/task"
 import {
-  Thread,
+  type Thread,
   ThreadMessageService,
   ThreadParticipation,
   ThreadPermissions,
-  ThreadService
+  ThreadService,
+  ThreadId
 } from "@amends-dev/core/thread"
-import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { TestClock } from "effect/testing"
@@ -35,14 +36,15 @@ import {
 
 const { core, initialized } = Support
 describe("tasks", () => {
-  const humanId = Member.Id.make("human")
-  const otherId = Member.Id.make("other")
-  const agentId = Member.Id.make("agent")
-  const identityFor = (id: Member.Id): Identity.MemberReference =>
+  const humanId = MemberId.MemberId.make("human")
+  const otherId = MemberId.MemberId.make("other")
+  const agentId = MemberId.MemberId.make("agent")
+  const identityFor = (id: MemberId.MemberId): Identity.MemberReference =>
     id === agentId
       ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
       : { _tag: "Human", id: Identity.HumanId.make(id) }
-  const actorFor = (memberId: Member.Id) => Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) })
+  const actorFor = (memberId: MemberId.MemberId) =>
+    Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) })
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], effect: Effect.Effect<A, E, R>) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
@@ -62,15 +64,20 @@ describe("tasks", () => {
         }))
         .sort((left, right) => left.sequence - right.sequence)
     )
-  const told = (bound: Bound, memberId: Member.Id) =>
+  const told = (bound: Bound, memberId: MemberId.MemberId) =>
     toldOf(bound, Notification.ofMember(memberId, identityFor(memberId)))
-  const grant = (bound: Bound, memberId: Member.Id, permission: Permission.Definition, target: Target.Reference) =>
+  const grant = (
+    bound: Bound,
+    memberId: MemberId.MemberId,
+    permission: Permission.Definition,
+    target: Target.Reference
+  ) =>
     facts(
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
-          assignmentId: Assignment.Id.make(`${memberId}:${permission.name}:${JSON.stringify(target)}`),
+          assignmentId: Assignment.AssignmentId.make(`${memberId}:${permission.name}:${JSON.stringify(target)}`),
           memberId,
           source: { _tag: "Direct", grant: Grant.make(permission, { _tag: "Target", target }) }
         })
@@ -92,7 +99,7 @@ describe("tasks", () => {
         )
       )
     )
-  const create = (memberIds: ReadonlyArray<Member.Id>) =>
+  const create = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
     Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name: "Engineering", memberIds, visibility: "Private" })
     )
@@ -104,18 +111,18 @@ describe("tasks", () => {
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ text: "Ship it", mentions: [], ...input }, options)
     )
-  const taskOf = (threadId: Thread.Id) =>
+  const taskOf = (threadId: ThreadId.ThreadId) =>
     Effect.flatMap(TaskService.TaskService, (taskService) => taskService.get(threadId))
   const createTask = (input: Task.CreateInput) =>
     Effect.flatMap(TaskService.TaskService, (taskService) => taskService.create(input))
-  const update = (threadId: Thread.Id, change: Task.Change) =>
+  const update = (threadId: ThreadId.ThreadId, change: Task.Change) =>
     Effect.flatMap(TaskService.TaskService, (taskService) => taskService.update({ threadId, change }))
-  const kinds = (bound: Bound, threadId: Thread.Id) =>
+  const kinds = (bound: Bound, threadId: ThreadId.ThreadId) =>
     Effect.map(bound.activities.listByThread(threadId), (activities) =>
       activities.map((activity) => [activity.sequence, activity.kind] as const)
     )
   /** Who takes part, by where they joined, then by participant. */
-  const participants = (bound: Bound, threadId: Thread.Id) =>
+  const participants = (bound: Bound, threadId: ThreadId.ThreadId) =>
     Effect.map(bound.participations.listByThread(threadId), (records) =>
       records
         .filter((record) => record.status === "active")
@@ -500,7 +507,7 @@ describe("tasks", () => {
             [bound, bound.tasks.apply(task.threadId, { _tag: "Status", from: "todo", to: "doing" })],
             [
               bound,
-              bound.tasks.apply(Thread.Id.make("missing"), {
+              bound.tasks.apply(ThreadId.ThreadId.make("missing"), {
                 _tag: "Priority",
                 from: "none",
                 to: "low"
@@ -516,7 +523,7 @@ describe("tasks", () => {
           }
           expect(yield* bound.tasks.get(task.threadId)).toEqual(Option.some(task))
           expect(yield* foreign.tasks.get(task.threadId)).toEqual(Option.none())
-          expect(yield* bound.tasks.getMany([task.threadId, Thread.Id.make("missing")])).toEqual([task])
+          expect(yield* bound.tasks.getMany([task.threadId, ThreadId.ThreadId.make("missing")])).toEqual([task])
           yield* bound.store.transaction(
             bound.tasks.apply(task.threadId, {
               _tag: "Assignee",

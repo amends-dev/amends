@@ -1,3 +1,4 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import * as Identity from "../../../src/identity/Identity.ts"
@@ -13,25 +14,24 @@ import * as Member from "../../../src/workspace/Member.ts"
 import * as MemberFacts from "../../../src/workspace/MemberFacts.ts"
 import * as MemberProjection from "../../../src/workspace/MemberProjection.ts"
 import * as MemberStore from "../../../src/workspace/MemberStore.ts"
-import * as Workspace from "../../../src/workspace/Workspace.ts"
 import { make, type Fixture } from "../../memory.ts"
 import { testProvenance } from "../../publication.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("workspace-one/journal")
-const firstId = Member.Id.make("member-one")
-const secondId = Member.Id.make("member-two")
-const agentId = Member.Id.make("member-agent")
+const firstId = MemberId.MemberId.make("member-one")
+const secondId = MemberId.MemberId.make("member-two")
+const agentId = MemberId.MemberId.make("member-agent")
 const human = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") })
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") })
 const name = Member.Name.make("same-id")
-const added = (memberId: Member.Id, identity: Identity.MemberReference) => ({
+const added = (memberId: MemberId.MemberId, identity: Identity.MemberReference) => ({
   memberId,
   workspaceId,
   identity,
   name
 })
-const removed = (memberId: Member.Id) => ({ memberId, workspaceId })
+const removed = (memberId: MemberId.MemberId) => ({ memberId, workspaceId })
 const setup = Journal.make({ logId, projections: [MemberProjection.definition] })
 const source = Journal.make({ logId, projections: [] })
 const run = <A, E>(
@@ -210,7 +210,7 @@ it.effect("a failed removal rolls back the entire replay batch while retaining e
         yield* writer.commit(
           Effect.gen(function* () {
             yield* writer.publish(MemberFacts.Removed, removed(firstId))
-            yield* writer.publish(MemberFacts.Removed, removed(Member.Id.make("missing")))
+            yield* writer.publish(MemberFacts.Removed, removed(MemberId.MemberId.make("missing")))
           })
         )
         const journal = yield* setup

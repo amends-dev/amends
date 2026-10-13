@@ -8,12 +8,11 @@ import {
   type Target
 } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
-import { Group, GroupService, GroupMembershipService, GroupMembershipFacts } from "@amends-dev/core/group"
+import { Group, GroupService, GroupMembershipService, GroupMembershipFacts, type GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Event, Fact, Journal, Publication, StoreError } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
-  Thread,
   ThreadService,
   ThreadActivity,
   ThreadFacts,
@@ -32,9 +31,12 @@ import {
   ThreadParticipationPermissions,
   ThreadParticipationStore,
   ThreadPermissions,
-  ThreadCommand
+  ThreadCommand,
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
-import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect"
@@ -67,14 +69,15 @@ describe("thread participation", () => {
     return record.participant
   }
 
-  const humanId = Member.Id.make("human")
-  const otherId = Member.Id.make("other")
-  const agentId = Member.Id.make("agent")
-  const identityFor = (id: Member.Id): Identity.MemberReference =>
+  const humanId = MemberId.MemberId.make("human")
+  const otherId = MemberId.MemberId.make("other")
+  const agentId = MemberId.MemberId.make("agent")
+  const identityFor = (id: MemberId.MemberId): Identity.MemberReference =>
     id === agentId
       ? { _tag: "Agent", id: Identity.AgentId.make("agent") }
       : { _tag: "Human", id: Identity.HumanId.make(id) }
-  const actorFor = (memberId: Member.Id) => Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) })
+  const actorFor = (memberId: MemberId.MemberId) =>
+    Actor.Actor.of({ workspaceId, memberId, identity: identityFor(memberId) })
   const asActor = <A, E, R>(effect: Effect.Effect<A, E, R>, actor: Actor.Actor["Service"]) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor))
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], effect: Effect.Effect<A, E, R>) =>
@@ -85,36 +88,43 @@ describe("thread participation", () => {
       Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound))))
     )
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
-  const notifications = (bound: Bound, id: Member.Id) =>
+  const notifications = (bound: Bound, id: MemberId.MemberId) =>
     listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
       limit: 100
     })
-  const create = (memberIds: ReadonlyArray<Member.Id>) =>
+  const create = (memberIds: ReadonlyArray<MemberId.MemberId>) =>
     Effect.flatMap(GroupService.GroupService, (groupService) =>
       groupService.createTeam({ name: "Engineering", memberIds })
     )
-  const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+  const opening = (groupId: GroupId.GroupId, mentions: ReadonlyArray<MemberId.MemberId> = []) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, mentions, text: "Opening" })
     )
-  const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+  const start = (groupId: GroupId.GroupId, mentions: ReadonlyArray<MemberId.MemberId> = []) =>
     Effect.flatMap(opening(groupId, mentions), placed)
-  const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
+  const reply = (threadId: ThreadId.ThreadId, mentions: ReadonlyArray<MemberId.MemberId> = [], text = "Reply") =>
     Effect.flatMap(ThreadMessageService.ThreadMessageService, (threadMessageService) =>
       threadMessageService.publish({ threadId, mentions, text })
     ).pipe(Effect.flatMap((message) => placed({ message })))
-  const threadTarget = (threadId: Thread.Id): Target.Reference => ({
+  const threadTarget = (threadId: ThreadId.ThreadId): Target.Reference => ({
     _tag: "Thread",
     workspaceId,
     threadId
   })
-  const grant = (bound: Bound, memberId: Member.Id, permission: Permission.Definition, target?: Target.Reference) =>
+  const grant = (
+    bound: Bound,
+    memberId: MemberId.MemberId,
+    permission: Permission.Definition,
+    target?: Target.Reference
+  ) =>
     facts(
       bound,
       Effect.flatMap(Journal.Journal, (journal) =>
         journal.publish(AssignmentFacts.Created, {
           workspaceId: bound.store.workspaceId,
-          assignmentId: Assignment.Id.make(`${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`),
+          assignmentId: Assignment.AssignmentId.make(
+            `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`
+          ),
           memberId,
           source: {
             _tag: "Direct",
@@ -159,19 +169,19 @@ describe("thread participation", () => {
     return { bound, owner, group, first, human: actorFor(humanId), agent: actorFor(agentId) }
   })
 
-  const follow = (threadId: Thread.Id) =>
+  const follow = (threadId: ThreadId.ThreadId) =>
     Effect.flatMap(ThreadParticipationService.ThreadParticipationService, (threadParticipationService) =>
       threadParticipationService.follow(threadId)
     )
-  const unfollow = (threadId: Thread.Id, participationId: ThreadParticipation.Id) =>
+  const unfollow = (threadId: ThreadId.ThreadId, participationId: ThreadParticipationId.ThreadParticipationId) =>
     Effect.flatMap(ThreadParticipationService.ThreadParticipationService, (threadParticipationService) =>
       threadParticipationService.unfollow({ threadId, participationId })
     )
-  const timeline = (threadId: Thread.Id, afterSequence = 0) =>
+  const timeline = (threadId: ThreadId.ThreadId, afterSequence = 0) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.readTimeline(threadId, { limit: 100, afterSequence })
     )
-  const snapshot = Effect.fnUntraced(function* (bound: Bound, threadId: Thread.Id) {
+  const snapshot = Effect.fnUntraced(function* (bound: Bound, threadId: ThreadId.ThreadId) {
     return {
       history: yield* history(bound),
       participants: yield* bound.participations.listByThread(threadId),
@@ -201,7 +211,7 @@ describe("thread participation", () => {
           ])
           const collect = <F extends Fact.Definition>(
             fact: F,
-            locate: (payload: Fact.Payload<F>) => { threadId: Thread.Id; groupId: Group.Id }
+            locate: (payload: Fact.Payload<F>) => { threadId: ThreadId.ThreadId; groupId: GroupId.GroupId }
           ) =>
             facts(
               bound,
@@ -491,7 +501,7 @@ describe("thread participation", () => {
             Effect.flatMap(Journal.Journal, (journal) =>
               journal.publish(AssignmentFacts.Created, {
                 workspaceId,
-                assignmentId: Assignment.Id.make("viewer"),
+                assignmentId: Assignment.AssignmentId.make("viewer"),
                 memberId: humanId,
                 source: {
                   _tag: "Role",
@@ -546,7 +556,7 @@ describe("thread participation", () => {
           const second = yield* run(bound, owner, start(group.id, [owner.memberId, humanId, agentId]))
           for (const [threadId, id] of [
             [second.thread.id, own.id],
-            [first.thread.id, ThreadParticipation.Id.make("missing")]
+            [first.thread.id, ThreadParticipationId.ThreadParticipationId.make("missing")]
           ] as const)
             expect(yield* Effect.flip(run(bound, human, unfollow(threadId, id)))).toEqual(
               new CoreError.NotFound({ resource: "ThreadParticipation", id })
@@ -906,15 +916,21 @@ describe("thread participation", () => {
             reason: { _tag: "AlreadyEnded", resource: "ThreadParticipation" }
           })
           expect(
-            yield* Effect.flip(gateway.asMember(workspace.id, owner, follow(Thread.Id.make("missing"))))
+            yield* Effect.flip(gateway.asMember(workspace.id, owner, follow(ThreadId.ThreadId.make("missing"))))
           ).toMatchObject({ _tag: "CoreError.NotFound" })
-          expect(yield* Effect.flip(gateway.asMember(workspace.id, owner, follow("" as Thread.Id)))).toMatchObject({
+          expect(
+            yield* Effect.flip(gateway.asMember(workspace.id, owner, follow("" as ThreadId.ThreadId)))
+          ).toMatchObject({
             _tag: "CoreError.Invalid",
             reason: { _tag: "Malformed" }
           })
           expect(
             yield* Effect.flip(
-              gateway.asMember(workspace.id, owner, unfollow(first.thread.id, ThreadParticipation.Id.make("missing")))
+              gateway.asMember(
+                workspace.id,
+                owner,
+                unfollow(first.thread.id, ThreadParticipationId.ThreadParticipationId.make("missing"))
+              )
             )
           ).toMatchObject({ _tag: "CoreError.NotFound" })
         })
@@ -939,7 +955,7 @@ describe("thread participation", () => {
               bound.store.transaction(
                 bound.activities.insert(
                   Object.assign({}, activity, {
-                    id: ThreadActivity.Id.make("bad-follow"),
+                    id: ThreadActivity.ThreadActivityId.make("bad-follow"),
                     sequence: 3
                   })
                 )
@@ -957,8 +973,8 @@ describe("thread participation", () => {
           }
           for (const bad of [
             { ...departure, workspaceId: otherWorkspaceId },
-            { ...departure, participationId: ThreadParticipation.Id.make("missing") },
-            { ...departure, threadId: Thread.Id.make("foreign") }
+            { ...departure, participationId: ThreadParticipationId.ThreadParticipationId.make("missing") },
+            { ...departure, threadId: ThreadId.ThreadId.make("foreign") }
           ])
             expect(
               yield* Effect.flip(bound.store.transaction(bound.participations.end(bad, yield* DateTime.now)))
@@ -1437,7 +1453,7 @@ describe("thread participation", () => {
           const at = first.message.publishedAt
           const contactId = Identity.ContactId.make("customer")
           const contact = {
-            id: ThreadParticipation.Id.make("contact-participation"),
+            id: ThreadParticipationId.ThreadParticipationId.make("contact-participation"),
             workspaceId,
             threadId,
             participant: { _tag: "Contact", contactId },
@@ -1448,11 +1464,11 @@ describe("thread participation", () => {
           } satisfies ThreadParticipation.ThreadParticipation
           const triage = {
             ...contact,
-            id: ThreadParticipation.Id.make("triage-participation"),
+            id: ThreadParticipationId.ThreadParticipationId.make("triage-participation"),
             participant: { _tag: "Triage" }
           } satisfies ThreadParticipation.ThreadParticipation
           const message = {
-            id: ThreadMessage.Id.make("contact-message"),
+            id: ThreadMessageId.ThreadMessageId.make("contact-message"),
             workspaceId,
             threadId,
             author: { _tag: "Contact", contactId },
@@ -1474,7 +1490,7 @@ describe("thread participation", () => {
                     activity: ThreadActivityKind.makeRecordUnsafe(
                       ThreadMessageActivity.Published,
                       {
-                        id: ThreadActivity.Id.make("contact-activity"),
+                        id: ThreadActivity.ThreadActivityId.make("contact-activity"),
                         workspaceId,
                         threadId,
                         sequence: 2,
@@ -1524,7 +1540,9 @@ describe("thread participation", () => {
             ])).toSorted((left, right) => (left.id < right.id ? -1 : 1))
           ).toEqual([contact, triage])
           expect(
-            yield* bound.participations.findActive(threadId, [{ _tag: "Member", memberId: Member.Id.make(contactId) }])
+            yield* bound.participations.findActive(threadId, [
+              { _tag: "Member", memberId: MemberId.MemberId.make(contactId) }
+            ])
           ).toEqual([])
           for (const recipient of [
             { _tag: "Contact", id: contactId },
@@ -1538,8 +1556,8 @@ describe("thread participation", () => {
             ).toEqual([[Notification.Recipient.isAnyOf(["Triage"])(recipient) ? triage.id : contact.id, "Pending"]])
           // One active participation per contact and per thread's triage.
           for (const invalid of [
-            { ...contact, id: ThreadParticipation.Id.make("contact-again") },
-            { ...triage, id: ThreadParticipation.Id.make("triage-again") }
+            { ...contact, id: ThreadParticipationId.ThreadParticipationId.make("contact-again") },
+            { ...triage, id: ThreadParticipationId.ThreadParticipationId.make("triage-again") }
           ])
             expect(yield* Effect.flip(bound.store.transaction(bound.participations.insert(invalid)))).toMatchObject({
               _tag: "StoreError",

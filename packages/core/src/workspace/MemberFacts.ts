@@ -12,7 +12,8 @@ import * as Audience from "../journal/Audience.ts"
 import * as Fact from "../journal/Fact.ts"
 import * as Subject from "../journal/Subject.ts"
 import * as Member from "./Member.ts"
-import * as Workspace from "./Workspace.ts"
+import * as MemberId from "./MemberId.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
  * A member joined: an active membership with a fresh member ID, for the identity and under the name
@@ -26,8 +27,8 @@ export const Added = Fact.make("workspace.member.added", {
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
-    memberId: Member.Id,
-    workspaceId: Workspace.Id,
+    memberId: MemberId.MemberId,
+    workspaceId: WorkspaceId.WorkspaceId,
     identity: Identity.MemberReference,
     /** What the member is called on joining; later facts may rename them. */
     name: Member.Name
@@ -46,8 +47,8 @@ export const Renamed = Fact.make("workspace.member.renamed", {
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
-    memberId: Member.Id,
-    workspaceId: Workspace.Id,
+    memberId: MemberId.MemberId,
+    workspaceId: WorkspaceId.WorkspaceId,
     name: Member.Name
   })
 })
@@ -65,8 +66,8 @@ export const Removed = Fact.make("workspace.member.removed", {
   subject: (payload) => Subject.make("member", payload.memberId),
   version: 1,
   payload: Schema.Struct({
-    memberId: Member.Id,
-    workspaceId: Workspace.Id
+    memberId: MemberId.MemberId,
+    workspaceId: WorkspaceId.WorkspaceId
   }),
   occurrence: (payload) => [payload.memberId]
 })

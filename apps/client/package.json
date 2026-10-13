@@ -11,6 +11,7 @@
     "test": "bun run --bun vitest run --config vite.config.ts"
   },
   "dependencies": {
+    "@amends-dev/connection": "workspace:*",
     "@amends-dev/core": "workspace:*",
     "@amends-dev/gateway": "workspace:*",
     "@amends-dev/http": "workspace:*",

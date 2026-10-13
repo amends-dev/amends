@@ -17,7 +17,7 @@ import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
 import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
-import * as Member from "../workspace/Member.ts"
+import * as MemberId from "../workspace/MemberId.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Assignment from "./Assignment.ts"
 import * as Role from "./Role.ts"
@@ -49,17 +49,17 @@ export class AssignmentStore extends Context.Service<
   {
     /** Find an active or revoked assignment in this workspace; None if absent. */
     readonly get: (
-      assignmentId: Assignment.Id
+      assignmentId: Assignment.AssignmentId
     ) => Effect.Effect<Option.Option<Assignment.Assignment>, StoreError.StoreError>
 
     /** All active role and direct grant assignments for this member in this workspace. */
     readonly listActiveByMember: (
-      memberId: Member.Id
+      memberId: MemberId.MemberId
     ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>
 
     /** All active Role-source assignments referencing this role in this workspace. */
     readonly listActiveByRole: (
-      roleId: Role.Id
+      roleId: Role.RoleId
     ) => Effect.Effect<ReadonlyArray<Assignment.Assignment>, StoreError.StoreError>
 
     /**
@@ -73,7 +73,9 @@ export class AssignmentStore extends Context.Service<
      * and source. Rejected if absent or already revoked. Assigning access
      * again requires a fresh ID.
      */
-    readonly markRevoked: (assignmentId: Assignment.Id) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
+    readonly markRevoked: (
+      assignmentId: Assignment.AssignmentId
+    ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/authorization/AssignmentStore") {}
 
@@ -84,14 +86,18 @@ export class AssignmentStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: AssignmentStore["Service"]): AssignmentStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: AssignmentStore["Service"]
+): AssignmentStore["Service"] => {
   const read = StoreInput.read("AssignmentStore")
   const write = StoreInput.write("AssignmentStore", workspaceId)
   return {
-    get: (assignmentId) => Effect.flatMap(read("get", Assignment.Id, assignmentId), driver.get),
+    get: (assignmentId) => Effect.flatMap(read("get", Assignment.AssignmentId, assignmentId), driver.get),
     listActiveByMember: (memberId) =>
-      Effect.flatMap(read("listActiveByMember", Member.Id, memberId), driver.listActiveByMember),
-    listActiveByRole: (roleId) => Effect.flatMap(read("listActiveByRole", Role.Id, roleId), driver.listActiveByRole),
+      Effect.flatMap(read("listActiveByMember", MemberId.MemberId, memberId), driver.listActiveByMember),
+    listActiveByRole: (roleId) =>
+      Effect.flatMap(read("listActiveByRole", Role.RoleId, roleId), driver.listActiveByRole),
     insert: (record) =>
       write("insert", Assignment.Assignment, record).pipe(
         Effect.filterOrFail(
@@ -100,7 +106,8 @@ export const make = (workspaceId: WorkspaceId.Id, driver: AssignmentStore["Servi
         ),
         Effect.flatMap(driver.insert)
       ),
-    markRevoked: (assignmentId) => Effect.flatMap(write("markRevoked", Assignment.Id, assignmentId), driver.markRevoked)
+    markRevoked: (assignmentId) =>
+      Effect.flatMap(write("markRevoked", Assignment.AssignmentId, assignmentId), driver.markRevoked)
   }
 }
 

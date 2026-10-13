@@ -39,7 +39,7 @@ export class GroupMembershipStore extends Context.Service<
   {
     /** The admission, active or ended, if stored. */
     readonly get: (
-      id: GroupMembership.Id
+      id: GroupMembership.GroupMembershipId
     ) => Effect.Effect<Option.Option<GroupMembership.GroupMembership>, StoreError.StoreError>
     /**
      * Find several admissions, active or ended, in one read. Absent IDs are omitted and each found
@@ -47,20 +47,20 @@ export class GroupMembershipStore extends Context.Service<
      * reads nothing.
      */
     readonly getMany: (
-      ids: ReadonlyArray<GroupMembership.Id>
+      ids: ReadonlyArray<GroupMembership.GroupMembershipId>
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, StoreError.StoreError>
     /** The member's active admission to the group, if any: at most one is active at a time. */
     readonly findActive: (
-      groupId: GroupId.Id,
-      memberId: MemberId.Id
+      groupId: GroupId.GroupId,
+      memberId: MemberId.MemberId
     ) => Effect.Effect<Option.Option<GroupMembership.GroupMembership>, StoreError.StoreError>
     /**
      * The group's active admissions of these members, in one read. Each found record appears once;
      * order is unspecified, so callers index results by member. An empty request reads nothing.
      */
     readonly findActiveMany: (
-      groupId: GroupId.Id,
-      memberIds: ReadonlyArray<MemberId.Id>
+      groupId: GroupId.GroupId,
+      memberIds: ReadonlyArray<MemberId.MemberId>
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, StoreError.StoreError>
     /**
      * How many active admissions each of several groups has, and whether this member holds one, in
@@ -68,24 +68,24 @@ export class GroupMembershipStore extends Context.Service<
      * nothing.
      */
     readonly summarize: (
-      groupIds: ReadonlyArray<GroupId.Id>,
-      memberId: MemberId.Id
+      groupIds: ReadonlyArray<GroupId.GroupId>,
+      memberId: MemberId.MemberId
     ) => Effect.Effect<ReadonlyArray<Group.Summary>, StoreError.StoreError>
     /**
      * Every admission of a group, active or ended, in stable ID order. A history read for
      * inspection; operations use the bounded reads.
      */
     readonly listByGroup: (
-      groupId: GroupId.Id
+      groupId: GroupId.GroupId
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, StoreError.StoreError>
     /** A page of a group's active admissions in binary admission-ID order, after the cursor. */
     readonly pageActiveByGroup: (
-      groupId: GroupId.Id,
+      groupId: GroupId.GroupId,
       options: GroupMembership.ListOptions
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, StoreError.StoreError>
     /** A page of a member's active admissions in binary group-ID order, after the group cursor. */
     readonly pageActiveByMember: (
-      memberId: MemberId.Id,
+      memberId: MemberId.MemberId,
       options: GroupMembership.ByMemberOptions
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, StoreError.StoreError>
     /**
@@ -93,7 +93,7 @@ export class GroupMembershipStore extends Context.Service<
      * ends when the member is removed from the workspace. Internal only.
      */
     readonly listActiveByMember: (
-      memberId: MemberId.Id
+      memberId: MemberId.MemberId
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, StoreError.StoreError>
     /**
      * Insert an active admission. Reject reused admission IDs and duplicate active group/member
@@ -122,47 +122,48 @@ export class GroupMembershipStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   driver: GroupMembershipStore["Service"]
 ): GroupMembershipStore["Service"] => {
   const read = StoreInput.read("GroupMembershipStore")
   const write = StoreInput.write("GroupMembershipStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", GroupMembership.Id, id), driver.get),
-    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(GroupMembership.Id), ids), driver.getMany),
+    get: (id) => Effect.flatMap(read("get", GroupMembership.GroupMembershipId, id), driver.get),
+    getMany: (ids) =>
+      Effect.flatMap(read("getMany", Schema.Array(GroupMembership.GroupMembershipId), ids), driver.getMany),
     findActive: Effect.fn("GroupMembershipStore.findActive")(function* (groupId, memberId) {
       return yield* driver.findActive(
-        yield* read("findActive", GroupId.Id, groupId),
-        yield* read("findActive", MemberId.Id, memberId)
+        yield* read("findActive", GroupId.GroupId, groupId),
+        yield* read("findActive", MemberId.MemberId, memberId)
       )
     }),
     findActiveMany: Effect.fn("GroupMembershipStore.findActiveMany")(function* (groupId, memberIds) {
       return yield* driver.findActiveMany(
-        yield* read("findActiveMany", GroupId.Id, groupId),
-        yield* read("findActiveMany", Schema.Array(MemberId.Id), memberIds)
+        yield* read("findActiveMany", GroupId.GroupId, groupId),
+        yield* read("findActiveMany", Schema.Array(MemberId.MemberId), memberIds)
       )
     }),
     summarize: Effect.fn("GroupMembershipStore.summarize")(function* (groupIds, memberId) {
       return yield* driver.summarize(
-        yield* read("summarize", Schema.Array(GroupId.Id), groupIds),
-        yield* read("summarize", MemberId.Id, memberId)
+        yield* read("summarize", Schema.Array(GroupId.GroupId), groupIds),
+        yield* read("summarize", MemberId.MemberId, memberId)
       )
     }),
-    listByGroup: (groupId) => Effect.flatMap(read("listByGroup", GroupId.Id, groupId), driver.listByGroup),
+    listByGroup: (groupId) => Effect.flatMap(read("listByGroup", GroupId.GroupId, groupId), driver.listByGroup),
     pageActiveByGroup: Effect.fn("GroupMembershipStore.pageActiveByGroup")(function* (groupId, options) {
       return yield* driver.pageActiveByGroup(
-        yield* read("pageActiveByGroup", GroupId.Id, groupId),
+        yield* read("pageActiveByGroup", GroupId.GroupId, groupId),
         yield* read("pageActiveByGroup", GroupMembership.ListOptions, options)
       )
     }),
     pageActiveByMember: Effect.fn("GroupMembershipStore.pageActiveByMember")(function* (memberId, options) {
       return yield* driver.pageActiveByMember(
-        yield* read("pageActiveByMember", MemberId.Id, memberId),
+        yield* read("pageActiveByMember", MemberId.MemberId, memberId),
         yield* read("pageActiveByMember", GroupMembership.ByMemberOptions, options)
       )
     }),
     listActiveByMember: (memberId) =>
-      Effect.flatMap(read("listActiveByMember", MemberId.Id, memberId), driver.listActiveByMember),
+      Effect.flatMap(read("listActiveByMember", MemberId.MemberId, memberId), driver.listActiveByMember),
     insert: (record) =>
       write("insert", GroupMembership.GroupMembership, record).pipe(
         Effect.filterOrFail(
@@ -221,7 +222,7 @@ const makeMemory = Effect.fn("GroupMembershipStore.makeMemory")(function* () {
       function* (groupInput, memberId) {
         const groupIds = new Set(groupInput)
         if (groupIds.size === 0) return []
-        const summaries = new Map<Group.Id, Group.Summary>()
+        const summaries = new Map<GroupId.GroupId, Group.Summary>()
         for (const record of yield* all) {
           if (record.status !== "active" || !groupIds.has(record.groupId)) continue
           const summary = summaries.get(record.groupId)

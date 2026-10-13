@@ -1,4 +1,4 @@
-import { Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Contract from "@amends-dev/http/Api"
 import * as Authentication from "@amends-dev/http/Authentication"
 import * as WorkspaceMember from "@amends-dev/http/WorkspaceMember"
@@ -44,7 +44,7 @@ const httpClientOf = (options: ApiClientOptions, workspaceId?: string) => {
     ),
     workspaceId === undefined
       ? WorkspaceMember.layerClientOutsideWorkspace
-      : WorkspaceMember.layerClient(Workspace.Id.make(workspaceId))
+      : WorkspaceMember.layerClient(WorkspaceId.WorkspaceId.make(workspaceId))
   )
 }
 

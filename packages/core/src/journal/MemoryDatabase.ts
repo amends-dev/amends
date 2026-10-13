@@ -31,7 +31,7 @@ import type * as Store from "./Store.ts"
  */
 export interface Batch {
   readonly position: Entry.Position
-  readonly commitId: Commit.Id
+  readonly commitId: Commit.CommitId
   readonly entries: ReadonlyArray<Store.Entry>
 }
 
@@ -43,7 +43,7 @@ export interface Batch {
  * @since 0.1.0
  */
 export interface Append {
-  readonly commitId: Commit.Id
+  readonly commitId: Commit.CommitId
   readonly firstIndex: number
   readonly entryCount: number
 }
@@ -129,12 +129,12 @@ export class MemoryDatabase extends Context.Service<
   MemoryDatabase,
   {
     /** Committed state of each workspace that has any. */
-    readonly spaces: Map<WorkspaceId.Id, Space>
+    readonly spaces: Map<WorkspaceId.WorkspaceId, Space>
     /**
      * The host whose transaction is writing each workspace. Writers to one workspace take turns:
      * a host's own writers wait for each other, and another host's writer reports contention.
      */
-    readonly writers: Map<WorkspaceId.Id, object>
+    readonly writers: Map<WorkspaceId.WorkspaceId, object>
     /**
      * Each participation's session log by workspace and participation: its entries' JSON in position
      * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
@@ -203,7 +203,7 @@ export const copy = (space: Space): Space => ({
  * @category utils
  * @since 0.1.0
  */
-export const committed = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.Id): Space =>
+export const committed = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId): Space =>
   database.spaces.get(workspaceId) ?? empty()
 
 /**
@@ -213,7 +213,7 @@ export const committed = (database: MemoryDatabase["Service"], workspaceId: Work
  * @category utils
  * @since 0.1.0
  */
-export const writable = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.Id): Space => {
+export const writable = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId): Space => {
   const existing = database.spaces.get(workspaceId)
   if (existing !== undefined) return existing
   const created = empty()
@@ -288,7 +288,7 @@ export interface Written {
  */
 export const commit = (
   database: MemoryDatabase["Service"],
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   staged: Space,
   written: Written
 ) => {
@@ -322,7 +322,7 @@ export const commit = (
  * @category utils
  * @since 0.1.0
  */
-export const logLock = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.Id, logId: string) =>
+export const logLock = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId, logId: string) =>
   lock(database, JSON.stringify(["log", workspaceId, logId]))
 
 /**

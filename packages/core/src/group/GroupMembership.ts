@@ -20,13 +20,13 @@ import * as GroupId from "./GroupId.ts"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupMembershipId"))
+export const GroupMembershipId = Schema.NonEmptyString.pipe(Schema.brand("GroupMembershipId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type GroupMembershipId = typeof GroupMembershipId.Type
 
 /**
  * Whether the admission is current or has ended.
@@ -50,10 +50,10 @@ export type Status = typeof Status.Type
  * @since 0.1.0
  */
 export const GroupMembership = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  memberId: MemberId.Id,
+  id: GroupMembershipId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId,
   admittedAt: Schema.DateTimeUtcFromString,
   status: Status
 })
@@ -71,7 +71,7 @@ export interface GroupMembership extends Schema.Schema.Type<typeof GroupMembersh
  * @since 0.1.0
  */
 export const ListOptions = Schema.Struct({
-  after: Schema.optionalKey(Id),
+  after: Schema.optionalKey(GroupMembershipId),
   limit: Schema.Int.check(Schema.isGreaterThan(0))
 })
 
@@ -88,7 +88,7 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  * @since 0.1.0
  */
 export const ByMemberOptions = Schema.Struct({
-  afterGroupId: Schema.optionalKey(GroupId.Id),
+  afterGroupId: Schema.optionalKey(GroupId.GroupId),
   limit: Schema.Int.check(Schema.isGreaterThan(0))
 })
 
@@ -105,8 +105,8 @@ export interface ByMemberOptions extends Schema.Schema.Type<typeof ByMemberOptio
  * @since 0.1.0
  */
 export const AddInput = Schema.Struct({
-  groupId: GroupId.Id,
-  memberId: MemberId.Id
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId
 })
 
 /**
@@ -122,8 +122,8 @@ export interface AddInput extends Schema.Schema.Type<typeof AddInput> {}
  * @since 0.1.0
  */
 export const RemoveInput = Schema.Struct({
-  groupId: GroupId.Id,
-  membershipId: Id
+  groupId: GroupId.GroupId,
+  membershipId: GroupMembershipId
 })
 
 /**
@@ -156,8 +156,8 @@ export interface LeaveInput extends Schema.Schema.Type<typeof LeaveInput> {}
  */
 export const Removal = Schema.Struct({
   ...RemoveInput.fields,
-  workspaceId: WorkspaceId.Id,
-  memberId: MemberId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  memberId: MemberId.MemberId,
   reason: Schema.Literals(["removed", "left", "workspace-removed"])
 })
 

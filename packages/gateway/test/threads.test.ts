@@ -2,12 +2,11 @@ import type * as Core from "@amends-dev/core"
 import { AgentPermissions } from "@amends-dev/core/agent"
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant, RoleFacts } from "@amends-dev/core/authorization"
 import { CoreError } from "@amends-dev/core/error"
-import { Group, GroupService, GroupMembershipService, GroupMembershipFacts } from "@amends-dev/core/group"
+import { GroupService, GroupMembershipService, GroupMembershipFacts, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, Event, Journal, Publication, StoreError } from "@amends-dev/core/journal"
 import { Notification, NotificationStore } from "@amends-dev/core/notification"
 import {
-  Thread,
   ThreadService,
   ThreadActivity,
   ThreadActivityFacts,
@@ -20,9 +19,12 @@ import {
   ThreadParticipationStore,
   ThreadPermissions,
   type ThreadCommand,
-  ThreadTitleActivity
+  ThreadTitleActivity,
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
-import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect"
@@ -52,9 +54,9 @@ describe("threads", () => {
       throw new Error("Expected a member participant")
     return record.participant
   }
-  const humanId = Member.Id.make("human")
-  const otherId = Member.Id.make("other")
-  const agentId = Member.Id.make("agent")
+  const humanId = MemberId.MemberId.make("human")
+  const otherId = MemberId.MemberId.make("other")
+  const agentId = MemberId.MemberId.make("agent")
   const humanIdentity = Identity.MemberReference.cases.Human.make({
     id: Identity.HumanId.make("human")
   })
@@ -70,14 +72,18 @@ describe("threads", () => {
       Effect.provideService(Publication.Publication, testProvenance(bound.store.workspaceId)),
       Effect.provide(core(bound))
     )
-  const startOnly = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Here's the proposal") =>
+  const startOnly = (
+    groupId: GroupId.GroupId,
+    mentions: ReadonlyArray<MemberId.MemberId> = [],
+    text = "Here's the proposal"
+  ) =>
     Effect.flatMap(ThreadService.ThreadService, (threadService) =>
       threadService.startInGroup({ groupId, mentions, text })
     )
   // Inspect persisted participation through the internal test binding, not the public result.
   const start = Effect.fnUntraced(function* (
-    groupId: Group.Id,
-    mentions: ReadonlyArray<Member.Id> = [],
+    groupId: GroupId.GroupId,
+    mentions: ReadonlyArray<MemberId.MemberId> = [],
     text = "Here's the proposal"
   ) {
     const started = yield* startOnly(groupId, mentions, text)
@@ -89,7 +95,7 @@ describe("threads", () => {
       participants: yield* threadParticipationStore.listByThread(result.thread.id)
     })
   })
-  const create = (members: ReadonlyArray<Member.Id>, name = "Engineering") =>
+  const create = (members: ReadonlyArray<MemberId.MemberId>, name = "Engineering") =>
     Effect.flatMap(GroupService.GroupService, (groupService) => groupService.createTeam({ name, memberIds: members }))
   const history = (bound: Bound) => bound.store.read(Entry.LogId.make("journal"), { limit: 100 })
   const seed = (bound: Bound) =>
@@ -134,14 +140,14 @@ describe("threads", () => {
       agent: Actor.Actor.of({ workspaceId, memberId: agentId, identity: agentIdentity })
     }
   })
-  const notifications = (bound: Bound, memberId: Member.Id, identity: Identity.MemberReference) =>
+  const notifications = (bound: Bound, memberId: MemberId.MemberId, identity: Identity.MemberReference) =>
     listOldestFirst(bound.notifications, Notification.ofMember(memberId, identity), {
       limit: 100
     })
   const sorted = (values: ReadonlyArray<ThreadParticipation.ThreadParticipation>) =>
     values.toSorted((a, b) => (a.id < b.id ? -1 : 1))
   /** Mentioning every member of the fixture group, the author included, enrolls and notifies them all. */
-  const everyone = (ownerId: Member.Id) => [ownerId, humanId, agentId]
+  const everyone = (ownerId: MemberId.MemberId) => [ownerId, humanId, agentId]
 
   it.effect("an unmentioned team opening enrolls only its author and notifies no one, atomically and in order", () =>
     withStorage((storage) =>
@@ -224,7 +230,7 @@ describe("threads", () => {
           expect(yield* notifications(bound, agentId, agentIdentity)).toHaveLength(1)
           expect(yield* bound.groupMemberships.findActive(group.id, otherId)).toEqual(Option.none())
           const before = yield* history(bound)
-          for (const id of [otherId, Member.Id.make("missing")])
+          for (const id of [otherId, MemberId.MemberId.make("missing")])
             expect(yield* Effect.flip(run(bound, owner, start(group.id, [id])))).toEqual(
               new CoreError.Conflict({
                 reason: new CoreError.ParticipantUnavailable({ memberId: id })
@@ -261,7 +267,7 @@ describe("threads", () => {
             expect(yield* Effect.flip(run(bound, owner, start(hidden.id)))).toEqual(
               new CoreError.NotFound({ resource: "Group", id: hidden.id })
             )
-            expect(yield* Effect.flip(run(bound, owner, start(Group.Id.make("missing"))))).toMatchObject({
+            expect(yield* Effect.flip(run(bound, owner, start(GroupId.GroupId.make("missing"))))).toMatchObject({
               _tag: "CoreError.NotFound"
             })
             expect(yield* history(bound)).toEqual(before)
@@ -270,7 +276,7 @@ describe("threads", () => {
               Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
-                  assignmentId: Assignment.Id.make("start"),
+                  assignmentId: Assignment.AssignmentId.make("start"),
                   memberId: humanId,
                   source: {
                     _tag: "Direct",
@@ -301,7 +307,7 @@ describe("threads", () => {
               Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
-                  assignmentId: Assignment.Id.make("use-agent"),
+                  assignmentId: Assignment.AssignmentId.make("use-agent"),
                   memberId: humanId,
                   source: {
                     _tag: "Direct",
@@ -319,7 +325,7 @@ describe("threads", () => {
               Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
-                  assignmentId: Assignment.Id.make("agent-start"),
+                  assignmentId: Assignment.AssignmentId.make("agent-start"),
                   memberId: agentId,
                   source: {
                     _tag: "Direct",
@@ -362,7 +368,10 @@ describe("threads", () => {
           storage,
           Effect.gen(function* () {
             const { bound, owner, human } = yield* prepare()
-            const direct = (memberIds: ReadonlyArray<Member.Id>, mentions: ReadonlyArray<Member.Id> = []) =>
+            const direct = (
+              memberIds: ReadonlyArray<MemberId.MemberId>,
+              mentions: ReadonlyArray<MemberId.MemberId> = []
+            ) =>
               Effect.flatMap(ThreadService.ThreadService, (threadService) =>
                 threadService.startDirect({ memberIds, text: "Hello", mentions })
               )
@@ -372,7 +381,7 @@ describe("threads", () => {
               Effect.flatMap(Journal.Journal, (journal) =>
                 journal.publish(AssignmentFacts.Created, {
                   workspaceId,
-                  assignmentId: Assignment.Id.make("start-anywhere"),
+                  assignmentId: Assignment.AssignmentId.make("start-anywhere"),
                   memberId: humanId,
                   source: {
                     _tag: "Direct",
@@ -731,7 +740,7 @@ describe("threads", () => {
             const foreign = yield* boundTo(otherWorkspaceId)
             for (const record of [
               Object.assign({}, first.thread, {
-                id: Thread.Id.make("wrong-workspace"),
+                id: ThreadId.ThreadId.make("wrong-workspace"),
                 workspaceId: otherWorkspaceId
               })
             ]) {
@@ -746,7 +755,7 @@ describe("threads", () => {
                 bound.store.transaction(
                   bound.participations.insert(
                     Object.assign({}, participation, {
-                      id: ThreadParticipation.Id.make("duplicate-participation")
+                      id: ThreadParticipationId.ThreadParticipationId.make("duplicate-participation")
                     })
                   )
                 )
@@ -761,7 +770,7 @@ describe("threads", () => {
                 bound.store.transaction(
                   bound.messages.insert(
                     Object.assign({}, first.message, {
-                      id: ThreadMessage.Id.make("blank"),
+                      id: ThreadMessageId.ThreadMessageId.make("blank"),
                       // Text the store must refuse, which `ThreadMessage.published` would not build.
                       content: { _tag: "Text", text: "  ", mentions: [], revision: 1, editedAt: null }
                     })
@@ -777,12 +786,12 @@ describe("threads", () => {
             for (const record of [
               // A message has one activity, even in the next position of another thread.
               Object.assign({}, firstRow, {
-                id: ThreadActivity.Id.make("same-message"),
+                id: ThreadActivity.ThreadActivityId.make("same-message"),
                 threadId: second.thread.id,
                 sequence: 2
               }),
               Object.assign({}, firstRow, {
-                id: ThreadActivity.Id.make("gap"),
+                id: ThreadActivity.ThreadActivityId.make("gap"),
                 sequence: 3
               })
             ]) {
@@ -961,7 +970,7 @@ describe("threads", () => {
 
           // Participants: a reused ID.
           const joined: ThreadParticipation.ThreadParticipation = {
-            id: ThreadParticipation.Id.make("joined"),
+            id: ThreadParticipationId.ThreadParticipationId.make("joined"),
             workspaceId,
             threadId: second.thread.id,
             participant: {
@@ -994,14 +1003,14 @@ describe("threads", () => {
 
           // Timeline: contiguous sequences and one entry per subject.
           const message = Object.assign({}, first.message, {
-            id: ThreadMessage.Id.make("direct-message")
+            id: ThreadMessageId.ThreadMessageId.make("direct-message")
           })
           yield* write(bound.messages.insert(message))
-          const published = (id: string, messageId: ThreadMessage.Id, sequence: number) =>
+          const published = (id: string, messageId: ThreadMessageId.ThreadMessageId, sequence: number) =>
             ThreadActivityKind.makeRecordUnsafe(
               ThreadMessageActivity.Published,
               {
-                id: ThreadActivity.Id.make(id),
+                id: ThreadActivity.ThreadActivityId.make(id),
                 workspaceId,
                 threadId: first.thread.id,
                 sequence,
@@ -1025,7 +1034,7 @@ describe("threads", () => {
           const ended = ThreadActivityKind.makeRecordUnsafe(
             ThreadParticipationActivity.Ended,
             {
-              id: ThreadActivity.Id.make("ended"),
+              id: ThreadActivity.ThreadActivityId.make("ended"),
               workspaceId,
               threadId: first.thread.id,
               sequence: 3,
@@ -1037,7 +1046,9 @@ describe("threads", () => {
           // A participation ends once.
           expect(
             yield* refused(
-              bound.activities.insert(Object.assign({}, ended, { id: ThreadActivity.Id.make("again"), sequence: 4 }))
+              bound.activities.insert(
+                Object.assign({}, ended, { id: ThreadActivity.ThreadActivityId.make("again"), sequence: 4 })
+              )
             )
           ).toMatchObject({
             _tag: "StoreError",
@@ -1065,7 +1076,7 @@ describe("threads", () => {
           })
           const rename = (
             by: Actor.Actor["Service"],
-            threadId: Thread.Id,
+            threadId: ThreadId.ThreadId,
             title: string,
             expectedTitle: string | null = null
           ) =>
@@ -1152,8 +1163,8 @@ describe("threads", () => {
             expect((yield* Effect.flip(rename(owner, started.thread.id, title, "Launch review")))._tag).toBe(
               "CoreError.Invalid"
             )
-          expect(yield* Effect.flip(rename(owner, Thread.Id.make("missing"), "Launch plan"))).toEqual(
-            new CoreError.NotFound({ resource: "Thread", id: Thread.Id.make("missing") })
+          expect(yield* Effect.flip(rename(owner, ThreadId.ThreadId.make("missing"), "Launch plan"))).toEqual(
+            new CoreError.NotFound({ resource: "Thread", id: ThreadId.ThreadId.make("missing") })
           )
           // A start may title the thread; the title is the thread's own, apart from its message.
           const titled = yield* run(
@@ -1173,7 +1184,7 @@ describe("threads", () => {
           // The store refuses a rename of a missing thread, or of one in another workspace.
           const foreign = yield* boundTo(otherWorkspaceId)
           for (const [space, input] of [
-            [bound, { threadId: Thread.Id.make("missing") }],
+            [bound, { threadId: ThreadId.ThreadId.make("missing") }],
             [foreign, { threadId: started.thread.id }]
           ] as const)
             expect(

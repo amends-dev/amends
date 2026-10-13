@@ -2,7 +2,7 @@ import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group } from "@amends-dev/core/group"
 import type { Actor } from "@amends-dev/core/identity"
 import { Entry, Journal } from "@amends-dev/core/journal"
-import { Invitation, type InvitationService, Member } from "@amends-dev/core/workspace"
+import { Invitation, type InvitationService, Member, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import { DateTime, Effect, Option, Result } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -224,7 +224,7 @@ describe("invitations", () => {
           const workspace = yield* initialized(bound)
           const issuedAt = yield* DateTime.now
           const details = (id: string, roleId = BuiltinRoles.MemberId): Invitation.Issuance => ({
-            id: Invitation.Id.make(id),
+            id: Invitation.InvitationId.make(id),
             workspaceId,
             recipientId: bob.id,
             inviterMemberId: workspace.ownerMemberId,
@@ -232,7 +232,7 @@ describe("invitations", () => {
             expiresAt: DateTime.add(issuedAt, { hours: 1 }),
             roleId
           })
-          const memberId = Member.Id.make("joined")
+          const memberId = MemberId.MemberId.make("joined")
           const settledAt = DateTime.add(issuedAt, { minutes: 5 })
           const pending = (id: string, roleId = BuiltinRoles.MemberId): Invitation.Invitation => ({
             details: details(id, roleId),
@@ -242,7 +242,7 @@ describe("invitations", () => {
             Effect.gen(function* () {
               yield* bound.invitations.insert(pending("first"))
               yield* bound.invitations.insert(pending("second", BuiltinRoles.AdministratorId))
-              yield* bound.invitations.settle(Invitation.Id.make("first"), {
+              yield* bound.invitations.settle(Invitation.InvitationId.make("first"), {
                 _tag: "Accepted",
                 memberId,
                 acceptedAt: settledAt
@@ -253,7 +253,7 @@ describe("invitations", () => {
           expect(
             yield* Effect.flip(
               bound.store.transaction(
-                bound.invitations.settle(Invitation.Id.make("first"), {
+                bound.invitations.settle(Invitation.InvitationId.make("first"), {
                   _tag: "Revoked",
                   revokedBy: memberId,
                   revokedAt: settledAt
@@ -274,7 +274,7 @@ describe("invitations", () => {
               reason: { _tag: "Rejected" }
             }
           )
-          expect(yield* bound.invitations.get(Invitation.Id.make("first"))).toEqual(
+          expect(yield* bound.invitations.get(Invitation.InvitationId.make("first"))).toEqual(
             Option.some({
               details: details("first"),
               state: { _tag: "Accepted", memberId, acceptedAt: settledAt }

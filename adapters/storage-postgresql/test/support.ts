@@ -13,9 +13,9 @@ import {
   InvitationStore,
   Member,
   MemberStore,
-  Workspace,
   WorkspaceInitialization,
-  WorkspaceStore
+  WorkspaceStore,
+  WorkspaceId
 } from "@amends-dev/core/workspace"
 import type { WorkspaceStorage } from "@amends-dev/gateway"
 import { BunCrypto } from "@effect/platform-bun"
@@ -37,7 +37,7 @@ export const setup = () => {
 }
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
 export const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") })
-export const workspaceId = Workspace.Id.make("workspace-one")
+export const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 export const journalLog = Entry.LogId.make("journal")
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
@@ -68,7 +68,7 @@ export const views = (options: PostgresWorkspaceStorage.Options = {}) =>
   Effect.gen(function* () {
     const service = yield* PostgresWorkspaceStorage.make(options)
     return {
-      forWorkspace: (workspaceId: Workspace.Id) =>
+      forWorkspace: (workspaceId: WorkspaceId.WorkspaceId) =>
         Effect.map(service.forWorkspace(workspaceId), (context) =>
           bind(
             context.pipe(
@@ -101,7 +101,7 @@ export const initialized = (bound: Bound, creator = alice.id) =>
     name: "Test workspace",
     memberName: Member.Name.make(creator)
   }).pipe(Effect.provide(core(bound)))
-export const boundTo = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
+export const boundTo = Effect.fnUntraced(function* (workspaceId: WorkspaceId.WorkspaceId) {
   return yield* (yield* views()).forWorkspace(workspaceId)
 })
 

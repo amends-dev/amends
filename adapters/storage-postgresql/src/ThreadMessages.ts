@@ -12,7 +12,7 @@
  */
 
 import { StoreError } from "@amends-dev/core/journal"
-import { ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread"
+import { ThreadMessage, ThreadMessageStore, type ThreadMessageId } from "@amends-dev/core/thread"
 import { and, count, eq } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as DateTime from "effect/DateTime"
@@ -133,7 +133,7 @@ export const make = Effect.gen(function* () {
   /** Replace a message's content, which must have text; nothing updated means no such message. */
   const replaceContent = Effect.fnUntraced(function* (
     operation: string,
-    messageId: ThreadMessage.Id,
+    messageId: ThreadMessageId.ThreadMessageId,
     content: ThreadMessage.Content,
     expectedRevision: number | undefined
   ) {

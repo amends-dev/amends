@@ -12,8 +12,7 @@
 
 import { Integrations } from "@amends-dev/connection"
 import type * as Core from "@amends-dev/core"
-import type { Delivery, DeliveryJobs } from "@amends-dev/core/channel"
-import { DeliveryExecution } from "@amends-dev/core/channel"
+import { type Delivery, type DeliveryJobs, DeliveryExecution, type DeliveryId } from "@amends-dev/core/channel"
 import { Gateway } from "@amends-dev/gateway"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
@@ -29,7 +28,7 @@ import type * as Scope from "effect/Scope"
  * @since 0.1.0
  */
 export class RunFailed extends Data.TaggedError("DeliveryRunner.RunFailed")<{
-  readonly deliveryId: Delivery.Id | undefined
+  readonly deliveryId: DeliveryId.DeliveryId | undefined
   readonly cause: unknown
 }> {}
 
@@ -46,7 +45,7 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
   const gateway = yield* Gateway.Gateway
   const integrations = yield* Integrations.Integrations
   /** How many times this runner tried to post each delivery it has not finished with. */
-  const tries = yield* Ref.make(new Map<Delivery.Id, number>())
+  const tries = yield* Ref.make(new Map<DeliveryId.DeliveryId, number>())
   /**
    * Run `program` in the job's workspace, holding the workspace only while `program` runs: a post
    * waits on another system, and the workspace may reload meanwhile.
@@ -122,7 +121,7 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
         )
     }),
     /** Fail the delivery the job could not post, after as many tries as this runner made. */
-    giveUp: (deliveryId: Delivery.Id, reason: string) =>
+    giveUp: (deliveryId: DeliveryId.DeliveryId, reason: string) =>
       Effect.gen(function* () {
         const attempts = (yield* Ref.get(tries)).get(deliveryId) ?? 0
         yield* inWorkspace(

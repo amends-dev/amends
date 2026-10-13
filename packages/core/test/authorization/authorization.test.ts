@@ -1,3 +1,4 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Effect, Exit, Layer, Option } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -31,30 +32,29 @@ import * as MemberFacts from "../../src/workspace/MemberFacts.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
 import * as MemberProjection from "../../src/workspace/MemberProjection.ts"
 import * as MemberStore from "../../src/workspace/MemberStore.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
-const foreignWorkspaceId = Workspace.Id.make("workspace-two")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
+const foreignWorkspaceId = WorkspaceId.WorkspaceId.make("workspace-two")
 const alice = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("alice"),
+  memberId: MemberId.MemberId.make("alice"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") })
 })
 const bob = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("bob"),
+  memberId: MemberId.MemberId.make("bob"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") })
 })
 const charlie = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("charlie"),
+  memberId: MemberId.MemberId.make("charlie"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("charlie") })
 })
 const agent = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("agent"),
+  memberId: MemberId.MemberId.make("agent"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") })
 })
 const membership = (actor: Actor.Actor["Service"]) =>
@@ -84,12 +84,12 @@ const workspaceTarget = Target.Reference.cases.Workspace.make({ workspaceId })
 const createInWorkspace = Requirement.make(Create, workspaceTarget)
 const direct = (
   id: string,
-  recipient: Member.Id,
+  recipient: MemberId.MemberId,
   permission: Permission.Definition,
   scope: Scope.Scope = workspaceScope
 ) =>
   Assignment.Assignment.make({
-    id: Assignment.Id.make(id),
+    id: Assignment.AssignmentId.make(id),
     workspaceId,
     memberId: recipient,
     source: Assignment.Source.cases.Direct.make({ grant: Grant.make(permission, scope) }),
@@ -213,13 +213,13 @@ it.effect("authorization requires a matching permission and scope for the actual
 it.effect("every requirement must be satisfied across role and direct assignments", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
-    const roleId = Role.Id.make("reader")
+    const roleId = Role.RoleId.make("reader")
     yield* seed(
       fixture,
       [alice],
       [
         Assignment.Assignment.make({
-          id: Assignment.Id.make("role"),
+          id: Assignment.AssignmentId.make("role"),
           workspaceId,
           memberId: alice.memberId,
           status: "active",
@@ -281,7 +281,7 @@ it.effect("a built-in role's identity and permission tiers never bypass its stor
       [alice],
       [
         {
-          id: Assignment.Id.make("owner"),
+          id: Assignment.AssignmentId.make("owner"),
           workspaceId,
           memberId: alice.memberId,
           status: "active",
@@ -406,8 +406,8 @@ it.effect("requirements are validated against canonical permission definitions",
 it.effect("authorization observes transactional changes and protects the mutation in the same commit", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
-    const roleId = Role.Id.make("manager")
-    const assignmentId = Assignment.Id.make("manager-assignment")
+    const roleId = Role.RoleId.make("manager")
+    const assignmentId = Assignment.AssignmentId.make("manager-assignment")
     const source = Assignment.Source.cases.Role.make({ roleId, scope: workspaceScope })
     yield* seed(
       fixture,
@@ -497,7 +497,7 @@ it.effect("authorization observes transactional changes and protects the mutatio
       })
       yield* journal
         .publish(AssignmentFacts.Created, {
-          assignmentId: Assignment.Id.make("reassigned"),
+          assignmentId: Assignment.AssignmentId.make("reassigned"),
           workspaceId,
           memberId: alice.memberId,
           source
@@ -561,7 +561,7 @@ it.effect("resolver failures propagate even when another assignment could satisf
       [
         direct("read", alice.memberId, MemberPermissions.Read),
         Assignment.Assignment.make({
-          id: Assignment.Id.make("by-role"),
+          id: Assignment.AssignmentId.make("by-role"),
           workspaceId,
           memberId: alice.memberId,
           status: "active",

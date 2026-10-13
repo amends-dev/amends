@@ -16,21 +16,6 @@ import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 
 /**
- * Names a connection: `@amends-dev/connection`'s `Connection.ConnectionId`, so that core and an
- * integration name a connection alike.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = ConnectionContract.ConnectionId
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = ConnectionContract.ConnectionId
-
-/**
  * A connection's name as recorded; names chosen now are `NewName`.
  *
  * @category schemas
@@ -119,8 +104,8 @@ export type Status = typeof Status.Type
  * @since 0.1.0
  */
 export const Connection = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: ConnectionContract.ConnectionId,
+  workspaceId: WorkspaceId.WorkspaceId,
 
   /** The integration the connection links to, as its id names it, such as `anthropic`. */
   integration: Schema.NonEmptyString,
@@ -130,7 +115,7 @@ export const Connection = Schema.Struct({
   /** How the connection authenticates; one that authenticates with a key always has one. */
   auth: ConnectionContract.AuthMethod,
   status: Status,
-  createdBy: MemberId.Id,
+  createdBy: MemberId.MemberId,
   createdAt: Schema.DateTimeUtcFromString
 })
 
@@ -183,7 +168,11 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category options
  * @since 0.1.0
  */
-export const RenameInput = Schema.Struct({ connectionId: Id, name: NewName, expectedName: Name })
+export const RenameInput = Schema.Struct({
+  connectionId: ConnectionContract.ConnectionId,
+  name: NewName,
+  expectedName: Name
+})
 
 /**
  * @category options
@@ -197,7 +186,7 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
  * @category options
  * @since 0.1.0
  */
-export const ConfigureInput = Schema.Struct({ connectionId: Id, settings: NewSettings })
+export const ConfigureInput = Schema.Struct({ connectionId: ConnectionContract.ConnectionId, settings: NewSettings })
 
 /**
  * @category options
@@ -211,7 +200,7 @@ export interface ConfigureInput extends Schema.Schema.Type<typeof ConfigureInput
  * @category options
  * @since 0.1.0
  */
-export const ReplaceKeyInput = Schema.Struct({ connectionId: Id, apiKey: ApiKey })
+export const ReplaceKeyInput = Schema.Struct({ connectionId: ConnectionContract.ConnectionId, apiKey: ApiKey })
 
 /**
  * @category options
@@ -226,7 +215,11 @@ export interface ReplaceKeyInput extends Schema.Schema.Type<typeof ReplaceKeyInp
  * @category schemas
  * @since 0.1.0
  */
-export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id, name: Name })
+export const Renamed = Schema.Struct({
+  workspaceId: WorkspaceId.WorkspaceId,
+  connectionId: ConnectionContract.ConnectionId,
+  name: Name
+})
 
 /**
  * @category schemas
@@ -242,8 +235,8 @@ export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
  * @since 0.1.0
  */
 export const Configured = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  connectionId: Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  connectionId: ConnectionContract.ConnectionId,
   settings: Settings
 })
 
@@ -259,7 +252,10 @@ export interface Configured extends Schema.Schema.Type<typeof Configured> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Reference = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id })
+export const Reference = Schema.Struct({
+  workspaceId: WorkspaceId.WorkspaceId,
+  connectionId: ConnectionContract.ConnectionId
+})
 
 /**
  * @category schemas
@@ -296,7 +292,7 @@ export type Readiness = typeof Readiness.Type
  * @since 0.1.0
  */
 export const View = Schema.Struct({
-  id: Id,
+  id: ConnectionContract.ConnectionId,
   name: Name,
   integration: Schema.NonEmptyString,
   settings: Settings,
@@ -305,7 +301,7 @@ export const View = Schema.Struct({
 
   /** Whether the reader may rename it, change its settings and key, check it, and remove it. */
   manageable: Schema.Boolean,
-  createdBy: MemberId.Id,
+  createdBy: MemberId.MemberId,
   createdAt: Schema.DateTimeUtcFromString
 })
 

@@ -1,3 +1,4 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -8,19 +9,17 @@ import * as Role from "../../src/authorization/Role.ts"
 import * as Scope from "../../src/authorization/Scope.ts"
 import * as Target from "../../src/authorization/Target.ts"
 import * as Codec from "../../src/journal/Codec.ts"
-import * as Member from "../../src/workspace/Member.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 
-const workspaceId = Workspace.Id.make("workspace-1")
-const recipientId = Member.Id.make("recipient")
-const targetMemberId = Member.Id.make("target-member")
-const roleId = Role.Id.make("role-1")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
+const recipientId = MemberId.MemberId.make("recipient")
+const targetMemberId = MemberId.MemberId.make("target-member")
+const roleId = Role.RoleId.make("role-1")
 const ManageWorkspace = Permission.make("test.workspace.manage", {
   targetKind: "Workspace",
   builtinTier: "administrator"
 })
-const sourcesIn = (workspaceId: Workspace.Id): ReadonlyArray<Assignment.Source> => {
+const sourcesIn = (workspaceId: WorkspaceId.WorkspaceId): ReadonlyArray<Assignment.Source> => {
   const scopedPermissions = [
     [MemberPermissions.Remove, Scope.Scope.cases.Workspace.make({ workspaceId })],
     [
@@ -51,7 +50,7 @@ it.effect("assignments retain role references or direct grants within the recipi
     for (const source of sourcesIn(workspaceId)) {
       for (const status of Assignment.Status.literals) {
         const input = {
-          id: Assignment.Id.make(`assignment-${source._tag}-${status}`),
+          id: Assignment.AssignmentId.make(`assignment-${source._tag}-${status}`),
           workspaceId,
           memberId: recipientId,
           source,
@@ -67,10 +66,10 @@ it.effect("assignments retain role references or direct grants within the recipi
 it.effect("both assignment sources reject foreign workspace and exact-target scopes, including after revocation", () =>
   Effect.gen(function* () {
     const decode = Schema.decodeUnknownEffect(Assignment.Assignment)
-    for (const source of sourcesIn(Workspace.Id.make("workspace-2"))) {
+    for (const source of sourcesIn(WorkspaceId.WorkspaceId.make("workspace-2"))) {
       for (const status of Assignment.Status.literals) {
         const input = {
-          id: Assignment.Id.make(`assignment-${source._tag}-${status}`),
+          id: Assignment.AssignmentId.make(`assignment-${source._tag}-${status}`),
           workspaceId,
           memberId: recipientId,
           source,
@@ -91,7 +90,7 @@ it.effect("assignment creation facts preserve workspace checks through the journ
     // Encode invalid stored data without the cross-field check to exercise replay decoding.
     const unchecked = Codec.makeForSchema(Schema.Struct(AssignmentFacts.Created.payload.fields))
     const identifiers = {
-      assignmentId: Assignment.Id.make("assignment-1"),
+      assignmentId: Assignment.AssignmentId.make("assignment-1"),
       workspaceId,
       memberId: recipientId
     }
@@ -100,7 +99,7 @@ it.effect("assignment creation facts preserve workspace checks through the journ
       const bytes = yield* codec.encode(payload)
       expect(yield* codec.decode(bytes)).toEqual(payload)
     }
-    for (const source of sourcesIn(Workspace.Id.make("workspace-2"))) {
+    for (const source of sourcesIn(WorkspaceId.WorkspaceId.make("workspace-2"))) {
       const payload = { ...identifiers, source }
       const error = yield* codec.encode(payload).pipe(Effect.flip)
       expect(error.message).toContain("Assignment scope must belong to its workspace")

@@ -44,7 +44,7 @@ export class GroupQuery extends Context.Service<
      * no transaction; writes must call it inside their commit. Never cache its result as authority.
      */
     readonly requireAudience: (
-      groupId: GroupId.Id
+      groupId: GroupId.GroupId
     ) => Effect.Effect<GroupMembership.GroupMembership, AudienceError, Actor.Actor>
   }
 >()("@amends-dev/core/group/GroupQuery") {}
@@ -60,8 +60,8 @@ export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const groupMembershipStore = yield* GroupMembershipStore.GroupMembershipStore
 
-  const requireAudience = Effect.fn("GroupQuery.requireAudience")(function* (groupId: GroupId.Id) {
-    const id = yield* Schema.decodeEffect(GroupId.Id)(groupId)
+  const requireAudience = Effect.fn("GroupQuery.requireAudience")(function* (groupId: GroupId.GroupId) {
+    const id = yield* Schema.decodeEffect(GroupId.GroupId)(groupId)
     yield* authorization.require([])
     const actor = yield* Actor.Actor
     const found = yield* groupMembershipStore.findActive(id, actor.memberId)

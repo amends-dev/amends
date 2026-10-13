@@ -1,12 +1,11 @@
 import { ChannelTransport } from "@amends-dev/channel"
-import { Integration, Integrations } from "@amends-dev/connection"
-import { Delivery, DeliveryExecution, DeliveryJobs } from "@amends-dev/core/channel"
-import { Connection } from "@amends-dev/core/connection"
+import { Integration, Integrations, Connection as ConnectionContract } from "@amends-dev/connection"
+import { Delivery, DeliveryExecution, DeliveryJobs, DeliveryId } from "@amends-dev/core/channel"
 import { CoreError } from "@amends-dev/core/error"
 import { Group } from "@amends-dev/core/group"
 import { Commit, Store } from "@amends-dev/core/journal"
-import { ThreadId, ThreadMessage } from "@amends-dev/core/thread"
-import { Workspace } from "@amends-dev/core/workspace"
+import { ThreadId, ThreadMessageId } from "@amends-dev/core/thread"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Context, DateTime, Duration, Effect, Layer } from "effect"
@@ -23,12 +22,12 @@ const cluster = Sharding.layer.pipe(
   Layer.provide(ShardingConfig.layer({ entityMessagePollInterval: Duration.seconds(1) }))
 )
 
-const workspaceId = Workspace.Id.make("workspace-1")
-const job: DeliveryJobs.Job = { workspaceId, threadId: ThreadId.Id.make("thread-1") }
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
+const job: DeliveryJobs.Job = { workspaceId, threadId: ThreadId.ThreadId.make("thread-1") }
 const at = DateTime.makeUnsafe("2026-10-10T12:00:00.000Z")
 const conversation = { id: "conv-1", details: {} }
 const connection = {
-  id: Connection.Id.make("connection-channels"),
+  id: ConnectionContract.ConnectionId.make("connection-channels"),
   integration: "test-channels",
   name: "Support desk",
   settings: {},
@@ -37,13 +36,13 @@ const connection = {
 /** A delivery of the thread's `sequence`th message, requested. */
 const requested = (sequence: number) =>
   Delivery.requested({
-    id: Delivery.Id.make(`delivery-${sequence}`),
+    id: DeliveryId.DeliveryId.make(`delivery-${sequence}`),
     workspaceId,
     channelId: "channel-1" as never,
     threadId: job.threadId,
     groupId: Group.GeneralId,
     conversationId: conversation.id,
-    messageId: ThreadMessage.Id.make(`message-${sequence}`),
+    messageId: ThreadMessageId.ThreadMessageId.make(`message-${sequence}`),
     sequence,
     requestedAt: at
   })
@@ -181,7 +180,7 @@ const inCommit = <E>(
   Effect.gen(function* () {
     const afterCommit: Array<Effect.Effect<void>> = []
     const storeTransaction = Store.Transaction.of({
-      id: Commit.Id.make(commitId),
+      id: Commit.CommitId.make(commitId),
       append: () => Effect.die("The test commit appends nothing"),
       afterCommit: (effect) => Effect.sync(() => void afterCommit.push(effect))
     })

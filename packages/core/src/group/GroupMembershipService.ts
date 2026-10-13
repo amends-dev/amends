@@ -24,10 +24,11 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as Group from "./Group.ts"
 import * as GroupCommand from "./GroupCommand.ts"
+import * as GroupId from "./GroupId.ts"
 import * as GroupMembership from "./GroupMembership.ts"
 import * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts"
 import * as GroupMembershipStore from "./GroupMembershipStore.ts"
@@ -89,7 +90,7 @@ export class GroupMembershipService extends Context.Service<
      * `CoreError.NotFound` like missing ones, so joining discloses nothing about them. Joining
      * again returns the actor's current admission and records nothing.
      */
-    readonly join: (groupId: Group.Id) => Effect.Effect<GroupMembership.GroupMembership, Error, Actor.Actor>
+    readonly join: (groupId: GroupId.GroupId) => Effect.Effect<GroupMembership.GroupMembership, Error, Actor.Actor>
     /**
      * End only the actor's own team-group admission; active workspace membership is sufficient.
      * Nobody leaves the general group.
@@ -102,7 +103,7 @@ export class GroupMembershipService extends Context.Service<
      * group.read and audience membership.
      */
     readonly listCurrent: (
-      groupId: Group.Id,
+      groupId: GroupId.GroupId,
       options: GroupMembership.ListOptions
     ) => Effect.Effect<ReadonlyArray<GroupMembership.GroupMembership>, ReadError, Actor.Actor>
   }
@@ -129,7 +130,7 @@ export const make = Effect.gen(function* () {
   /**
    * Management needs the grant and membership of the group; to anyone outside it, it is missing.
    */
-  const requireManagement = Effect.fnUntraced(function* (groupId: Group.Id) {
+  const requireManagement = Effect.fnUntraced(function* (groupId: GroupId.GroupId) {
     yield* authorization.require([
       Requirement.make(GroupMembershipPermissions.Manage, Target.Reference.cases.Group.make({ workspaceId, groupId }))
     ])
@@ -137,14 +138,14 @@ export const make = Effect.gen(function* () {
   })
 
   /** The group, or `CoreError.NotFound` when it is not stored. */
-  const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+  const requireGroup = Effect.fnUntraced(function* (groupId: GroupId.GroupId) {
     const foundGroup = yield* groupStore.get(groupId)
     if (Option.isNone(foundGroup)) return yield* new CoreError.NotFound({ resource: "Group", id: groupId })
     return foundGroup.value
   })
 
   /** The group, when it is a team: a direct group keeps the members it started with. */
-  const requireTeamGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+  const requireTeamGroup = Effect.fnUntraced(function* (groupId: GroupId.GroupId) {
     const group = yield* requireGroup(groupId)
     if (group.kind === "Direct")
       return yield* new CoreError.Invalid({ reason: new CoreError.FixedMembership({ groupId }) })
@@ -152,7 +153,7 @@ export const make = Effect.gen(function* () {
   })
 
   /** Admit the member to the group now, returning the new admission. */
-  const admitMember = Effect.fnUntraced(function* (groupId: Group.Id, memberId: Member.Id) {
+  const admitMember = Effect.fnUntraced(function* (groupId: GroupId.GroupId, memberId: MemberId.MemberId) {
     const admitted = yield* groupCommand.admitMember(groupId, memberId, yield* DateTime.now)
     return admitted.membership
   })
@@ -182,8 +183,8 @@ export const make = Effect.gen(function* () {
   )
 
   const join = Effect.fn("GroupMembershipService.join")(
-    function* (input: Group.Id) {
-      const groupId = yield* Schema.decodeEffect(Group.Id)(input)
+    function* (input: GroupId.GroupId) {
+      const groupId = yield* Schema.decodeEffect(GroupId.GroupId)(input)
       yield* authorization.require([
         Requirement.make(GroupMembershipPermissions.Join, Target.Reference.cases.Group.make({ workspaceId, groupId }))
       ])
@@ -287,7 +288,10 @@ export const make = Effect.gen(function* () {
   /**
    * Fill a page with admissions whose workspace member is still active, reading further as needed.
    */
-  const pageCurrentMemberships = Effect.fnUntraced(function* (groupId: Group.Id, input: GroupMembership.ListOptions) {
+  const pageCurrentMemberships = Effect.fnUntraced(function* (
+    groupId: GroupId.GroupId,
+    input: GroupMembership.ListOptions
+  ) {
     const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input)
     yield* requireGroup(groupId)
     const active: Array<GroupMembership.GroupMembership> = []
@@ -313,10 +317,10 @@ export const make = Effect.gen(function* () {
   })
 
   const listCurrent = Effect.fn("GroupMembershipService.listCurrent")(function* (
-    groupId: Group.Id,
+    groupId: GroupId.GroupId,
     options: GroupMembership.ListOptions
   ) {
-    const id = yield* Schema.decodeEffect(Group.Id)(groupId)
+    const id = yield* Schema.decodeEffect(GroupId.GroupId)(groupId)
     yield* groupQuery.requireAudience(id)
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId: id }))

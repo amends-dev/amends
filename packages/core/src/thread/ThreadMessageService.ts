@@ -31,10 +31,11 @@ import * as ReadStateStore from "../read-state/ReadStateStore.ts"
 import * as Request from "../request/Request.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
-import type * as Member from "../workspace/Member.ts"
-import type * as Thread from "./Thread.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
+import type * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
+import * as ThreadMessageId from "./ThreadMessageId.ts"
 import * as ThreadMessagePermissions from "./ThreadMessagePermissions.ts"
 import * as ThreadMessageStore from "./ThreadMessageStore.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
@@ -125,7 +126,7 @@ export class ThreadMessageService extends Context.Service<
      * no one is told; one already deleted records nothing. Returns the message as deleted.
      */
     readonly delete: (
-      messageId: ThreadMessage.Id
+      messageId: ThreadMessageId.ThreadMessageId
     ) => Effect.Effect<ThreadMessage.ThreadMessage, DeleteError, Actor.Actor>
     /**
      * Tell the thread's readers that the acting member is composing a message there, for the next
@@ -133,7 +134,7 @@ export class ThreadMessageService extends Context.Service<
      * from the same member in the same thread within a moment are dropped, so a client may send it
      * whenever the member types.
      */
-    readonly typing: (threadId: Thread.Id) => Effect.Effect<void, TypingError, Actor.Actor>
+    readonly typing: (threadId: ThreadId.ThreadId) => Effect.Effect<void, TypingError, Actor.Actor>
   }
 >()("@amends-dev/core/thread/ThreadMessageService") {}
 
@@ -143,8 +144,8 @@ export class ThreadMessageService extends Context.Service<
  * included.
  */
 const selectedFor = (
-  authorId: Member.Id,
-  mentions: ReadonlyArray<Member.Id>,
+  authorId: MemberId.MemberId,
+  mentions: ReadonlyArray<MemberId.MemberId>,
   current: ReadonlyArray<ThreadParticipation.ThreadParticipation>
 ): ReadonlyArray<ThreadParticipation.Reference> => {
   const author: ThreadParticipation.Reference = ThreadParticipation.Reference.cases.Member.make({ memberId: authorId })
@@ -184,11 +185,13 @@ export const make = Effect.gen(function* () {
    */
   const deriveReplyId = Effect.fnUntraced(function* (key: Request.Key | undefined) {
     const actor = yield* Actor.Actor
-    return ThreadMessage.Id.make(yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId]))
+    return ThreadMessageId.ThreadMessageId.make(
+      yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId])
+    )
   })
 
   /** The thread, once the actor may read it and publish there. */
-  const requirePublishable = Effect.fnUntraced(function* (threadId: Thread.Id) {
+  const requirePublishable = Effect.fnUntraced(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* threadQuery.requireAccess(threadId)
     yield* authorization.require([
       Requirement.make(
@@ -200,14 +203,14 @@ export const make = Effect.gen(function* () {
   })
 
   /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
-  const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessage.Id) =>
+  const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessageId.ThreadMessageId) =>
     key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId)
 
   /**
    * A message and its thread, once the actor may act in that thread; to anyone outside its group,
    * the message is missing, as a missing one is.
    */
-  const requireMessage = Effect.fnUntraced(function* (messageId: ThreadMessage.Id) {
+  const requireMessage = Effect.fnUntraced(function* (messageId: ThreadMessageId.ThreadMessageId) {
     const found = yield* threadMessageStore.get(messageId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "ThreadMessage", id: messageId })
     const thread = yield* threadQuery
@@ -226,7 +229,7 @@ export const make = Effect.gen(function* () {
     ThreadMessage.Author.isAnyOf(["Member"])(message.author) && message.author.memberId === actor.memberId
 
   /** Whether two sets of mentions name the same members. */
-  const sameMentions = (left: ReadonlyArray<Member.Id>, right: ReadonlyArray<Member.Id>) =>
+  const sameMentions = (left: ReadonlyArray<MemberId.MemberId>, right: ReadonlyArray<MemberId.MemberId>) =>
     left.length === right.length && left.every((memberId) => right.includes(memberId))
   const publish = Effect.fn("ThreadMessageService.publish")(
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
@@ -359,8 +362,8 @@ export const make = Effect.gen(function* () {
   )
 
   const deleteMessage = Effect.fn("ThreadMessageService.delete")(
-    function* (messageId: ThreadMessage.Id) {
-      const id = yield* Schema.decodeEffect(ThreadMessage.Id)(messageId)
+    function* (messageId: ThreadMessageId.ThreadMessageId) {
+      const id = yield* Schema.decodeEffect(ThreadMessageId.ThreadMessageId)(messageId)
       const { message, thread } = yield* requireMessage(id)
       const actor = yield* Actor.Actor
       if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
@@ -391,7 +394,7 @@ export const make = Effect.gen(function* () {
 
   /** When each member last said they were typing in each thread, in this process. */
   const lastTyping = new Map<string, number>()
-  const typing = Effect.fn("ThreadMessageService.typing")(function* (threadId: Thread.Id) {
+  const typing = Effect.fn("ThreadMessageService.typing")(function* (threadId: ThreadId.ThreadId) {
     const thread = yield* requirePublishable(threadId)
     const actor = yield* Actor.Actor
     const now = yield* DateTime.now

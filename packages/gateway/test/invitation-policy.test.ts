@@ -1,6 +1,6 @@
 import { AssignmentFacts, BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization"
 import { Entry, Journal, Publication } from "@amends-dev/core/journal"
-import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -136,7 +136,7 @@ describe("invitation policy", () => {
                 bound.workspace.transferOwnership({
                   workspaceId: workspace.id,
                   previousOwnerMemberId: workspace.ownerMemberId,
-                  ownerMemberId: Member.Id.make("successor")
+                  ownerMemberId: MemberId.MemberId.make("successor")
                 })
               )
             }
@@ -167,7 +167,7 @@ describe("invitation policy", () => {
           const workspace = yield* Operations.createWorkspace(alice.id)
           const bound = yield* boundTo(workspace.id)
           const before = yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })
-          for (const roleId of [Role.Id.make("unknown"), BuiltinRoles.OwnerId]) {
+          for (const roleId of [Role.RoleId.make("unknown"), BuiltinRoles.OwnerId]) {
             yield* Effect.flip(Operations.invite(workspace.id, alice, request(yield* future, bob.id, roleId)))
             expect(yield* bound.store.read(Entry.LogId.make("journal"), { limit: 20 })).toEqual(before)
           }

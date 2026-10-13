@@ -1,5 +1,5 @@
 import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authorization"
-import { Group, GroupFollow, GroupMembership, GroupService } from "@amends-dev/core/group"
+import { Group, GroupFollow, GroupMembership, GroupService, GroupId } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
 import { type Checkpoint, Entry, type Store } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
@@ -7,13 +7,14 @@ import {
   ThreadActivity,
   ThreadActivityKind,
   ThreadId,
-  ThreadMessage,
   ThreadMessageActivity,
   ThreadParticipation,
-  ThreadService
+  ThreadService,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
-import { Turn } from "@amends-dev/core/turn"
-import { Member, MemberPermissions, type Workspace } from "@amends-dev/core/workspace"
+import { Turn, TurnId } from "@amends-dev/core/turn"
+import { Member, MemberPermissions, type WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -27,11 +28,11 @@ export const contracts = (fixture: Fixture.Fixture) => {
   const { initialized } = Support
   describe.skipIf(!fixture.available)(`${fixture.name}: store contracts`, () => {
     const permission = MemberPermissions.Read.name
-    const roleId = Role.Id.make("contract-role")
+    const roleId = Role.RoleId.make("contract-role")
     const localScope = (
       kind: "Workspace" | "TargetWorkspace" | "TargetMember" | "TargetThread" | "TargetGroup",
-      id: Workspace.Id,
-      memberId: Member.Id
+      id: WorkspaceId.WorkspaceId,
+      memberId: MemberId.MemberId
     ): Scope.Scope => {
       if (kind === "Workspace") return Scope.Scope.cases.Workspace.make({ workspaceId: id })
       return Scope.Scope.cases.Target.make({
@@ -39,12 +40,12 @@ export const contracts = (fixture: Fixture.Fixture) => {
           kind === "TargetGroup"
             ? Target.Reference.cases.Group.make({
                 workspaceId: id,
-                groupId: Group.Id.make("group")
+                groupId: GroupId.GroupId.make("group")
               })
             : kind === "TargetThread"
               ? Target.Reference.cases.Thread.make({
                   workspaceId: id,
-                  threadId: ThreadId.Id.make("thread")
+                  threadId: ThreadId.ThreadId.make("thread")
                 })
               : kind === "TargetMember"
                 ? Target.Reference.cases.Member.make({ workspaceId: id, memberId })
@@ -75,7 +76,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
             const bound = yield* Support.boundTo(Support.workspaceId)
             const { workspace, role } = yield* seed(bound)
             const record: Assignment.Assignment = {
-              id: Assignment.Id.make("rolled-back"),
+              id: Assignment.AssignmentId.make("rolled-back"),
               workspaceId: Support.workspaceId,
               memberId: workspace.ownerMemberId,
               status: "active",
@@ -109,7 +110,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
           Effect.gen(function* () {
             const bound = yield* Support.boundTo(Support.workspaceId)
             const workspace = yield* initialized(bound)
-            const next = Member.Id.make("next-owner")
+            const next = MemberId.MemberId.make("next-owner")
             const change = {
               workspaceId: Support.workspaceId,
               previousOwnerMemberId: workspace.ownerMemberId,
@@ -188,7 +189,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
             const bound = yield* Support.boundTo(Support.workspaceId)
             const workspace = yield* initialized(bound)
             const member = (id: string, identity: Identity.MemberReference = Support.bob): Member.Member => ({
-              id: Member.Id.make(id),
+              id: MemberId.MemberId.make(id),
               workspaceId: Support.workspaceId,
               identity,
               name: Member.Name.make(identity.id),
@@ -215,10 +216,10 @@ export const contracts = (fixture: Fixture.Fixture) => {
                 operation: "insert",
                 reason: { _tag: "Rejected" }
               })
-            yield* bound.store.transaction(bound.members.markRemoved(Member.Id.make("bob-first")))
+            yield* bound.store.transaction(bound.members.markRemoved(MemberId.MemberId.make("bob-first")))
             for (const id of ["bob-first", "missing"])
               expect(
-                yield* Effect.flip(bound.store.transaction(bound.members.markRemoved(Member.Id.make(id))))
+                yield* Effect.flip(bound.store.transaction(bound.members.markRemoved(MemberId.MemberId.make(id))))
               ).toMatchObject({
                 _tag: "StoreError",
                 store: "MemberStore",
@@ -273,7 +274,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
               reason: { _tag: "Rejected" }
             })
             expect(
-              yield* Effect.flip(bound.store.transaction(bound.roles.rename(Role.Id.make("missing"), "Missing")))
+              yield* Effect.flip(bound.store.transaction(bound.roles.rename(Role.RoleId.make("missing"), "Missing")))
             ).toMatchObject({
               _tag: "StoreError",
               store: "RoleStore",
@@ -281,7 +282,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
               reason: { _tag: "Rejected" }
             })
             const assignment: Assignment.Assignment = {
-              id: Assignment.Id.make("reused"),
+              id: Assignment.AssignmentId.make("reused"),
               workspaceId: Support.workspaceId,
               memberId: workspace.ownerMemberId,
               status: "active",
@@ -292,7 +293,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
             for (const operation of [
               bound.assignments.insert(assignment),
               bound.assignments.markRevoked(assignment.id),
-              bound.assignments.markRevoked(Assignment.Id.make("missing"))
+              bound.assignments.markRevoked(Assignment.AssignmentId.make("missing"))
             ])
               expect(yield* Effect.flip(bound.store.transaction(operation))).toMatchObject({
                 _tag: "StoreError",
@@ -391,7 +392,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
           })
           const human = Actor.Actor.of({
             workspaceId: Support.workspaceId,
-            memberId: Member.Id.make("human"),
+            memberId: MemberId.MemberId.make("human"),
             identity: Support.bob
           })
           yield* Support.seed(bound, [human], [human])
@@ -433,7 +434,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
           })
           for (const duplicate of [
             admission,
-            Object.assign({}, admission, { id: GroupMembership.Id.make("another-admission") })
+            Object.assign({}, admission, { id: GroupMembership.GroupMembershipId.make("another-admission") })
           ])
             expect(yield* refused(bound.groupMemberships.insert(duplicate))).toMatchObject({
               _tag: "StoreError",
@@ -443,7 +444,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
 
           // Follows: a reused ID, and one active follow per admission.
           const follow = {
-            id: GroupFollow.Id.make("follow"),
+            id: GroupFollow.GroupFollowId.make("follow"),
             workspaceId: Support.workspaceId,
             groupId: group.id,
             memberId: human.memberId,
@@ -453,7 +454,10 @@ export const contracts = (fixture: Fixture.Fixture) => {
             endedAt: null
           } satisfies GroupFollow.GroupFollow
           yield* write(bound.groupFollows.insert(follow))
-          for (const duplicate of [follow, Object.assign({}, follow, { id: GroupFollow.Id.make("second-follow") })])
+          for (const duplicate of [
+            follow,
+            Object.assign({}, follow, { id: GroupFollow.GroupFollowId.make("second-follow") })
+          ])
             expect(yield* refused(bound.groupFollows.insert(duplicate))).toMatchObject({
               _tag: "StoreError",
               store: "GroupFollowStore",
@@ -471,7 +475,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
           for (const duplicate of [
             participation,
             Object.assign({}, participation, {
-              id: ThreadParticipation.Id.make("duplicate-participation")
+              id: ThreadParticipationId.ThreadParticipationId.make("duplicate-participation")
             })
           ])
             expect(yield* refused(bound.participations.insert(duplicate))).toMatchObject({
@@ -487,14 +491,14 @@ export const contracts = (fixture: Fixture.Fixture) => {
 
           // Timelines: contiguous positions, and one activity per subject.
           const message = Object.assign({}, started.message, {
-            id: ThreadMessage.Id.make("direct-message")
+            id: ThreadMessageId.ThreadMessageId.make("direct-message")
           })
           yield* write(bound.messages.insert(message))
-          const published = (id: string, messageId: ThreadMessage.Id, sequence: number) =>
+          const published = (id: string, messageId: ThreadMessageId.ThreadMessageId, sequence: number) =>
             ThreadActivityKind.makeRecordUnsafe(
               ThreadMessageActivity.Published,
               {
-                id: ThreadActivity.Id.make(id),
+                id: ThreadActivity.ThreadActivityId.make(id),
                 workspaceId: Support.workspaceId,
                 threadId: started.thread.id,
                 sequence,
@@ -527,13 +531,13 @@ export const contracts = (fixture: Fixture.Fixture) => {
           yield* initialized(bound)
           const createdAt = yield* DateTime.now
           const turn = (id: string, status: Turn.Status, thread = "thread"): Turn.Turn => ({
-            id: Turn.Id.make(id),
+            id: TurnId.TurnId.make(id),
             workspaceId: Support.workspaceId,
             groupId: Group.GeneralId,
-            threadId: ThreadId.Id.make(thread),
+            threadId: ThreadId.ThreadId.make(thread),
             agentId: Identity.AgentId.make("agent"),
-            memberId: Member.Id.make("agent-member"),
-            participationId: ThreadParticipation.Id.make(`${thread}-participation`),
+            memberId: MemberId.MemberId.make("agent-member"),
+            participationId: ThreadParticipationId.ThreadParticipationId.make(`${thread}-participation`),
             retry: null,
             status,
             acceptedThroughSequence: 1,
@@ -580,17 +584,17 @@ export const contracts = (fixture: Fixture.Fixture) => {
           const bound = yield* Support.forWorkspace(yield* storage.connect(), Support.workspaceId)
           yield* initialized(bound)
           const recordedAt = yield* DateTime.now
-          const reader = Notification.ofMember(Member.Id.make("reader"), Support.bob)
-          const threadId = ThreadId.Id.make("thread")
+          const reader = Notification.ofMember(MemberId.MemberId.make("reader"), Support.bob)
+          const threadId = ThreadId.ThreadId.make("thread")
           const note = (
             id: string,
             sequence: number,
             recipient: Notification.Recipient = reader,
             thread = threadId
           ): Notification.Notification => ({
-            id: Notification.Id.make(id),
+            id: Notification.NotificationId.make(id),
             workspaceId: Support.workspaceId,
-            source: { logId: Entry.LogId.make(`${thread}-log`), entryId: Entry.Id.make(id) },
+            source: { logId: Entry.LogId.make(`${thread}-log`), entryId: Entry.EntryId.make(id) },
             thread: { threadId: thread, groupId: Group.GeneralId, sequence },
             recipient,
             recordedAt,
@@ -601,8 +605,8 @@ export const contracts = (fixture: Fixture.Fixture) => {
               note("first", 1),
               note("second", 2),
               note("later", 3),
-              note("other-thread", 1, reader, ThreadId.Id.make("other-thread")),
-              note("other-member", 1, Notification.ofMember(Member.Id.make("other"), Support.charlie))
+              note("other-thread", 1, reader, ThreadId.ThreadId.make("other-thread")),
+              note("other-member", 1, Notification.ofMember(MemberId.MemberId.make("other"), Support.charlie))
             ])
           )
           const position = (readThrough: number) => ({
@@ -613,7 +617,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
           })
           /** Each notification's state, Pending or when it was seen, in the order inserted. */
           const states = Effect.forEach(["first", "second", "later", "other-thread", "other-member"], (id) =>
-            Effect.map(bound.notifications.get(Notification.Id.make(id)), (found) => {
+            Effect.map(bound.notifications.get(Notification.NotificationId.make(id)), (found) => {
               const { state } = Option.getOrThrow(found)
               return Notification.State.isAnyOf(["Seen"])(state) ? DateTime.toEpochMillis(state.seenAt) : state._tag
             })

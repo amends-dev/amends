@@ -22,7 +22,7 @@ const key = { logId: Entry.LogId.make("journal"), name: "projection", version: 1
 
 it.effect("an operation reports its kinds as they are", () =>
   Effect.gen(function* () {
-    const missing = new CoreError.NotFound({ resource: "Member", id: MemberId.Id.make("m") })
+    const missing = new CoreError.NotFound({ resource: "Member", id: MemberId.MemberId.make("m") })
     expect(yield* reported(missing)).toBe(missing)
   })
 )
@@ -45,7 +45,7 @@ it.effect("a commit storage could not confirm is Uncertain, without storage's de
   Effect.gen(function* () {
     const uncertain = yield* reported(
       new Store.CommitUncertain({
-        commitId: Commit.Id.make("commit"),
+        commitId: Commit.CommitId.make("commit"),
         cause: new Error("driver detail")
       })
     )

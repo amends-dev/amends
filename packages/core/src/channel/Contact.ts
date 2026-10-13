@@ -16,21 +16,6 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ChannelId from "./ChannelId.ts"
 
 /**
- * Names a contact; `Identity.ContactId`, derived from the channel and the external user, so that
- * the same person on the same channel is one contact however often they write.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = Identity.ContactId
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = Identity.ContactId
-
-/**
  * What a contact is called, as the external system calls them: 1 to 200 characters, without
  * surrounding space, which storage keeps as given.
  *
@@ -69,9 +54,9 @@ export const nameOf = (sender: string): Name => {
  * @since 0.1.0
  */
 export const Contact = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  channelId: ChannelId.Id,
+  id: Identity.ContactId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  channelId: ChannelId.ChannelId,
   /** The external system's id for the person. */
   externalId: ChannelTransport.ExternalId,
   name: Name,
@@ -98,7 +83,11 @@ export const change = (record: Contact, changes: Partial<Contact>): Contact => O
  * @category schemas
  * @since 0.1.0
  */
-export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, contactId: Id, name: Name })
+export const Renamed = Schema.Struct({
+  workspaceId: WorkspaceId.WorkspaceId,
+  contactId: Identity.ContactId,
+  name: Name
+})
 
 /**
  * @category schemas

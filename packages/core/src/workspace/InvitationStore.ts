@@ -37,7 +37,9 @@ export class InvitationStore extends Context.Service<
   InvitationStore,
   {
     /** Return an isolated record from the current transaction or committed state. */
-    readonly get: (id: Invitation.Id) => Effect.Effect<Option.Option<Invitation.Invitation>, StoreError.StoreError>
+    readonly get: (
+      id: Invitation.InvitationId
+    ) => Effect.Effect<Option.Option<Invitation.Invitation>, StoreError.StoreError>
     /** All Pending invitations for this human in this workspace, including expired ones. */
     readonly listPendingByRecipient: (
       recipientId: Identity.HumanId
@@ -51,7 +53,7 @@ export class InvitationStore extends Context.Service<
      * the issuance is retained as it was.
      */
     readonly settle: (
-      id: Invitation.Id,
+      id: Invitation.InvitationId,
       state: Exclude<Invitation.State, { readonly _tag: "Pending" }>
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
@@ -67,11 +69,14 @@ const Settled = Schema.Union([Invitation.State.cases.Accepted, Invitation.State.
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: InvitationStore["Service"]): InvitationStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: InvitationStore["Service"]
+): InvitationStore["Service"] => {
   const read = StoreInput.read("InvitationStore")
   const write = StoreInput.write("InvitationStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Invitation.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", Invitation.InvitationId, id), driver.get),
     listPendingByRecipient: (recipientId) =>
       Effect.flatMap(read("listPendingByRecipient", Identity.HumanId, recipientId), driver.listPendingByRecipient),
     list: driver.list,
@@ -84,7 +89,10 @@ export const make = (workspaceId: WorkspaceId.Id, driver: InvitationStore["Servi
         Effect.flatMap(driver.insert)
       ),
     settle: Effect.fn("InvitationStore.settle")(function* (id, state) {
-      return yield* driver.settle(yield* write("settle", Invitation.Id, id), yield* write("settle", Settled, state))
+      return yield* driver.settle(
+        yield* write("settle", Invitation.InvitationId, id),
+        yield* write("settle", Settled, state)
+      )
     })
   }
 }

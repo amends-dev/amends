@@ -9,27 +9,13 @@
  * @since 0.1.0
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import * as Schema from "effect/Schema"
-import * as Connection from "../connection/Connection.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Text from "../text/Text.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as ChannelId from "./ChannelId.ts"
-
-/**
- * Names a channel; `ChannelId.Id`, where models that only refer to channels import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = ChannelId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = ChannelId.Id
 
 /**
  * A channel's name as recorded; names chosen now are `NewName`.
@@ -75,17 +61,17 @@ export type Status = typeof Status.Type
  * @since 0.1.0
  */
 export const Channel = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: ChannelId.ChannelId,
+  workspaceId: WorkspaceId.WorkspaceId,
   /** The connection whose transport receives the channel's events and posts its replies. */
-  connectionId: Connection.Id,
+  connectionId: ConnectionContract.ConnectionId,
   /** The destination: the group a new conversation becomes a thread in. */
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   name: Name,
   /** Whether a new conversation opens as a task in triage, or as a conversation alone. */
   opensTasks: Schema.Boolean,
   status: Status,
-  createdBy: MemberId.Id,
+  createdBy: MemberId.MemberId,
   createdAt: Schema.DateTimeUtcFromString
 })
 
@@ -110,8 +96,8 @@ export const change = (record: Channel, changes: Partial<Channel>): Channel => O
  * @since 0.1.0
  */
 export const CreateInput = Schema.Struct({
-  connectionId: Connection.Id,
-  groupId: GroupId.Id,
+  connectionId: ConnectionContract.ConnectionId,
+  groupId: GroupId.GroupId,
   name: NewName,
   opensTasks: Schema.Boolean
 })
@@ -128,7 +114,7 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category options
  * @since 0.1.0
  */
-export const RedirectInput = Schema.Struct({ channelId: Id, groupId: GroupId.Id })
+export const RedirectInput = Schema.Struct({ channelId: ChannelId.ChannelId, groupId: GroupId.GroupId })
 
 /**
  * @category options
@@ -143,9 +129,9 @@ export interface RedirectInput extends Schema.Schema.Type<typeof RedirectInput> 
  * @since 0.1.0
  */
 export const Redirected = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  channelId: Id,
-  groupId: GroupId.Id
+  workspaceId: WorkspaceId.WorkspaceId,
+  channelId: ChannelId.ChannelId,
+  groupId: GroupId.GroupId
 })
 
 /**
@@ -160,7 +146,7 @@ export interface Redirected extends Schema.Schema.Type<typeof Redirected> {}
  * @category schemas
  * @since 0.1.0
  */
-export const Reference = Schema.Struct({ workspaceId: WorkspaceId.Id, channelId: Id })
+export const Reference = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, channelId: ChannelId.ChannelId })
 
 /**
  * @category schemas

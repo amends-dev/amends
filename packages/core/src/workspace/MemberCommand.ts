@@ -23,8 +23,9 @@ import * as Journal from "../journal/Journal.ts"
 import type * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
 import type * as StoreError from "../journal/StoreError.ts"
-import * as Member from "./Member.ts"
+import type * as Member from "./Member.ts"
 import * as MemberFacts from "./MemberFacts.ts"
+import * as MemberId from "./MemberId.ts"
 
 /**
  * What adding a member can fail with: the failures of assigning its role, of reading the general
@@ -49,7 +50,7 @@ export interface NewMember {
   readonly name: Member.Name
 
   /** The role the member holds across the workspace from the start. */
-  readonly roleId: Role.Id
+  readonly roleId: Role.RoleId
 
   /** When the member joined, which the general group admits them at. */
   readonly joinedAt: DateTime.Utc
@@ -94,7 +95,7 @@ export const make = Effect.gen(function* () {
 
   const add = Effect.fn("MemberCommand.add")(function* (member: NewMember) {
     const added: Member.Member = {
-      id: Member.Id.make(yield* crypto.randomUUIDv4),
+      id: MemberId.MemberId.make(yield* crypto.randomUUIDv4),
       workspaceId,
       identity: member.identity,
       name: member.name,

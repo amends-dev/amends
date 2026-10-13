@@ -12,7 +12,7 @@ import { SignalHub } from "@amends-dev/core/signal"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadStore, ThreadParticipationStore, ThreadMessageStore, ThreadActivityStore } from "@amends-dev/core/thread"
 import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends-dev/core/turn"
-import { InvitationStore, Member, MemberStore, Workspace, WorkspaceStore } from "@amends-dev/core/workspace"
+import { InvitationStore, Member, MemberStore, WorkspaceStore, WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { Cause, Context, Crypto, Deferred, Effect, Exit, Fiber, Layer, Option, Result, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -20,13 +20,13 @@ import * as Gateway from "../src/Gateway.ts"
 import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts"
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts"
 
-const workspaceId = Workspace.Id.make("workspace")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace")
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("agent") })
-const memberId = Member.Id.make("member")
+const memberId = MemberId.MemberId.make("member")
 const unexpected = () => Effect.die(new Error("Unexpected storage operation in gateway test"))
 interface BindingOptions {
-  readonly workspaceId?: Workspace.Id
+  readonly workspaceId?: WorkspaceId.WorkspaceId
   readonly findActive?: MemberStore.MemberStore["Service"]["findActive"]
   readonly read?: Store.Store["Service"]["read"]
   readonly head?: Store.Store["Service"]["head"]
@@ -47,7 +47,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       transaction: (program) =>
         program.pipe(
           Effect.provideService(Store.Transaction, {
-            id: Commit.Id.make("replay"),
+            id: Commit.CommitId.make("replay"),
             append: unexpected,
             afterCommit: unexpected
           })
@@ -401,7 +401,7 @@ it.effect.each(["make", "layer"] as const)(
   (construction) =>
     Effect.gen(function* () {
       const failure = new Error("Cannot bind workspace")
-      const requested: Array<Workspace.Id> = []
+      const requested: Array<WorkspaceId.WorkspaceId> = []
       const storage = WorkspaceStorage.WorkspaceStorage.of({
         forWorkspace: (id) =>
           Effect.sync(() => {
@@ -805,9 +805,9 @@ it.effect("interrupting a caller leaves shared boot available to the next reques
 
 it.effect("workspace runtimes are isolated and a new host boots from storage again", () =>
   Effect.gen(function* () {
-    const booted: Array<Workspace.Id> = []
+    const booted: Array<WorkspaceId.WorkspaceId> = []
     const storage = {
-      forWorkspace: (id: Workspace.Id) =>
+      forWorkspace: (id: WorkspaceId.WorkspaceId) =>
         Effect.succeed(
           bindings({
             workspaceId: id,
@@ -819,7 +819,7 @@ it.effect("workspace runtimes are isolated and a new host boots from storage aga
           })
         )
     }
-    const other = Workspace.Id.make("other")
+    const other = WorkspaceId.WorkspaceId.make("other")
     for (let restart = 0; restart < 2; restart += 1) {
       yield* Effect.scoped(
         Effect.gen(function* () {
@@ -842,14 +842,14 @@ it.effect("boot uses the host context and does not capture the first request's a
         effect.pipe(
           Effect.provideService(Actor.Actor, { workspaceId, memberId, identity: alice }),
           Effect.provideService(Store.Transaction, {
-            id: Commit.Id.make("request"),
+            id: Commit.CommitId.make("request"),
             append: unexpected,
             afterCommit: unexpected
           })
         )
       yield* inRequest(gateway.inWorkspace(workspaceId, Effect.void))
       // A member's admission check reads another cold workspace's stores as the host, too.
-      yield* inRequest(gateway.asMember(Workspace.Id.make("cold"), alice, Effect.void))
+      yield* inRequest(gateway.asMember(WorkspaceId.WorkspaceId.make("cold"), alice, Effect.void))
       yield* gateway.inWorkspace(
         workspaceId,
         Effect.gen(function* () {

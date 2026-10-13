@@ -17,12 +17,11 @@ import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
 import * as Store from "../journal/Store.ts"
 import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
-import type * as Thread from "../thread/Thread.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
-import type * as Member from "../workspace/Member.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Turn from "./Turn.ts"
+import * as TurnId from "./TurnId.ts"
 
 /**
  * The turn store, bound to one workspace by the host: what a storage adapter implements for
@@ -39,25 +38,25 @@ export class TurnStore extends Context.Service<
   TurnStore,
   {
     /** The turn, if stored. */
-    readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>
+    readonly get: (id: TurnId.TurnId) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>
     /** The agent's active turn on the thread: queued, running, or cancelling. */
     readonly findActive: (
-      memberId: MemberId.Id,
-      threadId: ThreadId.Id
+      memberId: MemberId.MemberId,
+      threadId: ThreadId.ThreadId
     ) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>
     /**
      * The agent's most recent turn on the thread, active or finished: by creation, then by how far
      * its accepted input reaches, which a later turn always extends.
      */
     readonly findLatest: (
-      memberId: MemberId.Id,
-      threadId: ThreadId.Id
+      memberId: MemberId.MemberId,
+      threadId: ThreadId.ThreadId
     ) => Effect.Effect<Option.Option<Turn.Turn>, StoreError.StoreError>
     /** Every active turn in the workspace, oldest first, at most `limit`. */
     readonly listActive: (limit: number) => Effect.Effect<ReadonlyArray<Turn.Turn>, StoreError.StoreError>
     /** The agent's active turns, one at most per thread, oldest first. */
     readonly listActiveByMember: (
-      memberId: MemberId.Id
+      memberId: MemberId.MemberId
     ) => Effect.Effect<ReadonlyArray<Turn.Turn>, StoreError.StoreError>
     /**
      * Reject reused IDs and a second active turn for the same agent
@@ -79,26 +78,26 @@ export class TurnStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: TurnStore["Service"]): TurnStore["Service"] => {
+export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: TurnStore["Service"]): TurnStore["Service"] => {
   const read = StoreInput.read("TurnStore")
   const write = StoreInput.write("TurnStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Turn.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", TurnId.TurnId, id), driver.get),
     findActive: Effect.fn("TurnStore.findActive")(function* (memberId, threadId) {
       return yield* driver.findActive(
-        yield* read("findActive", MemberId.Id, memberId),
-        yield* read("findActive", ThreadId.Id, threadId)
+        yield* read("findActive", MemberId.MemberId, memberId),
+        yield* read("findActive", ThreadId.ThreadId, threadId)
       )
     }),
     findLatest: Effect.fn("TurnStore.findLatest")(function* (memberId, threadId) {
       return yield* driver.findLatest(
-        yield* read("findLatest", MemberId.Id, memberId),
-        yield* read("findLatest", ThreadId.Id, threadId)
+        yield* read("findLatest", MemberId.MemberId, memberId),
+        yield* read("findLatest", ThreadId.ThreadId, threadId)
       )
     }),
     listActive: (limit) => Effect.flatMap(read("listActive", Schema.Natural, limit), driver.listActive),
     listActiveByMember: (memberId) =>
-      Effect.flatMap(read("listActiveByMember", MemberId.Id, memberId), driver.listActiveByMember),
+      Effect.flatMap(read("listActiveByMember", MemberId.MemberId, memberId), driver.listActiveByMember),
     insert: (record) => Effect.flatMap(write("insert", Turn.Turn, record), driver.insert),
     update: (record) => Effect.flatMap(write("update", Turn.Turn, record), driver.update)
   }
@@ -134,7 +133,11 @@ const makeMemory = Effect.fn("TurnStore.makeMemory")(function* () {
         other.memberId === record.memberId &&
         other.threadId === record.threadId
     )
-  const ofAgent = Effect.fnUntraced(function* (operation: string, memberId: Member.Id, threadId: Thread.Id) {
+  const ofAgent = Effect.fnUntraced(function* (
+    operation: string,
+    memberId: MemberId.MemberId,
+    threadId: ThreadId.ThreadId
+  ) {
     return (yield* all(operation))
       .filter((record) => record.memberId === memberId && record.threadId === threadId)
       .toSorted(byCreated)

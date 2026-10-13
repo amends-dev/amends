@@ -4,7 +4,7 @@ import { Actor, Identity } from "@amends-dev/core/identity"
 import { Entry, StoreError } from "@amends-dev/core/journal"
 import { Request } from "@amends-dev/core/request"
 import { ThreadService, ThreadMessageService } from "@amends-dev/core/thread"
-import { InvitationService, Member } from "@amends-dev/core/workspace"
+import { InvitationService, Member, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import type { Storage } from "@amends-dev/gateway/conformance"
 import { describe, expect, it } from "@effect/vitest"
@@ -16,7 +16,7 @@ import { alice, type Bound, failingLate, forWorkspace, future, request, workspac
 const memberActor = (name: string) =>
   Actor.Actor.of({
     workspaceId,
-    memberId: Member.Id.make(name),
+    memberId: MemberId.MemberId.make(name),
     identity: { _tag: "Human", id: Identity.HumanId.make(name) }
   })
 const other = memberActor("other")

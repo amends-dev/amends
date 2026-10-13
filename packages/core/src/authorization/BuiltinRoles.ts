@@ -9,7 +9,7 @@
  */
 
 import * as Schema from "effect/Schema"
-import type * as Workspace from "../workspace/Workspace.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Permission from "./Permission.ts"
 import * as Role from "./Role.ts"
 
@@ -20,7 +20,7 @@ import * as Role from "./Role.ts"
  * @category constructors
  * @since 0.1.0
  */
-export const MemberId = Role.Id.make("builtin:member")
+export const MemberId = Role.RoleId.make("builtin:member")
 
 /**
  * The Administrator role, which only the owner gives, and which a former owner takes on transfer.
@@ -28,7 +28,7 @@ export const MemberId = Role.Id.make("builtin:member")
  * @category constructors
  * @since 0.1.0
  */
-export const AdministratorId = Role.Id.make("builtin:administrator")
+export const AdministratorId = Role.RoleId.make("builtin:administrator")
 
 /**
  * The Owner role, held by the workspace's owner alone and given only at initialization and by
@@ -37,7 +37,7 @@ export const AdministratorId = Role.Id.make("builtin:administrator")
  * @category constructors
  * @since 0.1.0
  */
-export const OwnerId = Role.Id.make("builtin:owner")
+export const OwnerId = Role.RoleId.make("builtin:owner")
 
 const roles = [
   { id: MemberId, name: "Member", tier: "member" },
@@ -71,7 +71,7 @@ export const revision = 1
  * @category utils
  * @since 0.1.0
  */
-export const nameOf = (roleId: Role.Id): string => roles.find(({ id }) => id === roleId)?.name ?? roleId
+export const nameOf = (roleId: Role.RoleId): string => roles.find(({ id }) => id === roleId)?.name ?? roleId
 
 // Ordering is local to bundle construction. Access checks use stored permissions and scopes.
 const order: Readonly<Record<Permission.BuiltinTier, number>> = {
@@ -90,7 +90,7 @@ const declarations = Schema.Array(Permission.Definition)
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: Workspace.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   permissions: ReadonlyArray<Permission.Definition>
 ): ReadonlyArray<Role.Role> => {
   const checked = declarations.make(permissions)

@@ -9,7 +9,7 @@
  */
 
 import type { Identity } from "@amends-dev/core/identity"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
@@ -84,7 +84,7 @@ export class Streams extends Context.Service<
   {
     /** Hold a place for a stream within the limits, for as long as the scope lasts. */
     readonly hold: (
-      workspaceId: Workspace.Id,
+      workspaceId: WorkspaceId.WorkspaceId,
       principal: Identity.MemberReference
     ) => Effect.Effect<void, ApiErrors.TooManyStreams, Scope.Scope>
     /**

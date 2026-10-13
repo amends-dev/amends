@@ -1,7 +1,9 @@
+import * as ConnectionContract from "@amends-dev/connection/Connection"
 import { Agent } from "@amends-dev/core/agent"
 import { Connection } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import { Identity } from "@amends-dev/core/identity"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import type { AgentIssue, AgentsFailure, Effort } from "@amends-dev/ui/screens/agents"
 import * as Cause from "effect/Cause"
@@ -15,9 +17,9 @@ import { refreshResult } from "../api/refresh.ts"
 import { connectionsReads } from "../connections/api.ts"
 import { newWorkspaceRequestKey } from "../workspaces/api.ts"
 
-export { Agent, Connection }
+export { Agent, Connection, ConnectionContract }
 
-const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
+const reads = (client: ApiClient, workspaceId: WorkspaceId.WorkspaceId) => {
   const connections = connectionsReads(client, workspaceId)!
   return {
     /** The agents the reader may read, by name. */
@@ -28,7 +30,7 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
     connections: connections.connections,
     integrations: connections.integrations,
     /** The models a connection offers, as its integration lists them. */
-    models: (connectionId: Connection.Id) =>
+    models: (connectionId: ConnectionContract.ConnectionId) =>
       client.query("connections", "models", {
         params: { connectionId },
         reactivityKeys: [workspaceKey(workspaceId, "connections")]
@@ -44,7 +46,9 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
  * invalidation key, and the connections reads they share. Undefined for an invalid workspace ID.
  */
 export const agentsReads = (client: ApiClient, workspaceId: string) =>
-  Option.getOrUndefined(Option.map(Schema.decodeOption(Workspace.Id)(workspaceId), (id) => reads(client, id)))
+  Option.getOrUndefined(
+    Option.map(Schema.decodeOption(WorkspaceId.WorkspaceId)(workspaceId), (id) => reads(client, id))
+  )
 export type AgentsReads = ReturnType<typeof reads>
 
 /** How an agent is set up, as a change sends it. */
@@ -99,7 +103,7 @@ const configurationOf = (setup: SetupInput) => ({
  */
 export const changeAgent = (api: WorkspaceApi, change: AgentCommand) =>
   Effect.gen(function* () {
-    const agent = (agentId: string) => Effect.map(command(Agent.Id)(agentId), (id) => ({ agentId: id }))
+    const agent = (agentId: string) => Effect.map(command(Identity.AgentId)(agentId), (id) => ({ agentId: id }))
     switch (change.kind) {
       case "create": {
         const created = yield* api.agents.create({
@@ -131,7 +135,7 @@ export const changeAgent = (api: WorkspaceApi, change: AgentCommand) =>
         return undefined
       case "remove":
         yield* api.members.remove({
-          params: { memberId: yield* command(Member.Id)(change.memberId) }
+          params: { memberId: yield* command(MemberId.MemberId)(change.memberId) }
         })
         return undefined
     }

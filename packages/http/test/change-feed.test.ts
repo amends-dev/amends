@@ -2,7 +2,7 @@ import type * as Core from "@amends-dev/core"
 import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed"
 import { CoreError } from "@amends-dev/core/error"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { SessionTokens, Gateway } from "@amends-dev/gateway"
 import { expect, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect"
@@ -13,10 +13,10 @@ import { Api, Authentication, BearerAuthentication, ChangeFeedHandlers, Workspac
 import * as WorkspaceMemberServer from "../src/internal/workspace-member.ts"
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") })
-const workspaceId = Workspace.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const actor = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("member-one"),
+  memberId: MemberId.MemberId.make("member-one"),
   identity: alice
 })
 const secret = "connect ECONNREFUSED 10.0.0.5:5432 password=hunter2"
@@ -39,7 +39,7 @@ const gateway = Layer.succeed(
     inWorkspace: () => Effect.die("unused"),
     createWorkspace: () => Effect.die("unused"),
     asMember: <A, E>(
-      _id: Workspace.Id,
+      _id: WorkspaceId.WorkspaceId,
       _identity: Identity.MemberReference,
       program: Effect.Effect<A, E, Core.Operations | Actor.Actor | Scope.Scope>
     ) =>

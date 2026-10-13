@@ -10,7 +10,7 @@
  */
 
 import { Assignment, Permission } from "@amends-dev/core/authorization"
-import { Member } from "@amends-dev/core/workspace"
+import { MemberId } from "@amends-dev/core/workspace"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as Schema from "effect/Schema"
@@ -18,7 +18,7 @@ import * as ApiErrors from "./ApiErrors.ts"
 import * as Authentication from "./Authentication.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const member = { memberId: Member.Id }
+const member = { memberId: MemberId.MemberId }
 const error = [...ApiErrors.workspace, ...ApiErrors.assignment]
 
 /**
@@ -55,7 +55,7 @@ export class AssignmentsGroup extends HttpApiGroup.make("assignments")
       error
     }),
     HttpApiEndpoint.delete("revoke", "/members/:memberId/assignments/:assignmentId", {
-      params: { ...member, assignmentId: Assignment.Id },
+      params: { ...member, assignmentId: Assignment.AssignmentId },
       success: Assignment.Assignment,
       error
     })

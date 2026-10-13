@@ -7,7 +7,7 @@
  */
 
 import { CoreError } from "@amends-dev/core/error"
-import { Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import * as Effect from "effect/Effect"
 import * as Headers from "effect/http/Headers"
@@ -19,7 +19,7 @@ import * as Schema from "effect/Schema"
 import * as Authentication from "../Authentication.ts"
 import * as WorkspaceMember from "../WorkspaceMember.ts"
 
-const decodeWorkspaceId = Schema.decodeUnknownOption(Workspace.Id)
+const decodeWorkspaceId = Schema.decodeUnknownOption(WorkspaceId.WorkspaceId)
 
 /** A member's request that names no workspace, or no valid one. */
 const unnamed = new CoreError.Invalid({

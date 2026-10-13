@@ -1,3 +1,5 @@
+import { ThreadId, ThreadMessageId, ThreadParticipationId } from "@amends-dev/core/thread"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime } from "effect"
 import type { Prompt } from "effect/ai"
@@ -7,17 +9,15 @@ import type * as Task from "../../src/task/Task.ts"
 import * as Thread from "../../src/thread/Thread.ts"
 import * as ThreadActivity from "../../src/thread/ThreadActivity.ts"
 import * as ThreadMessage from "../../src/thread/ThreadMessage.ts"
-import * as ThreadParticipation from "../../src/thread/ThreadParticipation.ts"
+import type * as ThreadParticipation from "../../src/thread/ThreadParticipation.ts"
 import * as TurnPrompt from "../../src/turn/TurnPrompt.ts"
-import * as Member from "../../src/workspace/Member.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 
-const workspaceId = Workspace.Id.make("workspace")
-const threadId = Thread.Id.make("thread")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace")
+const threadId = ThreadId.ThreadId.make("thread")
 const at = DateTime.makeUnsafe("2026-10-10T12:00:00Z")
-const reviewer = Member.Id.make("reviewer")
-const adaId = Member.Id.make("ada")
-const kaiId = Member.Id.make("kai")
+const reviewer = MemberId.MemberId.make("reviewer")
+const adaId = MemberId.MemberId.make("ada")
+const kaiId = MemberId.MemberId.make("kai")
 const danaId = Identity.ContactId.make("dana")
 const ada: ThreadMessage.Author = { _tag: "Member", memberId: adaId }
 const dana: ThreadMessage.Author = { _tag: "Contact", contactId: danaId }
@@ -37,7 +37,7 @@ let sequence = 0
 /** An activity of `kind` at the next position, with `details`. */
 const activity = (kind: string, details: unknown) =>
   ({
-    id: ThreadActivity.Id.make(`activity-${++sequence}`),
+    id: ThreadActivity.ThreadActivityId.make(`activity-${++sequence}`),
     workspaceId,
     threadId,
     sequence,
@@ -54,7 +54,7 @@ const message = (
   author: ThreadMessage.Author,
   content: ThreadMessage.Content
 ): ThreadMessage.ThreadMessage => ({
-  id: ThreadMessage.Id.make(id),
+  id: ThreadMessageId.ThreadMessageId.make(id),
   workspaceId,
   threadId,
   author,
@@ -83,12 +83,12 @@ const renamed = (title: string): Thread.TimelineItem =>
 const followed = (participant: ThreadParticipation.Reference): Thread.TimelineItem =>
   ({
     activity: activity("participation.followed", { participationId: "p" }),
-    participant: { id: ThreadParticipation.Id.make("p"), participant, status: "active" }
+    participant: { id: ThreadParticipationId.ThreadParticipationId.make("p"), participant, status: "active" }
   }) as never
 const taskCreated = (details: {
   status: Task.Status
   priority: Task.Priority
-  assignee: Member.Id | null
+  assignee: MemberId.MemberId | null
   createdBy: ThreadMessage.Author
 }): Thread.TimelineItem => ({ activity: activity("task.created", details) }) as never
 const taskUpdated = (change: Task.Change): Thread.TimelineItem =>

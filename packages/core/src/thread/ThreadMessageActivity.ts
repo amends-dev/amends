@@ -11,7 +11,8 @@ import * as ThreadActivityKind from "./ThreadActivityKind.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
 import * as ThreadMessageId from "./ThreadMessageId.ts"
 
-const subject = ({ messageId }: { readonly messageId: ThreadMessageId.Id }) => Subject.make("message", messageId)
+const subject = ({ messageId }: { readonly messageId: ThreadMessageId.ThreadMessageId }) =>
+  Subject.make("message", messageId)
 
 /**
  * A message was published to the thread. It is the thread's latest activity for its readers, and
@@ -22,7 +23,7 @@ const subject = ({ messageId }: { readonly messageId: ThreadMessageId.Id }) => S
  */
 export const Published = ThreadActivityKind.make("message.published", {
   version: 1,
-  details: Schema.Struct({ messageId: ThreadMessageId.Id }),
+  details: Schema.Struct({ messageId: ThreadMessageId.ThreadMessageId }),
   subject,
   newActivity: true
 })
@@ -42,7 +43,7 @@ export type Published = ThreadActivityKind.Activity<typeof Published>
  */
 export const Edited = ThreadActivityKind.make("message.edited", {
   version: 1,
-  details: Schema.Struct({ messageId: ThreadMessageId.Id, revision: ThreadMessage.Revision }),
+  details: Schema.Struct({ messageId: ThreadMessageId.ThreadMessageId, revision: ThreadMessage.Revision }),
   subject,
   occurrence: ({ messageId, revision }) => [subject({ messageId }), String(revision)],
   newActivity: false
@@ -62,7 +63,7 @@ export type Edited = ThreadActivityKind.Activity<typeof Edited>
  */
 export const Deleted = ThreadActivityKind.make("message.deleted", {
   version: 1,
-  details: Schema.Struct({ messageId: ThreadMessageId.Id }),
+  details: Schema.Struct({ messageId: ThreadMessageId.ThreadMessageId }),
   subject,
   newActivity: false
 })

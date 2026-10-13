@@ -9,7 +9,7 @@
  * @since 0.1.0
  */
 
-import { Integrations } from "@amends-dev/connection"
+import { Integrations, type Connection as ConnectionContract } from "@amends-dev/connection"
 import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -91,7 +91,7 @@ export class AgentQuery extends Context.Service<
      * conversation, while it can still run on it, and otherwise the oldest it can run on.
      */
     readonly select: (
-      memberId: MemberId.Id,
+      memberId: MemberId.MemberId,
       previous: Agent.Selection | undefined
     ) => Effect.Effect<Agent.Selection, SelectError>
 
@@ -101,7 +101,10 @@ export class AgentQuery extends Context.Service<
      * connection of the selection can no longer give its part, as when it was removed since the
      * selection was made, or it has no key.
      */
-    readonly buildRunnable: (memberId: MemberId.Id, selection: Agent.Selection) => Effect.Effect<Runnable, BuildError>
+    readonly buildRunnable: (
+      memberId: MemberId.MemberId,
+      selection: Agent.Selection
+    ) => Effect.Effect<Runnable, BuildError>
   }
 >()("@amends-dev/core/agent/AgentQuery") {}
 
@@ -132,7 +135,7 @@ export const make = Effect.gen(function* () {
   const integrations = yield* Integrations.Integrations
 
   /** The agent whose membership `memberId` is, while it lasts. */
-  const requireAgent = Effect.fnUntraced(function* (memberId: MemberId.Id) {
+  const requireAgent = Effect.fnUntraced(function* (memberId: MemberId.MemberId) {
     const member = yield* memberStore.get(memberId)
     if (Option.isNone(member) || member.value.status !== "active")
       return yield* new CoreError.NotFound({ resource: "Agent", id: memberId })
@@ -180,7 +183,7 @@ export const make = Effect.gen(function* () {
    */
   const accessFor = Effect.fnUntraced(function* (
     part: Agent.Part,
-    connectionId: Connection.Id,
+    connectionId: ConnectionContract.ConnectionId,
     connections: AgentReadiness.Connections
   ) {
     const resolved = yield* AgentReadiness.resolveConnection(connectionId, connections, integrations)
@@ -198,7 +201,7 @@ export const make = Effect.gen(function* () {
   })
 
   const select = Effect.fn("AgentQuery.select")(function* (
-    memberId: MemberId.Id,
+    memberId: MemberId.MemberId,
     previous: Agent.Selection | undefined
   ) {
     const record = yield* requireAgent(memberId)
@@ -213,7 +216,7 @@ export const make = Effect.gen(function* () {
   })
 
   const buildRunnable = Effect.fn("AgentQuery.buildRunnable")(function* (
-    memberId: MemberId.Id,
+    memberId: MemberId.MemberId,
     selection: Agent.Selection
   ) {
     const record = yield* requireAgent(memberId)

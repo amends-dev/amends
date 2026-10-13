@@ -1,3 +1,4 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Schema } from "effect"
 import * as Grant from "../../src/authorization/Grant.ts"
@@ -5,9 +6,7 @@ import * as Permission from "../../src/authorization/Permission.ts"
 import * as Requirement from "../../src/authorization/Requirement.ts"
 import * as Scope from "../../src/authorization/Scope.ts"
 import * as Target from "../../src/authorization/Target.ts"
-import * as Member from "../../src/workspace/Member.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 
 it("permission groups preserve existing member definitions and their specific target kind", () => {
   expect(MemberPermissions.Read).toEqual(
@@ -37,11 +36,11 @@ it("an action can target its workspace while other actions in the group keep the
   )
   expect(read).toEqual(Permission.make("it.member.read", { targetKind: "Member", builtinTier: "member" }))
 
-  const workspaceId = Workspace.Id.make("workspace-1")
+  const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
   const workspace = Target.Reference.cases.Workspace.make({ workspaceId })
   const target = Target.Reference.cases.Member.make({
     workspaceId,
-    memberId: Member.Id.make("member-1")
+    memberId: MemberId.MemberId.make("member-1")
   })
   expect(Requirement.make(created, workspace).target).toEqual(workspace)
   expect(() => {

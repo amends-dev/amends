@@ -14,7 +14,7 @@
 
 import type * as Core from "@amends-dev/core"
 import type { Actor } from "@amends-dev/core/identity"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import * as Effect from "effect/Effect"
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
@@ -52,7 +52,7 @@ export class WorkspaceMember extends HttpApiMiddleware.Service<
  * @category layers
  * @since 0.1.0
  */
-export const layerClient = (workspaceId: Workspace.Id) =>
+export const layerClient = (workspaceId: WorkspaceId.WorkspaceId) =>
   HttpApiMiddleware.layerClient(WorkspaceMember, ({ next, request }) =>
     next(HttpClientRequest.setHeader(request, header, workspaceId))
   )

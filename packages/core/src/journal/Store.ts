@@ -197,14 +197,14 @@ export interface AppendInput extends Schema.Schema.Type<typeof AppendInput> {}
 export const AppendReceipt = Schema.Struct({
   logId: LogEntry.LogId,
   key: Occurrence.Key,
-  commitId: Commit.Id,
+  commitId: Commit.CommitId,
   firstIndex: Schema.Natural,
   entryCount: Schema.Int.check(Schema.isGreaterThan(0)),
   entries: Schema.NonEmptyArray(Entry)
 }).check(
   Schema.makeFilter((receipt) => {
     if (receipt.entries.length !== receipt.entryCount) return "Incomplete keyed append receipt"
-    const ids = new Set<LogEntry.Id>()
+    const ids = new Set<LogEntry.EntryId>()
     for (const [offset, entry] of receipt.entries.entries()) {
       if (
         entry.logId !== receipt.logId ||
@@ -262,7 +262,7 @@ export const sameContents = (left: ReadonlyArray<Content>, right: ReadonlyArray<
  * @since 0.1.0
  */
 export class CommitUncertain extends Schema.TaggedError<CommitUncertain>()("Store.CommitUncertain", {
-  commitId: Commit.Id,
+  commitId: Commit.CommitId,
   cause: Schema.Defect()
 }) {}
 
@@ -278,7 +278,7 @@ export class Transaction extends Context.Service<
   Transaction,
   {
     /** The commit's ID, which its entries record. */
-    readonly id: Commit.Id
+    readonly id: Commit.CommitId
     /**
      * Append in request order, assigning unique ids, timestamps, and log positions.
      * Appends to the same log in this transaction share a position and extend its
@@ -316,7 +316,7 @@ export class Store extends Context.Service<
   Store,
   {
     /** Every log and read addresses this workspace alone. */
-    readonly workspaceId: WorkspaceId.Id
+    readonly workspaceId: WorkspaceId.WorkspaceId
     /**
      * Lookup is workspace-bound and sees this transaction's staged keys when present. Inside a
      * transaction, it holds the log against standalone appends, as appending does.
@@ -354,12 +354,12 @@ export class Store extends Context.Service<
      */
     readonly getEntry: (
       logId: LogEntry.LogId,
-      entryId: LogEntry.Id
+      entryId: LogEntry.EntryId
     ) => Effect.Effect<Option.Option<Entry>, StoreError.StoreError>
     /** The batch commit `commitId` appended to the log, or None when it did not touch the log. */
     readonly get: (
       logId: LogEntry.LogId,
-      commitId: Commit.Id
+      commitId: Commit.CommitId
     ) => Effect.Effect<Option.Option<Batch>, StoreError.StoreError>
     /**
      * The position of this log's latest batch, or None for an empty log. Use the current
@@ -458,11 +458,11 @@ export const make = (driver: Store["Service"]): Store["Service"] => {
     getEntry: Effect.fn("Store.getEntry")(function* (logId, entryId) {
       return yield* driver.getEntry(
         yield* read("getEntry", LogEntry.LogId, logId),
-        yield* read("getEntry", LogEntry.Id, entryId)
+        yield* read("getEntry", LogEntry.EntryId, entryId)
       )
     }),
     get: Effect.fn("Store.get")(function* (logId, commitId) {
-      return yield* driver.get(yield* read("get", LogEntry.LogId, logId), yield* read("get", Commit.Id, commitId))
+      return yield* driver.get(yield* read("get", LogEntry.LogId, logId), yield* read("get", Commit.CommitId, commitId))
     }),
     head: (logId) => Effect.flatMap(read("head", LogEntry.LogId, logId), driver.head),
     read: Effect.fn("Store.read")(function* (logId, options) {
@@ -496,7 +496,7 @@ export class MemoryTransaction extends Context.Service<
   {
     /** The connection that opened it; a handle reaching another connection's binding fails. */
     readonly connection: MemoryDatabase.Connection["Service"]
-    readonly workspaceId: WorkspaceId.Id
+    readonly workspaceId: WorkspaceId.WorkspaceId
     /** The commit it records, with the count of entries appended so far. */
     readonly commit: Commit.Commit
     /** Its snapshot of the workspace, which its writes change and a commit makes committed. */
@@ -534,7 +534,7 @@ export class MemoryBinding extends Context.Service<
   MemoryBinding,
   {
     /** The workspace every store over this binding reads and writes. */
-    readonly workspaceId: WorkspaceId.Id
+    readonly workspaceId: WorkspaceId.WorkspaceId
     /** The host's connection: the storage the stores read, and the gate transactions take. */
     readonly connection: MemoryDatabase.Connection["Service"]
     /**
@@ -567,7 +567,7 @@ export class MemoryBinding extends Context.Service<
 >()("@amends-dev/core/journal/Store/MemoryBinding") {}
 
 /** One workspace's binding over the caller's connection. */
-const makeMemoryBinding = Effect.fn("Store.makeMemoryBinding")(function* (workspaceId: WorkspaceId.Id) {
+const makeMemoryBinding = Effect.fn("Store.makeMemoryBinding")(function* (workspaceId: WorkspaceId.WorkspaceId) {
   const memoryConnection = yield* MemoryDatabase.Connection
   const { database, gate } = memoryConnection
 
@@ -649,7 +649,7 @@ const makeMemoryBinding = Effect.fn("Store.makeMemoryBinding")(function* (worksp
           workspaceId,
           active: true,
           commit: {
-            id: Commit.Id.make(database.nextId("commit")),
+            id: Commit.CommitId.make(database.nextId("commit")),
             recordedAt: yield* DateTime.now,
             entryCount: 0
           },
@@ -801,7 +801,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
       const written = request.entries.map((content, offset): Entry =>
         Object.assign(
           {
-            id: LogEntry.Id.make(database.nextId("entry")),
+            id: LogEntry.EntryId.make(database.nextId("entry")),
             logId: request.logId,
             position,
             commitId: session.commit.id,
@@ -894,7 +894,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
       )
     }),
     get: Effect.fn("Store.memory.get")(
-      function* (logId, commitId: Commit.Id) {
+      function* (logId, commitId: Commit.CommitId) {
         const space = yield* read
         const batch = (space.logs.get(logId) ?? []).find((batch) => batch.commitId === commitId)
         return batch === undefined ? Option.none() : Option.some(yield* batchOf(space, logId, batch))
@@ -956,7 +956,7 @@ const makeMemory = Effect.fn("Store.makeMemory")(function* () {
  * @category layers
  * @since 0.1.0
  */
-export const layerMemory = (workspaceId: WorkspaceId.Id) =>
+export const layerMemory = (workspaceId: WorkspaceId.WorkspaceId) =>
   Layer.effect(Store, makeMemory()).pipe(
     Layer.provideMerge(Layer.effect(MemoryBinding, makeMemoryBinding(workspaceId)))
   )

@@ -1,9 +1,16 @@
 import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authorization"
-import { Group } from "@amends-dev/core/group"
+import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Entry, Store } from "@amends-dev/core/journal"
 import { ThreadId } from "@amends-dev/core/thread"
-import { Invitation, Member, MemberPermissions, type Workspace } from "@amends-dev/core/workspace"
+import {
+  Invitation,
+  Member,
+  MemberPermissions,
+  type Workspace,
+  type WorkspaceId,
+  MemberId
+} from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"
@@ -14,11 +21,11 @@ import { type Bound, boundTo, otherWorkspaceId, runHost, workspaceId } from "./s
 describe("store validation", () => {
   const { initialized } = Support
   const permission = MemberPermissions.Read.name
-  const roleId = Role.Id.make("contract-role")
+  const roleId = Role.RoleId.make("contract-role")
   const localScope = (
     kind: "Workspace" | "TargetWorkspace" | "TargetMember" | "TargetThread" | "TargetGroup",
-    id: Workspace.Id,
-    memberId: Member.Id
+    id: WorkspaceId.WorkspaceId,
+    memberId: MemberId.MemberId
   ): Scope.Scope => {
     if (kind === "Workspace") return Scope.Scope.cases.Workspace.make({ workspaceId: id })
     return Scope.Scope.cases.Target.make({
@@ -26,12 +33,12 @@ describe("store validation", () => {
         kind === "TargetGroup"
           ? Target.Reference.cases.Group.make({
               workspaceId: id,
-              groupId: Group.Id.make("group")
+              groupId: GroupId.GroupId.make("group")
             })
           : kind === "TargetThread"
             ? Target.Reference.cases.Thread.make({
                 workspaceId: id,
-                threadId: ThreadId.Id.make("thread")
+                threadId: ThreadId.ThreadId.make("thread")
               })
             : kind === "TargetMember"
               ? Target.Reference.cases.Member.make({ workspaceId: id, memberId })
@@ -64,8 +71,8 @@ describe("store validation", () => {
           yield* bound.store.transaction(
             Effect.gen(function* () {
               for (const record of [
-                { ...role, id: Role.Id.make("invalid"), name: "" },
-                { ...role, id: Role.Id.make("invalid"), permissions: [permission, permission] }
+                { ...role, id: Role.RoleId.make("invalid"), name: "" },
+                { ...role, id: Role.RoleId.make("invalid"), permissions: [permission, permission] }
               ]) {
                 expect(yield* Effect.flip(bound.roles.insert(record))).toMatchObject({
                   _tag: "StoreError",
@@ -74,7 +81,7 @@ describe("store validation", () => {
                   reason: { _tag: "Rejected" }
                 })
               }
-              expect(yield* bound.roles.get(Role.Id.make("invalid"))).toEqual(Option.none())
+              expect(yield* bound.roles.get(Role.RoleId.make("invalid"))).toEqual(Option.none())
               expect(yield* Effect.flip(bound.roles.rename(roleId, ""))).toMatchObject({
                 _tag: "StoreError",
                 store: "RoleStore",
@@ -117,7 +124,7 @@ describe("store validation", () => {
           const bound = yield* boundTo(workspaceId)
           const { workspace } = yield* seed(bound)
           const record: Assignment.Assignment = {
-            id: Assignment.Id.make("contract-assignment"),
+            id: Assignment.AssignmentId.make("contract-assignment"),
             workspaceId,
             memberId: workspace.ownerMemberId,
             status: "active",
@@ -160,7 +167,7 @@ describe("store validation", () => {
             const issuedAt = DateTime.makeUnsafe("2026-09-18T12:00:00Z")
             const record: Invitation.Invitation = {
               details: {
-                id: Invitation.Id.make("contract-invitation"),
+                id: Invitation.InvitationId.make("contract-invitation"),
                 workspaceId,
                 recipientId: Identity.HumanId.make("recipient"),
                 inviterMemberId: workspace.ownerMemberId,
@@ -264,7 +271,7 @@ describe("store validation", () => {
             id: workspaceId,
             name: "Design & Engineering",
             createdBy: Identity.HumanId.make("owner"),
-            ownerMemberId: Member.Id.make("owner-member")
+            ownerMemberId: MemberId.MemberId.make("owner-member")
           }
           yield* bound.store.transaction(
             Effect.gen(function* () {
@@ -303,7 +310,7 @@ describe("store validation", () => {
           const bound = yield* boundTo(workspaceId)
           yield* initialized(bound)
           const invalid: Member.Member = {
-            id: Member.Id.make("contact-member"),
+            id: MemberId.MemberId.make("contact-member"),
             workspaceId,
             status: "active",
             identity: Identity.MemberReference.cases.Human.make({

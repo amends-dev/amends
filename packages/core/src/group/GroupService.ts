@@ -34,6 +34,7 @@ import * as Group from "./Group.ts"
 import * as GroupCommand from "./GroupCommand.ts"
 import * as GroupFacts from "./GroupFacts.ts"
 import * as GroupFollowStore from "./GroupFollowStore.ts"
+import * as GroupId from "./GroupId.ts"
 import type * as GroupMembership from "./GroupMembership.ts"
 import * as GroupMembershipPermissions from "./GroupMembershipPermissions.ts"
 import * as GroupMembershipStore from "./GroupMembershipStore.ts"
@@ -117,7 +118,7 @@ export class GroupService extends Context.Service<
      */
     readonly rename: (input: Group.RenameInput) => Effect.Effect<Group.Group, RenameError, Actor.Actor>
     /** Require group.read and current audience membership; no transaction or publication. */
-    readonly get: (groupId: Group.Id) => Effect.Effect<Group.Group, ReadError, Actor.Actor>
+    readonly get: (groupId: GroupId.GroupId) => Effect.Effect<Group.Group, ReadError, Actor.Actor>
     /**
      * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
      * its latest activity, when the actor last read it, whether it has new activity for them,
@@ -164,7 +165,7 @@ export const make = Effect.gen(function* () {
   )
 
   /** The group, or `CoreError.NotFound` when it is not stored. */
-  const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+  const requireGroup = Effect.fnUntraced(function* (groupId: GroupId.GroupId) {
     const found = yield* groupStore.get(groupId)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Group", id: groupId })
     return found.value
@@ -175,7 +176,7 @@ export const make = Effect.gen(function* () {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreateTeamInput))(input)
       yield* authorization.require([createGroupRequirement])
       const actor = yield* Actor.Actor
-      const groupId = Group.Id.make(
+      const groupId = GroupId.GroupId.make(
         yield* Request.idFor(options.requestKey, ["group.create", workspaceId, actor.memberId])
       )
       // A retry returns the group its first attempt created.
@@ -213,8 +214,8 @@ export const make = Effect.gen(function* () {
     Operation.report
   )
 
-  const get = Effect.fn("GroupService.get")(function* (groupId: Group.Id) {
-    const id = yield* Schema.decodeEffect(Group.Id)(groupId)
+  const get = Effect.fn("GroupService.get")(function* (groupId: GroupId.GroupId) {
+    const id = yield* Schema.decodeEffect(GroupId.GroupId)(groupId)
     yield* groupQuery.requireAudience(id)
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId: id }))
@@ -258,7 +259,7 @@ export const make = Effect.gen(function* () {
    */
   const buildListItems = Effect.fnUntraced(function* (
     actor: Actor.Actor["Service"],
-    admissions: ReadonlyMap<Group.Id, GroupMembership.GroupMembership>
+    admissions: ReadonlyMap<GroupId.GroupId, GroupMembership.GroupMembership>
   ) {
     const memberId = actor.memberId
     // One grant resolution and one read per kind of record for the page.

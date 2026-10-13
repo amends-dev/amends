@@ -39,7 +39,7 @@ import * as ChangeFeedEvents from "./ChangeFeedEvents.ts"
  */
 export interface Delivery {
   readonly position: Entry.Position
-  readonly commitId: Commit.Id
+  readonly commitId: Commit.CommitId
   /** Possibly empty: a commit of internal facts still advances the journal. */
   readonly events: ReadonlyArray<ChangeFeedEvents.Prepared>
 }

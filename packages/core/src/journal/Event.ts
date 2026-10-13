@@ -27,10 +27,10 @@ import * as Subject from "./Subject.ts"
  * @since 0.1.0
  */
 export const Reference = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   logId: Entry.LogId,
-  commitId: Commit.Id,
-  id: Entry.Id
+  commitId: Commit.CommitId,
+  id: Entry.EntryId
 })
 
 /**
@@ -64,7 +64,7 @@ export type CorrelationId = typeof CorrelationId.Type
  * @since 0.1.0
  */
 export const Provenance = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   /** The member, non-member identity, or named system process responsible for the action. */
   performedBy: Performer.Reference,
   /** Null identifies a root action with no upstream event. */

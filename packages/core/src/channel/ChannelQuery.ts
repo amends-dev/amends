@@ -19,6 +19,7 @@ import * as ConnectionStore from "../connection/ConnectionStore.ts"
 import * as CoreError from "../error/CoreError.ts"
 import type * as StoreError from "../journal/StoreError.ts"
 import type * as Channel from "./Channel.ts"
+import type * as ChannelId from "./ChannelId.ts"
 import * as ChannelStore from "./ChannelStore.ts"
 
 /**
@@ -32,7 +33,7 @@ export class ChannelQuery extends Context.Service<
   {
     /** The channel, which must exist and not be removed; otherwise it is `CoreError.NotFound`. */
     readonly requireActive: (
-      channelId: Channel.Id
+      channelId: ChannelId.ChannelId
     ) => Effect.Effect<Channel.Channel, StoreError.StoreError | CoreError.NotFound>
     /** The integration of a connection, which must be installed and give channels. */
     readonly integrationOf: (
@@ -64,7 +65,7 @@ export const make = Effect.gen(function* () {
   const connectionCredentialStore = yield* ConnectionCredentialStore.ConnectionCredentialStore
   const integrations = yield* Integrations.Integrations
 
-  const requireActive = Effect.fn("ChannelQuery.requireActive")(function* (channelId: Channel.Id) {
+  const requireActive = Effect.fn("ChannelQuery.requireActive")(function* (channelId: ChannelId.ChannelId) {
     const found = yield* channelStore.get(channelId)
     if (Option.isNone(found) || found.value.status !== "active")
       return yield* new CoreError.NotFound({ resource: "Channel", id: channelId })

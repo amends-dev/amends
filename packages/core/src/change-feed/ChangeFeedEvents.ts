@@ -8,6 +8,7 @@
  * @since 0.1.0
  */
 
+import type { Connection as ConnectionContract } from "@amends-dev/connection"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -23,12 +24,11 @@ import * as ChannelFacts from "../channel/ChannelFacts.ts"
 import type * as ChannelId from "../channel/ChannelId.ts"
 import * as ChannelPermissions from "../channel/ChannelPermissions.ts"
 import * as DeliveryFacts from "../channel/DeliveryFacts.ts"
-import type * as Connection from "../connection/Connection.ts"
 import * as ConnectionFacts from "../connection/ConnectionFacts.ts"
 import * as ConnectionPermissions from "../connection/ConnectionPermissions.ts"
-import type * as Group from "../group/Group.ts"
 import * as GroupFacts from "../group/GroupFacts.ts"
 import * as GroupFollowFacts from "../group/GroupFollowFacts.ts"
+import type * as GroupId from "../group/GroupId.ts"
 import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts"
 import * as GroupPermissions from "../group/GroupPermissions.ts"
 import type * as Audience from "../journal/Audience.ts"
@@ -49,6 +49,7 @@ import * as InvitationFacts from "../workspace/InvitationFacts.ts"
 import * as InvitationPermissions from "../workspace/InvitationPermissions.ts"
 import * as Member from "../workspace/Member.ts"
 import * as MemberFacts from "../workspace/MemberFacts.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as MemberPermissions from "../workspace/MemberPermissions.ts"
 import * as WorkspaceFacts from "../workspace/WorkspaceFacts.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
@@ -62,9 +63,9 @@ import * as ChangeFeed from "./ChangeFeed.ts"
  * @since 0.1.0
  */
 export type Access = Data.TaggedEnum<{
-  Groups: { readonly memberId: Member.Id }
-  Grants: { readonly memberId: Member.Id | undefined }
-  Removed: { readonly memberId: Member.Id }
+  Groups: { readonly memberId: MemberId.MemberId }
+  Grants: { readonly memberId: MemberId.MemberId | undefined }
+  Removed: { readonly memberId: MemberId.MemberId }
 }>
 /**
  * @category models
@@ -131,14 +132,14 @@ type Standalone = Fact.Definition & {
 const registerFact = <F extends Standalone, View extends Schema.Constraint = F["payload"]>(
   fact: F,
   options: {
-    readonly requirement?: (payload: Fact.Payload<F>, workspaceId: WorkspaceId.Id) => Requirement.Requirement
+    readonly requirement?: (payload: Fact.Payload<F>, workspaceId: WorkspaceId.WorkspaceId) => Requirement.Requirement
     readonly view?: {
       readonly schema: View
       readonly from: (payload: Fact.Payload<F>) => View["Type"]
     }
     readonly access?: (payload: Fact.Payload<F>) => Access | undefined
     /** The member the fact is about, who sees it without the read permission. */
-    readonly concerns?: (payload: Fact.Payload<F>) => Member.Id
+    readonly concerns?: (payload: Fact.Payload<F>) => MemberId.MemberId
     /** The notifications the fact's projection creates, as their recipients' inboxes list them. */
     readonly notifications?: (event: Event.Metadata & { readonly payload: Fact.Payload<F> }) => ReadonlyArray<Addressed>
   } = {}
@@ -174,21 +175,23 @@ const registerFact = <F extends Standalone, View extends Schema.Constraint = F["
   }
 }
 
-const readThreadRequirement = (threadId: ThreadId.Id, workspaceId: WorkspaceId.Id) =>
+const readThreadRequirement = (threadId: ThreadId.ThreadId, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(ThreadPermissions.Read, Target.Reference.cases.Thread.make({ workspaceId, threadId }))
-const readGroupRequirement = (groupId: Group.Id, workspaceId: WorkspaceId.Id) =>
+const readGroupRequirement = (groupId: GroupId.GroupId, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(GroupPermissions.Read, Target.Reference.cases.Group.make({ workspaceId, groupId }))
-const readMemberRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+const readMemberRequirement = (memberId: MemberId.MemberId, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(MemberPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
-const readAccessRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+const readAccessRequirement = (memberId: MemberId.MemberId, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(AssignmentPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
-const readConnectionRequirement = (connectionId: Connection.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(ConnectionPermissions.Read, Target.Reference.cases.Connection.make({ workspaceId, connectionId }))
-const readAgentRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+const readConnectionRequirement = (
+  connectionId: ConnectionContract.ConnectionId,
+  workspaceId: WorkspaceId.WorkspaceId
+) => Requirement.make(ConnectionPermissions.Read, Target.Reference.cases.Connection.make({ workspaceId, connectionId }))
+const readAgentRequirement = (memberId: MemberId.MemberId, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(AgentPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
-const readChannelRequirement = (channelId: ChannelId.Id, workspaceId: WorkspaceId.Id) =>
+const readChannelRequirement = (channelId: ChannelId.ChannelId, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(ChannelPermissions.Read, Target.Reference.cases.Channel.make({ workspaceId, channelId }))
-const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.Id) =>
+const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.WorkspaceId) =>
   Requirement.make(InvitationPermissions.Manage, Target.Reference.cases.Workspace.make({ workspaceId }))
 
 /**

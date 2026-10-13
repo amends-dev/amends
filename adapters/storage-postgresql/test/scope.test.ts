@@ -1,12 +1,12 @@
 import { Scope, Target } from "@amends-dev/core/authorization"
-import { Group } from "@amends-dev/core/group"
+import { GroupId } from "@amends-dev/core/group"
 import { ThreadId } from "@amends-dev/core/thread"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { Schema } from "effect"
 import * as ScopeColumns from "../src/ScopeColumns.ts"
 
-const workspaceId = Workspace.Id.make("workspace")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace")
 const decode = Schema.decodeUnknownOption(Scope.Scope)
 
 it("scope columns preserve every target variant without broadening exact grants", () => {
@@ -14,9 +14,9 @@ it("scope columns preserve every target variant without broadening exact grants"
     Scope.Scope.cases.Workspace.make({ workspaceId }),
     ...[
       Target.Reference.cases.Workspace.make({ workspaceId }),
-      Target.Reference.cases.Member.make({ workspaceId, memberId: Member.Id.make("same") }),
-      Target.Reference.cases.Thread.make({ workspaceId, threadId: ThreadId.Id.make("same") }),
-      Target.Reference.cases.Group.make({ workspaceId, groupId: Group.Id.make("same") })
+      Target.Reference.cases.Member.make({ workspaceId, memberId: MemberId.MemberId.make("same") }),
+      Target.Reference.cases.Thread.make({ workspaceId, threadId: ThreadId.ThreadId.make("same") }),
+      Target.Reference.cases.Group.make({ workspaceId, groupId: GroupId.GroupId.make("same") })
     ].map((target) => Scope.Scope.cases.Target.make({ target }))
   ]
   for (const scope of scopes)
@@ -30,7 +30,7 @@ it("unknown, incomplete, and contradictory scope columns fail decoding", () => {
     Scope.Scope.cases.Target.make({
       target: Target.Reference.cases.Thread.make({
         workspaceId,
-        threadId: ThreadId.Id.make("thread")
+        threadId: ThreadId.ThreadId.make("thread")
       })
     })
   )

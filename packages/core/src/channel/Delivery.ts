@@ -19,20 +19,6 @@ import * as ChannelId from "./ChannelId.ts"
 import * as DeliveryId from "./DeliveryId.ts"
 
 /**
- * Names a delivery; `DeliveryId.Id`, where models that only refer to deliveries import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = DeliveryId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = DeliveryId.Id
-
-/**
  * Where a delivery stands: `requested` until the job has posted the message or given up, then
  * `sent` or `failed`, which are final.
  *
@@ -54,15 +40,15 @@ export type Status = typeof Status.Type
  * @since 0.1.0
  */
 export const Delivery = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  channelId: ChannelId.Id,
-  threadId: ThreadId.Id,
+  id: DeliveryId.DeliveryId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  channelId: ChannelId.ChannelId,
+  threadId: ThreadId.ThreadId,
   /** The thread's group, copied so that the facts' audience follows from their payloads. */
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   /** The external conversation the message goes to, as the thread's binding names it. */
   conversationId: ChannelTransport.ExternalId,
-  messageId: ThreadMessageId.Id,
+  messageId: ThreadMessageId.ThreadMessageId,
   /** The message's position in the thread; a thread's deliveries are sent in this order. */
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
   status: Status,
@@ -115,10 +101,10 @@ export const requested = (
  * @since 0.1.0
  */
 export const Sent = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  deliveryId: Id,
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  deliveryId: DeliveryId.DeliveryId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   externalMessageId: ChannelTransport.ExternalId,
   attempts: Schema.Int.check(Schema.isGreaterThan(0)),
   sentAt: Schema.DateTimeUtcFromString
@@ -137,10 +123,10 @@ export interface Sent extends Schema.Schema.Type<typeof Sent> {}
  * @since 0.1.0
  */
 export const Failed = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  deliveryId: Id,
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  deliveryId: DeliveryId.DeliveryId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   reason: Schema.NonEmptyString,
   attempts: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   failedAt: Schema.DateTimeUtcFromString

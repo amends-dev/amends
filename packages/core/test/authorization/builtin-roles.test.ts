@@ -1,10 +1,10 @@
+import { WorkspaceId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import * as BuiltinRoles from "../../src/authorization/BuiltinRoles.ts"
 import * as Permission from "../../src/authorization/Permission.ts"
 import * as Core from "../../src/index.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const read = Permission.make("it.read", {
   targetKind: "Member",
   builtinTier: "member"
@@ -48,7 +48,7 @@ it("new declarations affect newly constructed bundles without mutating earlier r
     [read.name, manage.name]
   ])
   expect(after.map((role) => role.id)).toEqual(before.map((role) => role.id))
-  const otherWorkspaceId = Workspace.Id.make("workspace-two")
+  const otherWorkspaceId = WorkspaceId.WorkspaceId.make("workspace-two")
   expect(BuiltinRoles.make(otherWorkspaceId, declarations).map((role) => role.workspaceId)).toEqual([
     otherWorkspaceId,
     otherWorkspaceId,

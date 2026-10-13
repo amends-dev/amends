@@ -38,18 +38,20 @@ export class GroupFollowStore extends Context.Service<
   GroupFollowStore,
   {
     /** The follow, active or ended, if stored. */
-    readonly get: (id: GroupFollow.Id) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, StoreError.StoreError>
+    readonly get: (
+      id: GroupFollow.GroupFollowId
+    ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, StoreError.StoreError>
     /** The active follow of one group admission; None when that admission follows nothing. */
     readonly findActive: (
-      groupMembershipId: GroupMembership.Id
+      groupMembershipId: GroupMembership.GroupMembershipId
     ) => Effect.Effect<Option.Option<GroupFollow.GroupFollow>, StoreError.StoreError>
     /** The active follows of several admissions in one read; admissions without one are omitted. */
     readonly findActiveMany: (
-      groupMembershipIds: ReadonlyArray<GroupMembership.Id>
+      groupMembershipIds: ReadonlyArray<GroupMembership.GroupMembershipId>
     ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, StoreError.StoreError>
     /** Active follows of a group, in stable ID order, which `ThreadQuery.followers` reads. */
     readonly listActiveByGroup: (
-      groupId: GroupId.Id
+      groupId: GroupId.GroupId
     ) => Effect.Effect<ReadonlyArray<GroupFollow.GroupFollow>, StoreError.StoreError>
     /**
      * Insert an active follow. Reject reused IDs and a second active follow for one admission. The
@@ -72,20 +74,23 @@ export class GroupFollowStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: GroupFollowStore["Service"]): GroupFollowStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: GroupFollowStore["Service"]
+): GroupFollowStore["Service"] => {
   const read = StoreInput.read("GroupFollowStore")
   const write = StoreInput.write("GroupFollowStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", GroupFollow.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", GroupFollow.GroupFollowId, id), driver.get),
     findActive: (groupMembershipId) =>
-      Effect.flatMap(read("findActive", GroupMembership.Id, groupMembershipId), driver.findActive),
+      Effect.flatMap(read("findActive", GroupMembership.GroupMembershipId, groupMembershipId), driver.findActive),
     findActiveMany: (groupMembershipIds) =>
       Effect.flatMap(
-        read("findActiveMany", Schema.Array(GroupMembership.Id), groupMembershipIds),
+        read("findActiveMany", Schema.Array(GroupMembership.GroupMembershipId), groupMembershipIds),
         driver.findActiveMany
       ),
     listActiveByGroup: (groupId) =>
-      Effect.flatMap(read("listActiveByGroup", GroupId.Id, groupId), driver.listActiveByGroup),
+      Effect.flatMap(read("listActiveByGroup", GroupId.GroupId, groupId), driver.listActiveByGroup),
     insert: (record) =>
       write("insert", GroupFollow.GroupFollow, record).pipe(
         Effect.filterOrFail(

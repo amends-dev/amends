@@ -13,7 +13,14 @@
  */
 
 import type * as Core from "@amends-dev/core"
-import { SessionLog, type SessionStateStore, type Turn, type TurnJobs, TurnExecution } from "@amends-dev/core/turn"
+import {
+  SessionLog,
+  type SessionStateStore,
+  type Turn,
+  type TurnJobs,
+  TurnExecution,
+  type TurnId
+} from "@amends-dev/core/turn"
 import { Gateway } from "@amends-dev/gateway"
 import { Agent, type Session, StreamPart } from "@amends-dev/harness"
 import * as Array from "effect/Array"
@@ -67,7 +74,7 @@ export const Outcome = Data.taggedEnum<Outcome>()
  * @since 0.1.0
  */
 export class RunFailed extends Data.TaggedError("TurnRunner.RunFailed")<{
-  readonly turnId: Turn.Id | undefined
+  readonly turnId: TurnId.TurnId | undefined
   readonly cause: unknown
 }> {}
 
@@ -108,7 +115,7 @@ const savedOf = (state: Session.SessionState): SessionStateStore.Resume =>
  * @since 0.1.0
  */
 export interface Run {
-  readonly turnId: Turn.Id
+  readonly turnId: TurnId.TurnId
   /** The agent the turn runs on. */
   readonly agent: string
   /** Where the run's opening sits in the log, which names its steps. */
@@ -251,7 +258,7 @@ export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
    * Show readers `drafts` of the turn's step, best effort: the step's entry in the log shows what
    * a missed one held.
    */
-  const showDrafts = (turnId: Turn.Id, drafts: ReadonlyArray<Turn.Draft>) =>
+  const showDrafts = (turnId: TurnId.TurnId, drafts: ReadonlyArray<Turn.Draft>) =>
     Effect.forEach(
       drafts,
       (draft) =>
@@ -318,7 +325,7 @@ export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
    * asked to stop, log the step it left unfinished, release the session, and end the turn.
    */
   const runTurn = Effect.fnUntraced(
-    function* (turnId: Turn.Id, stop: Deferred.Deferred<void>) {
+    function* (turnId: TurnId.TurnId, stop: Deferred.Deferred<void>) {
       const start = yield* inWorkspace(TurnExecution.TurnExecution.use((turnExecution) => turnExecution.start(turnId)))
       if (TurnExecution.Start.isAnyOf(["Idle"])(start)) return
       const writer = yield* inWorkspace(SessionLogWriter.open(start))
@@ -371,7 +378,7 @@ export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
       const accepted = yield* inWorkspace(
         TurnExecution.TurnExecution.use((turnExecution) => turnExecution.accept(job.memberId, job.threadId))
       ).pipe(Effect.mapError((cause) => new RunFailed({ turnId: undefined, cause })))
-      if (Option.isNone(accepted)) return Option.none<Turn.Id>()
+      if (Option.isNone(accepted)) return Option.none<TurnId.TurnId>()
       const turnId = accepted.value.id
       const stop = yield* Deferred.make<void>()
       yield* Ref.set(running, { turnId, stop })
@@ -394,14 +401,14 @@ export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
    * Stop the turn: the run that holds it stops it, and one no run holds ends as it stands, when it
    * was asked to stop or its participation ended.
    */
-  const stopTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
+  const stopTurn = Effect.fnUntraced(function* (turnId: TurnId.TurnId) {
     const held = yield* Ref.get(running)
     if (held?.turnId === turnId) return yield* Effect.asVoid(Deferred.succeed(held.stop, undefined))
     yield* inWorkspace(TurnExecution.TurnExecution.use((turnExecution) => turnExecution.confirmStopped(turnId, {})))
   })
 
   /** Fail the turn its job could not run, for `reason`. */
-  const giveUp = (turnId: Turn.Id, reason: string) =>
+  const giveUp = (turnId: TurnId.TurnId, reason: string) =>
     inWorkspace(TurnExecution.TurnExecution.use((turnExecution) => turnExecution.fail(turnId, { reason })))
 
   return { runNextTurn, stopTurn, giveUp }
@@ -409,7 +416,7 @@ export const make = Effect.fnUntraced(function* (job: TurnJobs.Job) {
 
 /** The turn a run holds, and how to ask it to stop. */
 interface Running {
-  readonly turnId: Turn.Id
+  readonly turnId: TurnId.TurnId
   readonly stop: Deferred.Deferred<void>
 }
 

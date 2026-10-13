@@ -1,13 +1,20 @@
-import { Group, GroupFollow, GroupFollowFacts, GroupMembership, GroupMembershipFacts } from "@amends-dev/core/group"
+import {
+  Group,
+  GroupFollow,
+  GroupFollowFacts,
+  GroupMembership,
+  GroupMembershipFacts,
+  GroupId
+} from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Audience, Fact, Subject } from "@amends-dev/core/journal"
-import { Member, MemberFacts, Workspace } from "@amends-dev/core/workspace"
+import { Member, MemberFacts, WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Schema } from "effect"
 
-const workspaceId = Workspace.Id.make("workspace-one")
-const groupId = Group.Id.make("group-one")
-const memberId = Member.Id.make("member-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
+const groupId = GroupId.GroupId.make("group-one")
+const memberId = MemberId.MemberId.make("member-one")
 const at = DateTime.makeUnsafe("2026-09-23T12:00:00.000Z")
 const Payload = Schema.Struct({ scopes: Schema.Array(Schema.String) })
 const Declared = Fact.make("test.declared", {
@@ -56,7 +63,7 @@ it.effect("group admissions reach the group and the admitted member; follows onl
     expect(group).toBe("group:group-one")
     expect(member).toBe("member:member-one")
     const admission = {
-      id: GroupMembership.Id.make("admission"),
+      id: GroupMembership.GroupMembershipId.make("admission"),
       workspaceId,
       groupId,
       memberId,
@@ -77,7 +84,7 @@ it.effect("group admissions reach the group and the admitted member; follows onl
       yield* Fact.makeAudience(GroupFollowFacts.Ended, {
         workspaceId,
         groupId,
-        followId: GroupFollow.Id.make("follow"),
+        followId: GroupFollow.GroupFollowId.make("follow"),
         memberId
       })
     ).toEqual([member])

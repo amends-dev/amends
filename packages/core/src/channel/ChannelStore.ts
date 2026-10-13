@@ -17,6 +17,7 @@ import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Channel from "./Channel.ts"
+import * as ChannelId from "./ChannelId.ts"
 
 /**
  * The channel store, bound to one workspace by the host.
@@ -34,7 +35,7 @@ export class ChannelStore extends Context.Service<
   ChannelStore,
   {
     /** The channel, removed or not. */
-    readonly get: (id: Channel.Id) => Effect.Effect<Option.Option<Channel.Channel>, StoreError.StoreError>
+    readonly get: (id: ChannelId.ChannelId) => Effect.Effect<Option.Option<Channel.Channel>, StoreError.StoreError>
     /** The workspace's channels that are not removed, in no particular order. */
     readonly listActive: Effect.Effect<ReadonlyArray<Channel.Channel>, StoreError.StoreError>
     /** Reject a reused id. Never upsert. */
@@ -51,11 +52,14 @@ export class ChannelStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: ChannelStore["Service"]): ChannelStore["Service"] => {
+export const make = (
+  workspaceId: WorkspaceId.WorkspaceId,
+  driver: ChannelStore["Service"]
+): ChannelStore["Service"] => {
   const read = StoreInput.read("ChannelStore")
   const write = StoreInput.write("ChannelStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Channel.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", ChannelId.ChannelId, id), driver.get),
     listActive: driver.listActive,
     insert: (record) => Effect.flatMap(write("insert", Channel.Channel, record), driver.insert),
     update: (record) => Effect.flatMap(write("update", Channel.Channel, record), driver.update)

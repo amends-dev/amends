@@ -26,7 +26,7 @@ const decoder = <S extends Schema.Top>(schema: S) => {
 }
 
 /** Does the value, or any value in it, name another workspace? */
-const foreign = (value: unknown, workspaceId: WorkspaceId.Id): boolean =>
+const foreign = (value: unknown, workspaceId: WorkspaceId.WorkspaceId): boolean =>
   Array.isArray(value)
     ? value.some((item) => foreign(item, workspaceId))
     : typeof value === "object" && value !== null && "workspaceId" in value && value.workspaceId !== workspaceId
@@ -51,7 +51,7 @@ export const read =
  * @since 0.1.0
  */
 export const write =
-  (store: string, workspaceId?: WorkspaceId.Id) =>
+  (store: string, workspaceId?: WorkspaceId.WorkspaceId) =>
   <S extends Schema.Top>(operation: string, schema: S, input: S["Type"]) =>
     decoder(schema)(input).pipe(
       Effect.mapError((cause) => StoreError.rejected(store, operation, cause.message)),

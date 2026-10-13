@@ -1,7 +1,7 @@
 import { Identity } from "@amends-dev/core/identity"
 import { Entry, type StoreError } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
-import { Member } from "@amends-dev/core/workspace"
+import { MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect } from "effect"
 import { SqlClient } from "effect/sql"
@@ -17,13 +17,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const bound = yield* boundTo(workspaceId)
           yield* initialized(bound)
           const human = Notification.ofMember(
-            Member.Id.make("recipient-member"),
+            MemberId.MemberId.make("recipient-member"),
             Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("recipient") })
           )
           const value: Notification.Notification = {
-            id: Notification.Id.make("malformed"),
+            id: Notification.NotificationId.make("malformed"),
             workspaceId,
-            source: { logId: Entry.LogId.make("journal"), entryId: Entry.Id.make("source") },
+            source: { logId: Entry.LogId.make("journal"), entryId: Entry.EntryId.make("source") },
             recipient: human,
             recordedAt: DateTime.makeUnsafe("2026-09-19T12:00:00.123Z"),
             state: { _tag: "Pending" }

@@ -1,5 +1,5 @@
 import type * as Core from "@amends-dev/core"
-import { Channel, ChannelIntake, ChannelService, DeliveryExecution } from "@amends-dev/core/channel"
+import { Channel, ChannelIntake, ChannelService, DeliveryExecution, ChannelId } from "@amends-dev/core/channel"
 import { ConnectionService } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
 import { Group, GroupFollowService, GroupService } from "@amends-dev/core/group"
@@ -7,13 +7,13 @@ import type { Actor, Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
 import { TaskService } from "@amends-dev/core/task"
 import {
-  type Thread,
   ThreadMessage,
   ThreadMessageService,
   ThreadParticipation,
-  ThreadService
+  ThreadService,
+  type ThreadId
 } from "@amends-dev/core/thread"
-import { Member, type Workspace } from "@amends-dev/core/workspace"
+import { Member, type WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
@@ -33,19 +33,19 @@ import {
 } from "./support.ts"
 
 const as = <A, E, R extends Core.Operations | Actor.Actor>(
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
   program: Effect.Effect<A, E, R>
 ) => Effect.flatMap(Gateway.Gateway, (gateway) => gateway.asMember(id, identity, program))
 /** Run a step of a job service in the workspace, as a host does for what its channels receive. */
-const asHost = <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, Core.JobServices>) =>
+const asHost = <A, E>(id: WorkspaceId.WorkspaceId, program: Effect.Effect<A, E, Core.JobServices>) =>
   Effect.flatMap(Gateway.Gateway, (gateway) => Effect.scoped(gateway.inWorkspace(id, program)))
 const intake = <A, E>(
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   step: (channelIntake: ChannelIntake.ChannelIntake["Service"]) => Effect.Effect<A, E>
 ) => asHost(id, Effect.flatMap(ChannelIntake.ChannelIntake, step))
 const deliver = <A, E>(
-  id: Workspace.Id,
+  id: WorkspaceId.WorkspaceId,
   step: (deliveryExecution: DeliveryExecution.DeliveryExecution["Service"]) => Effect.Effect<A, E>
 ) => asHost(id, Effect.flatMap(DeliveryExecution.DeliveryExecution, step))
 
@@ -75,7 +75,7 @@ const opened = (intake: ChannelIntake.Intake | undefined) =>
     ? intake
     : expect.fail(`Expected a thread opened or replied to, not ${intake?._tag}`)
 /** Who takes part in the thread, by key. */
-const participantsOf = (bound: Support.Bound, threadId: Thread.Id) =>
+const participantsOf = (bound: Support.Bound, threadId: ThreadId.ThreadId) =>
   Effect.map(bound.participations.listByThread(threadId), (records) =>
     records
       .filter((record) => record.status === "active")
@@ -283,13 +283,13 @@ describe("channels", () => {
             expect(
               yield* Effect.flip(
                 intake(workspace.id, (channelIntake) =>
-                  channelIntake.receive(Channel.Id.make("missing"), {
+                  channelIntake.receive(ChannelId.ChannelId.make("missing"), {
                     headers: {},
                     body: body([])
                   })
                 )
               )
-            ).toEqual(new CoreError.NotFound({ resource: "Channel", id: Channel.Id.make("missing") }))
+            ).toEqual(new CoreError.NotFound({ resource: "Channel", id: ChannelId.ChannelId.make("missing") }))
           })
         )
       )

@@ -1,36 +1,36 @@
-import { Integration, Integrations } from "@amends-dev/connection"
+import { Integration, Integrations, Connection as ConnectionContract } from "@amends-dev/connection"
 import type { AgentQuery } from "@amends-dev/core/agent"
-import { Connection } from "@amends-dev/core/connection"
 import { CoreError } from "@amends-dev/core/error"
-import { Group } from "@amends-dev/core/group"
+import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
-import { ThreadId, ThreadParticipation } from "@amends-dev/core/thread"
+import { ThreadId, ThreadParticipationId } from "@amends-dev/core/thread"
 import {
   type SessionLog,
   SessionLogStore,
   type SessionStateStore,
-  Turn,
+  type Turn,
   TurnExecution,
-  type TurnJobs
+  type TurnJobs,
+  TurnId
 } from "@amends-dev/core/turn"
-import { Member, Workspace } from "@amends-dev/core/workspace"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends-dev/harness"
 import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect"
 import { Prompt } from "effect/ai"
 
-export const workspaceId = Workspace.Id.make("workspace-1")
+export const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
 export const job: TurnJobs.Job = {
   workspaceId,
-  memberId: Member.Id.make("member-planner"),
-  threadId: ThreadId.Id.make("thread-1")
+  memberId: MemberId.MemberId.make("member-planner"),
+  threadId: ThreadId.ThreadId.make("thread-1")
 }
-export const participationId = ThreadParticipation.Id.make("participation-1")
+export const participationId = ThreadParticipationId.ThreadParticipationId.make("participation-1")
 const at = DateTime.makeUnsafe("2026-10-07T12:00:00.000Z")
 export const turn: Turn.Turn = {
-  id: Turn.Id.make("turn-1"),
+  id: TurnId.TurnId.make("turn-1"),
   workspaceId,
-  groupId: Group.Id.make("group-1"),
+  groupId: GroupId.GroupId.make("group-1"),
   threadId: job.threadId,
   agentId: Identity.AgentId.make("agent-planner"),
   memberId: job.memberId,
@@ -51,7 +51,7 @@ export const turn: Turn.Turn = {
 /** A connection the runnable names, on `integration`, taking no key. */
 const connectionOn = (integration: string) => ({
   connection: {
-    id: Connection.Id.make(`connection-${integration}`),
+    id: ConnectionContract.ConnectionId.make(`connection-${integration}`),
     integration,
     name: integration,
     settings: {},
@@ -65,7 +65,7 @@ export const runnableOn = (harnessIntegration: string): AgentQuery.Runnable => (
   harness: connectionOn(harnessIntegration),
   model: {
     ...connectionOn("test-models"),
-    model: { connectionId: Connection.Id.make("connection-test-models"), id: "test-model" }
+    model: { connectionId: ConnectionContract.ConnectionId.make("connection-test-models"), id: "test-model" }
   },
   sandbox: null
 })

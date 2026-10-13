@@ -1,3 +1,4 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Layer } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -21,19 +22,17 @@ import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
 import * as Store from "../../src/journal/Store.ts"
 import * as StoreError from "../../src/journal/StoreError.ts"
-import * as Member from "../../src/workspace/Member.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
-const foreignWorkspaceId = Workspace.Id.make("workspace-two")
-const memberId = Member.Id.make("recipient")
-const roleId = Role.Id.make("manager")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
+const foreignWorkspaceId = WorkspaceId.WorkspaceId.make("workspace-two")
+const memberId = MemberId.MemberId.make("recipient")
+const roleId = Role.RoleId.make("manager")
 const workspaceScope = Scope.Scope.cases.Workspace.make({ workspaceId })
 const memberScope = Scope.Scope.cases.Target.make({
-  target: Target.Reference.cases.Member.make({ workspaceId, memberId: Member.Id.make("subject") })
+  target: Target.Reference.cases.Member.make({ workspaceId, memberId: MemberId.MemberId.make("subject") })
 })
 const workspaceTargetScope = Scope.Scope.cases.Target.make({
   target: Target.Reference.cases.Workspace.make({ workspaceId })
@@ -54,7 +53,7 @@ const directSource = (permission: Permission.Name, scope: Scope.Scope) =>
   Assignment.Source.cases.Direct.make({ grant: { permission, scope } })
 const assigned = (id: string, source: Assignment.Source) =>
   Assignment.Assignment.make({
-    id: Assignment.Id.make(id),
+    id: Assignment.AssignmentId.make(id),
     workspaceId,
     memberId,
     source,
@@ -110,7 +109,7 @@ it.effect("the resolver reads current state without requiring a transaction", ()
 it.effect("resolution expands role and direct assignments at their individual scopes", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
-    const emptyRoleId = Role.Id.make("empty")
+    const emptyRoleId = Role.RoleId.make("empty")
     yield* seed(
       fixture,
       [role, { id: emptyRoleId, workspaceId, name: "Empty", permissions: [] }],
@@ -144,8 +143,8 @@ it.effect("resolution expands role and direct assignments at their individual sc
 it.effect("one resolver observes staged journal changes, later role edits, and assignment revocations", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
-    const roleAssignmentId = Assignment.Id.make("role-assignment")
-    const directAssignmentId = Assignment.Id.make("direct-assignment")
+    const roleAssignmentId = Assignment.AssignmentId.make("role-assignment")
+    const directAssignmentId = Assignment.AssignmentId.make("direct-assignment")
     yield* Effect.gen(function* () {
       const grantResolver = yield* GrantResolver.GrantResolver
       const journal = yield* Journal.make({
@@ -225,7 +224,7 @@ it.effect("members without active assignments receive no grants", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
     expect(yield* run(fixture, resolve)).toEqual([])
-    const revoked = assigned("revoked", roleSource(workspaceScope, Role.Id.make("missing")))
+    const revoked = assigned("revoked", roleSource(workspaceScope, Role.RoleId.make("missing")))
     yield* seed(fixture, [], [revoked])
     yield* fixture.store.transaction(fixture.assignments.markRevoked(revoked.id))
     expect(yield* run(fixture, resolve)).toEqual([])
@@ -287,7 +286,7 @@ it.effect("a direct grant scoped to another workspace authorizes nothing here", 
   Effect.gen(function* () {
     const fixture = yield* make()
     const wrongScope = {
-      id: Assignment.Id.make("foreign-scope"),
+      id: Assignment.AssignmentId.make("foreign-scope"),
       workspaceId,
       memberId,
       status: "active",

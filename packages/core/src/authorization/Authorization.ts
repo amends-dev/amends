@@ -21,7 +21,7 @@ import * as Identity from "../identity/Identity.ts"
 import * as Store from "../journal/Store.ts"
 import type * as StoreError from "../journal/StoreError.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
-import type * as Workspace from "../workspace/Workspace.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Grant from "./Grant.ts"
 import * as GrantResolver from "./GrantResolver.ts"
 import * as PermissionCatalog from "./PermissionCatalog.ts"
@@ -69,8 +69,8 @@ export class Authorization extends Context.Service<
 const sameIdentity = Schema.toEquivalence(Identity.Reference)
 /** Fails unless what the actor or a target names belongs to this core's workspace. */
 const requireWorkspace = Effect.fnUntraced(function* (
-  expectedWorkspaceId: Workspace.Id,
-  actualWorkspaceId: Workspace.Id
+  expectedWorkspaceId: WorkspaceId.WorkspaceId,
+  actualWorkspaceId: WorkspaceId.WorkspaceId
 ) {
   if (expectedWorkspaceId !== actualWorkspaceId) {
     return yield* new CoreError.Invalid({

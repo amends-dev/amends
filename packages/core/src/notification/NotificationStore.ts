@@ -16,7 +16,6 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
-import type * as Group from "../group/Group.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
 import * as Store from "../journal/Store.ts"
@@ -37,7 +36,7 @@ import * as Notification from "./Notification.ts"
  */
 export const Cursor = Schema.Struct({
   recordedAt: Notification.Notification.fields.recordedAt,
-  id: Notification.Id
+  id: Notification.NotificationId
 })
 
 /**
@@ -140,7 +139,7 @@ export class NotificationStore extends Context.Service<
   {
     /** Find a notification in this workspace; None if absent. */
     readonly get: (
-      id: Notification.Id
+      id: Notification.NotificationId
     ) => Effect.Effect<Option.Option<Notification.Notification>, StoreError.StoreError>
 
     /**
@@ -176,7 +175,7 @@ export class NotificationStore extends Context.Service<
      */
     readonly listByThread: (
       recipient: Notification.Recipient,
-      threadId: ThreadId.Id,
+      threadId: ThreadId.ThreadId,
       range: ThreadRange
     ) => Effect.Effect<ReadonlyArray<Notification.Notification>, StoreError.StoreError>
     /**
@@ -185,7 +184,7 @@ export class NotificationStore extends Context.Service<
      */
     readonly listPendingByThread: (
       recipient: Notification.Recipient,
-      threadId: ThreadId.Id,
+      threadId: ThreadId.ThreadId,
       throughSequence: number
     ) => Effect.Effect<ReadonlyArray<Notification.Notification>, StoreError.StoreError>
 
@@ -200,7 +199,7 @@ export class NotificationStore extends Context.Service<
      */
     readonly countPendingByGroup: (
       recipient: Notification.Recipient,
-      groupIds: ReadonlyArray<GroupId.Id>
+      groupIds: ReadonlyArray<GroupId.GroupId>
     ) => Effect.Effect<ReadonlyArray<PendingCount>, StoreError.StoreError>
 
     /**
@@ -227,7 +226,7 @@ export class NotificationStore extends Context.Service<
      * write joins the caller's transaction when there is one and is atomic on its own otherwise.
      */
     readonly markSeen: (
-      ids: ReadonlyArray<Notification.Id>,
+      ids: ReadonlyArray<Notification.NotificationId>,
       seenAt: DateTime.Utc
     ) => Effect.Effect<void, StoreError.StoreError>
     /**
@@ -237,7 +236,7 @@ export class NotificationStore extends Context.Service<
      * writes nothing.
      */
     readonly accept: (
-      ids: ReadonlyArray<Notification.Id>,
+      ids: ReadonlyArray<Notification.NotificationId>,
       by: Notification.AcceptedBy,
       acceptedAt: DateTime.Utc
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
@@ -246,7 +245,7 @@ export class NotificationStore extends Context.Service<
      * history.
      */
     readonly discardPendingForParticipation: (
-      id: ThreadParticipationId.Id
+      id: ThreadParticipationId.ThreadParticipationId
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
     /**
      * Settle what a member had pending from a group's threads once they no longer belong to it,
@@ -255,8 +254,8 @@ export class NotificationStore extends Context.Service<
      * the departure. A person's seen ones and everyone else's stay.
      */
     readonly discardPendingForGroup: (
-      memberId: MemberId.Id,
-      groupId: GroupId.Id
+      memberId: MemberId.MemberId,
+      groupId: GroupId.GroupId
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
 >()("@amends-dev/core/notification/NotificationStore") {}
@@ -275,13 +274,13 @@ const settled = (operation: string) => () =>
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   driver: NotificationStore["Service"]
 ): NotificationStore["Service"] => {
   const read = StoreInput.read("NotificationStore")
   const write = StoreInput.write("NotificationStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Notification.Id, id), driver.get),
+    get: (id) => Effect.flatMap(read("get", Notification.NotificationId, id), driver.get),
     listPendingByRecipient: Effect.fn("NotificationStore.listPendingByRecipient")(function* (recipient, options) {
       return yield* driver.listPendingByRecipient(
         yield* read("listPendingByRecipient", Notification.Recipient, recipient),
@@ -305,7 +304,7 @@ export const make = (
     listByThread: Effect.fn("NotificationStore.listByThread")(function* (recipient, threadId, range) {
       return yield* driver.listByThread(
         yield* read("listByThread", Notification.Recipient, recipient),
-        yield* read("listByThread", ThreadId.Id, threadId),
+        yield* read("listByThread", ThreadId.ThreadId, threadId),
         yield* read("listByThread", ThreadRange, range)
       )
     }),
@@ -313,7 +312,7 @@ export const make = (
       function* (recipient, threadId, throughSequence) {
         return yield* driver.listPendingByThread(
           yield* read("listPendingByThread", Notification.Recipient, recipient),
-          yield* read("listPendingByThread", ThreadId.Id, threadId),
+          yield* read("listPendingByThread", ThreadId.ThreadId, threadId),
           yield* read("listPendingByThread", Schema.Int, throughSequence)
         )
       }
@@ -326,7 +325,7 @@ export const make = (
     countPendingByGroup: Effect.fn("NotificationStore.countPendingByGroup")(function* (recipient, groupIds) {
       return yield* driver.countPendingByGroup(
         yield* read("countPendingByGroup", Notification.Recipient, recipient),
-        yield* read("countPendingByGroup", Schema.Array(GroupId.Id), groupIds)
+        yield* read("countPendingByGroup", Schema.Array(GroupId.GroupId), groupIds)
       )
     }),
     insert: (record) =>
@@ -341,26 +340,26 @@ export const make = (
       ),
     markSeen: Effect.fn("NotificationStore.markSeen")(function* (ids, seenAt) {
       return yield* driver.markSeen(
-        yield* write("markSeen", Schema.Array(Notification.Id), ids),
+        yield* write("markSeen", Schema.Array(Notification.NotificationId), ids),
         yield* write("markSeen", Schema.DateTimeUtc, seenAt)
       )
     }),
     accept: Effect.fn("NotificationStore.accept")(function* (ids, by, acceptedAt) {
       return yield* driver.accept(
-        yield* write("accept", Schema.Array(Notification.Id), ids),
+        yield* write("accept", Schema.Array(Notification.NotificationId), ids),
         yield* write("accept", Notification.AcceptedBy, by),
         yield* write("accept", Schema.DateTimeUtc, acceptedAt)
       )
     }),
     discardPendingForParticipation: (id) =>
       Effect.flatMap(
-        write("discardPendingForParticipation", ThreadParticipationId.Id, id),
+        write("discardPendingForParticipation", ThreadParticipationId.ThreadParticipationId, id),
         driver.discardPendingForParticipation
       ),
     discardPendingForGroup: Effect.fn("NotificationStore.discardPendingForGroup")(function* (memberId, groupId) {
       return yield* driver.discardPendingForGroup(
-        yield* write("discardPendingForGroup", MemberId.Id, memberId),
-        yield* write("discardPendingForGroup", GroupId.Id, groupId)
+        yield* write("discardPendingForGroup", MemberId.MemberId, memberId),
+        yield* write("discardPendingForGroup", GroupId.GroupId, groupId)
       )
     })
   }
@@ -552,7 +551,7 @@ const makeMemory = Effect.fn("NotificationStore.makeMemory")(function* () {
       function* (recipient, groupInput) {
         const target = inboxKey(recipient)
         const groupIds = new Set(groupInput)
-        const counts = new Map<Group.Id, number>()
+        const counts = new Map<GroupId.GroupId, number>()
         for (const record of yield* all)
           if (
             inboxKey(record.recipient) === target &&

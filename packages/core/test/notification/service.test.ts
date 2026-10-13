@@ -1,3 +1,4 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, expectTypeOf, it } from "@effect/vitest"
 import { Crypto, DateTime, Effect, Layer, Option, Schema } from "effect"
 import * as AssignmentStore from "../../src/authorization/AssignmentStore.ts"
@@ -24,27 +25,26 @@ import * as Member from "../../src/workspace/Member.ts"
 import * as MemberFacts from "../../src/workspace/MemberFacts.ts"
 import * as MemberProjection from "../../src/workspace/MemberProjection.ts"
 import * as MemberStore from "../../src/workspace/MemberStore.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 import * as TestSignalHub from "../signal-hub.ts"
 
-const workspaceId = Workspace.Id.make("workspace")
-const otherWorkspaceId = Workspace.Id.make("other-workspace")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace")
+const otherWorkspaceId = WorkspaceId.WorkspaceId.make("other-workspace")
 const logId = Entry.LogId.make("journal")
 const alice = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("alice-member"),
+  memberId: MemberId.MemberId.make("alice-member"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("same-id") })
 })
 const agent = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("agent-member"),
+  memberId: MemberId.MemberId.make("agent-member"),
   identity: Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("same-id") })
 })
 const bob = Actor.Actor.of({
   workspaceId,
-  memberId: Member.Id.make("bob-member"),
+  memberId: MemberId.MemberId.make("bob-member"),
   identity: Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") })
 })
 const page = { limit: 10 }
@@ -53,9 +53,9 @@ const record = (
   recipient: Notification.Recipient = Notification.ofMember(alice.memberId, alice.identity),
   recordWorkspaceId = workspaceId
 ): Notification.Notification => ({
-  id: Notification.Id.make(id),
+  id: Notification.NotificationId.make(id),
   workspaceId: recordWorkspaceId,
-  source: { logId, entryId: Entry.Id.make(`source-${id}`) },
+  source: { logId, entryId: Entry.EntryId.make(`source-${id}`) },
   recipient,
   recordedAt: DateTime.makeUnsafe("2026-09-19T12:00:00Z"),
   state: { _tag: "Pending" }
@@ -213,7 +213,7 @@ it.effect("missing notifications and another recipient's notifications have the 
       fixture,
       Effect.gen(function* () {
         const notificationService = yield* NotificationService.NotificationService
-        for (const id of [theirs.id, agents.id, Notification.Id.make("absent")]) {
+        for (const id of [theirs.id, agents.id, Notification.NotificationId.make("absent")]) {
           expect(yield* Effect.flip(notificationService.markSeen(id))).toEqual(
             new CoreError.NotFound({ resource: "Notification", id })
           )
@@ -230,7 +230,7 @@ it.effect("authorization rejects missing, removed, mismatched, or foreign actors
     yield* fixture.store.transaction(fixture.members.markRemoved(bob.memberId))
     for (const actor of [
       bob,
-      Actor.Actor.of({ ...alice, memberId: Member.Id.make("missing") }),
+      Actor.Actor.of({ ...alice, memberId: MemberId.MemberId.make("missing") }),
       Actor.Actor.of({ ...alice, identity: agent.identity }),
       Actor.Actor.of({ ...alice, workspaceId: otherWorkspaceId })
     ]) {
@@ -306,7 +306,7 @@ it.effect("the inbox forwards validated paging with the actor's recipient, ignor
     yield* seed(fixture)
     const options = {
       limit: 1,
-      before: { recordedAt: mine.recordedAt, id: Notification.Id.make("later") }
+      before: { recordedAt: mine.recordedAt, id: Notification.NotificationId.make("later") }
     }
     const calls: Array<{
       pending: boolean

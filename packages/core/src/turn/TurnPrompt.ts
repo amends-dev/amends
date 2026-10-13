@@ -17,8 +17,9 @@ import * as Task from "../task/Task.ts"
 import type * as Thread from "../thread/Thread.ts"
 import type * as ThreadActivityKind from "../thread/ThreadActivityKind.ts"
 import * as ThreadMessage from "../thread/ThreadMessage.ts"
+import type * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as ThreadParticipation from "../thread/ThreadParticipation.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 
 /**
  * A message of the thread as the agent is told it, for the conversation it joins.
@@ -53,7 +54,7 @@ export interface Context {
  * @since 0.1.0
  */
 export interface Names {
-  readonly member: (memberId: Member.Id) => string
+  readonly member: (memberId: MemberId.MemberId) => string
   readonly contact: (contactId: Identity.ContactId) => string
 }
 
@@ -66,14 +67,15 @@ export interface Names {
  */
 export interface Options {
   /** The agent's own membership, which is "you". */
-  readonly self: Member.Id
+  readonly self: MemberId.MemberId
   readonly names: Names
   /** Who asked for the turn to run again, when someone retried it. */
   readonly retriedBy: string | undefined
 }
 
 const quoted = (text: string) => `“${text}”`
-const memberOf = (memberId: Member.Id): ThreadMessage.Author => ThreadMessage.Author.cases.Member.make({ memberId })
+const memberOf = (memberId: MemberId.MemberId): ThreadMessage.Author =>
+  ThreadMessage.Author.cases.Member.make({ memberId })
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** What `author` is called: "you" for the agent itself. */
@@ -121,7 +123,7 @@ export const contextOf = (context: Context, options: Options): string | undefine
 }
 
 /** The member an assignee is, when there is one. */
-const assigneeOf = (assignee: Member.Id | null): ReadonlyArray<ThreadMessage.Author> =>
+const assigneeOf = (assignee: MemberId.MemberId | null): ReadonlyArray<ThreadMessage.Author> =>
   assignee === null ? [] : [memberOf(assignee)]
 /** The person a participant is, when it is one: a member or a contact, not triage. */
 const personOf = (reference: ThreadParticipation.Reference): ReadonlyArray<ThreadMessage.Author> =>
@@ -134,7 +136,11 @@ const personOf = (reference: ThreadParticipation.Reference): ReadonlyArray<Threa
 /** How an agent reads activity of one kind: whom it names, and what it says, if anything. */
 interface Reading<Item> {
   readonly people: (item: Item) => ReadonlyArray<ThreadMessage.Author>
-  readonly tell: (item: Item, options: Options, toldMessages: Set<ThreadMessage.Id>) => string | undefined
+  readonly tell: (
+    item: Item,
+    options: Options,
+    toldMessages: Set<ThreadMessageId.ThreadMessageId>
+  ) => string | undefined
 }
 
 /** A kind that tells an agent nothing. */
@@ -242,7 +248,7 @@ export const promptOf = (
   items: ReadonlyArray<Thread.TimelineItem>,
   options: Options
 ): Prompt.UserMessage | undefined => {
-  const toldMessages = new Set<ThreadMessage.Id>()
+  const toldMessages = new Set<ThreadMessageId.ThreadMessageId>()
   const texts: Array<string> = []
   for (const item of items) {
     const text = readingOf(item).tell(item, options, toldMessages)

@@ -1,10 +1,9 @@
 import { Connection as ConnectionContract, Integration, Integrations, type ModelCatalog } from "@amends-dev/connection"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Result, Schema } from "effect"
 import * as AgentReadiness from "../../src/agent/AgentReadiness.ts"
-import * as Connection from "../../src/connection/Connection.ts"
-import * as Member from "../../src/workspace/Member.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
+import type * as Connection from "../../src/connection/Connection.ts"
 
 const unused = () => Effect.die("No test makes a harness or a sandbox provider")
 
@@ -58,14 +57,14 @@ const installed = Integrations.make([
 ])
 
 const connection = (id: string, integration: string, settings: Connection.Settings = {}): Connection.Connection => ({
-  id: Connection.Id.make(id),
-  workspaceId: Workspace.Id.make("workspace-one"),
+  id: ConnectionContract.ConnectionId.make(id),
+  workspaceId: WorkspaceId.WorkspaceId.make("workspace-one"),
   integration,
   name: id,
   settings,
   auth: "none",
   status: "active",
-  createdBy: Member.Id.make("member-owner"),
+  createdBy: MemberId.MemberId.make("member-owner"),
   createdAt: DateTime.makeUnsafe("2026-10-06T12:00:00.000Z")
 })
 

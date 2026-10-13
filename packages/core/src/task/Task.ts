@@ -63,7 +63,7 @@ export const working = (status: Status): boolean => status === "todo" || status 
  * @category utils
  * @since 0.1.0
  */
-export const asked = (task: { readonly status: Status; readonly assignee: MemberId.Id | null }) =>
+export const asked = (task: { readonly status: Status; readonly assignee: MemberId.MemberId | null }) =>
   working(task.status) ? task.assignee : null
 
 /**
@@ -74,14 +74,14 @@ export const asked = (task: { readonly status: Status; readonly assignee: Member
  * @since 0.1.0
  */
 export const Task = Schema.Struct({
-  threadId: ThreadId.Id,
-  workspaceId: WorkspaceId.Id,
+  threadId: ThreadId.ThreadId,
+  workspaceId: WorkspaceId.WorkspaceId,
   /** The thread's group, which is the assignee pool, copied so tasks list by group. */
-  groupId: GroupId.Id,
+  groupId: GroupId.GroupId,
   status: Status,
   priority: Priority,
   /** The one member responsible, or null. An assignee takes part in the thread. */
-  assignee: Schema.NullOr(MemberId.Id),
+  assignee: Schema.NullOr(MemberId.MemberId),
   /** Who created the task: a member, or the contact whose conversation a channel opened as one. */
   createdBy: ThreadMessage.Author,
   createdAt: Schema.DateTimeUtcFromString
@@ -103,7 +103,7 @@ export interface Task extends Schema.Schema.Type<typeof Task> {}
  */
 export const Change = Schema.TaggedUnion({
   Status: { from: Status, to: Status },
-  Assignee: { from: Schema.NullOr(MemberId.Id), to: Schema.NullOr(MemberId.Id) },
+  Assignee: { from: Schema.NullOr(MemberId.MemberId), to: Schema.NullOr(MemberId.MemberId) },
   Priority: { from: Priority, to: Priority }
 })
 
@@ -149,7 +149,7 @@ export const apply = (task: Task, change: Change): Task =>
 export const Options = Schema.Struct({
   status: Schema.optionalKey(Status),
   priority: Schema.optionalKey(Priority),
-  assignee: Schema.optionalKey(MemberId.Id)
+  assignee: Schema.optionalKey(MemberId.MemberId)
 })
 
 /**
@@ -176,7 +176,7 @@ export const initial = (options: Options): Pick<Task, "status" | "priority" | "a
  * @category options
  * @since 0.1.0
  */
-export const CreateInput = Schema.Struct({ threadId: ThreadId.Id, ...Options.fields })
+export const CreateInput = Schema.Struct({ threadId: ThreadId.ThreadId, ...Options.fields })
 
 /**
  * @category options
@@ -190,7 +190,7 @@ export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
  * @category options
  * @since 0.1.0
  */
-export const UpdateInput = Schema.Struct({ threadId: ThreadId.Id, change: Change })
+export const UpdateInput = Schema.Struct({ threadId: ThreadId.ThreadId, change: Change })
 
 /**
  * @category options
@@ -205,9 +205,9 @@ export interface UpdateInput extends Schema.Schema.Type<typeof UpdateInput> {}
  * @since 0.1.0
  */
 export const Updated = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   change: Change,
   changedAt: Schema.DateTimeUtcFromString
 })
@@ -227,7 +227,7 @@ export interface Updated extends Schema.Schema.Type<typeof Updated> {}
  */
 export const ListCursor = Schema.Struct({
   createdAt: Task.fields.createdAt,
-  threadId: ThreadId.Id
+  threadId: ThreadId.ThreadId
 })
 
 /**
@@ -265,7 +265,7 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
 export const recipients = (
   participants: ReadonlyArray<ThreadParticipation.ThreadParticipation>,
   by: ThreadParticipation.Reference | undefined,
-  asked: MemberId.Id | null
+  asked: MemberId.MemberId | null
 ): ReadonlyArray<ThreadActivity.Recipient> => {
   const byKey = by === undefined ? undefined : ThreadParticipation.keyOf(by)
   return participants.flatMap(({ id, participant }) => {

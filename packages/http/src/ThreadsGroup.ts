@@ -10,14 +10,17 @@
  * @since 0.1.0
  */
 
-import { Group } from "@amends-dev/core/group"
+import { GroupId } from "@amends-dev/core/group"
 import { ReadState } from "@amends-dev/core/read-state"
 import {
   Thread,
   ThreadActivityStore,
   ThreadMessage,
   ThreadParticipation,
-  ThreadTimeline
+  ThreadTimeline,
+  ThreadId,
+  ThreadMessageId,
+  ThreadParticipationId
 } from "@amends-dev/core/thread"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
@@ -28,9 +31,9 @@ import * as Authentication from "./Authentication.ts"
 import { limit } from "./internal/paging.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const thread = { threadId: Thread.Id }
-const message = { messageId: ThreadMessage.Id }
-const inGroup = { groupId: Group.Id }
+const thread = { threadId: ThreadId.ThreadId }
+const message = { messageId: ThreadMessageId.ThreadMessageId }
+const inGroup = { groupId: GroupId.GroupId }
 const reply = Schema.Struct({
   text: ThreadMessage.PublishInput.fields.text,
   mentions: ThreadMessage.PublishInput.fields.mentions
@@ -127,7 +130,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
       params: thread,
       query: {
         limit,
-        after: Schema.optionalKey(ThreadParticipation.Id).annotate({
+        after: Schema.optionalKey(ThreadParticipationId.ThreadParticipationId).annotate({
           description: "Exclusive boundary: the last participation ID of the previous page."
         })
       },

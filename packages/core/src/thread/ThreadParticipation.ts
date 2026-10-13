@@ -17,21 +17,6 @@ import * as ThreadId from "./ThreadId.ts"
 import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 
 /**
- * Names a participation; `ThreadParticipationId.Id`, where models that only refer to
- * participations import it from.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = ThreadParticipationId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = ThreadParticipationId.Id
-
-/**
  * Who takes part. Members participate through their current group admission, and carry the
  * identity they are notified as; contacts and triage take part without group access.
  *
@@ -40,8 +25,8 @@ export type Id = ThreadParticipationId.Id
  */
 export const Participant = Schema.TaggedUnion({
   Member: {
-    memberId: MemberId.Id,
-    groupMembershipId: GroupMembership.Id,
+    memberId: MemberId.MemberId,
+    groupMembershipId: GroupMembership.GroupMembershipId,
     identity: Identity.MemberReference
   },
   Contact: { contactId: Identity.ContactId },
@@ -89,9 +74,9 @@ export const keyOf = (participant: Participant | Reference): string =>
  * @since 0.1.0
  */
 export const ThreadParticipation = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
+  id: ThreadParticipationId.ThreadParticipationId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
   participant: Participant,
   joinedAt: Schema.DateTimeUtcFromString,
   joinedAtSequence: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -132,7 +117,7 @@ export const Admission = Schema.Struct({
  * @since 0.1.0
  */
 export const Reference = Schema.TaggedUnion({
-  Member: { memberId: MemberId.Id },
+  Member: { memberId: MemberId.MemberId },
   Contact: { contactId: Identity.ContactId },
   Triage: {}
 })
@@ -149,7 +134,7 @@ export type Reference = typeof Reference.Type
  * @category utils
  * @since 0.1.0
  */
-export const memberOf = (participant: Participant | Reference): MemberId.Id | undefined =>
+export const memberOf = (participant: Participant | Reference): MemberId.MemberId | undefined =>
   Reference.isAnyOf(["Member"])(participant) ? participant.memberId : undefined
 
 /**
@@ -173,7 +158,7 @@ export const referenceOf = (participant: Participant): Reference =>
  * @since 0.1.0
  */
 export const ListOptions = Schema.Struct({
-  after: Schema.optionalKey(Id),
+  after: Schema.optionalKey(ThreadParticipationId.ThreadParticipationId),
   limit: Schema.Int.check(Schema.isGreaterThan(0))
 })
 
@@ -191,9 +176,9 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  * @since 0.1.0
  */
 export const Summary = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
+  id: ThreadParticipationId.ThreadParticipationId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
   participant: Reference,
   joinedAt: ThreadParticipation.fields.joinedAt,
   joinedAtSequence: ThreadParticipation.fields.joinedAtSequence
@@ -226,7 +211,10 @@ export const toSummary = (record: ThreadParticipation): Summary => ({
  * @category options
  * @since 0.1.0
  */
-export const UnfollowInput = Schema.Struct({ threadId: ThreadId.Id, participationId: Id })
+export const UnfollowInput = Schema.Struct({
+  threadId: ThreadId.ThreadId,
+  participationId: ThreadParticipationId.ThreadParticipationId
+})
 
 /**
  * @category options
@@ -242,7 +230,7 @@ export interface UnfollowInput extends Schema.Schema.Type<typeof UnfollowInput> 
  * @since 0.1.0
  */
 export const Departure = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   ...UnfollowInput.fields
 })
 

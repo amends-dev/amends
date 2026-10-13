@@ -52,7 +52,7 @@ const inCommit = <E>(
   Effect.gen(function* () {
     const afterCommit: Array<Effect.Effect<void>> = []
     const storeTransaction = Store.Transaction.of({
-      id: Commit.Id.make(commitId),
+      id: Commit.CommitId.make(commitId),
       append: () => Effect.die("The test commit appends nothing"),
       afterCommit: (effect) => Effect.sync(() => void afterCommit.push(effect))
     })

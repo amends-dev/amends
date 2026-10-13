@@ -12,12 +12,13 @@ import * as Projection from "../journal/Projection.ts"
 import * as Channel from "./Channel.ts"
 import * as ChannelBindingStore from "./ChannelBindingStore.ts"
 import * as ChannelFacts from "./ChannelFacts.ts"
+import type * as ChannelId from "./ChannelId.ts"
 import * as ChannelStore from "./ChannelStore.ts"
 import * as Contact from "./Contact.ts"
 import * as ContactStore from "./ContactStore.ts"
 
 /** Change the stored channel a fact names, as `changes` says. */
-const updateChannel = Effect.fnUntraced(function* (channelId: Channel.Id, changes: Partial<Channel.Channel>) {
+const updateChannel = Effect.fnUntraced(function* (channelId: ChannelId.ChannelId, changes: Partial<Channel.Channel>) {
   const channelStore = yield* ChannelStore.ChannelStore
   const found = yield* channelStore.get(channelId)
   if (Option.isNone(found)) return yield* Effect.die("A changed channel is missing")

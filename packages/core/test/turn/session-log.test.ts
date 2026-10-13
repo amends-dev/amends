@@ -1,8 +1,9 @@
+import { ThreadMessageId } from "@amends-dev/core/thread"
+import { TurnId } from "@amends-dev/core/turn"
 import type { StreamPart } from "@amends-dev/harness"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime } from "effect"
 import { Prompt } from "effect/ai"
-import * as ThreadMessage from "../../src/thread/ThreadMessage.ts"
 import * as SessionLog from "../../src/turn/SessionLog.ts"
 import * as Turn from "../../src/turn/Turn.ts"
 
@@ -10,7 +11,7 @@ const at = DateTime.makeUnsafe("2026-10-06T12:00:00.000Z")
 /** A user message with the text `text`. */
 const userMessage = (text: string) => Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] })
 const usage = { inputTokens: {}, outputTokens: {} }
-const turnId = Turn.Id.make("turn-1")
+const turnId = TurnId.TurnId.make("turn-1")
 
 /** A step that only reads the notes. */
 const reading: StreamPart.Step = {
@@ -58,7 +59,7 @@ const started: SessionLog.Entry = {
   agentState: { turn: "turn-1" }
 }
 
-const itemsOf = (entries: ReadonlyArray<SessionLog.Entry>, ended?: ReadonlyArray<ThreadMessage.Id>) => {
+const itemsOf = (entries: ReadonlyArray<SessionLog.Entry>, ended?: ReadonlyArray<ThreadMessageId.ThreadMessageId>) => {
   const reader = SessionLog.reader(turnId, 0)
   reader.add(entries.map((entry, index) => ({ position: index + 1, recordedAt: at, entry })))
   if (ended !== undefined) reader.end(ended)
@@ -92,7 +93,7 @@ describe("a turn's log items", () => {
   it("mark the response the turn posted as its reply once it ends", () => {
     const items = itemsOf(
       [prompted(), step("one", writing("Reading.")), step("two", writing("The sum ", "is 5."))],
-      [ThreadMessage.Id.make("message-1")]
+      [ThreadMessageId.ThreadMessageId.make("message-1")]
     )
 
     expect(items.map((item) => Turn.LogItem.isAnyOf(["Responded"])(item) && item.reply)).toEqual([false, false, true])
@@ -102,7 +103,7 @@ describe("a turn's log items", () => {
   })
 
   it("take the turn's entries past where its log begins, and know how far they read", () => {
-    const other = Turn.Id.make("turn-0")
+    const other = TurnId.TurnId.make("turn-0")
     const reader = SessionLog.reader(turnId, 2)
     const recorded = [prompted("Ada: Earlier.", other), step("a", writing("Old."), other)].map((entry, index) => ({
       position: index + 1,
@@ -120,7 +121,7 @@ describe("a turn's log items", () => {
     const before = itemsOf([prompted(), step("one", writing("Half"))])
     const now = itemsOf(
       [prompted(), step("one", writing("Half")), step("two", writing("Whole."))],
-      [ThreadMessage.Id.make("message-1")]
+      [ThreadMessageId.ThreadMessageId.make("message-1")]
     )
     expect(SessionLog.changesSince(before, now).map(({ index }) => index)).toEqual([2])
     expect(SessionLog.changesSince(now, now)).toEqual([])
@@ -129,7 +130,7 @@ describe("a turn's log items", () => {
 
 describe("the conversation a session log records", () => {
   it("is the conversation joined, then each turn's prompt and the steps it took", () => {
-    const later = Turn.Id.make("turn-2")
+    const later = TurnId.TurnId.make("turn-2")
     const history = SessionLog.historyOf([
       { _tag: "Joined", conversation: [userMessage("Ada: Hello.")] },
       prompted(),
@@ -155,7 +156,7 @@ describe("the conversation a session log records", () => {
   })
 
   it("starts from the latest compaction's summary", () => {
-    const later = Turn.Id.make("turn-2")
+    const later = TurnId.TurnId.make("turn-2")
     const history = SessionLog.historyOf([
       prompted(),
       step("one", writing("The sum is 5.")),

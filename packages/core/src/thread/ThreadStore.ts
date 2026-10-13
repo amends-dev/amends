@@ -12,7 +12,6 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import type * as Group from "../group/Group.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as MemoryDatabase from "../journal/MemoryDatabase.ts"
 import * as Store from "../journal/Store.ts"
@@ -20,6 +19,7 @@ import * as StoreError from "../journal/StoreError.ts"
 import * as StoreInput from "../journal/StoreInput.ts"
 import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Thread from "./Thread.ts"
+import * as ThreadId from "./ThreadId.ts"
 
 /**
  * The thread store, bound to one workspace by the host.
@@ -36,25 +36,25 @@ import * as Thread from "./Thread.ts"
 export class ThreadStore extends Context.Service<
   ThreadStore,
   {
-    readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Thread>, StoreError.StoreError>
+    readonly get: (id: ThreadId.ThreadId) => Effect.Effect<Option.Option<Thread.Thread>, StoreError.StoreError>
     /**
      * Several threads in one read. Absent IDs are omitted and each found thread appears once; order
      * is unspecified, so callers index results by ID. An empty request reads nothing.
      */
     readonly getMany: (
-      ids: ReadonlyArray<Thread.Id>
+      ids: ReadonlyArray<ThreadId.ThreadId>
     ) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>
     /**
      * Every thread of a group in stable ID order. A history read for inspection; operations read
      * pages.
      */
-    readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>
+    readonly listByGroup: (id: GroupId.GroupId) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>
     /**
      * A group's threads with recorded activity, newest latest activity first, then ID in descending
      * binary order, after the exclusive `before` cursor and up to `limit`.
      */
     readonly listByLatest: (
-      id: GroupId.Id,
+      id: GroupId.GroupId,
       options: Thread.ListOptions
     ) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>
     /**
@@ -62,7 +62,7 @@ export class ThreadStore extends Context.Service<
      * `before` cursor and up to `limit`.
      */
     readonly listByStart: (
-      id: GroupId.Id,
+      id: GroupId.GroupId,
       options: Thread.OpeningOptions
     ) => Effect.Effect<ReadonlyArray<Thread.Thread>, StoreError.StoreError>
     /**
@@ -80,7 +80,7 @@ export class ThreadStore extends Context.Service<
      * are omitted; order is unspecified.
      */
     readonly getLatest: (
-      ids: ReadonlyArray<Thread.Id>
+      ids: ReadonlyArray<ThreadId.ThreadId>
     ) => Effect.Effect<ReadonlyArray<Thread.Latest>, StoreError.StoreError>
     /**
      * Projection write that advances a thread's latest content activity. A position at or before
@@ -97,28 +97,28 @@ export class ThreadStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: ThreadStore["Service"]): ThreadStore["Service"] => {
+export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: ThreadStore["Service"]): ThreadStore["Service"] => {
   const read = StoreInput.read("ThreadStore")
   const write = StoreInput.write("ThreadStore", workspaceId)
   return {
-    get: (id) => Effect.flatMap(read("get", Thread.Id, id), driver.get),
-    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(Thread.Id), ids), driver.getMany),
-    listByGroup: (id) => Effect.flatMap(read("listByGroup", GroupId.Id, id), driver.listByGroup),
+    get: (id) => Effect.flatMap(read("get", ThreadId.ThreadId, id), driver.get),
+    getMany: (ids) => Effect.flatMap(read("getMany", Schema.Array(ThreadId.ThreadId), ids), driver.getMany),
+    listByGroup: (id) => Effect.flatMap(read("listByGroup", GroupId.GroupId, id), driver.listByGroup),
     listByLatest: Effect.fn("ThreadStore.listByLatest")(function* (id, options) {
       return yield* driver.listByLatest(
-        yield* read("listByLatest", GroupId.Id, id),
+        yield* read("listByLatest", GroupId.GroupId, id),
         yield* read("listByLatest", Thread.ListOptions, options)
       )
     }),
     listByStart: Effect.fn("ThreadStore.listByStart")(function* (id, options) {
       return yield* driver.listByStart(
-        yield* read("listByStart", GroupId.Id, id),
+        yield* read("listByStart", GroupId.GroupId, id),
         yield* read("listByStart", Thread.OpeningOptions, options)
       )
     }),
     insert: (record) => Effect.flatMap(write("insert", Thread.Thread, record), driver.insert),
     rename: (renamed) => Effect.flatMap(write("rename", Thread.Renamed, renamed), driver.rename),
-    getLatest: (ids) => Effect.flatMap(read("getLatest", Schema.Array(Thread.Id), ids), driver.getLatest),
+    getLatest: (ids) => Effect.flatMap(read("getLatest", Schema.Array(ThreadId.ThreadId), ids), driver.getLatest),
     recordLatest: (latest) => Effect.flatMap(write("recordLatest", Thread.Latest, latest), driver.recordLatest)
   }
 }
@@ -137,7 +137,7 @@ const newestFirst = (
  */
 const makeMemory = Effect.fn("ThreadStore.makeMemory")(function* () {
   const { workspaceId, read, write } = yield* Store.MemoryBinding
-  const inGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+  const inGroup = Effect.fnUntraced(function* (groupId: GroupId.GroupId) {
     const records = yield* rows.all((yield* read).records.of("threads"))
     return records.filter((record) => record.groupId === groupId)
   })

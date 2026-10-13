@@ -7,7 +7,7 @@
  * turn.
  */
 
-import { SessionLog, SessionLogStore, Turn, TurnExecution } from "@amends-dev/core/turn"
+import { SessionLog, SessionLogStore, type Turn, TurnExecution, TurnId } from "@amends-dev/core/turn"
 import { Agent, type Session } from "@amends-dev/harness"
 import type * as Prompt from "effect/ai/Prompt"
 import * as Array from "effect/Array"
@@ -19,7 +19,7 @@ import * as Schema from "effect/Schema"
  * Another run of the turn wrote to its session log after this one: this one stops.
  */
 export class Superseded extends Schema.TaggedError<Superseded>()("SessionLogWriter.Superseded", {
-  turnId: Turn.Id
+  turnId: TurnId.TurnId
 }) {}
 
 /**
@@ -96,7 +96,7 @@ const sessionStateOf = (ready: Ready, id: Agent.SessionId, history: Prompt.Promp
  */
 const unfinishedTurnOf = (
   entries: ReadonlyArray<SessionLog.Entry>,
-  turnId: Turn.Id,
+  turnId: TurnId.TurnId,
   prompt: Prompt.UserMessage,
   id: Agent.SessionId,
   history: Prompt.Prompt

@@ -9,10 +9,10 @@ import type { Identity } from "@amends-dev/core/identity"
 import { Journal, Publication } from "@amends-dev/core/journal"
 import { TaskPermissions } from "@amends-dev/core/task"
 import {
-  Thread,
   ThreadMessagePermissions,
   ThreadParticipationPermissions,
-  ThreadPermissions
+  ThreadPermissions,
+  ThreadId
 } from "@amends-dev/core/thread"
 import { TurnExecution } from "@amends-dev/core/turn"
 import {
@@ -24,7 +24,8 @@ import {
   MemberPermissions,
   Invitation,
   OwnershipPermissions,
-  Workspace
+  type Workspace,
+  WorkspaceId
 } from "@amends-dev/core/workspace"
 import { Gateway, WorkspaceDirectory } from "@amends-dev/gateway"
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
@@ -359,13 +360,13 @@ describe("gateway", () => {
         Effect.gen(function* () {
           const gateway = yield* Gateway.Gateway
           const workspace = yield* Operations.createWorkspace(alice.id)
-          const threadId = Thread.Id.make("thread")
+          const threadId = ThreadId.ThreadId.make("thread")
           // A member that is no agent has no work to accept.
           const acceptWork = Effect.flatMap(TurnExecution.TurnExecution, (turnExecution) =>
             turnExecution.accept(workspace.ownerMemberId, threadId)
           )
           expect(yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork))).toEqual(Option.none())
-          const missing = Workspace.Id.make("never-created")
+          const missing = WorkspaceId.WorkspaceId.make("never-created")
           expect(yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, acceptWork)))).toEqual(
             new CoreError.NotFound({ resource: "Workspace", id: missing })
           )
@@ -414,14 +415,16 @@ describe("gateway", () => {
           runGateway(
             storage,
             Effect.gen(function* () {
-              const unknown = Workspace.Id.make("never-created")
+              const unknown = WorkspaceId.WorkspaceId.make("never-created")
               expect(yield* Effect.flip(Operations.getMember(unknown, bob, workspace.ownerMemberId))).toEqual(
                 new CoreError.Denied({
                   reason: new CoreError.NotMember({ workspaceId: unknown })
                 })
               )
               expect(
-                yield* Effect.flip(Operations.acceptInvitation(unknown, bob.id, Invitation.Id.make("never-issued")))
+                yield* Effect.flip(
+                  Operations.acceptInvitation(unknown, bob.id, Invitation.InvitationId.make("never-issued"))
+                )
               ).toEqual(new CoreError.NotFound({ resource: "Workspace", id: unknown }))
               expect(yield* Effect.flip(Operations.getMember(workspace.id, bob, workspace.ownerMemberId))).toEqual(
                 new CoreError.Denied({

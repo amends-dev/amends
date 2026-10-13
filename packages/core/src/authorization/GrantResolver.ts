@@ -14,7 +14,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import type * as StoreError from "../journal/StoreError.ts"
-import type * as Member from "../workspace/Member.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentStore from "./AssignmentStore.ts"
 import * as Grant from "./Grant.ts"
@@ -48,7 +48,7 @@ export class GrantResolver extends Context.Service<
      * grants nothing, since no requirement can name it. Overlapping grants may repeat.
      * Actor identity, active membership, and action requirements are checked by authorization.
      */
-    readonly resolve: (memberId: Member.Id) => Effect.Effect<ReadonlyArray<Grant.Grant>, Error>
+    readonly resolve: (memberId: MemberId.MemberId) => Effect.Effect<ReadonlyArray<Grant.Grant>, Error>
   }
 >()("@amends-dev/core/authorization/GrantResolver") {}
 
@@ -78,7 +78,7 @@ export const make: Effect.Effect<
     return [yield* Effect.orDie(Schema.decodeEffect(Grant.makeSchema(permission.value))({ permission: name, scope }))]
   })
 
-  const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: Member.Id) {
+  const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: MemberId.MemberId) {
     const grants: Array<Grant.Grant> = []
     for (const assignment of yield* assignmentStore.listActiveByMember(memberId)) {
       const source = assignment.source

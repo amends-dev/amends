@@ -15,21 +15,6 @@ import * as MemberId from "./MemberId.ts"
 import * as WorkspaceId from "./WorkspaceId.ts"
 
 /**
- * Identifies one admission to a workspace; `MemberId.Id`, where models that only refer to members
- * import it from. Rejoining creates a new membership.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = MemberId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = MemberId.Id
-
-/**
  * Whether the membership gives access now: `active`, or `removed`, which is terminal and keeps the
  * record for history.
  *
@@ -78,8 +63,8 @@ export const NewName = Name.check(Text.isName)
  * @since 0.1.0
  */
 export const Member = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: MemberId.MemberId,
+  workspaceId: WorkspaceId.WorkspaceId,
   identity: Identity.MemberReference,
   name: Name,
   status: Status
@@ -98,4 +83,4 @@ export interface Member extends Schema.Schema.Type<typeof Member> {}
  * @category utils
  * @since 0.1.0
  */
-export const audienceOf = (memberId: Id): Audience.Scope => Audience.make("member", memberId)
+export const audienceOf = (memberId: MemberId.MemberId): Audience.Scope => Audience.make("member", memberId)

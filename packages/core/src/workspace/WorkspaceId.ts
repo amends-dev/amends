@@ -15,10 +15,10 @@ import * as Schema from "effect/Schema"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceId"))
+export const WorkspaceId = Schema.NonEmptyString.pipe(Schema.brand("WorkspaceId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type WorkspaceId = typeof WorkspaceId.Type

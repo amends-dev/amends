@@ -30,7 +30,7 @@ export type SystemId = typeof SystemId.Type
  * @since 0.1.0
  */
 export const Reference = Schema.TaggedUnion({
-  Member: { memberId: MemberId.Id, identity: Identity.MemberReference },
+  Member: { memberId: MemberId.MemberId, identity: Identity.MemberReference },
   Identity: { identity: Identity.Reference },
   System: { id: SystemId }
 })

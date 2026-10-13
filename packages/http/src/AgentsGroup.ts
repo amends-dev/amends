@@ -9,6 +9,7 @@
  */
 
 import { Agent } from "@amends-dev/core/agent"
+import { Identity } from "@amends-dev/core/identity"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
@@ -17,7 +18,7 @@ import * as ApiErrors from "./ApiErrors.ts"
 import * as Authentication from "./Authentication.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const agent = { agentId: Agent.Id }
+const agent = { agentId: Identity.AgentId }
 const view = Agent.View.annotate({ identifier: "Agent" })
 /** Outcomes of a setup: a connection the caller cannot give the agent, or one that cannot run. */
 const setup = [ApiErrors.Invalid, ApiErrors.Invalid] as const

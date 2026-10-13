@@ -20,7 +20,7 @@ import type * as PlatformError from "effect/PlatformError"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import * as CoreError from "../error/CoreError.ts"
-import * as Group from "../group/Group.ts"
+import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
 import type * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
@@ -32,18 +32,21 @@ import type * as StoreError from "../journal/StoreError.ts"
 import * as Notification from "../notification/Notification.ts"
 import * as Task from "../task/Task.ts"
 import * as TaskStore from "../task/TaskStore.ts"
-import * as Member from "../workspace/Member.ts"
+import * as MemberId from "../workspace/MemberId.ts"
 import * as Thread from "./Thread.ts"
 import * as ThreadActivity from "./ThreadActivity.ts"
 import * as ThreadActivityFacts from "./ThreadActivityFacts.ts"
 import * as ThreadActivityKind from "./ThreadActivityKind.ts"
 import * as ThreadActivityStore from "./ThreadActivityStore.ts"
 import * as ThreadFacts from "./ThreadFacts.ts"
+import * as ThreadId from "./ThreadId.ts"
 import * as ThreadMessage from "./ThreadMessage.ts"
 import * as ThreadMessageActivity from "./ThreadMessageActivity.ts"
 import * as ThreadMessageFacts from "./ThreadMessageFacts.ts"
+import * as ThreadMessageId from "./ThreadMessageId.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts"
+import * as ThreadParticipationId from "./ThreadParticipationId.ts"
 import * as ThreadQuery from "./ThreadQuery.ts"
 import * as ThreadStore from "./ThreadStore.ts"
 
@@ -82,11 +85,11 @@ export type Error =
  */
 export const MessageInput = Schema.Struct({
   /** The caller names the message, so a keyed request can name the same one on its retry. */
-  messageId: ThreadMessage.Id,
-  threadId: Thread.Id,
+  messageId: ThreadMessageId.ThreadMessageId,
+  threadId: ThreadId.ThreadId,
   author: ThreadMessage.Author,
   text: ThreadMessage.Text,
-  mentions: Schema.UniqueArray(Member.Id),
+  mentions: Schema.UniqueArray(MemberId.MemberId),
   /** The author, mentions, and everyone else this message addresses when it has no mentions. */
   participants: Schema.Array(ThreadParticipation.Reference),
   occurredAt: Schema.DateTimeUtcFromString,
@@ -120,7 +123,7 @@ export interface MessagePublished {
 export interface EditInput {
   readonly message: ThreadMessage.ThreadMessage
   readonly text: ThreadMessage.Text
-  readonly mentions: ReadonlyArray<Member.Id>
+  readonly mentions: ReadonlyArray<MemberId.MemberId>
   readonly occurredAt: DateTime.Utc
 }
 
@@ -167,8 +170,8 @@ export interface MessageDeleted {
  */
 export const CreateInput = Schema.Struct({
   /** The caller names the thread, so a keyed request can name the same one on its retry. */
-  threadId: Thread.Id,
-  groupId: Group.Id,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   title: Thread.Thread.fields.title,
   origin: Thread.Thread.fields.origin,
   /** Everyone who takes part from the first activity; group membership enrolls no one else. */
@@ -342,7 +345,7 @@ const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.
  */
 const recipientsOf = (
   author: ThreadMessage.Author,
-  mentions: ReadonlyArray<Member.Id>,
+  mentions: ReadonlyArray<MemberId.MemberId>,
   participants: ReadonlyArray<ThreadParticipation.ThreadParticipation>
 ): ReadonlyArray<ThreadActivity.Recipient> => {
   const authorKey = ThreadParticipation.keyOf(authorAsParticipant(author))
@@ -385,7 +388,7 @@ export const make = Effect.gen(function* () {
   const { workspaceId } = yield* Store.Store
 
   /** The position the thread's next activity takes, read in the caller's transaction. */
-  const nextSequence = Effect.fn("ThreadCommand.nextSequence")(function* (threadId: Thread.Id) {
+  const nextSequence = Effect.fn("ThreadCommand.nextSequence")(function* (threadId: ThreadId.ThreadId) {
     yield* Store.Transaction
     const latest = yield* threadActivityStore.latest(threadId)
     return Option.isNone(latest) ? 1 : latest.value.sequence + 1
@@ -397,7 +400,7 @@ export const make = Effect.gen(function* () {
    */
   const participantOf = Effect.fnUntraced(function* (
     reference: ThreadParticipation.Reference,
-    candidates: ReadonlyMap<Member.Id, ThreadQuery.Eligible>
+    candidates: ReadonlyMap<MemberId.MemberId, ThreadQuery.Eligible>
   ): Effect.fn.Return<ThreadParticipation.Participant, CoreError.Conflict> {
     if (!ThreadParticipation.Reference.isAnyOf(["Member"])(reference)) return reference
     const candidate = candidates.get(reference.memberId)
@@ -448,7 +451,7 @@ export const make = Effect.gen(function* () {
       }
       const participant = yield* participantOf(reference, candidates)
       const admitted: typeof ThreadParticipation.Admission.Type = {
-        id: ThreadParticipation.Id.make(yield* crypto.randomUUIDv4),
+        id: ThreadParticipationId.ThreadParticipationId.make(yield* crypto.randomUUIDv4),
         workspaceId,
         threadId: thread.id,
         participant,
@@ -483,7 +486,7 @@ export const make = Effect.gen(function* () {
     const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details, input.thread.id)
     const activity: ThreadActivity.ThreadActivity = {
       ...prepared,
-      id: ThreadActivity.Id.make(yield* crypto.randomUUIDv4),
+      id: ThreadActivity.ThreadActivityId.make(yield* crypto.randomUUIDv4),
       workspaceId,
       threadId: input.thread.id,
       sequence: input.sequence,
@@ -525,7 +528,7 @@ export const make = Effect.gen(function* () {
 
   /** The thread a message belongs to, which a message cannot outlive. */
   const threadOf = Effect.fnUntraced(function* (message: {
-    readonly threadId: Thread.Id
+    readonly threadId: ThreadId.ThreadId
   }): Effect.fn.Return<Thread.Thread, StoreError.StoreError> {
     const found = yield* threadStore.get(message.threadId)
     if (Option.isNone(found)) return yield* Effect.die("A message's thread is missing")

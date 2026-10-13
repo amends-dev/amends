@@ -77,11 +77,11 @@ export class SessionStateStore extends Context.Service<
   {
     /** The participation's session as its last turn left it, or none before its first ended. */
     readonly get: (
-      participationId: ThreadParticipationId.Id
+      participationId: ThreadParticipationId.ThreadParticipationId
     ) => Effect.Effect<Option.Option<Saved>, StoreError.StoreError>
     /** Store the participation's session, in place of any it had. */
     readonly set: (
-      participationId: ThreadParticipationId.Id,
+      participationId: ThreadParticipationId.ThreadParticipationId,
       saved: Saved
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
   }
@@ -96,10 +96,11 @@ export class SessionStateStore extends Context.Service<
 export const make = (driver: SessionStateStore["Service"]): SessionStateStore["Service"] => {
   const read = StoreInput.read("SessionStateStore")
   return {
-    get: (participationId) => Effect.flatMap(read("get", ThreadParticipationId.Id, participationId), driver.get),
+    get: (participationId) =>
+      Effect.flatMap(read("get", ThreadParticipationId.ThreadParticipationId, participationId), driver.get),
     set: Effect.fn("SessionStateStore.set")(function* (participationId, saved) {
       return yield* driver.set(
-        yield* read("set", ThreadParticipationId.Id, participationId),
+        yield* read("set", ThreadParticipationId.ThreadParticipationId, participationId),
         yield* read("set", Saved, saved)
       )
     })

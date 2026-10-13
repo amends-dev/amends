@@ -49,9 +49,9 @@ export interface Key extends Schema.Schema.Type<typeof Key> {}
  */
 export const Cursor = Schema.Struct({
   position: Entry.Position,
-  commitId: Commit.Id,
+  commitId: Commit.CommitId,
   index: Schema.Natural,
-  entryId: Entry.Id
+  entryId: Entry.EntryId
 })
 
 /**

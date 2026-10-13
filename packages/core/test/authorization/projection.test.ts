@@ -1,3 +1,4 @@
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { Effect, Option } from "effect"
 import * as Assignment from "../../src/authorization/Assignment.ts"
@@ -25,16 +26,15 @@ import * as MemberFacts from "../../src/workspace/MemberFacts.ts"
 import * as MemberPermissions from "../../src/workspace/MemberPermissions.ts"
 import * as MemberProjection from "../../src/workspace/MemberProjection.ts"
 import * as MemberStore from "../../src/workspace/MemberStore.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 import { make, type Fixture } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("workspace-one/journal")
-const roleId = Role.Id.make("manager")
-const memberId = Member.Id.make("recipient")
-const roleAssignmentId = Assignment.Id.make("role-assignment")
-const directAssignmentId = Assignment.Id.make("direct-assignment")
+const roleId = Role.RoleId.make("manager")
+const memberId = MemberId.MemberId.make("recipient")
+const roleAssignmentId = Assignment.AssignmentId.make("role-assignment")
+const directAssignmentId = Assignment.AssignmentId.make("direct-assignment")
 const roleSource = Assignment.Source.cases.Role.make({
   roleId,
   scope: Scope.Scope.cases.Workspace.make({ workspaceId })
@@ -45,7 +45,7 @@ const directSource = Assignment.Source.cases.Direct.make({
     Scope.Scope.cases.Target.make({
       target: Target.Reference.cases.Member.make({
         workspaceId,
-        memberId: Member.Id.make("subject")
+        memberId: MemberId.MemberId.make("subject")
       })
     })
   )
@@ -62,7 +62,11 @@ const initialRole = {
   name: createdRole.name,
   permissions: createdRole.permissions
 }
-const assigned = (assignmentId: Assignment.Id, source: Assignment.Source = roleSource, recipient = memberId) => ({
+const assigned = (
+  assignmentId: Assignment.AssignmentId,
+  source: Assignment.Source = roleSource,
+  recipient = memberId
+) => ({
   assignmentId,
   workspaceId,
   memberId: recipient,
@@ -105,8 +109,8 @@ it.effect("live role and assignment projections preserve role references, querie
         const journal = yield* setup
         const roleStore = yield* RoleStore.RoleStore
         const assignmentStore = yield* AssignmentStore.AssignmentStore
-        const otherMemberId = Member.Id.make("other-recipient")
-        const otherAssignmentId = Assignment.Id.make("other-recipient-assignment")
+        const otherMemberId = MemberId.MemberId.make("other-recipient")
+        const otherAssignmentId = Assignment.AssignmentId.make("other-recipient-assignment")
         yield* journal.commit(
           Effect.gen(function* () {
             yield* journal.publish(RoleFacts.Created, createdRole)
@@ -186,7 +190,7 @@ it.effect("live role and assignment projections preserve role references, querie
           memberId: memberId
         })
         expect(yield* fixture.snapshot).toEqual(before)
-        yield* journal.publish(AssignmentFacts.Created, assigned(Assignment.Id.make("reassigned")))
+        yield* journal.publish(AssignmentFacts.Created, assigned(Assignment.AssignmentId.make("reassigned")))
         expect(yield* assignmentStore.listActiveByMember(memberId)).toHaveLength(2)
         yield* journal.replay
         expect((yield* fixture.snapshot).assignments.size).toBe(4)
@@ -323,7 +327,7 @@ it.effect("a revocation naming another member than its assignment fails without 
           journal.publish(AssignmentFacts.Revoked, {
             assignmentId: roleAssignmentId,
             workspaceId,
-            memberId: Member.Id.make("someone-else")
+            memberId: MemberId.MemberId.make("someone-else")
           })
         )
         expect(failure).toMatchObject({
@@ -380,7 +384,7 @@ it.effect("a failed role replay batch restores its prior name, permissions, and 
               permissions: []
             })
             yield* writer.publish(RoleFacts.Renamed, {
-              roleId: Role.Id.make("missing"),
+              roleId: Role.RoleId.make("missing"),
               workspaceId,
               name: "Missing"
             })
@@ -424,7 +428,7 @@ it.effect("a failed assignment replay batch restores active access and earlier c
             })
             yield* writer.publish(AssignmentFacts.Created, assigned(directAssignmentId, directSource))
             yield* writer.publish(AssignmentFacts.Revoked, {
-              assignmentId: Assignment.Id.make("missing"),
+              assignmentId: Assignment.AssignmentId.make("missing"),
               workspaceId,
               memberId: memberId
             })
@@ -456,7 +460,7 @@ it.effect("a failed assignment replay batch restores active access and earlier c
 it.effect("authorization stores isolate matching IDs across workspaces and copy nested input and output data", () =>
   Effect.gen(function* () {
     const fixture = yield* make()
-    const foreign = Workspace.Id.make("another-workspace")
+    const foreign = WorkspaceId.WorkspaceId.make("another-workspace")
     const other = yield* fixture.bind(foreign)
     yield* run(
       fixture,
@@ -466,7 +470,7 @@ it.effect("authorization stores isolate matching IDs across workspaces and copy 
         const permissions = [MemberPermissions.Read.name]
         const target = Target.Reference.cases.Member.make({
           workspaceId,
-          memberId: Member.Id.make("subject")
+          memberId: MemberId.MemberId.make("subject")
         })
         const localDirect = Assignment.Source.cases.Direct.make({
           grant: Grant.make(MemberPermissions.Read, Scope.Scope.cases.Target.make({ target }))
@@ -511,7 +515,7 @@ it.effect("authorization stores isolate matching IDs across workspaces and copy 
           })
         )
         permissions.push(MemberPermissions.Remove.name)
-        Reflect.set(target, "memberId", Member.Id.make("mutated-input"))
+        Reflect.set(target, "memberId", MemberId.MemberId.make("mutated-input"))
         const role = yield* roleStore.get(roleId)
         if (Option.isNone(role)) throw new Error("Missing role")
         expect(role.value.permissions).toEqual([MemberPermissions.Read.name])

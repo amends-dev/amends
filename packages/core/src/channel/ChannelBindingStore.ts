@@ -38,11 +38,11 @@ export class ChannelBindingStore extends Context.Service<
   {
     /** The thread's binding, if it came through a channel. */
     readonly get: (
-      threadId: ThreadId.Id
+      threadId: ThreadId.ThreadId
     ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, StoreError.StoreError>
     /** The binding of an external conversation on a channel, if the conversation has a thread. */
     readonly findByConversation: (
-      channelId: ChannelId.Id,
+      channelId: ChannelId.ChannelId,
       conversationId: ChannelTransport.ExternalId
     ) => Effect.Effect<Option.Option<ChannelBinding.ChannelBinding>, StoreError.StoreError>
     /**
@@ -63,16 +63,16 @@ export class ChannelBindingStore extends Context.Service<
  * @since 0.1.0
  */
 export const make = (
-  workspaceId: WorkspaceId.Id,
+  workspaceId: WorkspaceId.WorkspaceId,
   driver: ChannelBindingStore["Service"]
 ): ChannelBindingStore["Service"] => {
   const read = StoreInput.read("ChannelBindingStore")
   const write = StoreInput.write("ChannelBindingStore", workspaceId)
   return {
-    get: (threadId) => Effect.flatMap(read("get", ThreadId.Id, threadId), driver.get),
+    get: (threadId) => Effect.flatMap(read("get", ThreadId.ThreadId, threadId), driver.get),
     findByConversation: Effect.fn("ChannelBindingStore.findByConversation")(function* (channelId, conversationId) {
       return yield* driver.findByConversation(
-        yield* read("findByConversation", ChannelId.Id, channelId),
+        yield* read("findByConversation", ChannelId.ChannelId, channelId),
         yield* read("findByConversation", ChannelTransport.ExternalId, conversationId)
       )
     }),

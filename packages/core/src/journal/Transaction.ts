@@ -103,7 +103,7 @@ export class Transaction extends Context.Service<
   Transaction,
   {
     /** The workspace whose storage it commits to. */
-    readonly workspaceId: WorkspaceId.Id
+    readonly workspaceId: WorkspaceId.WorkspaceId
     /**
      * Runs `program` as one commit in a native transaction, or within the current commit when
      * nested. A nested program or write that fails fails the outer commit, with `Aborted` when its

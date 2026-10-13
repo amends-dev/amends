@@ -20,13 +20,13 @@ import * as GroupMembership from "./GroupMembership.ts"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("GroupFollowId"))
+export const GroupFollowId = Schema.NonEmptyString.pipe(Schema.brand("GroupFollowId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type GroupFollowId = typeof GroupFollowId.Type
 
 /**
  * Whether the follow is current or has ended.
@@ -51,12 +51,12 @@ export type Status = typeof Status.Type
  * @since 0.1.0
  */
 export const GroupFollow = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  memberId: MemberId.Id,
+  id: GroupFollowId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId,
   /** The admission the follow is held through; it ends when the admission does. */
-  groupMembershipId: GroupMembership.Id,
+  groupMembershipId: GroupMembership.GroupMembershipId,
   followedAt: Schema.DateTimeUtcFromString,
   status: Status,
   endedAt: Schema.NullOr(Schema.DateTimeUtcFromString)
@@ -75,8 +75,8 @@ export interface GroupFollow extends Schema.Schema.Type<typeof GroupFollow> {}
  * @since 0.1.0
  */
 export const Input = Schema.Struct({
-  groupId: GroupId.Id,
-  memberId: MemberId.Id
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId
 })
 
 /**
@@ -93,10 +93,10 @@ export interface Input extends Schema.Schema.Type<typeof Input> {}
  * @since 0.1.0
  */
 export const Ending = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  followId: Id,
-  memberId: MemberId.Id
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  followId: GroupFollowId,
+  memberId: MemberId.MemberId
 })
 
 /**

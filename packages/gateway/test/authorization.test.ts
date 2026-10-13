@@ -19,7 +19,7 @@ describe("authorization", () => {
         yield* Effect.gen(function* () {
           const journal = yield* Journal.Journal
           const publish = Effect.provideService(Publication.Publication, testProvenance(workspaceId))
-          const roleId = Role.Id.make("reader")
+          const roleId = Role.RoleId.make("reader")
           yield* journal
             .publish(RoleFacts.Created, {
               workspaceId,

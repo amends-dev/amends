@@ -13,7 +13,7 @@
 
 import { Assignment, AssignmentStore } from "@amends-dev/core/authorization"
 import { StoreError } from "@amends-dev/core/journal"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import { and, eq, type SQL } from "drizzle-orm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -26,7 +26,7 @@ import * as ScopeColumns from "./ScopeColumns.ts"
 
 /** A row is one of two source cases, so it is shaped in code before decoding checks it. */
 const toEncodedRecord = (row: typeof assignments.$inferSelect) => {
-  const scope = ScopeColumns.decode(row.workspaceId as Workspace.Id, row)
+  const scope = ScopeColumns.decode(row.workspaceId as WorkspaceId.WorkspaceId, row)
   return {
     id: row.id,
     workspaceId: row.workspaceId,

@@ -86,7 +86,7 @@ export const make = Effect.fnUntraced(function* (resolvers: ReadonlyArray<Resolv
       batch.push(activity)
       batches.set(resolver, batch)
     }
-    const items = new Map<ThreadActivity.Id, ThreadActivityKind.Item>()
+    const items = new Map<ThreadActivity.ThreadActivityId, ThreadActivityKind.Item>()
     for (const [resolver, batch] of batches)
       for (const item of yield* resolver.resolve(thread, batch)) items.set(item.activity.id, item)
     return activities.flatMap((activity) => {

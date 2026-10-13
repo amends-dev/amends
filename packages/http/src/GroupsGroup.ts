@@ -10,7 +10,7 @@
  * @since 0.1.0
  */
 
-import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group"
+import { Group, GroupFollow, GroupMembership, GroupId } from "@amends-dev/core/group"
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
@@ -20,8 +20,8 @@ import * as Authentication from "./Authentication.ts"
 import { limit } from "./internal/paging.ts"
 import * as WorkspaceMember from "./WorkspaceMember.ts"
 
-const group = { groupId: Group.Id }
-const admission = { ...group, membershipId: GroupMembership.Id }
+const group = { groupId: GroupId.GroupId }
+const admission = { ...group, membershipId: GroupMembership.GroupMembershipId }
 const record = Group.Group.annotate({ identifier: "Group" })
 const membership = GroupMembership.GroupMembership.annotate({ identifier: "GroupMembership" })
 const follower = Schema.Struct({ memberId: GroupFollow.Input.fields.memberId })
@@ -39,7 +39,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
     HttpApiEndpoint.get("list", "/", {
       query: {
         limit,
-        after: Schema.optionalKey(Group.Id).annotate({
+        after: Schema.optionalKey(GroupId.GroupId).annotate({
           description: "Exclusive boundary: the last group ID of the previous page."
         })
       },
@@ -49,7 +49,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
     HttpApiEndpoint.get("listPublic", "/public", {
       query: {
         limit,
-        after: Schema.optionalKey(Group.Id).annotate({
+        after: Schema.optionalKey(GroupId.GroupId).annotate({
           description: "Exclusive boundary: the last group ID of the previous page."
         })
       },
@@ -82,7 +82,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       params: group,
       query: {
         limit,
-        after: Schema.optionalKey(GroupMembership.Id).annotate({
+        after: Schema.optionalKey(GroupMembership.GroupMembershipId).annotate({
           description: "Exclusive boundary: the last admission ID of the previous page."
         })
       },

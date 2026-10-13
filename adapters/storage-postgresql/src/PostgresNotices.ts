@@ -13,7 +13,7 @@
  */
 
 import { LocalSignalHub, Signal } from "@amends-dev/core/signal"
-import type { Workspace } from "@amends-dev/core/workspace"
+import type { WorkspaceId } from "@amends-dev/core/workspace"
 import * as PgClient from "@effect/sql-pg/PgClient"
 import * as Deferred from "effect/Deferred"
 import * as Duration from "effect/Duration"
@@ -54,7 +54,7 @@ const decodeNotice = Schema.decodeUnknownOption(Notice)
  * @category utils
  * @since 0.1.0
  */
-export const appendNotice = (workspaceId: Workspace.Id, logId: string): string =>
+export const appendNotice = (workspaceId: WorkspaceId.WorkspaceId, logId: string): string =>
   encodeNotice(["append", workspaceId, logId])
 
 /**
@@ -98,7 +98,7 @@ export interface PostgresNotices {
    * append between the check and the wait still wakes the caller. Hold a `listening` lease while
    * waiting.
    */
-  readonly nextAppend: (workspaceId: Workspace.Id, logId: string) => Deferred.Deferred<void>
+  readonly nextAppend: (workspaceId: WorkspaceId.WorkspaceId, logId: string) => Deferred.Deferred<void>
   /**
    * Completes at the next commit, in any pool, that stores job requests. It also completes
    * whenever the listener connects, since notices sent while it was not listening are lost. Take
@@ -110,7 +110,7 @@ export interface PostgresNotices {
    * Tell waiting readers in every pool that an append outside any transaction landed, best effort:
    * a notice lost leaves them to their poll.
    */
-  readonly notifyAppend: (workspaceId: Workspace.Id, logId: string) => Effect.Effect<void>
+  readonly notifyAppend: (workspaceId: WorkspaceId.WorkspaceId, logId: string) => Effect.Effect<void>
   /** Publish a signal to its workspace's subscribers in every pool, best effort. */
   readonly publishSignal: (signal: Signal.Signal) => Effect.Effect<void>
   /**
@@ -118,7 +118,7 @@ export interface PostgresNotices {
    * falls behind misses the oldest. Keeps the pool listening.
    */
   readonly subscribeSignals: (
-    workspaceId: Workspace.Id
+    workspaceId: WorkspaceId.WorkspaceId
   ) => Effect.Effect<Stream.Stream<Signal.Signal>, never, Scope.Scope>
 }
 
@@ -209,7 +209,7 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
     waiting.set(key, noticed)
     return noticed
   }
-  const nextAppend = (workspaceId: Workspace.Id, logId: string) => next(appendNotice(workspaceId, logId))
+  const nextAppend = (workspaceId: WorkspaceId.WorkspaceId, logId: string) => next(appendNotice(workspaceId, logId))
   const nextJobRequests = () => next(jobRequestsNotice)
 
   const publishSignal = (signal: Signal.Signal) =>
@@ -218,12 +218,13 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
       Effect.catchCause((cause) => Effect.logWarning("Signal not published", cause))
     )
 
-  const notifyAppend = (workspaceId: Workspace.Id, logId: string) =>
+  const notifyAppend = (workspaceId: WorkspaceId.WorkspaceId, logId: string) =>
     client
       .notify(channel, appendNotice(workspaceId, logId))
       .pipe(Effect.catchCause((cause) => Effect.logWarning("Append notice not sent", cause)))
 
-  const subscribeSignals = (workspaceId: Workspace.Id) => Effect.andThen(listening, signals.subscribe(workspaceId))
+  const subscribeSignals = (workspaceId: WorkspaceId.WorkspaceId) =>
+    Effect.andThen(listening, signals.subscribe(workspaceId))
 
   return {
     listening,

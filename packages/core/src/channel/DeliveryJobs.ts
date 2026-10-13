@@ -28,7 +28,7 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts"
  * @category schemas
  * @since 0.1.0
  */
-export const Job = Schema.Struct({ workspaceId: WorkspaceId.Id, threadId: ThreadId.Id })
+export const Job = Schema.Struct({ workspaceId: WorkspaceId.WorkspaceId, threadId: ThreadId.ThreadId })
 
 /**
  * @category schemas

@@ -7,8 +7,8 @@
  */
 
 import * as Context from "effect/Context"
-import type * as Member from "../workspace/Member.ts"
-import type * as Workspace from "../workspace/Workspace.ts"
+import type * as MemberId from "../workspace/MemberId.ts"
+import type * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import type * as Identity from "./Identity.ts"
 
 /**
@@ -27,9 +27,9 @@ export class Actor extends Context.Service<
   Actor,
   {
     /** The workspace the member acts in. */
-    readonly workspaceId: Workspace.Id
+    readonly workspaceId: WorkspaceId.WorkspaceId
     /** The acting member. */
-    readonly memberId: Member.Id
+    readonly memberId: MemberId.MemberId
     /** The human or agent the member was resolved from. */
     readonly identity: Identity.MemberReference
   }

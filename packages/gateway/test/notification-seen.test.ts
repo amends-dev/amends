@@ -9,7 +9,7 @@ import {
   ThreadParticipation,
   ThreadParticipationService
 } from "@amends-dev/core/thread"
-import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberService, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
 import { Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect"
@@ -37,28 +37,28 @@ const { core, initialized, runGateway } = Support
 describe("marking notifications seen", () => {
   const human: Actor.Actor["Service"] = {
     workspaceId,
-    memberId: Member.Id.make("human"),
+    memberId: MemberId.MemberId.make("human"),
     identity: { _tag: "Human", id: Identity.HumanId.make("recipient") }
   }
   const agent: Actor.Actor["Service"] = {
     workspaceId,
-    memberId: Member.Id.make("agent"),
+    memberId: MemberId.MemberId.make("agent"),
     identity: { _tag: "Agent", id: Identity.AgentId.make("recipient") }
   }
   /** Writes the opening message, so the others, including the owner, receive it. */
   const writer: Actor.Actor["Service"] = {
     workspaceId,
-    memberId: Member.Id.make("writer"),
+    memberId: MemberId.MemberId.make("writer"),
     identity: { _tag: "Human", id: Identity.HumanId.make("writer") }
   }
   const run = <A, E, R>(bound: Bound, actor: Actor.Actor["Service"], effect: Effect.Effect<A, E, R>) =>
     effect.pipe(Effect.provideService(Actor.Actor, actor), Effect.provide(core(bound)))
   const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
     effect.pipe(Effect.provideService(Publication.Publication, testProvenance()), Effect.provide(core(bound)))
-  const markSeen = (id: Notification.Id) =>
+  const markSeen = (id: Notification.NotificationId) =>
     Effect.flatMap(NotificationService.NotificationService, (notificationService) => notificationService.markSeen(id))
   /** What the actor's inbox shows a notification pointing to, or undefined without a source. */
-  const sourceOf = (id: Notification.Id) =>
+  const sourceOf = (id: Notification.NotificationId) =>
     Effect.flatMap(NotificationService.NotificationService, (notificationService) =>
       Effect.map(
         notificationService.inbox({ limit: 50 }),
@@ -97,7 +97,7 @@ describe("marking notifications seen", () => {
             Effect.andThen(
               journal.publish(AssignmentFacts.Created, {
                 workspaceId,
-                assignmentId: Assignment.Id.make("writer-viewer"),
+                assignmentId: Assignment.AssignmentId.make("writer-viewer"),
                 memberId: writer.memberId,
                 source: {
                   _tag: "Role",
@@ -273,7 +273,7 @@ describe("marking notifications seen", () => {
             [p.owner, p.humanNote.id, "CoreError.NotFound"],
             [agent, p.humanNote.id, "CoreError.NotFound"],
             [human, p.agentNote.id, "CoreError.NotFound"],
-            [human, Notification.Id.make("missing"), "CoreError.NotFound"],
+            [human, Notification.NotificationId.make("missing"), "CoreError.NotFound"],
             [agent, p.agentNote.id, "CoreError.Denied"],
             [changed(human, { identity: p.owner.identity }), p.humanNote.id, "CoreError.Denied"]
           ] as const)
@@ -346,7 +346,7 @@ describe("marking notifications seen", () => {
             value: { state: { _tag: "Seen" } }
           })
           const missing = changed(p.humanNote, {
-            id: Notification.Id.make("missing-source"),
+            id: Notification.NotificationId.make("missing-source"),
             source: { logId: Entry.LogId.make("other-log"), entryId: p.humanNote.source.entryId }
           })
           yield* p.bound.store.transaction(p.bound.notifications.insert(missing))
@@ -535,7 +535,7 @@ describe("marking notifications seen", () => {
           const p = yield* prepare()
           const before = yield* snapshot(p)
           const staged = changed(p.humanNote, {
-            id: Notification.Id.make("staged"),
+            id: Notification.NotificationId.make("staged"),
             source: { logId: Entry.LogId.make("staged"), entryId: p.humanNote.source.entryId }
           })
           const operation = facts(
@@ -679,7 +679,7 @@ describe("marking notifications seen", () => {
             const foreign = yield* boundTo(otherWorkspaceId)
             yield* initialized(foreign)
             const discarded = changed(p.humanNote, {
-              id: Notification.Id.make("discarded"),
+              id: Notification.NotificationId.make("discarded"),
               source: { logId: Entry.LogId.make("discarded"), entryId: p.humanNote.source.entryId },
               state: { _tag: "Discarded", reason: "participation-ended" }
             })
@@ -690,7 +690,7 @@ describe("marking notifications seen", () => {
                 p.bound.store.transaction(
                   p.bound.notifications.insert(
                     changed(p.humanNote, {
-                      id: Notification.Id.make("inserted-seen"),
+                      id: Notification.NotificationId.make("inserted-seen"),
                       source: {
                         logId: Entry.LogId.make("seen"),
                         entryId: p.humanNote.source.entryId
@@ -706,7 +706,7 @@ describe("marking notifications seen", () => {
               reason: { _tag: "Rejected" }
             })
             const before = yield* snapshot(p)
-            for (const id of [Notification.Id.make("missing"), p.agentNote.id, discarded.id])
+            for (const id of [Notification.NotificationId.make("missing"), p.agentNote.id, discarded.id])
               // A valid ID in the same call is not recorded either.
               expect(yield* Effect.flip(p.bound.notifications.markSeen([p.humanNote.id, id], seenAt))).toMatchObject({
                 _tag: "StoreError",

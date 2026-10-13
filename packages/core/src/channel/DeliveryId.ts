@@ -13,10 +13,10 @@ import * as Schema from "effect/Schema"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("DeliveryId"))
+export const DeliveryId = Schema.NonEmptyString.pipe(Schema.brand("DeliveryId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type DeliveryId = typeof DeliveryId.Type

@@ -45,7 +45,7 @@ export class RoleStore extends Context.Service<
   RoleStore,
   {
     /** Find a role in this workspace; None if absent. */
-    readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Role>, StoreError.StoreError>
+    readonly get: (roleId: Role.RoleId) => Effect.Effect<Option.Option<Role.Role>, StoreError.StoreError>
 
     /**
      * Insert a role. Reject a reused role ID. Never upsert.
@@ -56,7 +56,7 @@ export class RoleStore extends Context.Service<
      * Change only the display name. Rejected if the role is absent in this workspace.
      */
     readonly rename: (
-      roleId: Role.Id,
+      roleId: Role.RoleId,
       name: Role.Role["name"]
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
 
@@ -65,7 +65,7 @@ export class RoleStore extends Context.Service<
      * An empty list is valid. Rejected if the role is absent in this workspace.
      */
     readonly setPermissions: (
-      roleId: Role.Id,
+      roleId: Role.RoleId,
       permissions: Role.Role["permissions"]
     ) => Effect.Effect<void, StoreError.StoreError, Store.Transaction>
 
@@ -87,21 +87,21 @@ export class RoleStore extends Context.Service<
  * @category constructors
  * @since 0.1.0
  */
-export const make = (workspaceId: WorkspaceId.Id, driver: RoleStore["Service"]): RoleStore["Service"] => {
+export const make = (workspaceId: WorkspaceId.WorkspaceId, driver: RoleStore["Service"]): RoleStore["Service"] => {
   const read = StoreInput.read("RoleStore")
   const write = StoreInput.write("RoleStore", workspaceId)
   return {
-    get: (roleId) => Effect.flatMap(read("get", Role.Id, roleId), driver.get),
+    get: (roleId) => Effect.flatMap(read("get", Role.RoleId, roleId), driver.get),
     insert: (record) => Effect.flatMap(write("insert", Role.Role, record), driver.insert),
     rename: Effect.fn("RoleStore.rename")(function* (roleId, name) {
       return yield* driver.rename(
-        yield* write("rename", Role.Id, roleId),
+        yield* write("rename", Role.RoleId, roleId),
         yield* write("rename", Role.Role.fields.name, name)
       )
     }),
     setPermissions: Effect.fn("RoleStore.setPermissions")(function* (roleId, permissions) {
       return yield* driver.setPermissions(
-        yield* write("setPermissions", Role.Id, roleId),
+        yield* write("setPermissions", Role.RoleId, roleId),
         yield* write("setPermissions", Role.Role.fields.permissions, permissions)
       )
     }),
@@ -123,7 +123,7 @@ const makeMemory = Effect.fn("RoleStore.makeMemory")(function* () {
   const { workspaceId, read, write } = yield* Store.MemoryBinding
   /** Replace one role with an edited record. */
   const edit = Effect.fn("RoleStore.memory.edit")(
-    function* (operation: string, id: Role.Id, change: (role: Role.Role) => Role.Role) {
+    function* (operation: string, id: Role.RoleId, change: (role: Role.Role) => Role.Role) {
       const space = yield* write
       const current = yield* rows.get(space.records.of("roles"), id)
       if (Option.isNone(current)) return yield* StoreError.rejected("RoleStore", operation, "Role does not exist")

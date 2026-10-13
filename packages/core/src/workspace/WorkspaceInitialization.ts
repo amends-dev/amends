@@ -25,10 +25,11 @@ import * as Performer from "../identity/Performer.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
-import * as Member from "./Member.ts"
 import * as MemberFacts from "./MemberFacts.ts"
+import * as MemberId from "./MemberId.ts"
 import * as Workspace from "./Workspace.ts"
 import * as WorkspaceFacts from "./WorkspaceFacts.ts"
+import * as WorkspaceId from "./WorkspaceId.ts"
 import * as WorkspaceStore from "./WorkspaceStore.ts"
 
 /**
@@ -41,7 +42,7 @@ import * as WorkspaceStore from "./WorkspaceStore.ts"
 export class AlreadyInitialized extends Schema.TaggedError<AlreadyInitialized>()(
   "WorkspaceInitialization.AlreadyInitialized",
   {
-    workspaceId: Workspace.Id
+    workspaceId: WorkspaceId.WorkspaceId
   }
 ) {}
 
@@ -78,7 +79,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   return yield* journal.commit(
     Effect.gen(function* () {
       if (Option.isSome(yield* workspaceStore.get)) return yield* new AlreadyInitialized({ workspaceId })
-      const ownerMemberId = Member.Id.make(yield* crypto.randomUUIDv4)
+      const ownerMemberId = MemberId.MemberId.make(yield* crypto.randomUUIDv4)
       const record = Workspace.Workspace.make({
         id: workspaceId,
         name,

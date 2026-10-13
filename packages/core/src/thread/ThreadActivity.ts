@@ -20,13 +20,13 @@ import * as ThreadParticipationId from "./ThreadParticipationId.ts"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadActivityId"))
+export const ThreadActivityId = Schema.NonEmptyString.pipe(Schema.brand("ThreadActivityId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type ThreadActivityId = typeof ThreadActivityId.Type
 
 /**
  * An activity kind's name: dotted, chosen by the domain that owns the kind, such as
@@ -54,9 +54,9 @@ export type Kind = typeof Kind.Type
  * @since 0.1.0
  */
 export const Common = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  threadId: ThreadId.Id,
+  id: ThreadActivityId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  threadId: ThreadId.ThreadId,
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
   occurredAt: Schema.DateTimeUtcFromString
 })
@@ -96,7 +96,7 @@ export interface ThreadActivity extends Schema.Schema.Type<typeof ThreadActivity
  * @since 0.1.0
  */
 export const Recipient = Schema.Struct({
-  participationId: ThreadParticipationId.Id,
+  participationId: ThreadParticipationId.ThreadParticipationId,
   recipient: Notification.Recipient,
   /**
    * Whether the activity asks this recipient for work: an agent to take it into a turn. People

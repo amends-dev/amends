@@ -1,10 +1,12 @@
+import { Connection as ConnectionContract } from "@amends-dev/connection"
+import { Identity } from "@amends-dev/core/identity"
+import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Exit, Option } from "effect"
 import * as Agent from "../../src/agent/Agent.ts"
 import * as AgentFacts from "../../src/agent/AgentFacts.ts"
 import * as AgentProjection from "../../src/agent/AgentProjection.ts"
 import * as AgentStore from "../../src/agent/AgentStore.ts"
-import * as Connection from "../../src/connection/Connection.ts"
 import * as Checkpoint from "../../src/journal/Checkpoint.ts"
 import * as Entry from "../../src/journal/Entry.ts"
 import * as Journal from "../../src/journal/Journal.ts"
@@ -12,23 +14,21 @@ import * as Log from "../../src/journal/Log.ts"
 import * as Publication from "../../src/journal/Publication.ts"
 import * as Store from "../../src/journal/Store.ts"
 import * as StoreError from "../../src/journal/StoreError.ts"
-import * as Member from "../../src/workspace/Member.ts"
-import * as Workspace from "../../src/workspace/Workspace.ts"
 import { make } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
-const workspaceId = Workspace.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("workspace-one/journal")
 
 const created: Agent.Agent = {
-  id: Agent.Id.make("agent-one"),
+  id: Identity.AgentId.make("agent-one"),
   workspaceId,
-  memberId: Member.Id.make("member-agent"),
+  memberId: MemberId.MemberId.make("member-agent"),
   instructions: "Review each change.",
   harness: { _tag: "Auto" },
-  model: { connectionId: Connection.Id.make("conn-models"), id: "claude-opus-5-5" },
+  model: { connectionId: ConnectionContract.ConnectionId.make("conn-models"), id: "claude-opus-5-5" },
   sandbox: null,
-  createdBy: Member.Id.make("member-owner"),
+  createdBy: MemberId.MemberId.make("member-owner"),
   createdAt: DateTime.makeUnsafe("2026-10-06T12:00:00.000Z")
 }
 
@@ -75,13 +75,13 @@ it.effect("records an agent, and replaces how it is set up as a whole", () =>
     const agentStore = agentsInMemory()
     const configured = {
       instructions: "Review each change, then test it.",
-      harness: { _tag: "Connection", connectionId: Connection.Id.make("conn-opencode") },
+      harness: { _tag: "Connection", connectionId: ConnectionContract.ConnectionId.make("conn-opencode") },
       model: {
-        connectionId: Connection.Id.make("conn-models"),
+        connectionId: ConnectionContract.ConnectionId.make("conn-models"),
         id: "claude-sonnet-5-5",
         effort: "high"
       },
-      sandbox: { connectionId: Connection.Id.make("conn-daytona") }
+      sandbox: { connectionId: ConnectionContract.ConnectionId.make("conn-daytona") }
     } as const
 
     yield* commit(agentStore, (journal) =>

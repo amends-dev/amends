@@ -23,8 +23,8 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
-import type * as Thread from "./Thread.ts"
 import * as ThreadCommand from "./ThreadCommand.ts"
+import type * as ThreadId from "./ThreadId.ts"
 import * as ThreadParticipation from "./ThreadParticipation.ts"
 import * as ThreadParticipationActivity from "./ThreadParticipationActivity.ts"
 import * as ThreadParticipationFacts from "./ThreadParticipationFacts.ts"
@@ -58,7 +58,7 @@ export class ThreadParticipationService extends Context.Service<
   ThreadParticipationService,
   {
     /** Follow as the acting member. An existing participation is returned without new facts. */
-    readonly follow: (threadId: Thread.Id) => Effect.Effect<ThreadParticipation.Summary, Error, Actor.Actor>
+    readonly follow: (threadId: ThreadId.ThreadId) => Effect.Effect<ThreadParticipation.Summary, Error, Actor.Actor>
     /**
      * End only the actor's addressed participation, with no action grant required. Threads of a
      * direct conversation, where everyone takes part in everything, cannot be unfollowed.
@@ -83,7 +83,7 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto
   const { workspaceId } = yield* Store.Store
   const follow = Effect.fn("ThreadParticipationService.follow")(
-    function* (threadId: Thread.Id) {
+    function* (threadId: ThreadId.ThreadId) {
       const thread = yield* threadQuery.requireAccess(threadId)
       yield* authorization.require([
         Requirement.make(

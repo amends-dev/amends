@@ -21,20 +21,6 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as TurnId from "./TurnId.ts"
 
 /**
- * The identity of a turn, from `TurnId`.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Id = TurnId.Id
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type Id = TurnId.Id
-
-/**
  * Where a turn stands. `queued` holds accepted work until its job starts it; `running` is
  * running; `cancelling` asked to stop and has not yet been confirmed stopped. The rest are
  * final: a finished turn never reopens.
@@ -96,7 +82,7 @@ export type Outcome = typeof Outcome.Type
  * @category schemas
  * @since 0.1.0
  */
-export const Retry = Schema.Struct({ of: Id, by: MemberId.Id })
+export const Retry = Schema.Struct({ of: TurnId.TurnId, by: MemberId.MemberId })
 
 /**
  * @category schemas
@@ -114,15 +100,15 @@ export interface Retry extends Schema.Schema.Type<typeof Retry> {}
  * @since 0.1.0
  */
 export const Turn = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  threadId: ThreadId.Id,
+  id: TurnId.TurnId,
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  threadId: ThreadId.ThreadId,
   agentId: Identity.AgentId,
   /** The agent's membership, whose permissions the turn acts with. */
-  memberId: MemberId.Id,
+  memberId: MemberId.MemberId,
   /** The participation the turn's input came through, whose session it continues. */
-  participationId: ThreadParticipationId.Id,
+  participationId: ThreadParticipationId.ThreadParticipationId,
   retry: Schema.NullOr(Retry),
   status: Status,
   /** The thread position the turn's input reaches: the work it accepted. */
@@ -135,7 +121,7 @@ export const Turn = Schema.Struct({
   /** What the turn runs on, recorded when it starts and kept when it runs again. */
   selection: Schema.NullOr(Agent.Selection),
   /** The agent's reply, once the turn posted it. */
-  messageIds: Schema.Array(ThreadMessageId.Id),
+  messageIds: Schema.Array(ThreadMessageId.ThreadMessageId),
   /** Why it failed. */
   failure: Schema.NullOr(Schema.String),
   /** Why it was asked to stop. */

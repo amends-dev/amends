@@ -59,7 +59,7 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
       if (
         path === "apps/client/package.json" &&
         ((name.startsWith("@amends-dev/") &&
-          !["@amends-dev/core", "@amends-dev/gateway", "@amends-dev/http"].includes(name) &&
+          !["@amends-dev/connection", "@amends-dev/core", "@amends-dev/gateway", "@amends-dev/http"].includes(name) &&
           !screenTypes) ||
           name.startsWith("@tauri-apps/") ||
           name === "@solidjs/router" ||
@@ -134,7 +134,7 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/{src,t
     const uiImport = dependency === "@amends-dev/ui" || dependency.startsWith("@amends-dev/ui/")
     const clientImport = dependency === "@amends-dev/client" || dependency.startsWith("@amends-dev/client/")
     // Shared API plumbing and each feature's api.ts reach the HTTP contract, never its handlers,
-    // and the schemas it carries: core's features and the gateway's.
+    // and the schemas it carries: core's features, the gateway's, and a connection's ID.
     // Client may name the screens' types, never import UI code.
     const screenTypeImport = uiImport && !runtime.has(dependency)
     const contractImport =
@@ -142,6 +142,7 @@ for await (const path of new Bun.Glob("apps/{icons,ui,client,web,desktop}/{src,t
       (/^@amends-dev\/http\/(Api|ApiErrors|Authentication|WorkspaceMember|\w+Group)$/.test(dependency) ||
         /^@amends-dev\/core\/[a-z-]+$/.test(dependency) ||
         [
+          "@amends-dev/connection/Connection",
           "@amends-dev/gateway/Accounts",
           "@amends-dev/gateway/SignIn",
           "@amends-dev/gateway/WorkspaceDirectory"

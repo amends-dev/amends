@@ -27,13 +27,13 @@ import * as WorkspaceId from "../workspace/WorkspaceId.ts"
  * @category schemas
  * @since 0.1.0
  */
-export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"))
+export const NotificationId = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"))
 
 /**
  * @category schemas
  * @since 0.1.0
  */
-export type Id = typeof Id.Type
+export type NotificationId = typeof NotificationId.Type
 
 /**
  * The committed journal entry a notification tells of, by log and entry, in the notification's
@@ -44,7 +44,7 @@ export type Id = typeof Id.Type
  */
 export const Source = Schema.Struct({
   logId: Entry.LogId,
-  entryId: Entry.Id
+  entryId: Entry.EntryId
 })
 
 /**
@@ -61,8 +61,8 @@ export interface Source extends Schema.Schema.Type<typeof Source> {}
  * @since 0.1.0
  */
 export const ThreadReference = Schema.Struct({
-  threadId: ThreadId.Id,
-  groupId: GroupId.Id,
+  threadId: ThreadId.ThreadId,
+  groupId: GroupId.GroupId,
   sequence: Schema.Int.check(Schema.isGreaterThan(0))
 })
 
@@ -82,8 +82,8 @@ export interface ThreadReference extends Schema.Schema.Type<typeof ThreadReferen
  * @since 0.1.0
  */
 export const Recipient = Schema.TaggedUnion({
-  Human: { ...Identity.Reference.cases.Human.fields, memberId: MemberId.Id },
-  Agent: { ...Identity.Reference.cases.Agent.fields, memberId: MemberId.Id },
+  Human: { ...Identity.Reference.cases.Human.fields, memberId: MemberId.MemberId },
+  Agent: { ...Identity.Reference.cases.Agent.fields, memberId: MemberId.MemberId },
   Contact: Identity.Reference.cases.Contact.fields,
   Triage: {}
 })
@@ -100,7 +100,7 @@ export type Recipient = typeof Recipient.Type
  * @category constructors
  * @since 0.1.0
  */
-export const ofMember = <const I extends Identity.MemberReference>(memberId: MemberId.Id, identity: I) =>
+export const ofMember = <const I extends Identity.MemberReference>(memberId: MemberId.MemberId, identity: I) =>
   Object.assign({}, identity, { memberId })
 
 /**
@@ -111,8 +111,8 @@ export const ofMember = <const I extends Identity.MemberReference>(memberId: Mem
  * @since 0.1.0
  */
 export const AcceptedBy = Schema.TaggedUnion({
-  Turn: { turnId: TurnId.Id },
-  Delivery: { deliveryId: DeliveryId.Id }
+  Turn: { turnId: TurnId.TurnId },
+  Delivery: { deliveryId: DeliveryId.DeliveryId }
 })
 
 /**
@@ -176,11 +176,11 @@ export const fitsRecipient = (recipient: Recipient, state: State) =>
  * @since 0.1.0
  */
 export const Notification = Schema.Struct({
-  id: Id,
-  workspaceId: WorkspaceId.Id,
+  id: NotificationId,
+  workspaceId: WorkspaceId.WorkspaceId,
   source: Source,
   /** Present for thread-generated member notifications; ties pending work to one participation. */
-  participationId: Schema.optionalKey(ThreadParticipationId.Id),
+  participationId: Schema.optionalKey(ThreadParticipationId.ThreadParticipationId),
   /** Present for thread-activity notifications; lets reading a thread settle its notifications. */
   thread: Schema.optionalKey(ThreadReference),
   recipient: Recipient,
@@ -206,20 +206,20 @@ export interface Notification extends Schema.Schema.Type<typeof Notification> {}
  * @since 0.1.0
  */
 export const fromActivity = (
-  entry: { readonly logId: Entry.LogId; readonly id: Entry.Id; readonly recordedAt: DateTime.Utc },
+  entry: { readonly logId: Entry.LogId; readonly id: Entry.EntryId; readonly recordedAt: DateTime.Utc },
   activity: {
-    readonly workspaceId: WorkspaceId.Id
-    readonly groupId: GroupId.Id
-    readonly threadId: ThreadId.Id
+    readonly workspaceId: WorkspaceId.WorkspaceId
+    readonly groupId: GroupId.GroupId
+    readonly threadId: ThreadId.ThreadId
     readonly sequence: number
   },
   selected: {
-    readonly participationId: ThreadParticipationId.Id
+    readonly participationId: ThreadParticipationId.ThreadParticipationId
     readonly recipient: Recipient
     readonly requestsWork: boolean
   }
 ): Notification => ({
-  id: Id.make(JSON.stringify([entry.logId, entry.id, selected.participationId])),
+  id: NotificationId.make(JSON.stringify([entry.logId, entry.id, selected.participationId])),
   workspaceId: activity.workspaceId,
   source: { logId: entry.logId, entryId: entry.id },
   participationId: selected.participationId,

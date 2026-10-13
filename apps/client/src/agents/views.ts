@@ -37,6 +37,7 @@ import {
   Agent,
   type AgentCommand,
   Connection,
+  type ConnectionContract,
   type AgentsReads,
   type SetupInput
 } from "./api.ts"
@@ -218,7 +219,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
   const capabilities = { harness: "harnesses", model: "models", sandbox: "sandboxes" } as const
   /** Why a connection can't give `part`, or nothing when it can. */
   const unavailable = (connectionId: string, part: SetupPart): string | undefined => {
-    const connection = connections().get(connectionId as Connection.Id)
+    const connection = connections().get(connectionId as ConnectionContract.ConnectionId)
     if (!connection) return "This connection was removed."
     const integration = integrations().get(connection.integration)
     if (!integration) return "Its integration isn’t installed on this host."
@@ -241,7 +242,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
       ]
     })
     if (current === undefined || current === auto || offered.some((option) => option.id === current)) return offered
-    const connection = connections().get(current as Connection.Id)
+    const connection = connections().get(current as ConnectionContract.ConnectionId)
     return [
       ...offered,
       {
@@ -255,7 +256,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
   }
   const harnessOptions = (current: string | undefined): ReadonlyArray<HarnessOption> =>
     optionsFor("harness", current).map((option) => {
-      const connection = connections().get(option.id as Connection.Id)
+      const connection = connections().get(option.id as ConnectionContract.ConnectionId)
       const integration = connection && integrations().get(connection.integration)
       return Object.assign({}, option, { requiresSandbox: integration?.requiresSandbox ?? false })
     })
@@ -267,14 +268,14 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
     if (!reads || connectionId === undefined || unavailable(connectionId, "model") !== undefined) return undefined
     let modelRead = modelReads.get(connectionId)
     if (!modelRead) {
-      modelRead = runWithOwner(owner, () => modelChoices(reads, connectionId as Connection.Id))!
+      modelRead = runWithOwner(owner, () => modelChoices(reads, connectionId as ConnectionContract.ConnectionId))!
       modelReads.set(connectionId, modelRead)
     }
     return modelRead()
   }
 
   const connectionOf = (connectionId: string): SetupConnection => {
-    const connection = connections().get(connectionId as Connection.Id)
+    const connection = connections().get(connectionId as ConnectionContract.ConnectionId)
     return connection === undefined ? { id: connectionId } : { id: connectionId, name: connection.name }
   }
   const summaryOf = (view: Agent.View): AgentSummary => {
@@ -581,7 +582,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
 export type AgentsView = ReturnType<typeof useAgents>
 
 /** The models a connection offers, as the setup's model field suggests them. */
-function modelChoices(reads: AgentsReads, connectionId: Connection.Id): Accessor<ModelChoices> {
+function modelChoices(reads: AgentsReads, connectionId: ConnectionContract.ConnectionId): Accessor<ModelChoices> {
   const result = useAtomValue(() => reads.models(connectionId))
   return () => {
     const current = result()

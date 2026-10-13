@@ -13,11 +13,11 @@
  * @since 0.1.0
  */
 
+import { Connection as ConnectionContract } from "@amends-dev/connection"
 import * as Schema from "effect/Schema"
 import * as Agent from "../agent/Agent.ts"
 import * as Requirement from "../authorization/Requirement.ts"
 import * as Role from "../authorization/Role.ts"
-import * as Connection from "../connection/Connection.ts"
 import * as GroupId from "../group/GroupId.ts"
 import * as Identity from "../identity/Identity.ts"
 import * as Commit from "../journal/Commit.ts"
@@ -25,6 +25,7 @@ import * as Notification from "../notification/Notification.ts"
 import * as ThreadId from "../thread/ThreadId.ts"
 import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as Turn from "../turn/Turn.ts"
+import * as TurnId from "../turn/TurnId.ts"
 import * as Invitation from "../workspace/Invitation.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
@@ -103,7 +104,7 @@ export class Changed extends Schema.TaggedError<Changed>()("CoreError.Changed", 
  * @since 0.1.0
  */
 export class NotGranted extends Schema.TaggedError<NotGranted>()("NotGranted", {
-  memberId: MemberId.Id,
+  memberId: MemberId.MemberId,
   requirement: Requirement.Requirement
 }) {
   override get message(): string {
@@ -119,7 +120,7 @@ export class NotGranted extends Schema.TaggedError<NotGranted>()("NotGranted", {
  * @since 0.1.0
  */
 export class NotMember extends Schema.TaggedError<NotMember>()("NotMember", {
-  workspaceId: WorkspaceId.Id
+  workspaceId: WorkspaceId.WorkspaceId
 }) {
   override get message(): string {
     return `Not a member of workspace ${this.workspaceId}`
@@ -133,7 +134,7 @@ export class NotMember extends Schema.TaggedError<NotMember>()("NotMember", {
  * @since 0.1.0
  */
 export class InvalidActor extends Schema.TaggedError<InvalidActor>()("InvalidActor", {
-  memberId: MemberId.Id,
+  memberId: MemberId.MemberId,
   reason: Schema.Literals(["membership-missing", "membership-removed", "identity-mismatch"])
 }) {
   override get message(): string {
@@ -164,7 +165,7 @@ export class OwnerRequired extends Schema.TaggedError<OwnerRequired>()("OwnerReq
  * @since 0.1.0
  */
 export class NotAuthor extends Schema.TaggedError<NotAuthor>()("NotAuthor", {
-  messageId: ThreadMessageId.Id
+  messageId: ThreadMessageId.ThreadMessageId
 }) {
   override get message(): string {
     return `Only the author edits message ${this.messageId}`
@@ -178,7 +179,7 @@ export class NotAuthor extends Schema.TaggedError<NotAuthor>()("NotAuthor", {
  * @since 0.1.0
  */
 export class NotRecipient extends Schema.TaggedError<NotRecipient>()("NotRecipient", {
-  invitationId: Invitation.Id
+  invitationId: Invitation.InvitationId
 }) {
   override get message(): string {
     return `Invitation ${this.invitationId} is for someone else`
@@ -207,7 +208,7 @@ export class HumanRequired extends Schema.TaggedError<HumanRequired>()("HumanReq
  * @since 0.1.0
  */
 export class AgentRequired extends Schema.TaggedError<AgentRequired>()("AgentRequired", {
-  memberId: MemberId.Id
+  memberId: MemberId.MemberId
 }) {
   override get message(): string {
     return `Member ${this.memberId} is not an agent`
@@ -393,7 +394,7 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()("CoreError.Un
  * @since 0.1.0
  */
 export class InactiveMember extends Schema.TaggedError<InactiveMember>()("InactiveMember", {
-  memberId: MemberId.Id
+  memberId: MemberId.MemberId
 }) {
   override get message(): string {
     return `Member ${this.memberId} is no longer active`
@@ -408,7 +409,7 @@ export class InactiveMember extends Schema.TaggedError<InactiveMember>()("Inacti
  * @since 0.1.0
  */
 export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()("ParticipantUnavailable", {
-  memberId: MemberId.Id
+  memberId: MemberId.MemberId
 }) {
   override get message(): string {
     return `Member ${this.memberId} cannot take part`
@@ -435,8 +436,8 @@ export class OwnerProtected extends Schema.TaggedError<OwnerProtected>()("OwnerP
  * @since 0.1.0
  */
 export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()("AlreadyMember", {
-  groupId: GroupId.Id,
-  memberId: MemberId.Id
+  groupId: GroupId.GroupId,
+  memberId: MemberId.MemberId
 }) {
   override get message(): string {
     return `Member ${this.memberId} is in group ${this.groupId} already`
@@ -482,7 +483,7 @@ export class AlreadyEnded extends Schema.TaggedError<AlreadyEnded>()("AlreadyEnd
  * @since 0.1.0
  */
 export class AlreadyHandled extends Schema.TaggedError<AlreadyHandled>()("AlreadyHandled", {
-  notificationId: Notification.Id
+  notificationId: Notification.NotificationId
 }) {
   override get message(): string {
     return `Notification ${this.notificationId} was handled already`
@@ -496,7 +497,7 @@ export class AlreadyHandled extends Schema.TaggedError<AlreadyHandled>()("Alread
  * @since 0.1.0
  */
 export class AlreadyTask extends Schema.TaggedError<AlreadyTask>()("AlreadyTask", {
-  threadId: ThreadId.Id
+  threadId: ThreadId.ThreadId
 }) {
   override get message(): string {
     return `Thread ${this.threadId} is a task already`
@@ -510,7 +511,7 @@ export class AlreadyTask extends Schema.TaggedError<AlreadyTask>()("AlreadyTask"
  * @since 0.1.0
  */
 export class Deleted extends Schema.TaggedError<Deleted>()("Deleted", {
-  messageId: ThreadMessageId.Id
+  messageId: ThreadMessageId.ThreadMessageId
 }) {
   override get message(): string {
     return `Message ${this.messageId} was deleted`
@@ -524,7 +525,7 @@ export class Deleted extends Schema.TaggedError<Deleted>()("Deleted", {
  * @since 0.1.0
  */
 export class TurnNotActive extends Schema.TaggedError<TurnNotActive>()("TurnNotActive", {
-  turnId: Turn.Id,
+  turnId: TurnId.TurnId,
   status: Turn.Status
 }) {
   override get message(): string {
@@ -540,7 +541,7 @@ export class TurnNotActive extends Schema.TaggedError<TurnNotActive>()("TurnNotA
  * @since 0.1.0
  */
 export class NotRetryable extends Schema.TaggedError<NotRetryable>()("NotRetryable", {
-  turnId: Turn.Id,
+  turnId: TurnId.TurnId,
   reason: Turn.NotRetryableReason
 }) {
   override get message(): string {
@@ -555,7 +556,7 @@ export class NotRetryable extends Schema.TaggedError<NotRetryable>()("NotRetryab
  * @since 0.1.0
  */
 export class BeyondTimeline extends Schema.TaggedError<BeyondTimeline>()("BeyondTimeline", {
-  threadId: ThreadId.Id,
+  threadId: ThreadId.ThreadId,
   throughSequence: Schema.Int,
   latestSequence: Schema.Int
 }) {
@@ -572,7 +573,7 @@ export class BeyondTimeline extends Schema.TaggedError<BeyondTimeline>()("Beyond
  * @since 0.1.0
  */
 export class InvalidRecipient extends Schema.TaggedError<InvalidRecipient>()("InvalidRecipient", {
-  memberId: MemberId.Id,
+  memberId: MemberId.MemberId,
   reason: Schema.Literals(["same-owner", "removed", "agent"])
 }) {
   override get message(): string {
@@ -588,7 +589,7 @@ export class InvalidRecipient extends Schema.TaggedError<InvalidRecipient>()("In
  * @since 0.1.0
  */
 export class InvitationClosed extends Schema.TaggedError<InvitationClosed>()("InvitationClosed", {
-  invitationId: Invitation.Id,
+  invitationId: Invitation.InvitationId,
   reason: Schema.Literals(["expired", "revoked", "accepted"])
 }) {
   override get message(): string {
@@ -663,7 +664,7 @@ export class Malformed extends Schema.TaggedError<Malformed>()("Malformed", {
  * @since 0.1.0
  */
 export class UnsupportedRole extends Schema.TaggedError<UnsupportedRole>()("UnsupportedRole", {
-  roleId: Role.Id
+  roleId: Role.RoleId
 }) {
   override get message(): string {
     return `Role ${this.roleId} is not a built-in role`
@@ -701,7 +702,7 @@ export class DirectMembersRequired extends Schema.TaggedError<DirectMembersRequi
  * @since 0.1.0
  */
 export class NotRenamable extends Schema.TaggedError<NotRenamable>()("NotRenamable", {
-  groupId: GroupId.Id
+  groupId: GroupId.GroupId
 }) {
   override get message(): string {
     return `Group ${this.groupId} is named by its members`
@@ -715,7 +716,7 @@ export class NotRenamable extends Schema.TaggedError<NotRenamable>()("NotRenamab
  * @since 0.1.0
  */
 export class FixedMembership extends Schema.TaggedError<FixedMembership>()("FixedMembership", {
-  groupId: GroupId.Id
+  groupId: GroupId.GroupId
 }) {
   override get message(): string {
     return `Group ${this.groupId} has fixed members`
@@ -729,7 +730,7 @@ export class FixedMembership extends Schema.TaggedError<FixedMembership>()("Fixe
  * @since 0.1.0
  */
 export class GeneralMembership extends Schema.TaggedError<GeneralMembership>()("GeneralMembership", {
-  groupId: GroupId.Id
+  groupId: GroupId.GroupId
 }) {
   override get message(): string {
     return `Everyone belongs to the general group ${this.groupId}`
@@ -743,7 +744,7 @@ export class GeneralMembership extends Schema.TaggedError<GeneralMembership>()("
  * @since 0.1.0
  */
 export class NotFollowable extends Schema.TaggedError<NotFollowable>()("NotFollowable", {
-  groupId: GroupId.Id
+  groupId: GroupId.GroupId
 }) {
   override get message(): string {
     return `Group ${this.groupId} has nothing to follow`
@@ -757,7 +758,7 @@ export class NotFollowable extends Schema.TaggedError<NotFollowable>()("NotFollo
  * @since 0.1.0
  */
 export class FixedParticipation extends Schema.TaggedError<FixedParticipation>()("FixedParticipation", {
-  threadId: ThreadId.Id
+  threadId: ThreadId.ThreadId
 }) {
   override get message(): string {
     return `Everyone takes part in thread ${this.threadId}`
@@ -801,7 +802,7 @@ export class IntegrationRefused extends Schema.TaggedError<IntegrationRefused>()
  * @since 0.1.0
  */
 export class Keyless extends Schema.TaggedError<Keyless>()("Keyless", {
-  connectionId: Connection.Id
+  connectionId: ConnectionContract.ConnectionId
 }) {
   override get message(): string {
     return `Connection ${this.connectionId} takes no key`
@@ -839,7 +840,7 @@ export class Incomplete extends Schema.TaggedError<Incomplete>()("Incomplete", {
  * @since 0.1.0
  */
 export class ConnectionUnusable extends Schema.TaggedError<ConnectionUnusable>()("ConnectionUnusable", {
-  connectionId: Connection.Id,
+  connectionId: ConnectionContract.ConnectionId,
   part: Schema.optional(Agent.Part)
 }) {
   override get message(): string {
@@ -917,7 +918,7 @@ export class Invalid extends Schema.TaggedError<Invalid>()("CoreError.Invalid", 
  * @since 0.1.0
  */
 export class Uncertain extends Schema.TaggedError<Uncertain>()("CoreError.Uncertain", {
-  commitId: Commit.Id
+  commitId: Commit.CommitId
 }) {
   override get message(): string {
     return `Commit ${this.commitId} may or may not have taken effect`

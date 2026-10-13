@@ -20,19 +20,20 @@ import * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as MemberId from "../workspace/MemberId.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as Turn from "./Turn.ts"
+import * as TurnId from "./TurnId.ts"
 
 /**
  * Every fact names the turn's thread and group, which the group's members may learn of, and its
  * agent's membership, whose work it changes.
  */
 const Where = {
-  workspaceId: WorkspaceId.Id,
-  groupId: GroupId.Id,
-  threadId: ThreadId.Id,
-  memberId: MemberId.Id
+  workspaceId: WorkspaceId.WorkspaceId,
+  groupId: GroupId.GroupId,
+  threadId: ThreadId.ThreadId,
+  memberId: MemberId.MemberId
 }
-const audience = (payload: { readonly groupId: GroupId.Id }) => [Group.audienceOf(payload.groupId)]
-const subject = (payload: { readonly turnId: Turn.Id }) => Subject.make("turn", payload.turnId)
+const audience = (payload: { readonly groupId: GroupId.GroupId }) => [Group.audienceOf(payload.groupId)]
+const subject = (payload: { readonly turnId: TurnId.TurnId }) => Subject.make("turn", payload.turnId)
 
 /**
  * An agent accepted work into a new turn, settling the notifications that asked for it. The
@@ -49,7 +50,7 @@ export const Created = Fact.make("turn.created", {
   payload: Schema.Struct({
     ...Turn.Turn.fields,
     /** The notifications the turn accepted, which it settles. */
-    notificationIds: Schema.NonEmptyArray(Notification.Id)
+    notificationIds: Schema.NonEmptyArray(Notification.NotificationId)
   })
 })
 
@@ -81,7 +82,7 @@ export const Started = Fact.make("turn.started", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     selection: Agent.Selection,
     startedAt: Schema.DateTimeUtcFromString
   })
@@ -101,7 +102,7 @@ export const CancelRequested = Fact.make("turn.cancel-requested", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     reason: Turn.CancelReason,
     requestedAt: Schema.DateTimeUtcFromString
   })
@@ -120,8 +121,8 @@ export const Completed = Fact.make("turn.completed", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
-    messageIds: Schema.Array(ThreadMessageId.Id),
+    turnId: TurnId.TurnId,
+    messageIds: Schema.Array(ThreadMessageId.ThreadMessageId),
     finishedAt: Schema.DateTimeUtcFromString
   })
 })
@@ -139,7 +140,7 @@ export const Failed = Fact.make("turn.failed", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     reason: Schema.NonEmptyString,
     finishedAt: Schema.DateTimeUtcFromString
   })
@@ -159,7 +160,7 @@ export const Cancelled = Fact.make("turn.cancelled", {
   occurrence: (payload) => [payload.turnId],
   payload: Schema.Struct({
     ...Where,
-    turnId: Turn.Id,
+    turnId: TurnId.TurnId,
     cancelReason: Turn.CancelReason,
     finishedAt: Schema.DateTimeUtcFromString
   })

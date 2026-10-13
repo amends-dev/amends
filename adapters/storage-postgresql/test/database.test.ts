@@ -3,7 +3,7 @@ import { Actor, Identity } from "@amends-dev/core/identity"
 import { Fact, Journal, Publication, Subject } from "@amends-dev/core/journal"
 import { Notification } from "@amends-dev/core/notification"
 import { ThreadService } from "@amends-dev/core/thread"
-import { Member, MemberFacts } from "@amends-dev/core/workspace"
+import { Member, MemberFacts, MemberId } from "@amends-dev/core/workspace"
 import { BunCrypto } from "@effect/platform-bun"
 import { PgClient } from "@effect/sql-pg"
 import { describe, it, expect } from "@effect/vitest"
@@ -153,7 +153,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             memberId: workspace.ownerMemberId,
             identity: { _tag: "Human", id: workspace.createdBy }
           })
-          const memberIds = Array.makeBy(20, (index) => Member.Id.make(`member-${index}`))
+          const memberIds = Array.makeBy(20, (index) => MemberId.MemberId.make(`member-${index}`))
           const threads = yield* Effect.gen(function* () {
             const journal = yield* Journal.Journal
             yield* journal
@@ -327,14 +327,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
             bound.notifications.insertMany(
               Array.makeBy(200, (index) =>
                 Object.assign({}, sample, {
-                  id: Notification.Id.make(`agent-input-${index}`),
+                  id: Notification.NotificationId.make(`agent-input-${index}`),
                   source: { ...sample.source, logId: `agent-input-${index}` },
                   thread: {
                     threadId: `agent-thread-${index}`,
                     groupId: `agent-group-${index % 10}`,
                     sequence: 1
                   },
-                  recipient: Notification.ofMember(Member.Id.make(`agent-${index % 20}`), {
+                  recipient: Notification.ofMember(MemberId.MemberId.make(`agent-${index % 20}`), {
                     _tag: "Agent",
                     id: Identity.AgentId.make(`agent-${index % 20}`)
                   })

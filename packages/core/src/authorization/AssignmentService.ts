@@ -19,7 +19,7 @@ import * as Journal from "../journal/Journal.ts"
 import * as Publication from "../journal/Publication.ts"
 import * as Store from "../journal/Store.ts"
 import * as Operation from "../operation/Operation.ts"
-import * as Member from "../workspace/Member.ts"
+import * as MemberId from "../workspace/MemberId.ts"
 import * as MemberStore from "../workspace/MemberStore.ts"
 import * as Assignment from "./Assignment.ts"
 import * as AssignmentCommand from "./AssignmentCommand.ts"
@@ -92,7 +92,7 @@ export class AssignmentService extends Context.Service<
      * A member's access, under `assignment.read` on them: their active assignments, the roles on
      * offer, and whether the actor may change them.
      */
-    readonly list: (memberId: Member.Id) => Effect.Effect<Assignment.Access, ListError, Actor.Actor>
+    readonly list: (memberId: MemberId.MemberId) => Effect.Effect<Assignment.Access, ListError, Actor.Actor>
     /**
      * Give a member a built-in role across the workspace, under `assignment.manage` and the
      * delegation rules for the member and the role. A role they already hold is returned as it is,
@@ -105,8 +105,8 @@ export class AssignmentService extends Context.Service<
      * `CoreError.NotFound`; one already revoked is returned as it is.
      */
     readonly revoke: (
-      memberId: Member.Id,
-      assignmentId: Assignment.Id
+      memberId: MemberId.MemberId,
+      assignmentId: Assignment.AssignmentId
     ) => Effect.Effect<Assignment.Assignment, Error, Actor.Actor>
     /**
      * Replace a member's workspace roles with one, under `assignment.manage` and the delegation
@@ -163,13 +163,13 @@ export const make: Effect.Effect<
     )
     return workspaceWide.filter((_, index) => covered[index] === true).map((permission) => permission.name)
   }).pipe(Effect.withSpan("AssignmentService.permissions"), Operation.report)
-  const requireMember = Effect.fn("AssignmentService.requireMember")(function* (memberId: Member.Id) {
-    const id = yield* Schema.decodeEffect(Member.Id)(memberId)
+  const requireMember = Effect.fn("AssignmentService.requireMember")(function* (memberId: MemberId.MemberId) {
+    const id = yield* Schema.decodeEffect(MemberId.MemberId)(memberId)
     const found = yield* memberStore.get(id)
     if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Member", id })
     return found.value
   })
-  const authorizeRecipient = Effect.fn("AssignmentService.authorizeRecipient")(function* (memberId: Member.Id) {
+  const authorizeRecipient = Effect.fn("AssignmentService.authorizeRecipient")(function* (memberId: MemberId.MemberId) {
     yield* authorization.require([manageRequirement])
     const record = yield* requireMember(memberId)
     if (record.status !== "active")
@@ -185,7 +185,7 @@ export const make: Effect.Effect<
       })
     )
   }).pipe(Operation.report)
-  const list = Effect.fn("AssignmentService.list")(function* (memberId: Member.Id) {
+  const list = Effect.fn("AssignmentService.list")(function* (memberId: MemberId.MemberId) {
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Read, Target.Reference.cases.Member.make({ workspaceId, memberId }))
     ])
@@ -219,9 +219,9 @@ export const make: Effect.Effect<
     Operation.report
   )
   const revoke = Effect.fn("AssignmentService.revoke")(
-    function* (memberId: Member.Id, assignmentId: Assignment.Id) {
+    function* (memberId: MemberId.MemberId, assignmentId: Assignment.AssignmentId) {
       yield* authorizeRecipient(memberId)
-      const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId)
+      const id = yield* Schema.decodeEffect(Assignment.AssignmentId)(assignmentId)
       const found = yield* assignmentStore.get(id)
       if (Option.isNone(found)) return yield* new CoreError.NotFound({ resource: "Assignment", id })
       const record = found.value

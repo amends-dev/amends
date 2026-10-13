@@ -16,7 +16,7 @@ import * as WorkspaceId from "../../src/workspace/WorkspaceId.ts"
 import { Counter, make } from "../memory.ts"
 import { testProvenance } from "../publication.ts"
 
-const workspaceId = WorkspaceId.Id.make("workspace-one")
+const workspaceId = WorkspaceId.WorkspaceId.make("workspace-one")
 const logId = Entry.LogId.make("domain")
 const subject = () => Subject.make("test", "entity")
 const Noted = Fact.make("test.noted", {
