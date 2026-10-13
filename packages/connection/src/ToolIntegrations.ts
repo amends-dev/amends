@@ -19,7 +19,13 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
-import { type ConnectionErrorReason, type Health, InvalidConnectionError, UnavailableError } from "./Connection.ts"
+import {
+  type ConnectionErrorReason,
+  type Health,
+  healthOfReason,
+  InvalidConnectionError,
+  UnavailableError
+} from "./Connection.ts"
 import * as Integration from "./Integration.ts"
 
 const keyHeader = Schema.optionalKey(Schema.NonEmptyString).annotate({
@@ -151,12 +157,7 @@ export const openApi = Effect.map(HttpClient.HttpClient, (client) => {
     check: ({ settings }) =>
       apiOf(settings).pipe(
         Effect.as<Health>({ status: "healthy" }),
-        Effect.catch((reason) =>
-          Effect.succeed<Health>({
-            status: reason.isRetryable ? "unavailable" : "misconfigured",
-            description: reason.message
-          })
-        )
+        Effect.catch((reason) => Effect.succeed(healthOfReason(reason)))
       )
   })
 })

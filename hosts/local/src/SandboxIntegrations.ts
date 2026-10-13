@@ -77,12 +77,7 @@ export const local = Effect.fn("SandboxIntegrations.local")(function* (options: 
     check: (access) =>
       sandboxProviderOf(access).pipe(
         Effect.as<Connection.Health>({ status: "healthy" }),
-        Effect.catch((reason) =>
-          Effect.succeed<Connection.Health>({
-            status: reason.isRetryable ? "unavailable" : "misconfigured",
-            description: reason.message
-          })
-        )
+        Effect.catch((reason) => Effect.succeed(Connection.healthOfReason(reason)))
       )
   })
 })
@@ -136,11 +131,7 @@ const checkOrganization = (config: DaytonaConfig, url: string): Effect.Effect<Co
     Effect.as<Connection.Health>({ status: "healthy" }),
     Effect.timeout("15 seconds"),
     Effect.catch((failure) =>
-      Effect.succeed<Connection.Health>(
-        typeof failure === "number"
-          ? Connection.healthOf(failure, url)
-          : { status: "unavailable", description: `Nothing answered at ${url}` }
-      )
+      Effect.succeed(typeof failure === "number" ? Connection.healthOfStatus(failure, url) : Connection.unanswered(url))
     ),
     Effect.scoped
   )

@@ -186,10 +186,7 @@ const checkWith = (
   request: HttpClientRequest.HttpClientRequest
 ): Effect.Effect<Connection.Health> =>
   client.execute(request).pipe(
-    Effect.map((response: HttpClientResponse.HttpClientResponse) => Connection.healthOf(response.status, url)),
+    Effect.map((response: HttpClientResponse.HttpClientResponse) => Connection.healthOfStatus(response.status, url)),
     Effect.timeout("15 seconds"),
-    Effect.orElseSucceed((): Connection.Health => ({
-      status: "unavailable",
-      description: `Nothing answered at ${url}`
-    }))
+    Effect.orElseSucceed(() => Connection.unanswered(url))
   )

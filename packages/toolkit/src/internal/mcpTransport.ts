@@ -17,7 +17,6 @@ import type * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import type * as HttpClientResponse from "effect/http/HttpClientResponse"
 import * as Option from "effect/Option"
-import * as Predicate from "effect/Predicate"
 import * as Ref from "effect/Ref"
 import * as Schema from "effect/Schema"
 import * as Semaphore from "effect/Semaphore"
@@ -135,12 +134,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
     new ToolSourceError.ToolSourceError({ source: name, reason, cause })
 
   const failToReach = (error: HttpClientError.HttpClientError) =>
-    fail(
-      Predicate.isTagged(error.reason, "TransportError")
-        ? new ToolSourceError.UnavailableError({})
-        : new ToolSourceError.UnknownError({ description: error.message }),
-      error
-    )
+    fail(ToolSourceError.reasonFromHttpClientError(error), error)
 
   const failWithStatus = (status: number) => {
     const description = `The server answered ${status}`

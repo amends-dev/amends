@@ -115,7 +115,7 @@ export interface Health extends Schema.Schema.Type<typeof Health> {}
  * @category utils
  * @since 0.1.0
  */
-export const healthOf = (status: number, url: string): Health => {
+export const healthOfStatus = (status: number, url: string): Health => {
   if (status === 401 || status === 403) {
     return { status: "unauthorized", description: `${url} refused the key (${status})` }
   }
@@ -127,6 +127,29 @@ export const healthOf = (status: number, url: string): Health => {
   }
   return { status: "healthy" }
 }
+
+/**
+ * What a check that nothing at `url` answered says of the connection: it is unavailable.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const unanswered = (url: string): Health => ({
+  status: "unavailable",
+  description: `Nothing answered at ${url}`
+})
+
+/**
+ * What a check that failed for `reason` says of the connection: unavailable when trying again may
+ * succeed, and misconfigured otherwise.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const healthOfReason = (reason: ConnectionErrorReason): Health => ({
+  status: reason.isRetryable ? "unavailable" : "misconfigured",
+  description: reason.message
+})
 
 /**
  * The host has no integration of the id a connection names.

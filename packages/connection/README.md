@@ -55,8 +55,9 @@ ones it chooses, and those of the harnesses and sandbox providers it runs, which
 itself, as the local host's `HarnessIntegrations` and `SandboxIntegrations` do. What only the host
 decides, such as where a local sandbox keeps its files or what opencode's bridge tokens derive from,
 it gives an integration when it installs it; a connection's settings are what a workspace gives.
-`Connection.healthOf` says what an HTTP status an integration's check got says of the connection,
-for integrations that check over HTTP.
+What a check finds is a `Connection.Health`: `Connection.healthOfStatus` reads one from the HTTP
+status an integration's check got, `Connection.unanswered` is what a check that got no answer finds,
+and `Connection.healthOfReason` is what a check that failed with a `ConnectionError` reason finds.
 
 ## Models
 

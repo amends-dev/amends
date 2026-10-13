@@ -20,17 +20,12 @@
  * @since 0.1.0
  */
 
-import { type Agent, BridgeClient, HarnessError } from "@amends-dev/harness"
+import type { Agent } from "@amends-dev/harness"
 import type { Sandbox } from "@amends-dev/sandbox"
-import type * as Crypto from "effect/Crypto"
-import * as Effect from "effect/Effect"
 import type * as Redacted from "effect/Redacted"
 import type * as Schema from "effect/Schema"
-import type * as Socket from "effect/socket/Socket"
-import type { Options as DriverOptions } from "./internal/bridge/driver.ts"
+import * as internal from "./internal/agent.ts"
 import { hostToolName } from "./internal/bridge/v1/session.ts"
-import { modelsOf } from "./internal/models.ts"
-import { makeInstallation } from "./internal/template.ts"
 
 /**
  * What the agent is made with: the endpoints its turns run on, as `Agent.Options` give them, and
@@ -108,30 +103,13 @@ export interface Options extends Agent.Options {
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fnUntraced(function* (options: Options) {
-  const models = yield* Effect.fromResult(modelsOf(1, options)).pipe(
-    Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode", reason }))
+export const make = (options: Options) =>
+  internal.make(
+    {
+      id: "opencode",
+      version: 1,
+      // opencode names a host's tool after the MCP server that offers it, `host_<tool>`.
+      maxToolNameLength: 64 - hostToolName("").length
+    },
+    options
   )
-  const installation = yield* makeInstallation(1)
-  const services = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>()
-  const bridge: BridgeClient.Options = {
-    id: "opencode",
-    ...installation,
-    token: options.token,
-    agentOptions: {
-      model: models.model,
-      models: models.models,
-      config: { ...options.config, ...models.config },
-      env: { ...options.env, ...models.env }
-    } satisfies DriverOptions
-  }
-  const agent: Agent.Agent = {
-    id: "opencode",
-    requiresSandbox: true,
-    template: installation.template,
-    // opencode names a host's tool after the MCP server that offers it, `host_<tool>`.
-    maxToolNameLength: 64 - hostToolName("").length,
-    createSession: (sessionOptions) => Effect.provide(BridgeClient.createSession(bridge, sessionOptions), services)
-  }
-  return agent
-})

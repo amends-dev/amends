@@ -16,6 +16,8 @@
  * @since 0.1.0
  */
 
+import type * as HttpClientError from "effect/http/HttpClientError"
+import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 
 /**
@@ -221,6 +223,18 @@ export const ToolSourceErrorReason = Schema.Union([
  * @since 0.1.0
  */
 export type ToolSourceErrorReason = typeof ToolSourceErrorReason.Type
+
+/**
+ * Why a request that got no answer failed: a server that could not be reached is unavailable, and
+ * anything else about the request is unknown.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const reasonFromHttpClientError = (error: HttpClientError.HttpClientError): ToolSourceErrorReason =>
+  Predicate.isTagged(error.reason, "TransportError")
+    ? new UnavailableError({})
+    : new UnknownError({ description: error.message })
 
 /**
  * What every operation of a tool source fails with: the source that failed, by its name, and the
