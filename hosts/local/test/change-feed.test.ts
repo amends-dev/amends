@@ -5,10 +5,10 @@ import { Identity } from "@amends-dev/core/identity"
 import { ThreadService, ThreadId } from "@amends-dev/core/thread"
 import { InvitationFacts, Member, MemberFacts, type WorkspaceId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
-import { Streams } from "@amends-dev/http"
+import { ApiErrors, Streams } from "@amends-dev/http"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { type Context, DateTime, Effect, Exit, Layer, Queue, Redacted, Schema, Scope, Stream } from "effect"
+import { type Context, DateTime, Effect, Exit, Layer, Queue, Redacted, Schedule, Schema, Scope, Stream } from "effect"
 import { HttpClient, HttpRouter } from "effect/http"
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts"
 import * as LocalHost from "../src/LocalHost.ts"
@@ -44,11 +44,11 @@ const listen = (
   Effect.gen(function* () {
     const scope = yield* Scope.fork(yield* Scope.Scope)
     const queue = yield* Queue.unbounded<ChangeFeed.Message>()
-    yield* Stream.unwrap(
-      api.changeFeed.watch({
-        query: after === undefined ? {} : { after }
-      })
-    ).pipe(
+    // Open the stream before reading it, so a stream the server refuses fails here.
+    const messages = yield* api.changeFeed
+      .watch({ query: after === undefined ? {} : { after } })
+      .pipe(Scope.provide(scope))
+    yield* messages.pipe(
       Stream.runForEach((message) => Queue.offer(queue, message)),
       Effect.forkScoped,
       Scope.provide(scope)
@@ -340,10 +340,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           _tag: "ApiErrors.TooManyStreams",
           limit: "workspace"
         })
-        // Closing a stream gives its place back, to its member and to the workspace.
+        // Closing a stream gives its place back, to its member and to the workspace, once the
+        // server sees it close.
         yield* first.close
-        yield* Effect.sleep("200 millis")
-        yield* listen(carol, workspace.id)
+        yield* listen(carol, workspace.id).pipe(
+          Effect.retry({ while: Schema.is(ApiErrors.TooManyStreams), schedule: Schedule.spaced("20 millis") })
+        )
       }).pipe(
         Effect.timeout("10 seconds"),
         Effect.scoped,
