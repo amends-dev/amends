@@ -8,7 +8,7 @@ import { Gateway } from "@amends-dev/gateway"
 import { PostgresClusterStorage, type PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql"
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Clock, Context, type Crypto, Effect, Exit, Layer, Option, Redacted } from "effect"
+import { Context, type Crypto, type Duration, Effect, Exit, Layer, Option, Queue, Redacted } from "effect"
 import { SqlClient } from "effect/sql"
 import * as LocalHost from "../src/LocalHost.ts"
 import { setup } from "./database.ts"
@@ -24,7 +24,7 @@ const job: TurnJobs.Job = {
  * A gateway through which a turn job finds no work, telling `ran` in which workspace it looked:
  * accepting gives no turn, and nothing else is reached.
  */
-const acceptingNothing = (ran: (workspaceId: WorkspaceId.WorkspaceId) => void) => {
+const acceptingNothing = (ran: (workspaceId: WorkspaceId.WorkspaceId) => Effect.Effect<void>) => {
   const unexpected = () => Effect.die("Only accepting work is expected")
   return Gateway.Gateway.of({
     createWorkspace: unexpected,
@@ -35,7 +35,7 @@ const acceptingNothing = (ran: (workspaceId: WorkspaceId.WorkspaceId) => void) =
         Context.make(
           TurnExecution.TurnExecution,
           TurnExecution.TurnExecution.of({
-            accept: () => Effect.sync(() => ran(workspaceId)).pipe(Effect.as(Option.none())),
+            accept: () => ran(workspaceId).pipe(Effect.as(Option.none())),
             start: unexpected,
             joinedConversation: unexpected,
             showDraft: unexpected,
@@ -87,9 +87,28 @@ interface Ran {
   readonly workspaceId: WorkspaceId.WorkspaceId
 }
 
+/** The jobs that ran: every one so far, and each as it runs, for a test to wait on. */
+interface Runs {
+  readonly all: Array<Ran>
+  readonly next: Queue.Queue<Ran>
+}
+
+const makeRuns: Effect.Effect<Runs> = Effect.map(Queue.unbounded<Ran>(), (next) => ({ all: [], next }))
+
 /** A gateway through which `runner`'s turn jobs find no work, recording in `runs` each that ran. */
-const recordingRuns = (runs: Array<Ran>, runner: string) =>
-  acceptingNothing((workspaceId) => runs.push({ runner, workspaceId }))
+const recordingRuns = (runs: Runs, runner: string) =>
+  acceptingNothing((workspaceId) => {
+    const run = { runner, workspaceId }
+    runs.all.push(run)
+    return Queue.offer(runs.next, run)
+  })
+
+/** Wait for the next job to run in `workspaceId`, failing with `late` when none runs `within`. */
+const awaitRun = (runs: Runs, workspaceId: WorkspaceId.WorkspaceId, within: Duration.Input, late: string) =>
+  Queue.take(runs.next).pipe(
+    Effect.repeat({ until: (run) => run.workspaceId === workspaceId }),
+    Effect.timeoutOrElse({ duration: within, orElse: () => Effect.fail(late) })
+  )
 
 /**
  * In each workspace, commit a request to run its job through the requests `context` holds, going
@@ -98,9 +117,9 @@ const recordingRuns = (runs: Array<Ran>, runner: string) =>
  */
 const commitAndAwait = Effect.fnUntraced(function* (
   context: Context.Context<TurnJobs.TurnJobs | PostgresDatabase.PostgresDatabase | Crypto.Crypto>,
-  runs: ReadonlyArray<Ran>,
+  runs: Runs,
   workspaceIds: ReadonlyArray<WorkspaceId.WorkspaceId>,
-  within: number
+  within: Duration.Input
 ) {
   const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provideContext(context))
   const requests = Context.get(context, TurnJobs.TurnJobs)
@@ -111,12 +130,7 @@ const commitAndAwait = Effect.fnUntraced(function* (
         .requestRun({ workspaceId, memberId: job.memberId, threadId: job.threadId })
         .pipe(Effect.andThen(Effect.sleep("50 millis")))
     )
-    const committedAt = yield* Clock.currentTimeMillis
-    while (!runs.some((run) => run.workspaceId === workspaceId)) {
-      if ((yield* Clock.currentTimeMillis) - committedAt > within)
-        return yield* Effect.fail(`The job of ${workspaceId} waited for a runner's next poll`)
-      yield* Effect.sleep("10 millis")
-    }
+    yield* awaitRun(runs, workspaceId, within, `The job of ${workspaceId} waited for a runner's next poll`)
   }
 })
 
@@ -132,12 +146,9 @@ describe.skipIf(!available)("jobs on the local host", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const runs: Array<WorkspaceId.WorkspaceId> = []
+          const runs = yield* makeRuns
           const context = yield* Layer.build(
-            turnJobs(
-              acceptingNothing((workspaceId) => runs.push(workspaceId)),
-              LocalHost.layerDatabase(Redacted.make(url))
-            )
+            turnJobs(recordingRuns(runs, "runner"), LocalHost.layerDatabase(Redacted.make(url)))
           )
           const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provide(context))
           const store = Context.get(yield* storage.forWorkspace(job.workspaceId), Store.Store)
@@ -160,8 +171,8 @@ describe.skipIf(!available)("jobs on the local host", () => {
           yield* store.transaction(requests.requestRun(job))
           expect(yield* stored).toBe(1)
           // The committed request reaches the worker; the rolled-back one never existed.
-          yield* Effect.sleep("3 seconds")
-          expect(runs).toEqual([job.workspaceId])
+          yield* awaitRun(runs, job.workspaceId, "10 seconds", "The committed request never ran")
+          expect(runs.all).toEqual([{ runner: "runner", workspaceId: job.workspaceId }])
         }).pipe(Effect.scoped)
       ),
     30_000
@@ -174,12 +185,10 @@ describe.skipIf(!available)("jobs on the local host", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          let runs = 0
+          const runs = yield* makeRuns
           const context = yield* Layer.build(
             turnJobs(
-              acceptingNothing(() => {
-                runs += 1
-              }),
+              recordingRuns(runs, "runner"),
               LocalHost.layerDatabase(Redacted.make(url), { pollInterval: "1 minute" })
             )
           )
@@ -190,16 +199,9 @@ describe.skipIf(!available)("jobs on the local host", () => {
           // and staged writes, so Cluster's own look comes before the request is there to find.
           for (let commit = 1; commit <= 5; commit++) {
             yield* store.transaction(requests.requestRun(job).pipe(Effect.andThen(Effect.sleep("100 millis"))))
-            const committedAt = yield* Clock.currentTimeMillis
-            // `runs` grows in the runner's fiber, which the rule cannot see.
-            // oxlint-disable-next-line eslint/no-unmodified-loop-condition
-            while (runs < commit) {
-              if ((yield* Clock.currentTimeMillis) - committedAt > 5_000)
-                return expect.fail(`Request ${commit} waited for the runner's next poll`)
-              yield* Effect.sleep("10 millis")
-            }
+            yield* awaitRun(runs, job.workspaceId, "5 seconds", `Request ${commit} waited for the runner's next poll`)
           }
-          expect(runs).toBe(5)
+          expect(runs.all).toHaveLength(5)
         }).pipe(Effect.scoped)
       ),
     60_000
@@ -230,7 +232,7 @@ describe.skipIf(!available)("jobs on the local host", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const runs: Array<Ran> = []
+          const runs = yield* makeRuns
           yield* Layer.build(
             turnJobs(
               recordingRuns(runs, "runner"),
@@ -241,9 +243,9 @@ describe.skipIf(!available)("jobs on the local host", () => {
             turnJobRequests(LocalHost.layerDatabase(Redacted.make(url), { runJobs: false }))
           )
           // The runner takes every shard as it starts, and reads what was stored before.
-          yield* commitAndAwait(api, runs, workspacesOf("first", 1), 30_000)
-          yield* commitAndAwait(api, runs, workspacesOf("then", 5), 2_000)
-          expect(runs.every((run) => run.runner === "runner")).toBe(true)
+          yield* commitAndAwait(api, runs, workspacesOf("first", 1), "30 seconds")
+          yield* commitAndAwait(api, runs, workspacesOf("then", 5), "2 seconds")
+          expect(runs.all.every((run) => run.runner === "runner")).toBe(true)
         }).pipe(Effect.scoped)
       ),
     60_000
@@ -257,7 +259,7 @@ describe.skipIf(!available)("jobs on the local host", () => {
       () =>
         withDatabase((url) =>
           Effect.gen(function* () {
-            const runs: Array<Ran> = []
+            const runs = yield* makeRuns
             const runner = (name: string, port: number) =>
               turnJobs(
                 recordingRuns(runs, name),
@@ -271,11 +273,11 @@ describe.skipIf(!available)("jobs on the local host", () => {
             yield* Layer.build(runner("second", 34472))
             // The processes share out the shards a few seconds after both start; until then a
             // request may wait for a shard to change hands.
-            for (let round = 0; !runs.some((run) => run.runner === "second"); round++)
-              yield* commitAndAwait(first, runs, workspacesOf(`warm-${round}`, 10), 30_000)
-            runs.length = 0
-            yield* commitAndAwait(first, runs, workspacesOf("shared", 20), 2_000)
-            expect(new Set(runs.map((run) => run.runner))).toEqual(new Set(["first", "second"]))
+            for (let round = 0; !runs.all.some((run) => run.runner === "second"); round++)
+              yield* commitAndAwait(first, runs, workspacesOf(`warm-${round}`, 10), "30 seconds")
+            runs.all.length = 0
+            yield* commitAndAwait(first, runs, workspacesOf("shared", 20), "2 seconds")
+            expect(new Set(runs.all.map((run) => run.runner))).toEqual(new Set(["first", "second"]))
           }).pipe(Effect.scoped)
         ),
       90_000
