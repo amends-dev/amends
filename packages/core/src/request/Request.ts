@@ -10,7 +10,6 @@
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import * as Hex from "effect/encoding/Hex"
-import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 
 /**
@@ -41,8 +40,10 @@ export interface Options {
   readonly requestKey?: Key | undefined
 }
 
-/** A string's UTF-8 bytes; hex encoding reads strings as UTF-8, and valid hex always decodes. */
-const utf8 = (text: string) => Result.getOrThrow(Hex.decode(Hex.encode(text)))
+// Every runtime a host runs on has the WHATWG `TextEncoder`, which no type this package includes
+// declares, and Effect exports no encoder of its own.
+declare const TextEncoder: new () => { readonly encode: (text: string) => Uint8Array }
+const encoder = new TextEncoder()
 
 /**
  * The ID a keyed request gives the record it creates, derived from parts naming the operation,
@@ -54,7 +55,7 @@ const utf8 = (text: string) => Result.getOrThrow(Hex.decode(Hex.encode(text)))
  */
 export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<string>) {
   const crypto = yield* Crypto.Crypto
-  const bytes = (yield* crypto.digest("SHA-256", utf8(JSON.stringify(parts)))).slice(0, 16)
+  const bytes = (yield* crypto.digest("SHA-256", encoder.encode(JSON.stringify(parts)))).slice(0, 16)
   bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80
   bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80
   const hex = Hex.encode(bytes)
