@@ -28,6 +28,10 @@ as parallel jobs; see [continuous integration](docs/testing.md#continuous-integr
 Keep these diagnostics enabled in `tsconfig.base.json`: the pinned Oxlint version is
 newer than the versions supported by the Effect Oxlint patch, so Effect checks
 currently run through TypeScript. Check compatibility before changing this setup.
+`tsconfig.base.json` raises the language service's idiom rules, such as `Effect.void` over
+`Effect.succeed(undefined)` or `Effect.catchTag` over a catch-all that re-fails, to warnings,
+which fail `typecheck`; the few that only fit source, such as `deterministicKeys` for service
+keys, are off in tests and scripts.
 `.oxlintrc.json` takes the rules of Effect's own Oxlint configuration
 (`repos/effect/packages/tools/oxc/oxlintrc.json`), with its type-aware rules off as Effect
 runs them, and keeps `console` to tests and scripts.
