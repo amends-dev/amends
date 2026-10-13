@@ -2,7 +2,7 @@ import type * as Core from "@amends-dev/core"
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group"
 import { Actor, Identity } from "@amends-dev/core/identity"
-import { Entry, Journal, Store } from "@amends-dev/core/journal"
+import { Entry, Journal, Store, StoreError } from "@amends-dev/core/journal"
 import { Notification, NotificationService, type NotificationStore } from "@amends-dev/core/notification"
 import { Thread, ThreadService, ThreadParticipation } from "@amends-dev/core/thread"
 import { TurnId } from "@amends-dev/core/turn"
@@ -423,7 +423,7 @@ describe("notifications", () => {
                   Effect.match({
                     onSuccess: () => "Inserted",
                     onFailure: (error) =>
-                      error._tag === "StoreError" ? `${error.store} ${error.reason._tag}` : error._tag
+                      StoreError.isStoreError(error) ? `${error.store} ${error.reason._tag}` : error._tag
                   })
                 ),
               { concurrency: "unbounded" }

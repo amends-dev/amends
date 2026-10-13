@@ -1,5 +1,5 @@
 import { Deferred, Effect, Sink, Stream } from "effect"
-import { type ChildProcess, ChildProcessSpawner } from "effect/process"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 
 export interface FakeServerProcesses {
   readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
@@ -65,7 +65,7 @@ export const makeScriptedCommands = (
   const ran: Array<ReadonlyArray<string>> = []
   const spawner = ChildProcessSpawner.make((command) =>
     Effect.suspend(() => {
-      if (command._tag !== "StandardCommand") return Effect.die("Scripted commands are not piped")
+      if (!ChildProcess.isStandardCommand(command)) return Effect.die("Scripted commands are not piped")
       ran.push([command.command, ...command.args])
       const { output = "", code = 0 } = answer(command.command, command.args)
       return Effect.succeed(

@@ -89,7 +89,10 @@ const isUnavailable = Schema.is(CoreError.Unavailable)
  */
 const isStaleCause = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
-    (reason) => Cause.isFailReason(reason) && isUnavailable(reason.error) && reason.error.reason._tag === "Reloading"
+    (reason) =>
+      Cause.isFailReason(reason) &&
+      isUnavailable(reason.error) &&
+      CoreError.UnavailableReason.isAnyOf(["Reloading"])(reason.error.reason)
   )
 
 /**

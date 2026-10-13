@@ -163,7 +163,7 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     connections: AgentReadiness.Connections,
     previous: Agent.Selection | undefined
   ) {
-    if (record.harness._tag === "Connection") return record.harness.connectionId
+    if (Agent.Harness.isAnyOf(["Connection"])(record.harness)) return record.harness.connectionId
     const choices = yield* AgentReadiness.harnessesToChoose(record, connections, integrations)
     const chosen = AgentReadiness.chooseHarness(choices, previous?.harness.connectionId)
     if (chosen === undefined)
@@ -184,7 +184,7 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     connections: AgentReadiness.Connections
   ) {
     const resolved = yield* AgentReadiness.resolveConnection(connectionId, connections, integrations)
-    if (resolved._tag !== "Installed")
+    if (!AgentReadiness.Resolved.$is("Installed")(resolved))
       return yield* new CoreError.Invalid({
         reason: new CoreError.Incomplete({ issues: [{ _tag: resolved._tag, part }] })
       })

@@ -10,6 +10,7 @@ import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Logger, Path, Redacted, Schema, type Scope, Stream } from "effect"
 import { LanguageModel, McpProtocol, McpServer, type Response, Tool, Toolkit } from "effect/ai"
 import { FetchHttpClient, HttpRouter } from "effect/http"
+import { NetAddress } from "effect/net"
 import * as HarnessIntegrations from "../src/HarnessIntegrations.ts"
 
 /** A connection as a workspace stores it. */
@@ -262,7 +263,7 @@ const serveCodewords = Effect.gen(function* () {
   )
   const server = yield* BunHttpServer.make({ hostname: "127.0.0.1", port: 0 })
   yield* server.serve(app)
-  if (server.address._tag === "UnixPathAddress") {
+  if (NetAddress.isUnixPathAddress(server.address)) {
     return yield* Effect.die("The MCP server listens on no port")
   }
   return `http://127.0.0.1:${server.address.port}/mcp`

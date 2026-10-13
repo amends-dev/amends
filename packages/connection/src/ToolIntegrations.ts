@@ -12,7 +12,7 @@
  * @since 0.1.0
  */
 
-import { Http, Mcp, OpenApi, type ToolSourceError } from "@amends-dev/toolkit"
+import { Http, Mcp, OpenApi, ToolSourceError } from "@amends-dev/toolkit"
 import * as Effect from "effect/Effect"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
@@ -192,14 +192,12 @@ const withKey = (
       )
 
 /** What a source's failing to say which tools it has says of the connection. */
-const healthOfFailure = (error: ToolSourceError.ToolSourceError): Health => {
-  const description = error.reason.message
-  switch (error.reason._tag) {
-    case "AuthenticationError":
-      return { status: "unauthorized", description }
-    case "UnavailableError":
-      return { status: "unavailable", description }
-    default:
-      return { status: "misconfigured", description }
-  }
-}
+const healthOfFailure = ({ reason }: ToolSourceError.ToolSourceError): Health =>
+  ToolSourceError.ToolSourceErrorReason.matchOrElse(
+    reason,
+    {
+      AuthenticationError: (): Health => ({ status: "unauthorized", description: reason.message }),
+      UnavailableError: (): Health => ({ status: "unavailable", description: reason.message })
+    },
+    (): Health => ({ status: "misconfigured", description: reason.message })
+  )

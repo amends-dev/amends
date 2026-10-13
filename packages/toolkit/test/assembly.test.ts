@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Cause, Effect, Schema, Stream } from "effect"
+import { Cause, Effect, Exit, Schema, Stream } from "effect"
 import { Tool } from "effect/ai"
 import * as Assembly from "../src/Assembly.ts"
 import type { ToolDefinition } from "../src/ToolDefinition.ts"
@@ -288,7 +288,7 @@ describe("the name of a tool", () => {
       Effect.gen(function* () {
         const exit = yield* Effect.exit(Assembly.toolkit([], allowAll, { maxNameLength: limit }))
 
-        expect(exit._tag === "Failure" ? Cause.pretty(exit.cause) : "").toContain(
+        expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "").toContain(
           "maxNameLength must be a whole number of at least 16"
         )
       })

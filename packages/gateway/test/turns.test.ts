@@ -10,7 +10,7 @@ import { TaskService } from "@amends-dev/core/task"
 import {
   Thread,
   ThreadService,
-  type ThreadMessage,
+  ThreadMessage,
   ThreadMessageService,
   ThreadParticipationService,
   type ThreadTimeline,
@@ -111,7 +111,7 @@ const brief = (message: Turn.LogMessage | "done" | "unavailable") => {
 /** A timeline item in brief: a message's text, or a turn's change. */
 const told = (item: ThreadTimeline.Item) => {
   if ("message" in item)
-    return `message: ${item.message.content._tag === "Text" ? item.message.content.text : "(deleted)"}`
+    return `message: ${ThreadMessage.Content.isAnyOf(["Text"])(item.message.content) ? item.message.content.text : "(deleted)"}`
   const activity = item.activity
   switch (activity.kind) {
     case "turn.created":
@@ -331,9 +331,8 @@ const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Turn["thre
 /** Run the agent's job in the thread, as its turn job does, expecting a turn ready to run. */
 const startReady = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Turn["threadId"]) =>
   runJob(id, memberId, threadId).pipe(
-    Effect.filterOrElse(
-      (started): started is Ready => started._tag === "Ready",
-      (started) => Effect.die(`Expected a turn ready to run, not ${started._tag}`)
+    Effect.filterOrElse(TurnExecution.Start.isAnyOf(["Ready"]), (started) =>
+      Effect.die(`Expected a turn ready to run, not ${started._tag}`)
     )
   )
 /** The texts of a message the agent is told, its parts' in order. */
@@ -1071,7 +1070,9 @@ describe("turns", () => {
           const { receive } = yield* channelInto(workspace.id)
           // The contact's message opens a task in triage, which alice assigns to the agent.
           const opened = (yield* receive("m1", "Where is my order?")).intakes[0]
-          if (opened?._tag !== "Opened") return expect.fail(`Expected a thread opened, not ${opened?._tag}`)
+          if (opened === undefined || !ChannelIntake.Intake.isAnyOf(["Opened"])(opened)) {
+            return expect.fail(`Expected a thread opened, not ${opened?._tag}`)
+          }
           const { threadId } = opened
           yield* takeTurnJobs(workspace.id)
           yield* as(

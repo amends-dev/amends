@@ -17,6 +17,7 @@ import type * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import type * as HttpClientResponse from "effect/http/HttpClientResponse"
 import * as Option from "effect/Option"
+import * as Predicate from "effect/Predicate"
 import * as Ref from "effect/Ref"
 import * as Schema from "effect/Schema"
 import * as Semaphore from "effect/Semaphore"
@@ -73,15 +74,17 @@ const newestSessionVersion = "2025-11-25"
 const sessionVersions = [newestSessionVersion, "2025-06-18", "2025-03-26", "2024-11-05"]
 
 /** How the server is spoken to, which the first request settles. */
-type Connection =
-  | { readonly _tag: "Stateless" }
-  | {
-      readonly _tag: "Session"
-      readonly protocolVersion: string
+type Connection = Data.TaggedEnum<{
+  Stateless: {}
+  Session: {
+    readonly protocolVersion: string
 
-      /** A server may not give one. */
-      readonly sessionId: string | undefined
-    }
+    /** A server may not give one. */
+    readonly sessionId: string | undefined
+  }
+}>
+
+const Connection = Data.taggedEnum<Connection>()
 
 /** The server has ended the session a request belonged to, so the next request starts another. */
 class SessionEnded extends Data.TaggedError("SessionEnded")<{
@@ -131,7 +134,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
 
   const failToReach = (error: HttpClientError.HttpClientError) =>
     fail(
-      error.reason._tag === "TransportError"
+      Predicate.isTagged(error.reason, "TransportError")
         ? new ToolSourceError.UnavailableError({})
         : new ToolSourceError.UnknownError({ description: error.message }),
       error
@@ -176,36 +179,42 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
       readonly headers?: Readonly<Record<string, string>>
     }
   ) {
-    const version = connection._tag === "Stateless" ? statelessVersion : connection.protocolVersion
+    // A stateless request says what it is in its headers and carries its protocol in its params; a
+    // request in a session names the session.
+    const spoken = Connection.$match(connection, {
+      Stateless: () => ({
+        version: statelessVersion,
+        headers: {
+          "mcp-method": method,
+          ...(options?.toolName === undefined ? {} : { "mcp-name": encodeHeaderValue(options.toolName) }),
+          ...options?.headers
+        },
+        params: {
+          ...params,
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": statelessVersion,
+            "io.modelcontextprotocol/clientCapabilities": {},
+            "io.modelcontextprotocol/clientInfo": clientInfo
+          }
+        }
+      }),
+      Session: ({ protocolVersion, sessionId }) => ({
+        version: protocolVersion,
+        headers: sessionId === undefined ? {} : { "mcp-session-id": sessionId },
+        params
+      })
+    })
     const request = HttpClientRequest.post(url).pipe(
       HttpClientRequest.setHeaders({
         accept: "application/json, text/event-stream",
-        "mcp-protocol-version": version,
-        ...(connection._tag === "Stateless"
-          ? {
-              "mcp-method": method,
-              ...(options?.toolName === undefined ? {} : { "mcp-name": encodeHeaderValue(options.toolName) }),
-              ...options?.headers
-            }
-          : connection.sessionId === undefined
-            ? {}
-            : { "mcp-session-id": connection.sessionId })
+        "mcp-protocol-version": spoken.version,
+        ...spoken.headers
       }),
       HttpClientRequest.bodyJsonUnsafe({
         jsonrpc: "2.0",
         ...(options?.id === undefined ? {} : { id: options.id }),
         method,
-        params:
-          connection._tag === "Stateless"
-            ? {
-                ...params,
-                _meta: {
-                  "io.modelcontextprotocol/protocolVersion": statelessVersion,
-                  "io.modelcontextprotocol/clientCapabilities": {},
-                  "io.modelcontextprotocol/clientInfo": clientInfo
-                }
-              }
-            : params
+        params: spoken.params
       })
     )
     return yield* client.execute(request).pipe(
@@ -286,7 +295,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
   ) {
     const id = yield* Ref.updateAndGet(requestCount, (count) => count + 1)
     const response = yield* post(connection, method, params, { ...options, id })
-    if (response.status === 404 && connection._tag === "Session" && connection.sessionId) {
+    if (response.status === 404 && Connection.$is("Session")(connection) && connection.sessionId) {
       return yield* new SessionEnded({ connection })
     }
     const result = yield* readResult(response, id)
@@ -304,11 +313,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
 
   /** Starts a session with a server that has them. */
   const initialize = Effect.gen(function* () {
-    const unstarted: Connection = {
-      _tag: "Session",
-      protocolVersion: newestSessionVersion,
-      sessionId: undefined
-    }
+    const unstarted = Connection.Session({ protocolVersion: newestSessionVersion, sessionId: undefined })
     const params = { protocolVersion: newestSessionVersion, capabilities: {}, clientInfo }
     const id = yield* Ref.updateAndGet(requestCount, (count) => count + 1)
     const response = yield* post(unstarted, "initialize", params, { id })
@@ -332,11 +337,10 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
         })
       )
     }
-    const connection: Connection = {
-      _tag: "Session",
+    const connection = Connection.Session({
       protocolVersion: answer.protocolVersion,
       sessionId: response.headers["mcp-session-id"]
-    }
+    })
     const acknowledged = yield* post(connection, "notifications/initialized", {})
     if (acknowledged.status >= 400) return yield* failWithStatus(acknowledged.status)
     return connection
@@ -344,7 +348,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
 
   /** Finds out how the server is spoken to: statelessly if it says it can be, or else with sessions. */
   const settleConnection = Effect.gen(function* () {
-    const stateless: Connection = { _tag: "Stateless" }
+    const stateless = Connection.Stateless()
     const isStateless = yield* exchange(Discovered, stateless, "server/discover", {}).pipe(
       Effect.map((discovered) => discovered.supportedVersions.includes(statelessVersion)),
       // A stateless request carries no session, so none can have ended.
@@ -352,7 +356,8 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
       // A server that is not reached, or does not let the source in, would not answer `initialize`
       // either. Any other failure is one an older server gives to a method it does not know.
       Effect.catchIf(
-        (error) => error.reason._tag !== "AuthenticationError" && error.reason._tag !== "UnavailableError",
+        (error) =>
+          !ToolSourceError.ToolSourceErrorReason.isAnyOf(["AuthenticationError", "UnavailableError"])(error.reason),
         () => Effect.succeed(false)
       )
     )
@@ -399,7 +404,7 @@ export const streamableHttp = Effect.fn("Mcp.Transport.streamableHttp")(function
 
   const transport: Transport = {
     request,
-    mirrorsParameters: Effect.map(connection, (settled) => settled._tag === "Stateless")
+    mirrorsParameters: Effect.map(connection, Connection.$is("Stateless"))
   }
   return transport
 })

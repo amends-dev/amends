@@ -10,6 +10,7 @@
 
 import { Session, StreamPart } from "@amends-dev/harness"
 import * as Prompt from "effect/ai/Prompt"
+import { constVoid } from "effect/Function"
 import * as Schema from "effect/Schema"
 import type * as ThreadMessageId from "../thread/ThreadMessageId.ts"
 import * as Turn from "./Turn.ts"
@@ -92,7 +93,7 @@ export interface Recorded extends Schema.Schema.Type<typeof Recorded> {}
 export const isOfTurn =
   (turnId: Turn.Id) =>
   (entry: Entry): boolean =>
-    entry._tag !== "Joined" && entry.turnId === turnId
+    !Entry.isAnyOf(["Joined"])(entry) && entry.turnId === turnId
 
 /**
  * The conversation a log records, as the agent's session resumes with it: the conversation it
@@ -104,31 +105,25 @@ export const isOfTurn =
  * @category utils
  * @since 0.1.0
  */
-export const historyOf = (entries: ReadonlyArray<Entry>): Prompt.Prompt => {
-  let conversation = Prompt.empty
-  /** The conversation the latest turn starts from: up to its prompt. */
-  let turnStart = conversation
-  for (const entry of entries) {
-    switch (entry._tag) {
-      case "Joined":
-        conversation = Prompt.concat(conversation, Prompt.fromMessages(entry.conversation))
-        break
-      case "Prompted":
-        conversation = Prompt.concat(conversation, Prompt.fromMessages([entry.prompt]))
-        turnStart = conversation
-        break
-      case "Started":
-        conversation = turnStart
-        break
-      case "Step":
-        conversation = Session.recordStep(conversation, entry.step)
-        break
-      case "Interrupted":
-        break
-    }
-  }
-  return conversation
-}
+export const historyOf = (entries: ReadonlyArray<Entry>): Prompt.Prompt =>
+  entries.reduce(
+    // `turnStart` is the conversation the latest turn starts from: up to its prompt.
+    ({ conversation, turnStart }, entry) =>
+      Entry.match(entry, {
+        Joined: (joined) => ({
+          conversation: Prompt.concat(conversation, Prompt.fromMessages(joined.conversation)),
+          turnStart
+        }),
+        Prompted: ({ prompt }) => {
+          const prompted = Prompt.concat(conversation, Prompt.fromMessages([prompt]))
+          return { conversation: prompted, turnStart: prompted }
+        },
+        Started: () => ({ conversation: turnStart, turnStart }),
+        Step: ({ step }) => ({ conversation: Session.recordStep(conversation, step), turnStart }),
+        Interrupted: () => ({ conversation, turnStart })
+      }),
+    { conversation: Prompt.empty, turnStart: Prompt.empty }
+  ).conversation
 
 /** A step's text, as the parts it wrote it in, joined. */
 const textOf = (step: StreamPart.Step) =>
@@ -141,14 +136,18 @@ const textOf = (step: StreamPart.Step) =>
  * @category utils
  * @since 0.1.0
  */
-export const answerOf = (entries: ReadonlyArray<Entry>): string => {
-  let answer = ""
-  for (const entry of entries) {
-    if (entry._tag === "Prompted" || entry._tag === "Started") answer = ""
-    else if (entry._tag === "Step" && entry.step.parts.length > 0) answer = textOf(entry.step)
-  }
-  return answer
-}
+export const answerOf = (entries: ReadonlyArray<Entry>): string =>
+  entries.reduce(
+    (answer, entry) =>
+      Entry.match(entry, {
+        Joined: () => answer,
+        Prompted: () => "",
+        Started: () => "",
+        Step: ({ step }) => (step.parts.length > 0 ? textOf(step) : answer),
+        Interrupted: () => answer
+      }),
+    ""
+  )
 
 /**
  * Reads a turn's entries from its participation's log as they come: `add` each page in order,
@@ -188,44 +187,43 @@ export const reader = (turnId: Turn.Id, after: number): Reader => {
       if (ofTurn(entry.entry)) addEntry(entry)
     }
   }
-  const addEntry = ({ entry, recordedAt: at }: Recorded) => {
-    switch (entry._tag) {
-      case "Joined":
-      case "Started":
-        return
-      case "Prompted":
+  const addEntry = ({ entry, recordedAt: at }: Recorded) =>
+    Entry.match(entry, {
+      Joined: constVoid,
+      Started: constVoid,
+      Prompted: ({ messages }) => {
         lastResponse = undefined
-        items.push({ _tag: "InputTaken", at, messages: entry.messages })
-        return
-      case "Step": {
-        const text = textOf(entry.step)
+        items.push({ _tag: "InputTaken", at, messages })
+      },
+      Step: ({ id, step }) => {
+        const text = textOf(step)
         if (text === "") return
         lastResponse = items.length
         items.push({
           _tag: "Responded",
           at,
-          responseId: entry.id,
+          responseId: id,
           text,
-          parts: entry.step.parts.flatMap((part, index) => (part.type === "text" ? [index] : [])),
+          parts: step.parts.flatMap((part, index) => (part.type === "text" ? [index] : [])),
           reply: false
         })
-        return
-      }
-      case "Interrupted":
+      },
+      Interrupted: ({ reason }) => {
         lastResponse = undefined
-        items.push({ _tag: "Interrupted", at, reason: entry.reason, retryable: true })
-        return
-    }
-  }
+        items.push({ _tag: "Interrupted", at, reason, retryable: true })
+      }
+    })
   const end: Reader["end"] = (messageIds) => {
-    const response = lastResponse === undefined ? undefined : items[lastResponse]
-    if (messageIds.length > 0 && lastResponse !== undefined && response?._tag === "Responded")
+    if (messageIds.length === 0 || lastResponse === undefined) return
+    const response = items[lastResponse]
+    if (response !== undefined && Turn.LogItem.isAnyOf(["Responded"])(response)) {
       items[lastResponse] = { ...response, reply: true }
+    }
   }
   return { add, end, position: () => position, items: () => [...items] }
 }
 
-const isSameItem = Schema.toEquivalence(Turn.LogItem)
+const sameItem = Schema.toEquivalence(Turn.LogItem)
 
 /**
  * The items of `now` that `before` did not have as they are, each at its index: what a reader
@@ -240,5 +238,5 @@ export const changesSince = (
 ): ReadonlyArray<Turn.LogChange> =>
   now.flatMap((item, index) => {
     const had = before[index]
-    return had !== undefined && isSameItem(had, item) ? [] : [{ index, item }]
+    return had !== undefined && sameItem(had, item) ? [] : [{ index, item }]
   })

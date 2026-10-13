@@ -17,6 +17,7 @@ import * as Clock from "effect/Clock"
 import * as Crypto from "effect/Crypto"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Ref from "effect/Ref"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
@@ -206,11 +207,11 @@ export const makeCreateSession =
                 )
             })
           )
-          if (outcome._tag === "None" || outcome.value.type !== "session.compaction.ended") {
+          if (Option.isNone(outcome) || outcome.value.type !== "session.compaction.ended") {
             return yield* harnessError(
               new HarnessError.UnknownError({
                 description: `opencode failed to summarize the conversation${
-                  outcome._tag === "Some" && outcome.value.type === "session.compaction.failed"
+                  Option.isSome(outcome) && outcome.value.type === "session.compaction.failed"
                     ? `: ${outcome.value.data.error.message}`
                     : ""
                 }`

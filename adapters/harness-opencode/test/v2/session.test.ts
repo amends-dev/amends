@@ -322,7 +322,7 @@ layer(TestLayer)("opencode 2 sessions", (it) => {
               params: { name: "lookup_weather", arguments: { city: "Lisbon" } }
             })
             yield* Deferred.succeed(called, undefined)
-            if (reply._tag === "Events") {
+            if (HostToolRelay.Answer.$is("Events")(reply)) {
               const last = yield* Stream.runLast(reply.messages)
               yield* Deferred.succeed(answered, Option.getOrUndefined(last))
             }

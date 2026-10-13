@@ -24,6 +24,7 @@ import type { ToolSource } from "@amends-dev/toolkit"
 import * as McpSchema from "effect/ai/McpSchema"
 import type * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import type * as Redacted from "effect/Redacted"
 import type * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
@@ -478,6 +479,6 @@ const settingsFormOf = (name: string, settings: Schema.Decoder<unknown>): Settin
   const { schema } = Schema.toJsonSchemaDocument(settings)
   // The JSON Schema of an object with no keys lists no properties, which a form must.
   const form = Schema.decodeUnknownExit(SettingsForm)({ properties: {}, ...schema })
-  if (form._tag === "Success") return form.value
+  if (Exit.isSuccess(form)) return form.value
   throw new Error(`The settings of ${name} do not make a form: ${String(form.cause)}`)
 }

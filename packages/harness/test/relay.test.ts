@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Crypto, Deferred, Effect, Fiber, Redacted, type Schema, Stream } from "effect"
+import { Crypto, Deferred, Effect, Fiber, Option, Redacted, type Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { SessionId } from "../src/Agent.ts"
 import type { ToolDefinition } from "../src/Bridge.ts"
@@ -61,7 +61,7 @@ const setUp = (options?: HostToolRelay.Options) =>
 const replyTo = (relay: HostToolRelay.Relay, authorization: string | undefined, message: Schema.Json) =>
   Effect.gen(function* () {
     const answer = yield* relay.answer(authorization, message)
-    if (answer._tag !== "Reply") return yield* Effect.die(`Expected a reply, got ${answer._tag}`)
+    if (!HostToolRelay.Answer.$is("Reply")(answer)) return yield* Effect.die(`Expected a reply, got ${answer._tag}`)
     return answer.message
   })
 
@@ -69,7 +69,7 @@ const replyTo = (relay: HostToolRelay.Relay, authorization: string | undefined, 
 const eventsOf = (relay: HostToolRelay.Relay, authorization: string, message: Schema.Json) =>
   Effect.gen(function* () {
     const answer = yield* relay.answer(authorization, message)
-    if (answer._tag !== "Events") return yield* Effect.die(`Expected events, got ${answer._tag}`)
+    if (!HostToolRelay.Answer.$is("Events")(answer)) return yield* Effect.die(`Expected events, got ${answer._tag}`)
     return answer.messages
   })
 
@@ -275,7 +275,7 @@ describe("HostToolRelay", () => {
           _tag: "Some",
           value: { type: "tool-call", name: "echo", params: { text: "hello" } }
         })
-        const id = part._tag === "Some" && part.value.type === "tool-call" ? part.value.id : ""
+        const id = Option.isSome(part) && part.value.type === "tool-call" ? part.value.id : ""
         // The agent's own tool call was the relay's to make, so the part is the host's to run.
         expect(part).not.toMatchObject({ value: { providerExecuted: true } })
 
@@ -298,7 +298,7 @@ describe("HostToolRelay", () => {
         const second = yield* callAndRead(relay, authorization, parts, callOf("echo", { text: "b" }))
 
         const idOf = (read: typeof first) =>
-          read.part._tag === "Some" && read.part.value.type === "tool-call" ? read.part.value.id : ""
+          Option.isSome(read.part) && read.part.value.type === "tool-call" ? read.part.value.id : ""
 
         expect(idOf(first)).not.toBe("")
         expect(idOf(first)).not.toBe(idOf(second))
@@ -333,7 +333,7 @@ describe("HostToolRelay", () => {
         const { relay, session, authorization } = yield* setUp()
         const parts = yield* session.offerTools([echo])
         const { answered, part } = yield* callAndRead(relay, authorization, parts, callOf("echo"))
-        const id = part._tag === "Some" && part.value.type === "tool-call" ? part.value.id : ""
+        const id = Option.isSome(part) && part.value.type === "tool-call" ? part.value.id : ""
 
         yield* session.submitToolResult({ id, name: "echo", result, isFailure })
 
@@ -429,7 +429,7 @@ describe("HostToolRelay", () => {
         const other = yield* relay.open(SessionId.make("session-two"))
         const parts = yield* session.offerTools([echo])
         const { answered, part } = yield* callAndRead(relay, authorization, parts, callOf("echo"))
-        const id = part._tag === "Some" && part.value.type === "tool-call" ? part.value.id : ""
+        const id = Option.isSome(part) && part.value.type === "tool-call" ? part.value.id : ""
 
         yield* other.submitToolResult({ id, name: "echo", result: "stolen", isFailure: false })
         yield* session.submitToolResult({ id, name: "echo", result: "mine", isFailure: false })
@@ -456,7 +456,7 @@ describe("HostToolRelay", () => {
         const { relay, session, authorization } = yield* setUp()
         const parts = yield* session.offerTools([echo])
         const { answered, part } = yield* callAndRead(relay, authorization, parts, callOf("echo"))
-        const id = part._tag === "Some" && part.value.type === "tool-call" ? part.value.id : ""
+        const id = Option.isSome(part) && part.value.type === "tool-call" ? part.value.id : ""
 
         yield* relay.answer(authorization, notification("notifications/cancelled", { requestId: 8 }))
         yield* session.submitToolResult({ id, name: "echo", result: "done", isFailure: false })
@@ -472,7 +472,7 @@ describe("HostToolRelay", () => {
         const { relay, session, authorization } = yield* setUp({ heartbeat: "10 seconds" })
         const parts = yield* session.offerTools([echo])
         const { answered, part } = yield* callAndRead(relay, authorization, parts, callOf("echo", {}, "token-1"))
-        const id = part._tag === "Some" && part.value.type === "tool-call" ? part.value.id : ""
+        const id = Option.isSome(part) && part.value.type === "tool-call" ? part.value.id : ""
 
         yield* TestClock.adjust("10 seconds")
         yield* TestClock.adjust("10 seconds")
@@ -496,7 +496,7 @@ describe("HostToolRelay", () => {
         const { relay, session, authorization } = yield* setUp({ heartbeat: "10 seconds" })
         const parts = yield* session.offerTools([echo])
         const { answered, part } = yield* callAndRead(relay, authorization, parts, callOf("echo"))
-        const id = part._tag === "Some" && part.value.type === "tool-call" ? part.value.id : ""
+        const id = Option.isSome(part) && part.value.type === "tool-call" ? part.value.id : ""
 
         yield* TestClock.adjust("30 seconds")
         yield* session.submitToolResult({ id, name: "echo", result: "done", isFailure: false })
@@ -530,7 +530,7 @@ describe("HostToolRelay", () => {
         })
         const parts = yield* session.offerTools([echo])
         const { answered, part } = yield* callAndRead(relay, authorization, parts, callOf("echo", {}, "token-1"))
-        const id = part._tag === "Some" && part.value.type === "tool-call" ? part.value.id : ""
+        const id = Option.isSome(part) && part.value.type === "tool-call" ? part.value.id : ""
         const approved = yield* Deferred.make<void>()
         yield* Effect.forkChild(
           Deferred.await(approved).pipe(

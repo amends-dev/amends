@@ -1,7 +1,7 @@
 import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
-import type { Thread } from "@amends-dev/core/thread"
+import { type Thread, ThreadMessage } from "@amends-dev/core/thread"
 import type { Member } from "@amends-dev/core/workspace"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
@@ -137,7 +137,9 @@ const agentMessages = (asAlice: Client, params: { readonly threadId: Thread.Id }
   asAlice.threads.timeline({ params, query: { limit: 50 } }).pipe(
     Effect.map((timeline) =>
       timeline.flatMap((item) =>
-        "message" in item && item.message.author._tag === "Member" && item.message.author.memberId === memberId
+        "message" in item &&
+        ThreadMessage.Author.isAnyOf(["Member"])(item.message.author) &&
+        item.message.author.memberId === memberId
           ? [item.message]
           : []
       )
@@ -172,7 +174,9 @@ describe.skipIf(!available).each(Object.entries(servers))("turns on the local ho
             { role: "system", text: "Plan each change." },
             { role: "user", text: "Alice: Planner, summarize the plan." }
           ])
-          if (answer?.via?._tag !== "Turn") return yield* Effect.die("Expected an agent's reply")
+          if (answer?.via == null || !ThreadMessage.Via.isAnyOf(["Turn"])(answer.via)) {
+            return yield* Effect.die("Expected an agent's reply")
+          }
           const turn = yield* asAlice.turns.get({
             params: { turnId: answer.via.turnId }
           })

@@ -1,5 +1,6 @@
 import { Agent } from "@amends-dev/core/agent"
 import { Connection } from "@amends-dev/core/connection"
+import { CoreError } from "@amends-dev/core/error"
 import { Member, Workspace } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import type { AgentIssue, AgentsFailure, Effort } from "@amends-dev/ui/screens/agents"
@@ -144,20 +145,13 @@ export const reloadAgents = (reads: AgentsReads) =>
   })
 
 /** Why an agent can't run, as the screens word it. */
-export const issueOf = (issue: Agent.Issue): AgentIssue => {
-  switch (issue._tag) {
-    case "Removed":
-      return { kind: "removed", part: issue.part }
-    case "Uninstalled":
-      return { kind: "uninstalled", part: issue.part }
-    case "Invalid":
-      return { kind: "invalid", part: issue.part, description: issue.description }
-    case "SandboxRequired":
-      return { kind: "sandbox-required" }
-    case "NoHarness":
-      return { kind: "no-harness" }
-  }
-}
+export const issueOf = Agent.Issue.match<AgentIssue>({
+  Removed: ({ part }) => ({ kind: "removed", part }),
+  Uninstalled: ({ part }) => ({ kind: "uninstalled", part }),
+  Invalid: ({ part, description }) => ({ kind: "invalid", part, description }),
+  SandboxRequired: () => ({ kind: "sandbox-required" }),
+  NoHarness: () => ({ kind: "no-harness" })
+})
 
 const invalid = Schema.is(ApiErrors.Invalid)
 /**
@@ -165,10 +159,10 @@ const invalid = Schema.is(ApiErrors.Invalid)
  * role is not one this workspace gives.
  */
 const roleRefused = (error: unknown) =>
-  (Schema.is(ApiErrors.Denied)(error) && error.reason._tag === "OwnerRequired") ||
-  (Schema.is(ApiErrors.Conflict)(error) && error.reason._tag === "OwnerProtected") ||
+  (Schema.is(ApiErrors.Denied)(error) && CoreError.DeniedReason.isAnyOf(["OwnerRequired"])(error.reason)) ||
+  (Schema.is(ApiErrors.Conflict)(error) && CoreError.ConflictReason.isAnyOf(["OwnerProtected"])(error.reason)) ||
   (Schema.is(ApiErrors.NotFound)(error) && error.resource === "Role") ||
-  (invalid(error) && error.reason._tag === "UnsupportedRole")
+  (invalid(error) && CoreError.InvalidReason.isAnyOf(["UnsupportedRole"])(error.reason))
 
 /**
  * Why a change failed, telling apart a connection the setup names that the reader can't use, a
@@ -178,10 +172,13 @@ const roleRefused = (error: unknown) =>
 export function agentsFailure(cause: Cause.Cause<unknown>): Omit<AgentsFailure, "action"> {
   for (const reason of cause.reasons) {
     if (!Cause.isFailReason(reason)) continue
-    const refused = invalid(reason.error) ? reason.error.reason : undefined
-    if (refused?._tag === "ConnectionUnusable" && refused.part !== undefined)
-      return { error: "unavailable", part: refused.part }
-    if (refused?._tag === "Incomplete") return { error: "incomplete", issues: refused.issues.map(issueOf) }
+    if (invalid(reason.error)) {
+      const refused = reason.error.reason
+      if (CoreError.InvalidReason.isAnyOf(["ConnectionUnusable"])(refused) && refused.part !== undefined)
+        return { error: "unavailable", part: refused.part }
+      if (CoreError.InvalidReason.isAnyOf(["Incomplete"])(refused))
+        return { error: "incomplete", issues: refused.issues.map(issueOf) }
+    }
     if (roleRefused(reason.error)) return { error: "role-denied" }
   }
   return { error: workspaceFailure(cause) }

@@ -16,6 +16,7 @@ import type * as HttpClient from "effect/http/HttpClient"
 import type * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import type * as HttpClientResponse from "effect/http/HttpClientResponse"
+import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as ToolDefinition from "./ToolDefinition.ts"
@@ -155,7 +156,7 @@ export const make = Effect.fn("Http.make")(function* (options: Options) {
 
   const failToReach = (error: HttpClientError.HttpClientError) =>
     fail(
-      error.reason._tag === "TransportError"
+      Predicate.isTagged(error.reason, "TransportError")
         ? new ToolSourceError.UnavailableError({})
         : new ToolSourceError.UnknownError({ description: error.message }),
       error

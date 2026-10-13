@@ -53,7 +53,7 @@ const makeSandboxCommands = (
 const withHome = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], home: string) =>
   ChildProcessSpawner.make((command) =>
     spawner.spawn(
-      command._tag === "StandardCommand"
+      ChildProcess.isStandardCommand(command)
         ? ChildProcess.make(command.command, command.args, {
             ...command.options,
             env: { ...command.options.env, HOME: home },

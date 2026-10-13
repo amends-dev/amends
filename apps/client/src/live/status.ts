@@ -31,8 +31,8 @@ export function useLastingDown(down: Accessor<boolean>): Accessor<boolean> {
 export function useChangeFeedStatus(): Accessor<"connecting" | "reconnecting" | undefined> {
   const feed = useChangeFeed()
   const shown = useLastingDown(() => {
-    const state = feed.state()._tag
-    return state === "Connecting" || state === "Reconnecting"
+    const state = feed.state()
+    return ChangeFeedState.$is("Connecting")(state) || ChangeFeedState.$is("Reconnecting")(state)
   })
   return () => {
     if (!shown()) return undefined

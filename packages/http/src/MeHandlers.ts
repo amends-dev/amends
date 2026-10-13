@@ -12,6 +12,7 @@ import { Accounts, SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as Option from "effect/Option"
 import * as Api from "./Api.ts"
 import * as Authentication from "./Authentication.ts"
 import { requireHuman } from "./internal/human.ts"
@@ -35,7 +36,7 @@ export const layer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const person = yield* requireHuman
           const found = Array.head(yield* accounts.findByIds([person.id]))
-          if (found._tag === "None")
+          if (Option.isNone(found))
             return yield* new Authentication.Unauthorized({
               message: "No account holds this session"
             })

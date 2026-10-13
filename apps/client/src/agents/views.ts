@@ -34,9 +34,9 @@ import {
   issueOf,
   newAgentRequestKey,
   reloadAgents,
-  type Agent,
+  Agent,
   type AgentCommand,
-  type Connection,
+  Connection,
   type AgentsReads,
   type SetupInput
 } from "./api.ts"
@@ -77,7 +77,7 @@ const blankSetup: SetupDraft = {
 
 const draftOf = (view: Agent.View): SetupDraft => ({
   instructions: view.instructions,
-  harness: view.harness._tag === "Auto" ? auto : view.harness.connectionId,
+  harness: Agent.Harness.isAnyOf(["Auto"])(view.harness) ? auto : view.harness.connectionId,
   modelConnectionId: view.model.connectionId,
   model: view.model.id,
   ...(view.model.effort === undefined ? {} : { effort: view.model.effort }),
@@ -176,7 +176,7 @@ export function useAgentList(workspaceId: string) {
             id: view.id,
             memberId: view.memberId,
             name: view.name,
-            issues: view.readiness._tag === "Ready" ? [] : view.readiness.issues.map(issueOf),
+            issues: Agent.Readiness.isAnyOf(["Ready"])(view.readiness) ? [] : view.readiness.issues.map(issueOf),
             ...(activity === undefined ? {} : { activity })
           }
         })
@@ -223,7 +223,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
     const integration = integrations().get(connection.integration)
     if (!integration) return "Its integration isn’t installed on this host."
     if (!integration.provides.includes(capabilities[part])) return `${integration.name} gives no ${capabilities[part]}.`
-    if (connection.readiness._tag === "Invalid") return connection.readiness.description
+    if (Connection.Readiness.isAnyOf(["Invalid"])(connection.readiness)) return connection.readiness.description
     return undefined
   }
   const optionsFor = (part: SetupPart, current: string | undefined): ReadonlyArray<ConnectionOption> => {
@@ -286,10 +286,9 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
       memberId: view.memberId,
       name: view.name,
       instructions: view.instructions,
-      harness:
-        view.harness._tag === "Auto"
-          ? { kind: "auto" }
-          : Object.assign({ kind: "connection" as const }, connectionOf(view.harness.connectionId)),
+      harness: Agent.Harness.isAnyOf(["Auto"])(view.harness)
+        ? { kind: "auto" }
+        : Object.assign({ kind: "connection" as const }, connectionOf(view.harness.connectionId)),
       model: {
         connection: connectionOf(view.model.connectionId),
         id: view.model.id,
@@ -297,7 +296,7 @@ export function useAgents(workspaceId: string, options: { readonly done?: (done:
         ...(view.model.effort === undefined ? {} : { effort: view.model.effort })
       },
       ...(view.sandbox === null ? {} : { sandbox: connectionOf(view.sandbox.connectionId) }),
-      issues: view.readiness._tag === "Ready" ? [] : view.readiness.issues.map(issueOf),
+      issues: Agent.Readiness.isAnyOf(["Ready"])(view.readiness) ? [] : view.readiness.issues.map(issueOf),
       configurable: view.configurable,
       createdBy: memberName(members.member(view.createdBy)),
       createdAt: toDate(view.createdAt),

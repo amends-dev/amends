@@ -198,7 +198,7 @@ describe("Harness", () => {
       expect(codex.createdWith[1]?.agentState).toBeUndefined()
       expect(codex.createdWith[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true })
       expect(session.hasUnfinishedTurn).toBe(true)
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("TurnInProgressError")
+      expect(refused).toMatchObject({ _tag: "HarnessError", reason: { _tag: "TurnInProgressError" } })
       expect(codex.continued).toEqual([1])
       expect(result).toEqual(reply("codex answers slow"))
       expect((yield* session.detach).history.content).toMatchObject([
@@ -299,7 +299,7 @@ describe("Harness", () => {
       const refused = yield* Effect.flip(Stream.runCollect(resumed.continueStream({})))
 
       expect(state.unfinishedTurn?.responseFormat).toEqual({ type: "json", objectName: "Sum" })
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("NoTurnError")
+      expect(refused).toMatchObject({ _tag: "HarnessError", reason: { _tag: "NoTurnError" } })
     })
   )
 
@@ -329,7 +329,7 @@ describe("Harness", () => {
         const result = yield* session.continueGenerateObject({ schema: Sum })
         const format = codex.turns[0]?.responseFormat
 
-        expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("NoTurnError")
+        expect(refused).toMatchObject({ _tag: "HarnessError", reason: { _tag: "NoTurnError" } })
         expect(format?.type === "json" && format.objectName).toBe("Sum")
         expect(format?.type === "json" && format.schema).toBe(Sum)
         expect(result.value).toEqual({ sum: 5 })

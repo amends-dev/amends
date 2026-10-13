@@ -3,7 +3,7 @@ import { SessionId } from "@amends-dev/harness/Agent"
 import { type Sandbox, Template } from "@amends-dev/sandbox"
 import { BunServices, BunSocket } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Path, Redacted, Schedule, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Path, Redacted, Schedule, Schema, Stream } from "effect"
 import { Prompt } from "effect/ai"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { isRunning, makeBridgedAgent, makeProxy, makeSandbox } from "./fixtures.ts"
@@ -133,7 +133,7 @@ const listeningOf = (sandbox: Sandbox.Sandbox["Service"]) =>
         Effect.option
       )
     })
-    return listed.flatMap((option) => (option._tag === "Some" ? [option.value] : []))
+    return listed.flatMap((option) => (Option.isSome(option) ? [option.value] : []))
   })
 
 /** Whether a WebSocket to `port` on this machine, presenting `token`, opens. */

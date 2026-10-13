@@ -234,7 +234,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
         })
     }
     const issues = (yield* AgentReadiness.issuesOf(setup, connections, integrations)).filter(
-      (issue) => issue._tag !== "NoHarness"
+      (issue) => !Agent.Issue.isAnyOf(["NoHarness"])(issue)
     )
     if (Array.isReadonlyArrayNonEmpty(issues))
       return yield* new CoreError.Invalid({ reason: new CoreError.Incomplete({ issues }) })

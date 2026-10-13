@@ -27,7 +27,8 @@ import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as PlatformError from "effect/PlatformError"
-import type * as ChildProcess from "effect/process/ChildProcess"
+import * as Predicate from "effect/Predicate"
+import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Ref from "effect/Ref"
 import * as Schedule from "effect/Schedule"
@@ -44,6 +45,8 @@ type Status = Data.TaggedEnum<{
   Ended: {}
 }>
 const Status = Data.taggedEnum<Status>()
+
+const isRunning = Status.$is("Running")
 
 /** Polls a process's status quickly at first, then once a second while it runs long. */
 const untilExit = Schedule.min([Schedule.exponential("50 millis"), Schedule.spaced("1 second")])
@@ -128,7 +131,7 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
       Effect.catch((error) => statusAfterFailure(sandbox, error))
     )
     const awaitExit = Effect.repeat(readStatus, {
-      until: (status) => status._tag !== "Running",
+      until: (status) => !isRunning(status),
       schedule: untilExit
     })
 
@@ -162,9 +165,9 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
           }
           if (ended) return [[], Option.none()] as const
           const status = yield* readStatus
-          if (status._tag === "Running") yield* Effect.sleep(delayAfter(idle))
+          if (isRunning(status)) yield* Effect.sleep(delayAfter(idle))
           // A process that has ended wrote all it will, which one more read finds.
-          return [[], Option.some({ offset, idle: idle + 1, ended: status._tag !== "Running" })] as const
+          return [[], Option.some({ offset, idle: idle + 1, ended: !isRunning(status) })] as const
         })
       )
 
@@ -183,7 +186,7 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
     return ChildProcessSpawner.makeHandle({
       pid: ChildProcessSpawner.ProcessId(yield* Ref.modify(lastPid, (last) => [last + 1, last + 1])),
       exitCode: Effect.flatMap(awaitExit, (status) =>
-        status._tag === "Exited"
+        Status.$is("Exited")(status)
           ? Effect.succeed(ChildProcessSpawner.ExitCode(status.exitCode))
           : Effect.fail(
               PlatformError.systemError({
@@ -194,15 +197,12 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
               })
             )
       ),
-      isRunning: Effect.map(readStatus, (status) => status._tag === "Running"),
+      isRunning: Effect.map(readStatus, isRunning),
       // Deleting the session sends SIGTERM to the process and its children, then SIGKILL,
       // whatever signal is asked for.
       kill: () =>
         callPlatform("ChildProcess", "kill", () => sandbox.process.deleteSession(session)).pipe(
-          Effect.catchIf(
-            (error) => error.reason._tag === "NotFound",
-            () => Effect.void
-          )
+          Effect.catchReason("PlatformError", "NotFound", () => Effect.void)
         ),
       stdin,
       stdout,
@@ -246,7 +246,7 @@ const sendLines = (send: (lines: string) => Effect.Effect<void, PlatformError.Pl
  * processes.
  */
 const statusAfterFailure = (sandbox: DaytonaSandbox, error: PlatformError.PlatformError) =>
-  error.reason._tag === "NotFound"
+  Predicate.isTagged(error.reason, "NotFound")
     ? Effect.succeed(Status.Ended())
     : Effect.tryPromise(() => sandbox.refreshData()).pipe(
         Effect.map(() => sandbox.state === "started"),
@@ -256,7 +256,7 @@ const statusAfterFailure = (sandbox: DaytonaSandbox, error: PlatformError.Platfo
 
 /** Why Daytona cannot run `command` as asked, or `undefined` when it can. */
 const unsupportedOption = (command: ChildProcess.Command): string | undefined => {
-  if (command._tag === "PipedCommand") {
+  if (ChildProcess.isPipedCommand(command)) {
     const { from = "stdout", to = "stdin" } = command.options
     if (from.startsWith("fd") || to !== "stdin") {
       return "A Daytona sandbox pipes only stdout, stderr, or both into stdin"
@@ -284,7 +284,7 @@ const commandLine = (
   workingDirectory: string,
   environmentScripts: ReadonlyMap<ChildProcess.StandardCommand, string>
 ): string => {
-  if (command._tag === "PipedCommand") {
+  if (ChildProcess.isPipedCommand(command)) {
     const from = command.options.from ?? "stdout"
     const redirect = from === "stdout" ? "" : from === "all" ? " 2>&1" : " 2>&1 >/dev/null"
     const left = commandLine(command.left, workingDirectory, environmentScripts)
@@ -309,7 +309,7 @@ const commandLine = (
 
 /** The commands `command` runs, in order: itself, or each command of its pipe. */
 const standardCommandsOf = (command: ChildProcess.Command): ReadonlyArray<ChildProcess.StandardCommand> =>
-  command._tag === "PipedCommand"
+  ChildProcess.isPipedCommand(command)
     ? [...standardCommandsOf(command.left), ...standardCommandsOf(command.right)]
     : [command]
 
@@ -328,7 +328,7 @@ const environmentScriptOf = (command: ChildProcess.StandardCommand) => {
 
 /** The input of the first command `command` runs. */
 const stdinOf = (command: ChildProcess.Command): ChildProcess.CommandInput => {
-  if (command._tag === "PipedCommand") return stdinOf(command.left)
+  if (ChildProcess.isPipedCommand(command)) return stdinOf(command.left)
   const { stdin } = command.options
   if (stdin === undefined) return "pipe"
   return typeof stdin === "string" || Stream.isStream(stdin) ? stdin : stdin.stream
@@ -350,7 +350,7 @@ const outputStreamOf = (
   output: "stdout" | "stderr",
   stream: () => Stream.Stream<Uint8Array, PlatformError.PlatformError>
 ): Stream.Stream<Uint8Array, PlatformError.PlatformError> => {
-  if (command._tag === "PipedCommand") return outputStreamOf(command.right, output, stream)
+  if (ChildProcess.isPipedCommand(command)) return outputStreamOf(command.right, output, stream)
   const option = outputOptionOf(command.options[output])
   if (option === "ignore") return Stream.empty
   return Sink.isSink(option) ? Stream.transduce(stream(), option) : stream()

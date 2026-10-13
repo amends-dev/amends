@@ -64,10 +64,7 @@ export const findSnapshot = Effect.fn("DaytonaSandboxProvider.findSnapshot")(fun
   const name = yield* snapshotNameOf(template, base)
   const state = yield* call(() => daytona.snapshot.get(name)).pipe(
     Effect.map((snapshot) => Option.some(snapshot.state)),
-    Effect.catchIf(
-      (error) => error.reason._tag === "NotFoundError",
-      () => Effect.succeedNone
-    )
+    Effect.catchReason("SandboxError", "NotFoundError", () => Effect.succeedNone)
   )
   const next = nextStepOf(state)
   if (next === "Use") return Option.some(name)

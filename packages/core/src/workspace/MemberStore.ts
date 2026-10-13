@@ -118,10 +118,10 @@ export const make = (workspaceId: WorkspaceId.Id, driver: MemberStore["Service"]
 
 const rows = MemoryDatabase.makeRows(Schema.fromJsonString(Member.Member))
 
+const sameMember = Schema.toEquivalence(Identity.MemberReference)
+
 const isActive = (member: Member.Member, identity: Identity.MemberReference) =>
-  member.status === "active" &&
-  Identity.MemberReference.isAnyOf([identity._tag])(member.identity) &&
-  member.identity.id === identity.id
+  member.status === "active" && sameMember(member.identity, identity)
 
 /**
  * Memberships, active and removed; one active membership per identity.

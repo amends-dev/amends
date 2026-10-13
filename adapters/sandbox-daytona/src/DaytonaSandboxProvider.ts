@@ -218,12 +218,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           call(() => sandbox.refreshData()),
           () => (deletedStates.has(sandbox.state ?? "") ? Effect.void : call(() => sandbox.delete()))
         )
-      ).pipe(
-        Effect.catchIf(
-          (error) => error.reason._tag === "NotFoundError",
-          () => Effect.void
-        )
-      ),
+      ).pipe(Effect.catchReason("SandboxError", "NotFoundError", () => Effect.void)),
       // Daytona applies the settings a moment after it answers, and lifts a full block before an
       // allow list takes over.
       setNetworkPolicy: (policy) =>
@@ -260,7 +255,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           : fromDaytonaError(error)
     }).pipe(
       Effect.tapError((error) =>
-        error.reason._tag === "AlreadyExistsError"
+        SandboxError.SandboxErrorReason.isAnyOf(["AlreadyExistsError"])(error.reason)
           ? Effect.void
           : call(() => daytona.get(name)).pipe(
               Effect.flatMap((sandbox) => call(() => sandbox.delete())),
@@ -290,7 +285,9 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       (sandbox) => Effect.ignore(call(() => sandbox.delete()))
     ).pipe(
       Effect.catchIf(
-        (error) => error instanceof SandboxError.SandboxError && error.reason._tag === "AlreadyExistsError",
+        (error) =>
+          Schema.is(SandboxError.SandboxError)(error) &&
+          SandboxError.SandboxErrorReason.isAnyOf(["AlreadyExistsError"])(error.reason),
         () => Effect.succeed(false)
       )
     )
@@ -406,31 +403,26 @@ const portsOf = (labels: Readonly<Record<string, string>>): ReadonlyArray<Networ
  * leaves out, so each policy sets all three, and a list that allows nothing blocks everything.
  * Daytona allows either hosts or CIDR ranges, and denies none.
  */
-const networkSettingsOf = (policy: Network.NetworkPolicy) => {
-  switch (policy._tag) {
-    case "AllowAll":
-      return Effect.succeed({ networkBlockAll: false, domainAllowList: "", networkAllowList: "" })
-    case "DenyAll":
-      return Effect.succeed({ networkBlockAll: true, domainAllowList: "", networkAllowList: "" })
-    case "AllowList": {
-      const { allowedHosts, allowedCidrs, deniedCidrs } = policy
-      if (deniedCidrs.length > 0 || (allowedHosts.length > 0 && allowedCidrs.length > 0)) {
-        return Effect.fail(
-          sandboxError(
-            new SandboxError.UnsupportedError({
-              description: "Daytona allows either hosts or CIDR ranges, and denies none"
-            })
-          )
+const networkSettingsOf = Network.NetworkPolicy.match({
+  AllowAll: () => Effect.succeed({ networkBlockAll: false, domainAllowList: "", networkAllowList: "" }),
+  DenyAll: () => Effect.succeed({ networkBlockAll: true, domainAllowList: "", networkAllowList: "" }),
+  AllowList: ({ allowedHosts, allowedCidrs, deniedCidrs }) => {
+    if (deniedCidrs.length > 0 || (allowedHosts.length > 0 && allowedCidrs.length > 0)) {
+      return Effect.fail(
+        sandboxError(
+          new SandboxError.UnsupportedError({
+            description: "Daytona allows either hosts or CIDR ranges, and denies none"
+          })
         )
-      }
-      return Effect.succeed({
-        networkBlockAll: allowedHosts.length === 0 && allowedCidrs.length === 0,
-        domainAllowList: allowedHosts.join(","),
-        networkAllowList: allowedCidrs.join(",")
-      })
+      )
     }
+    return Effect.succeed({
+      networkBlockAll: allowedHosts.length === 0 && allowedCidrs.length === 0,
+      domainAllowList: allowedHosts.join(","),
+      networkAllowList: allowedCidrs.join(",")
+    })
   }
-}
+})
 
 /**
  * Retries a change to a sandbox that Daytona refused because another change to it was in progress,

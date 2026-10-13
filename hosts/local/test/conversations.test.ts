@@ -2,8 +2,7 @@ import { BuiltinRoles } from "@amends-dev/core/authorization"
 import { Group } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { Request } from "@amends-dev/core/request"
-import { ThreadParticipation } from "@amends-dev/core/thread"
-import type { ThreadTimeline } from "@amends-dev/core/thread"
+import { ThreadMessage, ThreadParticipation, type ThreadTimeline } from "@amends-dev/core/thread"
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Redacted } from "effect"
@@ -51,7 +50,9 @@ const workspaceWithBob = Effect.gen(function* () {
 })
 const texts = (items: ReadonlyArray<ThreadTimeline.Item>) =>
   items.flatMap((item) =>
-    "message" in item && item.message.content._tag === "Text" ? [item.message.content.text] : []
+    "message" in item && ThreadMessage.Content.isAnyOf(["Text"])(item.message.content)
+      ? [item.message.content.text]
+      : []
   )
 const { available, withDatabase } = setup()
 describe.skipIf(!available)("PostgreSQL", () => {

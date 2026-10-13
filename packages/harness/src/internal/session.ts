@@ -54,6 +54,11 @@ type Status = Data.TaggedEnum<{
 
 const Status = Data.taggedEnum<Status>()
 
+const isUnfinished = Status.$is("Unfinished")
+const isRunning = Status.$is("Running")
+const isCompacting = Status.$is("Compacting")
+const isReleased = Status.$is("Released")
+
 /** A turn a session is running, as far as its stream has delivered it. */
 interface RunningTurn {
   readonly prompt: Prompt.UserMessage
@@ -80,7 +85,7 @@ type Operation = "stream" | "approve" | "compact" | Continue | Release
 const refusal = ({ status, releasing }: State, operation: Operation): HarnessError.HarnessErrorReason | undefined => {
   // A session can be destroyed at any time, also once released, or while it is.
   if (operation === "destroy") return undefined
-  if (status._tag === "Released") return new HarnessError.SessionReleasedError({})
+  if (isReleased(status)) return new HarnessError.SessionReleasedError({})
   if (releasing !== undefined) {
     return new HarnessError.SessionReleasedError({
       description: `The session is being released by ${releasing}`
@@ -89,18 +94,18 @@ const refusal = ({ status, releasing }: State, operation: Operation): HarnessErr
   switch (operation) {
     case "stream":
     case "compact":
-      if (status._tag === "Unfinished") {
+      if (isUnfinished(status)) {
         return new HarnessError.TurnInProgressError({
           description: "The session has an unfinished turn, which a continue operation finishes"
         })
       }
-      if (status._tag === "Compacting") return compactingError()
-      return status._tag === "Running" ? new HarnessError.TurnInProgressError({}) : undefined
+      if (isCompacting(status)) return compactingError()
+      return isRunning(status) ? new HarnessError.TurnInProgressError({}) : undefined
     case "continueStream":
     case "continueGenerate":
     case "continueGenerateObject": {
-      if (status._tag === "Running") return new HarnessError.TurnInProgressError({})
-      if (status._tag !== "Unfinished") {
+      if (isRunning(status)) return new HarnessError.TurnInProgressError({})
+      if (!isUnfinished(status)) {
         return new HarnessError.NoTurnError({ description: "The session has no unfinished turn" })
       }
       // A turn is finished the way it answers: whole and decoded for JSON, otherwise as text.
@@ -115,12 +120,12 @@ const refusal = ({ status, releasing }: State, operation: Operation): HarnessErr
       })
     }
     case "suspendTurn":
-      return status._tag === "Running"
+      return isRunning(status)
         ? undefined
         : new HarnessError.NoTurnError({ description: "The session is not running a turn" })
     case "detach":
-      if (status._tag === "Compacting") return compactingError()
-      return status._tag === "Running"
+      if (isCompacting(status)) return compactingError()
+      return isRunning(status)
         ? new HarnessError.TurnInProgressError({
             description: "A running turn must be suspended before the session detaches"
           })
@@ -142,7 +147,7 @@ const compactingError = () =>
  * ends to the turn's steps, and the turn's `finish` adds the turn to the conversation.
  */
 const deliver = (state: State, part: StreamPart.StreamPart): [boolean, State] => {
-  if (state.status._tag !== "Running") return [false, state]
+  if (!isRunning(state.status)) return [false, state]
   const { turn } = state.status
   if (part.type === "finish") {
     const history = withTurn(state.history, turn.prompt, stepsSoFar(turn))
@@ -159,8 +164,7 @@ const deliver = (state: State, part: StreamPart.StreamPart): [boolean, State] =>
 
 /** Whether `stop` or `destroy` aborted the turn a session ran, before its `finish`. */
 const wasAborted = ({ status, releasing }: State) =>
-  (status._tag === "Running" && (releasing === "stop" || releasing === "destroy")) ||
-  (status._tag === "Released" && status.abortedTurn)
+  (isRunning(status) && (releasing === "stop" || releasing === "destroy")) || (isReleased(status) && status.abortedTurn)
 
 /** How the stream of a turn `stop` or `destroy` aborted ends: as a turn that failed. */
 const abortedEnding: ReadonlyArray<StreamPart.StreamPart> = [
@@ -189,7 +193,7 @@ const stepsSoFar = (turn: RunningTurn) => [...turn.steps, ...StreamPart.stepsOf(
  * has not read to its end yet may be missing.
  */
 const recordedConversation = ({ status, history }: State): ReadonlyArray<Prompt.Message> =>
-  (status._tag === "Running" ? withTurn(history, status.turn.prompt, status.turn.steps) : history).content
+  (isRunning(status) ? withTurn(history, status.turn.prompt, status.turn.steps) : history).content
 
 /** Makes the session `Harness.createSession` hands out, over an agent session it started. */
 export const makeSession = Effect.fn("Session.make")(function* (options: {
@@ -265,7 +269,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       ),
       Stream.ensuring(
         Ref.update(state, (current) =>
-          current.status._tag === "Running" && current.releasing === undefined
+          isRunning(current.status) && current.releasing === undefined
             ? {
                 ...current,
                 status: Status.Idle(),
@@ -360,7 +364,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         const { status } = current
         const reason = refusal(current, operation)
         // `refusal` lets the session continue only an unfinished turn.
-        if (reason !== undefined || status._tag !== "Unfinished") {
+        if (reason !== undefined || !isUnfinished(status)) {
           return [Effect.fail(harnessError(reason ?? new HarnessError.NoTurnError({}))), current]
         }
         const turn = {
@@ -410,13 +414,11 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       })
     )
     const compaction = yield* Effect.onError(agentSession.compact(instructions), () =>
-      Ref.update(state, (current) =>
-        current.status._tag === "Compacting" ? { ...current, status: Status.Idle() } : current
-      )
+      Ref.update(state, (current) => (isCompacting(current.status) ? { ...current, status: Status.Idle() } : current))
     )
     // A compaction between turns is recorded as a step that only compacts.
     yield* Ref.update(state, (current) =>
-      current.status._tag === "Compacting"
+      isCompacting(current.status)
         ? {
             ...current,
             status: Status.Idle(),
@@ -442,7 +444,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         const reason = refusal(current, operation)
         if (reason !== undefined) return [Effect.fail(harnessError(reason)), current]
         // `destroy` also runs once the session is released, or while it is.
-        const holds = current.status._tag !== "Released" && current.releasing === undefined
+        const holds = !isReleased(current.status) && current.releasing === undefined
         return [Effect.void, holds ? { ...current, releasing: operation } : current]
       })
     )
@@ -520,29 +522,28 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     suspendTurn: Effect.gen(function* () {
       const [agentState, { status, history }] = yield* release("suspendTurn", agentSession.suspendTurn)
       // A turn that finished while the agent released it is in the conversation already.
-      const unfinishedTurn =
-        status._tag === "Running"
-          ? {
-              prompt: status.turn.prompt,
-              responseFormat: status.turn.responseFormat,
-              steps: status.turn.steps,
-              agentState
-            }
-          : undefined
+      const unfinishedTurn = isRunning(status)
+        ? {
+            prompt: status.turn.prompt,
+            responseFormat: status.turn.responseFormat,
+            steps: status.turn.steps,
+            agentState
+          }
+        : undefined
       return savedState(history, undefined, unfinishedTurn)
     }),
 
     detach: Effect.gen(function* () {
       const [agentState, { status, history }] = yield* release("detach", agentSession.detach)
-      return savedState(history, agentState, status._tag === "Unfinished" ? status.turn : undefined)
+      return savedState(history, agentState, isUnfinished(status) ? status.turn : undefined)
     }),
 
     stop: Effect.gen(function* () {
       const [agentState, { status, history }] = yield* release("stop", agentSession.stop)
       return savedState(
-        status._tag === "Running" ? withEndedTurn(history, status.turn) : history,
+        isRunning(status) ? withEndedTurn(history, status.turn) : history,
         agentState,
-        status._tag === "Unfinished" ? status.turn : undefined
+        isUnfinished(status) ? status.turn : undefined
       )
     }),
 

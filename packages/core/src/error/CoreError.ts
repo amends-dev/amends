@@ -808,20 +808,13 @@ export class Keyless extends Schema.TaggedError<Keyless>()("Keyless", {
   }
 }
 
-const describeIssue = (issue: Agent.Issue): string => {
-  switch (issue._tag) {
-    case "Removed":
-      return `The connection for the agent's ${issue.part} was removed.`
-    case "Uninstalled":
-      return `The integration of the agent's ${issue.part} connection is not installed here.`
-    case "Invalid":
-      return issue.description
-    case "SandboxRequired":
-      return "The agent's harness works only in a sandbox, and the agent has none."
-    case "NoHarness":
-      return "No connection gives a harness the agent can run on."
-  }
-}
+const describeIssue = Agent.Issue.match({
+  Removed: ({ part }) => `The connection for the agent's ${part} was removed.`,
+  Uninstalled: ({ part }) => `The integration of the agent's ${part} connection is not installed here.`,
+  Invalid: ({ description }) => description,
+  SandboxRequired: () => "The agent's harness works only in a sandbox, and the agent has none.",
+  NoHarness: () => "No connection gives a harness the agent can run on."
+})
 
 /**
  * The agent cannot run as it would be set up, for the issues its readiness reports.

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Redacted, Schema } from "effect"
+import { Exit, Redacted, Schema } from "effect"
 import * as Connection from "../../src/connection/Connection.ts"
 
 const accepts = (schema: Schema.Decoder<unknown>, value: unknown) =>
-  Schema.decodeUnknownExit(schema)(value)._tag === "Success"
+  Exit.isSuccess(Schema.decodeUnknownExit(schema)(value))
 
 const create = (fields: Record<string, unknown> = {}) => ({
   integration: "anthropic",

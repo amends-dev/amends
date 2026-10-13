@@ -22,6 +22,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
+import * as Match from "effect/Match"
 import * as Path from "effect/Path"
 import type * as PlatformError from "effect/PlatformError"
 import * as ChildProcess from "effect/process/ChildProcess"
@@ -257,7 +258,7 @@ export const layer = (options: Options) => Layer.effect(SandboxProvider.SandboxP
  * without one starts.
  */
 const resolveCwd = (path: Path.Path, workingDirectory: string, command: ChildProcess.Command): ChildProcess.Command =>
-  command._tag === "StandardCommand"
+  ChildProcess.isStandardCommand(command)
     ? ChildProcess.setCwd(command, path.resolve(workingDirectory, command.options.cwd ?? "."))
     : ChildProcess.pipeTo(
         resolveCwd(path, workingDirectory, command.left),
@@ -278,7 +279,7 @@ const endProcesses = (running: Set<ChildProcessSpawner.ChildProcessHandle>) =>
 
 /** Succeeds for `AllowAll` only, the network a local sandbox has, as it shares this machine's. */
 const allowAllOnly = (policy: Network.NetworkPolicy) =>
-  policy._tag === "AllowAll"
+  Network.NetworkPolicy.isAnyOf(["AllowAll"])(policy)
     ? Effect.void
     : Effect.fail(
         sandboxError(
@@ -294,13 +295,9 @@ const sandboxError = (reason: SandboxError.SandboxErrorReason, cause?: unknown) 
 const fromPlatformError = (error: PlatformError.PlatformError) => sandboxError(reasonOf(error), error)
 
 /** The sandbox error reason a failure of this machine's file system or processes amounts to. */
-const reasonOf = (error: PlatformError.PlatformError): SandboxError.SandboxErrorReason => {
-  switch (error.reason._tag) {
-    case "NotFound":
-      return new SandboxError.NotFoundError({})
-    case "AlreadyExists":
-      return new SandboxError.AlreadyExistsError({})
-    default:
-      return new SandboxError.UnknownError({ description: error.message })
-  }
-}
+const reasonOf = (error: PlatformError.PlatformError): SandboxError.SandboxErrorReason =>
+  Match.value(error.reason).pipe(
+    Match.tag("NotFound", () => new SandboxError.NotFoundError({})),
+    Match.tag("AlreadyExists", () => new SandboxError.AlreadyExistsError({})),
+    Match.orElse(() => new SandboxError.UnknownError({ description: error.message }))
+  )

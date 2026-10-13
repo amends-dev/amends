@@ -2,6 +2,7 @@ import { Network } from "@amends-dev/sandbox"
 import { BunHttpServer } from "@effect/platform-bun"
 import { Effect, Fiber, Schema, Stream, SubscriptionRef } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
+import { NetAddress } from "effect/net"
 import { SessionEvent } from "../../src/internal/bridge/v2/Event.ts"
 import { tokens } from "../fixtures.ts"
 
@@ -401,7 +402,7 @@ export const makeFakeOpencode = (runTurn: (turn: FakeTurn) => Effect.Effect<void
         )
       )
     )
-    if (server.address._tag === "UnixPathAddress") {
+    if (NetAddress.isUnixPathAddress(server.address)) {
       return yield* Effect.die("The fake server listens on no port")
     }
 

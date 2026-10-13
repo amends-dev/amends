@@ -85,6 +85,7 @@ export class WorkspaceDirectory extends Context.Service<
 
 const workspaceRows = MemoryDatabase.makeRows(Schema.fromJsonString(Workspace.Workspace))
 const memberRows = MemoryDatabase.makeRows(Schema.fromJsonString(Member.Member))
+const sameMember = Schema.toEquivalence(Identity.MemberReference)
 const invitationRows = MemoryDatabase.makeRows(Schema.fromJsonString(Invitation.Invitation))
 
 /**
@@ -109,7 +110,7 @@ const makeMemory = Effect.fn("WorkspaceDirectory.makeMemory")(function* () {
       const activeMemberCount = all.filter((member) => member.status === "active").length
       if (Option.isSome(workspace))
         for (const member of all.toSorted((left, right) => MemoryDatabase.compareBinary(left.id, right.id)))
-          if (Identity.MemberReference.isAnyOf([identity._tag])(member.identity) && member.identity.id === identity.id)
+          if (sameMember(member.identity, identity))
             memberships.push({ workspace: workspace.value, member, activeMemberCount })
       if (!Identity.MemberReference.isAnyOf(["Human"])(identity)) continue
       const issued = yield* invitationRows.all(space.records.of("invitations"))

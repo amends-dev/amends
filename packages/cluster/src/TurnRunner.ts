@@ -324,7 +324,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
   const runTurn = Effect.fnUntraced(
     function* (turnId: Turn.Id, stop: Deferred.Deferred<void>) {
       const start = yield* inWorkspace(TurnExecution.TurnExecution.use((turnExecution) => turnExecution.start(turnId)))
-      if (start._tag === "Idle") return
+      if (TurnExecution.Start.isAnyOf(["Idle"])(start)) return
       const writer = yield* inWorkspace(SessionLogWriter.open(start))
       const startedSession = yield* Ref.make<TurnAgent.Started | undefined>(undefined)
       const progress = yield* Ref.make(initialProgress)

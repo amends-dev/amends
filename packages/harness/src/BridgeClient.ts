@@ -41,6 +41,7 @@ import * as Hex from "effect/encoding/Hex"
 import * as Exit from "effect/Exit"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as RcRef from "effect/RcRef"
@@ -242,7 +243,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 
   /** Releases a connection that dropped, for the next request to open another. */
   const forgetDropped = (error: HarnessError.HarnessError | RpcClientError.RpcClientError) =>
-    error._tag === "RpcClientError" ? RcRef.invalidate(connection) : Effect.void
+    Predicate.isTagged(error, "RpcClientError") ? RcRef.invalidate(connection) : Effect.void
 
   /** Sends a request over the connection, releasing the connection if it dropped. */
   const sendOver = <A>(
@@ -578,10 +579,9 @@ const endpointOf = (agent: string, sandbox: Sandbox.Sandbox["Service"], port: Ne
       (error) =>
         new HarnessError.HarnessError({
           agent,
-          reason:
-            error.reason._tag === "UnavailableError"
-              ? new HarnessError.UnavailableError({ description: error.message })
-              : new HarnessError.UnknownError({ description: error.message }),
+          reason: error.isRetryable
+            ? new HarnessError.UnavailableError({ description: error.message })
+            : new HarnessError.UnknownError({ description: error.message }),
           cause: error
         })
     )
@@ -691,15 +691,15 @@ const launch = Effect.fnUntraced(
 const whileReconnecting = Schedule.spaced("100 millis").pipe(
   Schedule.upTo({ duration: "30 seconds" }),
   Schedule.setInputType<HarnessError.HarnessError | RpcClientError.RpcClientError>(),
-  Schedule.tap(({ input }) => (input._tag === "RpcClientError" ? Effect.void : Effect.fail(input)))
+  Schedule.tap(({ input }) => (Predicate.isTagged(input, "RpcClientError") ? Effect.void : Effect.fail(input)))
 )
 
 /** Whether a request failed because the bridge does not have the turn, as after it died. */
 const isLostTurn = (error: HarnessError.HarnessError | RpcClientError.RpcClientError) =>
-  error._tag === "HarnessError" && error.reason._tag === "NoTurnError"
+  Predicate.isTagged(error, "HarnessError") && HarnessError.HarnessErrorReason.isAnyOf(["NoTurnError"])(error.reason)
 
 const fromRequestError = (agent: string, error: HarnessError.HarnessError | RpcClientError.RpcClientError) =>
-  error._tag === "HarnessError"
+  Predicate.isTagged(error, "HarnessError")
     ? error
     : new HarnessError.HarnessError({
         agent,

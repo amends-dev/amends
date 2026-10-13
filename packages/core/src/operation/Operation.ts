@@ -66,7 +66,7 @@ const isUnregistered = Schema.is(Projection.Unregistered)
  */
 export const classify = (error: unknown): CoreError.CoreError | undefined => {
   if (isCoreError(error)) return error
-  if (StoreError.isStoreError(error) && error.reason._tag === "Contended")
+  if (StoreError.isStoreError(error) && StoreError.Reason.isAnyOf(["Contended"])(error.reason))
     return new CoreError.Unavailable({
       reason: new CoreError.Contention({
         operation: error.operation,

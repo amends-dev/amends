@@ -119,16 +119,12 @@ export type Change = typeof Change.Type
  * @category utils
  * @since 0.1.0
  */
-export const valueOf = (task: Task, change: Change): Change["from"] => {
-  switch (change._tag) {
-    case "Status":
-      return task.status
-    case "Assignee":
-      return task.assignee
-    case "Priority":
-      return task.priority
-  }
-}
+export const valueOf = (task: Task, change: Change): Change["from"] =>
+  Change.match(change, {
+    Status: (): Change["from"] => task.status,
+    Assignee: (): Change["from"] => task.assignee,
+    Priority: (): Change["from"] => task.priority
+  })
 
 /**
  * The task with a change applied.

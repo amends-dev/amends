@@ -37,6 +37,7 @@ import * as HttpRouter from "effect/http/HttpRouter"
 import * as HttpServer from "effect/http/HttpServer"
 import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import * as Layer from "effect/Layer"
+import * as NetAddress from "effect/net/NetAddress"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Redacted from "effect/Redacted"
@@ -166,7 +167,7 @@ export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options
     )
   )
   const { address } = yield* HttpServer.HttpServer
-  if (address._tag === "UnixPathAddress") {
+  if (NetAddress.isUnixPathAddress(address)) {
     return yield* Effect.die(new Error("A bridge listens on a port, not on a Unix socket"))
   }
   const port = Network.Port.make(address.port)
@@ -274,6 +275,9 @@ type TurnStart = Data.TaggedEnum<{
 }>
 
 const TurnStart = Data.taggedEnum<TurnStart>()
+
+const isStarted = TurnStart.$is("Started")
+const isContinue = TurnStart.$is("Continue")
 
 /** What the bridge prompts an agent with to continue a turn it aborted. */
 const continuePrompt = Prompt.makeMessage("user", {
@@ -425,7 +429,7 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
     const previous = started.turn?.id === id ? started.turn : yield* readTurnFile(id, turnFile(session, id))
     if (previous === undefined) return TurnStart.New()
     const { end } = yield* SubscriptionRef.get(previous.progress)
-    if (end?._tag !== "Aborted") return TurnStart.Started({ turn: previous })
+    if (end === undefined || !TurnEnd.isAnyOf(["Aborted"])(end)) return TurnStart.Started({ turn: previous })
     return started.driverSession.keptConversation
       ? TurnStart.Continue({ parts: finishedStepsOf(previous.parts) })
       : TurnStart.New()
@@ -446,8 +450,8 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
           if (unfinishedTurn === undefined) return { hasUnfinishedTurn: false, agentState: state }
           const turnStart = yield* turnStartOf(session, started, unfinishedTurn)
           // A bridge started again has a turn that ended before it exited only in the turn's file.
-          if (turnStart._tag === "Started") started.turn = turnStart.turn
-          return { hasUnfinishedTurn: turnStart._tag !== "New", agentState: state }
+          if (isStarted(turnStart)) started.turn = turnStart.turn
+          return { hasUnfinishedTurn: !TurnStart.$is("New")(turnStart), agentState: state }
         })
       ),
 
@@ -457,7 +461,7 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
         Effect.gen(function* () {
           const started = yield* startedSession(session)
           const turnStart = yield* turnStartOf(session, started, id)
-          if (turnStart._tag === "Started") {
+          if (isStarted(turnStart)) {
             started.turn = turnStart.turn
             return
           }
@@ -467,7 +471,7 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
             yield* abortTurn(started)
           }
           // A session keeps only its latest turn; a turn it continues keeps the steps it finished.
-          const kept = turnStart._tag === "Continue" ? turnStart.parts : []
+          const kept = isContinue(turnStart) ? turnStart.parts : []
           const directory = sessionDirectory(session)
           const file = turnFile(session, id)
           yield* fs.remove(directory, { recursive: true, force: true })
@@ -478,7 +482,7 @@ const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options
             parts: [...kept],
             progress: yield* SubscriptionRef.make<Progress>({ count: kept.length })
           }
-          const turnOptions = turnStart._tag === "Continue" ? { ...options, prompt: continuePrompt } : options
+          const turnOptions = isContinue(turnStart) ? { ...options, prompt: continuePrompt } : options
           const fiber = yield* Effect.forkIn(runTurn(started.driverSession, turn, turnOptions, file), started.scope)
           started.turn = turn
           started.fiber = fiber
@@ -555,7 +559,7 @@ const readTurn = (turn: Turn, after: number): Stream.Stream<Bridge.NumberedPart,
     Stream.concat(
       Stream.unwrap(
         Effect.map(SubscriptionRef.get(turn.progress), ({ end }) =>
-          end?._tag === "Failed" ? Stream.fail(end.error) : Stream.empty
+          end !== undefined && TurnEnd.isAnyOf(["Failed"])(end) ? Stream.fail(end.error) : Stream.empty
         )
       )
     )

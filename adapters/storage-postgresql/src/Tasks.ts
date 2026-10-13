@@ -46,19 +46,14 @@ const creatorColumns = (
     : { createdByKind: "Contact", createdByMemberId: null, createdByContactId: creator.contactId }
 const toRecords = (rows: ReadonlyArray<Row>) => decodeRows(rows.map(toRecord))
 /** The column a change writes, what it writes there, and the row it expects to find. */
-const changeColumns = (change: Task.Change): { readonly set: Partial<Insert>; readonly where: SQL } => {
-  switch (change._tag) {
-    case "Status":
-      return { set: { status: change.to }, where: eq(tasks.status, change.from) }
-    case "Priority":
-      return { set: { priority: change.to }, where: eq(tasks.priority, change.from) }
-    case "Assignee":
-      return {
-        set: { assignee: change.to },
-        where: change.from === null ? isNull(tasks.assignee) : eq(tasks.assignee, change.from)
-      }
-  }
-}
+const changeColumns = Task.Change.match<{ readonly set: Partial<Insert>; readonly where: SQL }>({
+  Status: ({ from, to }) => ({ set: { status: to }, where: eq(tasks.status, from) }),
+  Priority: ({ from, to }) => ({ set: { priority: to }, where: eq(tasks.priority, from) }),
+  Assignee: ({ from, to }) => ({
+    set: { assignee: to },
+    where: from === null ? isNull(tasks.assignee) : eq(tasks.assignee, from)
+  })
+})
 /**
  * Builds the task store for the binding's workspace: this module's driver inside
  * `TaskStore.make`, which checks every input first.

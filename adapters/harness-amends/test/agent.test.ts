@@ -204,7 +204,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const refused = yield* Effect.flip(inSandbox.generate({ prompt: "read", toolkit }))
       const answered = yield* withoutSandbox.generate({ prompt: "read", toolkit })
 
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("UnsupportedError")
+      expect(refused).toMatchObject({ _tag: "HarnessError", reason: { _tag: "UnsupportedError" } })
       expect(answered.text).toBe("done")
     })
   )
@@ -247,9 +247,12 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         })
       )
 
-      expect(error._tag === "AiError" && error.reason).toMatchObject({
-        _tag: "StructuredOutputError",
-        responseText: "not JSON"
+      expect(error).toMatchObject({
+        _tag: "AiError",
+        reason: {
+          _tag: "StructuredOutputError",
+          responseText: "not JSON"
+        }
       })
     })
   )
@@ -279,7 +282,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         },
         { type: "finish", reason: "error" }
       ])
-      expect(error._tag === "HarnessError" && error.reason._tag).toBe("TurnFailedError")
+      expect(error).toMatchObject({ _tag: "HarnessError", reason: { _tag: "TurnFailedError" } })
     })
   )
 
@@ -296,8 +299,8 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const inherited = yield* Effect.flip(session.generate({ prompt: "hello", model: "toString" }))
 
       expect([named.text, unnamed.text]).toEqual(["from fast", "from main"])
-      expect(unknown._tag === "HarnessError" && unknown.reason._tag).toBe("UnsupportedError")
-      expect(inherited._tag === "HarnessError" && inherited.reason._tag).toBe("UnsupportedError")
+      expect(unknown).toMatchObject({ _tag: "HarnessError", reason: { _tag: "UnsupportedError" } })
+      expect(inherited).toMatchObject({ _tag: "HarnessError", reason: { _tag: "UnsupportedError" } })
     })
   )
 

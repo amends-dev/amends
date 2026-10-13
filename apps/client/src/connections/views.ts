@@ -29,7 +29,7 @@ import {
   connectionsReads,
   newConnectionRequestKey,
   reloadConnections,
-  type Connection,
+  Connection,
   type ConnectionCommand,
   type ConnectionsReads
 } from "./api.ts"
@@ -44,10 +44,11 @@ export interface ConnectionsDone {
   readonly created?: string
 }
 
-const readinessOf = (readiness: Connection.View["readiness"]): ConnectionReadiness =>
-  readiness._tag === "Invalid"
-    ? { state: "invalid", description: readiness.description }
-    : { state: readiness._tag === "Ready" ? "ready" : "uninstalled" }
+const readinessOf = Connection.Readiness.match<ConnectionReadiness>({
+  Ready: () => ({ state: "ready" }),
+  Invalid: ({ description }) => ({ state: "invalid", description }),
+  Uninstalled: () => ({ state: "uninstalled" })
+})
 
 const integrationOf = (view: Connection.IntegrationView): IntegrationOption => ({
   id: view.id,

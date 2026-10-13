@@ -204,6 +204,16 @@ to verify APIs rather than guessing from prior versions or web snippets.
 Source imports Effect by module, `import * as Effect from "effect/Effect"`, as Effect's packages
 do; tests, scripts, and documentation examples may use the `effect` barrel.
 
+Tell which variant a tagged value is with the helpers its type gives, never by comparing `_tag`:
+`X.isAnyOf(["A"])` for a value of a schema's tagged union, which checks the tag alone, and `X.match`
+for a case per variant, or `Match.valueTags` when the cases return different types; `$is` and
+`$match` for a `Data.TaggedEnum`; and the guards Effect's modules give their own types, such as
+`Option.isSome`, `Exit.isSuccess`, and `ChildProcess.isPipedCommand`. A union's `guards` validate
+the whole value, so keep them for input of unknown shape. Recover from one reason of an error with
+`Effect.catchReason`. An error's reasons are `Schema.TaggedError` classes that say `isRetryable` and
+give a default message, in a union piped through `Schema.toTaggedUnion("_tag")`, as harness's
+`HarnessError` shows. Reading `_tag` as data, such as the kind a row stores, is fine.
+
 Name a variable that holds a service after the service, so a call says who it calls:
 `const threadStore = yield* ThreadStore.ThreadStore`,
 `const threadQuery = yield* ThreadQuery.ThreadQuery`, and `(threadService) => threadService.get(id)`

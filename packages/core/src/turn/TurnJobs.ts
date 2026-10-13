@@ -13,6 +13,7 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as GroupMembershipFacts from "../group/GroupMembershipFacts.ts"
 import type * as Event from "../journal/Event.ts"
@@ -174,7 +175,7 @@ const stopTurnOfEndedParticipation = Effect.fnUntraced(function* (event: Event.E
   const { memberId, threadId, participationId } = decodeParticipationEnded(event.payload)
   const turnStore = yield* TurnStore.TurnStore
   const active = yield* turnStore.findActive(memberId, threadId)
-  if (active._tag === "None" || active.value.participationId !== participationId) return
+  if (Option.isNone(active) || active.value.participationId !== participationId) return
   yield* (yield* TurnJobs).requestStop({
     workspaceId: event.provenance.workspaceId,
     memberId,

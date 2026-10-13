@@ -62,8 +62,8 @@ export const openingOf = (
   const turnId = ready.turn.id
   const id = Agent.SessionId.make(ready.turn.participationId)
   const before = entries.filter((entry) => !SessionLog.isOfTurn(turnId)(entry))
-  const prompted = entries.find((entry) => entry._tag === "Prompted" && entry.turnId === turnId)
-  if (prompted?._tag === "Prompted") {
+  const prompted = entries.filter(SessionLog.Entry.isAnyOf(["Prompted"])).find((entry) => entry.turnId === turnId)
+  if (prompted !== undefined) {
     const history = SessionLog.historyOf(before)
     return {
       entries: [{ _tag: "Interrupted", turnId, reason: "Its run stopped short." }],
@@ -103,12 +103,16 @@ const unfinishedTurnOf = (
   id: Agent.SessionId,
   history: Prompt.Prompt
 ): Session.SessionState | undefined => {
-  const startedAt = entries.findLastIndex((entry) => entry._tag === "Started" && entry.turnId === turnId)
+  const startedAt = entries.findLastIndex(
+    (entry) => SessionLog.Entry.isAnyOf(["Started"])(entry) && entry.turnId === turnId
+  )
   const started = entries[startedAt]
-  if (started?._tag !== "Started" || started.agentState === undefined) return undefined
+  if (started === undefined || !SessionLog.Entry.isAnyOf(["Started"])(started) || started.agentState === undefined) {
+    return undefined
+  }
   const steps = entries
     .slice(startedAt + 1)
-    .flatMap((entry) => (entry._tag === "Step" && entry.turnId === turnId ? [entry.step] : []))
+    .flatMap((entry) => (SessionLog.Entry.isAnyOf(["Step"])(entry) && entry.turnId === turnId ? [entry.step] : []))
   return {
     id,
     history,

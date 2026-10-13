@@ -1,3 +1,4 @@
+import { CoreError } from "@amends-dev/core/error"
 import { Turn } from "@amends-dev/core/turn"
 import { Workspace } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
@@ -75,8 +76,8 @@ export const turnRefusal = (cause: Cause.Cause<unknown>): TurnProblem | undefine
     if (!Cause.isFailReason(reason)) continue
     if (!Schema.is(ApiErrors.Conflict)(reason.error)) continue
     const refusal = reason.error.reason
-    if (refusal._tag === "TurnNotActive") return "finished"
-    if (refusal._tag === "NotRetryable") return refusals[refusal.reason]
+    if (CoreError.ConflictReason.isAnyOf(["TurnNotActive"])(refusal)) return "finished"
+    if (CoreError.ConflictReason.isAnyOf(["NotRetryable"])(refusal)) return refusals[refusal.reason]
   }
   return undefined
 }
@@ -115,7 +116,8 @@ const gone = (cause: Cause.Cause<unknown>) =>
     (reason) =>
       Cause.isFailReason(reason) &&
       (Schema.is(ApiErrors.NotFound)(reason.error) ||
-        (Schema.is(ApiErrors.Denied)(reason.error) && reason.error.reason._tag === "NotMember"))
+        (Schema.is(ApiErrors.Denied)(reason.error) &&
+          CoreError.DeniedReason.isAnyOf(["NotMember"])(reason.error.reason)))
   )
 
 /** The reader is in the turn's thread's group, but may no longer read the thread. */
@@ -124,7 +126,7 @@ const denied = (cause: Cause.Cause<unknown>) =>
     (reason) =>
       Cause.isFailReason(reason) &&
       Schema.is(ApiErrors.Denied)(reason.error) &&
-      reason.error.reason._tag === "NotGranted"
+      CoreError.DeniedReason.isAnyOf(["NotGranted"])(reason.error.reason)
   )
 
 /** The items with each change put in its place. */

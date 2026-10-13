@@ -95,7 +95,7 @@ describe("a turn's log items", () => {
       [ThreadMessage.Id.make("message-1")]
     )
 
-    expect(items.map((item) => item._tag === "Responded" && item.reply)).toEqual([false, false, true])
+    expect(items.map((item) => Turn.LogItem.isAnyOf(["Responded"])(item) && item.reply)).toEqual([false, false, true])
     expect(itemsOf([prompted(), step("one", writing("Done."))], [])[1]).toMatchObject({
       reply: false
     })

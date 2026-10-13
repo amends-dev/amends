@@ -1535,7 +1535,7 @@ describe("thread participation", () => {
                 note.participationId,
                 note.state._tag
               ])
-            ).toEqual([[recipient._tag === "Triage" ? triage.id : contact.id, "Pending"]])
+            ).toEqual([[Notification.Recipient.isAnyOf(["Triage"])(recipient) ? triage.id : contact.id, "Pending"]])
           // One active participation per contact and per thread's triage.
           for (const invalid of [
             { ...contact, id: ThreadParticipation.Id.make("contact-again") },

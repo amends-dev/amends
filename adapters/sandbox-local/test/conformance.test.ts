@@ -4,6 +4,7 @@ import * as Conformance from "@amends-dev/sandbox/conformance"
 import { BunHttpServer, BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Layer } from "effect"
 import { FetchHttpClient } from "effect/http"
+import { NetAddress } from "effect/net"
 import { ChildProcess } from "effect/process"
 
 /** A server, run by Bun, that answers each request on `PORT` with its headers. */
@@ -26,7 +27,7 @@ Conformance.run({
   }),
   freePort: Effect.scoped(
     Effect.flatMap(BunHttpServer.make({ hostname: "127.0.0.1", port: 0 }), ({ address }) =>
-      address._tag === "UnixPathAddress"
+      NetAddress.isUnixPathAddress(address)
         ? Effect.die("The server listens on no port")
         : Effect.succeed(Network.Port.make(address.port))
     )

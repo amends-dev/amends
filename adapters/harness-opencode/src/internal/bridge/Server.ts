@@ -29,7 +29,9 @@ import { flow } from "effect/Function"
 import * as HttpClient from "effect/http/HttpClient"
 import type * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
+import * as Match from "effect/Match"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import type * as Record from "effect/Record"
@@ -169,15 +171,15 @@ export const harnessError = (agent: string, reason: HarnessError.HarnessErrorRea
  * `UnknownError` for the rest.
  */
 export const requestError =
-  (agent: string) => (error: HttpClientError.HttpClientError | Schema.SchemaError | Sse.SseError | Sse.Retry) => {
-    switch (error._tag) {
-      case "HttpClientError": {
+  (agent: string) => (error: HttpClientError.HttpClientError | Schema.SchemaError | Sse.SseError | Sse.Retry) =>
+    Match.valueTags(error, {
+      HttpClientError: (error) => {
         const { reason } = error
         const description = error.message
-        if (reason._tag === "TransportError") {
+        if (Predicate.isTagged(reason, "TransportError")) {
           return harnessError(agent, new HarnessError.UnavailableError({ description }), error)
         }
-        const status = reason._tag === "StatusCodeError" ? reason.response.status : undefined
+        const status = Predicate.isTagged(reason, "StatusCodeError") ? reason.response.status : undefined
         return harnessError(
           agent,
           status === 404
@@ -187,16 +189,11 @@ export const requestError =
               : new HarnessError.UnknownError({ description }),
           error
         )
-      }
-      case "SchemaError":
-      case "SseError":
-        return harnessError(agent, new HarnessError.AgentContractError({ description: error.message }), error)
-      case "Retry":
-        return harnessError(
-          agent,
-          new HarnessError.UnavailableError({
-            description: "opencode's server asked to be retried"
-          })
-        )
-    }
-  }
+      },
+      SchemaError: (error) =>
+        harnessError(agent, new HarnessError.AgentContractError({ description: error.message }), error),
+      SseError: (error) =>
+        harnessError(agent, new HarnessError.AgentContractError({ description: error.message }), error),
+      Retry: () =>
+        harnessError(agent, new HarnessError.UnavailableError({ description: "opencode's server asked to be retried" }))
+    })

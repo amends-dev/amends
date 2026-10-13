@@ -10,12 +10,13 @@
 
 import type { Connection as ConnectionContract, Integration, Integrations } from "@amends-dev/connection"
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Connection from "../connection/Connection.ts"
-import type * as Agent from "./Agent.ts"
+import * as Agent from "./Agent.ts"
 
 /**
  * How an agent is set up, as far as whether it can run depends on it: a record's harness, model,
@@ -54,7 +55,9 @@ export interface Named {
  */
 export const namedConnections = (setup: Setup): ReadonlyArray<Named> => {
   const named: Array<Named> = []
-  if (setup.harness._tag === "Connection") named.push({ part: "harness", connectionId: setup.harness.connectionId })
+  if (Agent.Harness.isAnyOf(["Connection"])(setup.harness)) {
+    named.push({ part: "harness", connectionId: setup.harness.connectionId })
+  }
   named.push({ part: "model", connectionId: setup.model.connectionId })
   if (setup.sandbox !== null) named.push({ part: "sandbox", connectionId: setup.sandbox.connectionId })
   return named
@@ -77,7 +80,7 @@ export const issuesOf = Effect.fnUntraced(function* (
     issueOf(part, connectionId, setup, connections, integrations)
   )
   const issues = named.filter((issue) => issue !== undefined)
-  if (setup.harness._tag === "Connection") return issues
+  if (Agent.Harness.isAnyOf(["Connection"])(setup.harness)) return issues
   const choices = yield* harnessesToChoose(setup, connections, integrations)
   return choices.length === 0 ? [{ _tag: "NoHarness" }, ...issues] : issues
 })
@@ -98,14 +101,20 @@ export const readinessOf = (issues: ReadonlyArray<Agent.Issue>): Agent.Readiness
  * @category models
  * @since 0.1.0
  */
-export type Resolved =
-  | { readonly _tag: "Removed" }
-  | { readonly _tag: "Uninstalled" }
-  | {
-      readonly _tag: "Installed"
-      readonly connection: ConnectionContract.Connection
-      readonly integration: Integration.Integration
-    }
+export type Resolved = Data.TaggedEnum<{
+  Removed: {}
+  Uninstalled: {}
+  Installed: {
+    readonly connection: ConnectionContract.Connection
+    readonly integration: Integration.Integration
+  }
+}>
+
+/**
+ * @category constructors
+ * @since 0.1.0
+ */
+export const Resolved = Data.taggedEnum<Resolved>()
 
 /**
  * The connection `connectionId` among `connections`, with its integration when one is installed.
@@ -119,14 +128,10 @@ export const resolveConnection = Effect.fnUntraced(function* (
   integrations: Integrations.Integrations["Service"]
 ): Effect.fn.Return<Resolved> {
   const record = connections.find((connection) => connection.id === connectionId)
-  if (record === undefined) return { _tag: "Removed" }
+  if (record === undefined) return Resolved.Removed()
   const integration = yield* Effect.option(integrations.find(record.integration))
-  if (Option.isNone(integration)) return { _tag: "Uninstalled" }
-  return {
-    _tag: "Installed",
-    connection: Connection.connectionOf(record),
-    integration: integration.value
-  }
+  if (Option.isNone(integration)) return Resolved.Uninstalled()
+  return Resolved.Installed({ connection: Connection.connectionOf(record), integration: integration.value })
 })
 
 /**
@@ -142,7 +147,7 @@ const issueOf = Effect.fnUntraced(function* (
   integrations: Integrations.Integrations["Service"]
 ): Effect.fn.Return<Agent.Issue | undefined> {
   const resolved = yield* resolveConnection(connectionId, connections, integrations)
-  if (resolved._tag !== "Installed") return { _tag: resolved._tag, part }
+  if (!Resolved.$is("Installed")(resolved)) return { _tag: resolved._tag, part }
   const { integration, connection } = resolved
   const refusal = yield* refusalOf(part, integration, connection, setup)
   if (refusal !== undefined) return { _tag: "Invalid", part, description: refusal }

@@ -174,7 +174,7 @@ describe("Session", () => {
 
       const error = yield* Effect.flip(session.generate({ prompt: "delete" }))
 
-      expect(error._tag === "HarnessError" && error.reason._tag).toBe("AgentContractError")
+      expect(error).toMatchObject({ _tag: "HarnessError", reason: { _tag: "AgentContractError" } })
     })
   )
 
@@ -203,9 +203,12 @@ describe("Session", () => {
         })
       )
 
-      expect(error._tag === "AiError" && error.reason).toMatchObject({
-        _tag: "StructuredOutputError",
-        responseText: "not JSON"
+      expect(error).toMatchObject({
+        _tag: "AiError",
+        reason: {
+          _tag: "StructuredOutputError",
+          responseText: "not JSON"
+        }
       })
       expect(error.message).toContain("Harness.generateObject")
     })
@@ -225,9 +228,12 @@ describe("Session", () => {
       const error = yield* Effect.flip(session.generate({ prompt: "hello" }))
 
       expect(parts[0]).toEqual({ type: "error", error: failure })
-      expect(error._tag === "HarnessError" && error.reason).toMatchObject({
-        _tag: "TurnFailedError",
-        error: failure
+      expect(error).toMatchObject({
+        _tag: "HarnessError",
+        reason: {
+          _tag: "TurnFailedError",
+          error: failure
+        }
       })
     })
   )
@@ -247,7 +253,7 @@ describe("Session", () => {
       yield* Fiber.interrupt(slow)
       const result = yield* session.generate({ prompt: "hello" })
 
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("TurnInProgressError")
+      expect(refused).toMatchObject({ _tag: "HarnessError", reason: { _tag: "TurnInProgressError" } })
       expect(result.text).toBe("codex answers hello")
     })
   )
@@ -266,7 +272,7 @@ describe("Session", () => {
       expect(parts).toEqual([{ type: "text-start", id: "answer" }])
       expect(state.unfinishedTurn?.agentState).toEqual({ agent: "codex", turn: true })
       expect(state.history.content).toEqual([])
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("SessionReleasedError")
+      expect(refused).toMatchObject({ _tag: "HarnessError", reason: { _tag: "SessionReleasedError" } })
     })
   )
 

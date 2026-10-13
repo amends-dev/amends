@@ -6,7 +6,13 @@ import { Group, GroupFollowService, GroupService } from "@amends-dev/core/group"
 import type { Actor, Identity } from "@amends-dev/core/identity"
 import { Notification } from "@amends-dev/core/notification"
 import { TaskService } from "@amends-dev/core/task"
-import { type Thread, ThreadMessageService, ThreadParticipation, ThreadService } from "@amends-dev/core/thread"
+import {
+  type Thread,
+  ThreadMessage,
+  ThreadMessageService,
+  ThreadParticipation,
+  ThreadService
+} from "@amends-dev/core/thread"
 import { Member, type Workspace } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
@@ -65,7 +71,7 @@ const received = (
 })
 /** What an intake of the expected kind names, or a failed expectation. */
 const opened = (intake: ChannelIntake.Intake | undefined) =>
-  intake?._tag === "Opened" || intake?._tag === "Replied"
+  intake !== undefined && ChannelIntake.Intake.isAnyOf(["Opened", "Replied"])(intake)
     ? intake
     : expect.fail(`Expected a thread opened or replied to, not ${intake?._tag}`)
 /** Who takes part in the thread, by key. */
@@ -183,7 +189,9 @@ describe("channels", () => {
               bob,
               Effect.flatMap(ChannelService.ChannelService, (channelService) => channelService.getBinding(threadId))
             )
-            if (thread.createdBy._tag !== "Contact") return expect.fail("Expected a contact's thread")
+            if (!ThreadMessage.Author.isAnyOf(["Contact"])(thread.createdBy)) {
+              return expect.fail("Expected a contact's thread")
+            }
             const contactId = thread.createdBy.contactId
             const contacts = yield* bound.contacts.getMany([contactId])
             expect(thread).toMatchObject({
@@ -303,7 +311,7 @@ describe("channels", () => {
             )
             const { threadId, messageId } = opened(first.intakes[0])
             const author = Option.getOrThrow(yield* bound.messages.get(messageId)).author
-            if (author._tag !== "Contact") return expect.fail("Expected a contact's message")
+            if (!ThreadMessage.Author.isAnyOf(["Contact"])(author)) return expect.fail("Expected a contact's message")
             const contact: Notification.Recipient = { _tag: "Contact", id: author.contactId }
             // Bob, a member of the group, replies; the contact is told, which asks the thread's
             // delivery job to carry it.
@@ -354,7 +362,9 @@ describe("channels", () => {
               access: { connection: { integration: "test-channels" }, credential: null }
             })
             // The job posts through the transport and records the id the system gave the message.
-            if (ready._tag !== "Ready") return expect.fail("Expected a delivery ready to post")
+            if (!DeliveryExecution.Start.isAnyOf(["Ready"])(ready)) {
+              return expect.fail("Expected a delivery ready to post")
+            }
             const posted = yield* testTransport.post(ready.conversation, ready.outgoing)
             yield* deliver(workspace.id, (deliveryExecution) =>
               deliveryExecution.recordSent(delivery.id, {

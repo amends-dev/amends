@@ -54,7 +54,7 @@ const toRow = (record: Agent.Agent): typeof agents.$inferInsert => ({
   id: record.id,
   memberId: record.memberId,
   instructions: record.instructions,
-  harnessConnectionId: record.harness._tag === "Connection" ? record.harness.connectionId : null,
+  harnessConnectionId: Agent.Harness.isAnyOf(["Connection"])(record.harness) ? record.harness.connectionId : null,
   modelConnectionId: record.model.connectionId,
   modelId: record.model.id,
   modelEffort: record.model.effort ?? null,

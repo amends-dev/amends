@@ -2,7 +2,7 @@ import { Agent, Harness, type ModelEndpoint } from "@amends-dev/harness"
 import { LocalSandboxProvider } from "@amends-dev/sandbox-local"
 import { BunServices } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Path, Redacted, Schema } from "effect"
+import { Effect, FileSystem, Layer, Path, Predicate, Redacted, Schema } from "effect"
 import { AiError, LanguageModel, Tool, Toolkit } from "effect/ai"
 import { FetchHttpClient } from "effect/http"
 import * as AmendsAgent from "../src/AmendsAgent.ts"
@@ -69,7 +69,7 @@ const refusesKey = (endpoint: ModelEndpoint.ModelEndpoint) =>
     const error = yield* Effect.flip(
       LanguageModel.generateText({ prompt: "Say hi" }).pipe(Effect.provideService(LanguageModel.LanguageModel, model))
     )
-    return AiError.isAiError(error) && error.reason._tag === "AuthenticationError"
+    return AiError.isAiError(error) && Predicate.isTagged(error.reason, "AuthenticationError")
   })
 
 describe.skipIf(!enabled)("amends's agent on a real model API", () => {

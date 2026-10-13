@@ -1,4 +1,4 @@
-import type { SessionLog } from "@amends-dev/core/turn"
+import { SessionLog } from "@amends-dev/core/turn"
 import { Gateway } from "@amends-dev/gateway"
 import { HarnessError, type StreamPart } from "@amends-dev/harness"
 import { describe, expect, it } from "@effect/vitest"
@@ -78,7 +78,12 @@ describe("a turn's run", () => {
       expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Joined", "Prompted", "Started", "Step", "Step"])
       expect(workspace.log()[2]).toEqual({ _tag: "Started", turnId: turn.id, agent: "scripted" })
       // Steps are named after the run's opening position in the log, as their drafts are.
-      expect(workspace.log().flatMap((entry) => (entry._tag === "Step" ? [entry.id] : []))).toEqual(["2.0", "2.1"])
+      expect(
+        workspace
+          .log()
+          .filter(SessionLog.Entry.isAnyOf(["Step"]))
+          .map((entry) => entry.id)
+      ).toEqual(["2.0", "2.1"])
       // The first text arrives at once, and the rest once the text ends.
       expect(workspace.drafts()).toEqual([
         { responseId: "2.1", part: 0, offset: 0, text: "The plan " },

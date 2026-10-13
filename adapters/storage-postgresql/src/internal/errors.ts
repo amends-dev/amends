@@ -2,6 +2,7 @@ import { StoreError } from "@amends-dev/core/journal"
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core"
 import * as Cause from "effect/Cause"
 import * as Option from "effect/Option"
+import * as Predicate from "effect/Predicate"
 import * as SqlError from "effect/sql/SqlError"
 
 /** The client's classification of a failed statement, whether Drizzle or the client raised it. */
@@ -16,14 +17,18 @@ export const sqlError = (error: unknown): SqlError.SqlError | undefined => {
 
 /** A row the database refused: a duplicate key, a foreign key, or a check. */
 export const isConstraintViolation = (error: unknown): boolean => {
-  const reason = sqlError(error)?.reason._tag
-  return reason === "UniqueViolation" || reason === "ConstraintError"
+  const reason = sqlError(error)?.reason
+  return Predicate.isTagged(reason, "UniqueViolation") || Predicate.isTagged(reason, "ConstraintError")
 }
 
 /** Another writer holds what this transaction needs; the operation did not apply. */
 export const isContention = (error: unknown): boolean => {
-  const reason = sqlError(error)?.reason._tag
-  return reason === "LockTimeoutError" || reason === "SerializationError" || reason === "DeadlockError"
+  const reason = sqlError(error)?.reason
+  return (
+    Predicate.isTagged(reason, "LockTimeoutError") ||
+    Predicate.isTagged(reason, "SerializationError") ||
+    Predicate.isTagged(reason, "DeadlockError")
+  )
 }
 
 /**

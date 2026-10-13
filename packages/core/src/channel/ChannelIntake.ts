@@ -17,6 +17,7 @@ import * as Crypto from "effect/Crypto"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as CoreError from "../error/CoreError.ts"
@@ -371,23 +372,24 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         Effect.gen(function* () {
           const occurredAt = yield* DateTime.now
           const contact = yield* resolveContact(channel, contactId, event.sender, occurredAt)
-          switch (event._tag) {
-            case "MessageReceived": {
-              const text = textOf(event.text)
-              if (Option.isNone(text)) return ignored("empty")
-              const binding = yield* channelBindingStore.findByConversation(channel.id, event.conversation.id)
-              return Option.isNone(binding)
-                ? yield* open(channel, contact, event, text.value, messageId, occurredAt)
-                : yield* reply(channel, contact, binding.value, event, text.value, messageId, occurredAt)
-            }
-            case "MessageEdited": {
-              const text = textOf(event.text)
-              if (Option.isNone(text)) return ignored("empty")
-              return yield* edit(contact, text.value, messageId, occurredAt)
-            }
-            case "MessageDeleted":
-              return yield* remove(contact, messageId, occurredAt)
-          }
+          return yield* Match.valueTags(event, {
+            MessageReceived: (received) =>
+              Effect.gen(function* () {
+                const text = textOf(received.text)
+                if (Option.isNone(text)) return ignored("empty")
+                const binding = yield* channelBindingStore.findByConversation(channel.id, received.conversation.id)
+                return Option.isNone(binding)
+                  ? yield* open(channel, contact, received, text.value, messageId, occurredAt)
+                  : yield* reply(channel, contact, binding.value, received, text.value, messageId, occurredAt)
+              }),
+            MessageEdited: (edited) => {
+              const text = textOf(edited.text)
+              return Option.isNone(text)
+                ? Effect.succeed(ignored("empty"))
+                : edit(contact, text.value, messageId, occurredAt)
+            },
+            MessageDeleted: () => remove(contact, messageId, occurredAt)
+          })
         })
       )
     },

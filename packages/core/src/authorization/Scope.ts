@@ -28,7 +28,7 @@ export const Scope = Schema.TaggedUnion({
  */
 export type Scope = typeof Scope.Type
 
-const equivalentTarget = Schema.toEquivalence(Target.Reference)
+const sameTarget = Schema.toEquivalence(Target.Reference)
 
 /**
  * Whether a scope reaches a target: a workspace scope covers every target in that workspace, and
@@ -41,5 +41,5 @@ const equivalentTarget = Schema.toEquivalence(Target.Reference)
 export const covers = (scope: Scope, target: Target.Reference): boolean =>
   Scope.match(scope, {
     Workspace: ({ workspaceId }) => workspaceId === target.workspaceId,
-    Target: ({ target: exact }) => equivalentTarget(exact, target)
+    Target: ({ target: exact }) => sameTarget(exact, target)
   })

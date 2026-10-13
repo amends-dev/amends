@@ -20,6 +20,7 @@ import * as Actor from "../identity/Actor.ts"
 import * as Event from "../journal/Event.ts"
 import * as Journal from "../journal/Journal.ts"
 import * as Store from "../journal/Store.ts"
+import * as StoreError from "../journal/StoreError.ts"
 import * as Operation from "../operation/Operation.ts"
 import * as Signal from "../signal/Signal.ts"
 import * as SignalHub from "../signal/SignalHub.ts"
@@ -109,7 +110,7 @@ export class NotificationService extends Context.Service<
 >()("@amends-dev/core/notification/NotificationService") {}
 
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options))
-const isSameRecipient = Schema.toEquivalence(Notification.Recipient)
+const sameRecipient = Schema.toEquivalence(Notification.Recipient)
 const decodeCursor = Schema.decodeEffect(Schema.toType(NotificationStore.Cursor))
 /** IDs in binary lexical order, as stores order them: by code point. */
 const compareIds = (left: string, right: string) => {
@@ -163,7 +164,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     const target = yield* requireRecipient()
     const id = yield* Schema.decodeEffect(Notification.Id)(notificationId)
     const found = yield* notificationStore.get(id)
-    if (Option.isNone(found) || !isSameRecipient(found.value.recipient, target))
+    if (Option.isNone(found) || !sameRecipient(found.value.recipient, target))
       return yield* new CoreError.NotFound({ resource: "Notification", id })
     return found.value
   })
@@ -274,7 +275,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       const { page, due } = yield* markPageSeen(after).pipe(
         Effect.retry({
           times: 2,
-          while: (error) => error._tag === "StoreError" && error.reason._tag === "Rejected"
+          while: (error) => StoreError.isStoreError(error) && StoreError.Reason.isAnyOf(["Rejected"])(error.reason)
         })
       )
       marked += due

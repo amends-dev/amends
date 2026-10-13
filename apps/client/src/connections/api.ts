@@ -1,4 +1,5 @@
 import { Connection } from "@amends-dev/core/connection"
+import { CoreError } from "@amends-dev/core/error"
 import { Workspace } from "@amends-dev/core/workspace"
 import * as ApiErrors from "@amends-dev/http/ApiErrors"
 import type { ConnectionsFailure } from "@amends-dev/ui/screens/connections"
@@ -123,7 +124,8 @@ export const reloadConnections = (reads: ConnectionsReads) =>
 
 const invalid = Schema.is(ApiErrors.Invalid)
 const credentialsUnavailable = (error: unknown) =>
-  Schema.is(ApiErrors.Unavailable)(error) && error.reason._tag === "CredentialsUnavailable"
+  Schema.is(ApiErrors.Unavailable)(error) &&
+  CoreError.UnavailableReason.isAnyOf(["CredentialsUnavailable"])(error.reason)
 
 /**
  * Why a change or check failed, telling apart an integration this host no longer installs, one
@@ -133,9 +135,12 @@ const credentialsUnavailable = (error: unknown) =>
 export function connectionsFailure(cause: Cause.Cause<unknown>): Omit<ConnectionsFailure, "action"> {
   for (const reason of cause.reasons) {
     if (!Cause.isFailReason(reason)) continue
-    const refused = invalid(reason.error) ? reason.error.reason : undefined
-    if (refused?._tag === "UnknownIntegration") return { error: "uninstalled" }
-    if (refused?._tag === "IntegrationRefused") return { error: "refused", description: refused.description }
+    if (invalid(reason.error)) {
+      const refused = reason.error.reason
+      if (CoreError.InvalidReason.isAnyOf(["UnknownIntegration"])(refused)) return { error: "uninstalled" }
+      if (CoreError.InvalidReason.isAnyOf(["IntegrationRefused"])(refused))
+        return { error: "refused", description: refused.description }
+    }
     if (credentialsUnavailable(reason.error)) return { error: "storage-unavailable" }
   }
   return { error: workspaceFailure(cause) }
