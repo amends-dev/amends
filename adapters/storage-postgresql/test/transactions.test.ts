@@ -3,6 +3,7 @@ import { WorkspaceId } from "@amends-dev/core/workspace"
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Clock, Context, DateTime, Deferred, Duration, Effect, Exit, Fiber, Layer, Option } from "effect"
 import { SqlClient, SqlError } from "effect/sql"
+import { TestClock } from "effect/testing"
 import { PostgresDatabase, PostgresWorkspaceStorage } from "../src/index.ts"
 import * as Binding from "../src/internal/binding.ts"
 import type { Bound } from "./support.ts"
@@ -97,13 +98,18 @@ describe.skipIf(!available)("PostgreSQL", () => {
     )
   )
 
-  it.live("a program that runs past the transaction timeout rolls back and frees the workspace", () =>
+  it.effect("a program that runs past the transaction timeout rolls back and frees the workspace", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
         const host = yield* process(url, 2, { transactionTimeout: "200 millis" })
         const bound = yield* host.forWorkspace(first)
-        const failure = yield* Effect.flip(append(bound, Effect.sleep("2 seconds")))
-        expect(failure).toMatchObject({
+        const running = yield* Deferred.make<void>()
+        const overrun = yield* Effect.forkChild(
+          Effect.flip(append(bound, Deferred.succeed(running, undefined).pipe(Effect.andThen(Effect.never))))
+        )
+        yield* Deferred.await(running)
+        yield* TestClock.adjust("200 millis")
+        expect(yield* Fiber.join(overrun)).toMatchObject({
           _tag: "StoreError",
           store: "Store",
           reason: { _tag: "Failed", cause: expect.stringContaining("ran longer than") }
