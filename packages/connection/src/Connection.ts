@@ -128,19 +128,22 @@ export const healthOf = (status: number, url: string): Health => {
   return { status: "healthy" }
 }
 
-const described = { description: Schema.String }
-
 /**
  * The host has no integration of the id a connection names.
  *
  * @category errors
  * @since 0.1.0
  */
-export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends-dev/connection/ConnectionError/NotFoundError"
-)("NotFoundError", described) {
+export class NotFoundError extends Schema.TaggedError<NotFoundError>("@amends-dev/connection/Connection/NotFoundError")(
+  "NotFoundError",
+  { description: Schema.optional(Schema.String) }
+) {
+  get isRetryable(): boolean {
+    return false
+  }
+
   override get message(): string {
-    return this.description
+    return this.description ?? "The host has no integration of this id"
   }
 }
 
@@ -152,10 +155,14 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>(
  * @since 0.1.0
  */
 export class InvalidConnectionError extends Schema.TaggedError<InvalidConnectionError>(
-  "@amends-dev/connection/ConnectionError/InvalidConnectionError"
-)("InvalidConnectionError", described) {
+  "@amends-dev/connection/Connection/InvalidConnectionError"
+)("InvalidConnectionError", { description: Schema.optional(Schema.String) }) {
+  get isRetryable(): boolean {
+    return false
+  }
+
   override get message(): string {
-    return this.description
+    return this.description ?? "The integration does not take this connection"
   }
 }
 
@@ -167,10 +174,14 @@ export class InvalidConnectionError extends Schema.TaggedError<InvalidConnection
  * @since 0.1.0
  */
 export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends-dev/connection/ConnectionError/UnsupportedError"
-)("UnsupportedError", described) {
+  "@amends-dev/connection/Connection/UnsupportedError"
+)("UnsupportedError", { description: Schema.optional(Schema.String) }) {
+  get isRetryable(): boolean {
+    return false
+  }
+
   override get message(): string {
-    return this.description
+    return this.description ?? "The integration does not give what was asked"
   }
 }
 
@@ -181,10 +192,14 @@ export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
  * @since 0.1.0
  */
 export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends-dev/connection/ConnectionError/UnavailableError"
-)("UnavailableError", described) {
+  "@amends-dev/connection/Connection/UnavailableError"
+)("UnavailableError", { description: Schema.optional(Schema.String) }) {
+  get isRetryable(): boolean {
+    return true
+  }
+
   override get message(): string {
-    return this.description
+    return this.description ?? "The integration's system could not be reached"
   }
 }
 
@@ -200,7 +215,7 @@ export const ConnectionErrorReason = Schema.Union([
   InvalidConnectionError,
   UnsupportedError,
   UnavailableError
-])
+]).pipe(Schema.toTaggedUnion("_tag"))
 
 /**
  * @category errors
@@ -215,21 +230,20 @@ export type ConnectionErrorReason = typeof ConnectionErrorReason.Type
  * @category errors
  * @since 0.1.0
  */
-export class ConnectionError extends Schema.TaggedError<ConnectionError>("@amends-dev/connection/ConnectionError")(
-  "ConnectionError",
-  {
-    /** The integration of the connection, as its id names it. */
-    integration: Schema.String,
+export class ConnectionError extends Schema.TaggedError<ConnectionError>(
+  "@amends-dev/connection/Connection/ConnectionError"
+)("ConnectionError", {
+  /** The integration of the connection, as its id names it. */
+  integration: Schema.String,
 
-    /** Why the operation failed. */
-    reason: ConnectionErrorReason,
+  /** Why the operation failed. */
+  reason: ConnectionErrorReason,
 
-    /** The failure underneath, such as the error of decoding a connection's settings. */
-    cause: Schema.optional(Schema.Defect())
-  }
-) {
+  /** The failure underneath, such as the error of decoding a connection's settings. */
+  cause: Schema.optional(Schema.Defect())
+}) {
   get isRetryable(): boolean {
-    return this.reason._tag === "UnavailableError"
+    return this.reason.isRetryable
   }
 
   override get message(): string {

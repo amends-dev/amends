@@ -404,16 +404,15 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
     const channel = yield* channelQuery.requireActive(channelId)
     const transport = yield* transportOf(channel)
     const received = yield* transport.receive(inbound).pipe(
-      Effect.catchTag("TransportError", (error) =>
-        Effect.fail(
-          error.reason === "rejected"
-            ? new CoreError.Invalid({
-                reason: new CoreError.Unverified({ description: error.description })
-              })
-            : new CoreError.Unavailable({
-                reason: new CoreError.ChannelUnreachable({ description: error.description })
-              })
-        )
+      Effect.catchReason(
+        "TransportError",
+        "RejectedError",
+        (reason) =>
+          Effect.fail(new CoreError.Invalid({ reason: new CoreError.Unverified({ description: reason.message }) })),
+        (reason) =>
+          Effect.fail(
+            new CoreError.Unavailable({ reason: new CoreError.ChannelUnreachable({ description: reason.message }) })
+          )
       )
     )
     const intakes: Array<Intake> = []

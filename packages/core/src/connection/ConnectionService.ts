@@ -229,7 +229,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   /** Fails, as the integration describes it, for a connection the integration does not take. */
   const toInvalidConnection = (error: ConnectionContract.ConnectionError) =>
     new CoreError.Invalid({
-      reason: new CoreError.IntegrationRefused({ description: error.reason.description })
+      reason: new CoreError.IntegrationRefused({ description: error.reason.message })
     })
 
   /** Fails unless the integration this host installs takes `record`, as it describes it. */
@@ -247,7 +247,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     return yield* Effect.match(integration.value.validate(Connection.connectionOf(record)), {
       onFailure: (error): Connection.Readiness => ({
         _tag: "Invalid",
-        description: error.reason.description
+        description: error.reason.message
       }),
       onSuccess: (): Connection.Readiness => ({ _tag: "Ready" })
     })

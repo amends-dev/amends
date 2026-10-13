@@ -79,8 +79,8 @@ export const local = Effect.fn("SandboxIntegrations.local")(function* (options: 
         Effect.as<Connection.Health>({ status: "healthy" }),
         Effect.catch((reason) =>
           Effect.succeed<Connection.Health>({
-            status: reason._tag === "UnavailableError" ? "unavailable" : "misconfigured",
-            description: reason.description
+            status: reason.isRetryable ? "unavailable" : "misconfigured",
+            description: reason.message
           })
         )
       )

@@ -165,24 +165,81 @@ export const Posted = Schema.Struct({ messageId: ExternalId })
 export interface Posted extends Schema.Schema.Type<typeof Posted> {}
 
 /**
- * Why the transport could not do what was asked: it `rejected` an inbound request that is not the
- * system's, or whose signature does not hold; the system `refused` what it was asked, as for a
- * conversation that is gone; or the system was `unavailable`, which may pass.
+ * The transport rejected an inbound request that is not the system's, or whose signature does not
+ * hold, or that it cannot read; the system should be answered so.
  *
- * @category schemas
+ * @category errors
  * @since 0.1.0
  */
-export const TransportErrorReason = Schema.Literals(["rejected", "refused", "unavailable"])
+export class RejectedError extends Schema.TaggedError<RejectedError>(
+  "@amends-dev/channel/ChannelTransport/RejectedError"
+)("RejectedError", { description: Schema.optional(Schema.String) }) {
+  get isRetryable(): boolean {
+    return false
+  }
+
+  override get message(): string {
+    return this.description ?? "The request is not the system's"
+  }
+}
 
 /**
- * @category schemas
+ * The system refused what it was asked for good, as for a conversation that is gone.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class RefusedError extends Schema.TaggedError<RefusedError>("@amends-dev/channel/ChannelTransport/RefusedError")(
+  "RefusedError",
+  { description: Schema.optional(Schema.String) }
+) {
+  get isRetryable(): boolean {
+    return false
+  }
+
+  override get message(): string {
+    return this.description ?? "The channel's system refused the operation"
+  }
+}
+
+/**
+ * The system could not be reached now, which may pass.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class UnavailableError extends Schema.TaggedError<UnavailableError>(
+  "@amends-dev/channel/ChannelTransport/UnavailableError"
+)("UnavailableError", { description: Schema.optional(Schema.String) }) {
+  get isRetryable(): boolean {
+    return true
+  }
+
+  override get message(): string {
+    return this.description ?? "The channel's system could not be reached"
+  }
+}
+
+/**
+ * Why the transport could not do what was asked: one of the errors above, which
+ * `TransportError.reason` holds.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export const TransportErrorReason = Schema.Union([RejectedError, RefusedError, UnavailableError]).pipe(
+  Schema.toTaggedUnion("_tag")
+)
+
+/**
+ * @category errors
  * @since 0.1.0
  */
 export type TransportErrorReason = typeof TransportErrorReason.Type
 
 /**
- * The error a transport fails with: its `reason`, and what went wrong in words. Only an
- * `unavailable` system is worth asking again.
+ * The error a transport fails with: why, and what the system said as its `cause`. Only an
+ * unavailable system is worth asking again.
  *
  * @category errors
  * @since 0.1.0
@@ -191,15 +248,14 @@ export class TransportError extends Schema.TaggedError<TransportError>(
   "@amends-dev/channel/ChannelTransport/TransportError"
 )("TransportError", {
   reason: TransportErrorReason,
-  description: Schema.String,
   cause: Schema.optional(Schema.Defect())
 }) {
   get isRetryable(): boolean {
-    return this.reason === "unavailable"
+    return this.reason.isRetryable
   }
 
   override get message(): string {
-    return this.description
+    return this.reason.message
   }
 }
 

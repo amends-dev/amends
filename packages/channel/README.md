@@ -37,11 +37,12 @@ there later, kept as JSON and given back to `post` as it was: a Slack channel an
 an email's message id to reply to. A `Sender` is the person's `id` in the system and what they are
 called. Every id is an `ExternalId`, a non-empty string the system owns.
 
-Every operation fails with `TransportError`, whose `reason` says what to do: `rejected`, the
-request is not the system's or cannot be read, and the system should be answered so; `refused`, the
-system refused the operation for good, such as a message in an archived conversation; and
-`unavailable`, the system could not be reached now, which `isRetryable` says, so the caller may try
-again. `cause` carries what the system said.
+Every operation fails with `TransportError`, whose `reason` says what to do: `RejectedError`, the
+request is not the system's or cannot be read, and the system should be answered so; `RefusedError`,
+the system refused the operation for good, such as a message in an archived conversation; and
+`UnavailableError`, the system could not be reached now, which `isRetryable` says, so the caller may
+try again. Each reason's `description` says what happened, and `cause` carries what the system said.
+A caller recovers from one reason with `Effect.catchReason("TransportError", "RejectedError", ...)`.
 
 ## Writing a transport
 
@@ -60,7 +61,7 @@ export const slack = (options: {
   self: ChannelTransport.ExternalId.make(options.botUserId),
   receive: (inbound) =>
     Effect.gen(function* () {
-      yield* verifySignature(inbound, options.signingSecret) // TransportError "rejected"
+      yield* verifySignature(inbound, options.signingSecret) // TransportError with a RejectedError
       const payload = yield* decodeEventsApi(inbound.body)
       if (payload.type === "url_verification") return { events: [], answer: payload.challenge }
       return { events: yield* eventsOf(payload) }

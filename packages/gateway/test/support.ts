@@ -74,8 +74,7 @@ export const testTransport: ChannelTransport.ChannelTransport = {
       Effect.mapError(
         (error) =>
           new ChannelTransport.TransportError({
-            reason: "rejected",
-            description: "The body is not what the test system sends",
+            reason: new ChannelTransport.RejectedError({ description: "The body is not what the test system sends" }),
             cause: error
           })
       )

@@ -132,16 +132,14 @@ const makeTransport = (options: { readonly unavailable?: number; readonly refuse
         if (options.refuses === true)
           return Effect.fail(
             new ChannelTransport.TransportError({
-              reason: "refused",
-              description: "The channel is archived."
+              reason: new ChannelTransport.RefusedError({ description: "The channel is archived." })
             })
           )
         if (failures < (options.unavailable ?? 0)) {
           failures += 1
           return Effect.fail(
             new ChannelTransport.TransportError({
-              reason: "unavailable",
-              description: "The system timed out."
+              reason: new ChannelTransport.UnavailableError({ description: "The system timed out." })
             })
           )
         }

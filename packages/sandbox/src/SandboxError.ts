@@ -158,7 +158,7 @@ export const SandboxErrorReason = Schema.Union([
   UnsupportedError,
   UnavailableError,
   UnknownError
-])
+]).pipe(Schema.toTaggedUnion("_tag"))
 
 /**
  * @category errors

@@ -138,7 +138,7 @@ export const make = Effect.fn("ChannelQuery.make")(function* () {
       Effect.mapError(
         (error) =>
           new CoreError.Unavailable({
-            reason: new CoreError.ChannelUnreachable({ description: error.reason.description })
+            reason: new CoreError.ChannelUnreachable({ description: error.reason.message })
           })
       )
     )

@@ -178,7 +178,7 @@ const refusalOf = Effect.fnUntraced(function* (
         })
       : integration.validate(connection)
   return yield* Effect.match(validated, {
-    onFailure: (error) => error.reason.description,
+    onFailure: (error) => error.reason.message,
     onSuccess: () => undefined
   })
 })

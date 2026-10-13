@@ -205,7 +205,7 @@ export const HarnessErrorReason = Schema.Union([
   AgentContractError,
   UnavailableError,
   UnknownError
-])
+]).pipe(Schema.toTaggedUnion("_tag"))
 
 /**
  * @category errors

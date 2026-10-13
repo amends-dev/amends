@@ -17,7 +17,6 @@ import { DeliveryExecution } from "@amends-dev/core/channel"
 import { Gateway } from "@amends-dev/gateway"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
-import * as Predicate from "effect/Predicate"
 import * as Ref from "effect/Ref"
 import * as Result from "effect/Result"
 import type * as Scope from "effect/Scope"
@@ -33,18 +32,6 @@ export class RunFailed extends Data.TaggedError("DeliveryRunner.RunFailed")<{
   readonly deliveryId: Delivery.Id | undefined
   readonly cause: unknown
 }> {}
-
-/** Why a post failed, as the delivery records it. */
-const describe = (error: unknown): string =>
-  Predicate.hasProperty(error, "message") && typeof error.message === "string" && error.message !== ""
-    ? error.message
-    : "The channel's system refused the message."
-
-/** Whether a post may succeed if tried again: its system could not be reached. */
-const isRetryable = (error: unknown) =>
-  Predicate.isTagged(error, "TransportError") &&
-  Predicate.hasProperty(error, "isRetryable") &&
-  error.isRetryable === true
 
 /**
  * Makes the delivery runner of `job`, over `Gateway.Gateway` and the host's `Integrations`, which
@@ -98,13 +85,13 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
           })
         )
       )
-    } else if (isRetryable(posted.failure)) {
+    } else if (posted.failure.isRetryable) {
       return yield* new RunFailed({ deliveryId: delivery.id, cause: posted.failure })
     } else {
       yield* inWorkspace(
         DeliveryExecution.DeliveryExecution.use((deliveryExecution) =>
           deliveryExecution.recordFailed(delivery.id, {
-            reason: describe(posted.failure),
+            reason: posted.failure.message,
             attempts
           })
         )

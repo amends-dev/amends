@@ -153,8 +153,8 @@ export const openApi = Effect.map(HttpClient.HttpClient, (client) => {
         Effect.as<Health>({ status: "healthy" }),
         Effect.catch((reason) =>
           Effect.succeed<Health>({
-            status: reason._tag === "UnavailableError" ? "unavailable" : "misconfigured",
-            description: reason.description
+            status: reason.isRetryable ? "unavailable" : "misconfigured",
+            description: reason.message
           })
         )
       )

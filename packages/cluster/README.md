@@ -94,7 +94,7 @@ which answers `Idle` for one no longer requested or failed as it stood, and othe
 the text and its author's name, the conversation as the transport needs it, and the channel's
 connection with its key; build the transport from the connection's integration and `post`; and
 `recordSent` with the id the system gave the message, or `recordFailed` when the system refused it.
-A system that cannot be reached (`TransportError` with `isRetryable`) fails the run with the
+A system that cannot be reached (a failure whose `isRetryable` holds) fails the run with the
 delivery it was on, for the job to try again, and `giveUp` fails that delivery once the job stops
 trying. The runner counts the tries it made of each delivery, which the delivery records.
 
