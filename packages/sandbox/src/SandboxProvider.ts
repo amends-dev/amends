@@ -18,9 +18,12 @@ import type * as Template from "./Template.ts"
 
 /**
  * What only one platform takes on a create, keyed by the provider's id, as `SandboxError.provider`
- * names it, with JSON values: such as the snapshot a sandbox on Daytona starts from. A provider
- * decodes its own entry and ignores the others, so one value can name several providers; an entry
- * that is not what the provider takes fails with `InvalidOptionsError`, creating nothing.
+ * names it, with JSON values: such as the snapshot a sandbox on Daytona starts from.
+ *
+ * **Details**
+ *
+ * A provider decodes its own entry and ignores the others, so one value can name several providers;
+ * an entry that is not what the provider takes fails with `InvalidOptionsError`, creating nothing.
  *
  * **Example** (The snapshot a sandbox on Daytona starts from)
  *
@@ -81,9 +84,12 @@ export interface CreateOptions<E> {
 }
 
 /**
- * Creates sandboxes on one platform and resumes the ones it created before. A program asks for
- * the service and gets whichever provider's layer it runs under. `make` builds the service from a
- * provider's `create` and `resume`.
+ * Creates sandboxes on one platform and resumes the ones it created before.
+ *
+ * **Details**
+ *
+ * A program asks for the service and gets whichever provider's layer it runs under. `make` builds
+ * the service from a provider's `create` and `resume`.
  *
  * **Example** (Creating a sandbox, stopping it, and resuming it later)
  *

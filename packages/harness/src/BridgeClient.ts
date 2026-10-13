@@ -110,8 +110,12 @@ type Client = RpcClient.FromGroup<typeof Bridge.Rpcs, RpcClientError.RpcClientEr
 
 /**
  * Creates a session, as `Agent.createSession` does, of the agent behind the bridge that `options`
- * describes, in the sandbox of the session's workspace. It connects with the `WebSocketConstructor`
- * provided, which must send headers when it opens a connection, as Bun's and Node's do.
+ * describes, in the sandbox of the session's workspace.
+ *
+ * **Details**
+ *
+ * It connects with the `WebSocketConstructor` provided, which must send headers when it opens a
+ * connection, as Bun's and Node's do.
  *
  * **Example** (An adapter's agent whose sessions run behind its bridge)
  *

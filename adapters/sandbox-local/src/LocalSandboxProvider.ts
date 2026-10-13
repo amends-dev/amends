@@ -46,9 +46,12 @@ export interface Options {
 const Settings = Schema.fromJsonString(Schema.Struct({ ports: Schema.Array(Network.Port) }))
 
 /**
- * The provider over `options.directory`, which it creates if it is missing. It needs Effect's
- * `FileSystem`, `Path`, `Crypto`, and `ChildProcessSpawner` services for this machine, as
- * `BunServices.layer` or `NodeServices.layer` provide them.
+ * The provider over `options.directory`, which it creates if it is missing.
+ *
+ * **Details**
+ *
+ * It needs Effect's `FileSystem`, `Path`, `Crypto`, and `ChildProcessSpawner` services for this
+ * machine, as `BunServices.layer` or `NodeServices.layer` provide them.
  *
  * **Example** (A provider for one piece of work, over a temporary directory)
  *

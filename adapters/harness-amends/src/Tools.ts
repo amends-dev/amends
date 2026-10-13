@@ -91,8 +91,11 @@ export const Edit = Tool.make("edit", {
 
 /**
  * Runs a shell command in the session's directory, answering with its exit code and its output,
- * stdout and stderr interleaved, of which long output keeps its start and end. A command that
- * outruns the timeout is killed.
+ * stdout and stderr interleaved, of which long output keeps its start and end.
+ *
+ * **Details**
+ *
+ * A command that outruns the timeout is killed.
  *
  * @category tools
  * @since 0.1.0
@@ -145,8 +148,12 @@ const killGracePeriod = Duration.seconds(2)
 
 /**
  * The tools' handlers, working in `workspace`: its sandbox's file system and processes, in its
- * directory. `commandTimeout` is how long a `bash` command runs before it is killed,
- * `defaultCommandTimeout` by default.
+ * directory.
+ *
+ * **Details**
+ *
+ * `commandTimeout` is how long a `bash` command runs before it is killed, `defaultCommandTimeout`
+ * by default.
  *
  * **Example** (Running a command in a session's directory, as the model would)
  *

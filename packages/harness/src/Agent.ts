@@ -32,8 +32,12 @@ import type * as StreamPart from "./StreamPart.ts"
 
 /**
  * What every agent is made with: the model a turn runs on when it names none, and the models a turn
- * can name, by name. A turn that names another fails with `UnsupportedError`. An adapter's own
- * options extend these with what only its agent takes.
+ * can name, by name.
+ *
+ * **Details**
+ *
+ * A turn that names another fails with `UnsupportedError`. An adapter's own options extend these
+ * with what only its agent takes.
  *
  * @category options
  * @since 0.1.0
@@ -133,9 +137,13 @@ export interface TurnOptions {
 }
 
 /**
- * One conversation with the agent, as its adapter runs it. The harness calls one operation at a
- * time: it runs a turn to its `finish` before it starts another, and releases the session with
- * `suspendTurn`, `detach`, `stop`, or `destroy` once, after which it calls nothing else.
+ * One conversation with the agent, as its adapter runs it.
+ *
+ * **Details**
+ *
+ * The harness calls one operation at a time: it runs a turn to its `finish` before it starts
+ * another, and releases the session with `suspendTurn`, `detach`, `stop`, or `destroy` once, after
+ * which it calls nothing else.
  *
  * @category models
  * @since 0.1.0

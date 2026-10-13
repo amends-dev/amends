@@ -66,8 +66,11 @@ export interface Options {
 
 /**
  * What a sandbox on Daytona is created with besides the contract's options, under
- * `providerOptions.daytona`, each in place of the provider's own option for this sandbox. An entry
- * that is not this fails the create with `InvalidOptionsError` before Daytona is asked.
+ * `providerOptions.daytona`, each in place of the provider's own option for this sandbox.
+ *
+ * **Details**
+ *
+ * An entry that is not this fails the create with `InvalidOptionsError` before Daytona is asked.
  *
  * **Example** (A sandbox from another snapshot, which Daytona stops after an hour idle)
  *
@@ -117,8 +120,11 @@ const stoppedStates = new Set(["stopped", "archived"])
 
 /**
  * The provider over Daytona's SDK with `options`, in a scope that closes the SDK's client and
- * leaves snapshots still being made to a later create. It needs Effect's `Crypto` service, as
- * `BunCrypto.layer` or `NodeCrypto.layer` provide it.
+ * leaves snapshots still being made to a later create.
+ *
+ * **Details**
+ *
+ * It needs Effect's `Crypto` service, as `BunCrypto.layer` or `NodeCrypto.layer` provide it.
  *
  * **Example** (A provider for one piece of work)
  *

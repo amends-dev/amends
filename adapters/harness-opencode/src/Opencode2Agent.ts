@@ -25,8 +25,12 @@ import * as internal from "./internal/agent.ts"
 
 /**
  * What the agent is made with: the endpoints its turns run on, as `Agent.Options` give them, and
- * what only opencode takes. All of it, the keys included, names the bridge, so an agent made with
- * other options gets a bridge and a server of its own in a sandbox, and never runs on another's.
+ * what only opencode takes.
+ *
+ * **Details**
+ *
+ * All of it, the keys included, names the bridge, so an agent made with other options gets a bridge
+ * and a server of its own in a sandbox, and never runs on another's.
  *
  * @category options
  * @since 0.1.0
@@ -52,10 +56,13 @@ export interface Options extends Agent.Options {
 
 /**
  * The agent, which bundles the bridge program for its template when it is made, with `Bun.build`,
- * so the host runs on Bun. Each session reaches opencode through the bridge in its sandbox, with
- * the `Crypto` and the `WebSocketConstructor` the agent is made with; the constructor must send
- * headers, as Bun's and Node's do. Endpoints that opencode cannot serve together fail with
- * `UnsupportedError`.
+ * so the host runs on Bun.
+ *
+ * **Details**
+ *
+ * Each session reaches opencode through the bridge in its sandbox, with the `Crypto` and the
+ * `WebSocketConstructor` the agent is made with; the constructor must send headers, as Bun's and
+ * Node's do. Endpoints that opencode cannot serve together fail with `UnsupportedError`.
  *
  * **Example** (A turn of opencode 2 in a new sandbox)
  *

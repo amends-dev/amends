@@ -110,8 +110,11 @@ export interface HandlerOptions extends Pick<Options, "stateDirectory" | "bridge
 /**
  * Serves `driver`'s sessions over a WebSocket at `/`, on the `HttpServer` provided, and writes the
  * server's port to `Bridge.listeningFile`, until the bridge has been idle for its idle timeout or
- * another bridge of its id takes its place. The sessions end, aborting their turns, when the scope
- * closes.
+ * another bridge of its id takes its place.
+ *
+ * **Details**
+ *
+ * The sessions end, aborting their turns, when the scope closes.
  *
  * **Example** (A bridge program on Bun)
  *
@@ -192,9 +195,12 @@ export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options
 
 /**
  * Handles `Bridge.Rpcs` for `driver`'s sessions, over whichever transport serves them, recording in
- * `activity` the turns they run and when a host was last active. `serve` provides it to an
- * `RpcServer` over a WebSocket; a test, or a bridge with a transport of its own, provides it to
- * another.
+ * `activity` the turns they run and when a host was last active.
+ *
+ * **Details**
+ *
+ * `serve` provides it to an `RpcServer` over a WebSocket; a test, or a bridge with a transport of
+ * its own, provides it to another.
  *
  * @category layers
  * @since 0.1.0

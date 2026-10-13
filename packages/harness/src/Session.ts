@@ -194,9 +194,12 @@ export type TurnError<Tools extends Record<string, Tool.Any>> =
 export type TurnServices<Tools extends Record<string, Tool.Any>> = Tool.HandlerServices<Tools[keyof Tools]>
 
 /**
- * One conversation with an agent, as callers hold it. Turns run one at a time, each as a stream of
- * `StreamPart`s or returned whole, and the session is released once, with `suspendTurn`, `detach`,
- * `stop`, or `destroy`.
+ * One conversation with an agent, as callers hold it.
+ *
+ * **Details**
+ *
+ * Turns run one at a time, each as a stream of `StreamPart`s or returned whole, and the session is
+ * released once, with `suspendTurn`, `detach`, `stop`, or `destroy`.
  *
  * **Example** (A turn with a host tool that needs approval)
  *
@@ -353,9 +356,12 @@ export interface Session {
 /**
  * `conversation` with `step` recorded after it, as `SessionState.history` records a conversation:
  * an assistant message with what the model wrote and the tools it called, followed by a tool
- * message with the results, and none for a step that wrote nothing and called none. A step that
- * compacted the conversation replaces it, and what the step had before, with the conversation the
- * compaction left, so that the conversation is the one the agent goes on with.
+ * message with the results, and none for a step that wrote nothing and called none.
+ *
+ * **Details**
+ *
+ * A step that compacted the conversation replaces it, and what the step had before, with the
+ * conversation the compaction left, so that the conversation is the one the agent goes on with.
  *
  * It is for a caller that keeps a session's steps itself, as a log, and rebuilds the conversation
  * to give `Harness.createSession` as `history`, rather than storing it whole with every turn.
@@ -388,6 +394,9 @@ export const recordStep = (conversation: Prompt.Prompt, step: StreamPart.Step): 
 
 /**
  * The conversation a compaction leaves: its summary, as a user message, then the messages it kept.
+ *
+ * **Details**
+ *
  * An agent that keeps its own conversation goes on from this one, so that it has what the session
  * records.
  *

@@ -38,8 +38,11 @@ export const EndpointProtocol = Schema.Literals(["http", "ws"])
 export type EndpointProtocol = typeof EndpointProtocol.Type
 
 /**
- * How to reach a sandbox port from outside: the URL, and any headers the provider requires. A
- * request to the URL with those headers reaches the server with the request's other headers
+ * How to reach a sandbox port from outside: the URL, and any headers the provider requires.
+ *
+ * **Details**
+ *
+ * A request to the URL with those headers reaches the server with the request's other headers
  * intact, `Authorization` included.
  *
  * @category schemas
@@ -57,9 +60,12 @@ export const Endpoint = Schema.Struct({
 export interface Endpoint extends Schema.Schema.Type<typeof Endpoint> {}
 
 /**
- * Which outbound destinations the sandbox may reach. `AllowList` allows the listed hosts and
- * CIDR ranges, and `deniedCidrs` overrides both, for example to block a cloud metadata address
- * inside an allowed range.
+ * Which outbound destinations the sandbox may reach.
+ *
+ * **Details**
+ *
+ * `AllowList` allows the listed hosts and CIDR ranges, and `deniedCidrs` overrides both, for
+ * example to block a cloud metadata address inside an allowed range.
  *
  * **Example** (Allowing one registry and a private network, except its metadata address)
  *
@@ -94,8 +100,12 @@ export type NetworkPolicy = typeof NetworkPolicy.Type
 
 /**
  * Sets `setHeaders` on outbound HTTPS requests to `host` whose path starts with `pathPrefix` and
- * that carry every header in `matchHeaders` with exactly that value. The sandbox holds only a
- * placeholder credential, matched here, and the real value is set outside it.
+ * that carry every header in `matchHeaders` with exactly that value.
+ *
+ * **Details**
+ *
+ * The sandbox holds only a placeholder credential, matched here, and the real value is set outside
+ * it.
  *
  * **Example** (Giving a sandbox an API key it never sees)
  *

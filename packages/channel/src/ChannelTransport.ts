@@ -262,6 +262,48 @@ export class TransportError extends Schema.TaggedError<TransportError>(
 /**
  * A channel's transport: how a connection to the system receives events and posts there.
  *
+ * **Example** (A transport for a chat system that sends each message to a webhook)
+ *
+ * ```ts
+ * import { ChannelTransport } from "@amends-dev/channel"
+ * import { DateTime, Effect, Schema } from "effect"
+ *
+ * // What the system's webhook sends: one message in a room, as JSON.
+ * const Webhook = Schema.fromJsonString(
+ *   Schema.Struct({ room: Schema.String, id: Schema.String, from: Schema.String, text: Schema.String })
+ * )
+ *
+ * // The system's API, which answers a post with the new message's id.
+ * declare const sendToRoom: (room: string, text: string) => Effect.Effect<string, Error>
+ *
+ * const failWith = (reason: ChannelTransport.TransportErrorReason) => (cause: unknown) =>
+ *   new ChannelTransport.TransportError({ reason, cause })
+ *
+ * export const transport: ChannelTransport.ChannelTransport = {
+ *   self: undefined,
+ *   // A real transport first checks the signature the system puts in `inbound.headers`.
+ *   receive: (inbound) =>
+ *     Effect.gen(function* () {
+ *       const message = yield* Schema.decodeUnknownEffect(Webhook)(inbound.body).pipe(
+ *         Effect.mapError(failWith(new ChannelTransport.RejectedError({})))
+ *       )
+ *       const event = ChannelTransport.Event.cases.MessageReceived.make({
+ *         conversation: { id: message.room, details: {} },
+ *         messageId: message.id,
+ *         sender: { id: message.from, name: message.from },
+ *         text: message.text,
+ *         receivedAt: yield* DateTime.now
+ *       })
+ *       return { events: [event] }
+ *     }),
+ *   post: (conversation, outgoing) =>
+ *     sendToRoom(conversation.id, `${outgoing.author}: ${outgoing.text}`).pipe(
+ *       Effect.map((messageId) => ({ messageId })),
+ *       Effect.mapError(failWith(new ChannelTransport.UnavailableError({})))
+ *     )
+ * }
+ * ```
+ *
  * @category models
  * @since 0.1.0
  */

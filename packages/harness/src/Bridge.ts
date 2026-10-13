@@ -154,8 +154,12 @@ export interface DriverSession {
 
 /**
  * What an adapter implements to run its agent behind a bridge: it drives the agent in the sandbox,
- * starting its sessions and running their turns, while the bridge keeps the turns, so that a
- * driver needs neither to suspend nor to continue one. `BridgeServer.serve` serves it.
+ * starting its sessions and running their turns, while the bridge keeps the turns, so that a driver
+ * needs neither to suspend nor to continue one.
+ *
+ * **Details**
+ *
+ * `BridgeServer.serve` serves it.
  *
  * **Example** (A driver over an agent's own session API)
  *
@@ -237,9 +241,12 @@ export const NumberedPart = Schema.Struct({ seq: Schema.Int, part: StreamPart.St
 export interface NumberedPart extends Schema.Schema.Type<typeof NumberedPart> {}
 
 /**
- * The version of `Rpcs` that this package speaks. Every bridge's id includes it, so a host only
- * ever reaches a bridge of its own version. Bump it when hosts or bridges of the version before
- * could not read a change to the protocol.
+ * The version of `Rpcs` that this package speaks.
+ *
+ * **Details**
+ *
+ * Every bridge's id includes it, so a host only ever reaches a bridge of its own version. Bump it
+ * when hosts or bridges of the version before could not read a change to the protocol.
  *
  * @category constants
  * @since 0.1.0

@@ -15,8 +15,12 @@ import type * as SandboxProvider from "../SandboxProvider.ts"
 
 /**
  * What a provider's tests give `run`: how to make the provider, and what the suites cannot assume
- * of every platform. `R` is what making the provider needs, which `layer` provides, and `E` what
- * the fixture's effects fail with.
+ * of every platform.
+ *
+ * **Details**
+ *
+ * `R` is what making the provider needs, which `layer` provides, and `E` what the fixture's effects
+ * fail with.
  *
  * @category testing
  * @since 0.1.0

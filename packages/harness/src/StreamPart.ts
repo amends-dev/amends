@@ -82,11 +82,14 @@ export interface FileChangePart extends Schema.Schema.Type<typeof FileChangePart
 
 /**
  * Reports that the agent replaced its conversation so far with a summary, because it was asked to
- * (`manual`) or because the conversation outgrew its context (`auto`). The conversation goes on
- * from the summary and the messages the agent kept, in place of everything before the compaction,
- * as `Session.recordStep` records it. An agent that compacts during a turn streams the compaction
- * between two steps, so that it starts the step after; `AgentSession.compact` returns one made
- * between turns.
+ * (`manual`) or because the conversation outgrew its context (`auto`).
+ *
+ * **Details**
+ *
+ * The conversation goes on from the summary and the messages the agent kept, in place of everything
+ * before the compaction, as `Session.recordStep` records it. An agent that compacts during a turn
+ * streams the compaction between two steps, so that it starts the step after;
+ * `AgentSession.compact` returns one made between turns.
  *
  * @category schemas
  * @since 0.1.0
@@ -117,8 +120,12 @@ export interface CompactionPart extends Schema.Schema.Type<typeof CompactionPart
 
 /**
  * Starts a turn that runs apart from the host, as in a sandbox, with what `createSession` takes as
- * the unfinished turn's `agentState`. A caller that keeps it continues the turn with
- * `continueStream` once the host that ran it is gone, catching up on the steps it does not have.
+ * the unfinished turn's `agentState`.
+ *
+ * **Details**
+ *
+ * A caller that keeps it continues the turn with `continueStream` once the host that ran it is
+ * gone, catching up on the steps it does not have.
  *
  * @category schemas
  * @since 0.1.0
@@ -180,8 +187,11 @@ type Superset<Whole, Subset extends Whole> = Whole | Subset
 
 /**
  * A part of a step as the step's stream adds up: a text or a reasoning whole rather than its
- * deltas, a tool call without the params it streamed on its way, and a tool's final result. These
- * are the parts Effect AI's `generateText` returns for a response, and those only an agent
+ * deltas, a tool call without the params it streamed on its way, and a tool's final result.
+ *
+ * **Details**
+ *
+ * These are the parts Effect AI's `generateText` returns for a response, and those only an agent
  * produces.
  *
  * @category schemas
@@ -209,10 +219,13 @@ export const StepPart = Schema.Union([
 export type StepPart = typeof StepPart.Type
 
 /**
- * One step of a turn: what the model wrote, the tools it called and their results, in the order
- * the step streamed them, and the `finish-step` part that ended it. A step the turn ended partway
- * through, by failing or being stopped, has what it streamed so far and no `finish`. A step is
- * JSON, for callers that store a turn's steps.
+ * One step of a turn: what the model wrote, the tools it called and their results, in the order the
+ * step streamed them, and the `finish-step` part that ended it.
+ *
+ * **Details**
+ *
+ * A step the turn ended partway through, by failing or being stopped, has what it streamed so far
+ * and no `finish`. A step is JSON, for callers that store a turn's steps.
  *
  * @category schemas
  * @since 0.1.0
@@ -229,9 +242,12 @@ export const Step = Schema.Struct({
 export interface Step extends Schema.Schema.Type<typeof Step> {}
 
 /**
- * A turn's steps, from its parts as far as they go, split at their `finish-step` parts. The turn's
- * `finish` part ends the turn rather than a step, so no step holds it. A step the parts end before
- * its `finish-step` comes last when it has parts.
+ * A turn's steps, from its parts as far as they go, split at their `finish-step` parts.
+ *
+ * **Details**
+ *
+ * The turn's `finish` part ends the turn rather than a step, so no step holds it. A step the parts
+ * end before its `finish-step` comes last when it has parts.
  *
  * **Example** (Adding a turn's parts up into steps)
  *
