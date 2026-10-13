@@ -105,9 +105,9 @@ export const resolver = Effect.gen(function* () {
     listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
     const activities = yield* Effect.orDie(Effect.forEach(listed, (activity) => decode(activity)));
-    const rows = yield* threadMessageStore
-      .getMany([...new Set(activities.map((activity) => activity.details.messageId))])
-      .pipe(Effect.mapError((cause) => new ThreadActivityResolvers.Failure({ cause })));
+    const rows = yield* threadMessageStore.getMany([
+      ...new Set(activities.map((activity) => activity.details.messageId)),
+    ]);
     const found = new Map(rows.map((message) => [message.id, message] as const));
     return yield* Effect.forEach(
       activities,

@@ -54,7 +54,7 @@ describe("invitation replay", () => {
               InvitationService.InvitationService,
               (invitationService) =>
                 invitationService.accept(invitation.details.id, bob.id, Member.Name.make("bob")),
-            ).pipe(Effect.provide(core(broken)), Effect.flip);
+            ).pipe(Effect.provide(core(broken)), Effect.catchDefect(Effect.succeed));
             expect(failure).toBe(error);
             expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
             expect(yield* bound.invitations.get(invitation.details.id)).toMatchObject({
@@ -115,7 +115,7 @@ describe("invitation replay", () => {
                 memberId: workspace.ownerMemberId,
                 identity: alice,
               }),
-              Effect.flip,
+              Effect.catchDefect(Effect.succeed),
             );
             expect(failure).toBe(error);
             expect(yield* Operations.getMember(workspace.id, bob, member.id)).toEqual(member);

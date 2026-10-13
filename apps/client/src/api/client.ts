@@ -1,5 +1,7 @@
 import * as Contract from "@amends-dev/http/Api";
 import * as Authentication from "@amends-dev/http/Authentication";
+import * as WorkspaceMember from "@amends-dev/http/WorkspaceMember";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Cause, Effect, Layer, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
@@ -15,8 +17,11 @@ export interface ApiClientOptions {
   readonly rejected?: () => void;
 }
 
-/** How a credential's requests travel: with its bearer token, reporting a rejection of it. */
-const httpClientOf = (options: ApiClientOptions) => {
+/**
+ * How a credential's requests travel: with its bearer token, naming the workspace they act in when
+ * there is one, and reporting a rejection of the credential.
+ */
+const httpClientOf = (options: ApiClientOptions, workspaceId?: string) => {
   const transport = options.transport ?? FetchHttpClient.layer;
   const { session, rejected = () => {} } = options;
   const signingOut = Layer.effect(
@@ -31,16 +36,28 @@ const httpClientOf = (options: ApiClientOptions) => {
     HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
       next(session ? HttpClientRequest.bearerToken(request, session.token) : request),
     ),
+    workspaceId === undefined
+      ? WorkspaceMember.layerClientOutsideWorkspace
+      : WorkspaceMember.layerClient(Workspace.Id.make(workspaceId)),
   );
 };
 
-/** The typed API for one credential: each session gets its own client, runtime, and reads. */
-export function createApiClient(options: ApiClientOptions) {
-  class Client extends AtomHttpApi.Service<Client>()("@amends-dev/client/api/ApiClient", {
-    api: Contract.Api,
-    baseUrl: options.baseUrl,
-    httpClient: httpClientOf(options),
-  }) {}
+/**
+ * The typed API for one credential, acting in the workspace `workspaceId` when one is given: the
+ * session and each workspace it reaches get their own client, runtime, and reads. A client in no
+ * workspace calls no member's endpoint.
+ */
+export function createApiClient(options: ApiClientOptions, workspaceId?: string) {
+  class Client extends AtomHttpApi.Service<Client>()(
+    workspaceId === undefined
+      ? "@amends-dev/client/api/ApiClient"
+      : `@amends-dev/client/api/ApiClient/${workspaceId}`,
+    {
+      api: Contract.Api,
+      baseUrl: options.baseUrl,
+      httpClient: httpClientOf(options, workspaceId),
+    },
+  ) {}
   return Client;
 }
 
@@ -57,8 +74,10 @@ export const revokeSession = (options: ApiClientOptions) =>
     Effect.ignore,
   );
 export type ApiClient = ReturnType<typeof createApiClient>;
-/** The generated HTTP client operations call. */
-export type Api = ApiClient["Service"];
+/** The generated HTTP client a workspace's operations call. */
+export type WorkspaceApi = ApiClient["Service"];
+/** The part of it a client in no workspace calls: signing in, the account, and its workspaces. */
+export type Api = Pick<WorkspaceApi, "session" | "me" | "workspaces">;
 
 const unauthorized = Schema.is(Authentication.Unauthorized);
 export const isUnauthorized = (cause: Cause.Cause<unknown>): boolean =>

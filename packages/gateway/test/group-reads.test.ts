@@ -818,7 +818,7 @@ describe("group reads", () => {
                 yield* Effect.flip(
                   asActor(groupService.get(first.id), actorFor(readerId, otherWorkspaceId)),
                 ),
-              ).toMatchObject({ _tag: "Authorization.WorkspaceMismatch" });
+              ).toMatchObject({ _tag: "CoreError.Invalid" });
             }),
           );
         }),
@@ -826,7 +826,7 @@ describe("group reads", () => {
     ),
   );
 
-  it.effect("a storage failure reaches a group reader as it is, and records nothing", () =>
+  it.effect("a storage failure ends a group read as a defect, and records nothing", () =>
     withStorage((storage) =>
       runHost(
         storage,
@@ -843,7 +843,9 @@ describe("group reads", () => {
                 Effect.fail(StoreError.failed("GroupStore", "getMany")("failed storage")),
             }),
           };
-          expect(yield* Effect.flip(run(failed, reader, mine))).toMatchObject({
+          expect(
+            yield* Effect.catchDefect(run(failed, reader, mine), Effect.succeed),
+          ).toMatchObject({
             _tag: "StoreError",
             store: "GroupStore",
             reason: { _tag: "Failed" },

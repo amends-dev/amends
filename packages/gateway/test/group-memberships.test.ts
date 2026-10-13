@@ -650,7 +650,9 @@ describe("group memberships", () => {
           const live = yield* bound.checkpoints.listLive(journalLog);
           const failure = StoreError.failed("Store", "commit")("injected late failure");
           const broken = failingLate(bound, failure);
-          expect(yield* Effect.flip(run(broken, owner, add(group.id, humanId)))).toEqual(failure);
+          expect(
+            yield* Effect.catchDefect(run(broken, owner, add(group.id, humanId)), Effect.succeed),
+          ).toEqual(failure);
           expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
           expect(yield* bound.groups.get(group.id)).toEqual(Option.some(group));
           expect(yield* history(bound)).toEqual(before);
@@ -830,7 +832,7 @@ describe("group memberships", () => {
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               _tag: "Some",
               value: {
-                _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|CoreError.Unavailable)$/),
               },
             });
         }
@@ -1378,9 +1380,12 @@ describe("group memberships", () => {
             const broken = failingLate(bound, failure);
             for (const operation of [remove, leave]) {
               const actor = operation === remove ? owner : memberActor(humanId);
-              expect(yield* Effect.flip(run(broken, actor, operation(membership)))).toEqual(
-                failure,
-              );
+              expect(
+                yield* Effect.catchDefect(
+                  run(broken, actor, operation(membership)),
+                  Effect.succeed,
+                ),
+              ).toEqual(failure);
               expect(
                 yield* Effect.flip(
                   run(
@@ -1431,7 +1436,10 @@ describe("group memberships", () => {
             }),
           };
           expect(
-            yield* Effect.flip(run(broken, owner, removeWorkspaceMember(humanId))),
+            yield* Effect.catchDefect(
+              run(broken, owner, removeWorkspaceMember(humanId)),
+              Effect.succeed,
+            ),
           ).toMatchObject({ _tag: "Projection.Failure" });
           expect(yield* bound.members.get(humanId)).toMatchObject({
             value: { status: "active" },
@@ -1610,7 +1618,7 @@ describe("group memberships", () => {
           if (Exit.isFailure(outcome))
             expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
               value: {
-                _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
+                _tag: expect.stringMatching(/^(CoreError.Conflict|CoreError.Unavailable)$/),
               },
             });
         yield* Effect.scoped(
@@ -1685,7 +1693,7 @@ describe("group memberships", () => {
             if (Exit.isFailure(outcome))
               expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                 value: {
-                  _tag: expect.stringMatching(/^(CoreError.Conflict|StoreError)$/),
+                  _tag: expect.stringMatching(/^(CoreError.Conflict|CoreError.Unavailable)$/),
                 },
               });
           yield* Effect.scoped(

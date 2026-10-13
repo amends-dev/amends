@@ -11,13 +11,13 @@
  */
 import { Connection as ConnectionContract } from "@amends-dev/connection";
 import { Connection } from "@amends-dev/core/connection";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
-const connection = { workspaceId: Workspace.Id, connectionId: Connection.Id };
+const connection = { connectionId: Connection.Id };
 const view = Connection.View.annotate({ identifier: "Connection" });
 
 /**
@@ -31,19 +31,16 @@ const view = Connection.View.annotate({ identifier: "Connection" });
 export class ConnectionsGroup extends HttpApiGroup.make("connections")
   .add(
     HttpApiEndpoint.get("integrations", "/integrations", {
-      params: { workspaceId: Workspace.Id },
       success: Schema.Array(
         Connection.IntegrationView.annotate({ identifier: "ConnectionIntegration" }),
       ),
       error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.get("list", "/", {
-      params: { workspaceId: Workspace.Id },
       success: Schema.Array(view),
       error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
     HttpApiEndpoint.post("create", "/", {
-      params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
       payload: Connection.CreateInput,
       success: Connection.View.pipe(HttpApiSchema.status(201)).annotate({
@@ -93,5 +90,6 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       error: [...ApiErrors.workspace, ApiErrors.NotFound],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId/connections") {}
+  .prefix("/connections") {}

@@ -2,12 +2,14 @@
  * The HTTP protocol of amends: the contract clients call, and the server that implements it over
  * the gateway. `Api` is the whole contract and each `XGroup` one set of endpoints; `Authentication`
  * is the bearer middleware that provides `Principal` and `Credential` and fails with
- * `Unauthorized`; and `ApiErrors` gives each outcome an endpoint answers with its status. A client
- * imports these contract modules alone, by their subpaths, such as `@amends-dev/http/Api`, and
- * decodes with the schemas core and the gateway declare.
+ * `Unauthorized`; `WorkspaceMember` is the middleware every member endpoint declares, which runs it
+ * in the workspace its path names, as the principal's membership; and `ApiErrors` gives each
+ * outcome an endpoint answers with its status. A client imports these contract modules alone, by
+ * their subpaths, such as `@amends-dev/http/Api`, and decodes with the schemas core and the gateway
+ * declare.
  *
- * Each `XHandlers` module implements one group, entering a workspace through `Gateway.asMember`,
- * or `Gateway.inWorkspace` where no member acts, and calling the core service it is named for.
+ * Each `XHandlers` module implements one group, calling the core service it is named for in the
+ * workspace `WorkspaceMember` entered, or through `Gateway.inWorkspace` where no member acts.
  * `BearerAuthentication` implements the contract's authentication, `Streams` and `Draining` serve
  * the long-lived streams, and `Routes` composes them all for a host to serve.
  *
@@ -169,6 +171,16 @@ export * as SessionHandlers from "./SessionHandlers.ts";
 /**
  * @since 0.1.0
  */
+export * as SettingsGroup from "./SettingsGroup.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as SettingsHandlers from "./SettingsHandlers.ts";
+
+/**
+ * @since 0.1.0
+ */
 export * as Streams from "./Streams.ts";
 
 /**
@@ -200,6 +212,11 @@ export * as TurnsGroup from "./TurnsGroup.ts";
  * @since 0.1.0
  */
 export * as TurnsHandlers from "./TurnsHandlers.ts";
+
+/**
+ * @since 0.1.0
+ */
+export * as WorkspaceMember from "./WorkspaceMember.ts";
 
 /**
  * @since 0.1.0

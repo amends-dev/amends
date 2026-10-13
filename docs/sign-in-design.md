@@ -16,7 +16,7 @@ is typed.
 
 Invitations go to an address over HTTP; the host resolves it to the account and core records the
 human ID, so only someone signing in with that address can accept. A workspace's addresses are
-shown only to whoever may manage its invitations, through `GET /workspaces/:id/accounts`; members
+shown only to whoever may manage its invitations, through `GET /accounts`; members
 otherwise see each other by the name each chose in the workspace, which every member has.
 
 ## Sessions

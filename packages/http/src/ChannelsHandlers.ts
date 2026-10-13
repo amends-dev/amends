@@ -1,14 +1,13 @@
 /**
- * Implements `ChannelsGroup` and `ChannelEventsGroup`. The channel handlers enter the workspace as
- * the principal's membership through `Gateway.asMember` and call one `ChannelService` operation
- * each. The events handler has no principal: it enters through `Gateway.inWorkspace` and hands the
- * request's headers and its body, as text, to `ChannelIntake.receive`, answering with the text the
- * channel's transport says to give, or nothing. `layer` registers both groups.
+ * Implements `ChannelsGroup` and `ChannelEventsGroup`. The channel handlers call one
+ * `ChannelService` operation each, in the workspace `WorkspaceMember` entered as the principal's
+ * membership. The events handler has no principal: it enters through `Gateway.inWorkspace` and
+ * hands the request's headers and its body, as text, to `ChannelIntake.receive`, answering with the
+ * text the channel's transport says to give, or nothing. `layer` registers both groups.
  *
  * @since 0.1.0
  */
 import * as Api from "./Api.ts";
-import { makeAsMember } from "./internal/as-member.ts";
 import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
 import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
@@ -16,58 +15,32 @@ import { HttpServerRequest } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register channel handlers, capturing the gateway and reading the principal per request.
+ * Register channel handlers.
  *
  * @category layers
  * @since 0.1.0
  */
-export const layerChannels = HttpApiBuilder.group(
-  Api.Api,
-  "channels",
-  Effect.fn(function* (handlers) {
-    const asMember = yield* makeAsMember;
-    return handlers.handleAll({
-      list: ({ params }) =>
-        asMember(
-          params.workspaceId,
-          ChannelService.ChannelService.use((channelService) => channelService.list),
-        ),
-      create: ({ params, headers, payload }) =>
-        asMember(
-          params.workspaceId,
-          ChannelService.ChannelService.use((channelService) =>
-            channelService.create(payload, { requestKey: headers["idempotency-key"] }),
-          ),
-        ),
-      get: ({ params }) =>
-        asMember(
-          params.workspaceId,
-          ChannelService.ChannelService.use((channelService) =>
-            channelService.get(params.channelId),
-          ),
-        ),
-      redirect: ({ params, payload }) =>
-        asMember(
-          params.workspaceId,
-          ChannelService.ChannelService.use((channelService) =>
-            channelService.redirect({ channelId: params.channelId, groupId: payload.groupId }),
-          ),
-        ),
-      remove: ({ params }) =>
-        asMember(
-          params.workspaceId,
-          ChannelService.ChannelService.use((channelService) =>
-            channelService.remove(params.channelId),
-          ),
-        ),
-      binding: ({ params }) =>
-        asMember(
-          params.workspaceId,
-          ChannelService.ChannelService.use((channelService) =>
-            channelService.getBinding(params.threadId),
-          ),
-        ),
-    });
+export const layerChannels = HttpApiBuilder.group(Api.Api, "channels", (handlers) =>
+  handlers.handleAll({
+    list: () => ChannelService.ChannelService.use((channelService) => channelService.list),
+    create: ({ headers, payload }) =>
+      ChannelService.ChannelService.use((channelService) =>
+        channelService.create(payload, { requestKey: headers["idempotency-key"] }),
+      ),
+    get: ({ params }) =>
+      ChannelService.ChannelService.use((channelService) => channelService.get(params.channelId)),
+    redirect: ({ params, payload }) =>
+      ChannelService.ChannelService.use((channelService) =>
+        channelService.redirect({ channelId: params.channelId, groupId: payload.groupId }),
+      ),
+    remove: ({ params }) =>
+      ChannelService.ChannelService.use((channelService) =>
+        channelService.remove(params.channelId),
+      ),
+    binding: ({ params }) =>
+      ChannelService.ChannelService.use((channelService) =>
+        channelService.getBinding(params.threadId),
+      ),
   }),
 );
 

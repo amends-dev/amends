@@ -457,7 +457,7 @@ describe("connections", () => {
           const footprint = yield* storage.footprint;
           const failure = StoreError.failed("Store", "transaction")("Late write failed");
           expect(
-            yield* Effect.flip(
+            yield* Effect.catchDefect(
               Effect.flatMap(ConnectionService.ConnectionService, (connectionService) =>
                 connectionService.create(models),
               ).pipe(
@@ -468,6 +468,7 @@ describe("connections", () => {
                   identity: alice,
                 }),
               ),
+              Effect.succeed,
             ),
           ).toBe(failure);
           expect(yield* bound.store.read(journalLog, { limit: 200 })).toEqual(before);

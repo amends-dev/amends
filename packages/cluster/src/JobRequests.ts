@@ -1,13 +1,51 @@
 /**
- * How a job handles the requests Cluster delivers it, whatever its kind: a request that fails is
- * tried again where it is, after a delay that grows, until it holds or has failed `maxFailures`
- * times; then it is dropped, its work left for the next request to find. A request whose workspace
- * was never created is dropped at once. Failures are logged. `TurnJob` and `DeliveryJob` handle
- * each of their requests through `retrying` and `drop`.
+ * What every kind of job does with its requests. A commit that stores one wakes the runners once
+ * it is done, through `Wakeup`, so the runner that owns the job reads it at once. A request that
+ * fails is tried again where it is, after a delay that grows, until it holds or has failed
+ * `maxFailures` times; then it is dropped, its work left for the next request to find. A request
+ * whose workspace was never created is dropped at once. Failures are logged. `TurnJob` and
+ * `DeliveryJob` store their requests with `Wakeup` and handle each through `retrying` and `drop`.
  *
  * @since 0.1.0
  */
-import { Effect, Predicate, Schedule } from "effect";
+import { Store, type StoreError } from "@amends-dev/core/journal";
+import { Context, Effect, Layer, Predicate, Schedule } from "effect";
+import { Sharding } from "effect/cluster";
+
+/**
+ * Wakes the runners once a commit that stored job requests is done, so the runner that owns each
+ * job reads storage then rather than at its next poll: Cluster looks for a request as it stores
+ * it, before the commit can show it. `layerWakeLocal` wakes this process's runner alone, enough
+ * when it runs every job; a host whose processes share storage provides one that wakes each.
+ *
+ * @category services
+ * @since 0.1.0
+ */
+export class Wakeup extends Context.Service<
+  Wakeup,
+  {
+    /** Inside a commit that stores a request, wake the runners once the commit is done. */
+    readonly afterCommit: Effect.Effect<void, StoreError.StoreError, Store.Transaction>;
+  }
+>()("@amends-dev/cluster/JobRequests/Wakeup") {}
+
+/**
+ * Provides `Wakeup` for this process's runner alone, which reads storage again once the commit is
+ * done (`Sharding.pollStorage`).
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerWakeLocal = Layer.effect(
+  Wakeup,
+  Effect.map(Sharding.Sharding, (sharding) =>
+    Wakeup.of({
+      afterCommit: Effect.flatMap(Store.Transaction, (storeTransaction) =>
+        storeTransaction.afterCommit(sharding.pollStorage),
+      ),
+    }),
+  ),
+);
 
 /**
  * A request that fails this many times in a row is not tried again: its job gives up the work it

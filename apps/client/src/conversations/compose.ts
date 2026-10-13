@@ -12,7 +12,7 @@ import {
   type Post,
 } from "./api.ts";
 import { workspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 
 interface Draft {
   /** Markdown, whose mentions link to members. */
@@ -65,10 +65,11 @@ function compose(
     write = useAtomSet(() => draftAtom);
   const [error, setError] = createSignal<SendError>();
   const mentions = () => ThreadMessage.mentionedIn(draft().text);
-  const request = useMutation(postMessage(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, postMessage(workspaceId));
   const ready = () => isMessageText(draft().text) && !request.pending();
   // Replying tells the thread's readers the reader is typing, at most every so often.
-  const typing = target.kind === "reply" ? useMutation(sendTyping(workspaceId)) : undefined;
+  const typing =
+    target.kind === "reply" ? useWorkspaceMutation(workspaceId, sendTyping) : undefined;
   let typedAt = 0;
   const typed = (previous: string, text: string) => {
     if (!typing || target.kind !== "reply" || text.length <= previous.length) return;

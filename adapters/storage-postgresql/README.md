@@ -216,8 +216,9 @@ transaction see its staged state.
 
 A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the workspace
 and log once `COMMIT` succeeds, as a statement of its own on the commit's connection, so a
-notification means a commit. Each pool's listener, started by the first waiting reader or signal
-subscriber and stopped 30 seconds after the last, holds one connection on `LISTEN` and wakes that
+notification means a commit; a commit that stores job requests sends a notice for the runners in
+the same statement, as [Effect Cluster's tables](#effect-clusters-tables) describes. Each pool's listener, started by the first waiting reader, signal subscriber, or runner that
+listens for job requests and stopped 30 seconds after the last, holds one connection on `LISTEN` and wakes that
 log's waiters. A waiter takes its wakeup before checking the log, so an append in between still
 wakes it; the log is the truth, and the notification only says when to look again. When its
 connection fails, the listener listens again after a second and wakes every waiter to check what it
@@ -244,6 +245,9 @@ Behind a transaction-pooling proxy, signals are unavailable.
 
 A host that runs jobs on Effect Cluster over this database keeps Cluster's tables beside the
 adapter's, which Cluster creates itself with its `cluster` prefix and never prunes.
+`PostgresClusterStorage.layerOneAtATime(cluster)` builds Cluster's layer one process at a time,
+under a session-level advisory lock: Cluster checks for its migrations table and then creates it,
+so processes starting together over a new database would otherwise fail all but one.
 `PostgresClusterStorage.prune(entityTypes, before, options?)` removes the handled messages of those
 entity types stored before a time, with their replies, at most `batch` per statement (a thousand by
 default), and returns how many went; messages not yet handled stay however old.
@@ -251,6 +255,16 @@ default), and returns how many went; messages not yet handled stay however old.
 processes never run Cluster at one address: it fails with `AddressTaken` while another holds it. The
 claim is a session-level advisory lock on a connection it keeps, released before the connection
 returns to the pool, or by PostgreSQL when the process dies.
+
+Cluster looks for a request as it stores it, before the commit that stores it can show it, so the
+runner that owns the job would find it only at its next read. `PostgresClusterStorage.layerWakeup`
+provides cluster's `JobRequests.Wakeup` for commits in this adapter's transactions: once the commit
+is done, this process's runner reads storage again, and a `job-requests` notice, sent with the
+commit's other notices in their one statement and once however many requests the commit stored,
+reaches every pool. `PostgresClusterStorage.layerWakeupListener` keeps a process that runs jobs
+listening, holding the listener's connection while it runs, and has its runner read storage at each
+notice and whenever the listener connects. A notice lost, or `LISTEN` unavailable behind a
+transaction-pooling proxy, leaves the request to the runner's next read.
 
 ## Layout
 
@@ -265,7 +279,8 @@ for one workspace (`layerWorkspace`), its private `layerStores` registers each s
 that `PostgresSignalHub.ts` binds to each workspace, `PostgresTurns.ts` and `PostgresReads.ts` are
 the writer queue and read cap above, `CredentialKey.ts` seals credentials, `PostgresAccounts.ts`
 and `PostgresSignInStorage.ts` keep the host's accounts and sign-in, and
-`PostgresClusterStorage.ts` is the upkeep of Cluster's tables. Bindings and raw tables stay
+`PostgresClusterStorage.ts` is Cluster over this database: the upkeep of its tables and the
+wakeup for the job requests commits store. Bindings and raw tables stay
 internal.
 Follow the [adapter conventions](../README.md).
 

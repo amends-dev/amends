@@ -15,7 +15,7 @@ import { ThreadId } from "@amends-dev/core/thread";
 import { Turn, TurnJobs } from "@amends-dev/core/turn";
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer, PrimaryKey, Ref, Schema } from "effect";
-import { ClusterSchema, Entity, Sharding } from "effect/cluster";
+import { ClusterSchema, Entity } from "effect/cluster";
 import { Rpc } from "effect/rpc";
 import * as TurnRunner from "./TurnRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
@@ -102,9 +102,8 @@ export type Request = Run | Stop;
  * Provides core's `TurnJobs.TurnJobs`, whose requests Cluster stores, each keyed by the commit that
  * asks for it. Sent inside a commit, a request shares its transaction when Cluster's message
  * storage uses the same SQL client as the workspace's storage, so it commits or rolls back with the
- * commit; the host composing them owns that. Cluster looks for the request as it stores it, before
- * the commit can show it, so once the commit is done this runner reads storage again rather than
- * finding the request at its next poll.
+ * commit; the host composing them owns that. Once the commit is done, the host's
+ * `JobRequests.Wakeup` wakes the runners, so the one that owns the job reads the request at once.
  *
  * @category layers
  * @since 0.1.0
@@ -112,7 +111,7 @@ export type Request = Run | Stop;
 export const layerRequests = Layer.effect(
   TurnJobs.TurnJobs,
   Effect.gen(function* () {
-    const sharding = yield* Sharding.Sharding;
+    const wakeup = yield* JobRequests.Wakeup;
     const turnJobClient = yield* entity.client;
     const failure = StoreError.failed("Store", "request turn job");
     return TurnJobs.TurnJobs.of({
@@ -122,7 +121,7 @@ export const layerRequests = Layer.effect(
         yield* turnJobClient(entityId(run))
           .Run(run, { discard: true })
           .pipe(Effect.mapError(failure));
-        yield* storeTransaction.afterCommit(sharding.pollStorage);
+        yield* wakeup.afterCommit;
       }),
       requestStop: Effect.fnUntraced(function* ({ workspaceId, memberId, threadId, turnId }) {
         const storeTransaction = yield* Store.Transaction;
@@ -136,7 +135,7 @@ export const layerRequests = Layer.effect(
         yield* turnJobClient(entityId(stop))
           .Stop(stop, { discard: true })
           .pipe(Effect.mapError(failure));
-        yield* storeTransaction.afterCommit(sharding.pollStorage);
+        yield* wakeup.afterCommit;
       }),
     });
   }),

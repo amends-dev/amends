@@ -186,12 +186,12 @@ function fixture(
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/me/workspaces") return Promise.resolve(json(listing));
-    if (path === "/workspaces/one/members") return Promise.resolve(json(members));
-    if (path === "/workspaces/one/groups") return Promise.resolve(json(groups));
-    if (path === "/workspaces/one/groups/g1/members") return Promise.resolve(json(roster));
-    if (path === "/workspaces/one/groups/g1/openings")
+    if (path === "/members") return Promise.resolve(json(members));
+    if (path === "/groups") return Promise.resolve(json(groups));
+    if (path === "/groups/g1/members") return Promise.resolve(json(roster));
+    if (path === "/groups/g1/openings")
       return Promise.resolve(options.stream?.() ?? json(openings));
-    if (path === "/workspaces/one/threads/t1/timeline")
+    if (path === "/threads/t1/timeline")
       return Promise.resolve(
         options.timeline?.(new URL(request.url).searchParams) ?? json(timeline),
       );

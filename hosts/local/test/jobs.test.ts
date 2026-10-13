@@ -1,14 +1,18 @@
 import { TurnJob } from "@amends-dev/cluster";
 import { Integrations } from "@amends-dev/connection";
-import { Commit, Store } from "@amends-dev/core/journal";
+import { Store } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
 import { SessionLogStore, TurnExecution, TurnJobs } from "@amends-dev/core/turn";
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Gateway } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
-import { PostgresWorkspaceStorage } from "@amends-dev/storage-postgresql";
+import {
+  PostgresClusterStorage,
+  PostgresDatabase,
+  PostgresWorkspaceStorage,
+} from "@amends-dev/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, Context, Duration, Effect, Exit, Layer, Option, Redacted } from "effect";
+import { Clock, Context, Effect, Exit, Layer, Option, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
 import * as LocalHost from "../src/LocalHost.ts";
 import { setup } from "./database.ts";
@@ -58,12 +62,15 @@ const acceptingNothing = (ran: (workspaceId: Workspace.Id) => void) => {
   });
 };
 
-/** Turn jobs over the host's database and cluster, through `gateway`. */
+/**
+ * Turn jobs over the host's database and cluster, through `gateway`, waking runners and listening
+ * for requests as a process that runs jobs does.
+ */
 const turnJobs = (
   gateway: Gateway.Gateway["Service"],
   database: ReturnType<typeof LocalHost.layerDatabase>,
 ) =>
-  TurnJob.layer.pipe(
+  Layer.merge(TurnJob.layer, PostgresClusterStorage.layerWakeupListener).pipe(
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(Gateway.Gateway, gateway),
@@ -71,8 +78,59 @@ const turnJobs = (
         BunCrypto.layer,
       ),
     ),
+    Layer.provide(PostgresClusterStorage.layerWakeup),
     Layer.provideMerge(database),
   );
+
+/** Turn job requests alone, as a process that serves the API and runs no jobs stores them. */
+const turnJobRequests = (database: ReturnType<typeof LocalHost.layerDatabase>) =>
+  TurnJob.layerRequests.pipe(
+    Layer.provide(PostgresClusterStorage.layerWakeup),
+    Layer.provideMerge(database),
+  );
+
+/** A job that ran: which process ran it, in which workspace. */
+interface Ran {
+  readonly runner: string;
+  readonly workspaceId: Workspace.Id;
+}
+
+/** A gateway through which `runner`'s turn jobs find no work, recording in `runs` each that ran. */
+const recordingRuns = (runs: Array<Ran>, runner: string) =>
+  acceptingNothing((workspaceId) => runs.push({ runner, workspaceId }));
+
+/**
+ * In each workspace, commit a request to run its job through the requests `context` holds, going
+ * on after the request as a real commit does, and wait for the job to run, failing for one that
+ * has not run `within` milliseconds after its commit.
+ */
+const commitAndAwait = Effect.fnUntraced(function* (
+  context: Context.Context<TurnJobs.TurnJobs | PostgresDatabase.PostgresDatabase>,
+  runs: ReadonlyArray<Ran>,
+  workspaceIds: ReadonlyArray<Workspace.Id>,
+  within: number,
+) {
+  const storage = yield* PostgresWorkspaceStorage.make().pipe(Effect.provideContext(context));
+  const requests = Context.get(context, TurnJobs.TurnJobs);
+  for (const workspaceId of workspaceIds) {
+    const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Store);
+    yield* store.transaction(
+      requests
+        .requestRun({ workspaceId, memberId: job.memberId, threadId: job.threadId })
+        .pipe(Effect.andThen(Effect.sleep("50 millis"))),
+    );
+    const committedAt = yield* Clock.currentTimeMillis;
+    while (!runs.some((run) => run.workspaceId === workspaceId)) {
+      if ((yield* Clock.currentTimeMillis) - committedAt > within)
+        return yield* Effect.fail(`The job of ${workspaceId} waited for a runner's next poll`);
+      yield* Effect.sleep("10 millis");
+    }
+  }
+});
+
+/** The workspaces of a round of requests, one for each of `count`. */
+const workspacesOf = (round: string, count: number) =>
+  Array.from({ length: count }, (_, index) => Workspace.Id.make(`${round}-${index}`));
 
 describe.skipIf(!available)("jobs on the local host", () => {
   // The host's database and cluster share one client, so Cluster stores a request on the connection
@@ -175,67 +233,61 @@ describe.skipIf(!available)("jobs on the local host", () => {
     ),
   );
 
-  // Two processes over one database, linked by sockets: a request for a job the other process
-  // runs reaches it at once, well before its next read of the database.
+  // A process that serves the API runs no jobs: its commits store requests, and wake the process
+  // that runs each job, which reads them at once rather than at its next poll, here a minute away.
   it.live(
-    "over sockets, a request reaches the process that runs its job without waiting for a read",
+    "a request committed where no job runs reaches the process that runs its job at once",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const runs: Array<{ readonly runner: string; readonly workspaceId: string }> = [];
-          const runner = (name: string, port: number) =>
+          const runs: Array<Ran> = [];
+          yield* Layer.build(
             turnJobs(
-              acceptingNothing((workspaceId) => runs.push({ runner: name, workspaceId })),
-              LocalHost.layerDatabase(Redacted.make(url), {
-                runnerAddress: { host: "localhost", port },
-                runnerTransport: "socket",
-                pollInterval: "5 seconds",
-              }),
-            );
-          const first = yield* Layer.build(runner("first", 34471));
-          yield* Layer.build(runner("second", 34472));
-          const requests = Context.get(first, TurnJobs.TurnJobs);
-          const workspaces = Array.from({ length: 20 }, (_, index) =>
-            Workspace.Id.make(`workspace-${index}`),
+              recordingRuns(runs, "runner"),
+              LocalHost.layerDatabase(Redacted.make(url), { pollInterval: "1 minute" }),
+            ),
           );
-          const round = (name: string) =>
-            Effect.forEach(
-              workspaces,
-              (workspaceId) =>
-                requests
-                  .requestRun({ workspaceId, memberId: job.memberId, threadId: job.threadId })
-                  .pipe(
-                    Effect.provideService(Store.Transaction, {
-                      id: Commit.Id.make(`${name}:${workspaceId}`),
-                      append: () => Effect.die("Unexpected append"),
-                      afterCommit: (effect) => effect,
-                    }),
-                  ),
-              { discard: true },
-            );
-          const ran = (count: number, within: Duration.Input) =>
-            Effect.gen(function* () {
-              const deadline = (yield* Clock.currentTimeMillis) + Duration.toMillis(within);
-              while (runs.length < count && (yield* Clock.currentTimeMillis) < deadline)
-                yield* Effect.sleep("20 millis");
-              return runs.length;
-            });
-          // The processes share out the jobs once both run, a few seconds after starting.
-          const deadline = (yield* Clock.currentTimeMillis) + 30_000;
-          for (let attempt = 0; !runs.some((run) => run.runner === "second"); attempt++) {
-            if ((yield* Clock.currentTimeMillis) > deadline)
-              return expect.fail("The second process never took a job");
-            runs.length = 0;
-            yield* round(`warm-${attempt}`);
-            yield* ran(20, "10 seconds");
-            yield* Effect.sleep("1 second");
-          }
-          runs.length = 0;
-          yield* round("warmed");
-          expect(yield* ran(20, "1 second")).toBe(20);
-          expect(runs.some((run) => run.runner === "second")).toBe(true);
+          const api = yield* Layer.build(
+            turnJobRequests(LocalHost.layerDatabase(Redacted.make(url), { runJobs: false })),
+          );
+          // The runner takes every shard as it starts, and reads what was stored before.
+          yield* commitAndAwait(api, runs, workspacesOf("first", 1), 30_000);
+          yield* commitAndAwait(api, runs, workspacesOf("then", 5), 2_000);
+          expect(runs.every((run) => run.runner === "runner")).toBe(true);
         }).pipe(Effect.scoped),
       ),
     60_000,
   );
+
+  // Processes that run jobs share them out. A request committed in one reaches whichever runs its
+  // job at once, over the database alone or over sockets too.
+  for (const runnerTransport of ["storage", "socket"] as const)
+    it.live(
+      `over ${runnerTransport}, a committed request reaches the process that runs its job at once`,
+      () =>
+        withDatabase((url) =>
+          Effect.gen(function* () {
+            const runs: Array<Ran> = [];
+            const runner = (name: string, port: number) =>
+              turnJobs(
+                recordingRuns(runs, name),
+                LocalHost.layerDatabase(Redacted.make(url), {
+                  runnerAddress: { host: "localhost", port },
+                  runnerTransport,
+                  pollInterval: "1 minute",
+                }),
+              );
+            const first = yield* Layer.build(runner("first", 34471));
+            yield* Layer.build(runner("second", 34472));
+            // The processes share out the shards a few seconds after both start; until then a
+            // request may wait for a shard to change hands.
+            for (let round = 0; !runs.some((run) => run.runner === "second"); round++)
+              yield* commitAndAwait(first, runs, workspacesOf(`warm-${round}`, 10), 30_000);
+            runs.length = 0;
+            yield* commitAndAwait(first, runs, workspacesOf("shared", 20), 2_000);
+            expect(new Set(runs.map((run) => run.runner))).toEqual(new Set(["first", "second"]));
+          }).pipe(Effect.scoped),
+        ),
+      90_000,
+    );
 });

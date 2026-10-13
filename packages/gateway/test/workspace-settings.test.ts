@@ -295,7 +295,7 @@ describe("workspace settings", () => {
           const failure = StoreError.failed("Store", "transaction")("Late write failed");
           const broken = failingLate(bound, failure);
           expect(
-            yield* Effect.flip(
+            yield* Effect.catchDefect(
               Effect.flatMap(
                 WorkspaceSettingsService.WorkspaceSettingsService,
                 (workspaceSettingsService) =>
@@ -311,6 +311,7 @@ describe("workspace settings", () => {
                   identity: alice,
                 }),
               ),
+              Effect.succeed,
             ),
           ).toBe(failure);
           expect(yield* bound.workspace.get).toEqual(Option.some(workspace));

@@ -342,7 +342,8 @@ it("keeps a workspace current through its change feed over the desktop host conn
   mount("/workspaces/one/settings/workspace", "jo", fetch);
   await screen.findByRole("textbox", { name: "Workspace name" });
   const stream = feed.streams[0];
-  expect(stream?.request.url).toBe("http://127.0.0.1:8787/workspaces/one/changes");
+  expect(stream?.request.url).toBe("http://127.0.0.1:8787/changes");
+  expect(stream?.request.headers.get("amends-workspace")).toBe("one");
   expect(stream?.request.headers.get("authorization")).toBe("Bearer jo");
   name = "Atelier";
   stream?.send(
@@ -562,7 +563,7 @@ it("creates a group from the sidebar and opens it at its hash route", async () =
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (request.method === "POST" && path === "/workspaces/one/groups")
+    if (request.method === "POST" && path === "/groups")
       return response(
         {
           id: "g2",
@@ -619,9 +620,8 @@ it("browses public groups from the sidebar, and joining one opens it", async () 
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/groups/public")
-      return response([{ group: lobby, members: 1, joined: false }]);
-    if (request.method === "POST" && path === "/workspaces/one/groups/g5/join") {
+    if (path === "/groups/public") return response([{ group: lobby, members: 1, joined: false }]);
+    if (request.method === "POST" && path === "/groups/g5/join") {
       joins.push(path);
       return response({
         id: "a5",
@@ -672,7 +672,7 @@ it("drafts a first direct message at its hash route and opens the conversation",
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (request.method === "POST" && path === "/workspaces/one/threads")
+    if (request.method === "POST" && path === "/threads")
       return response(
         {
           thread: {
@@ -781,15 +781,15 @@ function connectionsHost() {
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/connections/integrations") return response([mcp]);
-    if (path === "/workspaces/one/connections" && request.method === "GET")
+    if (path === "/connections/integrations") return response([mcp]);
+    if (path === "/connections" && request.method === "GET")
       return response(created === undefined ? [] : [view()]);
-    if (path === "/workspaces/one/connections" && request.method === "POST") {
+    if (path === "/connections" && request.method === "POST") {
       created = (await request.json()) as Record<string, unknown>;
       writes.push({ method: "POST", path, body: created });
       return response(view(), 201);
     }
-    if (path === "/workspaces/one/connections/c1/check") {
+    if (path === "/connections/c1/check") {
       writes.push({ method: "POST", path, body: undefined });
       return response({ status: "unauthorized", description: "The server refused the key." });
     }
@@ -835,7 +835,7 @@ async function addMcpServerWithKey() {
 const connectionWrites = [
   {
     method: "POST",
-    path: "/workspaces/one/connections",
+    path: "/connections",
     body: {
       integration: "mcp",
       name: "MCP server",
@@ -844,7 +844,7 @@ const connectionWrites = [
       apiKey: "sk-tools",
     },
   },
-  { method: "POST", path: "/workspaces/one/connections/c1/check", body: undefined },
+  { method: "POST", path: "/connections/c1/check", body: undefined },
 ];
 
 it("adds a connection with its key at its hash route, then checks it", async () => {
@@ -899,21 +899,20 @@ function agentsHost() {
   return vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/agents")
+    if (path === "/agents")
       return response([agent("a1", "Atlas", null), agent("a2", "Review helper", "gone")]);
-    if (path === "/workspaces/one/connections/integrations")
+    if (path === "/connections/integrations")
       return response([
         integration("amends", "amends", "harnesses"),
         integration("openai-compatible", "OpenAI-compatible API", "models"),
       ]);
-    if (path === "/workspaces/one/connections")
+    if (path === "/connections")
       return response([
         connection("h1", "Amends harness", "amends"),
         connection("m1", "Local models", "openai-compatible"),
       ]);
-    if (path === "/workspaces/one/connections/m1/models")
-      return response({ listed: [], unlisted: true });
-    if (path === "/workspaces/one/settings")
+    if (path === "/connections/m1/models") return response({ listed: [], unlisted: true });
+    if (path === "/settings")
       return response({
         workspace,
         canRename: true,

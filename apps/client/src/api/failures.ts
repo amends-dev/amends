@@ -26,11 +26,12 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * The workspace, member, access, invitation, conversation, connection, agent, turn, and channel
- * endpoints.
+ * The workspace, settings, member, access, invitation, conversation, connection, agent, turn, and
+ * channel endpoints.
  */
 type Endpoints =
   | "workspaces"
+  | "settings"
   | "members"
   | "assignments"
   | "invitations"
@@ -65,11 +66,12 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // log that stopped short, or too many streams are open: asking again may work. A host that keeps
   // no keys is one too; `connectionsFailure` tells it apart.
   "CoreError.Unavailable": "failed",
+  // A commit storage could not confirm, which may have taken effect.
+  "CoreError.Uncertain": "failed",
   "ApiErrors.TooManyStreams": "failed",
   "Client.InvalidCommand": "invalid",
   // Rejected credentials sign out in the HTTP layer; the rest are transport or host failures.
   "Authentication.Unauthorized": "failed",
-  "GatewayErrors.Uncertain": "failed",
   HttpClientError: "failed",
   // A response that fails its schema; readers' inputs fail as Client.InvalidCommand instead.
   SchemaError: "failed",

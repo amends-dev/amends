@@ -30,8 +30,8 @@ it.effect.each([5, 50, 1000])("configuration accepts a pool of %i connections", 
   }),
 );
 
-// Three connections stay held (the address claim, shard locks, and the change feed's listener), and
-// requests need two more; three hangs once a change stream opens.
+// A process that runs jobs holds three connections (the address claim, shard locks, and the notice
+// listener), and requests need two more; three hangs once a change stream opens.
 it.effect.each(["", "0", "1", "3", "4", "1001", "5.5", "many"])(
   "configuration rejects a pool size of %j",
   (size) =>
@@ -156,5 +156,19 @@ it.effect("people sign in with emailed codes unless development sign-in is asked
       Effect.flip,
     );
     expect(error.message).toContain("AMENDS_SIGN_IN");
+  }),
+);
+
+it.effect("a process serves the API and runs jobs unless told to do one alone", () =>
+  Effect.gen(function* () {
+    expect((yield* load({ AMENDS_DATABASE_URL: databaseUrl })).role).toBe("all");
+    for (const role of ["api", "jobs"] as const)
+      expect((yield* load({ AMENDS_DATABASE_URL: databaseUrl, AMENDS_ROLE: role })).role).toBe(
+        role,
+      );
+    const error = yield* load({ AMENDS_DATABASE_URL: databaseUrl, AMENDS_ROLE: "web" }).pipe(
+      Effect.flip,
+    );
+    expect(error.message).toContain("AMENDS_ROLE");
   }),
 );

@@ -8,13 +8,13 @@
  * @since 0.1.0
  */
 import { Agent } from "@amends-dev/core/agent";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
-const agent = { workspaceId: Workspace.Id, agentId: Agent.Id };
+const agent = { agentId: Agent.Id };
 const view = Agent.View.annotate({ identifier: "Agent" });
 /** Outcomes of a setup: a connection the caller cannot give the agent, or one that cannot run. */
 const setup = [ApiErrors.Invalid, ApiErrors.Invalid] as const;
@@ -30,12 +30,10 @@ const setup = [ApiErrors.Invalid, ApiErrors.Invalid] as const;
 export class AgentsGroup extends HttpApiGroup.make("agents")
   .add(
     HttpApiEndpoint.get("list", "/", {
-      params: { workspaceId: Workspace.Id },
       success: Schema.Array(view),
       error: ApiErrors.workspace,
     }),
     HttpApiEndpoint.post("create", "/", {
-      params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
       payload: Agent.CreateInput,
       success: Agent.View.pipe(HttpApiSchema.status(201)).annotate({
@@ -64,5 +62,6 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
       error: [...ApiErrors.workspace, ApiErrors.NotFound, ApiErrors.Changed],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId/agents") {}
+  .prefix("/agents") {}

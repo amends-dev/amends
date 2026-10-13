@@ -26,20 +26,8 @@ import * as CoreError from "../error/CoreError.ts";
 import * as StoreError from "../journal/StoreError.ts";
 
 /**
- * The actor, or a requirement's target, belongs to another workspace than the one this core is
- * bound to.
- *
- * @category errors
- * @since 0.1.0
- */
-export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
-  "Authorization.WorkspaceMismatch",
-  { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
-) {}
-
-/**
- * What a check can fail with: the outcomes above, a workspace mismatch, and the
- * failures of reading the member, their grants, and the catalog.
+ * What a check can fail with: the actor refused, an actor or target from another workspace, and
+ * the failures of reading the member, their grants, and the catalog.
  *
  * @category errors
  * @since 0.1.0
@@ -47,7 +35,7 @@ export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
 export type Error =
   | StoreError.StoreError
   | GrantResolver.Error
-  | WorkspaceMismatch
+  | CoreError.Invalid
   | CoreError.Denied;
 
 /**
@@ -82,12 +70,17 @@ export class Authorization extends Context.Service<
 >()("@amends-dev/core/authorization/Authorization") {}
 
 const sameIdentity = Schema.toEquivalence(Identity.Reference);
+/** Fails unless what the actor or a target names belongs to this core's workspace. */
 const requireWorkspace = Effect.fnUntraced(function* (
   expectedWorkspaceId: Workspace.Id,
   actualWorkspaceId: Workspace.Id,
 ) {
   if (expectedWorkspaceId !== actualWorkspaceId) {
-    return yield* new WorkspaceMismatch({ expectedWorkspaceId, actualWorkspaceId });
+    return yield* new CoreError.Invalid({
+      reason: new CoreError.Malformed({
+        description: `Values must belong to workspace ${expectedWorkspaceId}`,
+      }),
+    });
   }
 });
 

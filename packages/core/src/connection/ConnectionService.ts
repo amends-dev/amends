@@ -10,15 +10,12 @@
  */
 import { type Connection as ConnectionContract, Integrations } from "@amends-dev/connection";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import type * as Permission from "../authorization/Permission.ts";
 import * as Requirement from "../authorization/Requirement.ts";
 import * as Target from "../authorization/Target.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as Request from "../request/Request.ts";
@@ -28,7 +25,7 @@ import * as ConnectionFacts from "./ConnectionFacts.ts";
 import * as ConnectionPermissions from "./ConnectionPermissions.ts";
 import * as ConnectionStore from "./ConnectionStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What reading connections can fail with.
@@ -37,29 +34,37 @@ import * as StoreError from "../journal/StoreError.ts";
  * @since 0.1.0
  */
 export type ReadError =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
- * What every change can fail with: reading's failures, and recording the change in the journal.
+ * What every change can fail with: reading's failures, and what its commit meets.
  *
  * @category errors
  * @since 0.1.0
  */
-export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
-/** Storing or reading a key can also meet a host that keeps no credentials. */
-type KeyError = StoreError.StoreError | CoreError.Unavailable;
+export type Error =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What creating a connection can fail with: an integration the host does not install or that does
- * not take the connection, and storing its key.
+ * not take the connection, besides what every change meets.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | CoreError.Invalid | KeyError;
+export type CreateError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What configuring a connection can fail with: an integration the host no longer installs, or one
@@ -68,33 +73,52 @@ export type CreateError = Error | CoreError.Invalid | KeyError;
  * @category errors
  * @since 0.1.0
  */
-export type ConfigureError = Error | CoreError.Invalid;
+export type ConfigureError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What replacing a connection's key can fail with: a connection that takes no key, and storing the
- * new one.
+ * What replacing a connection's key can fail with: a connection that takes no key, or a host that
+ * keeps no keys.
  *
  * @category errors
  * @since 0.1.0
  */
-export type ReplaceKeyError = Error | CoreError.Invalid | KeyError;
+export type ReplaceKeyError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What removing a connection can fail with: a change's failures, and deleting its key.
+ * What removing a connection can fail with: a change's failures.
  *
  * @category errors
  * @since 0.1.0
  */
-export type RemoveError = Error | StoreError.StoreError;
+export type RemoveError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What checking a connection can fail with: reading it, an integration the host no longer installs
- * or that does not take the connection, and reading its key.
+ * What checking a connection can fail with: reading it, and an integration the host no longer
+ * installs or that does not take the connection.
  *
  * @category errors
  * @since 0.1.0
  */
-export type CheckError = ReadError | CoreError.Invalid | KeyError;
+export type CheckError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * What reading the models a connection offers can fail with: reading it, and an integration the
@@ -103,7 +127,11 @@ export type CheckError = ReadError | CoreError.Invalid | KeyError;
  * @category errors
  * @since 0.1.0
  */
-export type ModelsError = ReadError | CoreError.Invalid;
+export type ModelsError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The connection operations, one of `Core.Operations`.
@@ -120,7 +148,7 @@ export class ConnectionService extends Context.Service<
      */
     readonly integrations: Effect.Effect<
       ReadonlyArray<Connection.IntegrationView>,
-      Authorization.Error,
+      CoreError.Denied | CoreError.Invalid | CoreError.Unavailable,
       Actor.Actor
     >;
     /** The workspace's connections the actor may read, by name. */
@@ -291,7 +319,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const listIntegrations = Effect.gen(function* () {
     yield* authorization.require([]);
     return integrations.all.map(Connection.integrationView);
-  });
+  }).pipe(Operation.report);
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
@@ -309,19 +337,19 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       if (readable) views.push(yield* viewOf(record, manageable));
     }
     return views.toSorted(byName);
-  });
+  }).pipe(Operation.report);
 
   const get = Effect.fn("ConnectionService.get")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     return yield* viewForActor(yield* requirePermittedConnection(id, ConnectionPermissions.Read));
-  });
+  }, Operation.report);
 
   const models = Effect.fn("ConnectionService.models")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     const record = yield* requirePermittedConnection(id, ConnectionPermissions.Read);
     const integration = yield* requireIntegration(record.integration);
     return integration.models;
-  });
+  }, Operation.report);
 
   const create = Effect.fn("ConnectionService.create")(
     function* (input: Connection.CreateInput, options: Request.Options = {}) {
@@ -362,6 +390,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const rename = Effect.fn("ConnectionService.rename")(
@@ -384,6 +413,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const configure = Effect.fn("ConnectionService.configure")(
@@ -405,6 +435,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const replaceKey = Effect.fn("ConnectionService.replaceKey")(
@@ -428,6 +459,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const check = Effect.fn("ConnectionService.check")(function* (connectionId: Connection.Id) {
@@ -439,7 +471,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       integration.check(Connection.connectionOf(record), credential),
       toInvalidConnection,
     );
-  });
+  }, Operation.report);
 
   const remove = Effect.fn("ConnectionService.remove")(
     function* (connectionId: Connection.Id) {
@@ -451,6 +483,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   return ConnectionService.of({

@@ -1,8 +1,15 @@
 import { useAtomValue } from "@effect/atom-solid";
 import { AsyncResult } from "effect/reactivity";
-import { createContext, createMemo, useContext, type Accessor, type ParentProps } from "solid-js";
+import {
+  createContext,
+  createMemo,
+  Show,
+  useContext,
+  type Accessor,
+  type ParentProps,
+} from "solid-js";
 import { changeFeed, ChangeFeedState } from "./api.ts";
-import { useApiClient, useSession } from "../provider.tsx";
+import { useSession, useWorkspaceClient } from "../provider.tsx";
 
 export interface ChangeFeedScope {
   readonly state: Accessor<ChangeFeedState>;
@@ -12,11 +19,19 @@ const Context = createContext<ChangeFeedScope>();
 /**
  * Keep the workspace's reads current while mounted: its change stream refreshes the reads each
  * commit affects. Rejected credentials end it (the HTTP layer signs them out); lost access
- * refreshes the directory, whose guard decides what the app shows. Mount once per workspace view, inside DirectoryProvider.
+ * refreshes the directory, whose guard decides what the app shows. Mount once per workspace view,
+ * inside DirectoryProvider; another workspace remounts what it holds.
  */
 export function ChangeFeedProvider(props: ParentProps<{ workspaceId: string }>) {
+  return (
+    <Show when={props.workspaceId} keyed>
+      {(workspaceId) => <WorkspaceFeed workspaceId={workspaceId}>{props.children}</WorkspaceFeed>}
+    </Show>
+  );
+}
+function WorkspaceFeed(props: ParentProps<{ readonly workspaceId: string }>) {
   const session = useSession();
-  const client = useApiClient();
+  const client = useWorkspaceClient(props.workspaceId);
   // Credentials are immutable within this owner; a guest has no feed to open.
   const result = session.session
     ? useAtomValue(() => changeFeed(client, props.workspaceId))

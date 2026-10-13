@@ -19,6 +19,12 @@ import { Base64 } from "effect/encoding";
  * @since 0.1.0
  */
 export interface Options {
+  /**
+   * What this process does: serve the HTTP API and run jobs (`all`), serve the API alone (`api`),
+   * storing the job requests its commits make for other processes to run, or run jobs alone
+   * (`jobs`).
+   */
+  readonly role: "all" | "api" | "jobs";
   /** The port the server listens on, on the loopback interface; `0` selects a free one. */
   readonly port: number;
   /** The PostgreSQL database the host stores every workspace in. */
@@ -45,6 +51,9 @@ export interface Options {
   readonly signIn: "email" | "development";
 }
 
+const role = Config.schema(Schema.Literals(["all", "api", "jobs"]), "AMENDS_ROLE").pipe(
+  Config.withDefault("all" as const),
+);
 const port = Config.schema(
   Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 65535 })),
   "AMENDS_PORT",
@@ -96,8 +105,9 @@ const runnerTakeover = Config.schema(
   ),
   "AMENDS_RUNNER_TAKEOVER",
 ).pipe(Config.withDefault(Duration.seconds(35)));
-// The runner-address claim, the cluster's shard locks, and the change feed's listener each keep a
-// connection; five leaves two for requests, so one long commit does not stall every read.
+// A process that runs jobs keeps a connection for each of the runner-address claim, the cluster's
+// shard locks, and the notice listener; five leaves two for requests, so one long commit does not
+// stall every read.
 const poolSize = Config.schema(
   Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 1000 })),
   "AMENDS_DATABASE_POOL_SIZE",
@@ -138,6 +148,7 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
   Config.ConfigError
 > {
   return {
+    role: yield* role,
     port: yield* port,
     databaseUrl: yield* databaseUrl,
     poolSize: yield* poolSize,

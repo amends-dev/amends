@@ -337,7 +337,7 @@ describe("assignments", () => {
               memberId: workspace.ownerMemberId,
               identity: alice,
             }),
-            Effect.flip,
+            Effect.catchDefect(Effect.succeed),
           );
           expect(rejected).toBe(failure);
           expect(yield* bound.assignments.listActiveByMember(viewer.id)).toEqual(active);

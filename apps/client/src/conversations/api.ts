@@ -12,7 +12,7 @@ import {
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/reactivity";
-import type { Api, ApiClient } from "../api/client.ts";
+import type { ApiClient, WorkspaceApi } from "../api/client.ts";
 import { command } from "../api/failures.ts";
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "../api/keys.ts";
 import { newWorkspaceRequestKey } from "../workspaces/api.ts";
@@ -43,7 +43,7 @@ const perClient = <K extends string, A extends object>(make: (client: ApiClient,
 };
 const split = (key: string) => {
   const [workspaceId = "", id = ""] = key.split("\u0000");
-  return { workspaceId: Workspace.Id.make(workspaceId), id };
+  return { workspaceId, id };
 };
 const joined = (workspaceId: string, id: string) => `${workspaceId}\u0000${id}`;
 const valid = (workspaceId: string) =>
@@ -55,12 +55,10 @@ const groupsOf = perClient((client: ApiClient, workspaceId: string) =>
     .atom(
       Effect.gen(function* () {
         const api = yield* client;
-        const params = { workspaceId: Workspace.Id.make(workspaceId) };
         const groups: Array<Group.ListItem> = [];
         let after: Group.Id | undefined;
         while (true) {
           const page = yield* api.groups.list({
-            params,
             query: after === undefined ? { limit: 100 } : { limit: 100, after },
           });
           groups.push(...page);
@@ -81,12 +79,10 @@ const publicGroupsOf = perClient((client: ApiClient, workspaceId: string) =>
     .atom(
       Effect.gen(function* () {
         const api = yield* client;
-        const params = { workspaceId: Workspace.Id.make(workspaceId) };
         const groups: Array<Group.PublicItem> = [];
         let after: Group.Id | undefined;
         while (true) {
           const page = yield* api.groups.listPublic({
-            params,
             query: after === undefined ? { limit: 100 } : { limit: 100, after },
           });
           groups.push(...page);
@@ -108,7 +104,7 @@ const rosterOf = perClient((client: ApiClient, key: string) => {
     .atom(
       Effect.gen(function* () {
         const api = yield* client;
-        const params = { workspaceId, groupId: Group.Id.make(id) };
+        const params = { groupId: Group.Id.make(id) };
         const admissions: Array<GroupMembership.GroupMembership> = [];
         let after: GroupMembership.Id | undefined;
         while (true) {
@@ -137,7 +133,7 @@ const threadOf = perClient((client: ApiClient, key: string) => {
     .atom(
       Effect.gen(function* () {
         const api = yield* client;
-        return yield* api.threads.get({ params: { workspaceId, threadId: Thread.Id.make(id) } });
+        return yield* api.threads.get({ params: { threadId: Thread.Id.make(id) } });
       }),
     )
     .pipe(Atom.withReactivity(itemKeys(workspaceId, "threads", id)));
@@ -154,7 +150,7 @@ const participantsOf = perClient((client: ApiClient, key: string) => {
     .atom(
       Effect.gen(function* () {
         const api = yield* client;
-        const params = { workspaceId, threadId: Thread.Id.make(id) };
+        const params = { threadId: Thread.Id.make(id) };
         const participants: Array<ThreadParticipation.Summary> = [];
         let after: ThreadParticipation.Id | undefined;
         while (true) {
@@ -180,7 +176,6 @@ export const participantsRead = (client: ApiClient, workspaceId: string, threadI
 export const permissionsRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId)
     ? client.query("assignments", "permissions", {
-        params: { workspaceId: Workspace.Id.make(workspaceId) },
         reactivityKeys: [workspaceKey(workspaceId, "permissions")],
       })
     : undefined;
@@ -189,7 +184,6 @@ export const permissionsRead = (client: ApiClient, workspaceId: string) =>
 export const membersRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId)
     ? client.query("members", "list", {
-        params: { workspaceId: Workspace.Id.make(workspaceId) },
         reactivityKeys: [workspaceKey(workspaceId, "members")],
       })
     : undefined;
@@ -231,7 +225,7 @@ const streamOf = perClient((client: ApiClient, key: string): PagedRead<Thread.Op
         // more reads one page past it. New threads arrive at the newest end.
         const reach = Option.flatMap(previous, (view) => Option.fromUndefinedOr(view.items[0]));
         const more = Option.isNone(previous) || requested > previous.value.earlier;
-        const params = { workspaceId, groupId: Group.Id.make(id) };
+        const params = { groupId: Group.Id.make(id) };
         const newestFirst: Array<Thread.Opening> = [];
         let before: Thread.OpeningCursor | undefined;
         let complete = false;
@@ -278,7 +272,7 @@ const timelineOf = perClient(
           const api = yield* client;
           const requested = get(earlier);
           const previous = previousOf<ThreadTimeline.Item>(get);
-          const params = { workspaceId, threadId: Thread.Id.make(id) };
+          const params = { threadId: Thread.Id.make(id) };
           const read = (query: {
             readonly afterSequence?: number;
             readonly beforeSequence?: number;
@@ -344,7 +338,6 @@ const inboxOf = perClient(
           let complete = false;
           while (true) {
             const page = yield* api.notifications.inbox({
-              params: { workspaceId },
               query: {
                 limit: inboxPageSize,
                 ...(filter === "pending" ? { pendingOnly: true } : {}),
@@ -381,7 +374,6 @@ export const inboxRead = (client: ApiClient, workspaceId: string, filter: InboxF
 export const pendingCountRead = (client: ApiClient, workspaceId: string) =>
   valid(workspaceId)
     ? client.query("notifications", "count", {
-        params: { workspaceId: Workspace.Id.make(workspaceId) },
         reactivityKeys: [workspaceKey(workspaceId, "inbox")],
       })
     : undefined;
@@ -391,29 +383,26 @@ export const pendingCountRead = (client: ApiClient, workspaceId: string) =>
  * they are shown; what arrived after it stays. Their sessions, this one included, refresh the
  * inbox and pending counts when its signal arrives through the change feed.
  */
-export const markSeenThrough =
-  (workspace: string) =>
-  (api: Api, through: Pick<Notification.Notification, "recordedAt" | "id">) =>
-    Effect.gen(function* () {
-      const { marked } = yield* api.notifications.markSeenThrough({
-        params: { workspaceId: yield* command(Workspace.Id)(workspace) },
-        payload: { through: { recordedAt: through.recordedAt, id: through.id } },
-      });
-      return marked;
+export const markSeenThrough = (
+  api: WorkspaceApi,
+  through: Pick<Notification.Notification, "recordedAt" | "id">,
+) =>
+  Effect.gen(function* () {
+    const { marked } = yield* api.notifications.markSeenThrough({
+      payload: { through: { recordedAt: through.recordedAt, id: through.id } },
     });
+    return marked;
+  });
 
 /**
  * Record that the reader saw a notification; seeing it again keeps the first time. Their
  * sessions, this one included, refresh the inbox and pending counts when its signal arrives
  * through the change feed.
  */
-export const markSeen = (workspace: string) => (api: Api, notificationId: string) =>
+export const markSeen = (api: WorkspaceApi, notificationId: string) =>
   Effect.gen(function* () {
     yield* api.notifications.markSeen({
-      params: {
-        workspaceId: yield* command(Workspace.Id)(workspace),
-        notificationId: yield* command(Notification.Id)(notificationId),
-      },
+      params: { notificationId: yield* command(Notification.Id)(notificationId) },
     });
   });
 
@@ -433,10 +422,9 @@ export const isGroupName = (name: string) => Schema.is(Group.NewName)(name.trim(
  * Create a team group, then invalidate the reader's groups and the public ones, as the change feed
  * would when the commit arrives. A retry with the same key returns the first attempt's group.
  */
-export const createGroup = (workspace: string) => (api: Api, group: NewGroup) =>
+export const createGroup = (workspace: string) => (api: WorkspaceApi, group: NewGroup) =>
   Effect.gen(function* () {
     const created = yield* api.groups.create({
-      params: { workspaceId: yield* command(Workspace.Id)(workspace) },
       headers: { "idempotency-key": group.key },
       payload: yield* command(Group.CreateTeamInput)({
         name: group.name.trim(),
@@ -461,14 +449,11 @@ export interface GroupRename {
  * Rename a team group from the name the reader last saw, then invalidate the groups that show
  * it. A rename made meanwhile refuses it as changed, and the groups refresh to show that name.
  */
-export const renameGroup = (workspace: string) => (api: Api, rename: GroupRename) =>
+export const renameGroup = (workspace: string) => (api: WorkspaceApi, rename: GroupRename) =>
   Effect.gen(function* () {
     const renamed = yield* api.groups
       .rename({
-        params: {
-          workspaceId: yield* command(Workspace.Id)(workspace),
-          groupId: yield* command(Group.Id)(rename.groupId),
-        },
+        params: { groupId: yield* command(Group.Id)(rename.groupId) },
         payload: {
           name: yield* command(Group.NewName)(rename.name.trim()),
           expectedName: yield* command(Group.Name)(rename.expectedName),
@@ -489,13 +474,10 @@ export const renameGroup = (workspace: string) => (api: Api, rename: GroupRename
  * Join a public group as the reader, then invalidate the groups, the public ones, and the inbox,
  * whose sources follow group access. Joining a group already joined returns the same admission.
  */
-export const joinGroup = (workspace: string) => (api: Api, groupId: string) =>
+export const joinGroup = (workspace: string) => (api: WorkspaceApi, groupId: string) =>
   Effect.gen(function* () {
     const admission = yield* api.groups.join({
-      params: {
-        workspaceId: yield* command(Workspace.Id)(workspace),
-        groupId: yield* command(Group.Id)(groupId),
-      },
+      params: { groupId: yield* command(Group.Id)(groupId) },
     });
     yield* Reactivity.invalidate([
       workspaceKey(workspace, "groups"),
@@ -515,44 +497,42 @@ export type MembershipChange =
  * and the inbox, whose sources follow group access. Members are added one at a time; one already
  * added, as by someone else meanwhile, counts as added.
  */
-export const changeMembership = (workspace: string) => (api: Api, change: MembershipChange) =>
-  Effect.gen(function* () {
-    const params = {
-      workspaceId: yield* command(Workspace.Id)(workspace),
-      groupId: yield* command(Group.Id)(change.groupId),
-    };
-    const invalidate = Reactivity.invalidate([
-      itemKey(workspace, "rosters", change.groupId),
-      itemKey(workspace, "streams", change.groupId),
-      workspaceKey(workspace, "groups"),
-      workspaceKey(workspace, "public-groups"),
-      workspaceKey(workspace, "inbox"),
-    ]);
-    switch (change.kind) {
-      case "add":
-        // What was added before a failure stays added, so the reads refresh either way.
-        yield* Effect.forEach(change.memberIds, (memberId) =>
-          Effect.flatMap(command(Member.Id)(memberId), (id) =>
-            api.groups.addMember({ params, payload: { memberId: id } }),
-          ).pipe(
-            Effect.asVoid,
-            Effect.catchReason("CoreError.Conflict", "AlreadyMember", () => Effect.void),
-          ),
-        ).pipe(Effect.ensuring(invalidate));
-        return;
-      case "remove":
-      case "leave": {
-        const admission = {
-          ...params,
-          membershipId: yield* command(GroupMembership.Id)(change.membershipId),
-        };
-        if (change.kind === "remove") yield* api.groups.removeMember({ params: admission });
-        else yield* api.groups.leave({ params: admission });
-        yield* invalidate;
-        return;
+export const changeMembership =
+  (workspace: string) => (api: WorkspaceApi, change: MembershipChange) =>
+    Effect.gen(function* () {
+      const params = { groupId: yield* command(Group.Id)(change.groupId) };
+      const invalidate = Reactivity.invalidate([
+        itemKey(workspace, "rosters", change.groupId),
+        itemKey(workspace, "streams", change.groupId),
+        workspaceKey(workspace, "groups"),
+        workspaceKey(workspace, "public-groups"),
+        workspaceKey(workspace, "inbox"),
+      ]);
+      switch (change.kind) {
+        case "add":
+          // What was added before a failure stays added, so the reads refresh either way.
+          yield* Effect.forEach(change.memberIds, (memberId) =>
+            Effect.flatMap(command(Member.Id)(memberId), (id) =>
+              api.groups.addMember({ params, payload: { memberId: id } }),
+            ).pipe(
+              Effect.asVoid,
+              Effect.catchReason("CoreError.Conflict", "AlreadyMember", () => Effect.void),
+            ),
+          ).pipe(Effect.ensuring(invalidate));
+          return;
+        case "remove":
+        case "leave": {
+          const admission = {
+            ...params,
+            membershipId: yield* command(GroupMembership.Id)(change.membershipId),
+          };
+          if (change.kind === "remove") yield* api.groups.removeMember({ params: admission });
+          else yield* api.groups.leave({ params: admission });
+          yield* invalidate;
+          return;
+        }
       }
-    }
-  });
+    });
 
 /** Whether text can be sent as a message: it has something besides whitespace. */
 export const isMessageText = Schema.is(ThreadMessage.Text);
@@ -581,9 +561,8 @@ export interface Posted {
  * commit arrives, so it shows even while the feed is away. A retry with the same key returns the
  * first attempt's result.
  */
-export const postMessage = (workspace: string) => (api: Api, post: Post) =>
+export const postMessage = (workspace: string) => (api: WorkspaceApi, post: Post) =>
   Effect.gen(function* () {
-    const workspaceId = yield* command(Workspace.Id)(workspace);
     const payload = {
       text: yield* command(ThreadMessage.Text)(post.text),
       mentions: yield* command(ThreadMessage.PublishInput.fields.mentions)(post.mentions),
@@ -593,7 +572,7 @@ export const postMessage = (workspace: string) => (api: Api, post: Post) =>
       case "start": {
         const groupId = yield* command(Group.Id)(post.groupId);
         const started = yield* api.threads.start({
-          params: { workspaceId, groupId },
+          params: { groupId },
           headers,
           payload,
         });
@@ -605,7 +584,6 @@ export const postMessage = (workspace: string) => (api: Api, post: Post) =>
       }
       case "direct": {
         const started = yield* api.threads.startDirect({
-          params: { workspaceId },
           headers,
           payload: {
             ...payload,
@@ -621,7 +599,7 @@ export const postMessage = (workspace: string) => (api: Api, post: Post) =>
       }
       case "reply": {
         const threadId = yield* command(Thread.Id)(post.threadId);
-        yield* api.threads.publish({ params: { workspaceId, threadId }, headers, payload });
+        yield* api.threads.publish({ params: { threadId }, headers, payload });
         // A reply changes its group's stream, whichever group that is.
         yield* Reactivity.invalidate([
           itemKey(workspace, "timelines", threadId),
@@ -641,19 +619,18 @@ export type ReadMark =
  * included, refresh the unread state and pending counts it changes when its signal arrives
  * through the change feed.
  */
-export const markRead = (workspace: string) => (api: Api, mark: ReadMark) =>
+export const markRead = (api: WorkspaceApi, mark: ReadMark) =>
   Effect.gen(function* () {
-    const workspaceId = yield* command(Workspace.Id)(workspace);
     if (mark.kind === "thread")
       yield* api.threads.markRead({
-        params: { workspaceId, threadId: yield* command(Thread.Id)(mark.threadId) },
+        params: { threadId: yield* command(Thread.Id)(mark.threadId) },
         payload: {
           throughSequence: yield* command(Thread.Latest.fields.sequence)(mark.through),
         },
       });
     else
       yield* api.groups.markRead({
-        params: { workspaceId, groupId: yield* command(Group.Id)(mark.groupId) },
+        params: { groupId: yield* command(Group.Id)(mark.groupId) },
       });
   });
 
@@ -668,18 +645,16 @@ export type Follow =
   | { readonly kind: "follow-group"; readonly groupId: string; readonly memberId: string }
   | { readonly kind: "unfollow-group"; readonly groupId: string; readonly memberId: string };
 /** Follow a thread or a team group, or stop following it. */
-export const changeFollow = (workspace: string) => (api: Api, follow: Follow) =>
+export const changeFollow = (api: WorkspaceApi, follow: Follow) =>
   Effect.gen(function* () {
-    const workspaceId = yield* command(Workspace.Id)(workspace);
     switch (follow.kind) {
       case "follow-thread":
       case "unfollow-thread": {
         const threadId = yield* command(Thread.Id)(follow.threadId);
-        if (follow.kind === "follow-thread")
-          yield* api.threads.follow({ params: { workspaceId, threadId } });
+        if (follow.kind === "follow-thread") yield* api.threads.follow({ params: { threadId } });
         else
           yield* api.threads.unfollow({
-            params: { workspaceId, threadId },
+            params: { threadId },
             payload: {
               participationId: yield* command(ThreadParticipation.Id)(follow.participationId),
             },
@@ -688,7 +663,7 @@ export const changeFollow = (workspace: string) => (api: Api, follow: Follow) =>
       }
       case "follow-group":
       case "unfollow-group": {
-        const params = { workspaceId, groupId: yield* command(Group.Id)(follow.groupId) };
+        const params = { groupId: yield* command(Group.Id)(follow.groupId) };
         const payload = { memberId: yield* command(Member.Id)(follow.memberId) };
         if (follow.kind === "follow-group") yield* api.groups.follow({ params, payload });
         else yield* api.groups.unfollow({ params, payload });
@@ -698,12 +673,7 @@ export const changeFollow = (workspace: string) => (api: Api, follow: Follow) =>
   });
 
 /** Tell a thread's readers that the reader is typing there, for the next few seconds. */
-export const sendTyping = (workspace: string) => (api: Api, threadId: string) =>
+export const sendTyping = (api: WorkspaceApi, threadId: string) =>
   Effect.gen(function* () {
-    yield* api.threads.typing({
-      params: {
-        workspaceId: yield* command(Workspace.Id)(workspace),
-        threadId: yield* command(Thread.Id)(threadId),
-      },
-    });
+    yield* api.threads.typing({ params: { threadId: yield* command(Thread.Id)(threadId) } });
   });

@@ -41,11 +41,13 @@ interface Scope {
 }
 const SessionContext = createContext<SessionScope>();
 const ApiContext = createContext<ApiClient>();
+const WorkspaceClientsContext = createContext<(workspaceId: string) => ApiClient>();
 
 /**
- * The credential, and the API client and atom registry made for it. Changing the credential
- * remounts everything under the provider, which interrupts the old credential's requests and
- * discards what it read. The consumer owns routing and all rendered content.
+ * The credential, and the API clients and atom registry made for it: one client for the session,
+ * and one for each workspace it acts in. Changing the credential remounts everything under the
+ * provider, which interrupts the old credential's requests and discards what it read. The consumer
+ * owns routing and all rendered content.
  */
 export function ClientProvider(props: ParentProps<ClientProviderProps>) {
   const store = props.sessionStore;
@@ -83,12 +85,22 @@ export function ClientProvider(props: ParentProps<ClientProviderProps>) {
             setScope({ session: stored, signedOut: false });
           else change(undefined, false);
         };
-        const client = createApiClient({
+        const options = {
           baseUrl: props.apiBaseUrl,
           transport: props.transport,
           session: current.session,
           rejected,
-        });
+        };
+        const client = createApiClient(options);
+        // A workspace's client is made when first used, and kept while the credential is.
+        const workspaceClients = new Map<string, ApiClient>();
+        const workspaceClient = (workspaceId: string) => {
+          const existing = workspaceClients.get(workspaceId);
+          if (existing) return existing;
+          const made = createApiClient(options, workspaceId);
+          workspaceClients.set(workspaceId, made);
+          return made;
+        };
         return (
           <SessionContext.Provider
             value={{
@@ -110,7 +122,9 @@ export function ClientProvider(props: ParentProps<ClientProviderProps>) {
             }}
           >
             <ApiContext.Provider value={client}>
-              <RegistryProvider>{props.children}</RegistryProvider>
+              <WorkspaceClientsContext.Provider value={workspaceClient}>
+                <RegistryProvider>{props.children}</RegistryProvider>
+              </WorkspaceClientsContext.Provider>
             </ApiContext.Provider>
           </SessionContext.Provider>
         );
@@ -123,8 +137,15 @@ export function useSession(): SessionScope {
   if (!session) throw new Error("Session operations require ClientProvider.");
   return session;
 }
+/** The session's API client, which acts in no workspace. */
 export function useApiClient(): ApiClient {
   const client = useContext(ApiContext);
   if (!client) throw new Error("API operations require ClientProvider.");
   return client;
+}
+/** The API client acting in the workspace `workspaceId`, for the session's credential. */
+export function useWorkspaceClient(workspaceId: string): ApiClient {
+  const workspaceClient = useContext(WorkspaceClientsContext);
+  if (!workspaceClient) throw new Error("API operations require ClientProvider.");
+  return workspaceClient(workspaceId);
 }

@@ -15,7 +15,7 @@ import { Store } from "@amends-dev/core/journal";
 import { ThreadId } from "@amends-dev/core/thread";
 import { Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer, PrimaryKey, Schema } from "effect";
-import { ClusterSchema, Entity, Sharding } from "effect/cluster";
+import { ClusterSchema, Entity } from "effect/cluster";
 import { Rpc } from "effect/rpc";
 import * as DeliveryRunner from "./DeliveryRunner.ts";
 import * as JobRequests from "./JobRequests.ts";
@@ -69,7 +69,8 @@ const jobOf = (entityId: string): DeliveryJobs.Job => {
 /**
  * Provides core's `DeliveryJobs.DeliveryJobs`, whose requests Cluster stores, each keyed by the
  * commit that asks for it: in the commit's transaction when Cluster's message storage shares the
- * workspace storage's SQL client, and read again once the commit is done, as `TurnJob`'s are.
+ * workspace storage's SQL client, and read at once through `JobRequests.Wakeup`, as `TurnJob`'s
+ * are.
  *
  * @category layers
  * @since 0.1.0
@@ -77,7 +78,7 @@ const jobOf = (entityId: string): DeliveryJobs.Job => {
 export const layerRequests = Layer.effect(
   DeliveryJobs.DeliveryJobs,
   Effect.gen(function* () {
-    const sharding = yield* Sharding.Sharding;
+    const wakeup = yield* JobRequests.Wakeup;
     const deliveryJobClient = yield* entity.client;
     return DeliveryJobs.DeliveryJobs.of({
       requestDeliver: Effect.fnUntraced(function* ({ workspaceId, threadId }) {
@@ -90,7 +91,7 @@ export const layerRequests = Layer.effect(
         yield* deliveryJobClient(entityId(deliver))
           .Deliver(deliver, { discard: true })
           .pipe(Effect.mapError(StoreError.failed("Store", "request delivery job")));
-        yield* storeTransaction.afterCommit(sharding.pollStorage);
+        yield* wakeup.afterCommit;
       }),
     });
   }),

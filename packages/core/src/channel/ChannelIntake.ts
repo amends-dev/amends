@@ -37,7 +37,7 @@ import * as Contact from "./Contact.ts";
 import * as ContactStore from "./ContactStore.ts";
 import * as DeliveryStore from "./DeliveryStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What intake made of one event: the thread it opened, the message it published, edited, or
@@ -88,9 +88,9 @@ export interface Received extends Schema.Schema.Type<typeof Received> {}
  */
 export type IntakeError =
   | CoreError.NotFound
+  | CoreError.Invalid
   | CoreError.Unavailable
-  | StoreError.StoreError
-  | Exclude<TaskCommand.Error, CoreError.Conflict>;
+  | CoreError.Uncertain;
 
 /**
  * What receiving an inbound request can fail with.
@@ -98,7 +98,11 @@ export type IntakeError =
  * @category errors
  * @since 0.1.0
  */
-export type ReceiveError = IntakeError | CoreError.Invalid;
+export type ReceiveError =
+  | CoreError.NotFound
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * Intake, one of `Core.JobServices`: a host calls it for what its channels receive, as no actor.
@@ -445,15 +449,17 @@ export const make = Effect.fn("ChannelIntake.make")(function* () {
         intakes.push(yield* intakeEvent(channel, transport.self, event));
       return { answer: received.answer ?? null, intakes } satisfies Received;
     },
+    Operation.report,
   );
 
-  const intake: ChannelIntake["Service"]["intake"] = Effect.fn("ChannelIntake.intake")(
-    function* (channelId, event) {
-      const channel = yield* channelQuery.requireActive(channelId);
-      const transport = yield* transportOf(channel);
-      return yield* intakeEvent(channel, transport.self, event);
-    },
-  );
+  const intake: ChannelIntake["Service"]["intake"] = Effect.fn("ChannelIntake.intake")(function* (
+    channelId,
+    event,
+  ) {
+    const channel = yield* channelQuery.requireActive(channelId);
+    const transport = yield* transportOf(channel);
+    return yield* intakeEvent(channel, transport.self, event);
+  }, Operation.report);
 
   return ChannelIntake.of({ receive, intake });
 });

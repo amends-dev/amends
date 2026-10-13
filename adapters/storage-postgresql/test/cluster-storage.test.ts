@@ -140,4 +140,25 @@ describe.skipIf(!available)("PostgreSQL", () => {
       }).pipe(Effect.scoped),
     ),
   );
+
+  // Cluster checks for its migrations table and then creates it, so processes starting together
+  // over a new database would race to create it, failing all but one.
+  it.effect("processes starting together over a new database each start Cluster", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const pools = yield* Effect.forEach([1, 2, 3, 4], () => Layer.build(database(url)));
+        const client = PostgresClusterStorage.layerOneAtATime(
+          SingleRunner.layer({ shardingConfig: { runnerAddress: Option.none() } }).pipe(
+            Layer.provide(BunCrypto.layer),
+          ),
+        );
+        const started = yield* Effect.forEach(
+          pools,
+          (pool) => Effect.exit(Layer.build(client).pipe(Effect.provide(pool))),
+          { concurrency: "unbounded" },
+        );
+        expect(started.filter(Exit.isFailure)).toEqual([]);
+      }).pipe(Effect.scoped),
+    ),
+  );
 });

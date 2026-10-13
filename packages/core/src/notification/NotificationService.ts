@@ -12,7 +12,6 @@ import * as Authorization from "../authorization/Authorization.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Event from "../journal/Event.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
 import * as ThreadActivityFacts from "../thread/ThreadActivityFacts.ts";
 import * as ThreadQuery from "../thread/ThreadQuery.ts";
 
@@ -24,7 +23,7 @@ import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import * as Store from "../journal/Store.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What every notification operation can fail with: authorization, the store, and an input that
@@ -33,7 +32,7 @@ import * as StoreError from "../journal/StoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type Error = Authorization.Error | StoreError.StoreError | Schema.SchemaError;
+export type Error = CoreError.Denied | CoreError.Invalid | CoreError.Unavailable;
 
 /**
  * What reading a notification's source can fail with.
@@ -41,7 +40,7 @@ export type Error = Authorization.Error | StoreError.StoreError | Schema.SchemaE
  * @category errors
  * @since 0.1.0
  */
-export type SourceError = Exclude<ThreadQuery.TimelineError, CoreError.NotFound> | Log.ReadError;
+export type SourceError = CoreError.Denied | CoreError.Invalid | CoreError.Unavailable;
 
 /**
  * What reading the inbox can fail with: reading notifications, and reading their sources.
@@ -49,21 +48,21 @@ export type SourceError = Exclude<ThreadQuery.TimelineError, CoreError.NotFound>
  * @category errors
  * @since 0.1.0
  */
-export type InboxError = Error | SourceError;
+export type InboxError = CoreError.Denied | CoreError.Invalid | CoreError.Unavailable;
 
 /**
- * What marking notifications seen can fail with: one missing or another's, one already handled,
- * an acting member who is not a person, and a write the store kept refusing.
+ * What marking notifications seen can fail with: one missing or another's, one already handled, and
+ * an acting member who is not a person.
  *
  * @category errors
  * @since 0.1.0
  */
 export type MarkSeenError =
-  | Error
-  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Denied
-  | CoreError.Conflict;
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The notification operations, one of `Core.Operations`.
@@ -215,7 +214,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
         }),
       ),
     );
-  });
+  }, Operation.report);
   const markSeen = Effect.fn("NotificationService.markSeen")(function* (
     notificationId: Notification.Id,
   ) {
@@ -249,7 +248,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       }),
     );
     return seen;
-  });
+  }, Operation.report);
   const markSeenThrough = Effect.fn("NotificationService.markSeenThrough")(function* (
     input: NotificationStore.Cursor,
   ) {
@@ -291,11 +290,11 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       if (last === undefined || page.length < seenBatch || due < page.length) return marked;
       after = { recordedAt: last.recordedAt, id: last.id };
     }
-  });
+  }, Operation.report);
   const countPending = Effect.gen(function* () {
     const target = yield* requireRecipient();
     return yield* notificationStore.countPendingByRecipient(target);
-  }).pipe(Effect.withSpan("NotificationService.countPending"));
+  }).pipe(Effect.withSpan("NotificationService.countPending"), Operation.report);
   return NotificationService.of({ inbox, markSeen, markSeenThrough, countPending });
 });
 

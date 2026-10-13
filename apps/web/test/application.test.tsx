@@ -487,9 +487,14 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
   // integrations they name; then the second workspace's settings and ownership. The feed stays
   // separate.
   expect(fetch).toHaveBeenCalledTimes(9);
-  expect(feed.streams.map((stream) => new URL(stream.request.url).pathname)).toEqual([
-    "/workspaces/one/changes",
-    "/workspaces/two/changes",
+  expect(
+    feed.streams.map(({ request }) => [
+      new URL(request.url).pathname,
+      request.headers.get("amends-workspace"),
+    ]),
+  ).toEqual([
+    ["/changes", "one"],
+    ["/changes", "two"],
   ]);
   await waitFor(() => expect(feed.streams[0]?.request.signal.aborted).toBe(true));
 });
@@ -605,7 +610,7 @@ it("invites someone and removes a member from the Members tab, confirming each w
     if (request.method !== "GET") requests.push(`${request.method} ${path}`);
     if (path === "/me/workspaces")
       return response({ memberships: [{ workspace, member: owner, people: 2 }], invitations: [] });
-    if (path === "/workspaces/one/settings")
+    if (path === "/settings")
       return response({
         workspace,
         canRename: true,
@@ -613,7 +618,7 @@ it("invites someone and removes a member from the Members tab, confirming each w
         canInvite: true,
         roles,
       });
-    if (path === "/workspaces/one/ownership")
+    if (path === "/settings/ownership")
       return response({
         workspace,
         owner,
@@ -621,7 +626,7 @@ it("invites someone and removes a member from the Members tab, confirming each w
         canTransfer: true,
         candidates: [ada],
       });
-    if (path === "/workspaces/one/member-management")
+    if (path === "/settings/members")
       return response([
         { member: owner, access: access("owner", "builtin:owner"), canRemove: false },
         {
@@ -630,12 +635,12 @@ it("invites someone and removes a member from the Members tab, confirming each w
           canRemove: true,
         },
       ]);
-    if (path === "/workspaces/one/members") return response([owner, { ...ada, status: adaStatus }]);
-    if (path === "/workspaces/one/members/ada" && request.method === "DELETE") {
+    if (path === "/members") return response([owner, { ...ada, status: adaStatus }]);
+    if (path === "/members/ada" && request.method === "DELETE") {
       adaStatus = "removed";
       return response({ ...ada, status: "removed" });
     }
-    if (path === "/workspaces/one/invitations" && request.method === "POST") {
+    if (path === "/invitations" && request.method === "POST") {
       const body = (await request.json()) as Record<string, string>;
       const recipient = { id: "account-new", email: body.email ?? "" };
       accounts.push(recipient);
@@ -654,8 +659,8 @@ it("invites someone and removes a member from the Members tab, confirming each w
       invitations.push(created);
       return response(created, 201);
     }
-    if (path === "/workspaces/one/invitations") return response(invitations);
-    if (path === "/workspaces/one/accounts") return response(accounts);
+    if (path === "/invitations") return response(invitations);
+    if (path === "/accounts") return response(accounts);
     return response([]);
   });
   const history = mount(
@@ -701,10 +706,7 @@ it("invites someone and removes a member from the Members tab, confirming each w
       1,
     ),
   );
-  expect(requests).toEqual([
-    "POST /workspaces/one/invitations",
-    "DELETE /workspaces/one/members/ada",
-  ]);
+  expect(requests).toEqual(["POST /invitations", "DELETE /members/ada"]);
 });
 
 function liveWorkspace(options: { name: () => string; status?: () => string }) {
@@ -1003,7 +1005,7 @@ it("lists the inbox at its route, and opening one marks it seen and shows its th
   );
   // Opening it marks it seen at once.
   await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
-  await waitFor(() => expect(markedSeen).toEqual(["/workspaces/one/notifications/n1/seen"]));
+  await waitFor(() => expect(markedSeen).toEqual(["/notifications/n1/seen"]));
   const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("Can you look at the terms?");
   // The message that notified the reader is set apart, and the panel says why it came.
@@ -1030,7 +1032,7 @@ it("offers a new group only to those who may create one, and opens the group it 
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (request.method === "POST" && path === "/workspaces/one/groups") {
+    if (request.method === "POST" && path === "/groups") {
       created.push(await request.json());
       return response(
         {
@@ -1077,9 +1079,8 @@ it("browses public groups from the sidebar, and joining one opens it", async () 
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/groups/public")
-      return response([{ group: lobby, members: 1, joined: false }]);
-    if (request.method === "POST" && path === "/workspaces/one/groups/g5/join") {
+    if (path === "/groups/public") return response([{ group: lobby, members: 1, joined: false }]);
+    if (request.method === "POST" && path === "/groups/g5/join") {
       joins.push(path);
       return response({
         id: "a5",
@@ -1155,7 +1156,7 @@ it("manages a group's members from its header, and leaving returns to the worksp
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/groups/g1/members" && request.method === "GET")
+    if (path === "/groups/g1/members" && request.method === "GET")
       return Promise.resolve(response(roster));
     const departure = /\/groups\/g1\/members\/([^/]+)(\/leave)?$/.exec(path);
     if (departure) {
@@ -1200,7 +1201,7 @@ it("drafts a first message to someone new and opens the conversation it starts",
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (request.method === "POST" && path === "/workspaces/one/threads") {
+    if (request.method === "POST" && path === "/threads") {
       started.push(await request.json());
       return response(
         {
@@ -1284,7 +1285,7 @@ it("lists teammates under Direct messages and says when there are no groups", as
 it("jumps to a group by name from ⌘K or the sidebar's search", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const path = new URL(new Request(input, init).url).pathname;
-    if (path === "/workspaces/one/groups/g1/members") return Promise.resolve(response([]));
+    if (path === "/groups/g1/members") return Promise.resolve(response([]));
     const answer = conversation(path);
     return Promise.resolve(
       response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] }),
@@ -1319,11 +1320,11 @@ it("renames a group from its settings", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/groups/g1/rename") {
+    if (path === "/groups/g1/rename") {
       ({ name, expectedName } = (await request.json()) as { name: string; expectedName: string });
       return response({ ...managed.group, name });
     }
-    if (path === "/workspaces/one/groups/g1/members") return response([]);
+    if (path === "/groups/g1/members") return response([]);
     const answer = conversation(path);
     return response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] });
   });
@@ -1353,7 +1354,7 @@ it("follows a group from its bell, confirming each change with a toast", async (
       changes.push(path.split("/").at(-1)!);
       return new Response(null, { status: 204 });
     }
-    if (path === "/workspaces/one/groups/g1/members") return response([]);
+    if (path === "/groups/g1/members") return response([]);
     const answer = conversation(path);
     return response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] });
   });
@@ -1384,7 +1385,7 @@ it("follows and renames a group from commands typed after /, posting nothing", a
       following = path.endsWith("/follow");
       return new Response(null, { status: 204 });
     }
-    if (path === "/workspaces/one/groups/g1/members") return response([]);
+    if (path === "/groups/g1/members") return response([]);
     const answer = conversation(path);
     return response(answer ?? { memberships: [membership("one", "Studio")], invitations: [] });
   });
@@ -1446,15 +1447,15 @@ function connectionsHost() {
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/connections/integrations") return response([mcp]);
-    if (path === "/workspaces/one/connections" && request.method === "GET")
+    if (path === "/connections/integrations") return response([mcp]);
+    if (path === "/connections" && request.method === "GET")
       return response(created === undefined ? [] : [view()]);
-    if (path === "/workspaces/one/connections" && request.method === "POST") {
+    if (path === "/connections" && request.method === "POST") {
       created = (await request.json()) as Record<string, unknown>;
       writes.push({ method: "POST", path, body: created });
       return response(view(), 201);
     }
-    if (path === "/workspaces/one/connections/c1/check") {
+    if (path === "/connections/c1/check") {
       writes.push({ method: "POST", path, body: undefined });
       return response({ status: "unauthorized", description: "The server refused the key." });
     }
@@ -1500,7 +1501,7 @@ async function addMcpServerWithKey() {
 const connectionWrites = [
   {
     method: "POST",
-    path: "/workspaces/one/connections",
+    path: "/connections",
     body: {
       integration: "mcp",
       name: "MCP server",
@@ -1509,7 +1510,7 @@ const connectionWrites = [
       apiKey: "sk-tools",
     },
   },
-  { method: "POST", path: "/workspaces/one/connections/c1/check", body: undefined },
+  { method: "POST", path: "/connections/c1/check", body: undefined },
 ];
 
 it("adds a connection with its key from Connections, opening its page and checking it", async () => {
@@ -1568,21 +1569,20 @@ function agentsHost() {
   return vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/agents")
+    if (path === "/agents")
       return response([agent("a1", "Atlas", null), agent("a2", "Review helper", "gone")]);
-    if (path === "/workspaces/one/connections/integrations")
+    if (path === "/connections/integrations")
       return response([
         integration("amends", "amends", "harnesses"),
         integration("openai-compatible", "OpenAI-compatible API", "models"),
       ]);
-    if (path === "/workspaces/one/connections")
+    if (path === "/connections")
       return response([
         connection("h1", "Amends harness", "amends"),
         connection("m1", "Local models", "openai-compatible"),
       ]);
-    if (path === "/workspaces/one/connections/m1/models")
-      return response({ listed: [], unlisted: true });
-    if (path === "/workspaces/one/settings")
+    if (path === "/connections/m1/models") return response({ listed: [], unlisted: true });
+    if (path === "/settings")
       return response({
         workspace,
         canRename: true,

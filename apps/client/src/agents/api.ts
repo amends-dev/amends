@@ -4,7 +4,7 @@ import { Connection } from "@amends-dev/core/connection";
 import { Member, Workspace } from "@amends-dev/core/workspace";
 import type { AgentIssue, AgentsFailure, Effort } from "@amends-dev/ui/screens/agents";
 import { Cause, Effect, Option, Schema } from "effect";
-import type { Api, ApiClient } from "../api/client.ts";
+import type { ApiClient, WorkspaceApi } from "../api/client.ts";
 import { command, workspaceFailure } from "../api/failures.ts";
 import { workspaceKey } from "../api/keys.ts";
 import { refreshResult } from "../api/refresh.ts";
@@ -14,12 +14,10 @@ import { newWorkspaceRequestKey } from "../workspaces/api.ts";
 export { Agent, Connection };
 
 const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
-  const params = { workspaceId };
   const connections = connectionsReads(client, workspaceId)!;
   return {
     /** The agents the reader may read, by name. */
     agents: client.query("agents", "list", {
-      params,
       reactivityKeys: [workspaceKey(workspaceId, "agents")],
     }),
     /** The connections an agent's setup names, and the integrations that say what each gives. */
@@ -28,19 +26,18 @@ const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
     /** The models a connection offers, as its integration lists them. */
     models: (connectionId: Connection.Id) =>
       client.query("connections", "models", {
-        params: { workspaceId, connectionId },
+        params: { connectionId },
         reactivityKeys: [workspaceKey(workspaceId, "connections")],
       }),
     /** The workspace's roles and which the reader may give, for an agent's first role. */
-    settings: client.query("workspaces", "settings", {
-      params,
+    settings: client.query("settings", "get", {
       reactivityKeys: [workspaceKey(workspaceId, "settings")],
     }),
   };
 };
 /**
- * The credential-scoped reads behind Agents: the agents under their own invalidation key, and
- * the connections reads they share. Undefined for an invalid workspace ID.
+ * The reads behind Agents, through the workspace's client: the agents under their own
+ * invalidation key, and the connections reads they share. Undefined for an invalid workspace ID.
  */
 export const agentsReads = (client: ApiClient, workspaceId: string) =>
   Option.getOrUndefined(
@@ -101,15 +98,13 @@ const configurationOf = (setup: SetupInput) => ({
  * Make one change to agents, answering with the ID of the agent it created, if any. An agent
  * leaves as any member does, so removing one ends its membership.
  */
-export const changeAgent = (workspace: string) => (api: Api, change: AgentCommand) =>
+export const changeAgent = (api: WorkspaceApi, change: AgentCommand) =>
   Effect.gen(function* () {
-    const workspaceId = yield* command(Workspace.Id)(workspace);
     const agent = (agentId: string) =>
-      Effect.map(command(Agent.Id)(agentId), (id) => ({ workspaceId, agentId: id }));
+      Effect.map(command(Agent.Id)(agentId), (id) => ({ agentId: id }));
     switch (change.kind) {
       case "create": {
         const created = yield* api.agents.create({
-          params: { workspaceId },
           headers: { "idempotency-key": change.key },
           payload: yield* command(Schema.toType(Agent.CreateInput))({
             name: change.name,
@@ -140,7 +135,7 @@ export const changeAgent = (workspace: string) => (api: Api, change: AgentComman
         return undefined;
       case "remove":
         yield* api.members.remove({
-          params: { workspaceId, memberId: yield* command(Member.Id)(change.memberId) },
+          params: { memberId: yield* command(Member.Id)(change.memberId) },
         });
         return undefined;
     }

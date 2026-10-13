@@ -1,4 +1,3 @@
-import { Api, Authentication } from "@amends-dev/http";
 import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { Identity } from "@amends-dev/core/identity";
 import { Request } from "@amends-dev/core/request";
@@ -7,21 +6,16 @@ import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import { Base64 } from "effect/encoding";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import * as DevelopmentAuthentication from "../src/DevelopmentAuthentication.ts";
 import * as LocalHost from "../src/LocalHost.ts";
 import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
+import { client } from "./client.ts";
 
 const alice = Identity.HumanId.make("alice");
 const secret = "sk-mcp-connections-test";
 /** Where nothing listens, so checking a connection to it reaches nothing. */
 const nowhere = "http://127.0.0.1:1/mcp";
-const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-    next(HttpClientRequest.bearerToken(request, token)),
-  );
-const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 /** The real routes, gateway, integrations, and PostgreSQL storage behind a Bun test server. */
 const server = (url: string, credentialKey: Redacted.Redacted<string> | undefined) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
@@ -36,14 +30,13 @@ const server = (url: string, credentialKey: Redacted.Redacted<string> | undefine
 const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
-  const asAlice = yield* client(alice);
-  const workspace = yield* asAlice.workspaces.create({
+  const workspace = yield* (yield* client(alice)).workspaces.create({
     headers: {},
     payload: { name: "Studio", memberName: "alice" },
   });
+  const asAlice = yield* client(alice, workspace.id);
   const invitation = yield* asAlice.invitations.issue({
     headers: {},
-    params: { workspaceId: workspace.id },
     payload: {
       email: "bob@example.com",
       expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),
@@ -51,8 +44,8 @@ const workspaceWithBob = Effect.gen(function* () {
     },
   });
   // Development tokens are human IDs: Bob's is his account's, which the invitation names.
-  const asBob = yield* client(invitation.details.recipientId);
-  yield* asBob.invitations.accept({
+  const asBob = yield* client(invitation.details.recipientId, workspace.id);
+  yield* asBob.workspaces.acceptInvitation({
     params: { workspaceId: workspace.id, invitationId: invitation.details.id },
     payload: { name: "bob" },
   });
@@ -67,7 +60,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         Effect.gen(function* () {
           const { asAlice, asBob, workspaceId } = yield* workspaceWithBob;
           // Every member sees what this host installed, with the form each one's settings make.
-          const integrations = yield* asBob.connections.integrations({ params: { workspaceId } });
+          const integrations = yield* asBob.connections.integrations();
           expect(integrations.find((integration) => integration.id === "mcp")).toMatchObject({
             name: "MCP server",
             auth: ["apiKey", "none"],
@@ -93,7 +86,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           } as const;
           const headers = { "idempotency-key": Request.Key.make("create-tools") };
           const created = yield* asAlice.connections.create({
-            params: { workspaceId },
             headers,
             payload,
           });
@@ -106,13 +98,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
             manageable: true,
           });
           // A retried create answers with the connection it made.
-          expect(
-            (yield* asAlice.connections.create({ params: { workspaceId }, headers, payload })).id,
-          ).toBe(created.id);
+          expect((yield* asAlice.connections.create({ headers, payload })).id).toBe(created.id);
           const params = { workspaceId, connectionId: created.id };
 
           // Members read connections but only administrators add, change, or check them.
-          expect(yield* asBob.connections.list({ params: { workspaceId } })).toMatchObject([
+          expect(yield* asBob.connections.list()).toMatchObject([
             { id: created.id, manageable: false },
           ]);
           expect(
@@ -129,7 +119,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(
             yield* asAlice.connections
               .create({
-                params: { workspaceId },
                 headers: {},
                 payload: { integration: "missing", name: "Other", settings: {}, auth: "none" },
               })
@@ -141,7 +130,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(
             yield* asAlice.connections
               .create({
-                params: { workspaceId },
                 headers: {},
                 payload: { integration: "mcp", name: "Other", settings: {}, auth: "none" },
               })
@@ -151,8 +139,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
           // The key is stored, and no read of the connection carries it.
           const read = (path: string) =>
             HttpClient.execute(
-              HttpClientRequest.get(`/workspaces/${workspaceId}/connections${path}`).pipe(
+              HttpClientRequest.get(`/connections${path}`).pipe(
                 HttpClientRequest.bearerToken(alice),
+                HttpClientRequest.setHeader("amends-workspace", workspaceId),
               ),
             ).pipe(Effect.flatMap((response) => response.text));
           expect(yield* read("")).not.toContain(secret);
@@ -196,19 +185,18 @@ describe.skipIf(!available)("PostgreSQL", () => {
 
           // A connection that authenticates with nothing takes no key.
           const agent = yield* asAlice.connections.create({
-            params: { workspaceId },
             headers: {},
             payload: { integration: "amends", name: "Agent", settings: {}, auth: "none" },
           });
           expect(
             yield* asAlice.connections.check({
-              params: { workspaceId, connectionId: agent.id },
+              params: { connectionId: agent.id },
             }),
           ).toEqual({ status: "healthy" });
           expect(
             yield* asAlice.connections
               .replaceKey({
-                params: { workspaceId, connectionId: agent.id },
+                params: { connectionId: agent.id },
                 payload: { apiKey: Redacted.make(secret) },
               })
               .pipe(Effect.flip),
@@ -218,9 +206,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* asBob.connections.get({ params }).pipe(Effect.flip)).toMatchObject({
             _tag: "CoreError.NotFound",
           });
-          expect(yield* asBob.connections.list({ params: { workspaceId } })).toMatchObject([
-            { id: agent.id },
-          ]);
+          expect(yield* asBob.connections.list()).toMatchObject([{ id: agent.id }]);
         }).pipe(Effect.scoped, Effect.provide(server(url, credentialKey))),
       ),
   );
@@ -228,11 +214,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
   it.live("a host without a credential key refuses keys but keeps keyless connections", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
-        const { asAlice, workspaceId } = yield* workspaceWithBob;
+        const { asAlice } = yield* workspaceWithBob;
         expect(
           yield* asAlice.connections
             .create({
-              params: { workspaceId },
               headers: {},
               payload: {
                 integration: "mcp",
@@ -247,10 +232,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
           _tag: "CoreError.Unavailable",
           reason: { _tag: "CredentialsUnavailable" },
         });
-        expect(yield* asAlice.connections.list({ params: { workspaceId } })).toEqual([]);
+        expect(yield* asAlice.connections.list()).toEqual([]);
         expect(
           yield* asAlice.connections.create({
-            params: { workspaceId },
             headers: {},
             payload: {
               integration: "mcp",

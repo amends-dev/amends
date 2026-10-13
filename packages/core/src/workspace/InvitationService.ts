@@ -9,7 +9,6 @@
  */
 import * as Request from "../request/Request.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Delegation from "../authorization/Delegation.ts";
@@ -19,8 +18,6 @@ import * as Actor from "../identity/Actor.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Store from "../journal/Store.ts";
 import * as Invitation from "./Invitation.ts";
 import * as InvitationFacts from "./InvitationFacts.ts";
@@ -30,27 +27,21 @@ import * as Member from "./Member.ts";
 import * as MemberCommand from "./MemberCommand.ts";
 import * as MemberStore from "./MemberStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What the invitation operations can fail with: the outcomes above, and the
- * failures of what they depend on.
+ * What the invitation operations can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Authorization.Error
-  | Delegation.Error
-  | Projection.Error
-  | Log.WriteError
-  | PlatformError.PlatformError
-  | StoreError.StoreError
-  | MemberCommand.Error
   | CoreError.NotFound
   | CoreError.Denied
   | CoreError.Conflict
-  | CoreError.Invalid;
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The invitation operations, one of `Core.Operations`.
@@ -189,78 +180,79 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
-  const accept = Effect.fn("InvitationService.accept")(function* (
-    id: Invitation.Id,
-    authenticated: Identity.HumanId,
-    chosenName: Member.Name,
-  ) {
-    const recipient = yield* Schema.decodeEffect(Identity.HumanId)(authenticated);
-    const name = yield* Schema.decodeEffect(Member.NewName)(chosenName);
-    const invitation = yield* requireInvitation(id);
-    const { details, state } = invitation;
-    if (details.recipientId !== recipient)
-      return yield* new CoreError.Denied({
-        reason: new CoreError.NotRecipient({ invitationId: id }),
-      });
-    // Repeated acceptance returns the original receipt, without restoring grants
-    // or reactivating a membership that has since been removed.
-    if (Invitation.State.isAnyOf(["Accepted"])(state)) {
-      const member = yield* memberStore.get(state.memberId);
-      if (Option.isNone(member))
-        return yield* Effect.die("An accepted invitation's member is missing");
-      return member.value;
-    }
-    if (Invitation.State.isAnyOf(["Revoked"])(state))
-      return yield* new CoreError.Conflict({
-        reason: new CoreError.InvitationClosed({ invitationId: id, reason: "revoked" }),
-      });
-    const acceptedAt = yield* DateTime.now;
-    if (!DateTime.isGreaterThan(details.expiresAt, acceptedAt))
-      return yield* new CoreError.Conflict({
-        reason: new CoreError.InvitationClosed({ invitationId: id, reason: "expired" }),
-      });
-    yield* requireUnjoined(recipient);
-    const inviter = yield* memberStore.get(details.inviterMemberId);
-    if (Option.isNone(inviter))
-      return yield* new CoreError.Denied({
-        reason: new CoreError.InvalidActor({
+  const accept = Effect.fn("InvitationService.accept")(
+    function* (id: Invitation.Id, authenticated: Identity.HumanId, chosenName: Member.Name) {
+      const recipient = yield* Schema.decodeEffect(Identity.HumanId)(authenticated);
+      const name = yield* Schema.decodeEffect(Member.NewName)(chosenName);
+      const invitation = yield* requireInvitation(id);
+      const { details, state } = invitation;
+      if (details.recipientId !== recipient)
+        return yield* new CoreError.Denied({
+          reason: new CoreError.NotRecipient({ invitationId: id }),
+        });
+      // Repeated acceptance returns the original receipt, without restoring grants
+      // or reactivating a membership that has since been removed.
+      if (Invitation.State.isAnyOf(["Accepted"])(state)) {
+        const member = yield* memberStore.get(state.memberId);
+        if (Option.isNone(member))
+          return yield* Effect.die("An accepted invitation's member is missing");
+        return member.value;
+      }
+      if (Invitation.State.isAnyOf(["Revoked"])(state))
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvitationClosed({ invitationId: id, reason: "revoked" }),
+        });
+      const acceptedAt = yield* DateTime.now;
+      if (!DateTime.isGreaterThan(details.expiresAt, acceptedAt))
+        return yield* new CoreError.Conflict({
+          reason: new CoreError.InvitationClosed({ invitationId: id, reason: "expired" }),
+        });
+      yield* requireUnjoined(recipient);
+      const inviter = yield* memberStore.get(details.inviterMemberId);
+      if (Option.isNone(inviter))
+        return yield* new CoreError.Denied({
+          reason: new CoreError.InvalidActor({
+            memberId: details.inviterMemberId,
+            reason: "membership-missing",
+          }),
+        });
+      // Only this authority check uses the recorded inviter, never recipient input.
+      yield* authorizeInvitation(details).pipe(
+        Effect.provideService(Actor.Actor, {
+          workspaceId,
           memberId: details.inviterMemberId,
-          reason: "membership-missing",
+          identity: inviter.value.identity,
         }),
-      });
-    // Only this authority check uses the recorded inviter, never recipient input.
-    yield* authorizeInvitation(details).pipe(
-      Effect.provideService(Actor.Actor, {
+      );
+      const identity = Identity.MemberReference.cases.Human.make({ id: recipient });
+      const provenance = yield* Publication.make(
         workspaceId,
-        memberId: details.inviterMemberId,
-        identity: inviter.value.identity,
-      }),
-    );
-    const identity = Identity.MemberReference.cases.Human.make({ id: recipient });
-    const provenance = yield* Publication.make(
-      workspaceId,
-      { _tag: "Identity", identity },
-      acceptedAt,
-    ).pipe(Effect.provideService(Crypto.Crypto, crypto));
-    return yield* Effect.gen(function* () {
-      const member = yield* memberCommand.add({
-        identity,
-        name,
-        roleId: details.roleId,
-        joinedAt: acceptedAt,
-      });
-      yield* journal.publish(InvitationFacts.Accepted, {
-        _tag: "Accepted",
-        workspaceId,
-        invitationId: id,
-        memberId: member.id,
+        { _tag: "Identity", identity },
         acceptedAt,
-      });
-      return member;
-    }).pipe(Effect.provideService(Publication.Publication, provenance));
-  }, journal.commit);
+      ).pipe(Effect.provideService(Crypto.Crypto, crypto));
+      return yield* Effect.gen(function* () {
+        const member = yield* memberCommand.add({
+          identity,
+          name,
+          roleId: details.roleId,
+          joinedAt: acceptedAt,
+        });
+        yield* journal.publish(InvitationFacts.Accepted, {
+          _tag: "Accepted",
+          workspaceId,
+          invitationId: id,
+          memberId: member.id,
+          acceptedAt,
+        });
+        return member;
+      }).pipe(Effect.provideService(Publication.Publication, provenance));
+    },
+    journal.commit,
+    Operation.report,
+  );
 
   const revoke = Effect.fn("InvitationService.revoke")(
     function* (id: Invitation.Id) {
@@ -286,12 +278,13 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const list = Effect.gen(function* () {
     yield* authorization.require([manage]);
     return yield* invitationStore.list;
-  }).pipe(Effect.withSpan("InvitationService.list"));
+  }).pipe(Effect.withSpan("InvitationService.list"), Operation.report);
 
   return InvitationService.of({ issue, accept, revoke, list });
 });

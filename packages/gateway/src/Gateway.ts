@@ -3,14 +3,14 @@
  * operations; the gateway creates workspaces, prepares each one's core over `WorkspaceStorage`
  * through `WorkspaceRuntime`, and resolves an authenticated identity into `Actor.Actor`, so those
  * operations can run. Every protocol, such as HTTP, and every host's jobs enter workspaces through
- * it, and fail only with the outcomes `GatewayErrors` makes public.
+ * it, and a program fails with what the operations it calls report, by kind.
  *
  * @since 0.1.0
  */
 import * as Core from "@amends-dev/core";
-import { Authorization } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
-import { Checkpoint, Projection, Store, StoreError } from "@amends-dev/core/journal";
+import { Checkpoint, Store } from "@amends-dev/core/journal";
+import { Operation } from "@amends-dev/core/operation";
 import {
   type Member,
   MemberStore,
@@ -23,7 +23,6 @@ import type { DeliveryJobs } from "@amends-dev/core/channel";
 import type { TurnJobs } from "@amends-dev/core/turn";
 import { Context, Crypto, Data, Effect, Layer, Option, Schema, Cause } from "effect";
 import { type Scope } from "effect";
-import * as GatewayErrors from "./GatewayErrors.ts";
 import * as WorkspaceStorage from "./WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "./internal/workspace-runtime.ts";
 import { CoreError } from "@amends-dev/core/error";
@@ -49,7 +48,7 @@ export class Gateway extends Context.Service<
       options?: Request.Options,
     ) => Effect.Effect<
       Workspace.Workspace,
-      CoreError.Unavailable | GatewayErrors.Uncertain | CoreError.Invalid
+      CoreError.Invalid | CoreError.Unavailable | CoreError.Uncertain
     >;
     /**
      * Run core operations as the identity's active membership, keeping the workspace prepared for
@@ -62,7 +61,7 @@ export class Gateway extends Context.Service<
       workspaceId: Workspace.Id,
       identity: Identity.MemberReference,
       program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.Denied, Scope.Scope>;
+    ) => Effect.Effect<A, E | CoreError.Denied, Scope.Scope>;
     /**
      * Run a program in a workspace without an actor, keeping the workspace prepared for the
      * caller's scope: invitation acceptance, where the recipient is not yet a member, and a host's
@@ -73,70 +72,23 @@ export class Gateway extends Context.Service<
     readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
       workspaceId: Workspace.Id,
       program: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | CoreError.NotFound, Scope.Scope>;
+    ) => Effect.Effect<A, E | CoreError.NotFound, Scope.Scope>;
   }
 >()("@amends-dev/gateway/Gateway") {}
 
-const isPublic = Schema.is(GatewayErrors.PublicError);
-const isStoreError = Schema.is(StoreError.StoreError);
-const isUncertain = Schema.is(Store.CommitUncertain);
-const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
-const isBehind = Schema.is(Projection.Behind);
-const isUnregistered = Schema.is(Projection.Unregistered);
+const isUnavailable = Schema.is(CoreError.Unavailable);
 
 /**
- * Another host changed which projection versions are live, so this prepared runtime's commits no
- * longer match them.
+ * Whether the program stopped because another host changed which projection versions are live, so
+ * this prepared runtime's commits no longer match them: core reports it as `Reloading`.
  */
-const isStaleError = (error: unknown): boolean => isBehind(error) || isUnregistered(error);
 const isStaleCause = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
     (reason) =>
-      (Cause.isFailReason(reason) && isStaleError(reason.error)) ||
-      (Cause.isDieReason(reason) && isStaleError(reason.defect)),
+      Cause.isFailReason(reason) &&
+      isUnavailable(reason.error) &&
+      reason.error.reason._tag === "Reloading",
   );
-
-/**
- * Apply the public error policy once. Schema failures and workspace mismatches
- * are reported as invalid input: core trusts what storage returns, so during
- * operations they arise only from validating caller-supplied values such as
- * invitation grants. Stored state core can't use is a defect, a server error.
- */
-const toPublicErrors = <A, E, R>(
-  workspaceId: Workspace.Id,
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, GatewayErrors.PublicErrorOf<E>, R> =>
-  Effect.catch(effect, (error): Effect.Effect<never, GatewayErrors.PublicErrorOf<E>> => {
-    // Storage another writer held or changed meanwhile: asking again may get past it.
-    if (isStoreError(error) && error.reason._tag === "Contended")
-      return Effect.fail(
-        new CoreError.Unavailable({
-          reason: new CoreError.Contention({
-            operation: error.operation,
-            description: error.reason.description,
-          }),
-        }),
-      );
-    if (isUncertain(error))
-      return Effect.fail(new GatewayErrors.Uncertain({ workspaceId, commitId: error.commitId }));
-    if (Schema.isSchemaError(error))
-      return Effect.fail(
-        new CoreError.Invalid({ reason: new CoreError.Malformed({ description: error.message }) }),
-      );
-    // The runtime is prepared again for the next request, so this one may simply be retried.
-    if (isBehind(error) || isUnregistered(error))
-      return Effect.fail(new CoreError.Unavailable({ reason: new CoreError.Reloading() }));
-    if (isMismatch(error))
-      return Effect.fail(
-        new CoreError.Invalid({
-          reason: new CoreError.Malformed({
-            description: `Values must belong to workspace ${error.expectedWorkspaceId}`,
-          }),
-        }),
-      );
-    if (isPublic(error)) return Effect.fail(error as Extract<E, GatewayErrors.PublicError>);
-    return Effect.die(error);
-  });
 
 /**
  * What `make` and `layer` take: the integrations the host installs, and how long an unused
@@ -263,10 +215,7 @@ export const make = Effect.fn("Gateway.make")(function* (
     if (Option.isNone(membership))
       return yield* new CoreError.Denied({ reason: new CoreError.NotMember({ workspaceId }) });
     const actor = Actor.Actor.of({ workspaceId, memberId: membership.value.id, identity });
-    return yield* toPublicErrors(
-      workspaceId,
-      reloadWhenStale(workspaceId, Effect.provideService(program, Actor.Actor, actor)),
-    );
+    return yield* reloadWhenStale(workspaceId, Effect.provideService(program, Actor.Actor, actor));
   });
 
   /**
@@ -287,26 +236,19 @@ export const make = Effect.fn("Gateway.make")(function* (
     options: Request.Options = {},
   ) {
     const key = options.requestKey;
-    if (key === undefined) {
-      const id = Workspace.Id.make(yield* Effect.orDie(crypto.randomUUIDv4));
-      return yield* Effect.scoped(
-        runInWorkspace(
-          id,
-          toPublicErrors(
-            id,
-            reloadWhenStale(id, WorkspaceInitialization.initialize(creator, input)),
-          ),
-        ),
+    const id =
+      key === undefined
+        ? Workspace.Id.make(yield* Effect.orDie(crypto.randomUUIDv4))
+        : yield* workspaceIdForKey(creator, key);
+    if (key !== undefined) {
+      // A completed first attempt answers its retry without preparing the workspace.
+      const recorded = yield* workspaceStorage.forWorkspace(id).pipe(
+        Effect.flatMap((bindings) => Context.get(bindings, WorkspaceStore.WorkspaceStore).get),
+        Effect.orDie,
+        Effect.setContext(hostContext),
       );
+      if (Option.isSome(recorded)) return recorded.value;
     }
-    const id = yield* workspaceIdForKey(creator, key);
-    // A completed first attempt answers its retry without preparing the workspace.
-    const recorded = yield* workspaceStorage.forWorkspace(id).pipe(
-      Effect.flatMap((bindings) => Context.get(bindings, WorkspaceStore.WorkspaceStore).get),
-      Effect.orDie,
-      Effect.setContext(hostContext),
-    );
-    if (Option.isSome(recorded)) return recorded.value;
     const initialized = WorkspaceInitialization.initialize(creator, input).pipe(
       // A concurrent attempt with the same key initialized it first.
       Effect.catchTag("WorkspaceInitialization.AlreadyInitialized", () =>
@@ -320,10 +262,9 @@ export const make = Effect.fn("Gateway.make")(function* (
           ),
         ),
       ),
+      Operation.report,
     );
-    return yield* Effect.scoped(
-      runInWorkspace(id, toPublicErrors(id, reloadWhenStale(id, initialized))),
-    );
+    return yield* Effect.scoped(runInWorkspace(id, reloadWhenStale(id, initialized)));
   });
 
   const asMember: Gateway["Service"]["asMember"] = Effect.fn("Gateway.asMember")(function* <
@@ -356,10 +297,7 @@ export const make = Effect.fn("Gateway.make")(function* (
       const operation: Effect.Effect<A, E, Core.Operations | Core.JobServices | Scope.Scope> =
         program;
       yield* requireCreated(workspaceId);
-      return yield* runInWorkspace(
-        workspaceId,
-        toPublicErrors(workspaceId, reloadWhenStale(workspaceId, operation)),
-      );
+      return yield* runInWorkspace(workspaceId, reloadWhenStale(workspaceId, operation));
     },
   );
 

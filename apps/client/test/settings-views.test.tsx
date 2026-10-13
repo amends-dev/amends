@@ -97,9 +97,9 @@ function fixture(section: SettingsTab = "members") {
     const path = new URL(request.url).pathname;
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 2 }], invitations: [] });
-    if (path === "/workspaces/one/settings")
+    if (path === "/settings")
       return json({ workspace, canRename: true, canReadInvitations: true, canInvite: true, roles });
-    if (path === "/workspaces/one/ownership")
+    if (path === "/settings/ownership")
       return json({
         workspace,
         owner,
@@ -107,8 +107,8 @@ function fixture(section: SettingsTab = "members") {
         canTransfer: true,
         candidates: [ada],
       });
-    if (path === "/workspaces/one/members") return json([owner, ada, bot, gone]);
-    if (path === "/workspaces/one/member-management")
+    if (path === "/members") return json([owner, ada, bot, gone]);
+    if (path === "/settings/members")
       // In no particular order: the roster puts the reader first, then everyone by name.
       return json([
         { member: bot, access: null, canRemove: true },
@@ -132,13 +132,13 @@ function fixture(section: SettingsTab = "members") {
         },
         { member: gone, access: null, canRemove: false },
       ]);
-    if (path === "/workspaces/one/assignments" && request.method === "PUT") {
+    if (path === "/assignments" && request.method === "PUT") {
       changes.push({ body: await request.json() });
       return (
         server.roleAnswers.shift() ?? json(assignment("a-ada-3", "ada", "builtin:administrator"))
       );
     }
-    if (path === "/workspaces/one/invitations" && request.method === "POST") {
+    if (path === "/invitations" && request.method === "POST") {
       const body = (await request.json()) as { email: string; expiresAt: string };
       issues.push({ key: request.headers.get("idempotency-key"), body });
       const answer = server.inviteAnswers.shift();
@@ -155,11 +155,11 @@ function fixture(section: SettingsTab = "members") {
       server.invitations.push(created);
       return json(created, 201);
     }
-    if (path === "/workspaces/one/invitations")
+    if (path === "/invitations")
       return server.invitationsDown
         ? new Response("Down", { status: 503 })
         : json(server.invitations);
-    if (path === "/workspaces/one/accounts") return json(server.accounts);
+    if (path === "/accounts") return json(server.accounts);
     return json({}, 404);
   });
   const done: SettingsDone[] = [];

@@ -18,11 +18,11 @@ import {
 import { expect, it } from "@effect/vitest";
 import { ReadStateStore } from "@amends-dev/core/read-state";
 import { SignalHub } from "@amends-dev/core/signal";
-import { AssignmentStore, Authorization, RoleStore } from "@amends-dev/core/authorization";
+import { AssignmentStore, RoleStore } from "@amends-dev/core/authorization";
 import { Actor, Identity } from "@amends-dev/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
 import { Checkpoint, Commit, Entry, Store } from "@amends-dev/core/journal";
-import { Notification, NotificationStore } from "@amends-dev/core/notification";
+import { NotificationStore } from "@amends-dev/core/notification";
 import {
   InvitationStore,
   Member,
@@ -41,12 +41,10 @@ import {
   Layer,
   Option,
   Result,
-  Schema,
   Scope,
   Stream,
 } from "effect";
 import { TestClock } from "effect/testing";
-import * as GatewayErrors from "../src/GatewayErrors.ts";
 import * as Gateway from "../src/Gateway.ts";
 import * as WorkspaceStorage from "../src/WorkspaceStorage.ts";
 import * as WorkspaceRuntime from "../src/internal/workspace-runtime.ts";
@@ -395,85 +393,25 @@ const defect = <A, E>(exit: Exit.Exit<A, E>): unknown => {
   return found.success.defect;
 };
 it.effect.each(["inWorkspace", "asMember"] as const)(
-  "%s maps operation failures to public outcomes",
+  "%s passes what a program fails with through as it is; interruption stays interruption",
   (entry) =>
     run((gateway) =>
       Effect.gen(function* () {
         const enter = <A, E>(
           program: Effect.Effect<A, E>,
-        ): Effect.Effect<
-          A,
-          GatewayErrors.PublicErrorOf<E> | CoreError.Denied | CoreError.NotFound,
-          Scope.Scope
-        > =>
+        ): Effect.Effect<A, E | CoreError.Denied | CoreError.NotFound, Scope.Scope> =>
           entry === "inWorkspace"
             ? gateway.inWorkspace(workspaceId, program)
             : gateway.asMember(workspaceId, alice, program);
-        const conflict = yield* Effect.flip(
-          enter(Effect.fail(StoreError.contended("Store", "append", "Changed position"))),
-        );
-        expect(conflict).toMatchObject({
-          _tag: "CoreError.Unavailable",
-          reason: { _tag: "Contention", operation: "append", description: "Changed position" },
-        });
-        const uncertain = yield* Effect.flip(
-          enter(
-            Effect.fail(
-              new Store.CommitUncertain({
-                commitId: Commit.Id.make("commit"),
-                cause: new Error("driver detail"),
-              }),
-            ),
-          ),
-        );
-        expect(yield* Schema.encodeEffect(GatewayErrors.PublicError)(uncertain)).toEqual({
-          _tag: "GatewayErrors.Uncertain",
-          workspaceId,
-          commitId: "commit",
-        });
-        const invalid = yield* Effect.flip(enter(Schema.decodeEffect(Schema.NonEmptyString)("")));
-        expect(invalid).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
-        const mismatch = yield* Effect.flip(
-          enter(
-            Effect.fail(
-              new Authorization.WorkspaceMismatch({
-                expectedWorkspaceId: workspaceId,
-                actualWorkspaceId: Workspace.Id.make("other"),
-              }),
-            ),
-          ),
-        );
-        expect(mismatch).toMatchObject({
-          _tag: "CoreError.Invalid",
-          reason: { _tag: "Malformed", description: "Values must belong to workspace workspace" },
-        });
         const missing = new CoreError.NotFound({ resource: "Member", id: memberId });
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing);
-        const missingNotification = new CoreError.NotFound({
-          resource: "Notification",
-          id: Notification.Id.make("missing"),
-        });
-        expect(yield* Effect.flip(enter(Effect.fail(missingNotification)))).toBe(
-          missingNotification,
-        );
-      }),
-    ),
-);
-
-it.effect(
-  "unexpected failures and malformed public errors stay defects; interruption stays interruption",
-  () =>
-    run((gateway) =>
-      Effect.gen(function* () {
-        const failure = StoreError.failed("MemberStore", "get")(new Error("database detail"));
-        expect(
-          defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
-        ).toBe(failure);
-        const malformed = { _tag: "CoreError.NotFound", resource: "Member", id: 42 };
-        expect(
-          defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(malformed)))),
-        ).toBe(malformed);
-        const interrupted = yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.interrupt));
+        // A job's own store, such as the session log, fails as that store does.
+        const failure = StoreError.failed(
+          "SessionLogStore",
+          "append",
+        )(new Error("database detail"));
+        expect(yield* Effect.flip(enter(Effect.fail(failure)))).toBe(failure);
+        const interrupted = yield* Effect.exit(enter(Effect.interrupt));
         expect(Exit.hasInterrupts(interrupted)).toBe(true);
         expect(Exit.hasDies(interrupted)).toBe(false);
       }),

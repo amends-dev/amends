@@ -397,9 +397,8 @@ it.effect("an actor or a target from another workspace is refused", () =>
     const fixture = yield* make();
     yield* seed(fixture, [alice], [direct("read", alice.memberId, MemberPermissions.Read)]);
     const mismatch = {
-      _tag: "Authorization.WorkspaceMismatch",
-      expectedWorkspaceId: workspaceId,
-      actualWorkspaceId: foreignWorkspaceId,
+      _tag: "CoreError.Invalid",
+      reason: { _tag: "Malformed", description: `Values must belong to workspace ${workspaceId}` },
     };
     const foreignActor = Actor.Actor.of({
       workspaceId: foreignWorkspaceId,

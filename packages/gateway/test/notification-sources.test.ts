@@ -608,32 +608,37 @@ describe("notification sources", () => {
       ),
   );
 
-  it.effect("source failures remain failures and a denied read never loads message content", () =>
-    withStorage((storage) =>
-      runHost(
-        storage,
-        Effect.gen(function* () {
-          const { bound, human } = yield* prepare();
-          const note = yield* noteFor(bound, humanId);
-          const guarded = Context.add(bound.context, ThreadMessageStore.ThreadMessageStore, {
-            ...bound.messages,
-            get: () => Effect.die("Message must not be read without permission"),
-            getMany: () => Effect.die("Message must not be read without permission"),
-          });
-          expect(
-            yield* run({ ...bound, context: guarded }, human, sourceOf(note.id)),
-          ).toBeUndefined();
-          const failure = StoreError.failed("Store", "getEntry")("injected");
-          const failing = Context.add(bound.context, Store.Store, {
-            ...bound.store,
-            getEntry: () => Effect.fail(failure),
-          });
-          expect(
-            yield* Effect.flip(run({ ...bound, context: failing }, human, sourceOf(note.id))),
-          ).toBe(failure);
-        }),
+  it.effect(
+    "a source's storage failure ends the read as a defect, and a denied read never loads message content",
+    () =>
+      withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, human } = yield* prepare();
+            const note = yield* noteFor(bound, humanId);
+            const guarded = Context.add(bound.context, ThreadMessageStore.ThreadMessageStore, {
+              ...bound.messages,
+              get: () => Effect.die("Message must not be read without permission"),
+              getMany: () => Effect.die("Message must not be read without permission"),
+            });
+            expect(
+              yield* run({ ...bound, context: guarded }, human, sourceOf(note.id)),
+            ).toBeUndefined();
+            const failure = StoreError.failed("Store", "getEntry")("injected");
+            const failing = Context.add(bound.context, Store.Store, {
+              ...bound.store,
+              getEntry: () => Effect.fail(failure),
+            });
+            expect(
+              yield* Effect.catchDefect(
+                run({ ...bound, context: failing }, human, sourceOf(note.id)),
+                Effect.succeed,
+              ),
+            ).toBe(failure);
+          }),
+        ),
       ),
-    ),
   );
 
   it.effect(

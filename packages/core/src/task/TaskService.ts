@@ -26,6 +26,7 @@ import * as TaskPermissions from "./TaskPermissions.ts";
 import * as TaskStore from "./TaskStore.ts";
 import * as CoreError from "../error/CoreError.ts";
 import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What creating a task in a conversation can fail with.
@@ -34,12 +35,12 @@ import * as StoreError from "../journal/StoreError.ts";
  * @since 0.1.0
  */
 export type CreateError =
-  | Authorization.Error
-  | ThreadQuery.AccessError
-  | TaskCommand.Error
-  | StoreError.StoreError
   | CoreError.NotFound
-  | CoreError.Conflict;
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What changing a task can fail with.
@@ -48,13 +49,13 @@ export type CreateError =
  * @since 0.1.0
  */
 export type UpdateError =
-  | Authorization.Error
-  | ThreadQuery.AccessError
-  | TaskCommand.Error
-  | StoreError.StoreError
   | CoreError.NotFound
   | CoreError.Changed
-  | CoreError.Conflict;
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What reading tasks can fail with.
@@ -63,10 +64,10 @@ export type UpdateError =
  * @since 0.1.0
  */
 export type ReadError =
-  | ThreadQuery.AccessError
-  | ThreadQuery.ListError
-  | StoreError.StoreError
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
  * The task operations, one of `Core.Operations`.
@@ -195,6 +196,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const update = Effect.fn("TaskService.update")(
@@ -226,13 +228,14 @@ export const make = Effect.fn("TaskService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   // Reads are outside journal.commit; an enclosing caller transaction remains authoritative.
   const get = Effect.fn("TaskService.get")(function* (threadId: Thread.Id) {
     const thread = yield* threadQuery.requireReadable(threadId);
     return yield* requireTask(thread);
-  });
+  }, Operation.report);
 
   const listInGroup = Effect.fn("TaskService.listInGroup")(function* (
     groupId: Group.Id,
@@ -273,7 +276,7 @@ export const make = Effect.fn("TaskService.make")(function* () {
         threadId: task.threadId,
       }),
     });
-  });
+  }, Operation.report);
 
   return TaskService.of({ create, update, get, listInGroup });
 });

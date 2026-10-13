@@ -13,7 +13,7 @@ describe("workspaceFailure", () => {
     expect(workspaceFailure(Cause.fail(new InvalidCommand({ message: "Expected a string" })))).toBe(
       "invalid",
     );
-    expect(failure("GatewayErrors.Uncertain")).toBe("failed");
+    expect(failure("CoreError.Uncertain")).toBe("failed");
   });
   it("fails closed for unknown tags, transport failures, and defects", () => {
     expect(workspaceFailure(Cause.fail({ _tag: "Something.New" }))).toBe("failed");

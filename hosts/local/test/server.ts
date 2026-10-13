@@ -2,11 +2,19 @@ import { fileURLToPath } from "node:url";
 
 interface Options {
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * The line the process writes once it is ready, whose first group says where it serves:
+   * `Listening on` and its URL, by default.
+   */
+  readonly ready?: RegExp;
   readonly command?: ReadonlyArray<string>;
   readonly startupTimeoutMs?: number;
 }
 
-/** One lifetime of the real server entry point over a PostgreSQL database, on an ephemeral port. */
+/**
+ * One lifetime of the real server entry point over a PostgreSQL database, on an ephemeral port,
+ * from the line that says it is ready.
+ */
 export const withServer = async <A>(
   databaseUrl: string,
   run: (call: Call, base: string, stop: Stop) => Promise<A>,
@@ -43,7 +51,7 @@ export const withServer = async <A>(
         const text = decoder.decode(chunk.value, { stream: true });
         output = (output + text).slice(-16_384);
         tail = (tail + text).slice(-16_384);
-        const base = /Listening on (http:\/\/[^\s]+)(?=\s)/.exec(tail)?.[1];
+        const base = (options.ready ?? /Listening on (http:\/\/[^\s]+)(?=\s)/).exec(tail)?.[1];
         if (base !== undefined) ready.resolve(base);
       }
     } finally {
@@ -53,19 +61,20 @@ export const withServer = async <A>(
   const drains = [drain(child.stdout), drain(child.stderr)];
   for (const draining of drains) void draining.catch(ready.reject);
   const timeout = setTimeout(() => {
-    ready.reject(new Error(`Timed out waiting for the server to listen: ${output}`));
+    ready.reject(new Error(`Timed out waiting for the server to be ready: ${output}`));
   }, options.startupTimeoutMs ?? 10_000);
   try {
     const base = await Promise.race([
       ready.promise,
       child.exited.then(async (code) => {
         await Promise.allSettled(drains);
-        throw new Error(`The server exited before listening (exit ${code}): ${output}`);
+        throw new Error(`The server exited before it was ready (exit ${code}): ${output}`);
       }),
     ]);
     clearTimeout(timeout);
-    const call: Call = async (token, method, path, body) => {
+    const call: Call = async (token, method, path, body, workspaceId) => {
       const headers = new Headers({ authorization: `Bearer ${token}` });
+      if (workspaceId !== undefined) headers.set("amends-workspace", workspaceId);
       const request: RequestInit = { method, headers };
       if (body !== undefined) {
         headers.set("content-type", "application/json");
@@ -101,9 +110,14 @@ export const withServer = async <A>(
  */
 export type Stop = (signal?: "SIGTERM" | "SIGKILL") => Promise<number>;
 
+/**
+ * Send a request as the bearer of `token`; one to an endpoint a member calls names the workspace
+ * it acts in, `workspaceId`.
+ */
 export type Call = (
   token: string,
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
+  workspaceId?: string,
 ) => Promise<{ status: number; body: unknown }>;

@@ -444,9 +444,7 @@ it("an inbox opens at its newest notifications, pages back, and a refresh keeps 
   view().retry();
   await waitFor(() => expect(ids()[0]).toBe("notification-060"));
   expect((ids().at(-1) ?? "") <= "notification-010").toBe(true);
-  expect(requests.every((url) => url.pathname === "/workspaces/one/notifications/inbox")).toBe(
-    true,
-  );
+  expect(requests.every((url) => url.pathname === "/notifications/inbox")).toBe(true);
   expect(requests.every((url) => !url.searchParams.has("pendingOnly"))).toBe(true);
   view().loadEarlier();
   await waitFor(() => expect(view().complete()).toBe(true));
@@ -664,12 +662,12 @@ it("lists public groups and joins one, refreshing the list; a group gone says so
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/groups/public")
+    if (path === "/groups/public")
       return json([
         { group: team("g1", "Lobby"), members: joined ? 3 : 2, joined },
         { group: team("g2", "Gone"), members: 1, joined: false },
       ]);
-    if (path === "/workspaces/one/groups/g1/join") {
+    if (path === "/groups/g1/join") {
       joins.push(path);
       joined = true;
       return json({
@@ -681,7 +679,7 @@ it("lists public groups and joins one, refreshing the list; a group gone says so
         status: "active",
       });
     }
-    if (path === "/workspaces/one/groups/g2/join")
+    if (path === "/groups/g2/join")
       return new Response(
         JSON.stringify({ _tag: "CoreError.NotFound", resource: "Group", id: "g2" }),
         {
@@ -766,7 +764,7 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
         ],
         invitations: [],
       });
-    if (path === "/workspaces/one/groups")
+    if (path === "/groups")
       return json([
         {
           group: {
@@ -788,9 +786,8 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
           renamable: true,
         },
       ]);
-    if (path === "/workspaces/one/groups/g1/members" && request.method === "GET")
-      return json(roster);
-    if (path === "/workspaces/one/groups/g1/members" && request.method === "POST") {
+    if (path === "/groups/g1/members" && request.method === "GET") return json(roster);
+    if (path === "/groups/g1/members" && request.method === "POST") {
       const { memberId } = (await request.json()) as { memberId: string };
       changes.push(`add ${memberId}`);
       // Someone else added Kit meanwhile: that still counts as added.
@@ -809,7 +806,7 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
         headers: { "content-type": "application/json" },
       });
     }
-    const departure = /^\/workspaces\/one\/groups\/g1\/members\/([^/]+)(\/leave)?$/.exec(path);
+    const departure = /^\/groups\/g1\/members\/([^/]+)(\/leave)?$/.exec(path);
     if (departure) {
       const [, id = "", leave] = departure;
       changes.push(`${leave ? "leave" : "remove"} ${id}`);
@@ -910,7 +907,7 @@ it("a new thread in a group posts its first message there with a key, then clear
   await waitFor(() => expect(composer.draft()).toBe(""));
   expect(posts).toEqual([
     {
-      path: "/workspaces/one/groups/g1/threads",
+      path: "/groups/g1/threads",
       key: expect.any(String),
       body: { text: "Kickoff notes", mentions: [] },
     },
@@ -963,7 +960,7 @@ it("a first direct message starts the conversation and hands over its group", as
   await waitFor(() => expect(started).toEqual(["g9"]));
   expect(posts).toEqual([
     {
-      path: "/workspaces/one/threads",
+      path: "/threads",
       body: { memberIds: ["bob-one"], text: "Are you free?", mentions: [] },
     },
   ]);
@@ -985,7 +982,7 @@ it("renames a group it may rename, from the name it started from, saving only a 
       createdBy: "alice-one",
       createdAt: minute(0),
     };
-    if (path === "/workspaces/one/groups/g1/rename") {
+    if (path === "/groups/g1/rename") {
       const body = (await request.json()) as { name: string; expectedName: string };
       renames.push(body);
       // As the host does, a rename from a name the group no longer has is refused.
@@ -1000,7 +997,7 @@ it("renames a group it may rename, from the name it started from, saving only a 
       name = body.name;
       return json({ ...group, name });
     }
-    if (path === "/workspaces/one/groups")
+    if (path === "/groups")
       return json([
         {
           group,
@@ -1131,7 +1128,7 @@ it("a reply keeps its draft across remounts, retries with its key, and clears on
       .map(([input, init]) => new Request(input, init))
       .filter((request) => request.method === "POST" && !request.url.endsWith("/typing"))
       .map((request) => new URL(request.url).pathname),
-  ).toEqual(Array.from({ length: 3 }, () => "/workspaces/one/threads/thread/messages"));
+  ).toEqual(Array.from({ length: 3 }, () => "/threads/thread/messages"));
 });
 
 it("a send cut off by closing the thread is sent again with its key after reopening", async () => {
@@ -1270,10 +1267,10 @@ it("marks an open thread read once per newer position, only while the page shows
   hide(false);
   await waitFor(() => expect(marks).toHaveLength(2));
   expect(marks).toContainEqual({
-    path: "/workspaces/one/threads/thread/read",
+    path: "/threads/thread/read",
     body: JSON.stringify({ throughSequence: 3 }),
   });
-  expect(marks).toContainEqual({ path: "/workspaces/one/groups/group/read", body: "" });
+  expect(marks).toContainEqual({ path: "/groups/group/read", body: "" });
   // The same position is not sent again; a newer one is.
   setThrough(3);
   setUnreadSince(undefined);
@@ -1282,7 +1279,7 @@ it("marks an open thread read once per newer position, only while the page shows
   setThrough(5);
   await waitFor(() => expect(marks).toHaveLength(3));
   expect(marks[2]).toEqual({
-    path: "/workspaces/one/threads/thread/read",
+    path: "/threads/thread/read",
     body: JSON.stringify({ throughSequence: 5 }),
   });
   hide(false);
@@ -1393,13 +1390,13 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
   await waitFor(() => expect(posts).toHaveLength(4));
   // Unfollowing names the participation the reader holds; groups are followed for the reader.
   expect(posts).toEqual([
-    { path: "/workspaces/one/threads/thread/follow", body: undefined },
+    { path: "/threads/thread/follow", body: undefined },
     {
-      path: "/workspaces/one/threads/thread/unfollow",
+      path: "/threads/thread/unfollow",
       body: { participationId: "participation" },
     },
-    { path: "/workspaces/one/groups/group/follow", body: { memberId: "owner" } },
-    { path: "/workspaces/one/groups/group/unfollow", body: { memberId: "owner" } },
+    { path: "/groups/group/follow", body: { memberId: "owner" } },
+    { path: "/groups/group/unfollow", body: { memberId: "owner" } },
   ]);
   expect(changed).toEqual([
     ["thread", true],

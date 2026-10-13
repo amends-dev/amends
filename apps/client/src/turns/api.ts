@@ -4,7 +4,7 @@ import { Workspace } from "@amends-dev/core/workspace";
 import type { TurnProblem } from "@amends-dev/ui/screens/turns";
 import { Cause, Effect, Exit, Option, Queue, Schema, Stream } from "effect";
 import { Atom } from "effect/reactivity";
-import { isUnauthorized, type Api, type ApiClient } from "../api/client.ts";
+import { isUnauthorized, type ApiClient, type WorkspaceApi } from "../api/client.ts";
 import { command } from "../api/failures.ts";
 import { itemKeys, workspaceKey } from "../api/keys.ts";
 import { retryDelay } from "../live/api.ts";
@@ -21,7 +21,6 @@ export const activeTurnsRead = (client: ApiClient, workspaceId: string) => {
   const workspace = Schema.decodeOption(Workspace.Id)(workspaceId);
   if (Option.isNone(workspace)) return undefined;
   return client.query("turns", "listActive", {
-    params: { workspaceId: workspace.value },
     query: { limit: 100 },
     reactivityKeys: [workspaceKey(workspaceId, "active-turns")],
   });
@@ -36,7 +35,7 @@ export const turnRead = (client: ApiClient, workspaceId: string, turnId: string)
   const turn = Schema.decodeOption(Turn.Id)(turnId);
   if (Option.isNone(workspace) || Option.isNone(turn)) return undefined;
   return client.query("turns", "get", {
-    params: { workspaceId: workspace.value, turnId: turn.value },
+    params: { turnId: turn.value },
     reactivityKeys: itemKeys(workspaceId, "turns", turnId),
   });
 };
@@ -47,12 +46,9 @@ export interface TurnCommand {
   readonly turnId: string;
 }
 /** Stop or retry a turn, answering with the turn it acted on, or for a retry, the new turn. */
-export const controlTurn = (workspace: string) => (api: Api, input: TurnCommand) =>
+export const controlTurn = (api: WorkspaceApi, input: TurnCommand) =>
   Effect.gen(function* () {
-    const params = {
-      workspaceId: yield* command(Workspace.Id)(workspace),
-      turnId: yield* command(Turn.Id)(input.turnId),
-    };
+    const params = { turnId: yield* command(Turn.Id)(input.turnId) };
     return input.kind === "stop"
       ? yield* api.turns.cancel({ params })
       : yield* api.turns.retry({ params });
@@ -145,7 +141,6 @@ const changed = (
  */
 const run = Effect.fnUntraced(function* (
   client: ApiClient,
-  workspaceId: string,
   turnId: string,
   states: Queue.Queue<TurnLogFeed, Cause.Done>,
 ) {
@@ -155,10 +150,9 @@ const run = Effect.fnUntraced(function* (
     state = { ...state, ...next };
     Queue.offerUnsafe(states, state);
   };
-  const workspace = Schema.decodeOption(Workspace.Id)(workspaceId);
   const turn = Schema.decodeOption(Turn.Id)(turnId);
-  if (Option.isNone(workspace) || Option.isNone(turn)) return set({ connection: "gone" });
-  const params = { workspaceId: workspace.value, turnId: turn.value };
+  if (Option.isNone(turn)) return set({ connection: "gone" });
+  const params = { turnId: turn.value };
   const wake = yield* Queue.sliding<void>(1);
   yield* Effect.acquireRelease(
     Effect.sync(() => watchWake(window, () => Queue.offerUnsafe(wake, undefined))),
@@ -207,22 +201,21 @@ const run = Effect.fnUntraced(function* (
 });
 
 const makeFamily = (client: ApiClient) =>
-  Atom.family((key: string) => {
-    const [workspaceId = "", turnId = ""] = key.split("\u0000");
-    return client.runtime.atom(
+  Atom.family((turnId: string) =>
+    client.runtime.atom(
       Stream.callback(
-        (states: Queue.Queue<TurnLogFeed, Cause.Done>) => run(client, workspaceId, turnId, states),
+        (states: Queue.Queue<TurnLogFeed, Cause.Done>) => run(client, turnId, states),
         { bufferSize: 1, strategy: "sliding" },
       ),
-    );
-  });
+    ),
+  );
 const families = new WeakMap<ApiClient, ReturnType<typeof makeFamily>>();
-/** Follow one turn's log in a credential scope, while any consumer is mounted. */
-export const turnLogFeed = (client: ApiClient, workspaceId: string, turnId: string) => {
+/** Follow one turn's log through its workspace's client, while any consumer is mounted. */
+export const turnLogFeed = (client: ApiClient, turnId: string) => {
   let family = families.get(client);
   if (!family) {
     family = makeFamily(client);
     families.set(client, family);
   }
-  return family(`${workspaceId}\u0000${turnId}`);
+  return family(turnId);
 };

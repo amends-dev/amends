@@ -118,11 +118,11 @@ function fixture() {
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    const base = "/workspaces/one/connections";
+    const base = "/connections";
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 1 }], invitations: [] });
-    if (path === "/workspaces/one/members") return json([owner]);
-    if (path === "/workspaces/one/permissions") return json(["connection.create"]);
+    if (path === "/members") return json([owner]);
+    if (path === "/permissions") return json(["connection.create"]);
     if (path === `${base}/integrations`) return json([search, amends]);
     if (path === base && request.method === "GET") return json(server.connections.map(viewOf));
     if (!path.startsWith(base)) return json({}, 404);
@@ -148,7 +148,7 @@ function fixture() {
       server.connections.push(created);
       return json(viewOf(created), 201);
     }
-    const id = path.split("/")[4];
+    const id = path.split("/")[2];
     const stored = server.connections.find((connection) => connection.id === id);
     if (!stored) return json({ _tag: "CoreError.NotFound", resource: "Connection", id }, 404);
     if (path.endsWith("/check")) return json({ status: "healthy" });
@@ -358,7 +358,7 @@ it("creates a connection with its key in one request, retrying with the same req
   await waitFor(() => expect(f.view.check.health("created")).toEqual({ status: "healthy" }));
   expect(f.writes[2]).toMatchObject({
     method: "POST",
-    path: "/workspaces/one/connections/created/check",
+    path: "/connections/created/check",
   });
 });
 
@@ -439,7 +439,7 @@ it("saves settings as their fields give them, and replaces a key", async () => {
   await waitFor(() => expect(f.done).toHaveLength(2));
   expect(f.writes[1]).toMatchObject({
     method: "PUT",
-    path: "/workspaces/one/connections/docs/key",
+    path: "/connections/docs/key",
     body: { apiKey: "sk-new" },
   });
   expect(f.view.key.apiKey()).toBe("");

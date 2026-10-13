@@ -1,4 +1,3 @@
-import { Api, Authentication } from "@amends-dev/http";
 import { Identity } from "@amends-dev/core/identity";
 import { Entry, Store } from "@amends-dev/core/journal";
 import { Notification, NotificationStore } from "@amends-dev/core/notification";
@@ -8,22 +7,17 @@ import { PostgresDatabase, PostgresWorkspaceStorage } from "@amends-dev/storage-
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
+import { HttpClient, HttpRouter } from "effect/http";
 import * as DevelopmentSignIn from "../src/DevelopmentSignIn.ts";
 import * as LocalHost from "../src/LocalHost.ts";
 import * as LocalServer from "../src/LocalServer.ts";
 import { setup } from "./database.ts";
+import { client } from "./client.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const bob = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("bob") });
 const agent = Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make("alice") });
 const outsider = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("outsider") });
-const asToken = (token: string) =>
-  HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-    next(HttpClientRequest.bearerToken(request, token)),
-  );
-const client = (token: string) => HttpApiClient.make(Api.Api).pipe(Effect.provide(asToken(token)));
 
 /** Real HTTP, gateway and storage; explicit session tokens also exercise an agent principal. */
 const server = (url: string) => {
@@ -80,22 +74,20 @@ describe.skipIf(!available)("PostgreSQL", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const humanClient = yield* client("human");
-          const bobClient = yield* client("bob");
-          const agentClient = yield* client("agent");
-          const outsiderClient = yield* client("outsider");
-          const workspace = yield* humanClient.workspaces.create({
+          const creator = yield* client("human");
+          const workspace = yield* creator.workspaces.create({
             headers: {},
             payload: { name: "Inbox", memberName: "alice" },
           });
-          const otherWorkspace = yield* humanClient.workspaces.create({
+          const otherWorkspace = yield* creator.workspaces.create({
             headers: {},
             payload: { name: "Other inbox", memberName: "alice" },
           });
-          const params = { workspaceId: workspace.id };
-          expect(yield* humanClient.notifications.inbox({ params, query: { limit: 10 } })).toEqual(
-            [],
-          );
+          const humanClient = yield* client("human", workspace.id);
+          const bobClient = yield* client("bob", workspace.id);
+          const agentClient = yield* client("agent", workspace.id);
+          const outsiderClient = yield* client("outsider", workspace.id);
+          expect(yield* humanClient.notifications.inbox({ query: { limit: 10 } })).toEqual([]);
           // Inboxes belong to memberships: the creator's in each workspace, and the seeded members'.
           const owner = Notification.ofMember(workspace.ownerMemberId, alice);
           const bobMemberId = Member.Id.make("bob-member");
@@ -144,31 +136,28 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
           }).pipe(Effect.provide(PostgresDatabase.layer({ url: Redacted.make(url) })));
           // Newest first, and without sources the reader cannot reach, as with these fixtures.
-          expect(yield* humanClient.notifications.inbox({ params, query: { limit: 1 } })).toEqual([
+          expect(yield* humanClient.notifications.inbox({ query: { limit: 1 } })).toEqual([
             { notification: second },
           ]);
           expect(
             yield* humanClient.notifications.inbox({
-              params,
               query: { limit: 10, before: { recordedAt: second.recordedAt, id: second.id } },
             }),
           ).toEqual([{ notification: first }]);
-          expect(yield* bobClient.notifications.inbox({ params, query: { limit: 10 } })).toEqual([
+          expect(yield* bobClient.notifications.inbox({ query: { limit: 10 } })).toEqual([
             { notification: forBob },
           ]);
           expect(
             yield* humanClient.notifications.inbox({
-              params,
               query: { limit: 10, pendingOnly: true },
             }),
           ).toEqual([{ notification: second }, { notification: first }]);
-          expect(yield* humanClient.notifications.count({ params })).toEqual({ pending: 2 });
-          expect(yield* agentClient.notifications.inbox({ params, query: { limit: 10 } })).toEqual([
+          expect(yield* humanClient.notifications.count()).toEqual({ pending: 2 });
+          expect(yield* agentClient.notifications.inbox({ query: { limit: 10 } })).toEqual([
             { notification: forAgent },
           ]);
           expect(
-            yield* humanClient.notifications.inbox({
-              params: { workspaceId: otherWorkspace.id },
+            yield* (yield* client("human", otherWorkspace.id)).notifications.inbox({
               query: { limit: 10 },
             }),
           ).toEqual([{ notification: foreign }]);
@@ -179,7 +168,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             Notification.Id.make("missing"),
           ]) {
             const response = yield* humanClient.notifications.markSeen({
-              params: { ...params, notificationId },
+              params: { notificationId },
               responseMode: "response-only",
             });
             expect(response.status).toBe(404);
@@ -191,36 +180,33 @@ describe.skipIf(!available)("PostgreSQL", () => {
           }
           expect(
             (yield* agentClient.notifications.markSeen({
-              params: { ...params, notificationId: first.id },
+              params: { notificationId: first.id },
               responseMode: "response-only",
             })).status,
           ).toBe(404);
           expect(
             (yield* outsiderClient.notifications.inbox({
-              params,
               query: { limit: 10 },
               responseMode: "response-only",
             })).status,
           ).toBe(403);
-          yield* humanClient.members.remove({ params: { ...params, memberId: bobMemberId } });
+          yield* humanClient.members.remove({ params: { memberId: bobMemberId } });
           expect(
             (yield* bobClient.notifications.inbox({
-              params,
               query: { limit: 10 },
               responseMode: "response-only",
             })).status,
           ).toBe(403);
           expect(
             (yield* bobClient.notifications.markSeen({
-              params: { ...params, notificationId: forBob.id },
+              params: { notificationId: forBob.id },
               responseMode: "response-only",
             })).status,
           ).toBe(403);
           const http = yield* HttpClient.HttpClient;
-          const base = `/workspaces/${workspace.id}/notifications`;
           const spoofed = yield* http.get(
-            `${base}/inbox?limit=10&recipientId=bob&recipientKind=Human`,
-            { headers: { authorization: "Bearer human" } },
+            "/notifications/inbox?limit=10&recipientId=bob&recipientKind=Human",
+            { headers: { authorization: "Bearer human", "amends-workspace": workspace.id } },
           );
           expect(yield* spoofed.json).toMatchObject([
             { notification: { id: second.id, recipient: alice } },
@@ -233,13 +219,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
   it.live("inbox HTTP queries reject malformed input and require authentication", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
-        const humanClient = yield* client("human");
-        const workspace = yield* humanClient.workspaces.create({
+        const workspace = yield* (yield* client("human")).workspaces.create({
           headers: {},
           payload: { name: "Inbox", memberName: "alice" },
         });
         const http = yield* HttpClient.HttpClient;
-        const base = `/workspaces/${workspace.id}/notifications`;
+        const base = "/notifications";
+        const inWorkspace = { "amends-workspace": workspace.id };
         for (const query of [
           "",
           "limit=0",
@@ -249,29 +235,38 @@ describe.skipIf(!available)("PostgreSQL", () => {
           `limit=1&before=${encodeURIComponent(JSON.stringify({ recordedAt: "not-a-date", id: "a" }))}`,
         ]) {
           const response = yield* http.get(`${base}/inbox?${query}`, {
-            headers: { authorization: "Bearer human" },
+            headers: { authorization: "Bearer human", ...inWorkspace },
           });
           expect(response.status).toBe(400);
         }
         for (const path of [base + "/inbox?limit=10", base + "/count"]) {
-          expect((yield* http.get(path)).status).toBe(401);
+          expect((yield* http.get(path, { headers: inWorkspace })).status).toBe(401);
           expect(
-            (yield* http.get(path, { headers: { authorization: "Bearer invalid" } })).status,
+            (yield* http.get(path, {
+              headers: { authorization: "Bearer invalid", ...inWorkspace },
+            })).status,
           ).toBe(401);
         }
-        const rejectedClient = yield* client("invalid");
+        const rejectedClient = yield* client("invalid", workspace.id);
         expect(
-          yield* rejectedClient.notifications
-            .inbox({ params: { workspaceId: workspace.id }, query: { limit: 10 } })
-            .pipe(Effect.flip),
+          yield* rejectedClient.notifications.inbox({ query: { limit: 10 } }).pipe(Effect.flip),
         ).toMatchObject({ _tag: "Authentication.Unauthorized" });
         const openapi = yield* (yield* http.get("/openapi.json")).json;
         expect(openapi).toMatchObject({
           paths: {
-            "/workspaces/{workspaceId}/notifications/inbox": {
-              get: { operationId: "notifications.inbox" },
+            "/notifications/inbox": {
+              get: {
+                operationId: "notifications.inbox",
+                parameters: expect.arrayContaining([
+                  expect.objectContaining({
+                    name: "Amends-Workspace",
+                    in: "header",
+                    required: true,
+                  }),
+                ]),
+              },
             },
-            "/workspaces/{workspaceId}/notifications/{notificationId}/seen": {
+            "/notifications/{notificationId}/seen": {
               post: { operationId: "notifications.markSeen" },
             },
           },

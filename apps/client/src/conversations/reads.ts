@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-solid";
 import { Option } from "effect";
 import { AsyncResult, type Atom } from "effect/reactivity";
 import { createMemo, type Accessor } from "solid-js";
-import { useApiClient } from "../provider.tsx";
+import { useWorkspaceClient } from "../provider.tsx";
 import {
   groupsRead,
   inboxRead,
@@ -61,7 +61,7 @@ function connect<A, E>(atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>): Read<A> 
 
 /** The reader's groups in a workspace, live while mounted. */
 export function useGroups(workspaceId: string): Read<ReadonlyArray<Group.ListItem>> {
-  const read = groupsRead(useApiClient(), workspaceId);
+  const read = groupsRead(useWorkspaceClient(workspaceId), workspaceId);
   return read ? connect(read) : unread;
 }
 
@@ -70,7 +70,7 @@ export function useGroups(workspaceId: string): Read<ReadonlyArray<Group.ListIte
  * does, live while mounted as groups are created, renamed, joined, and left.
  */
 export function usePublicGroups(workspaceId: string): Read<ReadonlyArray<Group.PublicItem>> {
-  const read = publicGroupsRead(useApiClient(), workspaceId);
+  const read = publicGroupsRead(useWorkspaceClient(workspaceId), workspaceId);
   return read ? connect(read) : unread;
 }
 
@@ -79,7 +79,7 @@ export function useGroupRoster(
   workspaceId: string,
   groupId: string,
 ): Read<ReadonlyArray<GroupMembership.GroupMembership>> {
-  const read = rosterRead(useApiClient(), workspaceId, groupId);
+  const read = rosterRead(useWorkspaceClient(workspaceId), workspaceId, groupId);
   return read ? connect(read) : unread;
 }
 export interface Members {
@@ -90,7 +90,7 @@ export interface Members {
 }
 /** The workspace's members, to name who wrote what and choose whom to include. */
 export function useMembers(workspaceId: string): Members {
-  const read = membersRead(useApiClient(), workspaceId);
+  const read = membersRead(useWorkspaceClient(workspaceId), workspaceId);
   if (!read) return { member: () => undefined, all: () => undefined };
   const members = connect(read);
   const byId = createMemo(
@@ -107,7 +107,7 @@ export function useWorkspacePermission(
   workspaceId: string,
   permission: string,
 ): Accessor<boolean | undefined> {
-  const read = permissionsRead(useApiClient(), workspaceId);
+  const read = permissionsRead(useWorkspaceClient(workspaceId), workspaceId);
   if (!read) return () => undefined;
   const permissions = connect(read);
   return () => permissions.value()?.some((name) => name === permission);
@@ -118,7 +118,7 @@ export function useWorkspacePermission(
  * count, including those from groups they have left.
  */
 export function useInboxPending(workspaceId: string): Accessor<number | undefined> {
-  const read = pendingCountRead(useApiClient(), workspaceId);
+  const read = pendingCountRead(useWorkspaceClient(workspaceId), workspaceId);
   if (!read) return () => undefined;
   const count = connect(read);
   return () => count.value()?.pending;
@@ -173,13 +173,13 @@ function page<A, E>(read: PagedRead<A, E>): PagedView<A> {
 
 /** A group's stream of threads by when they started, oldest shown first, live while mounted. */
 export function useGroupStream(workspaceId: string, groupId: string): PagedView<Thread.Opening> {
-  const read = streamRead(useApiClient(), workspaceId, groupId);
+  const read = streamRead(useWorkspaceClient(workspaceId), workspaceId, groupId);
   return read ? page(read) : unpaged;
 }
 
 /** One thread's record, live while mounted: its title as renamed, its group, and who started it. */
 export function useThread(workspaceId: string, threadId: string): Read<Thread.Thread> {
-  const read = threadRead(useApiClient(), workspaceId, threadId);
+  const read = threadRead(useWorkspaceClient(workspaceId), workspaceId, threadId);
   return read ? connect(read) : unread;
 }
 
@@ -188,7 +188,7 @@ export function useThreadTimeline(
   workspaceId: string,
   threadId: string,
 ): PagedView<ThreadTimeline.Item> {
-  const read = timelineRead(useApiClient(), workspaceId, threadId);
+  const read = timelineRead(useWorkspaceClient(workspaceId), workspaceId, threadId);
   return read ? page(read) : unpaged;
 }
 
@@ -200,6 +200,6 @@ export function useInbox(
   workspaceId: string,
   filter: InboxFilter,
 ): PagedView<NotificationInbox.Item> {
-  const read = inboxRead(useApiClient(), workspaceId, filter);
+  const read = inboxRead(useWorkspaceClient(workspaceId), workspaceId, filter);
   return read ? page(read) : unpaged;
 }

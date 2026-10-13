@@ -7,6 +7,7 @@
  * @since 0.1.0
  */
 import { HttpApi, OpenApi } from "effect/http-api";
+import { declareWorkspaceHeader } from "./internal/workspace-header.ts";
 import { AccountsGroup } from "./AccountsGroup.ts";
 import { InvitationsGroup } from "./InvitationsGroup.ts";
 import { AssignmentsGroup } from "./AssignmentsGroup.ts";
@@ -15,6 +16,7 @@ import { MembersGroup } from "./MembersGroup.ts";
 import { NotificationsGroup } from "./NotificationsGroup.ts";
 import { SessionGroup } from "./SessionGroup.ts";
 import { WorkspacesGroup } from "./WorkspacesGroup.ts";
+import { SettingsGroup } from "./SettingsGroup.ts";
 import { ChangeFeedGroup } from "./ChangeFeedGroup.ts";
 import { AgentsGroup } from "./AgentsGroup.ts";
 import { ChannelEventsGroup, ChannelsGroup } from "./ChannelsGroup.ts";
@@ -24,17 +26,13 @@ import { TasksGroup } from "./TasksGroup.ts";
 import { ThreadsGroup } from "./ThreadsGroup.ts";
 import { TurnsGroup } from "./TurnsGroup.ts";
 
-/**
- * The public HTTP contract. Servers implement its groups; clients are generated from it.
- *
- * @category models
- * @since 0.1.0
- */
-export class Api extends HttpApi.make("amends")
+/** Every endpoint group. */
+const groups = HttpApi.make("amends")
   .add(SessionGroup)
   .add(MeGroup)
   .add(AccountsGroup)
   .add(WorkspacesGroup)
+  .add(SettingsGroup)
   .add(MembersGroup)
   .add(InvitationsGroup)
   .add(AssignmentsGroup)
@@ -47,5 +45,15 @@ export class Api extends HttpApi.make("amends")
   .add(TurnsGroup)
   .add(ChannelsGroup)
   .add(ChannelEventsGroup)
-  .add(ChangeFeedGroup)
-  .annotateMerge(OpenApi.annotations({ title: "Amends API" })) {}
+  .add(ChangeFeedGroup);
+
+/**
+ * The public HTTP contract. Servers implement its groups; clients are generated from it. Its
+ * OpenAPI document declares the `Amends-Workspace` header on every endpoint a member calls.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export class Api extends groups.annotateMerge(
+  OpenApi.annotations({ title: "Amends API", transform: declareWorkspaceHeader(groups) }),
+) {}

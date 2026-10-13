@@ -433,7 +433,7 @@ it.effect("invalid cursors are rejected before subscribing", () =>
         const error = yield* Effect.flip(
           changeFeedService.watch({ after: after as ChangeFeed.Cursor }),
         );
-        expect(Schema.isSchemaError(error)).toBe(true);
+        expect(error).toMatchObject({ _tag: "CoreError.Invalid", reason: { _tag: "Malformed" } });
       }
     }),
   ),

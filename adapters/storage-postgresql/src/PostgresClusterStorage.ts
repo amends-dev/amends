@@ -1,14 +1,22 @@
 /**
- * Upkeep of the tables Effect Cluster's SQL message storage keeps in this database, with its
- * default `cluster` prefix. Cluster never removes a message or its reply, so the host prunes
- * the ones it has handled with `prune`, and holds its runner address with `claimAddress` so that
- * no two processes over the database run Cluster at one address.
+ * Effect Cluster over this database: the tables its SQL message storage keeps here, with its
+ * default `cluster` prefix, and how the processes over the database hear of the job requests
+ * commits store there. Cluster never removes a message or its reply, so the host prunes the ones
+ * it has handled with `prune`, and holds its runner address with `claimAddress` so that no two
+ * processes over the database run Cluster at one address. `layerOneAtATime` starts Cluster one
+ * process at a time, as it creates its tables. `layerWakeup` wakes the runners once a
+ * commit that stored job requests is done, and `layerWakeupListener` keeps a process that runs jobs
+ * awake to them, so a job's request is read at once whichever process committed it.
  *
  * @since 0.1.0
  */
-import { DateTime, Effect, Schema } from "effect";
-import { Snowflake } from "effect/cluster";
+import { JobRequests } from "@amends-dev/cluster";
+import { StoreError } from "@amends-dev/core/journal";
+import { DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
+import { Sharding, Snowflake } from "effect/cluster";
+import * as Binding from "./Binding.ts";
 import * as PostgresDatabase from "./PostgresDatabase.ts";
+import * as PostgresNotices from "./PostgresNotices.ts";
 
 /**
  * Another live process runs jobs at this runner address.
@@ -87,3 +95,91 @@ export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(fun
     Effect.ignore(claim("SELECT pg_advisory_unlock(hashtextextended($1, 2)) AS held")),
   );
 });
+
+/**
+ * Build `cluster`, Effect Cluster's layer over this database, one process at a time: Cluster
+ * creates its tables as it starts, and processes starting together over a new database would race
+ * to create them, failing all but one. The first to take the lock creates them; the others wait
+ * for it, then find them there. The lock holds one of the pool's connections while `cluster` is
+ * built.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerOneAtATime = <A, E, R>(cluster: Layer.Layer<A, E, R>) =>
+  Layer.effectContext(
+    Effect.gen(function* () {
+      const clusterScope = yield* Effect.scope;
+      const { sql } = yield* PostgresDatabase.PostgresDatabase;
+      return yield* Effect.scoped(
+        Effect.gen(function* () {
+          const connection = yield* sql.reserve;
+          const key = JSON.stringify(["cluster", "start"]);
+          const lock = (statement: string) =>
+            connection.executeUnprepared(statement, [key], undefined);
+          yield* lock("SELECT pg_advisory_lock(hashtextextended($1, 2))");
+          // A session lock outlives the connection's return to the pool, so let it go first.
+          yield* Effect.addFinalizer(() =>
+            Effect.ignore(lock("SELECT pg_advisory_unlock(hashtextextended($1, 2))")),
+          );
+          return yield* Layer.buildWithScope(cluster, clusterScope);
+        }),
+      );
+    }),
+  );
+
+/**
+ * Provides cluster's `JobRequests.Wakeup` over this database's transactions: once a commit that
+ * stored job requests is done, this process's runner reads storage again, and the commit's
+ * notices, sent right after COMMIT, wake every other process's listener. A notice lost leaves those
+ * runners to their next poll.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerWakeup = Layer.effect(
+  JobRequests.Wakeup,
+  Effect.gen(function* () {
+    const sharding = yield* Sharding.Sharding;
+    return JobRequests.Wakeup.of({
+      afterCommit: Effect.gen(function* () {
+        const session = yield* Effect.serviceOption(Binding.CurrentTransaction);
+        if (Option.isNone(session) || !session.value.active)
+          return yield* StoreError.failed(
+            "Store",
+            "wake runners",
+          )("Missing or closed workspace transaction");
+        // Sent with the commit's other notices, once it commits; repeats within it are sent once.
+        session.value.notices.add(PostgresNotices.jobRequestsNotice);
+        yield* Binding.afterCommit(session.value, sharding.pollStorage);
+      }),
+    });
+  }),
+);
+
+/**
+ * Keep this process's runner reading storage whenever a commit in any process over the database
+ * stores job requests, and whenever the pool's listener connects, for as long as the layer lives.
+ * It keeps the pool listening meanwhile, holding one of its connections. Only a process that runs
+ * jobs needs it.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layerWakeupListener = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const sharding = yield* Sharding.Sharding;
+    const { notices } = yield* PostgresDatabase.PostgresDatabase;
+    yield* notices.listening;
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Effect.gen(function* () {
+          // Taken before the read, so a commit during it wakes the runner again.
+          const next = notices.nextJobRequests();
+          yield* sharding.pollStorage;
+          yield* Deferred.await(next);
+        }),
+      ),
+    );
+  }),
+);

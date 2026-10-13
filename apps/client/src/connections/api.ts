@@ -3,7 +3,7 @@ import { Connection } from "@amends-dev/core/connection";
 import { Workspace } from "@amends-dev/core/workspace";
 import type { ConnectionsFailure } from "@amends-dev/ui/screens/connections";
 import { Cause, Effect, Option, Redacted, Schema } from "effect";
-import type { Api, ApiClient } from "../api/client.ts";
+import type { ApiClient, WorkspaceApi } from "../api/client.ts";
 import { command, workspaceFailure } from "../api/failures.ts";
 import { workspaceKey } from "../api/keys.ts";
 import { refreshResult } from "../api/refresh.ts";
@@ -13,18 +13,17 @@ import type { Settings } from "./settings.ts";
 export { Connection };
 
 const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
-  const params = { workspaceId };
   const reactivityKeys = [workspaceKey(workspaceId, "connections")];
   return {
     /** The integrations this host installs; any member may read them. */
-    integrations: client.query("connections", "integrations", { params, reactivityKeys }),
+    integrations: client.query("connections", "integrations", { reactivityKeys }),
     /** The workspace's connections, by name. */
-    connections: client.query("connections", "list", { params, reactivityKeys }),
+    connections: client.query("connections", "list", { reactivityKeys }),
   };
 };
 /**
- * The credential-scoped reads behind Connections, registered under one invalidation key that
- * writes and the workspace change feed refresh. Undefined for an invalid workspace ID.
+ * The reads behind Connections, through the workspace's client, registered under one invalidation
+ * key that writes and the workspace change feed refresh. Undefined for an invalid workspace ID.
  */
 export const connectionsReads = (client: ApiClient, workspaceId: string) =>
   Option.getOrUndefined(
@@ -58,18 +57,13 @@ export const newConnectionRequestKey = newWorkspaceRequestKey;
 const apiKeyOf = command(Schema.toType(Connection.ApiKey));
 
 /** Make one change to connections, answering with the ID of the connection it created, if any. */
-export const changeConnection = (workspace: string) => (api: Api, change: ConnectionCommand) =>
+export const changeConnection = (api: WorkspaceApi, change: ConnectionCommand) =>
   Effect.gen(function* () {
-    const workspaceId = yield* command(Workspace.Id)(workspace);
     const connection = (connectionId: string) =>
-      Effect.map(command(Connection.Id)(connectionId), (id) => ({
-        workspaceId,
-        connectionId: id,
-      }));
+      Effect.map(command(Connection.Id)(connectionId), (id) => ({ connectionId: id }));
     switch (change.kind) {
       case "create": {
         const created = yield* api.connections.create({
-          params: { workspaceId },
           headers: { "idempotency-key": change.key },
           payload: yield* command(Schema.toType(Connection.CreateInput))({
             integration: change.integration,
@@ -111,11 +105,10 @@ export const changeConnection = (workspace: string) => (api: Api, change: Connec
   });
 
 /** Ask a connection's system whether it works as set up, answering with what the check found. */
-export const checkConnection = (workspace: string) => (api: Api, connectionId: string) =>
+export const checkConnection = (api: WorkspaceApi, connectionId: string) =>
   Effect.gen(function* () {
-    const workspaceId = yield* command(Workspace.Id)(workspace);
     return yield* api.connections.check({
-      params: { workspaceId, connectionId: yield* command(Connection.Id)(connectionId) },
+      params: { connectionId: yield* command(Connection.Id)(connectionId) },
     });
   });
 

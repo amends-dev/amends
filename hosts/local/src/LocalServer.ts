@@ -37,6 +37,7 @@ export const layerRoutes = Layer.mergeAll(
       "Authorization",
       "Content-Type",
       "Idempotency-Key",
+      "Amends-Workspace",
       "traceparent",
       "tracestate",
       "b3",

@@ -9,10 +9,10 @@
  * @since 0.1.0
  */
 import * as Accounts from "@amends-dev/gateway/Accounts";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
@@ -25,10 +25,10 @@ import * as ApiErrors from "./ApiErrors.ts";
 export class AccountsGroup extends HttpApiGroup.make("accounts")
   .add(
     HttpApiEndpoint.get("list", "/", {
-      params: { workspaceId: Workspace.Id },
       success: Schema.Array(Accounts.Account),
       error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
   )
+  .middleware(WorkspaceMember)
   .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId/accounts") {}
+  .prefix("/accounts") {}

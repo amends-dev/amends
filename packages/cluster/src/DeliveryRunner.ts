@@ -10,10 +10,11 @@
  * @since 0.1.0
  */
 import { Integrations } from "@amends-dev/connection";
+import type * as Core from "@amends-dev/core";
 import type { Delivery, DeliveryJobs } from "@amends-dev/core/channel";
 import { DeliveryExecution } from "@amends-dev/core/channel";
 import { Gateway } from "@amends-dev/gateway";
-import { Data, Effect, Predicate, Ref, Result } from "effect";
+import { Data, Effect, Predicate, Ref, Result, type Scope } from "effect";
 
 /**
  * A run of the job failed before it had posted every delivery; `deliveryId` names the one it was
@@ -55,18 +56,12 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
   const integrations = yield* Integrations.Integrations;
   /** How many times this runner tried to post each delivery it has not finished with. */
   const tries = yield* Ref.make(new Map<Delivery.Id, number>());
-  /** Ask `call` of the workspace's delivery execution, holding the workspace only while it runs. */
-  const deliveryExecution = <A, E>(
-    call: (
-      deliveryExecution: DeliveryExecution.DeliveryExecution["Service"],
-    ) => Effect.Effect<A, E>,
-  ) =>
-    Effect.scoped(
-      gateway.inWorkspace(
-        job.workspaceId,
-        Effect.flatMap(DeliveryExecution.DeliveryExecution, call),
-      ),
-    );
+  /**
+   * Run `program` in the job's workspace, holding the workspace only while `program` runs: a post
+   * waits on another system, and the workspace may reload meanwhile.
+   */
+  const inWorkspace = <A, E>(program: Effect.Effect<A, E, Core.JobServices | Scope.Scope>) =>
+    Effect.scoped(gateway.inWorkspace(job.workspaceId, program));
 
   /** Post what `ready` says through the channel's transport. */
   const post = (ready: Extract<DeliveryExecution.Start, { readonly _tag: "Ready" }>) =>
@@ -81,8 +76,10 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
 
   /** Ready, post, and record one delivery; a retryable failure to post fails the run. */
   const deliverOne = Effect.fnUntraced(function* (delivery: Delivery.Delivery) {
-    const start = yield* deliveryExecution((deliveryExecution) =>
-      deliveryExecution.start(delivery.id),
+    const start = yield* inWorkspace(
+      DeliveryExecution.DeliveryExecution.use((deliveryExecution) =>
+        deliveryExecution.start(delivery.id),
+      ),
     );
     if (DeliveryExecution.Start.isAnyOf(["Idle"])(start)) return;
     const attempts = yield* Ref.modify(tries, (counts) => {
@@ -91,20 +88,24 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
     });
     const posted = yield* Effect.result(post(start));
     if (Result.isSuccess(posted)) {
-      yield* deliveryExecution((deliveryExecution) =>
-        deliveryExecution.recordSent(delivery.id, {
-          externalMessageId: posted.success.messageId,
-          attempts,
-        }),
+      yield* inWorkspace(
+        DeliveryExecution.DeliveryExecution.use((deliveryExecution) =>
+          deliveryExecution.recordSent(delivery.id, {
+            externalMessageId: posted.success.messageId,
+            attempts,
+          }),
+        ),
       );
     } else if (isRetryable(posted.failure)) {
       return yield* new RunFailed({ deliveryId: delivery.id, cause: posted.failure });
     } else {
-      yield* deliveryExecution((deliveryExecution) =>
-        deliveryExecution.recordFailed(delivery.id, {
-          reason: describe(posted.failure),
-          attempts,
-        }),
+      yield* inWorkspace(
+        DeliveryExecution.DeliveryExecution.use((deliveryExecution) =>
+          deliveryExecution.recordFailed(delivery.id, {
+            reason: describe(posted.failure),
+            attempts,
+          }),
+        ),
       );
     }
     yield* Ref.update(tries, (counts) => {
@@ -120,8 +121,10 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
      * still requested, in the order of their messages.
      */
     deliver: Effect.gen(function* () {
-      const deliveries = yield* deliveryExecution((deliveryExecution) =>
-        deliveryExecution.accept(job.threadId),
+      const deliveries = yield* inWorkspace(
+        DeliveryExecution.DeliveryExecution.use((deliveryExecution) =>
+          deliveryExecution.accept(job.threadId),
+        ),
       ).pipe(Effect.mapError((cause) => new RunFailed({ deliveryId: undefined, cause })));
       for (const delivery of deliveries)
         yield* deliverOne(delivery).pipe(
@@ -135,8 +138,10 @@ export const make = Effect.fnUntraced(function* (job: DeliveryJobs.Job) {
     giveUp: (deliveryId: Delivery.Id, reason: string) =>
       Effect.gen(function* () {
         const attempts = (yield* Ref.get(tries)).get(deliveryId) ?? 0;
-        yield* deliveryExecution((deliveryExecution) =>
-          deliveryExecution.recordFailed(deliveryId, { reason, attempts }),
+        yield* inWorkspace(
+          DeliveryExecution.DeliveryExecution.use((deliveryExecution) =>
+            deliveryExecution.recordFailed(deliveryId, { reason, attempts }),
+          ),
         );
         yield* Ref.update(tries, (counts) => {
           const remaining = new Map(counts);

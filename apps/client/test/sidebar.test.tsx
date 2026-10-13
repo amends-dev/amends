@@ -83,9 +83,9 @@ function fixture(suggestions?: number) {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const path = new URL(new Request(input, init).url).pathname;
     if (path === "/me/workspaces") return Promise.resolve(json(listing));
-    if (path === "/workspaces/one/members") return Promise.resolve(json(members));
-    if (path === "/workspaces/one/groups") return Promise.resolve(json(groups));
-    if (path === "/workspaces/one/groups/general/members") return Promise.resolve(json(roster));
+    if (path === "/members") return Promise.resolve(json(members));
+    if (path === "/groups") return Promise.resolve(json(groups));
+    if (path === "/groups/general/members") return Promise.resolve(json(roster));
     return Promise.resolve(json({}, 404));
   });
   const views = {} as {
@@ -159,4 +159,59 @@ it("offers no leaving the general group, and removes nobody from it", async () =
     ["Ada", false],
     ["Scout", false],
   ]);
+});
+
+it("reads each workspace through its own client, which names it in the Amends-Workspace header", async () => {
+  const requests: Array<[string, string | null]> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    const workspaceId = request.headers.get("amends-workspace");
+    requests.push([path, workspaceId]);
+    if (path === "/me/workspaces") return Promise.resolve(json(listing));
+    if (path === "/groups")
+      return Promise.resolve(
+        json([
+          item({
+            id: `${workspaceId}-general`,
+            kind: "Team",
+            visibility: "Public",
+            name: "general",
+          }),
+        ]),
+      );
+    return Promise.resolve(json([]));
+  });
+  const views = {} as Record<"one" | "two", ReturnType<typeof useWorkspaceGroups>>;
+  function Consumer() {
+    views.one = useWorkspaceGroups("one");
+    views.two = useWorkspaceGroups("two");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <Consumer />
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(views.two.all()).toHaveLength(1));
+  expect(views.one.all()?.map((entry) => entry.id)).toEqual(["one-general"]);
+  expect(views.two.all()?.map((entry) => entry.id)).toEqual(["two-general"]);
+  // The session's own reads act in no workspace.
+  expect(requests.filter(([path]) => path === "/me/workspaces")).toEqual([
+    ["/me/workspaces", null],
+  ]);
+  expect(
+    requests
+      .filter(([path]) => path === "/groups")
+      .map(([, workspaceId]) => workspaceId ?? "")
+      .toSorted((left, right) => left.localeCompare(right)),
+  ).toEqual(["one", "two"]);
 });

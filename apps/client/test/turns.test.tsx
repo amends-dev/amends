@@ -154,18 +154,17 @@ function fixture(options: { readonly atlasLeft?: boolean } = {}) {
     const path = url.pathname;
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
-    if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/agents") return json(agents);
-    if (path === "/workspaces/one/threads/thread/timeline") {
+    if (path === "/members") return json(members);
+    if (path === "/agents") return json(agents);
+    if (path === "/threads/thread/timeline") {
       const after = Number(url.searchParams.get("afterSequence") ?? 0);
       return json(server.items.filter((item) => item.activity.sequence > after));
     }
-    if (request.method !== "POST" || !path.startsWith("/workspaces/one/turns/"))
-      return json({}, 404);
+    if (request.method !== "POST" || !path.startsWith("/turns/")) return json({}, 404);
     writes.push({ path, key: request.headers.get("idempotency-key") });
     const answer = answers.shift();
     if (answer) return answer;
-    const id = path.split("/")[4]!;
+    const id = path.split("/")[2]!;
     const view = (turnId: string, status: string) => ({
       id: turnId,
       workspaceId: "one",
@@ -413,17 +412,17 @@ function followed(
     const path = new URL(request.url).pathname;
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
-    if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/turns/atlas-1") return json(turn);
-    if (path === "/workspaces/one/connections") return json(connections);
+    if (path === "/members") return json(members);
+    if (path === "/turns/atlas-1") return json(turn);
+    if (path === "/connections") return json(connections);
     // The workspace's change feed is live, so that nothing here depends on how long a test takes: a
     // feed that never connected would count as down once `liveGrace` passed.
-    if (path === "/workspaces/one/changes") {
+    if (path === "/changes") {
       const feed = eventStream(request);
       feed.send({ _tag: "Ready", workspaceId: "one", cursor: null, reset: false });
       return feed.response;
     }
-    if (path === "/workspaces/one/turns/atlas-1/log/events") {
+    if (path === "/turns/atlas-1/log/events") {
       const refused = refuse(subscriptions++);
       if (refused !== undefined) return refused;
       const created = eventStream(request);

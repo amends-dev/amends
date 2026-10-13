@@ -475,7 +475,7 @@ describe("thread reads", () => {
             ]) {
               expect(
                 yield* Effect.flip(run(bound, owner, timeline(first.thread.id, options as never))),
-              ).toMatchObject({ _tag: "SchemaError" });
+              ).toMatchObject({ _tag: "CoreError.Invalid" });
               expect(
                 yield* Effect.flip(bound.activities.readPage(first.thread.id, options as never)),
               ).toMatchObject({
@@ -545,7 +545,7 @@ describe("thread reads", () => {
             ]) {
               expect(
                 yield* Effect.flip(run(bound, owner, timeline(first.thread.id, options))),
-              ).toMatchObject({ _tag: "SchemaError" });
+              ).toMatchObject({ _tag: "CoreError.Invalid" });
               expect(
                 yield* Effect.flip(bound.activities.readPage(first.thread.id, options)),
               ).toMatchObject({
@@ -901,7 +901,7 @@ describe("thread reads", () => {
               yield* Effect.flip(
                 run(bound, actorFor(readerId, otherWorkspaceId), get(first.thread.id)),
               ),
-            ).toMatchObject({ _tag: "Authorization.WorkspaceMismatch" });
+            ).toMatchObject({ _tag: "CoreError.Invalid" });
           }),
         ),
       ),
@@ -978,7 +978,7 @@ describe("thread reads", () => {
       ),
   );
 
-  it.effect("a storage failure reaches a timeline reader as it is, and records nothing", () =>
+  it.effect("a storage failure ends a timeline read as a defect, and records nothing", () =>
     withStorage((storage) =>
       runHost(
         storage,
@@ -993,7 +993,12 @@ describe("thread reads", () => {
                 Effect.fail(StoreError.failed("ThreadActivityStore", "readPage")("failed storage")),
             }),
           };
-          expect(yield* Effect.flip(run(failing, owner, timeline(first.thread.id)))).toMatchObject({
+          expect(
+            yield* Effect.catchDefect(
+              run(failing, owner, timeline(first.thread.id)),
+              Effect.succeed,
+            ),
+          ).toMatchObject({
             _tag: "StoreError",
             store: "ThreadActivityStore",
             reason: { _tag: "Failed" },

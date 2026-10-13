@@ -12,7 +12,7 @@ import { AsyncResult, type Atom } from "effect/reactivity";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import { connectionsReads } from "../connections/api.ts";
 import { timelineRead } from "../conversations/api.ts";
-import { useApiClient } from "../provider.tsx";
+import { useWorkspaceClient } from "../provider.tsx";
 import { writing } from "./drafts.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import {
@@ -28,7 +28,7 @@ import { useMembers } from "../conversations/reads.ts";
 import { toDate } from "../conversations/time.ts";
 import { memberName, useWorkspaceGroups } from "../conversations/views.ts";
 import { useLastingDown, useChangeFeedStatus } from "../live/status.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { refreshResult } from "../api/refresh.ts";
 
 /** An agent's turn on a thread, as a thread shows it. */
@@ -169,13 +169,13 @@ function useControls(
     readonly retried?: (turnId: string) => void;
   },
 ): TurnControls {
-  const client = useApiClient();
+  const client = useWorkspaceClient(workspaceId);
   const timeline = threadId === undefined ? undefined : timelineRead(client, workspaceId, threadId);
   const [acting, setActing] = createSignal<ThreadTurnControls["acting"]>();
   const [problem, setProblem] = createSignal<ReturnType<TurnControls["problem"]>>();
   // A command answers once the thread's timeline, and the turn when its log is open, show it.
-  const request = useMutation((api, command: TurnCommand) =>
-    controlTurn(workspaceId)(api, command).pipe(
+  const request = useWorkspaceMutation(workspaceId, (api, command: TurnCommand) =>
+    controlTurn(api, command).pipe(
       Effect.tap(() => (timeline ? Effect.ignore(refreshResult(timeline.atom)) : Effect.void)),
       Effect.tap(() => {
         const turn = options.log ? turnRead(client, workspaceId, command.turnId) : undefined;
@@ -214,7 +214,7 @@ function useControls(
  * timeline is read again before it answers, so it shows the state the command produced.
  */
 export function useThreadTurnControls(workspaceId: string, threadId: string): TurnControls {
-  const timeline = timelineRead(useApiClient(), workspaceId, threadId);
+  const timeline = timelineRead(useWorkspaceClient(workspaceId), workspaceId, threadId);
   const refresh = timeline === undefined ? () => {} : useAtomRefresh(() => timeline.atom);
   return useControls(workspaceId, threadId, { log: false, refresh });
 }
@@ -252,9 +252,9 @@ export function useTurnLog(
   turnId: string,
   options: { readonly retried?: (turnId: string) => void } = {},
 ): TurnLogView {
-  const client = useApiClient();
+  const client = useWorkspaceClient(workspaceId);
   const read = useRead(turnRead(client, workspaceId, turnId));
-  const feedAtom = turnLogFeed(client, workspaceId, turnId);
+  const feedAtom = turnLogFeed(client, turnId);
   const feedResult = useAtomValue(() => feedAtom);
   const refollow = useAtomRefresh(() => feedAtom);
   const feed = () => Option.getOrUndefined(AsyncResult.value(feedResult()));
@@ -424,7 +424,7 @@ const mostUrgentFirst = (states: ReadonlyArray<TurnState>) =>
 
 /** Where agents are at work across the workspace, live while mounted. */
 export function useTurnActivity(workspaceId: string): TurnActivityView {
-  const read = useRead(activeTurnsRead(useApiClient(), workspaceId));
+  const read = useRead(activeTurnsRead(useWorkspaceClient(workspaceId), workspaceId));
   const entryOf = useEntries(workspaceId);
   const groups = useWorkspaceGroups(workspaceId);
   const all = createMemo((): ReadonlyArray<ActiveTurn> =>

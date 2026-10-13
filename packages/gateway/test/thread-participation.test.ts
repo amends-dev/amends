@@ -824,7 +824,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
+                value: { _tag: "CoreError.Unavailable", reason: { _tag: "Contention" } },
               });
           yield* Effect.scoped(
             runHost(
@@ -892,7 +892,7 @@ describe("thread participation", () => {
           for (const result of results)
             if (Exit.isFailure(result))
               expect(Cause.findErrorOption(result.cause)).toMatchObject({
-                value: { _tag: "StoreError", store: "Store", reason: { _tag: "Contended" } },
+                value: { _tag: "CoreError.Unavailable", reason: { _tag: "Contention" } },
               });
           yield* Effect.scoped(
             runHost(

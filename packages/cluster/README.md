@@ -6,22 +6,22 @@ the **turn job**, one for each agent in each thread, which runs the agent's
 [turns](../core/README.md#turns) there on [harness](../harness/README.md), and the **delivery job**,
 one for each thread bound to a [channel](../core/README.md#channels)'s conversation, which carries
 what the thread's contacts were told to the conversation. Jobs enter workspaces through the
-[gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an actor does. The
+[gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an actor does, once for
+each call to core, so a job holds a workspace only while a call runs. The
 [local host](../../hosts/local/README.md) runs them.
 
-| Module              | What it holds                                                                                                               |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `TurnJob.ts`        | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
-| `DeliveryJob.ts`    | `DeliveryJob`: the `amends/DeliveryJob` entity, its `Deliver` request, the requests commits store, and the worker for them. |
-| `JobRequests.ts`    | `JobRequests`: how every job handles a request that fails, tried again until it holds or is dropped.                        |
-| `DeliveryRunner.ts` | `DeliveryRunner`: a bound thread's deliveries, accepted and posted one at a time; see [delivering](#delivering).            |
-| `TurnRunner.ts`     | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
-| `JobPruning.ts`     | `JobPruning`, the hourly job that removes handled requests.                                                                 |
+| Module              | What it holds                                                                                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TurnJob.ts`        | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them.                                                            |
+| `DeliveryJob.ts`    | `DeliveryJob`: the `amends/DeliveryJob` entity, its `Deliver` request, the requests commits store, and the worker for them.                                                            |
+| `JobRequests.ts`    | `JobRequests`: `Wakeup`, which wakes the runners once a commit that stores requests is done, and how every job handles a request that fails, tried again until it holds or is dropped. |
+| `DeliveryRunner.ts` | `DeliveryRunner`: a bound thread's deliveries, accepted and posted one at a time; see [delivering](#delivering).                                                                       |
+| `TurnRunner.ts`     | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                                                                                |
+| `JobPruning.ts`     | `JobPruning`, the hourly job that removes handled requests.                                                                                                                            |
 
-`TurnRunner` keeps three steps of a run under `internal/`: `session-log-writer.ts`, what a run
-writes to its participation's session log; `turn-agent.ts`, starting the session of the agent a
-turn runs from what core gives and the host's integrations; and `turn-workspace.ts`, the workspace
-as a run calls it, each call entering it through the gateway for itself.
+`TurnRunner` keeps two steps of a run under `internal/`: `session-log-writer.ts`, what a run
+writes to its participation's session log; and `turn-agent.ts`, starting the session of the agent a
+turn runs from what core gives and the host's integrations.
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and connection
 contracts. It knows no harness, model provider, sandbox platform, or channel's system: the host
@@ -46,9 +46,12 @@ a run or a stop in the commit whose facts ask for it, keyed by the commit, so a 
 twice asks once. Sent inside the commit, a request is stored in the commit's transaction when
 Cluster's message storage uses the same SQL client as the workspace's storage; the host composing
 them owns that. Cluster saves such a request and only notifies its runner best-effort, and its
-notice comes before the commit can show the request, so `layerRequests` asks the commit's
-`afterCommit` to have this process's runner read storage again (`Sharding.pollStorage`). A request
-for a job another process runs waits for that process's next read, unless sockets carry it.
+notice comes before the commit can show the request, even across sockets, so the runner would find
+it at its next read. Instead `layerRequests` asks the host's `JobRequests.Wakeup` to wake the
+runners once the commit is done: `JobRequests.layerWakeLocal` has this process's runner read
+storage again (`Sharding.pollStorage`), enough when it runs every job, and a host whose processes
+share storage provides one that wakes each, as the
+[PostgreSQL adapter](../../adapters/storage-postgresql/README.md#effect-clusters-tables) does.
 `TurnJob.layerWorker` registers the entity and handles its requests, and `TurnJob.layer` provides
 both. Every runner over the same storage runs the worker, as Cluster requires of every entity type.
 
@@ -98,10 +101,9 @@ trying. The runner counts the tries it made of each delivery, which the delivery
 ## Running a turn
 
 `TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Gateway` and the host's
-`Integrations`. It calls the workspace through `TurnWorkspace`: core's `TurnExecution` and the
-session log store as a run calls them, each call entering the workspace through the gateway for
-itself, so the runner holds the workspace only while a call runs. `runNextTurn` runs one turn at a
-time:
+`Integrations`. It calls core's `TurnExecution` and the session log store directly, entering the
+job's workspace through the gateway for each call, so the runner holds the workspace only while a
+call runs, never for the minutes a turn runs. `runNextTurn` runs one turn at a time:
 
 1. `accept` the agent's active turn in the thread, or a new one that accepts the work that waits;
    with neither, there is nothing to run.

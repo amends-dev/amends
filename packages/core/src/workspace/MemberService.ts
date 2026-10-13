@@ -8,7 +8,6 @@
  */
 import * as Identity from "../identity/Identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Delegation from "../authorization/Delegation.ts";
 import * as Requirement from "../authorization/Requirement.ts";
@@ -19,8 +18,6 @@ import * as GroupCommand from "../group/GroupCommand.ts";
 import * as GroupMembershipStore from "../group/GroupMembershipStore.ts";
 import * as Journal from "../journal/Journal.ts";
 import * as Publication from "../journal/Publication.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Store from "../journal/Store.ts";
 
 import * as InvitationFacts from "./InvitationFacts.ts";
@@ -32,45 +29,46 @@ import * as Member from "./Member.ts";
 import * as WorkspaceStore from "./WorkspaceStore.ts";
 
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
- * What reading members can fail with: the outcome above, and the failures of what a
- * read depends on.
+ * What reading members can fail with.
  *
  * @category errors
  * @since 0.1.0
  */
 export type Error =
-  | Authorization.Error
-  | StoreError.StoreError
-  | Schema.SchemaError
-  | CoreError.NotFound;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
- * What renaming oneself can fail with: what a read can, and the failures of the commit.
+ * What renaming oneself can fail with: what a read can, and what its commit meets.
  *
  * @category errors
  * @since 0.1.0
  */
-export type RenameError = Error | Projection.Error | Log.WriteError | PlatformError.PlatformError;
+export type RenameError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
- * What removing a member can fail with: the outcomes above, the delegation rules, and
- * the failures of the group departures, invitation revocations, and commit a removal includes.
+ * What removing a member can fail with: the outcomes above, and the delegation rules.
  *
  * @category errors
  * @since 0.1.0
  */
 export type RemoveError =
-  | GroupCommand.RemoveError
-  | Error
-  | PlatformError.PlatformError
-  | Delegation.Error
-  | StoreError.StoreError
-  | Projection.Error
-  | Log.WriteError
-  | CoreError.Conflict;
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The member operations, one of `Core.Operations`.
@@ -160,7 +158,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
       ),
     ]);
     return yield* requireMember(id);
-  });
+  }, Operation.report);
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
@@ -175,7 +173,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
       ),
     );
     return all.filter((_, index) => allowed[index]);
-  }).pipe(Effect.withSpan("MemberService.list"));
+  }).pipe(Effect.withSpan("MemberService.list"), Operation.report);
 
   const remove = Effect.fn("MemberService.remove")(
     function* (memberId: Member.Id) {
@@ -230,6 +228,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const rename = Effect.fn("MemberService.rename")(
@@ -244,6 +243,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   return MemberService.of({ get, list, remove, rename });

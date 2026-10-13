@@ -9,7 +9,6 @@
  */
 import { Integrations } from "@amends-dev/connection";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
 import * as Authorization from "../authorization/Authorization.ts";
 import * as Delegation from "../authorization/Delegation.ts";
 import type * as Permission from "../authorization/Permission.ts";
@@ -21,8 +20,6 @@ import * as ConnectionStore from "../connection/ConnectionStore.ts";
 import * as Actor from "../identity/Actor.ts";
 import * as Identity from "../identity/Identity.ts";
 import * as Journal from "../journal/Journal.ts";
-import type * as Log from "../journal/Log.ts";
-import type * as Projection from "../journal/Projection.ts";
 import * as Publication from "../journal/Publication.ts";
 import * as Store from "../journal/Store.ts";
 import * as Request from "../request/Request.ts";
@@ -36,7 +33,7 @@ import * as AgentPermissions from "./AgentPermissions.ts";
 import * as AgentReadiness from "./AgentReadiness.ts";
 import * as AgentStore from "./AgentStore.ts";
 import * as CoreError from "../error/CoreError.ts";
-import * as StoreError from "../journal/StoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * What listing agents can fail with.
@@ -44,23 +41,32 @@ import * as StoreError from "../journal/StoreError.ts";
  * @category errors
  * @since 0.1.0
  */
-export type ListError = Authorization.Error | StoreError.StoreError;
+export type ListError = CoreError.Denied | CoreError.Invalid | CoreError.Unavailable;
 
 /**
- * What reading one agent can fail with: listing's failures, a malformed ID, and a missing agent.
+ * What reading one agent can fail with: a malformed ID, and a missing agent.
  *
  * @category errors
  * @since 0.1.0
  */
-export type ReadError = ListError | Schema.SchemaError | CoreError.NotFound;
+export type ReadError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable;
 
 /**
- * What every change can fail with: what reading meets, and what writing its commit meets.
+ * What every change can fail with: what reading meets, and what its commit meets.
  *
  * @category errors
  * @since 0.1.0
  */
-export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
+export type Error =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What creating can fail with. Creating also adds a membership, with a role the actor must be
@@ -69,7 +75,13 @@ export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | P
  * @category errors
  * @since 0.1.0
  */
-export type CreateError = Error | CoreError.Invalid | Delegation.Error | MemberCommand.Error;
+export type CreateError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Conflict
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What configuring can fail with.
@@ -77,7 +89,12 @@ export type CreateError = Error | CoreError.Invalid | Delegation.Error | MemberC
  * @category errors
  * @since 0.1.0
  */
-export type ConfigureError = Error | CoreError.Invalid;
+export type ConfigureError =
+  | CoreError.NotFound
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * What renaming can fail with: a rename made meanwhile, besides what every change meets.
@@ -85,7 +102,13 @@ export type ConfigureError = Error | CoreError.Invalid;
  * @category errors
  * @since 0.1.0
  */
-export type RenameError = Error | CoreError.Changed;
+export type RenameError =
+  | CoreError.NotFound
+  | CoreError.Changed
+  | CoreError.Denied
+  | CoreError.Invalid
+  | CoreError.Unavailable
+  | CoreError.Uncertain;
 
 /**
  * The agent operations an actor calls. An agent is a member, so its role is changed, and it is
@@ -262,13 +285,13 @@ export const make = Effect.fn("AgentService.make")(function* () {
       views.push(Agent.view(record, name, readiness, { configurable, usable }));
     }
     return views.toSorted(byName);
-  }).pipe(Effect.withSpan("AgentService.list"));
+  }).pipe(Effect.withSpan("AgentService.list"), Operation.report);
 
   const get = Effect.fn("AgentService.get")(function* (agentId: Agent.Id) {
     const id = yield* Schema.decodeEffect(Agent.Id)(agentId);
     const { record, name } = yield* requirePermittedAgent(id, AgentPermissions.Read);
     return yield* viewForActor(record, name);
-  });
+  }, Operation.report);
 
   const create = Effect.fn("AgentService.create")(
     function* (input: Agent.CreateInput, options: Request.Options = {}) {
@@ -311,6 +334,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const sameConfiguration = Schema.toEquivalence(Schema.toType(Agent.Configuration));
@@ -344,6 +368,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   const rename = Effect.fn("AgentService.rename")(
@@ -366,6 +391,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
+    Operation.report,
   );
 
   return AgentService.of({ list, get, create, configure, rename });

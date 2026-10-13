@@ -11,15 +11,15 @@
 import { Group } from "@amends-dev/core/group";
 import { Task } from "@amends-dev/core/task";
 import { Thread } from "@amends-dev/core/thread";
-import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
+import { WorkspaceMember } from "./WorkspaceMember.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 import { limit } from "./internal/paging.ts";
 
-const thread = { workspaceId: Workspace.Id, threadId: Thread.Id };
-const inGroup = { workspaceId: Workspace.Id, groupId: Group.Id };
+const thread = { threadId: Thread.Id };
+const inGroup = { groupId: Group.Id };
 const record = Task.Task.annotate({ identifier: "Task" });
 
 /**
@@ -64,5 +64,5 @@ export class TasksGroup extends HttpApiGroup.make("tasks")
       error: [...ApiErrors.workspace, ...ApiErrors.taskUpdate],
     }),
   )
-  .middleware(Authentication)
-  .prefix("/workspaces/:workspaceId") {}
+  .middleware(WorkspaceMember)
+  .middleware(Authentication) {}

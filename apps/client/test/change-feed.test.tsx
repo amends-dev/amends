@@ -375,8 +375,8 @@ it("a read mark refreshes the reads it changes when its signal arrives, from any
   const [through, setThrough] = createSignal<number>();
   const f = fixture({
     respond: (request, path) => {
-      if (path === "/workspaces/one/groups") return Promise.resolve(json([]));
-      if (request.method === "POST" && path === "/workspaces/one/threads/thread/read")
+      if (path === "/groups") return Promise.resolve(json([]));
+      if (request.method === "POST" && path === "/threads/thread/read")
         return Promise.resolve(new Response(null, { status: 204 }));
       return undefined;
     },

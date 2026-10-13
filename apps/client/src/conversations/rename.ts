@@ -3,7 +3,7 @@ import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { isGroupName, renameGroup } from "./api.ts";
 import { workspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { useGroups } from "./reads.ts";
 
 export interface RenameGroupController {
@@ -44,7 +44,7 @@ export function useRenameGroup(
     [error, setError] = createSignal<GroupChangeError>(),
     // The name the reader is renaming from; after a conflict, whatever the group is called then.
     [expected, setExpected] = createSignal<string>();
-  const request = useMutation(renameGroup(workspaceId));
+  const request = useWorkspaceMutation(workspaceId, renameGroup(workspaceId));
   const ready = () => isGroupName(name()) && name().trim() !== current() && !request.pending();
   async function save() {
     const from = expected() ?? current();

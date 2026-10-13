@@ -81,9 +81,9 @@ export const resolver = Effect.gen(function* () {
     listed: ReadonlyArray<ThreadActivity.ThreadActivity>,
   ) {
     const activities = yield* Effect.orDie(Effect.forEach(listed, (activity) => decode(activity)));
-    const rows = yield* threadParticipationStore
-      .getMany([...new Set(activities.map((activity) => activity.details.participationId))])
-      .pipe(Effect.mapError((cause) => new ThreadActivityResolvers.Failure({ cause })));
+    const rows = yield* threadParticipationStore.getMany([
+      ...new Set(activities.map((activity) => activity.details.participationId)),
+    ]);
     const found = new Map(rows.map((participant) => [participant.id, participant] as const));
     return yield* Effect.forEach(
       activities,

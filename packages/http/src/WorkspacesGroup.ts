@@ -1,45 +1,30 @@
 /**
- * The `workspaces` endpoint group: creating a workspace, its settings, and its ownership. `create`
- * goes through the gateway's `createWorkspace` for the authenticated person, who needs no
- * membership; any entitlement check is the host's. The other endpoints need active membership and
- * call `WorkspaceSettingsService` (`get`, `rename`, `members`) and `OwnershipService` (`get`,
- * `transfer`); transferring ownership needs the current human owner. An agent gets
- * `ApiErrors.Denied` from `create` and `transferOwnership`. `WorkspacesHandlers` implements
- * it.
+ * The `workspaces` endpoint group: what a person does with a workspace before they are its member,
+ * creating one or accepting an invitation into one. Neither enters a workspace as a member, so
+ * the workspace is in the path where there is one. `create` goes through the gateway's
+ * `createWorkspace` for the authenticated person; any entitlement check is the host's.
+ * `acceptInvitation` is for the invitation's recipient: it enters the workspace without an actor
+ * and calls `InvitationService.accept`, answering `ApiErrors.NotFound` for a workspace never
+ * created. An agent gets `ApiErrors.Denied` from both. A member reads and changes their
+ * workspace's settings through the `settings` group. `WorkspacesHandlers` implements it.
  *
  * @since 0.1.0
  */
-import { Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/workspace";
+import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./Authentication.ts";
 import * as ApiErrors from "./ApiErrors.ts";
 
 /**
- * Workspace creation, settings and renaming, the member-management view, and ownership. Creation
- * entitlement checks belong to the host.
+ * Workspace creation, and joining one by accepting its invitation. Creation entitlement checks
+ * belong to the host.
  *
  * @category models
  * @since 0.1.0
  */
 export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
   .add(
-    HttpApiEndpoint.get("settings", "/:workspaceId/settings", {
-      params: { workspaceId: Workspace.Id },
-      success: WorkspaceSettings.View,
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
-    HttpApiEndpoint.put("rename", "/:workspaceId/name", {
-      params: { workspaceId: Workspace.Id },
-      payload: WorkspaceSettings.RenameInput,
-      success: Workspace.Workspace,
-      error: [...ApiErrors.workspace, ApiErrors.Changed],
-    }),
-    HttpApiEndpoint.get("members", "/:workspaceId/member-management", {
-      params: { workspaceId: Workspace.Id },
-      success: Schema.Array(WorkspaceSettings.MemberEntry),
-      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
-    }),
     HttpApiEndpoint.post("create", "/", {
       headers: ApiErrors.requestKey,
       payload: Workspace.CreateInput,
@@ -48,16 +33,12 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
       }),
       error: [ApiErrors.Denied, ApiErrors.Unavailable, ApiErrors.Uncertain, ApiErrors.Invalid],
     }),
-    HttpApiEndpoint.get("ownership", "/:workspaceId/ownership", {
-      params: { workspaceId: Workspace.Id },
-      success: Ownership.View,
-      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
-    }),
-    HttpApiEndpoint.post("transferOwnership", "/:workspaceId/ownership", {
-      params: { workspaceId: Workspace.Id },
-      payload: Ownership.TransferInput,
-      success: Workspace.Workspace,
-      error: [...ApiErrors.workspace, ...ApiErrors.ownership, ...ApiErrors.delegation],
+    HttpApiEndpoint.post("acceptInvitation", "/:workspaceId/invitations/:invitationId/accept", {
+      params: { workspaceId: Workspace.Id, invitationId: Invitation.Id },
+      // What the recipient wants people in the workspace to call them.
+      payload: Schema.Struct({ name: Member.NewName }),
+      success: Member.Member,
+      error: [...ApiErrors.workspace, ...ApiErrors.delegation],
     }),
   )
   .middleware(Authentication)

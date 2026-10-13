@@ -10,7 +10,7 @@ import {
   ThreadMessage,
 } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useMutation } from "../api/mutation.ts";
+import { useWorkspaceMutation } from "../api/mutation.ts";
 import { useInbox, useInboxPending } from "./reads.ts";
 import { useMarkAllSeen } from "./seen.ts";
 import { toDate } from "./time.ts";
@@ -57,7 +57,7 @@ export function useInboxView(
   const [seenError, setSeenError] = createSignal<WorkspaceFailure>();
   // Opened notifications waiting their turn to be marked seen, one request at a time.
   const queue: string[] = [];
-  const seen = useMutation(markSeen(workspaceId));
+  const seen = useWorkspaceMutation(workspaceId, markSeen);
   async function markOpenedSeen() {
     for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
       const exit = await seen.run(next);

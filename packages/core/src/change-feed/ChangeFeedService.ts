@@ -28,6 +28,7 @@ import * as ChangeFeedSource from "./ChangeFeedSource.ts";
 import * as Signal from "../signal/Signal.ts";
 import * as SignalHub from "../signal/SignalHub.ts";
 import * as CoreError from "../error/CoreError.ts";
+import * as Operation from "../operation/Operation.ts";
 
 /**
  * The change feed for the acting member.
@@ -50,7 +51,7 @@ export class ChangeFeedService extends Context.Service<
       options?: ChangeFeed.WatchOptions,
     ) => Effect.Effect<
       Stream.Stream<ChangeFeed.Message, CoreError.Unavailable>,
-      Authorization.Error | CoreError.Unavailable | Schema.SchemaError,
+      CoreError.Denied | CoreError.Invalid | CoreError.Unavailable,
       Actor.Actor | Scope.Scope
     >;
   }
@@ -195,7 +196,7 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
     return Stream.make(ready).pipe(
       Stream.concat(Stream.merge(updates, happening, { haltStrategy: "left" })),
     );
-  });
+  }, Operation.report);
   return ChangeFeedService.of({ watch });
 });
 

@@ -99,10 +99,12 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   that gives one it can run on. Agents have no toolkits, skills, memory, or schedules, and no
   profile photos. A removed agent's membership cannot be reactivated, as a person's cannot.
 - Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish: a turn
-  job for each agent in each thread. The local host runs them, and prunes handled job requests on an Effect Cluster runner. Several host processes over one
-  database share that work; one that stops answering keeps its workspaces for the takeover time,
-  35 seconds by default. Cluster's socket transport, which delivers job requests between processes
-  at once, is not authenticated and belongs on a private network.
+  job for each agent in each thread. The local host runs them on Effect Cluster and prunes handled
+  job requests. A host process serves the API, runs jobs, or both; several over one database
+  share the jobs, and one that stops answering keeps its workspaces for the takeover time, 35
+  seconds by default. A commit wakes the process that runs each job it requests through a
+  PostgreSQL notice; a notice lost leaves the request to that process's next read, within two
+  seconds. Cluster's socket transport is not authenticated and belongs on a private network.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping
@@ -205,7 +207,7 @@ Discover, the public groups the reader may join, with their member counts; joini
 Private groups show no member count there, since the groups list does not carry one.
 New public groups appear on it live, while renames and member counts of groups the reader is not
 in update when it next loads. The apps read what the reader may do from
-`GET /workspaces/:id/permissions`, which lists workspace-wide permissions only.
+`GET /permissions`, which lists workspace-wide permissions only.
 
 A group's header shows its member stack, which opens Group settings on Members: the reader first as
 "You", then everyone by name. Any member of a team group adds people and agents with the member
@@ -411,22 +413,24 @@ newer projections, which newer hosts must rebuild from the last commit each one 
 whose commit fails because another host changed the live set prepares the workspace again for
 its next request, replaying it; the request that failed returns a conflict to retry. While hosts
 with different sets keep writing one workspace, each such write retires the other set's
-projections again, which then rebuild the commits they missed.
+projections again, which then rebuild the commits they missed. Processes that serve the API and
+processes that run jobs write the same workspaces, so this holds between them too, and a job
+request one stores is decoded by whichever runs the job: deploy every process over one database
+together. Nothing checks this.
 
 ## Commit outcomes and PostgreSQL contention
 
 The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/Binding.ts) returns
 `Store.CommitUncertain` for every failed COMMIT effect, even when a particular database error could
-establish that nothing committed. This over-reports uncertainty. The gateway exposes
-`GatewayErrors.Uncertain` with the commit ID; there is no public HTTP commit-reconciliation
-endpoint. Core and adapters do not retry transaction programs. Creating operations accept a request
+establish that nothing committed. This over-reports uncertainty. Operations report it as
+`CoreError.Uncertain` with the commit ID; there is no public HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction programs. Creating operations accept a request
 key, so their retries return the first result; other operations settle a repeat by their own rules,
 such as `CoreError.Conflict` (`AlreadyEnded`), rather than repeating it.
 
 PostgreSQL's [error mapping](../adapters/storage-postgresql/src/internal/errors.ts) treats lock
 timeouts, serialization failures, and deadlocks, and a log or checkpoint row another writer stored
-first, as contention, `StoreError` (`Contended`), which the gateway reports as retryable; during
-COMMIT they fall under the broad uncertain-outcome mapping above.
+first, as contention, `StoreError` (`Contended`), which operations report as retryable
+`CoreError.Unavailable`; during COMMIT they fall under the broad uncertain-outcome mapping above.
 
 A process's writers to one workspace wait for each other in memory, so they hold at most one
 pooled connection while PostgreSQL makes them wait, and every wait is bounded. Its reads for one
