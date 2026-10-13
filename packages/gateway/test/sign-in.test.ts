@@ -31,7 +31,7 @@ const connectSignIn = (storage: Storage) =>
     const host = yield* storage.connect()
     const context = yield* Layer.build(
       EmailSignIn.layer({ codeKey }).pipe(
-        Layer.provide(Layer.mergeAll(Layer.succeedContext(host), Layer.succeed(EmailSender.EmailSender, emailSender)))
+        Layer.provide([Layer.succeedContext(host), Layer.succeed(EmailSender.EmailSender, emailSender)])
       )
     )
     const signIn = Context.get(context, SignIn.SignIn)

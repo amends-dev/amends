@@ -211,7 +211,7 @@ it.effect("one resolver observes staged journal changes, later role edits, and a
         .pipe(Effect.provideService(Publication.Publication, testProvenance(workspaceId)))
       expect(yield* journal.commit(grantResolver.resolve(memberId))).toEqual([])
     }).pipe(
-      Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
+      Effect.provide([configured(fixture), Log.layer]),
       Effect.provideService(Store.Store, fixture.store),
       Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
       Effect.provideService(RoleStore.RoleStore, fixture.roles),

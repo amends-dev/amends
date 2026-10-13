@@ -204,28 +204,26 @@ const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer
 const groupQuery = GroupQuery.layer
 const groupCommand = GroupCommand.layer
 const threadQuery = ThreadQuery.layer.pipe(
-  Layer.provide(Layer.mergeAll(groupQuery, ThreadActivityResolvers.layer(activityResolvers)))
+  Layer.provide([groupQuery, ThreadActivityResolvers.layer(activityResolvers)])
 )
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery))
-const turnCommand = TurnCommand.layer.pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand)))
-const taskCommand = TaskCommand.layer.pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)))
+const turnCommand = TurnCommand.layer.pipe(Layer.provide([threadQuery, threadCommand]))
+const taskCommand = TaskCommand.layer.pipe(Layer.provide([threadQuery, threadCommand, turnCommand]))
 const channelQuery = ChannelQuery.layer
-const memberCommand = MemberCommand.layer.pipe(Layer.provide(Layer.mergeAll(AssignmentCommand.layer, groupCommand)))
+const memberCommand = MemberCommand.layer.pipe(Layer.provide([AssignmentCommand.layer, groupCommand]))
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
  */
 const changeFeedSource = ChangeFeedSource.layer()
-const changeFeedService = ChangeFeedService.layer.pipe(
-  Layer.provide(Layer.mergeAll(changeFeedSource, GrantResolver.layer))
-)
+const changeFeedService = ChangeFeedService.layer.pipe(Layer.provide([changeFeedSource, GrantResolver.layer]))
 
 /**
  * Application operations, sharing one journal and one authorization check. These
  * are what hosts and protocols call; stores and the journal stay internal.
  */
 const operations = Layer.mergeAll(
-  WorkspaceSettingsService.layer.pipe(Layer.provide(Layer.mergeAll(MemberService.layer, AssignmentService.layer))),
+  WorkspaceSettingsService.layer.pipe(Layer.provide([MemberService.layer, AssignmentService.layer])),
   MemberService.layer,
   InvitationService.layer,
   AssignmentService.layer,
@@ -245,21 +243,19 @@ const operations = Layer.mergeAll(
   AgentService.layer,
   TurnService.layer
 ).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      Delegation.layer,
-      AssignmentCommand.layer,
-      memberCommand,
-      groupQuery,
-      groupCommand,
-      threadQuery,
-      threadCommand,
-      turnCommand,
-      taskCommand,
-      channelQuery,
-      changeFeedSource
-    )
-  )
+  Layer.provide([
+    Delegation.layer,
+    AssignmentCommand.layer,
+    memberCommand,
+    groupQuery,
+    groupCommand,
+    threadQuery,
+    threadCommand,
+    turnCommand,
+    taskCommand,
+    channelQuery,
+    changeFeedSource
+  ])
 )
 
 /**
@@ -268,7 +264,7 @@ const operations = Layer.mergeAll(
  * execution, which a thread's delivery job drives. None is an operation an actor calls.
  */
 const jobServices = Layer.mergeAll(TurnExecution.layer, ChannelIntake.layer, DeliveryExecution.layer).pipe(
-  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand, taskCommand, channelQuery, AgentQuery.layer))
+  Layer.provide([threadQuery, threadCommand, turnCommand, taskCommand, channelQuery, AgentQuery.layer])
 )
 
 /**
@@ -279,7 +275,7 @@ const jobServices = Layer.mergeAll(TurnExecution.layer, ChannelIntake.layer, Del
  * @since 0.1.0
  */
 export const layer = Layer.mergeAll(operations, jobServices).pipe(
-  Layer.provideMerge(Layer.mergeAll(journal, authorization)),
+  Layer.provideMerge([journal, authorization]),
   Layer.provideMerge(PermissionCatalog.layer(permissions))
 )
 

@@ -64,12 +64,10 @@ const acceptingNothing = (ran: (workspaceId: WorkspaceId.WorkspaceId) => void) =
  */
 const turnJobs = (gateway: Gateway.Gateway["Service"], database: ReturnType<typeof LocalHost.layerDatabase>) =>
   Layer.merge(TurnJob.layer, PostgresClusterStorage.layerWakeupListener).pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        Layer.succeed(Gateway.Gateway, gateway),
-        Layer.effect(Integrations.Integrations, Integrations.make([]))
-      )
-    ),
+    Layer.provide([
+      Layer.succeed(Gateway.Gateway, gateway),
+      Layer.effect(Integrations.Integrations, Integrations.make([]))
+    ]),
     Layer.provide(PostgresClusterStorage.layerWakeup),
     Layer.provideMerge(database),
     Layer.provideMerge(BunCrypto.layer)

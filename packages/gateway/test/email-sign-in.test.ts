@@ -31,39 +31,37 @@ const signInOver = (codeKey: Uint8Array) => {
     sent: [] as Array<EmailSender.Message>
   }
   const layer = EmailSignIn.layer({ codeKey: Redacted.make(codeKey) }).pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        Layer.succeed(
-          SignInStorage.SignInStorage,
-          SignInStorage.SignInStorage.of({
-            modifyCode: (_email, decide) =>
-              Effect.sync(() => {
-                const [answer, next] = decide(stored.pending)
-                stored.pending = next
-                return answer
-              }),
-            insertSession: (digest) => Effect.sync(() => void stored.sessionDigests.push(digest)),
-            findSession: () => Effect.succeedNone,
-            extendSession: () => Effect.void,
-            deleteSession: () => Effect.void
-          })
-        ),
-        Layer.succeed(
-          Accounts.Accounts,
-          Accounts.Accounts.of({
-            findOrCreate: (email) => Effect.succeed({ id: Identity.HumanId.make("human-ada"), email }),
-            findByIds: () => Effect.succeed([])
-          })
-        ),
-        Layer.succeed(
-          EmailSender.EmailSender,
-          EmailSender.EmailSender.of({
-            send: (message) => Effect.sync(() => void stored.sent.push(message))
-          })
-        ),
-        Layer.succeed(Crypto.Crypto, webCrypto)
-      )
-    )
+    Layer.provide([
+      Layer.succeed(
+        SignInStorage.SignInStorage,
+        SignInStorage.SignInStorage.of({
+          modifyCode: (_email, decide) =>
+            Effect.sync(() => {
+              const [answer, next] = decide(stored.pending)
+              stored.pending = next
+              return answer
+            }),
+          insertSession: (digest) => Effect.sync(() => void stored.sessionDigests.push(digest)),
+          findSession: () => Effect.succeedNone,
+          extendSession: () => Effect.void,
+          deleteSession: () => Effect.void
+        })
+      ),
+      Layer.succeed(
+        Accounts.Accounts,
+        Accounts.Accounts.of({
+          findOrCreate: (email) => Effect.succeed({ id: Identity.HumanId.make("human-ada"), email }),
+          findByIds: () => Effect.succeed([])
+        })
+      ),
+      Layer.succeed(
+        EmailSender.EmailSender,
+        EmailSender.EmailSender.of({
+          send: (message) => Effect.sync(() => void stored.sent.push(message))
+        })
+      ),
+      Layer.succeed(Crypto.Crypto, webCrypto)
+    ])
   )
   return { stored, layer }
 }

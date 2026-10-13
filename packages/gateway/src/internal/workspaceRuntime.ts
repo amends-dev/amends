@@ -87,15 +87,13 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
   ) {
     const bindings = yield* workspaceStorage.forWorkspace(workspaceId)
     const services = Core.layer.pipe(
-      Layer.provideMerge(
-        Layer.mergeAll(
-          Layer.succeedContext(bindings),
-          Layer.succeed(Crypto.Crypto, crypto),
-          Layer.succeed(TurnJobs.TurnJobs, turnJobs),
-          Layer.succeed(DeliveryJobs.DeliveryJobs, deliveryJobs),
-          Layer.succeed(Integrations.Integrations, integrations)
-        )
-      ),
+      Layer.provideMerge([
+        Layer.succeedContext(bindings),
+        Layer.succeed(Crypto.Crypto, crypto),
+        Layer.succeed(TurnJobs.TurnJobs, turnJobs),
+        Layer.succeed(DeliveryJobs.DeliveryJobs, deliveryJobs),
+        Layer.succeed(Integrations.Integrations, integrations)
+      ]),
       Layer.orDie
     )
     const context = yield* Layer.build(services)

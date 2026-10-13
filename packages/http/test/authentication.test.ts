@@ -67,7 +67,7 @@ it.effect.each(["make", "layer"] as const)(
           HttpServer.layerServices
         ).pipe(
           Layer.provideMerge(authentication),
-          Layer.provide(Layer.mergeAll(directory, accounts, Layer.succeed(SessionTokens.SessionTokens, sessionTokens)))
+          Layer.provide([directory, accounts, Layer.succeed(SessionTokens.SessionTokens, sessionTokens)])
         )
         yield* Effect.gen(function* () {
           const client = yield* HttpApiTest.groups(Api.Api, ["me"])

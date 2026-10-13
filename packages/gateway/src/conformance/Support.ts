@@ -259,7 +259,7 @@ export const core = (bound: Bound) => Core.layer.pipe(Layer.provideMerge(Layer.s
  */
 export const gateway = (host: Context.Context<Fixture.Host>, options: Gateway.Options = {}) =>
   Gateway.layer(options).pipe(
-    Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(host), TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner))
+    Layer.provideMerge([Layer.succeedContext(host), TurnJobs.layerNoRunner, DeliveryJobs.layerNoRunner])
   )
 
 /**
@@ -373,17 +373,15 @@ export const placedIn =
  */
 export const threadInternals = ThreadCommand.layer.pipe(
   Layer.provideMerge(ThreadQuery.layer),
-  Layer.provide(
-    Layer.mergeAll(
-      GroupQuery.layer,
-      ThreadActivityResolvers.layer([
-        ThreadMessageTimeline.resolver,
-        ThreadParticipationTimeline.resolver,
-        TurnTimeline.resolver,
-        TaskTimeline.resolver
-      ])
-    )
-  )
+  Layer.provide([
+    GroupQuery.layer,
+    ThreadActivityResolvers.layer([
+      ThreadMessageTimeline.resolver,
+      ThreadParticipationTimeline.resolver,
+      TurnTimeline.resolver,
+      TaskTimeline.resolver
+    ])
+  ])
 )
 
 /**

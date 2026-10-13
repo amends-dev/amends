@@ -123,24 +123,22 @@ const configured = (
     insert: () => Effect.die("These member tests have no group admissions"),
     markRemoved: () => Effect.die("These member tests have no group admissions")
   })
-  const delegation = Delegation.layer.pipe(Layer.provide(Layer.mergeAll(services, workspace, host)))
+  const delegation = Delegation.layer.pipe(Layer.provide([services, workspace, host]))
   // Keep the journal available to exercise reads inside an outer application commit.
   return MemberService.layer.pipe(
-    Layer.provideMerge(
-      Layer.mergeAll(
-        services,
-        workspace,
-        invitations,
-        groupMemberships,
-        delegation,
-        Layer.succeed(Store.Store, fixture.store),
-        Layer.succeed(GroupCommand.GroupCommand, {
-          admitMember: () => Effect.die("These member tests admit no one to a group"),
-          removeMembership: () => Effect.die("These member tests have no group admissions"),
-          establishDirect: () => Effect.die("These member tests start no direct groups")
-        })
-      )
-    ),
+    Layer.provideMerge([
+      services,
+      workspace,
+      invitations,
+      groupMemberships,
+      delegation,
+      Layer.succeed(Store.Store, fixture.store),
+      Layer.succeed(GroupCommand.GroupCommand, {
+        admitMember: () => Effect.die("These member tests admit no one to a group"),
+        removeMembership: () => Effect.die("These member tests have no group admissions"),
+        establishDirect: () => Effect.die("These member tests start no direct groups")
+      })
+    ]),
     Layer.provide(members)
   )
 }

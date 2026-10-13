@@ -128,14 +128,12 @@ export const makeIntegrations = Effect.fnUntraced(
       yield* HarnessIntegrations.opencode2(opencodeOptions)
     ]
   },
-  Effect.provide(
-    Layer.mergeAll(
-      BunServices.layer,
-      BunSocket.layerWebSocketConstructor,
-      ModelCatalog.layer,
-      Models.layer.pipe(Layer.provideMerge(FetchHttpClient.layer))
-    )
-  )
+  Effect.provide([
+    BunServices.layer,
+    BunSocket.layerWebSocketConstructor,
+    ModelCatalog.layer,
+    Models.layer.pipe(Layer.provideMerge(FetchHttpClient.layer))
+  ])
 )
 
 /**

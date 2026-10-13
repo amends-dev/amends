@@ -1267,16 +1267,14 @@ describe("thread reads", () => {
           } satisfies ThreadActivityResolvers.Resolver)
           // Fresh: core builds its own reader, over only the resolvers core registers.
           const reading = Layer.fresh(ThreadQuery.layer).pipe(
-            Layer.provide(
-              Layer.mergeAll(
-                GroupQuery.layer,
-                ThreadActivityResolvers.layer([
-                  ThreadMessageTimeline.resolver,
-                  ThreadParticipationTimeline.resolver,
-                  resolver
-                ])
-              )
-            ),
+            Layer.provide([
+              GroupQuery.layer,
+              ThreadActivityResolvers.layer([
+                ThreadMessageTimeline.resolver,
+                ThreadParticipationTimeline.resolver,
+                resolver
+              ])
+            ]),
             Layer.provideMerge(core(bound))
           )
           const items = yield* Effect.flatMap(ThreadQuery.ThreadQuery, (threadQuery) =>

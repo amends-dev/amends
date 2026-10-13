@@ -29,12 +29,10 @@ it.effect("a follower whose read fails follows on from its last commit, and nobo
     }).pipe(
       Effect.provide(
         Log.layer.pipe(
-          Layer.provideMerge(
-            Layer.mergeAll(
-              Layer.succeed(Store.Store, fixture.store),
-              Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints)
-            )
-          )
+          Layer.provideMerge([
+            Layer.succeed(Store.Store, fixture.store),
+            Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints)
+          ])
         )
       )
     )

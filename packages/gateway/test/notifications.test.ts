@@ -9,7 +9,7 @@ import { TurnId } from "@amends-dev/core/turn"
 import { Member, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { describe, expect, it } from "@effect/vitest"
-import { Array, Context, DateTime, Effect, Layer, Option } from "effect"
+import { Array, Context, DateTime, Effect, Option } from "effect"
 import { withStorage } from "./fixture.ts"
 import { acceptInvitation, createWorkspace, invite, removeMember } from "./operations.ts"
 import * as Support from "./support.ts"
@@ -670,9 +670,7 @@ describe("notifications", () => {
           )
           yield* b.store.transaction(b.notifications.insert(foreign))
           const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 })
-          const gateway = yield* Gateway.make().pipe(
-            Effect.provide(Layer.mergeAll(layerRecordedTurnJobs, layerRecordedDeliveryJobs))
-          )
+          const gateway = yield* Gateway.make().pipe(Effect.provide([layerRecordedTurnJobs, layerRecordedDeliveryJobs]))
           yield* gateway.asMember(
             workspaceId,
             humanIdentity,

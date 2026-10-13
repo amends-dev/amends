@@ -528,7 +528,7 @@ it.effect("authorization observes transactional changes and protects the mutatio
         reason: { _tag: "InvalidActor", reason: "membership-removed" }
       })
     }).pipe(
-      Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
+      Effect.provide([configured(fixture), Log.layer]),
       Effect.provideService(Store.Store, fixture.store),
       Effect.provideService(Checkpoint.Checkpoint, fixture.checkpoints),
       Effect.provideService(MemberStore.MemberStore, fixture.members),

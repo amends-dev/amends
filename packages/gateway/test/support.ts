@@ -264,7 +264,7 @@ export const boundTo = Effect.fnUntraced(function* (id: WorkspaceId.WorkspaceId)
 /** A gateway over a host, which installs the test integrations, or what `options` say. */
 export const gateway = (host: Context.Context<Host>, options: Gateway.Options = installed) =>
   Gateway.layer(options).pipe(
-    Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(host), layerRecordedTurnJobs, layerRecordedDeliveryJobs))
+    Layer.provideMerge([Layer.succeedContext(host), layerRecordedTurnJobs, layerRecordedDeliveryJobs])
   )
 
 /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */

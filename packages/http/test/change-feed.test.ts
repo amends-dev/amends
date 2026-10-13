@@ -58,19 +58,17 @@ const credentials = Layer.succeed(
   })
 )
 const client = HttpApiTest.groups(Api.Api, ["changeFeed"]).pipe(
-  Effect.provide(
-    Layer.mergeAll(
-      ChangeFeedHandlers.layer.pipe(
-        Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMemberServer.layer)),
-        Layer.provide(Layer.mergeAll(gateway, credentials))
-      ),
-      HttpServer.layerServices,
-      HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
-        next(HttpClientRequest.bearerToken(request, "alice"))
-      ),
-      WorkspaceMember.layerClient(workspaceId)
-    )
-  )
+  Effect.provide([
+    ChangeFeedHandlers.layer.pipe(
+      Layer.provideMerge(Layer.merge(BearerAuthentication.layer, WorkspaceMemberServer.layer)),
+      Layer.provide([gateway, credentials])
+    ),
+    HttpServer.layerServices,
+    HttpApiMiddleware.layerClient(Authentication.Authentication, ({ next, request }) =>
+      next(HttpClientRequest.bearerToken(request, "alice"))
+    ),
+    WorkspaceMember.layerClient(workspaceId)
+  ])
 )
 
 it.effect("a change stream that fails unexpectedly is logged, and its client told only to reconnect", () =>

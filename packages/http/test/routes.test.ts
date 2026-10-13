@@ -432,12 +432,12 @@ const directory = Layer.succeed(
   })
 )
 const services = Layer.mergeAll(
-  Routes.layerHandlers.pipe(Layer.provide(Layer.mergeAll(gateway, signIn, credentials, directory, accounts))),
+  Routes.layerHandlers.pipe(Layer.provide([gateway, signIn, credentials, directory, accounts])),
   HttpServer.layerServices
 )
 const run = <A, E>(token: string, program: (client: Effect.Success<typeof makeClient>) => Effect.Effect<A, E>) =>
   Effect.scoped(Effect.flatMap(makeClient, program)).pipe(
-    Effect.provide(Layer.mergeAll(services, asToken(token), WorkspaceMember.layerClient(workspaceId)))
+    Effect.provide([services, asToken(token), WorkspaceMember.layerClient(workspaceId)])
   )
 const makeClient = HttpApiTest.groups(Api.Api, [
   "session",
@@ -572,7 +572,7 @@ it.effect("a member's request names its workspace in the Amends-Workspace header
         Effect.flatMap(makeClient, (client) =>
           client.members.get({ params: { memberId }, responseMode: "decoded-and-response" })
         )
-      ).pipe(Effect.provide(Layer.mergeAll(services, asToken("alice"), sending(value))))
+      ).pipe(Effect.provide([services, asToken("alice"), sending(value)]))
     calls.length = 0
     for (const value of [undefined, ""])
       expect(yield* Effect.flip(withHeader(value))).toMatchObject({

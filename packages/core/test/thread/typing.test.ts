@@ -96,19 +96,17 @@ const run = <A, E>(
     const result = yield* use(published).pipe(
       Effect.provide(
         ThreadMessageService.layer.pipe(
-          Layer.provide(
-            Layer.mergeAll(
-              Layer.succeed(ThreadQuery.ThreadQuery, threadQuery),
-              Layer.succeed(Authorization.Authorization, authorization),
-              Layer.succeed(SignalHub.SignalHub, signalHub),
-              Layer.succeed(Store.Store, (yield* make(workspaceId)).store),
-              unused(ThreadCommand.ThreadCommand),
-              unused(ReadStateStore.ReadStateStore),
-              unused(ThreadMessageStore.ThreadMessageStore),
-              unused(Journal.Journal),
-              unused(Crypto.Crypto)
-            )
-          )
+          Layer.provide([
+            Layer.succeed(ThreadQuery.ThreadQuery, threadQuery),
+            Layer.succeed(Authorization.Authorization, authorization),
+            Layer.succeed(SignalHub.SignalHub, signalHub),
+            Layer.succeed(Store.Store, (yield* make(workspaceId)).store),
+            unused(ThreadCommand.ThreadCommand),
+            unused(ReadStateStore.ReadStateStore),
+            unused(ThreadMessageStore.ThreadMessageStore),
+            unused(Journal.Journal),
+            unused(Crypto.Crypto)
+          ])
         )
       ),
       Effect.provideService(Actor.Actor, actor)

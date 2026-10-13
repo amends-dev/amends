@@ -108,10 +108,7 @@ export const layerWorkspace = (
   workspaceId: WorkspaceId.WorkspaceId,
   options: Options = {},
   credentialKey: Option.Option<CredentialKey.Cipher> = Option.none()
-) =>
-  layerStores.pipe(
-    Layer.provide(Layer.mergeAll(Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)))
-  )
+) => layerStores.pipe(Layer.provide([Binding.layer(workspaceId, options), CredentialKey.layer(credentialKey)]))
 
 /**
  * One pool, with inexpensive workspace-bound views over it. The stores hold no

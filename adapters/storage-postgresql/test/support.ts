@@ -84,13 +84,11 @@ export const database = (url: string, maxConnections = 4) =>
   Layer.merge(PostgresDatabase.layer({ url: Redacted.make(url), maxConnections }), BunCrypto.layer)
 export const core = (bound: Bound) =>
   Core.layer.pipe(
-    Layer.provideMerge(
-      Layer.mergeAll(
-        Layer.succeedContext(bound.context),
-        BunCrypto.layer,
-        Layer.effect(Integrations.Integrations, Integrations.make([]))
-      )
-    )
+    Layer.provideMerge([
+      Layer.succeedContext(bound.context),
+      BunCrypto.layer,
+      Layer.effect(Integrations.Integrations, Integrations.make([]))
+    ])
   )
 export const inDatabase = <A, E>(
   url: string,

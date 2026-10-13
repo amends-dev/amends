@@ -217,13 +217,11 @@ it.effect("projection defects remain defects and still roll back the publication
     const broken = counter.on(Changed, () => Effect.die(new Error("bug in handler")))
     const live = Journal.layer({ logId: Entry.LogId.make("domain"), projections: [broken] }).pipe(
       Layer.provide(Log.layer),
-      Layer.provide(
-        Layer.mergeAll(
-          Layer.succeed(Store.Store, fixture.store),
-          Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
-          Layer.succeed(Counter, fixture.counter)
-        )
-      )
+      Layer.provide([
+        Layer.succeed(Store.Store, fixture.store),
+        Layer.succeed(Checkpoint.Checkpoint, fixture.checkpoints),
+        Layer.succeed(Counter, fixture.counter)
+      ])
     )
     yield* Effect.gen(function* () {
       const journal = yield* Journal.Journal
