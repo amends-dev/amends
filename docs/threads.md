@@ -247,9 +247,11 @@ documentation is generated from them.
   type that twins a schema, which carries only the tags. A service is a class named after its
   module, `ThreadStore.ThreadStore`, with its methods documented one by one in its shape. The
   categories are `schemas`, `options` for operation inputs and options, `models` for types that
-  are not schemas, `errors`, `services`, `constructors`, `layers`, `utils`, `facts`,
-  `projections`, `permissions`, `kinds` for activity kinds, and `testing` for a conformance suite
-  and its fixture.
+  are not schemas, `errors`, `services`, `constructors`, `layers`, `facts`, `projections`,
+  `permissions`, `kinds` for activity kinds, and `testing` for a conformance suite, its fixture, and
+  their support. Any other export takes the category Effect gives its kind, never `utils`:
+  `guards` and `predicates`, `getters`, `constants`, `converting`, `decoding`, `validation` for a
+  schema filter, `combinators`, `error handling`, or `providing services`.
 - **Examples** where a reader would otherwise have to find a caller: `**Example** (Title)` and a
   ```ts block, formatted at the repository's print width, verified by extraction as
   [publishing](publishing.md) describes.
