@@ -8,8 +8,6 @@
  * meanwhile, each as `SessionLogStore.Overtaken`, and it then notifies readers waiting through
  * `PostgresNotices`, in every process. Every statement is scoped to the binding's workspace and
  * runs under its `guard`.
- *
- * @since 0.1.0
  */
 
 import { Store, StoreError } from "@amends-dev/core/journal"
@@ -22,10 +20,10 @@ import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { isConstraintViolation } from "./internal/errors.ts"
-import { sessionLogEntries } from "./internal/schema.ts"
-import * as PostgresNotices from "./PostgresNotices.ts"
+import * as PostgresNotices from "../PostgresNotices.ts"
+import * as Binding from "./binding.ts"
+import { isConstraintViolation } from "./errors.ts"
+import { sessionLogEntries } from "./schema.ts"
 
 const EntryJson = Schema.toCodecJson(SessionLog.Entry)
 const encodeEntry = Schema.encodeEffect(EntryJson)
@@ -60,9 +58,6 @@ const recordedOf = ({ position, recordedAt, kind, turnId, details }: Row) => ({
 /**
  * Each participation's session log in the workspace's database. Its statements run apart from any
  * commit the caller is in, each on its own, since the log takes part in none.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard, pollInterval } = yield* Binding.Binding
@@ -143,8 +138,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `SessionLogStore.SessionLogStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(SessionLogStore.SessionLogStore, make)

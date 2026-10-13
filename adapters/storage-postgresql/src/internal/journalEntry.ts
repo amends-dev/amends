@@ -4,8 +4,6 @@
  * binary payload; an entry of a log without facts leaves them null. The provenance's workspace is
  * the row's, so it is not stored again. `Journal` writes entries with `toColumns` and reads them
  * with `columns` and `decodeRows`.
- *
- * @since 0.1.0
  */
 
 import { Performer } from "@amends-dev/core/identity"
@@ -15,13 +13,10 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
-import { logEntries } from "./internal/schema.ts"
+import { logEntries } from "./schema.ts"
 
 /**
  * The `log_entries` columns a read selects, named as `decodeRows` expects them.
- *
- * @category utils
- * @since 0.1.0
  */
 export const columns = {
   id: logEntries.id,
@@ -109,9 +104,6 @@ const Row = Schema.Struct({
 /**
  * Decode rows selected with `columns` as `Store.Entry` values of `workspaceId`, failing on a row
  * whose fact header is incomplete or whose performer or cause is malformed.
- *
- * @category utils
- * @since 0.1.0
  */
 export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
   workspaceId: WorkspaceId.WorkspaceId,
@@ -165,9 +157,6 @@ export const decodeRows = Effect.fn("JournalEntry.decodeRows")(function* (
  * The header columns of an entry's content: its fact's subject, name, version, and provenance, or
  * nulls for content without a fact. Call only after validating the complete content and its
  * workspace binding, since the provenance's workspace is not stored.
- *
- * @category utils
- * @since 0.1.0
  */
 export const toColumns = (entry: Store.Content) => {
   const provenance = entry.fact?.provenance

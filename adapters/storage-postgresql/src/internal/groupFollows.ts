@@ -7,8 +7,6 @@
  * exactly the addressed follow active. Every statement is scoped to the binding's workspace and
  * runs under its `guard`, which lets a read join the caller's transaction and requires one for a
  * write.
- *
- * @since 0.1.0
  */
 
 import { GroupFollow, GroupFollowStore } from "@amends-dev/core/group"
@@ -19,10 +17,10 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { storeError } from "./internal/errors.ts"
-import { inIds } from "./internal/id-list.ts"
-import { groupFollows } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import { storeError } from "./errors.ts"
+import { inIds } from "./id-list.ts"
+import { groupFollows } from "./schema.ts"
 
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -37,9 +35,6 @@ const decode = Schema.decodeUnknownEffect(
 /**
  * Builds the group follow store for the binding's workspace: this module's driver inside
  * `GroupFollowStore.make`, which checks every input first.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -129,8 +124,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `GroupFollowStore.GroupFollowStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(GroupFollowStore.GroupFollowStore, make)

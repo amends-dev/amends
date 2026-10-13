@@ -6,8 +6,6 @@
  * process's other writers to the workspace in `PostgresTurns`, then for a pooled connection and the
  * workspace's advisory lock, all within `lockTimeout`; a standalone append waits for its log's
  * writers instead. `Journal` builds the journal's transactions and standalone appends on it.
- *
- * @since 0.1.0
  */
 
 import { Commit, Store, type Entry, StoreError } from "@amends-dev/core/journal"
@@ -24,16 +22,13 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import type * as SqlError from "effect/sql/SqlError"
-import { isContention } from "./internal/errors.ts"
-import * as PostgresDatabase from "./PostgresDatabase.ts"
-import * as PostgresNotices from "./PostgresNotices.ts"
+import * as PostgresDatabase from "../PostgresDatabase.ts"
+import * as PostgresNotices from "../PostgresNotices.ts"
+import { isContention } from "./errors.ts"
 
 /**
  * The host's limits on a workspace's transactions and on its statements outside them, each with a
  * default. `PostgresStorage.layer` takes them, and `settings` checks them when the host starts.
- *
- * @category options
- * @since 0.1.0
  */
 export interface Options {
   /**
@@ -71,9 +66,6 @@ export interface Options {
 
 /**
  * The options with their defaults applied, each duration a whole number of milliseconds.
- *
- * @category models
- * @since 0.1.0
  */
 export interface Settings {
   readonly lockTimeout: Duration.Duration
@@ -87,9 +79,6 @@ export interface Settings {
  * Apply the defaults and check the options, dying on any out of range. PostgreSQL reads a timeout
  * of zero as none, so every duration must be finite and at least a millisecond, and the statement
  * timeout at least the lock timeout, since taking the lock is a statement.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const settings = (options: Options = {}): Effect.Effect<Settings> =>
   Effect.gen(function* () {
@@ -117,18 +106,12 @@ export const settings = (options: Options = {}): Effect.Effect<Settings> =>
 /**
  * The `Store.Transaction` handle a session gives its program: the commit's ID, its appends, and
  * `afterCommit`. `Journal` builds one for each session the binding opens.
- *
- * @category models
- * @since 0.1.0
  */
 export type TransactionHandle = Context.Service.Shape<typeof Store.Transaction>
 
 /**
  * One open native transaction, closed when its program ends: what `CurrentTransaction` holds while
  * the program runs, and what `Journal` stages its appends against.
- *
- * @category models
- * @since 0.1.0
  */
 export interface TransactionState {
   /** The database the transaction runs on; a binding over another database refuses it. */
@@ -153,9 +136,6 @@ export interface TransactionState {
 /**
  * Ask for `effect` to run once the session's transaction commits, as `Store.Transaction`'s
  * `afterCommit` does; a closed session's handle is expired.
- *
- * @category utils
- * @since 0.1.0
  */
 export const afterCommit = (session: TransactionState, effect: Effect.Effect<void>) =>
   Effect.suspend(() => {
@@ -167,21 +147,15 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
 
 /**
  * The session a program runs under; statements check it against their own binding.
- *
- * @category services
- * @since 0.1.0
  */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
-  "@amends-dev/storage-postgresql/Binding/CurrentTransaction"
+  "@amends-dev/storage-postgresql/internal/binding/CurrentTransaction"
 ) {}
 
 /**
  * One workspace's view of the database, which every store module in this adapter is built over.
  * `make` builds it for a workspace, and `layer` provides it to the stores
  * `PostgresWorkspaceStorage.layerWorkspace` merges.
- *
- * @category services
- * @since 0.1.0
  */
 export class Binding extends Context.Service<
   Binding,
@@ -214,7 +188,7 @@ export class Binding extends Context.Service<
       options?: { readonly log?: Entry.LogId }
     ) => Effect.Effect<A, E | StoreError.StoreError | Store.CommitUncertain, Exclude<R, Store.Transaction>>
   }
->()("@amends-dev/storage-postgresql/Binding") {}
+>()("@amends-dev/storage-postgresql/internal/binding") {}
 
 /** Contention is worth retrying; anything else failed the transaction. */
 const transactionError = (cause: SqlError.SqlError) =>
@@ -229,9 +203,6 @@ const isCommitted = Schema.is(Schema.Struct({ command: Schema.Literal("COMMIT") 
  * Construct one workspace binding over the caller's database, naming each commit with the
  * caller's `Crypto.Crypto`; transactions are resolved per operation. Dies on options `settings`
  * refuses.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.fnUntraced(function* (workspaceId: WorkspaceId.WorkspaceId, options: Options = {}) {
   const postgresDatabase = yield* PostgresDatabase.PostgresDatabase
@@ -423,9 +394,6 @@ export const make = Effect.fnUntraced(function* (workspaceId: WorkspaceId.Worksp
 
 /**
  * Provides the binding for one workspace over the caller's `PostgresDatabase.PostgresDatabase`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = (workspaceId: WorkspaceId.WorkspaceId, options: Options = {}) =>
   Layer.effect(Binding, make(workspaceId, options))

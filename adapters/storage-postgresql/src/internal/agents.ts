@@ -7,8 +7,6 @@
  * membership, each rejected, and an update that finds no row is rejected. Every
  * statement is scoped to the binding's workspace and runs under its `guard`, which lets a read join
  * the caller's transaction and requires one for a write.
- *
- * @since 0.1.0
  */
 
 import { Agent, AgentStore } from "@amends-dev/core/agent"
@@ -20,9 +18,9 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { storeError } from "./internal/errors.ts"
-import { agents } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import { storeError } from "./errors.ts"
+import { agents } from "./schema.ts"
 
 type Row = typeof agents.$inferSelect
 
@@ -67,9 +65,6 @@ const toRow = (record: Agent.Agent): typeof agents.$inferInsert => ({
 /**
  * Builds the agent store for the binding's workspace: this module's driver inside
  * `AgentStore.make`, which checks every input first.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -107,8 +102,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `AgentStore.AgentStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(AgentStore.AgentStore, make)

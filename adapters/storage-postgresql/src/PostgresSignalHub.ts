@@ -11,7 +11,7 @@
 import { SignalHub } from "@amends-dev/core/signal"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as Binding from "./Binding.ts"
+import * as Binding from "./internal/binding.ts"
 
 /**
  * The workspace's signals, between every process over the same database, relayed with `NOTIFY`

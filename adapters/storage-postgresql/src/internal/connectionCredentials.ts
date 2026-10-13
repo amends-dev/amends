@@ -9,8 +9,6 @@
  * setting or reading a credential is `Unavailable`. Every statement is scoped to the binding's
  * workspace and runs under its `guard`, which lets a read join the caller's transaction and
  * requires one for a write.
- *
- * @since 0.1.0
  */
 
 import { Connection } from "@amends-dev/connection"
@@ -23,9 +21,9 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import * as CredentialKey from "./CredentialKey.ts"
-import { connectionCredentials } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import * as CredentialKey from "./credentialKey.ts"
+import { connectionCredentials } from "./schema.ts"
 
 const unavailable = new CoreError.Unavailable({
   reason: new CoreError.CredentialsUnavailable({
@@ -41,9 +39,6 @@ const decodeCredential = Schema.decodeEffect(CredentialJson)
  * Builds the credential store for the binding's workspace: this module's driver inside
  * `ConnectionCredentialStore.make`, which checks every input first. Without a key, storing or
  * reading a credential is `Unavailable`.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -98,8 +93,5 @@ export const make = Effect.gen(function* () {
 /**
  * Provides `ConnectionCredentialStore.ConnectionCredentialStore` over the caller's
  * `Binding.Binding` and `CredentialKey.CredentialKey`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(ConnectionCredentialStore.ConnectionCredentialStore, make)

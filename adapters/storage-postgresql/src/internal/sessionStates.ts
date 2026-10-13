@@ -7,8 +7,6 @@
  * joining the commit that ends the turn. Every statement is scoped to the binding's workspace and
  * runs under its `guard`, which lets a read join the caller's transaction and requires one for a
  * write.
- *
- * @since 0.1.0
  */
 
 import { StoreError } from "@amends-dev/core/journal"
@@ -19,8 +17,8 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { sessionStates } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import { sessionStates } from "./schema.ts"
 
 const decodeSaved = Schema.decodeUnknownEffect(SessionStateStore.Saved)
 
@@ -52,9 +50,6 @@ const agentStateColumn = (agentState: Schema.Json | undefined) =>
 /**
  * Each participation's harness session in the workspace's database; writes join the commit that
  * ends the turn.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -103,8 +98,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `SessionStateStore.SessionStateStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(SessionStateStore.SessionStateStore, make)

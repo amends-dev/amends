@@ -4,8 +4,6 @@
  * credential it was stored as. `PostgresWorkspaceStorage.make` imports the key from the host's
  * `credentialKey` option once, failing the host's start on a malformed one, and provides it to
  * every workspace's `ConnectionCredentials` store as `CredentialKey`.
- *
- * @since 0.1.0
  */
 
 import * as Context from "effect/Context"
@@ -18,9 +16,6 @@ import * as Redacted from "effect/Redacted"
 
 /**
  * The key is malformed, or a secret failed to seal or open.
- *
- * @category errors
- * @since 0.1.0
  */
 export class Failure extends Data.TaggedError("CredentialKey.Failure")<{
   readonly message: string
@@ -30,9 +25,6 @@ export class Failure extends Data.TaggedError("CredentialKey.Failure")<{
 /**
  * The imported key, which seals a secret and opens it again. A sealed value is text: a version
  * tag, the nonce, and the ciphertext.
- *
- * @category models
- * @since 0.1.0
  */
 export interface Cipher {
   /** Seal `secret`, bound to `binding`: only the same binding opens it. */
@@ -43,12 +35,9 @@ export interface Cipher {
 
 /**
  * The host's credential key, when it configured one; none means the host stores no credentials.
- *
- * @category services
- * @since 0.1.0
  */
 export class CredentialKey extends Context.Service<CredentialKey, Option.Option<Cipher>>()(
-  "@amends-dev/storage-postgresql/CredentialKey"
+  "@amends-dev/storage-postgresql/internal/credentialKey"
 ) {}
 
 const version = "v1"
@@ -62,9 +51,6 @@ const bytesOf = (base64: string, message: string) =>
 
 /**
  * Import a base64-encoded 32-byte key, failing for anything else.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.fnUntraced(function* (key: Redacted.Redacted<string>) {
   const raw = yield* bytesOf(Redacted.value(key), "The credential key must be base64")
@@ -107,8 +93,5 @@ export const make = Effect.fnUntraced(function* (key: Redacted.Redacted<string>)
 
 /**
  * Provides `CredentialKey` with the key the host imported, or none.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = (key: Option.Option<Cipher>) => Layer.succeed(CredentialKey, key)

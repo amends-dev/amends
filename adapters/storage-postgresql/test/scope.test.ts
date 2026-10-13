@@ -4,7 +4,7 @@ import { ThreadId } from "@amends-dev/core/thread"
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { expect, it } from "@effect/vitest"
 import { Schema } from "effect"
-import * as ScopeColumns from "../src/ScopeColumns.ts"
+import * as ScopeColumns from "../src/internal/scopeColumns.ts"
 
 const workspaceId = WorkspaceId.WorkspaceId.make("workspace")
 const decode = Schema.decodeUnknownOption(Scope.Scope)

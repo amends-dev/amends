@@ -8,8 +8,6 @@
  * the addressed participation active. A departure from a group ends every participation of the
  * admission in one statement. Every statement is scoped to the binding's workspace and runs under
  * its `guard`, which lets a read join the caller's transaction and requires one for a write.
- *
- * @since 0.1.0
  */
 
 import { StoreError } from "@amends-dev/core/journal"
@@ -20,10 +18,10 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { storeError } from "./internal/errors.ts"
-import { inIds } from "./internal/id-list.ts"
-import { threadParticipations } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import { storeError } from "./errors.ts"
+import { inIds } from "./id-list.ts"
+import { threadParticipations } from "./schema.ts"
 const validate = Schema.decodeEffect(Schema.toType(ThreadParticipation.ThreadParticipation))
 const decode = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -83,9 +81,6 @@ const decodeRows = (rows: ReadonlyArray<Row>) =>
 /**
  * Builds the participation store for the binding's workspace: this module's driver inside
  * `ThreadParticipationStore.make`, which checks every input first.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -229,8 +224,5 @@ export const make = Effect.gen(function* () {
 })
 /**
  * Provides `ThreadParticipationStore.ThreadParticipationStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(ThreadParticipationStore.ThreadParticipationStore, make)

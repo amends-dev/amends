@@ -21,7 +21,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
+import * as Binding from "./internal/binding.ts"
 import * as PostgresDatabase from "./PostgresDatabase.ts"
 import * as PostgresNotices from "./PostgresNotices.ts"
 

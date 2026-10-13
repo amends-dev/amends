@@ -8,8 +8,6 @@
  * identity's pending invitations across workspaces. Every statement is scoped to the binding's
  * workspace and runs under its `guard`, which lets a read join the caller's transaction and
  * requires one for a write.
- *
- * @since 0.1.0
  */
 
 import { StoreError } from "@amends-dev/core/journal"
@@ -20,10 +18,10 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { storeError } from "./internal/errors.ts"
-import { invitations } from "./internal/schema.ts"
-import type * as PostgresDatabase from "./PostgresDatabase.ts"
+import type * as PostgresDatabase from "../PostgresDatabase.ts"
+import * as Binding from "./binding.ts"
+import { storeError } from "./errors.ts"
+import { invitations } from "./schema.ts"
 
 type InvitationRow = typeof invitations.$inferSelect
 
@@ -61,9 +59,6 @@ const decode = Schema.decodeUnknownEffect(Schema.Array(Invitation.Invitation))
 /**
  * Read the invitations `where` selects, in `order`, decoded as records. The store scopes it to its
  * workspace; `PostgresDirectory` reads one recipient's across workspaces.
- *
- * @category utils
- * @since 0.1.0
  */
 export const select = (
   db: PostgresDatabase.PostgresDatabase["Service"]["db"],
@@ -80,9 +75,6 @@ export const select = (
 /**
  * Builds the invitation store for the binding's workspace: this module's driver inside
  * `InvitationStore.make`, which checks every input first.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -145,8 +137,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `InvitationStore.InvitationStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(InvitationStore.InvitationStore, make)

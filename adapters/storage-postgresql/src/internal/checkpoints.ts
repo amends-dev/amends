@@ -8,8 +8,6 @@
  * its lock, so a read followed by `set` cannot interleave with another runner's. Every statement
  * is scoped to the binding's workspace and runs under its `guard`, which lets a read join the
  * caller's transaction and requires one for a write; failures are the journal store's.
- *
- * @since 0.1.0
  */
 
 import { Checkpoint, StoreError } from "@amends-dev/core/journal"
@@ -18,16 +16,13 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { raceError } from "./internal/errors.ts"
-import { checkpoints, liveProjections } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import { raceError } from "./errors.ts"
+import { checkpoints, liveProjections } from "./schema.ts"
 
 /**
  * Builds the checkpoint store for the binding's workspace: this module's driver inside
  * `Checkpoint.make`, which checks every input first.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -115,8 +110,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `Checkpoint.Checkpoint` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(Checkpoint.Checkpoint, make)

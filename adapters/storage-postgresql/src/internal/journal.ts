@@ -9,8 +9,6 @@
  * keeps: a key reused with different content, a log that moved past `expectedAfter`, and
  * contention, each a `StoreError.StoreError`. A commit that appended notifies once it commits,
  * waking `waitForAppend` in every process; the binding's poll interval covers a lost notice.
- *
- * @since 0.1.0
  */
 
 import { Commit, Entry, Occurrence, Store, StoreError } from "@amends-dev/core/journal"
@@ -23,12 +21,12 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { isContention, raceError } from "./internal/errors.ts"
-import { insertChunked } from "./internal/parameters.ts"
-import { commits, logAppendKeys, logBatches, logEntries } from "./internal/schema.ts"
-import * as JournalEntry from "./JournalEntry.ts"
-import * as PostgresNotices from "./PostgresNotices.ts"
+import * as PostgresNotices from "../PostgresNotices.ts"
+import * as Binding from "./binding.ts"
+import { isContention, raceError } from "./errors.ts"
+import * as JournalEntry from "./journalEntry.ts"
+import { insertChunked } from "./parameters.ts"
+import { commits, logAppendKeys, logBatches, logEntries } from "./schema.ts"
 
 const BatchHeaderRow = Schema.Struct({
   logId: Entry.LogId,
@@ -77,9 +75,6 @@ const copyReceipt = (receipt: Store.AppendReceipt): Store.AppendReceipt =>
 /**
  * Builds the journal store for the binding's workspace: appends inside a transaction, reads of
  * committed batches, and waiting, inside `Store.make`, which checks every input first.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard, transaction, pollInterval } = yield* Binding.Binding
@@ -538,8 +533,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `Store.Store` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(Store.Store, make)

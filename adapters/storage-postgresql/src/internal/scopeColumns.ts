@@ -3,19 +3,14 @@
  * one ID column for each kind of target, of which only the target's own is set, as the
  * `assignments_scope_agrees` check requires. The scope's workspace is the row's, so it is not
  * stored again. `Assignments` writes a scope with `encode` and reads it back with `decode`.
- *
- * @since 0.1.0
  */
 
 import { Scope, Target } from "@amends-dev/core/authorization"
 import type { WorkspaceId } from "@amends-dev/core/workspace"
-import type { scopeKinds, targetKinds } from "./internal/schema.ts"
+import type { scopeKinds, targetKinds } from "./schema.ts"
 
 /**
  * Columns encoding an assignment's scope without dropping variant information.
- *
- * @category models
- * @since 0.1.0
  */
 export interface Columns {
   readonly scopeKind: (typeof scopeKinds)[number]
@@ -54,9 +49,6 @@ const target = (
 /**
  * The columns of a scope. The scope's workspace is the row's, so only the shape and target
  * survive.
- *
- * @category utils
- * @since 0.1.0
  */
 export const encode = (scope: Scope.Scope): Columns =>
   Scope.Scope.match(scope, {
@@ -82,9 +74,6 @@ const onlySet = (columns: Columns, kept?: TargetIdColumn) =>
 /**
  * The encoded form of a scope, in the row's workspace, to be validated with the record it belongs
  * to; columns that agree with no scope give `undefined`, which that validation refuses.
- *
- * @category utils
- * @since 0.1.0
  */
 export const decode = (workspaceId: WorkspaceId.WorkspaceId, columns: Columns): unknown => {
   if (columns.scopeKind === "Workspace")

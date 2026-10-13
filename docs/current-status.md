@@ -420,7 +420,7 @@ together. Nothing checks this.
 
 ## Commit outcomes and PostgreSQL contention
 
-The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/Binding.ts) returns
+The [PostgreSQL transaction binding](../adapters/storage-postgresql/src/internal/binding.ts) returns
 `Store.CommitUncertain` for every failed COMMIT effect, even when a particular database error could
 establish that nothing committed. This over-reports uncertainty. Operations report it as
 `CoreError.Uncertain` with the commit ID; there is no public HTTP commit-reconciliation endpoint. Core and adapters do not retry transaction programs. Creating operations accept a request
@@ -440,7 +440,7 @@ outside a transaction have no statement timeout.
 
 ## PostgreSQL isolation
 
-The [binding](../adapters/storage-postgresql/src/Binding.ts) uses plain `BEGIN`,
+The [binding](../adapters/storage-postgresql/src/internal/binding.ts) uses plain `BEGIN`,
 then takes a transaction-scoped advisory lock for the workspace, and one for each log a
 commit touches; a standalone append takes only its log's. It does not pin the isolation
 level. The locks serialize cooperating writers, but the connection's isolation default still

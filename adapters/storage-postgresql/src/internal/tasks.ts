@@ -7,8 +7,6 @@
  * applying a change is a conditional update rejected unless the task holds the value the
  * change replaces. Every statement is scoped to the binding's workspace and runs under its
  * `guard`, which lets a read join the caller's transaction and requires one for a write.
- *
- * @since 0.1.0
  */
 
 import { StoreError } from "@amends-dev/core/journal"
@@ -21,10 +19,10 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { storeError } from "./internal/errors.ts"
-import { inIds } from "./internal/id-list.ts"
-import { tasks } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import { storeError } from "./errors.ts"
+import { inIds } from "./id-list.ts"
+import { tasks } from "./schema.ts"
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ...Task.Task.fields, createdAt: Schema.DateTimeUtcFromDate }))
 )
@@ -57,9 +55,6 @@ const changeColumns = Task.Change.match<{ readonly set: Partial<Insert>; readonl
 /**
  * Builds the task store for the binding's workspace: this module's driver inside
  * `TaskStore.make`, which checks every input first.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -134,8 +129,5 @@ export const make = Effect.gen(function* () {
 })
 /**
  * Provides `TaskStore.TaskStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(TaskStore.TaskStore, make)

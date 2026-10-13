@@ -8,8 +8,6 @@
  * without a transaction. Every statement is scoped to the binding's workspace and runs under its
  * `guard`; a write joins the caller's transaction when there is one and otherwise commits on its
  * own, without the workspace's lock.
- *
- * @since 0.1.0
  */
 
 import { StoreError } from "@amends-dev/core/journal"
@@ -19,10 +17,10 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Binding from "./Binding.ts"
-import { storeError } from "./internal/errors.ts"
-import { inIds } from "./internal/id-list.ts"
-import { groupReadTimes, notificationSeen, threadReadPositions } from "./internal/schema.ts"
+import * as Binding from "./binding.ts"
+import { storeError } from "./errors.ts"
+import { inIds } from "./id-list.ts"
+import { groupReadTimes, notificationSeen, threadReadPositions } from "./schema.ts"
 
 const decodePositions = Schema.decodeUnknownEffect(Schema.Array(ReadState.ThreadPosition))
 const decodeGroups = Schema.decodeUnknownEffect(
@@ -33,9 +31,6 @@ const decodeGroups = Schema.decodeUnknownEffect(
  * Private read state in plain columns. Writes are single upserts that keep the later value; they
  * join the caller's transaction when there is one and otherwise commit on their own, without the
  * workspace lock that orders journal commits.
- *
- * @category constructors
- * @since 0.1.0
  */
 export const make = Effect.gen(function* () {
   const { workspaceId, database, guard } = yield* Binding.Binding
@@ -123,8 +118,5 @@ export const make = Effect.gen(function* () {
 
 /**
  * Provides `ReadStateStore.ReadStateStore` over the caller's `Binding.Binding`.
- *
- * @category layers
- * @since 0.1.0
  */
 export const layer = Layer.effect(ReadStateStore.ReadStateStore, make)

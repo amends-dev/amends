@@ -17,8 +17,8 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import * as Invitations from "./internal/invitations.ts"
 import { invitations, members, workspaces } from "./internal/schema.ts"
-import * as Invitations from "./Invitations.ts"
 import * as PostgresDatabase from "./PostgresDatabase.ts"
 
 const Membership = Schema.Struct({

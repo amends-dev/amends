@@ -268,20 +268,20 @@ transaction-pooling proxy, leaves the request to the runner's next read.
 
 ## Layout
 
-One module per store, each exporting `make` and a `layer` for the core store it implements, such as
-`Members.ts`, `Threads.ts`, `TurnRecords.ts`, `SessionLogs.ts`, and `Deliveries.ts`. They share
-`Binding.ts`, one workspace's view of the database: its identity, the transaction boundary, and the
-guard each statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a binding
+The package exports the `Postgres*` modules; the rest is under `src/internal/`. There, one module
+per store exports `make` and a `layer` for the core store it implements, such as `members.ts`,
+`threads.ts`, `turnRecords.ts`, `sessionLogs.ts`, and `deliveries.ts`. They share `binding.ts`, one
+workspace's view of the database: its identity, the transaction boundary, and the guard each
+statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a binding
 for one workspace (`layerWorkspace`), its private `layerStores` registers each store, and
 `PostgresStorage.ts` is the adapter: every gateway contract it implements, in one layer.
 `PostgresDatabase.ts` prepares the SQL client, `PostgresDirectory.ts` reads across workspaces,
 `internal/schema.ts` holds the tables, `PostgresNotices.ts` is the pool's notification listener
 that `PostgresSignalHub.ts` binds to each workspace, `PostgresTurns.ts` and `PostgresReads.ts` are
-the writer queue and read cap above, `CredentialKey.ts` seals credentials, `PostgresAccounts.ts`
+the writer queue and read cap above, `internal/credentialKey.ts` seals credentials, `PostgresAccounts.ts`
 and `PostgresSignInStorage.ts` keep the host's accounts and sign-in, and
 `PostgresClusterStorage.ts` is Cluster over this database: the upkeep of its tables and the
-wakeup for the job requests commits store. Bindings and raw tables stay
-internal.
+wakeup for the job requests commits store.
 Follow the [adapter conventions](../README.md).
 
 ## Development
