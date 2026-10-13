@@ -89,7 +89,7 @@ export interface Options {
  * The ways email sign-in offers: email codes alone, since identity providers come with their own
  * sign-in.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const methods: SignIn.Methods = { emailCode: true, providers: [] }
@@ -99,7 +99,7 @@ export const methods: SignIn.Methods = { emailCode: true, providers: [] }
  * `resendAfter` of the last, nor past `sendsPerAddress` in the window. `start` applies it through
  * `SignInStorage.modifyCode`.
  *
- * @category utils
+ * @category decisions
  * @since 0.1.0
  */
 export const decideSend = (
@@ -131,7 +131,7 @@ export const decideSend = (
  * The address's pending code once a send of the code with `digest` failed: as it was before that
  * send, unless another send has replaced it since.
  *
- * @category utils
+ * @category decisions
  * @since 0.1.0
  */
 export const withdrawUnsent = (
@@ -147,7 +147,7 @@ export const withdrawUnsent = (
  * `maximumFailedAttempts` but stays, so the address's sends are still counted. `complete` applies
  * it through `SignInStorage.modifyCode`.
  *
- * @category utils
+ * @category decisions
  * @since 0.1.0
  */
 export const decideRedeem = (
@@ -176,7 +176,7 @@ export const decideRedeem = (
  * `sessionMaximum` from its start, and at most once each `sessionRenewal`. Resolving a token
  * applies it.
  *
- * @category utils
+ * @category decisions
  * @since 0.1.0
  */
 export const renewalOf = (

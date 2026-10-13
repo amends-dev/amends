@@ -157,7 +157,7 @@ export type State = typeof State.Type
  * Only people see their notifications; only an agent's are accepted by a turn, and only a
  * contact's by a delivery. `Notification` holds every notification to this.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const fitsRecipient = (recipient: Recipient, state: State) =>

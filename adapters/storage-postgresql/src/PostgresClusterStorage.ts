@@ -45,7 +45,7 @@ export class AddressTaken extends Schema.TaggedError<AddressTaken>()("PostgresCl
  * Messages not yet handled stay, however old, as do other entity types' messages. Each statement
  * removes at most `batch` messages (a thousand by default), so each stays short.
  *
- * @category utils
+ * @category utilities
  * @since 0.1.0
  */
 export const prune = Effect.fn("PostgresClusterStorage.prune")(function* (
@@ -81,7 +81,7 @@ export const prune = Effect.fn("PostgresClusterStorage.prune")(function* (
  * closes or, if the process dies, when PostgreSQL ends its session, so a restart after a crash
  * can take the address at once. Fails with `AddressTaken` while another process holds it.
  *
- * @category utils
+ * @category resource management
  * @since 0.1.0
  */
 export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(function* (address: string) {

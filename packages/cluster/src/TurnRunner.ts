@@ -82,7 +82,7 @@ export class RunFailed extends Data.TaggedError("TurnRunner.RunFailed")<{
  * The drafts of the response `responseId`: the text each text part of `step` has past what
  * `shown` holds, by the part's position. `advance` shows them as the step grows.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const newDrafts = (
@@ -185,7 +185,7 @@ const stepId = (openedAt: number, index: number) => `${openedAt}.${index}`
  * joins the step being written, whose text is shown as drafts when it ends, and at most every
  * `draftInterval` milliseconds as it grows; an error the agent reports fails the turn.
  *
- * @category utils
+ * @category folding
  * @since 0.1.0
  */
 export const advance = (run: Run, progress: Progress, part: StreamPart.StreamPart, now: number): Advance => {

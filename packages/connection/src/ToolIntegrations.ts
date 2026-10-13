@@ -166,7 +166,7 @@ export const openApi = Effect.map(HttpClient.HttpClient, (client) => {
  * The address `url` names, which may be a path that follows the address of the document at `base`,
  * as a document may name its server.
  *
- * @category utils
+ * @category utilities
  * @since 0.1.0
  */
 export const resolveUrl = (url: string, base: string) => {

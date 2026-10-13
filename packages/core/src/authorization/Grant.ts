@@ -69,7 +69,7 @@ export const make = (permission: Permission.Definition, scope: Scope.Scope): Gra
  * Whether any of these grants allows a requirement: its permission, in a scope covering its
  * target.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const anyCovers = (grants: ReadonlyArray<Grant>, requirement: Requirement.Requirement) =>

@@ -84,7 +84,7 @@ export interface Channel extends Schema.Schema.Type<typeof Channel> {}
 /**
  * The record with some fields changed.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const change = (record: Channel, changes: Partial<Channel>): Channel => Object.assign({}, record, changes)

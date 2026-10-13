@@ -162,7 +162,7 @@ export interface Agent extends Schema.Schema.Type<typeof Agent> {}
 /**
  * The record with some fields changed, as a new record; the one given is left as it is.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const change = (record: Agent, changes: Partial<Agent>): Agent => Object.assign({}, record, changes)

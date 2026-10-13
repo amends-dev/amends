@@ -57,7 +57,7 @@ export const layerWakeLocal = Layer.effect(
  * A request that fails this many times in a row is not tried again: its job gives up the work it
  * was on, or drops the request.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const maxFailures = 8
@@ -66,7 +66,7 @@ export const maxFailures = 8
  * How long a request waits before it is tried again, after each failure: doubling from two
  * seconds, up to five minutes.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const retryDelays = Schedule.min([Schedule.exponential("2 seconds"), Schedule.spaced("5 minutes")])
@@ -75,7 +75,7 @@ export const retryDelays = Schedule.min([Schedule.exponential("2 seconds"), Sche
  * Whether a request failed because its workspace was never created, directly or as a run's cause:
  * the gateway's `CoreError.NotFound` for the workspace, or a runner's `RunFailed` that carries it.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const isWorkspaceNotFound = (error: unknown) => {
@@ -103,7 +103,7 @@ export class Died extends Data.TaggedError("JobRequests.Died")<{
  * long as its workspace exists. `named` is what a log says of the request. Work that dies fails
  * with `Died`, to be tried again like any other failure.
  *
- * @category utils
+ * @category error handling
  * @since 0.1.0
  */
 export const retrying = <A, E, R>(
@@ -136,7 +136,7 @@ export const retrying = <A, E, R>(
  * Leave the request's work for the next request to find, as it failed with `error` for good,
  * logging why: its workspace was not found, or it kept failing.
  *
- * @category utils
+ * @category error handling
  * @since 0.1.0
  */
 export const drop = (job: string, named: Record<string, unknown>, error: unknown) =>

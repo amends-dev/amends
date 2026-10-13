@@ -50,7 +50,7 @@ export interface Named {
  * The connections `setup` names, by the part each gives, in order: its harness, when it names one
  * rather than `Auto`; its model; and its sandbox, when it has one.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const namedConnections = (setup: Setup): ReadonlyArray<Named> => {
@@ -68,7 +68,7 @@ export const namedConnections = (setup: Setup): ReadonlyArray<Named> => {
  * that no connection gives a harness it can run on, and then what keeps each connection it names
  * from giving its part, for its harness, then its model, then its sandbox.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const issuesOf = Effect.fnUntraced(function* (
@@ -88,7 +88,7 @@ export const issuesOf = Effect.fnUntraced(function* (
 /**
  * Ready when nothing keeps an agent from running, and otherwise incomplete for `issues`.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const readinessOf = (issues: ReadonlyArray<Agent.Issue>): Agent.Readiness =>
@@ -121,7 +121,7 @@ export const Resolved = Data.taggedEnum<Resolved>()
 /**
  * The connection `connectionId` among `connections`, with its integration when one is installed.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const resolveConnection = Effect.fnUntraced(function* (
@@ -201,7 +201,7 @@ const oldestFirst: Order.Order<Connection.Connection> = Order.combine(
  * The connections whose harness an agent on `Auto`, set up as `setup`, can run on, oldest first:
  * those that would give it its harness with no issue.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const harnessesToChoose = Effect.fnUntraced(function* (
@@ -220,7 +220,7 @@ export const harnessesToChoose = Effect.fnUntraced(function* (
  * its last turn in a conversation ran on, `previous`, while it is still among them, so that the
  * conversation stays with one harness, and otherwise the first.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const chooseHarness = (

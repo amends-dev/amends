@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema"
  * Text storage keeps as given: no NUL, which PostgreSQL text cannot hold, and no unpaired
  * surrogate half, which UTF-8 cannot encode and would be replaced.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const isStorable = Schema.makeFilter(
@@ -26,7 +26,7 @@ const hidden = /[\p{Cc}\p{Cs}​‪-‮⁦-⁩﻿]/u
 /**
  * A name people read and choose between: without control, direction, or invisible characters.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const isName = Schema.makeFilter(
@@ -36,7 +36,7 @@ export const isName = Schema.makeFilter(
 /**
  * The most characters a name may have, as people choose one.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const nameLength = 80

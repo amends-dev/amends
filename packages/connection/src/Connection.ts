@@ -112,7 +112,7 @@ export interface Health extends Schema.Schema.Type<typeof Health> {}
  * incomplete, comes once the key is taken. For integrations whose check asks over HTTP, as those
  * of `ModelIntegrations` do.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const healthOfStatus = (status: number, url: string): Health => {
@@ -131,7 +131,7 @@ export const healthOfStatus = (status: number, url: string): Health => {
 /**
  * What a check that nothing at `url` answered says of the connection: it is unavailable.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const unanswered = (url: string): Health => ({
@@ -143,7 +143,7 @@ export const unanswered = (url: string): Health => ({
  * What a check that failed for `reason` says of the connection: unavailable when trying again may
  * succeed, and misconfigured otherwise.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const healthOfReason = (reason: ConnectionErrorReason): Health => ({

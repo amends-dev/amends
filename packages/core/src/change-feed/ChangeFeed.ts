@@ -35,7 +35,7 @@ export type Cursor = typeof Cursor.Type
 /**
  * The cursor that resumes after a journal position.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
 export const cursorOf = (position: Entry.Position): Cursor => Cursor.make(String(position))
@@ -43,7 +43,7 @@ export const cursorOf = (position: Entry.Position): Cursor => Cursor.make(String
 /**
  * The journal position a cursor resumes after.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
 export const positionOf = (cursor: Cursor): Entry.Position => Entry.Position.make(Number(cursor))

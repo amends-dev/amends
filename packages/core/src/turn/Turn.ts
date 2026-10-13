@@ -40,7 +40,7 @@ export type Status = typeof Status.Type
  * Whether a turn in `status` is active: queued, running, or cancelling. An agent has at most one
  * active turn on each thread.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const active = (status: Status) => status === "queued" || status === "running" || status === "cancelling"
@@ -140,7 +140,7 @@ export interface Turn extends Schema.Schema.Type<typeof Turn> {}
 /**
  * The record with `changes` applied, as a new record; the one given is left as it is.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const change = (record: Turn, changes: Partial<Turn>): Turn => Object.assign({}, record, changes)

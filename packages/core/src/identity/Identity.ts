@@ -85,7 +85,7 @@ export type Reference = typeof Reference.Type
  * A human or agent in person, across their memberships: the audience scope their own sessions
  * read.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const audienceOf = (identity: MemberReference): Audience.Scope =>

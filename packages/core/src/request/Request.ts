@@ -50,7 +50,7 @@ const encoder = new TextEncoder()
  * who asked, and the key: a retry names the same record, so finding it answers the retry, and
  * nobody without the key can predict it. Formatted as a UUID (version 8).
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<string>) {
@@ -67,7 +67,7 @@ export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<strin
  * parts naming the operation and requester and from the key, so a retry names the record its first
  * attempt created and returns it.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const idFor = Effect.fnUntraced(function* (key: Key | undefined, parts: ReadonlyArray<string>) {

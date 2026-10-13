@@ -52,7 +52,7 @@ const prepareResponse: HttpEffect.PreResponseHandler = (_request, response) => {
  * `cache-control: no-store`, and proxy buffering off. A response that is not a stream passes
  * unchanged.
  *
- * @category utils
+ * @category middleware
  * @since 0.1.0
  */
 export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse)

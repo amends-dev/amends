@@ -125,7 +125,7 @@ export interface Envelope extends Schema.Schema.Type<typeof Envelope> {}
  * payload bytes as they are, preserving the envelope's typed metadata without encoding a second
  * binary wrapper. Each direction copies the bytes.
  *
- * @category utils
+ * @category serialization
  * @since 0.1.0
  */
 export const storageCodec: Codec.EntryCodec<typeof Envelope> = {
@@ -219,7 +219,7 @@ export const makeReference = (event: Event): Reference => ({
  * Own and freeze attribution before sharing it with projections and subscribers: a frozen copy of
  * `value`, its performer's identity and its cause included.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const snapshotProvenance = (value: Provenance): Provenance => {
@@ -265,7 +265,7 @@ export const makeSchema = <
  * `FactMismatch` when the entry records another name or version, or a subject other than the one
  * `fact` derives from the decoded payload. The event's provenance is frozen.
  *
- * @category utils
+ * @category decoding
  * @since 0.1.0
  */
 export const decode = Effect.fn("Event.decode")(function* <F extends Fact.Definition>(

@@ -35,7 +35,7 @@ const sameTarget = Schema.toEquivalence(Target.Reference)
  * an exact scope only the same target. Authorization checks the permission, its target kind, and
  * the acting member's current grants beside it.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const covers = (scope: Scope, target: Target.Reference): boolean =>

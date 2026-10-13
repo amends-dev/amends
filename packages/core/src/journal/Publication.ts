@@ -103,7 +103,7 @@ export const makeCausedBy = Effect.fnUntraced(function* (
  * Runs `program` with the current attribution, or, when there is none, with root attribution for
  * the current actor from `makeForActor`; nested operations reuse the current context.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
 export const withActor = Effect.fn("Publication.withActor")(function* <A, E, R>(program: Effect.Effect<A, E, R>) {
@@ -117,7 +117,7 @@ export const withActor = Effect.fn("Publication.withActor")(function* <A, E, R>(
  * workspace: `event` becomes the cause, its correlation is carried on, and the occurrence time is
  * `occurredAt` or now.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
 export const withCause = (event: Event.Event, occurredAt?: DateTime.Utc) =>
@@ -136,7 +136,7 @@ export const withCause = (event: Event.Event, occurredAt?: DateTime.Utc) =>
 /**
  * Override the performer for one trusted operation without changing its causal history.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
 export const withPerformer = (performedBy: Performer.Reference) =>
@@ -151,7 +151,7 @@ export const withPerformer = (performedBy: Performer.Reference) =>
 /**
  * Use the domain action's timestamp for one publication or a block of related publications.
  *
- * @category utils
+ * @category providing services
  * @since 0.1.0
  */
 export const withOccurredAt = (occurredAt: DateTime.Utc) =>

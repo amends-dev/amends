@@ -228,7 +228,7 @@ export interface AppendReceipt extends Schema.Schema.Type<typeof AppendReceipt> 
 /**
  * Compare encoded append intent byte for byte, preserving payload order.
  *
- * @category utils
+ * @category comparisons
  * @since 0.1.0
  */
 export const samePayloads = (left: ReadonlyArray<Uint8Array>, right: ReadonlyArray<Uint8Array>): boolean =>
@@ -245,7 +245,7 @@ const sameHeader = Schema.toEquivalence(Schema.UndefinedOr(Event.Header))
  * for byte, and fact headers by value. Storage adapters check a keyed retry against its original
  * append with it.
  *
- * @category utils
+ * @category comparisons
  * @since 0.1.0
  */
 export const sameContents = (left: ReadonlyArray<Content>, right: ReadonlyArray<Content>): boolean =>
@@ -406,7 +406,7 @@ export class Store extends Context.Service<
  * Run what a committed transaction's `afterCommit` collected, in order, logging each failure
  * rather than passing it on: the commit already happened. For storage adapters.
  *
- * @category utils
+ * @category running
  * @since 0.1.0
  */
 export const runAfterCommit = (effects: ReadonlyArray<Effect.Effect<void>>) =>

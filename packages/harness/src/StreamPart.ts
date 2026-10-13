@@ -249,7 +249,7 @@ export interface Step extends Schema.Schema.Type<typeof Step> {}
  * // steps[0].parts is [{ type: "text", text: "Hello, world." }]
  * ```
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const stepsOf = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<Step> => {
@@ -271,7 +271,7 @@ export const stepsOf = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<Step> =
  * Drops the parts of a turn's first `steps` steps, for an agent whose turn kept running to stream
  * it again from the step after those the harness already has, as `continueTurn` asks.
  *
- * @category utils
+ * @category filtering
  * @since 0.1.0
  */
 export const afterSteps = (steps: number) =>

@@ -169,7 +169,7 @@ export const prepare = Effect.fn("ThreadActivityKind.prepare")(function* <K exte
 /**
  * Whether an activity is of this kind.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const is =
@@ -193,7 +193,7 @@ export class Mismatch extends Schema.TaggedError<Mismatch>()("ThreadActivityKind
  * Read an activity as this kind, decoding its details; one of another kind or version is a
  * `Mismatch`.
  *
- * @category utils
+ * @category decoding
  * @since 0.1.0
  */
 export const decode = Effect.fn("ThreadActivityKind.decode")(function* <K extends Definition>(

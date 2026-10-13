@@ -141,7 +141,7 @@ class Forbidden extends Context.Service<Forbidden, string>()("@amends-dev/core/j
  * Projections may update their stores, but may not append new log entries: runs `program` so that
  * appends and publications in it fail with `WriteForbidden`, giving `reason`.
  *
- * @category utils
+ * @category combinators
  * @since 0.1.0
  */
 export const withoutAppends = <A, E, R>(program: Effect.Effect<A, E, R>, reason: string) =>

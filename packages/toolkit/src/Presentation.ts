@@ -20,7 +20,7 @@ import * as ToolSource from "./ToolSource.ts"
 /**
  * Whether `presented` has a tool named `name`, with the name as the type of one.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const hasTool = <Tools extends Record<string, Tool.Any>>(
@@ -32,7 +32,7 @@ export const hasTool = <Tools extends Record<string, Tool.Any>>(
  * The tool's parameters, as a JSON Schema with an object root, as a model is shown them. A tool
  * whose parameters are not an object is shown an object with no properties.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const inputSchemaOf = (tool: Tool.Any): Schema.JsonObject =>
@@ -57,7 +57,7 @@ export const failure = (code: string, message: string): ToolSource.Failure => ({
  * Runs the tool of `presented` named `name` with `input`, and returns its result as JSON. What the
  * tool fails with, as its handler or its parameters, fails as a `Failure`, a result the model reads.
  *
- * @category utils
+ * @category running
  * @since 0.1.0
  */
 export const call = <Tools extends Record<string, Tool.Any>>(

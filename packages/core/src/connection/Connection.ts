@@ -129,7 +129,7 @@ export interface Connection extends Schema.Schema.Type<typeof Connection> {}
  * The record with the given fields replaced: what a rename, a configuration, or a removal makes of
  * it.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const change = (record: Connection, changes: Partial<Connection>): Connection =>
@@ -333,7 +333,7 @@ export interface Access extends Schema.Schema.Type<typeof Access> {}
  * The record as its integration takes it, `@amends-dev/connection`'s `Connection.Connection`:
  * without its workspace, its status, or who created it.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
 export const connectionOf = (record: Connection): ConnectionContract.Connection => ({
@@ -347,7 +347,7 @@ export const connectionOf = (record: Connection): ConnectionContract.Connection 
 /**
  * A connection as its readers see it, as ready as its integration finds it.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const view = (record: Connection, readiness: Readiness, manageable: boolean): View => ({
@@ -394,7 +394,7 @@ export interface IntegrationView extends Schema.Schema.Type<typeof IntegrationVi
 /**
  * An installed integration as readers see it, as `ConnectionService.integrations` lists it.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const integrationView = (integration: Integration.Integration): IntegrationView => ({

@@ -17,7 +17,7 @@ import * as Effect from "effect/Effect"
  * The name of the job that prunes handled requests, under which `ClusterCron` stores its own runs,
  * which it prunes too.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const jobName = "amends/prune-handled-requests"

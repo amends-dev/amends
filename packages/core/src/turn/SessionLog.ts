@@ -88,7 +88,7 @@ export interface Recorded extends Schema.Schema.Type<typeof Recorded> {}
 /**
  * Whether an entry is one of the turn's; the conversation joined belongs to none.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const isOfTurn =
@@ -103,7 +103,7 @@ export const isOfTurn =
  * turn keeps them. A step that compacted the conversation leaves its summary in place of what came
  * before.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const historyOf = (entries: ReadonlyArray<Entry>): Prompt.Prompt =>
@@ -134,7 +134,7 @@ const textOf = (step: StreamPart.Step) =>
  * What a turn answers, from its entries: the text of the last step that has any parts since the
  * turn last started, as harness answers a turn. Empty when that step wrote nothing.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const answerOf = (entries: ReadonlyArray<Entry>): string =>
@@ -231,7 +231,7 @@ const sameItem = Schema.toEquivalence(Turn.LogItem)
  * The items of `now` that `before` did not have as they are, each at its index: what a reader
  * following the log is sent as `Turn.LogChange`s.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const changesSince = (

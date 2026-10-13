@@ -24,7 +24,7 @@ import type * as Authentication from "./Authentication.ts"
 /**
  * The header that names the workspace a member's request acts in.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const header = "Amends-Workspace"

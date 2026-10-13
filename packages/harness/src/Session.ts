@@ -372,7 +372,7 @@ export interface Session {
  * const history = steps.reduce(Session.recordStep, Prompt.fromMessages([prompt]))
  * ```
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const recordStep = (conversation: Prompt.Prompt, step: StreamPart.Step): Prompt.Prompt => {
@@ -391,7 +391,7 @@ export const recordStep = (conversation: Prompt.Prompt, step: StreamPart.Step): 
  * An agent that keeps its own conversation goes on from this one, so that it has what the session
  * records.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const conversationAfter = (compaction: Pick<StreamPart.CompactionPart, "summary" | "kept">): Prompt.Prompt =>

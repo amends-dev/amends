@@ -34,7 +34,7 @@ export type Name = typeof Name.Type
  * The name a contact takes from what the external system calls the sender: what remains of it
  * within a name, or "Someone" when nothing does.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const nameOf = (sender: string): Name => {
@@ -72,7 +72,7 @@ export interface Contact extends Schema.Schema.Type<typeof Contact> {}
 /**
  * The record with some fields changed.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const change = (record: Contact, changes: Partial<Contact>): Contact => Object.assign({}, record, changes)

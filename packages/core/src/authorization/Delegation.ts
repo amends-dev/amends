@@ -107,7 +107,7 @@ export interface Recipient {
 /**
  * Whether the rule depends on the recipient's assignments, so callers read them only then.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const recipientNeedsAssignments = (recipient: Recipient) =>
@@ -120,7 +120,7 @@ export const recipientNeedsAssignments = (recipient: Recipient) =>
  * Otherwise only members holding the Member role alone, or nothing, are ordinary recipients:
  * direct grants and other roles require the owner, rather than guessing their authority.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const recipientDenial = (
@@ -264,7 +264,7 @@ const isRefusal = (error: unknown): error is Refusal =>
  * Whether a check of authorization and delegation allows the actor: `false` when it refuses them,
  * for screens that show what the actor may do; any other failure fails the same.
  *
- * @category utils
+ * @category error handling
  * @since 0.1.0
  */
 export const isAllowedBy = <A, E, R>(

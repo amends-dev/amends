@@ -42,7 +42,7 @@ export type Participant = typeof Participant.Type
 /**
  * The notification recipient that a participant routes to.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const recipientOf = (participant: Participant): Notification.Recipient =>
@@ -56,7 +56,7 @@ export const recipientOf = (participant: Participant): Notification.Recipient =>
  * The key under which a participant is unique in a thread: a member, a contact, or the thread's
  * one triage participant. A participant and its reference share a key.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const keyOf = (participant: Participant | Reference): string =>
@@ -131,7 +131,7 @@ export type Reference = typeof Reference.Type
 /**
  * The member behind a participant or its reference, when it is one.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const memberOf = (participant: Participant | Reference): MemberId.MemberId | undefined =>
@@ -140,7 +140,7 @@ export const memberOf = (participant: Participant | Reference): MemberId.MemberI
 /**
  * A participant's public reference.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const referenceOf = (participant: Participant): Reference =>
@@ -193,7 +193,7 @@ export interface Summary extends Schema.Schema.Type<typeof Summary> {}
 /**
  * A participation as readers see it.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
 export const toSummary = (record: ThreadParticipation): Summary => ({

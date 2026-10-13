@@ -80,7 +80,7 @@ export interface Member extends Schema.Schema.Type<typeof Member> {}
  * The audience scope of one membership alone: a fact or signal addressed to it, such as a member's
  * own follows and admissions, reaches that member and nobody else.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const audienceOf = (memberId: MemberId.MemberId): Audience.Scope => Audience.make("member", memberId)

@@ -110,7 +110,7 @@ const threadReaders = (signal: {
  * its messages do; read state reaches only its member's own sessions. A turn's drafts reach no
  * one there: only readers following its log, which checks their access itself.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const changeFeedReachOf = (signal: Signal): Reach | undefined =>

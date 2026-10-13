@@ -102,7 +102,7 @@ export type Document = typeof Document.Type
  * The catalog of what `document` holds, from models.dev's `api.json`. It fails when a field the
  * catalog keeps has changed shape.
  *
- * @category utils
+ * @category decoding
  * @since 0.1.0
  */
 export const toCatalog = Effect.fn("ModelsDev.toCatalog")(function* (document: unknown) {

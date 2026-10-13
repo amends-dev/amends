@@ -109,7 +109,7 @@ const stateOf = (task: Pick<Task.Task, "status" | "priority" | "assignee">, opti
  * The thread as it stands, in a sentence or two: its title, and its task's state when it is one.
  * Nothing for a thread that is neither titled nor a task; its opening message says what it is.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const contextOf = (context: Context, options: Options): string | undefined => {
@@ -224,7 +224,7 @@ const isPublished = (item: Thread.TimelineItem): item is ThreadActivityKind.Item
 /**
  * Everyone the items and the context name, for the caller to read what they are called.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const peopleOf = (
@@ -263,7 +263,7 @@ export const promptOf = (
 /**
  * How many of the thread's messages the items tell: those published that still have text.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const countMessages = (items: ReadonlyArray<Thread.TimelineItem>) =>

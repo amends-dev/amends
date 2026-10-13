@@ -59,7 +59,7 @@ export const Revision = Schema.Int.check(Schema.isGreaterThan(0))
  * workspace recorded at an older revision is upgraded when a host loads it, and one at a newer
  * revision is left alone, so an older host never reverts it. A test pins each revision's bundles.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const revision = 1
@@ -68,7 +68,7 @@ export const revision = 1
  * Display label for a built-in identity, including invitations before membership exists; any
  * other role ID is its own label.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const nameOf = (roleId: Role.RoleId): string => roles.find(({ id }) => id === roleId)?.name ?? roleId

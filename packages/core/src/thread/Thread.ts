@@ -145,7 +145,7 @@ export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
  * `readThrough`, or, having never read it, joined its group at `admittedAt`: a thread never read
  * is new only if its latest message came after the reader joined.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const isUnread = (latest: Latest, readThrough: number | null, admittedAt: DateTime.Utc): boolean =>
@@ -154,7 +154,7 @@ export const isUnread = (latest: Latest, readThrough: number | null, admittedAt:
 /**
  * `thread` as a reader lists it, who read through `readThrough` and joined at `admittedAt`.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const listItem = (
@@ -234,7 +234,7 @@ export interface Opening extends Schema.Schema.Type<typeof Opening> {}
 /**
  * A listed thread as its group's stream shows it, with its opening `message` and `replies`.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const opening = (item: ListItem, message: ThreadMessage.ThreadMessage, replies: number): Opening => ({

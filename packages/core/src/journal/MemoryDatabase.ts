@@ -181,7 +181,7 @@ export const empty = (): Space => ({
  * An isolated snapshot: every map is copied, and the values they hold never change. A transaction
  * runs against one, and `commit` makes it the committed state.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const copy = (space: Space): Space => ({
@@ -200,7 +200,7 @@ export const copy = (space: Space): Space => ({
  * Committed state of one workspace, without creating any: what a read outside a transaction sees,
  * and what a transaction copies when it opens.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const committed = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId): Space =>
@@ -210,7 +210,7 @@ export const committed = (database: MemoryDatabase["Service"], workspaceId: Work
  * Committed state of one workspace, created on first write: what a write outside a transaction
  * changes, through the binding's `join` and `exclusive`.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const writable = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId): Space => {
@@ -225,7 +225,7 @@ export const writable = (database: MemoryDatabase["Service"], workspaceId: Works
  * A table beside the workspaces' state, created on first use: where the gateway's memory accounts
  * and sign-in storage keep what a host stores across its workspaces.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const table = (database: MemoryDatabase["Service"], name: string): Table => {
@@ -240,7 +240,7 @@ export const table = (database: MemoryDatabase["Service"], name: string): Table 
  * A lock by key across every host, created on first use, for whatever changes one at a time, such
  * as a sign-in code.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const lock = (database: MemoryDatabase["Service"], key: string): Semaphore.Semaphore => {
@@ -283,7 +283,7 @@ export interface Written {
  * and commits combine. Holding the workspace, its records replace the committed ones, and read
  * state keeps the later value of each key, or the earlier first time for Seen.
  *
- * @category utils
+ * @category mutations
  * @since 0.1.0
  */
 export const commit = (
@@ -319,7 +319,7 @@ export const commit = (
  * A log's writer lock, created on first use. The memory `Store` takes it on a transaction's first
  * append to the log, or lookup of one of its keys, and releases it when the transaction ends.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const logLock = (database: MemoryDatabase["Service"], workspaceId: WorkspaceId.WorkspaceId, logId: string) =>
@@ -330,7 +330,7 @@ export const logLock = (database: MemoryDatabase["Service"], workspaceId: Worksp
  * the memory `Store` and `SessionLogStore` wait on `appended`
  * for their `waitForAppend`.
  *
- * @category utils
+ * @category mutations
  * @since 0.1.0
  */
 export const wakeAppendReaders = (database: MemoryDatabase["Service"]) => {
@@ -443,7 +443,7 @@ export const makeRows = <A>(codec: Schema.Codec<A, string>) => {
  * Order strings by their UTF-8 bytes, as the PostgreSQL adapter's binary collation does, so the
  * memory stores list IDs in the same order.
  *
- * @category utils
+ * @category ordering
  * @since 0.1.0
  */
 export const compareBinary = (left: string, right: string): number => {
@@ -463,7 +463,7 @@ export const compareBinary = (left: string, right: string): number => {
  * A composite key for maps, unambiguous whatever its parts contain: the read-state maps key by
  * member and thread or group, and the journal's append slices by log and idempotency key.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const keyOf = (...parts: ReadonlyArray<string | number>): string => JSON.stringify(parts)

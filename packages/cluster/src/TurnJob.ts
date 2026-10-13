@@ -80,7 +80,7 @@ export const entity = Entity.make("amends/TurnJob", [
  * The ID of `job`'s entity: its workspace, membership, and thread as a JSON array, which the
  * worker reads back into the job.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const entityId = (job: TurnJobs.Job) => encodeEntityId([job.workspaceId, job.memberId, job.threadId])

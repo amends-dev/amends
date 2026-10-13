@@ -46,7 +46,7 @@ const labelMarks = /[\\[\]*_`~<>]/gu
  * when mentioned, and readers show their current one. The text shows who was mentioned; a
  * message's `mentions` are whom it addresses.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const mentionText = (memberId: string, name: string) =>
@@ -57,7 +57,7 @@ const mentionLinks = /\[@(?:\\.|[^\\\]])*\]\(member:([^)\s]+)\)/gu
 /**
  * The members a text mentions, each once, in the order first mentioned.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const mentionedIn = (text: string): ReadonlyArray<string> => [
@@ -175,7 +175,7 @@ export interface ThreadMessage extends Schema.Schema.Type<typeof ThreadMessage> 
 /**
  * The content a message is published with: its text and mentions at revision 1.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const published = (text: Text, mentions: ReadonlyArray<MemberId.MemberId>): Content =>

@@ -56,7 +56,7 @@ export const entity = Entity.make("amends/DeliveryJob", [
  * The ID of `job`'s entity: its workspace and thread as a JSON array, which the worker reads back
  * into the job.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const entityId = (job: DeliveryJobs.Job) => encodeEntityId([job.workspaceId, job.threadId])

@@ -46,7 +46,7 @@ export const layerRoutes = Layer.mergeAll(
 /**
  * The largest request body the server reads, in bytes: one mebibyte. Bun answers 413 beyond it.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const maxRequestBodySize = 1024 * 1024

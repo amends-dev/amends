@@ -28,7 +28,7 @@ import type * as Stream from "effect/Stream"
 /**
  * The channel every notice uses.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const channel = "amends_notices"
@@ -51,7 +51,7 @@ const decodeNotice = Schema.decodeUnknownOption(Notice)
  * The notice an append sends for each log it appended to: a journal log, by its id, or a session
  * log, by `sessionLogKey`.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const appendNotice = (workspaceId: WorkspaceId.WorkspaceId, logId: string): string =>
@@ -60,7 +60,7 @@ export const appendNotice = (workspaceId: WorkspaceId.WorkspaceId, logId: string
 /**
  * How appends name a participation's session log, apart from every journal log's id.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const sessionLogKey = (participationId: string): string => JSON.stringify(["session-log", participationId])
@@ -69,7 +69,7 @@ export const sessionLogKey = (participationId: string): string => JSON.stringify
  * The notice a commit that stored job requests sends, so the runner that owns each job, in
  * whichever process, reads it at once.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const jobRequestsNotice = encodeNotice(["job-requests"])

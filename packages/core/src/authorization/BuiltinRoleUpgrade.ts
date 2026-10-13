@@ -54,7 +54,7 @@ const haveSamePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<s
  * Hosts run this when they load a workspace; most find it current and open no transaction.
  * Returns whether it upgraded.
  *
- * @category utils
+ * @category utilities
  * @since 0.1.0
  */
 export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (options?: Options) {

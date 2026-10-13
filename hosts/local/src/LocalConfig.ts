@@ -143,7 +143,7 @@ const signIn = Config.schema(Schema.Literals(["email", "development"]), "AMENDS_
  * The startup options, read and validated without opening a database or server: reading them fails
  * with a `Config.ConfigError` that names the setting missing or invalid.
  *
- * @category configs
+ * @category configuration
  * @since 0.1.0
  */
 export const options: Config.Config<Options> = Config.all({
@@ -164,7 +164,7 @@ export const options: Config.Config<Options> = Config.all({
  * which every host over the database shares, so that hosts agree on it; or, without a credential
  * key, this process's own.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const deriveSecret = (credentialKey: Redacted.Redacted<string> | undefined, purpose: string) =>

@@ -63,7 +63,7 @@ export type Source = typeof Source.Type
 /**
  * The check records and creation facts share: an assignment's scope belongs to its workspace.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const SourceInWorkspace = Schema.makeFilter(

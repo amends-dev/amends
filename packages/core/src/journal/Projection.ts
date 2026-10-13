@@ -209,7 +209,7 @@ export type Error =
 /**
  * Whether a live version is this key's projection at this key's version.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const isVersion = (key: Checkpoint.Key) => (live: Checkpoint.LiveVersion) =>
@@ -257,7 +257,7 @@ const toCursor = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
  * so it applied every commit through the log's head: its progress moves to the head's last
  * entry, and rebuilding it later applies only the commits it missed, never earlier ones again.
  *
- * @category utils
+ * @category mutations
  * @since 0.1.0
  */
 export const replaceLive = Effect.fnUntraced(function* (

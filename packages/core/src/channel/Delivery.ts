@@ -71,7 +71,7 @@ export interface Delivery extends Schema.Schema.Type<typeof Delivery> {}
 /**
  * The record with some fields changed.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const change = (record: Delivery, changes: Partial<Delivery>): Delivery => Object.assign({}, record, changes)
@@ -79,7 +79,7 @@ export const change = (record: Delivery, changes: Partial<Delivery>): Delivery =
 /**
  * A new delivery, requested and not yet tried.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const requested = (

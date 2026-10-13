@@ -52,7 +52,7 @@ export type Priority = typeof Priority.Type
  * Whether a task in this status is being worked, so its assignee is asked to work it: `todo` and
  * `doing`. In `triage` a decision is awaited, and `held`, `done`, and `dismissed` ask no work.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const working = (status: Status): boolean => status === "todo" || status === "doing"
@@ -60,7 +60,7 @@ export const working = (status: Status): boolean => status === "todo" || status 
 /**
  * The assignee, while the task is being worked and so asks them to work it; null otherwise.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const asked = (task: { readonly status: Status; readonly assignee: MemberId.MemberId | null }) =>
@@ -116,7 +116,7 @@ export type Change = typeof Change.Type
 /**
  * The task's current value of what a change changes.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const valueOf = (task: Task, change: Change): Change["from"] =>
@@ -129,7 +129,7 @@ export const valueOf = (task: Task, change: Change): Change["from"] =>
 /**
  * The task with a change applied.
  *
- * @category utils
+ * @category transforming
  * @since 0.1.0
  */
 export const apply = (task: Task, change: Change): Task =>
@@ -161,7 +161,7 @@ export interface Options extends Schema.Schema.Type<typeof Options> {}
 /**
  * What a task starts as, from its options.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const initial = (options: Options): Pick<Task, "status" | "priority" | "assignee"> => ({
@@ -259,7 +259,7 @@ export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
  * Whom a change on a task's thread reaches: every participant given but whoever made it, told,
  * and `asked`, when an agent among them, asked for work.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const recipients = (

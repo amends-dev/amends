@@ -80,7 +80,7 @@ export interface Team extends Schema.Schema.Type<typeof Team> {}
  * workspace, in the same commit, and stays in it until they leave the workspace: nobody leaves it
  * or is removed from it. It may be renamed.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const GeneralId = GroupId.GroupId.make("general")
@@ -88,7 +88,7 @@ export const GeneralId = GroupId.GroupId.make("general")
 /**
  * The general group's name when a workspace is created.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const generalName: Name = "general"
@@ -96,7 +96,7 @@ export const generalName: Name = "general"
 /**
  * Whether a group is its workspace's general group.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const isGeneral = (group: { readonly id: string }) => group.id === GeneralId
@@ -161,7 +161,7 @@ export type Group = typeof Group.Type
 /**
  * Order a direct group's requested members canonically, removing repeats.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const directMembers = <Id extends string>(memberIds: ReadonlyArray<Id>): ReadonlyArray<Id> =>
@@ -170,7 +170,7 @@ export const directMembers = <Id extends string>(memberIds: ReadonlyArray<Id>): 
 /**
  * Storage key for a direct group's member set. Member IDs change on readmission, so do keys.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const directKey = (memberIds: ReadonlyArray<string>): string => JSON.stringify(directMembers(memberIds))
@@ -273,7 +273,7 @@ export interface Activity {
  * Whether a group whose latest message was at `latestActivityAt` has activity new to a reader who
  * last read it at `readAt`, or, never having read it, was admitted at `admittedAt`.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const hasNewActivity = (
@@ -288,7 +288,7 @@ export const hasNewActivity = (
  * named by them, so none of it; any member tidies a private group, while removing people from a
  * public one is moderation.
  *
- * @category utils
+ * @category constructors
  * @since 0.1.0
  */
 export const listItem = (group: Group, admittedAt: DateTime.Utc, activity: Activity, grants: Grants): ListItem => {
@@ -396,7 +396,7 @@ export interface Summary extends Schema.Schema.Type<typeof Summary> {}
  * The readers of one group: its current members. The audience the facts about a group and its
  * threads are published to.
  *
- * @category utils
+ * @category getters
  * @since 0.1.0
  */
 export const audienceOf = (groupId: GroupId.GroupId): Audience.Scope => Audience.make("group", groupId)

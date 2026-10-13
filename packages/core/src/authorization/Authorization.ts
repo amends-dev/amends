@@ -182,7 +182,7 @@ export const layer = Layer.effect(Authorization, make)
  * read fails with `hidden`, so they learn nothing of it; one they can read but not act on is
  * denied. The operations on agents, connections, and channels check this way.
  *
- * @category utils
+ * @category validation
  * @since 0.1.0
  */
 export const requireVisible = Effect.fnUntraced(function* <E>(

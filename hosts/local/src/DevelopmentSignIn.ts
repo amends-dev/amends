@@ -34,7 +34,7 @@ export type DeliverCode = (email: Accounts.Email, code: SignIn.Code) => Effect.E
  * Deliver a code by logging it, with its address, where the server runs: what `make` and `layer`
  * deliver with when given nothing else.
  *
- * @category utils
+ * @category handlers
  * @since 0.1.0
  */
 export const logCode: DeliverCode = (email, code) => Effect.logInfo(`Sign-in code for ${email}: ${code}`)
@@ -42,7 +42,7 @@ export const logCode: DeliverCode = (email, code) => Effect.logInfo(`Sign-in cod
 /**
  * Codes expire ten minutes after issuance.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const codeLifetime = Duration.minutes(10)
@@ -50,7 +50,7 @@ export const codeLifetime = Duration.minutes(10)
 /**
  * The sign-in methods development offers: email codes alone, with no providers.
  *
- * @category utils
+ * @category constants
  * @since 0.1.0
  */
 export const methods: SignIn.Methods = { emailCode: true, providers: [] }

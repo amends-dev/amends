@@ -61,7 +61,7 @@ const isUnregistered = Schema.is(Projection.Unregistered)
  * asked again, as may read models another host is rebuilding; storage that failed otherwise, and
  * stored state core cannot use, are server errors.
  *
- * @category utils
+ * @category error handling
  * @since 0.1.0
  */
 export const classify = (error: unknown): CoreError.CoreError | undefined => {
@@ -86,7 +86,7 @@ export const classify = (error: unknown): CoreError.CoreError | undefined => {
  * Report an operation's failures by kind, as `classify` decides, and the rest as defects that keep
  * the original failure for the host's logs.
  *
- * @category utils
+ * @category error handling
  * @since 0.1.0
  */
 export const report = <A, E, R>(operation: Effect.Effect<A, E, R>): Effect.Effect<A, Failure<E>, R> =>

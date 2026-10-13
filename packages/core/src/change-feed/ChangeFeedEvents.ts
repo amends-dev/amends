@@ -402,7 +402,7 @@ for (const registered of registry) {
 /**
  * Whether the feed delivers a fact at this version; facts it does not register are internal.
  *
- * @category utils
+ * @category predicates
  * @since 0.1.0
  */
 export const delivers = (fact: { readonly name: string; readonly version: number }) =>
@@ -413,7 +413,7 @@ export const delivers = (fact: { readonly name: string; readonly version: number
  * yield None; a registered name recorded with an unknown version fails rather than disappear,
  * and the source makes subscribers refresh instead of delivering its commit.
  *
- * @category utils
+ * @category converting
  * @since 0.1.0
  */
 export const prepare = Effect.fn("ChangeFeedEvents.prepare")(function* (entry: Log.Entry<Event.Envelope>) {
