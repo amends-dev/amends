@@ -31,7 +31,7 @@ export const make = Effect.gen(function* () {
     decodeAccounts(rows.map((row) => ({ id: row.humanId, email: row.email })))
   return Accounts.Accounts.of({
     findOrCreate: Effect.fn("PostgresAccounts.findOrCreate")(function* (email) {
-      const humanId = yield* crypto.randomUUIDv4
+      const humanId = yield* crypto.randomUUIDv4()
       // Updating the address to itself on conflict makes the statement return the existing row.
       const [account] = yield* db
         .insert(accounts)

@@ -48,7 +48,7 @@ export const make = Effect.fnUntraced(function* (
           catch: unavailable
         }))
       const sessionId =
-        kept && saved !== undefined ? saved.sessionId : yield* crypto.randomUUIDv4.pipe(Effect.mapError(unavailable))
+        kept && saved !== undefined ? saved.sessionId : yield* crypto.randomUUIDv4().pipe(Effect.mapError(unavailable))
       let started = kept
       let history = kept ? Prompt.empty : sessionOptions.history
       const relaySession = yield* relay.open(sessionOptions.id)

@@ -108,11 +108,26 @@ jobs:
         working-directory: apps/site
         run: bun run build
 
+  # Each published package as npm gets it, in a project that installs its other dependencies,
+  # Effect among them, from npm at the newest versions the package allows.
+  distributions:
+    name: Published packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check the distributions
+        run: bun run dist check
+
   # One required check that succeeds only when every job above succeeds.
   check:
     name: Check
     if: always()
-    needs: [static, types, tests, build]
+    needs: [static, types, tests, build, distributions]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:

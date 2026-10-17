@@ -10,11 +10,11 @@
  *
  * Without a directory, each command takes every published package. `check` builds the package and
  * the workspace packages it depends on, then typechecks and runs a consumer of the distribution,
- * as a project that installed it from npm would, under both of TypeScript's module resolutions and
- * on Bun and Node.
+ * as a project that installed it from npm would, with its other dependencies from npm, under both
+ * of TypeScript's module resolutions and on Bun and Node.
  */
 
-import { cp, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { $ } from "bun"
@@ -38,7 +38,7 @@ interface Manifest {
   readonly exports?: Exports
   readonly dependencies?: Record<string, string>
   readonly peerDependencies?: Record<string, string>
-  readonly peerDependenciesMeta?: unknown
+  readonly peerDependenciesMeta?: Readonly<Record<string, { readonly optional?: boolean }>>
   readonly optionalDependencies?: Record<string, string>
   readonly engines?: unknown
   readonly publishConfig?: { readonly access?: string; readonly directory?: string }
@@ -151,38 +151,46 @@ const build = async (directory: string, workspace: Workspace) => {
 
 /**
  * Builds the package and the workspace packages it depends on, then typechecks and runs a project
- * that depends on the distribution, with the workspace packages copied in as npm would install
- * them and the other dependencies linked from the workspace.
+ * that depends on the distribution as one that installed it from npm would: the distributions copied
+ * into its `node_modules`, and every other dependency, Effect among them, installed from npm at the
+ * newest version the distributions allow, as a new project gets it.
  */
 const check = async (directory: string, workspace: Workspace) => {
   const consumer = await mkdtemp(join(tmpdir(), "amends-dist-"))
-  const modules = join(consumer, "node_modules")
-  const installed = new Set<string>()
-  /** Makes `name` resolvable in the consumer: a copy of a distribution, or a link to `target`. */
-  const install = async (name: string, target: string, copy: boolean) => {
-    if (installed.has(name)) return
-    installed.add(name)
-    await mkdir(dirname(join(modules, name)), { recursive: true })
-    await (copy ? cp(target, join(modules, name), { recursive: true }) : symlink(target, join(modules, name)))
-  }
-  const installWithDependencies = async (packageDirectory: string) => {
+  const distributions = new Map<string, string>()
+  const dependencies: Record<string, string> = {}
+  /** Builds the package's distribution and those of the workspace packages it depends on. */
+  const collect = async (packageDirectory: string): Promise<Manifest> => {
     const manifest = await build(packageDirectory, workspace)
-    await install(manifest.name, join(packageDirectory, "dist"), true)
-    for (const name of Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies })) {
+    if (distributions.has(manifest.name)) return manifest
+    const dist = join(packageDirectory, "dist")
+    distributions.set(manifest.name, dist)
+    const distributed = await readManifest(dist)
+    const requiredPeers = Object.entries(distributed.peerDependencies ?? {}).filter(
+      ([name]) => distributed.peerDependenciesMeta?.[name]?.optional !== true
+    )
+    for (const [name, range] of [...Object.entries(distributed.dependencies ?? {}), ...requiredPeers]) {
       const workspaceDirectory = workspace.directories.get(name)
       if (workspaceDirectory !== undefined) {
-        await installWithDependencies(workspaceDirectory)
+        await collect(workspaceDirectory)
+      } else if (dependencies[name] !== undefined && dependencies[name] !== range) {
+        throw new Error(`${name} is required as both ${dependencies[name]} and ${range}`)
       } else {
-        // Bun links each workspace's own dependencies under it, or under the root.
-        const target = await realpath(join(packageDirectory, "node_modules", name)).catch(() =>
-          realpath(join(root, "node_modules", name))
-        )
-        await install(name, target, false)
+        dependencies[name] = range
       }
     }
     return manifest
   }
-  const { name } = await installWithDependencies(directory)
+  const { name } = await collect(directory)
+
+  await Bun.write(join(consumer, "package.json"), JSON.stringify({ private: true, type: "module", dependencies }))
+  await $`bun install`.cwd(consumer).quiet()
+  for (const [distributed, dist] of distributions) {
+    await mkdir(dirname(join(consumer, "node_modules", distributed)), { recursive: true })
+    await cp(dist, join(consumer, "node_modules", distributed), { recursive: true })
+  }
+  const effect = await readManifest(join(consumer, "node_modules", "effect"))
+  console.log(`Installed ${Object.keys(dependencies).length} dependencies from npm, with effect@${effect.version}`)
 
   await Bun.write(
     join(consumer, "main.ts"),

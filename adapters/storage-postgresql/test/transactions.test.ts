@@ -127,9 +127,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
     withDatabase((url) =>
       Effect.gen(function* () {
         const stalled = yield* process(url, 2, { transactionTimeout: "300 millis" })
-        yield* holding(yield* stalled.forWorkspace(first))
+        const writer = yield* holding(yield* stalled.forWorkspace(first))
         const other = yield* process(url, 2)
         yield* append(yield* other.forWorkspace(first))
+        // Closing a pool waits for the connections it lent, so the stalled writer ends first.
+        yield* Fiber.interrupt(writer.fiber)
       }).pipe(Effect.scoped)
     )
   )

@@ -103,13 +103,14 @@ attributing a small timing difference to a configuration change.
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on pull requests to `main` and
 pushes to it, as parallel jobs, so a run takes as long as its slowest job:
 
-| Job            | Runs                                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| Static         | Lint, format, package boundaries, generated icons, and the PostgreSQL migration          |
-| Types          | `bun run typecheck`                                                                      |
-| Tests          | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
-| Frontend build | The web and desktop bundles, the UI workshop, and the site                               |
-| Check          | Succeeds only when every job above does; main's ruleset requires it for merging          |
+| Job                | Runs                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| Static             | Lint, format, package boundaries, generated icons, and the PostgreSQL migration          |
+| Types              | `bun run typecheck`                                                                      |
+| Tests              | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
+| Frontend build     | The web and desktop bundles, the UI workshop, and the site                               |
+| Published packages | `bun run dist check`: each published package as npm gets it, its dependencies from npm   |
+| Check              | Succeeds only when every job above does; main's ruleset requires it for merging          |
 
 Each job installs the pinned Bun and the locked dependencies through
 [`.github/actions/setup`](../.github/actions/setup/action.yml), which caches Bun's packages by
@@ -129,6 +130,11 @@ libraries and a Rust build cache.
 amends.dev, and each pull request opened from this repository to a preview that it links in a
 comment and destroys when the pull request closes; see the
 [site](../apps/site/README.md#build-and-deploy).
+
+[`.github/workflows/latest-effect.yml`](../.github/workflows/latest-effect.yml) runs every week
+against the newest Effect release the published packages allow: it moves the catalog's Effect
+packages to that release, then checks the types, the backend and PostgreSQL tests, and the
+published packages, so a change in Effect that breaks them shows before their users find it.
 
 [`.github/workflows/release.yml`](../.github/workflows/release.yml) runs on pushes to main: it keeps
 the release pull request open while changesets are pending, and publishes the packages when it

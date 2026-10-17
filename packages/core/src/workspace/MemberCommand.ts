@@ -95,7 +95,7 @@ export const make = Effect.gen(function* () {
 
   const add = Effect.fn("MemberCommand.add")(function* (member: NewMember) {
     const added: Member.Member = {
-      id: MemberId.MemberId.make(yield* crypto.randomUUIDv4),
+      id: MemberId.MemberId.make(yield* crypto.randomUUIDv4()),
       workspaceId,
       identity: member.identity,
       name: member.name,

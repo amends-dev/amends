@@ -451,7 +451,7 @@ export const make = Effect.gen(function* () {
       }
       const participant = yield* participantOf(reference, candidates)
       const admitted: typeof ThreadParticipation.Admission.Type = {
-        id: ThreadParticipationId.ThreadParticipationId.make(yield* crypto.randomUUIDv4),
+        id: ThreadParticipationId.ThreadParticipationId.make(yield* crypto.randomUUIDv4()),
         workspaceId,
         threadId: thread.id,
         participant,
@@ -486,7 +486,7 @@ export const make = Effect.gen(function* () {
     const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details, input.thread.id)
     const activity: ThreadActivity.ThreadActivity = {
       ...prepared,
-      id: ThreadActivity.ThreadActivityId.make(yield* crypto.randomUUIDv4),
+      id: ThreadActivity.ThreadActivityId.make(yield* crypto.randomUUIDv4()),
       workspaceId,
       threadId: input.thread.id,
       sequence: input.sequence,

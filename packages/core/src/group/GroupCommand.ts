@@ -148,7 +148,7 @@ export const make = Effect.gen(function* () {
   ) {
     yield* Store.Transaction
     const membership = {
-      id: GroupMembership.GroupMembershipId.make(yield* crypto.randomUUIDv4),
+      id: GroupMembership.GroupMembershipId.make(yield* crypto.randomUUIDv4()),
       workspaceId,
       groupId,
       memberId,
@@ -187,7 +187,7 @@ export const make = Effect.gen(function* () {
           reason: new CoreError.ParticipantUnavailable({ memberId })
         })
     const group: Group.Direct = {
-      id: GroupId.GroupId.make(yield* crypto.randomUUIDv4),
+      id: GroupId.GroupId.make(yield* crypto.randomUUIDv4()),
       workspaceId,
       kind: "Direct",
       memberIds: requested,

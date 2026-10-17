@@ -53,7 +53,7 @@ export const make = Effect.fnUntraced(function* (
       workspaceId,
       performedBy,
       causedBy: null,
-      correlationId: Event.CorrelationId.make(yield* crypto.randomUUIDv4),
+      correlationId: Event.CorrelationId.make(yield* crypto.randomUUIDv4()),
       occurredAt: occurredAt ?? (yield* DateTime.now)
     })
   )

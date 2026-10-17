@@ -388,7 +388,7 @@ export const make = Effect.fnUntraced(function* (options?: Options) {
       })
     }
 
-    const callId = yield* Effect.orDie(crypto.randomUUIDv4)
+    const callId = yield* Effect.orDie(crypto.randomUUIDv4())
     const answered = yield* Deferred.make<Outcome>()
     yield* Ref.update(entry.pending, HashMap.set(callId, { requestId, answered }))
     yield* Queue.offer(running.value, {

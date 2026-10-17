@@ -20,9 +20,12 @@ and the LICENSE go with it. `dist/` is ignored by Git, lint, and formatting. Wit
 
 `bun run dist check packages/harness` builds the package and the workspace packages it depends on,
 then typechecks and runs a project that depends on the distribution as one that installed it from
-npm would: the distributions copied into its `node_modules`, Effect linked from the workspace,
-under TypeScript's `bundler` and `nodenext` resolutions, and on Bun and Node. Run it after changing
-a manifest or a build configuration; without a directory, it checks every published package.
+npm would: the distributions copied into its `node_modules`, and its other dependencies, Effect
+among them, installed from npm at the newest versions the distributions allow, under TypeScript's
+`bundler` and `nodenext` resolutions, and on Bun and Node. Without a directory, it checks every
+published package, as CI does for each pull request. It imports each package and runs nothing else
+of it, so a change in Effect that breaks a call shows in the weekly check against the newest
+Effect, which [testing](testing.md#continuous-integration) describes.
 `npm pack --dry-run packages/harness/dist` lists what npm would get.
 
 ## Versions

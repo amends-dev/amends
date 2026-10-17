@@ -116,7 +116,7 @@ package.
 
 The root manifest's `workspaces.catalog` pins every Effect package, and `repos/effect` holds the
 matching source as a squashed Git subtree of [Effect-TS/effect](https://github.com/Effect-TS/effect),
-at tag `effect@4.0.0`, commit `67ba4e46a11ccda0b6761578bfd22c04ae00167d`. Upgrade both together:
+at tag `effect@4.0.5`, commit `7f524e25cfb49a71ac39b0f44278d08d40dda5de`. Upgrade both together:
 
 1. Set the new version for every Effect package in the catalog, and run `bun install`.
 2. Commit, then pull the matching tag, replacing `<version>` with the catalog's version:
@@ -129,6 +129,12 @@ at tag `effect@4.0.0`, commit `67ba4e46a11ccda0b6761578bfd22c04ae00167d`. Upgrad
 3. Update the tag and commit recorded above, run `bun run check` and `bun run test`, recheck the
    APIs the upgrade touches, and verify the host starts as its
    [guide](hosts/local/README.md#verify) describes.
+4. Raise the published packages to a new line with a changeset, since their `effect` range moves
+   with the catalog; see [releasing](docs/publishing.md#releasing).
+
+The weekly [Latest Effect](.github/workflows/latest-effect.yml) workflow checks the repository
+against the newest Effect release the published packages allow, and fails when one breaks them:
+the sign to upgrade.
 
 Journal payloads are encoded with `SchemaBinary`, and the
 [codec fixtures](packages/core/test/journal/codec.test.ts) check bytes captured from an earlier

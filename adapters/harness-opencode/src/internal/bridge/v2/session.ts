@@ -262,7 +262,7 @@ const createOpencodeSession = Effect.fnUntraced(function* (
   }
   // opencode imports a session under the id it is given.
   const crypto = yield* Crypto.Crypto
-  const sessionID = `ses_${(yield* Effect.orDie(crypto.randomUUIDv4)).replaceAll("-", "")}`
+  const sessionID = `ses_${(yield* Effect.orDie(crypto.randomUUIDv4())).replaceAll("-", "")}`
   const now = yield* Clock.currentTimeMillis
   const messages = yield* Effect.fromResult(Prompt.messagesOf(history, { sessionID, now })).pipe(
     Effect.mapError((reason) => harnessError(reason))
