@@ -134,6 +134,42 @@ describe("opencode 1 turns", () => {
     ])
   })
 
+  it("reports each file of an applied patch, a move as the file it removed and the one it created", () => {
+    const { parts } = translate([
+      event.busy(),
+      event.stepStarted("msg_1"),
+      event.tool("msg_1", "call_1", "apply_patch", {
+        status: "completed",
+        input: { patchText: "*** Begin Patch\n*** End Patch" },
+        output: "Success. Updated the following files:",
+        metadata: {
+          diff: "",
+          files: [
+            { filePath: `${directory}/haiku.txt`, relativePath: "haiku.txt", type: "add" },
+            { filePath: `${directory}/src/main.ts`, relativePath: "src/main.ts", type: "update" },
+            { filePath: `${directory}/old.txt`, relativePath: "old.txt", type: "delete" },
+            {
+              filePath: `${directory}/a.ts`,
+              relativePath: "b.ts",
+              type: "move",
+              movePath: `${directory}/b.ts`
+            },
+            { filePath: "/elsewhere/notes.txt", relativePath: "../../elsewhere/notes.txt", type: "update" }
+          ]
+        }
+      })
+    ])
+
+    expect(parts.filter((part) => part.type === "file-change")).toEqual([
+      { type: "file-change", event: "create", path: "haiku.txt" },
+      { type: "file-change", event: "modify", path: "src/main.ts" },
+      { type: "file-change", event: "delete", path: "old.txt" },
+      { type: "file-change", event: "delete", path: "a.ts" },
+      { type: "file-change", event: "create", path: "b.ts" },
+      { type: "file-change", event: "modify", path: "/elsewhere/notes.txt" }
+    ])
+  })
+
   it("leaves out the calls of the host's tools, of the tool opencode answers in JSON with, and of questions", () => {
     const { parts } = translate(
       [

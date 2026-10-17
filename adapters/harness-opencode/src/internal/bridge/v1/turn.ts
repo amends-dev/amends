@@ -19,6 +19,7 @@
 
 import type { StreamPart } from "@amends-dev/harness"
 import type * as Response from "effect/ai/Response"
+import * as Schema from "effect/Schema"
 import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../steps.ts"
 import {
   type AssistantMessage,
@@ -365,9 +366,20 @@ const callUpdated = (turn: Turn, part: ToolPart): Translated => {
   return [{ ...turn, calls: withEntry(turn.calls, callID, { name, called: true, answered }) }, parts]
 }
 
+/** The files a completed call of `apply_patch` reports in its metadata, by their absolute paths. */
+const PatchedFiles = Schema.Array(
+  Schema.Struct({
+    filePath: Schema.String,
+    type: Schema.Literals(["add", "update", "delete", "move"]),
+    movePath: Schema.optional(Schema.String)
+  })
+)
+
 /**
- * The file a completed call of `write` or `edit` changed, by its path within `directory`, or as it
- * is when outside it: `write` says whether the file existed before. Other tools, such as `bash`,
+ * The files a completed call of `write`, `edit`, or `apply_patch` changed, by their paths within
+ * `directory`, or as they are when outside it: `write` says whether the file existed before, and
+ * `apply_patch`, which opencode gives OpenAI's models in place of the other two, reports each file
+ * of the patch, a move as the file it removed and the one it created. Other tools, such as `bash`,
  * do not say which files they change.
  */
 const fileChangesOf = (
@@ -378,20 +390,41 @@ const fileChangesOf = (
     readonly metadata?: Readonly<Record<string, unknown>> | undefined
   }
 ): ReadonlyArray<StreamPart.StreamPart> => {
+  const pathOf = (file: string) => (file.startsWith(`${directory}/`) ? file.slice(directory.length + 1) : file)
+  if (tool === "apply_patch") {
+    const files = state.metadata?.["files"]
+    if (!Schema.is(PatchedFiles)(files)) return []
+    return files.flatMap(({ filePath, type, movePath }): ReadonlyArray<StreamPart.StreamPart> => {
+      switch (type) {
+        case "add":
+          return [{ type: "file-change", event: "create", path: pathOf(filePath) }]
+        case "update":
+          return [{ type: "file-change", event: "modify", path: pathOf(filePath) }]
+        case "delete":
+          return [{ type: "file-change", event: "delete", path: pathOf(filePath) }]
+        case "move":
+          return movePath === undefined
+            ? [{ type: "file-change", event: "modify", path: pathOf(filePath) }]
+            : [
+                { type: "file-change", event: "delete", path: pathOf(filePath) },
+                { type: "file-change", event: "create", path: pathOf(movePath) }
+              ]
+      }
+    })
+  }
   const file = state.metadata?.["filepath"] ?? state.input["filePath"]
   if (typeof file !== "string") return []
-  const path = file.startsWith(`${directory}/`) ? file.slice(directory.length + 1) : file
   switch (tool) {
     case "write":
       return [
         {
           type: "file-change",
           event: state.metadata?.["exists"] === false ? "create" : "modify",
-          path
+          path: pathOf(file)
         }
       ]
     case "edit":
-      return [{ type: "file-change", event: "modify", path }]
+      return [{ type: "file-change", event: "modify", path: pathOf(file) }]
     default:
       return []
   }

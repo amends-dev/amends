@@ -156,8 +156,10 @@ as data URLs or as the URLs they are. The events opencode publishes for the turn
 harness's stream parts as they happen: text and reasoning stream as opencode writes them, a tool's
 input streams whole once the tool runs, and opencode's own tools run inside opencode, so their
 calls and results are `providerExecuted`. A file that opencode's `write` or `edit` tool changes is
-a `file-change` part, with its path relative to the session's directory. An answer in JSON is the
-text of the last step.
+a `file-change` part, with its path relative to the session's directory, and so is each file of a
+patch from `apply_patch`, the tool opencode gives OpenAI's models in their place; a file the patch
+moves is the file it removed and the one it created. An answer in JSON is the text of the last
+step.
 
 The host's tools reach opencode through the bridge's MCP server, which opencode names `host`, so
 it calls a tool `host_<tool>`: the names of the host's tools fit in 59 characters, as the agent's
