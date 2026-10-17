@@ -298,19 +298,6 @@ CREATE TABLE "roles" (
 	CONSTRAINT "roles_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
-CREATE TABLE "session_log_entries" (
-	"workspace_id" text,
-	"participation_id" text,
-	"position" integer,
-	"recorded_at" timestamp with time zone NOT NULL,
-	"kind" text NOT NULL,
-	"turn_id" text,
-	"details" jsonb NOT NULL,
-	CONSTRAINT "session_log_entries_pkey" PRIMARY KEY("workspace_id","participation_id","position"),
-	CONSTRAINT "session_log_positive_position" CHECK ("position" > 0),
-	CONSTRAINT "session_log_entry_turn" CHECK (("kind" = 'Joined') = ("turn_id" IS NULL))
-);
---> statement-breakpoint
 CREATE TABLE "session_states" (
 	"workspace_id" text,
 	"participation_id" text,
@@ -455,7 +442,7 @@ CREATE TABLE "turns" (
 	"retried_by" text,
 	"status" text NOT NULL,
 	"accepted_through_sequence" integer NOT NULL,
-	"log_after" integer NOT NULL,
+	"log_after" integer,
 	"harness_connection_id" text,
 	"model_connection_id" text,
 	"model_id" text,

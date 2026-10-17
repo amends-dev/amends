@@ -8,6 +8,7 @@
  * @since 0.1.0
  */
 
+import { Entry as LogEntry } from "@amends-dev/log"
 import * as Schema from "effect/Schema"
 import * as Struct from "effect/Struct"
 import * as Agent from "../agent/Agent.ts"
@@ -114,10 +115,10 @@ export const Turn = Schema.Struct({
   /** The thread position the turn's input reaches: the work it accepted. */
   acceptedThroughSequence: Sequence,
   /**
-   * Where the turn's entries begin in its participation's session log: after this position, which
-   * was the log's latest when the turn was created, or 0 for an empty log.
+   * Where the turn's entries begin in its participation's session log: after this batch, which was
+   * the log's latest when the turn was created, or null for an empty log.
    */
-  logAfter: Sequence,
+  logAfter: Schema.NullOr(LogEntry.Position),
   /** What the turn runs on, recorded when it starts and kept when it runs again. */
   selection: Schema.NullOr(Agent.Selection),
   /** The agent's reply, once the turn posted it. */

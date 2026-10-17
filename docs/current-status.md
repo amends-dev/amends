@@ -473,8 +473,9 @@ determines snapshot behavior.
 
 Every journal commit still takes the workspace's lock, so one workspace's conversation writes
 run one at a time, at roughly the rate one commit's statements allow. A turn's steps go to its
-session log, which takes no lock and no part in commits, so they never wait for those writes. The adapter's tests do not
-establish correctness for arbitrary session/database isolation settings.
+session log as standalone appends, which take only that log's lock and no part in commits, so they
+never wait for those writes. The adapter's tests do not establish correctness for arbitrary
+session/database isolation settings.
 An explicit isolation choice and coverage for changed defaults remain outstanding.
 
 ## Edge resource controls

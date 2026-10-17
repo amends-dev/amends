@@ -87,7 +87,7 @@ export interface Space {
 
 /**
  * The storage every connected host shares: each workspace's committed state and who is writing
- * it, the session logs, and the tables and locks beside them. `make` builds an empty one and
+ * it, and the tables and locks beside them. `make` builds an empty one and
  * `layer` provides it; a host connects through a `Connection`.
  *
  * @category services
@@ -104,11 +104,6 @@ export class MemoryDatabase extends Context.Service<
      */
     readonly writers: Map<WorkspaceId.WorkspaceId, object>
     /**
-     * Each participation's session log by workspace and participation: its entries' JSON in position
-     * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
-     */
-    readonly sessionLogs: Map<string, ReadonlyArray<string>>
-    /**
      * Tables beside the workspaces' state, by name, each created on first use: what a host stores
      * across its workspaces, such as its accounts, as JSON rows by ID.
      */
@@ -118,7 +113,7 @@ export class MemoryDatabase extends Context.Service<
      * transaction until it ends, and whatever else changes one at a time.
      */
     readonly locks: Map<string, Semaphore.Semaphore>
-    /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
+    /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
     appended: Deferred.Deferred<void>
     /** Every workspace's signals, across every host; signals themselves are never kept. */
     readonly signals: LocalSignalHub.LocalSignalHub
@@ -282,8 +277,8 @@ export const logLock = (database: MemoryDatabase["Service"], workspaceId: Worksp
   lock(database, JSON.stringify(["log", workspaceId, logId]))
 
 /**
- * Wake every reader waiting for an append, after a commit with entries or a session log append;
- * the memory store and `SessionLogStore` wait on `appended` for their `waitForAppend`.
+ * Wake every reader waiting for an append, after a commit with entries; the memory store waits on
+ * `appended` for its `waitForAppend`.
  *
  * @category mutations
  * @since 0.1.0
@@ -305,7 +300,6 @@ export const make = Effect.gen(function* () {
   return MemoryDatabase.of({
     spaces: new Map(),
     writers: new Map(),
-    sessionLogs: new Map(),
     tables: new Map(),
     locks: new Map(),
     appended: yield* Deferred.make<void>(),

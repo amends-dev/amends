@@ -135,12 +135,9 @@ its connection's ID as a column, where a null `harness_connection_id` is `Auto`,
 agents' turns, with a partial unique index allowing one active turn per agent and thread, and the
 harness, model, and sandbox a turn started on as columns set all together or not at all.
 
-`session_states` holds each participation's harness session as its last turn left it, and
-`session_log_entries` each participation's session log, keyed by position, with each entry's kind
-and turn as columns and the rest in `details`. Session log statements run apart from any transaction
-the caller is in, since the log takes part in no commit: an append checks the log's latest position,
-the key refuses a position taken meanwhile, which is the store's `Overtaken`, and it then notifies
-readers waiting for an append. Both tables, like credentials, survive rebuilds.
+`session_states` holds each participation's harness session as its last turn left it, beside its
+session log, which is one of the workspace's logs in `log_entries`, its entries as JSON. Both, like
+credentials, survive rebuilds.
 
 ### Channels
 
@@ -269,7 +266,7 @@ transaction-pooling proxy, leaves the request to the runner's next read.
 
 The package exports the `Postgres*` modules; the rest is under `src/internal/`. There, one module
 per store exports `make` and a `layer` for the core store it implements, such as `members.ts`,
-`threads.ts`, `turnRecords.ts`, `sessionLogs.ts`, and `deliveries.ts`. They share `binding.ts`, one
+`threads.ts`, `turnRecords.ts`, and `deliveries.ts`. They share `binding.ts`, one
 workspace's view of the database: its identity, the transaction boundary, and the guard each
 statement runs under. `PostgresWorkspaceStorage.ts` composes every store over a binding
 for one workspace (`layerWorkspace`), its private `layerStores` registers each store, and

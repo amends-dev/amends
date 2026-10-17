@@ -9,6 +9,7 @@
  * @since 0.1.0
  */
 
+import type { Log } from "@amends-dev/log"
 import * as Context from "effect/Context"
 import * as Crypto from "effect/Crypto"
 import * as Data from "effect/Data"
@@ -41,7 +42,6 @@ import * as ThreadPermissions from "../thread/ThreadPermissions.ts"
 import * as ThreadQuery from "../thread/ThreadQuery.ts"
 import * as WorkspaceId from "../workspace/WorkspaceId.ts"
 import * as SessionLog from "./SessionLog.ts"
-import * as SessionLogStore from "./SessionLogStore.ts"
 import * as Turn from "./Turn.ts"
 import * as TurnActivity from "./TurnActivity.ts"
 import * as TurnCommand from "./TurnCommand.ts"
@@ -199,7 +199,7 @@ export const make = Effect.gen(function* () {
   const authorization = yield* Authorization.Authorization
   const turnCommand = yield* TurnCommand.TurnCommand
   const journal = yield* Journal.Journal
-  const sessionLogStore = yield* SessionLogStore.SessionLogStore
+  const sessionLogs = yield* SessionLog.SessionLogs
   const signalHub = yield* SignalHub.SignalHub
   const changeFeedSource = yield* ChangeFeedSource.ChangeFeedSource
   const crypto = yield* Crypto.Crypto
@@ -301,14 +301,18 @@ export const make = Effect.gen(function* () {
       Effect.mapError(logInterrupted)
     )
 
-    const reader = SessionLog.reader(turn.id, turn.logAfter)
+    const sessionLog = sessionLogs.open(turn.participationId)
+    const reader = SessionLog.reader(turn.id, Option.fromNullOr(turn.logAfter))
+    /** The reads of the log past what the reader took. */
+    const pastReader = () =>
+      Option.match(reader.position(), {
+        onNone: () => ({ limit: logPage }),
+        onSome: (after) => ({ after, limit: logPage })
+      })
     /** Read what the log holds past what the reader took, until it is all read. */
     const readLogSoFar = Effect.gen(function* () {
       for (;;) {
-        const page = yield* sessionLogStore.read(turn.participationId, {
-          after: reader.position(),
-          limit: logPage
-        })
+        const page = yield* sessionLog.read(pastReader())
         reader.add(page)
         if (page.length < logPage) return
       }
@@ -331,21 +335,17 @@ export const make = Effect.gen(function* () {
     })
 
     type Input = Data.TaggedEnum<{
-      Logged: { readonly recorded: ReadonlyArray<SessionLog.Recorded> }
+      Logged: { readonly batch: Log.Batch<SessionLog.Entry> }
       Drafted: { readonly draft: Turn.LogMessage }
       AccessChanged: {}
       Ended: {}
     }>
     const Input = Data.taggedEnum<Input>()
     // The session log as it grows past the first read, on a position of its own.
-    const loggedInputs = Stream.paginate(
-      reader.position(),
-      Effect.fnUntraced(function* (after: number) {
-        yield* sessionLogStore.waitForAppend(turn.participationId, after)
-        const page = yield* sessionLogStore.read(turn.participationId, { after, limit: logPage })
-        return [[Input.Logged({ recorded: page })], Option.some(page.at(-1)?.position ?? after)] as const
-      })
-    ).pipe(Stream.mapError(logInterrupted))
+    const loggedInputs = sessionLog.tail(pastReader()).pipe(
+      Stream.map((batch) => Input.Logged({ batch })),
+      Stream.mapError(logInterrupted)
+    )
     const draftedInputs = live.pipe(
       Stream.filter(
         (signal): signal is Extract<Signal.Signal, { readonly _tag: "TurnDraft" }> =>
@@ -386,9 +386,9 @@ export const make = Effect.gen(function* () {
       Input.$match(input, {
         Drafted: ({ draft }) => Effect.succeed([draft]),
         AccessChanged: () => Effect.as(checkStillReadable, []),
-        Logged: ({ recorded }) =>
+        Logged: ({ batch }) =>
           checkStillReadable.pipe(
-            Effect.andThen(Effect.sync(() => reader.add(recorded))),
+            Effect.andThen(Effect.sync(() => reader.add([batch]))),
             Effect.andThen(changeMessages)
           ),
         Ended: () => Effect.andThen(checkStillReadable, readEnding)
@@ -451,7 +451,7 @@ export const make = Effect.gen(function* () {
         participationId: turn.participationId,
         retry: { of: turn.id, by: actor.memberId },
         acceptedThroughSequence: turn.acceptedThroughSequence,
-        logAfter: yield* sessionLogStore.head(turn.participationId),
+        logAfter: Option.getOrNull(yield* sessionLogs.open(turn.participationId).head),
         createdAt: DateTime.isGreaterThan(now, turn.createdAt) ? now : DateTime.add(turn.createdAt, { milliseconds: 1 })
       })
       const event = yield* journal.publish(TurnFacts.Retried, created)

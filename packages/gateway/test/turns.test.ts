@@ -17,7 +17,7 @@ import {
   ThreadParticipation
 } from "@amends-dev/core/thread"
 import {
-  type SessionLog,
+  SessionLog,
   type SessionStateStore,
   Turn,
   TurnExecution,
@@ -57,15 +57,15 @@ const timelineOf = (id: WorkspaceId.WorkspaceId, threadId: Turn.Turn["threadId"]
 /** The turn as stored now. */
 const turnOf = (id: WorkspaceId.WorkspaceId, turnId: TurnId.TurnId) =>
   Effect.flatMap(boundTo(id), (bound) => Effect.map(bound.turns.get(turnId), Option.getOrThrow))
-/** Append to the participation's session log after its latest entry, as a turn's job does. */
+/** Append to the participation's session log as one batch, as a turn's job does. */
 const appendToLog = (
   id: WorkspaceId.WorkspaceId,
   participationId: Turn.Turn["participationId"],
   entries: readonly [SessionLog.Entry, ...Array<SessionLog.Entry>]
 ) =>
   Effect.flatMap(boundTo(id), (bound) =>
-    Effect.flatMap(bound.sessionLogs.head(participationId), (head) =>
-      bound.sessionLogs.append(participationId, entries, head)
+    Effect.flatMap(SessionLog.SessionLogs, (sessionLogs) => sessionLogs.open(participationId).appendAll(entries)).pipe(
+      Effect.provide(Support.core(bound))
     )
   )
 /** Log the prompt a turn started with, as its job does before running it. */

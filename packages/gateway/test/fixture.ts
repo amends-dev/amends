@@ -53,7 +53,6 @@ export const fixture: Fixture = {
                 for (const batch of batches) total += 1 + batch.entries.length
               for (const table of space.records) total += table.size
             }
-            for (const log of database.sessionLogs.values()) total += log.length
             for (const table of database.tables.values()) total += table.size
             return total
           })

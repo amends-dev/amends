@@ -133,7 +133,7 @@ describe("workspace isolation", () => {
               retry: null,
               status: "queued",
               acceptedThroughSequence: 1,
-              logAfter: 0,
+              logAfter: null,
               selection: null,
               messageIds: [],
               failure: null,

@@ -40,7 +40,7 @@ import {
   ThreadQuery,
   ThreadStore
 } from "@amends-dev/core/thread"
-import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore, TurnTimeline } from "@amends-dev/core/turn"
+import { SessionStateStore, TurnJobs, TurnStore, TurnTimeline } from "@amends-dev/core/turn"
 import {
   type Invitation,
   InvitationStore,
@@ -151,8 +151,7 @@ export const bind = (
   connectionCredentials: Context.get(context, ConnectionCredentialStore.ConnectionCredentialStore),
   agents: Context.get(context, AgentStore.AgentStore),
   turns: Context.get(context, TurnStore.TurnStore),
-  sessionStates: Context.get(context, SessionStateStore.SessionStateStore),
-  sessionLogs: Context.get(context, SessionLogStore.SessionLogStore)
+  sessionStates: Context.get(context, SessionStateStore.SessionStateStore)
 })
 /**
  * A workspace's bound stores by name, with the context core receives, as `bind` returns them.

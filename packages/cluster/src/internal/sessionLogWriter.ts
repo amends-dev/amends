@@ -1,19 +1,21 @@
 /**
- * A turn's run writing its participation's session log, which takes part in no commit. It opens
- * the log for the turn, then appends each entry after the one it wrote last, so a run that finds
- * the log past what it wrote, as one another run replaced after Cluster moved its job, writes
- * nothing more and stops: it is `Superseded`. It calls the workspace's session log store and turn
- * execution, and leaves entering the workspace to `TurnRunner`, which opens one for each run of a
- * turn.
+ * A turn's run writing its participation's session log, outside every commit. It opens the log for
+ * the turn, then appends each batch after the one it wrote last, so a run that finds the log past
+ * what it wrote, as one another run replaced after Cluster moved its job, writes nothing more and
+ * stops: it is `Superseded`. It calls the workspace's session logs and turn execution, and leaves
+ * entering the workspace to `TurnRunner`, which opens one for each run of a turn.
  */
 
-import { SessionLog, SessionLogStore, type Turn, TurnExecution, TurnId } from "@amends-dev/core/turn"
+import { SessionLog, TurnExecution, TurnId } from "@amends-dev/core/turn"
 import { Agent, type Session } from "@amends-dev/harness"
+import type { Entry } from "@amends-dev/log"
 import type * as Prompt from "effect/ai/Prompt"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Ref from "effect/Ref"
 import * as Schema from "effect/Schema"
+import * as Stream from "effect/Stream"
 
 /**
  * Another run of the turn wrote to its session log after this one: this one stops.
@@ -124,59 +126,56 @@ const unfinishedTurnOf = (
   }
 }
 
-/** Entries read at a time. */
-const pageSize = 500
+/** Batches read at a time. */
+const pageSize = 100
 
-/** Every entry of the participation's log, oldest first, read a page at a time. */
-const readLog = Effect.fnUntraced(function* (participationId: Turn.Turn["participationId"]) {
-  const sessionLogStore = yield* SessionLogStore.SessionLogStore
-  const recorded: Array<SessionLog.Recorded> = []
-  for (;;) {
-    const page = yield* sessionLogStore.read(participationId, {
-      after: recorded.at(-1)?.position ?? 0,
-      limit: pageSize
-    })
-    recorded.push(...page)
-    if (page.length < pageSize) return recorded
-  }
-})
-
-/** Where a run's last entry sits in the log, and what the run wrote so far. */
+/** Where a run's last batch sits in the log, None for an empty log, and what the run wrote so far. */
 interface Written {
-  readonly head: number
+  readonly head: Option.Option<Entry.Position>
   readonly entries: ReadonlyArray<SessionLog.Entry>
 }
 
 /**
  * Open the participation's log for a run of `ready`: read it, write the run's opening, and
  * return what the run starts from, where its opening sits in the log, `append`, which writes more
- * after the run's last entry or fails with `Superseded`, writing none of it, and the turn's
+ * after the run's last batch or fails with `Superseded`, writing none of it, and the turn's
  * entries, those read and those the run wrote so far, oldest first. An append is not cut short: a
  * run stopped meanwhile stops after it.
  */
 export const open = Effect.fn("SessionLogWriter.open")(function* (ready: Ready) {
   const { participationId, id: turnId } = ready.turn
-  const recorded = yield* readLog(participationId)
-  const entries = recorded.map(({ entry }) => entry)
+  const sessionLogs = yield* SessionLog.SessionLogs
+  const sessionLog = sessionLogs.open(participationId)
+  const batches = yield* Stream.runCollect(sessionLog.stream({ limit: pageSize }))
+  const entries = batches.flatMap((batch) => batch.entries.map((entry) => entry.payload))
   const joined =
     entries.length === 0
       ? yield* TurnExecution.TurnExecution.use((turnExecution) => turnExecution.joinedConversation(turnId))
       : []
-  const written = yield* Ref.make<Written>({ head: recorded.at(-1)?.position ?? 0, entries: [] })
+  const written = yield* Ref.make<Written>({
+    head: Option.fromUndefinedOr(batches.at(-1)?.position),
+    entries: []
+  })
+  /** Another run wrote past this one's last batch; a log that has not moved was only busy. */
+  const overtaken = (head: Written["head"]) =>
+    Effect.map(sessionLog.head, (current) => !Option.makeEquivalence<number>((a, b) => a === b)(current, head))
+  /** Append after the run's last batch, as one batch, returning its position. */
   const append = Effect.fnUntraced(function* (more: Array.NonEmptyReadonlyArray<SessionLog.Entry>) {
     const { head } = yield* Ref.get(written)
-    const sessionLogStore = yield* SessionLogStore.SessionLogStore
-    const appended = yield* sessionLogStore
-      .append(participationId, more, head)
-      .pipe(Effect.catchTag("SessionLogStore.Overtaken", () => new Superseded({ turnId })))
-    yield* Ref.update(written, (before) => ({
-      head: appended.at(-1)?.position ?? before.head,
-      entries: [...before.entries, ...more]
-    }))
+    const appended = yield* sessionLog
+      .appendAll(more, { expectedAfter: head })
+      .pipe(
+        Effect.catchReason("StoreError", "Contended", (_, error) =>
+          Effect.flatMap(overtaken(head), (moved) => Effect.fail(moved ? new Superseded({ turnId }) : error))
+        )
+      )
+    if (!Array.isReadonlyArrayNonEmpty(appended)) return yield* Effect.die("An append of entries wrote none")
+    const { position } = Array.headNonEmpty(appended)
+    yield* Ref.update(written, (before) => ({ head: Option.some(position), entries: [...before.entries, ...more] }))
+    return position
   }, Effect.uninterruptible)
   const opening = openingOf(entries, ready, joined)
-  yield* append(opening.entries)
-  const { head: openedAt } = yield* Ref.get(written)
+  const openedAt = yield* append(opening.entries)
   const read = entries.filter(SessionLog.isOfTurn(turnId))
   return {
     opening,

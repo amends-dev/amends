@@ -73,7 +73,7 @@ import * as ThreadProjection from "./thread/ThreadProjection.ts"
 import * as ThreadQuery from "./thread/ThreadQuery.ts"
 import * as ThreadService from "./thread/ThreadService.ts"
 import * as ThreadTitleTimeline from "./thread/ThreadTitleTimeline.ts"
-import type * as SessionLogStore from "./turn/SessionLogStore.ts"
+import * as SessionLog from "./turn/SessionLog.ts"
 import * as TurnCommand from "./turn/TurnCommand.ts"
 import * as TurnExecution from "./turn/TurnExecution.ts"
 import * as TurnJobs from "./turn/TurnJobs.ts"
@@ -275,6 +275,7 @@ const jobServices = Layer.mergeAll(TurnExecution.layer, ChannelIntake.layer, Del
  * @since 0.1.0
  */
 export const layer = Layer.mergeAll(operations, jobServices).pipe(
+  Layer.provideMerge(SessionLog.layer),
   Layer.provideMerge([journal, authorization]),
   Layer.provideMerge(PermissionCatalog.layer(permissions))
 )
@@ -309,4 +310,4 @@ export type Operations = Layer.Success<typeof operations>
  * @category models
  * @since 0.1.0
  */
-export type JobServices = Layer.Success<typeof jobServices> | SessionLogStore.SessionLogStore
+export type JobServices = Layer.Success<typeof jobServices> | SessionLog.SessionLogs

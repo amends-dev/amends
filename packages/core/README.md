@@ -25,7 +25,7 @@ The package root composes one workspace's core:
 - `Operations` is the set of services a gateway runs for an actor. Programs may require only these,
   so they cannot bypass the membership and permission checks each operation performs.
 - `JobServices` is what a host's jobs call as no actor: `TurnExecution`, `ChannelIntake`,
-  `DeliveryExecution`, and the `SessionLogStore` a turn's job writes. They act as the agent, the
+  `DeliveryExecution`, and the `SessionLog.SessionLogs` a turn's job writes. They act as the agent, the
   contact, or delivery itself and check no actor's permissions, so only jobs a host trusts run them.
 - `journalLog` names the workspace journal's log; a workspace that was never created has no batch in
   it, which hosts can check without booting the workspace.
@@ -468,9 +468,10 @@ way a turn ends, including a queued turn stopped by a reader, goes through `Turn
 which publishes the turn's fact and records `turn.ended` in its thread's timeline in the ending
 commit.
 
-Each participation has a session log, the record of the agent's conversation in the thread, apart
-from the journal and every commit (`SessionLogStore`: `head`, `append` after the position the writer
-read to, which a log past it refuses with `Overtaken`, `read` past a position, and `waitForAppend`).
+Each participation has a session log, the record of the agent's conversation in the thread: one of
+the workspace's logs, apart from the journal, which `SessionLog.SessionLogs` opens and a run appends
+to outside every commit, each batch after the one it wrote last (`expectedAfter`), so a log another
+run wrote past refuses it. Its entries are stored as JSON.
 Its entries (`SessionLog.Entry`) are `Joined`, the conversation the agent joined, and, each naming
 its turn, `Prompted`, `Started` when a run started the turn, on which harness agent and with what
 continues the turn when the agent gives that, each `Step`, and `Interrupted` when a run stopped
@@ -624,7 +625,7 @@ Nothing survives the process.
 Every store contract builds its store with `make(workspaceId, driver)`, over the driver an adapter
 implements: the store checks each input against its schema, and a record against the workspace,
 through the log package's `StoreInput`, with `WorkspaceId.rejectForeign`, before the driver sees
-it. The checkpoint and session log stores, whose inputs name no workspace, take the driver alone,
+it. The checkpoint store, whose inputs name no workspace, takes the driver alone,
 as the log package's `Store.make` does. A
 driver keeps only what storage keeps, such as reused IDs and conditional writes, which it rejects
 with `StoreError` (`Rejected`), and an adapter's module returns the contract's `make` over its
@@ -702,7 +703,7 @@ only kinds; see [errors by kind](#errors-by-kind). Every store fails with one `S
 operation, whose reason says whether storage `Failed`, `Rejected` a write, or was `Contended`; an
 operation reports contention as `CoreError.Unavailable` and the rest as defects. Any other
 error belongs to the module that raises it, and its tag is its name there, as
-`SessionLogStore.Overtaken`. Helpers no consumer imports go under `internal/`.
+`ThreadCommand.PositionChanged`. Helpers no consumer imports go under `internal/`.
 
 Every module is written as the published packages are: a header paragraph and `@since` on every
 module, `@category` and `@since` on every export, and a service key that names its module, such as

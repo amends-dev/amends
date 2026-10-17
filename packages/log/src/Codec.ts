@@ -1,9 +1,10 @@
 /**
- * How log values become stored bytes and back. Every payload is encoded in the binary format
- * `SchemaBinary.toCodec` derives from its schema, a persistence contract: stored bytes must stay
- * readable when dependencies change. An ordinary log stores its whole value through
- * `makeEntryCodec`; a log whose entries carry a name or subject beside the payload, which storage
- * indexes, gives `Log.open` an entry codec of its own over `makeForSchema`.
+ * How log values become stored bytes and back. A payload is encoded in the binary format
+ * `SchemaBinary.toCodec` derives from its schema, `makeForSchema`, or as the UTF-8 bytes of its JSON,
+ * `makeJsonForSchema`, for a schema the binary format cannot lay out; either is a persistence
+ * contract: stored bytes must stay readable when dependencies change. An ordinary log stores its
+ * whole value through `makeEntryCodec`; a log whose entries carry a name or subject beside the
+ * payload, which storage indexes, gives `Log.open` an entry codec of its own.
  *
  * @since 0.2.0
  */
@@ -26,15 +27,19 @@ export interface EntryCodec<S extends Schema.Constraint> {
 }
 
 /**
- * The entry codec of an ordinary log: the whole value is the payload, encoded with
- * `makeForSchema`, and an entry has neither name nor subject. Decoding an entry that has either
- * fails, so a log whose entries carry them is never misread through this codec.
+ * The entry codec of an ordinary log: the whole value is the payload, encoded with `payload`,
+ * `makeForSchema(schema)` unless given, and an entry has neither name nor subject. Decoding an
+ * entry that has either fails, so a log whose entries carry them is never misread through this
+ * codec.
  *
  * @category constructors
  * @since 0.2.0
  */
-export const makeEntryCodec = <S extends Schema.Constraint>(schema: S): EntryCodec<S> => {
-  const codec = makeForSchema(schema)
+export const makeEntryCodec = <S extends Schema.Constraint>(
+  schema: S,
+  payload: PayloadCodec<S> = makeForSchema(schema)
+): EntryCodec<S> => {
+  const codec = payload
   const unnamed = Schema.decodeUnknownEffect(Schema.Undefined)
   return {
     encode: (value) => Effect.map(codec.encode(value), (payload) => ({ payload })),
@@ -82,6 +87,35 @@ export const makeForSchema = <S extends Schema.Constraint>(payload: S): PayloadC
     }),
     decode: Effect.fn("Codec.decode")(function* (bytes: Uint8Array) {
       return yield* decode(bytes)
+    })
+  }
+}
+
+// Every runtime a store runs on has the WHATWG `TextEncoder` and `TextDecoder`, which no type this
+// package includes declares.
+declare const TextEncoder: new () => { readonly encode: (text: string) => Uint8Array<ArrayBuffer> }
+declare const TextDecoder: new () => { readonly decode: (bytes: Uint8Array) => string }
+const utf8Encoder = new TextEncoder()
+const utf8Decoder = new TextDecoder()
+
+/**
+ * Encodes one schema's values as the UTF-8 bytes of their JSON, through `Schema.toCodecJson`: for a
+ * schema the binary format cannot lay out, such as a union whose members it cannot tell apart, as
+ * many of Effect AI's are. Decoding checks the JSON against the schema.
+ *
+ * @category constructors
+ * @since 0.2.0
+ */
+export const makeJsonForSchema = <S extends Schema.Constraint>(payload: S): PayloadCodec<S> => {
+  const schema = Schema.fromJsonString(Schema.toCodecJson(payload))
+  const encode = Schema.encodeEffect(schema)
+  const decode = Schema.decodeUnknownEffect(schema)
+  return {
+    encode: Effect.fn("Codec.encodeJson")(function* (value: S["Type"]) {
+      return utf8Encoder.encode(yield* encode(value))
+    }),
+    decode: Effect.fn("Codec.decodeJson")(function* (bytes: Uint8Array) {
+      return yield* decode(utf8Decoder.decode(bytes))
     })
   }
 }

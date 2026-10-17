@@ -19,11 +19,6 @@ export * as SessionLog from "./SessionLog.ts"
 /**
  * @since 0.1.0
  */
-export * as SessionLogStore from "./SessionLogStore.ts"
-
-/**
- * @since 0.1.0
- */
 export * as SessionStateStore from "./SessionStateStore.ts"
 
 /**

@@ -5,8 +5,7 @@ import { GroupId } from "@amends-dev/core/group"
 import { Identity } from "@amends-dev/core/identity"
 import { ThreadId, ThreadParticipationId } from "@amends-dev/core/thread"
 import {
-  type SessionLog,
-  SessionLogStore,
+  SessionLog,
   type SessionStateStore,
   type Turn,
   TurnExecution,
@@ -16,7 +15,8 @@ import {
 import { WorkspaceId, MemberId } from "@amends-dev/core/workspace"
 import { Gateway } from "@amends-dev/gateway"
 import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends-dev/harness"
-import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect"
+import { Log, MemoryStore } from "@amends-dev/log"
+import { Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect"
 import { Prompt } from "effect/ai"
 
 export const workspaceId = WorkspaceId.WorkspaceId.make("workspace-1")
@@ -38,7 +38,7 @@ export const turn: Turn.Turn = {
   retry: null,
   status: "running",
   acceptedThroughSequence: 3,
-  logAfter: 0,
+  logAfter: null,
   selection: null,
   messageIds: [],
   failure: null,
@@ -102,15 +102,16 @@ export interface FakeWorkspaceOptions {
 
 /**
  * A workspace in memory, as the job reaches it through a gateway: one turn of the agent's, which
- * accepting gives while it is active and starting readies, and the participation's session log.
- * It records how the turn ended and the drafts it showed.
+ * accepting gives while it is active and starting readies, and the participation's session log,
+ * in a memory store, which holds each entry `logged` as a batch of its own. It records how the
+ * turn ended and the drafts it showed.
  */
-export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
-  const log: Array<SessionLog.Recorded> = (options.logged ?? []).map((entry, index) => ({
-    position: index + 1,
-    recordedAt: at,
-    entry
-  }))
+export const makeFakeWorkspace = Effect.fnUntraced(function* (options: FakeWorkspaceOptions = {}) {
+  const sessionLogs = yield* Effect.service(SessionLog.SessionLogs).pipe(
+    Effect.provide(SessionLog.layer.pipe(Layer.provide(Log.layer), Layer.provide(MemoryStore.layer)))
+  )
+  const sessionLog = sessionLogs.open(participationId)
+  for (const entry of options.logged ?? []) yield* Effect.orDie(sessionLog.append(entry))
   const endings: Array<Ending> = []
   const drafts: Array<Turn.Draft> = []
   let active = options.workWaits ?? true
@@ -143,28 +144,10 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     fail: (_, { reason, resume }) => end({ kind: "fail", reason, resume }),
     confirmStopped: (_, { resume }) => (active ? end({ kind: "stop", resume }) : Effect.void)
   })
-  /** Append to the log as another writer, after its latest entry. */
-  const appendElsewhere = (entry: SessionLog.Entry) =>
-    Effect.sync(() => void log.push({ position: log.length + 1, recordedAt: at, entry }))
-  const sessionLogStore = SessionLogStore.SessionLogStore.of({
-    head: () => Effect.sync(() => log.length),
-    append: (_, entries, after) =>
-      Effect.suspend(() => {
-        if (after !== log.length)
-          return Effect.fail(new SessionLogStore.Overtaken({ participationId: String(participationId), after }))
-        const recorded = Array.map(entries, (entry, index) => ({
-          position: after + index + 1,
-          recordedAt: at,
-          entry
-        }))
-        log.push(...recorded)
-        return Effect.succeed(recorded)
-      }),
-    read: (_, { after, limit }) => Effect.sync(() => log.slice(after, after + limit)),
-    waitForAppend: () => Effect.never
-  })
+  /** Append to the log as another writer, after its latest batch. */
+  const appendElsewhere = (entry: SessionLog.Entry) => Effect.asVoid(Effect.orDie(sessionLog.append(entry)))
   const services = Context.make(TurnExecution.TurnExecution, turnExecution).pipe(
-    Context.add(SessionLogStore.SessionLogStore, sessionLogStore)
+    Context.add(SessionLog.SessionLogs, sessionLogs)
   )
   let entered = 0
   const gateway = Gateway.Gateway.of({
@@ -184,7 +167,11 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
   return {
     gateway,
     /** The session log's entries, oldest first. */
-    log: () => log.map(({ entry }) => entry),
+    log: Effect.orDie(
+      Effect.map(Stream.runCollect(sessionLog.stream({ limit: 100 })), (batches) =>
+        batches.flatMap((batch) => batch.entries.map((entry) => entry.payload))
+      )
+    ),
     endings: () => [...endings],
     /** How many times the job started the turn. */
     starts: () => starts,
@@ -193,9 +180,9 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     drafts: () => [...drafts],
     appendElsewhere
   }
-}
+})
 
-export type FakeWorkspace = ReturnType<typeof makeFakeWorkspace>
+export type FakeWorkspace = Effect.Success<ReturnType<typeof makeFakeWorkspace>>
 
 export interface ScriptedAgent {
   readonly agent: Agent.Agent

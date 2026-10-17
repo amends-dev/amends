@@ -542,7 +542,7 @@ export const contracts = (fixture: Fixture.Fixture) => {
             retry: null,
             status,
             acceptedThroughSequence: 1,
-            logAfter: 0,
+            logAfter: null,
             selection: null,
             messageIds: [],
             failure: null,

@@ -19,7 +19,6 @@ import { factMetadata } from "./internal/factMetadata.ts"
 import { idempotency } from "./internal/idempotency.ts"
 import { journal } from "./internal/journal.ts"
 import { reads } from "./internal/reads.ts"
-import { sessionLogs } from "./internal/sessionLogs.ts"
 import { signals } from "./internal/signals.ts"
 import { signInStorage } from "./internal/signInStorage.ts"
 import { transactions } from "./internal/transactions.ts"
@@ -90,7 +89,6 @@ export const run = (fixture: Fixture.Fixture) => {
   transactions(fixture)
   changeFeed(fixture)
   signals(fixture)
-  sessionLogs(fixture)
   idempotency(fixture)
   factMetadata(fixture)
   reads(fixture)

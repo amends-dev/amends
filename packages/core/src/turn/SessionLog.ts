@@ -1,18 +1,25 @@
 /**
- * An agent's session log in a thread: the record of its conversation there, one log for each
- * participation, which its turns write as they run. It holds what the agent was told and each step
- * it took, each with the turn it belongs to; how a turn ended is the turn's record's to say. The
- * log takes part in no commit of the workspace, so a host may keep it apart, in a store built for
- * appending (`SessionLogStore`). The agent's session resumes with the conversation rebuilt from it.
+ * An agent's session log in a thread: the record of its conversation there, one log of the
+ * workspace's store for each participation, which its turns write as they run. It holds what the
+ * agent was told and each step it took, each with the turn it belongs to; how a turn ended is the
+ * turn's record's to say. A run appends to it alone, outside every commit, so its writes wait only
+ * for the log's other writers. `SessionLogs` opens a participation's log, and the agent's session
+ * resumes with the conversation rebuilt from it.
  *
  * @since 0.1.0
  */
 
 import { Session, StreamPart } from "@amends-dev/harness"
+import { Codec, Entry as LogEntry, Log } from "@amends-dev/log"
 import * as Prompt from "effect/ai/Prompt"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
 import { constVoid } from "effect/Function"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import type * as ThreadMessageId from "../thread/ThreadMessageId.ts"
+import type * as ThreadParticipationId from "../thread/ThreadParticipationId.ts"
 import * as Turn from "./Turn.ts"
 import * as TurnId from "./TurnId.ts"
 
@@ -60,30 +67,50 @@ export const Entry = Schema.TaggedUnion({
 export type Entry = typeof Entry.Type
 
 /**
- * Where an entry sits in its log: the first at 1, each next one after.
+ * The ID of a participation's session log among the workspace's logs.
  *
- * @category schemas
+ * @category constructors
  * @since 0.1.0
  */
-export const Position = Schema.Int.check(Schema.isGreaterThan(0))
+export const logIdOf = (participationId: ThreadParticipationId.ThreadParticipationId): LogEntry.LogId =>
+  LogEntry.LogId.make(`session/${participationId}`)
 
 /**
- * An entry as its log recorded it: where, and when.
+ * Each participation's session log, as a typed log of the workspace's store: what a turn's job
+ * writes and what readers following a turn read. It opens session logs alone, so the jobs given it
+ * reach no other log.
  *
- * @category schemas
+ * @category services
  * @since 0.1.0
  */
-export const Recorded = Schema.Struct({
-  position: Position,
-  recordedAt: Schema.DateTimeUtcFromString,
-  entry: Entry
-})
+export class SessionLogs extends Context.Service<
+  SessionLogs,
+  {
+    /** The participation's session log; opening it touches no storage. */
+    readonly open: (participationId: ThreadParticipationId.ThreadParticipationId) => Log.Handle<typeof Entry>
+  }
+>()("@amends-dev/core/turn/SessionLog/SessionLogs") {}
 
 /**
- * @category schemas
+ * How a session log stores its entries: as JSON, since what an agent was told and did holds Effect
+ * AI's prompts and parts, whose unions the binary format cannot lay out.
+ */
+const storageCodec = Codec.makeEntryCodec(Entry, Codec.makeJsonForSchema(Entry))
+
+/**
+ * Provide `SessionLogs` over the workspace's `Log.Log`.
+ *
+ * @category layers
  * @since 0.1.0
  */
-export interface Recorded extends Schema.Schema.Type<typeof Recorded> {}
+export const layer = Layer.effect(
+  SessionLogs,
+  Effect.map(Log.Log, (logs) =>
+    SessionLogs.of({
+      open: (participationId) => logs.open({ id: logIdOf(participationId), schema: Entry, storageCodec })
+    })
+  )
+)
 
 /**
  * Whether an entry is one of the turn's; the conversation joined belongs to none.
@@ -151,44 +178,44 @@ export const answerOf = (entries: ReadonlyArray<Entry>): string =>
   )
 
 /**
- * Reads a turn's entries from its participation's log as they come: `add` each page in order,
- * which takes the entries past `position`, the turn's own among them, `end` once the turn ended,
- * with the reply it posted, and `items` says what they show.
+ * Reads a turn's entries from its participation's log as they come: `add` each page of batches in
+ * order, which takes the batches past `position`, the turn's entries among them, `end` once the
+ * turn ended, with the reply it posted, and `items` says what they show.
  *
  * @category models
  * @since 0.1.0
  */
 export interface Reader {
-  readonly add: (recorded: ReadonlyArray<Recorded>) => void
+  readonly add: (batches: ReadonlyArray<Log.Batch<Entry>>) => void
   readonly end: (messageIds: ReadonlyArray<ThreadMessageId.ThreadMessageId>) => void
-  /** The latest position of the log the reader took, the turn's entry or another's. */
-  readonly position: () => number
+  /** The position of the latest batch the reader took, the turn's or another's; None before any. */
+  readonly position: () => Option.Option<LogEntry.Position>
   readonly items: () => ReadonlyArray<Turn.LogItem>
 }
 
 /**
- * Reads the turn's entries past `after`, where its log begins, as its readers see them: the prompt
- * as the messages it took in, each step that wrote text as a response, and each run that stopped
- * short. The response the turn posted is its reply, once the turn ends; steps that only called
- * tools show nothing yet.
+ * Reads the turn's entries past `after`, the batch its log begins after, as its readers see them:
+ * the prompt as the messages it took in, each step that wrote text as a response, and each run that
+ * stopped short. The response the turn posted is its reply, once the turn ends; steps that only
+ * called tools show nothing yet.
  *
  * @category constructors
  * @since 0.1.0
  */
-export const reader = (turnId: TurnId.TurnId, after: number): Reader => {
+export const reader = (turnId: TurnId.TurnId, after: Option.Option<LogEntry.Position>): Reader => {
   const ofTurn = isOfTurn(turnId)
   const items: Array<Turn.LogItem> = []
   let position = after
   /** Where the latest run's last response sits among the items. */
   let lastResponse: number | undefined
-  const add: Reader["add"] = (recorded) => {
-    for (const entry of recorded) {
-      if (entry.position <= position) continue
-      position = entry.position
-      if (ofTurn(entry.entry)) addEntry(entry)
+  const add: Reader["add"] = (batches) => {
+    for (const batch of batches) {
+      if (Option.isSome(position) && batch.position <= position.value) continue
+      position = Option.some(batch.position)
+      for (const entry of batch.entries) if (ofTurn(entry.payload)) addEntry(entry)
     }
   }
-  const addEntry = ({ entry, recordedAt: at }: Recorded) =>
+  const addEntry = ({ payload: entry, recordedAt: at }: Log.Entry<Entry>) =>
     Entry.match(entry, {
       Joined: constVoid,
       Started: constVoid,

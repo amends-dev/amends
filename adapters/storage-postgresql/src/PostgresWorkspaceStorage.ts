@@ -36,7 +36,6 @@ import * as Members from "./internal/members.ts"
 import * as Notifications from "./internal/notifications.ts"
 import * as ReadStates from "./internal/readStates.ts"
 import * as Roles from "./internal/roles.ts"
-import * as SessionLogs from "./internal/sessionLogs.ts"
 import * as SessionStates from "./internal/sessionStates.ts"
 import * as Tasks from "./internal/tasks.ts"
 import * as ThreadActivities from "./internal/threadActivities.ts"
@@ -91,7 +90,6 @@ const layerStores = Layer.mergeAll(
   Connections.layer,
   ConnectionCredentials.layer,
   SessionStates.layer,
-  SessionLogs.layer,
   Agents.layer,
   TurnRecords.layer,
   PostgresSignalHub.layer

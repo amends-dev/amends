@@ -22,7 +22,7 @@ import { ReadStateStore } from "@amends-dev/core/read-state"
 import { SignalHub } from "@amends-dev/core/signal"
 import { TaskStore } from "@amends-dev/core/task"
 import { ThreadActivityStore, ThreadMessageStore, ThreadParticipationStore, ThreadStore } from "@amends-dev/core/thread"
-import { SessionLogStore, SessionStateStore, TurnStore } from "@amends-dev/core/turn"
+import { SessionStateStore, TurnStore } from "@amends-dev/core/turn"
 import type { TurnJobs } from "@amends-dev/core/turn"
 import { InvitationStore, MemberStore, WorkspaceStore, type WorkspaceId } from "@amends-dev/core/workspace"
 import * as Context from "effect/Context"
@@ -88,7 +88,6 @@ const layerMemoryStores = Layer.mergeAll(
   AgentStore.layerMemory,
   TurnStore.layerMemory,
   SessionStateStore.layerMemory,
-  SessionLogStore.layerMemory,
   SignalHub.layerMemory
 )
 
