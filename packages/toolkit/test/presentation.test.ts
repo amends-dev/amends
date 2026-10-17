@@ -28,8 +28,11 @@ const math = MathToolkit.pipe(
 )
 
 /** Has the toolkit run the tool the way a harness does, and returns the results it streams. */
-const run = (toolkit: Toolkit.WithHandler<Record<string, Tool.Any>>, name: string, params: unknown) =>
-  toolkit.handle(name, params as never).pipe(Effect.flatMap(Stream.runCollect))
+const run = <Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+  name: string,
+  params: unknown
+) => toolkit.handle(name as keyof Tools, params as never).pipe(Effect.flatMap(Stream.runCollect))
 
 describe("Presentation.hasTool", () => {
   it.effect("is true for the tools a toolkit has, and not for a name it inherits", () =>
@@ -155,10 +158,8 @@ describe("Presentation.merge", () => {
       const error = yield* Effect.flip(run(merged, "Fail", {}))
 
       // It names the tools of both toolkits as the tools it has.
-      expect(error.reason).toMatchObject({
-        _tag: "ToolNotFoundError",
-        toolName: "Fail",
-        availableTools: ["Greet", "Add"]
+      expect(error).toMatchObject({
+        reason: { _tag: "ToolNotFoundError", toolName: "Fail", availableTools: ["Greet", "Add"] }
       })
     })
   )
