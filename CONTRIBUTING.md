@@ -129,6 +129,12 @@ at tag `effect@4.0.5`, commit `7f524e25cfb49a71ac39b0f44278d08d40dda5de`. Upgrad
 3. Update the tag and commit recorded above, run `bun run check` and `bun run test`, recheck the
    APIs the upgrade touches, and verify the host starts as its
    [guide](hosts/local/README.md#verify) describes.
+4. Raise the published packages to a new line with a changeset, since their `effect` range moves
+   with the catalog; see [releasing](docs/publishing.md#releasing).
+
+The weekly [Latest Effect](.github/workflows/latest-effect.yml) workflow checks the repository
+against the newest Effect release the published packages allow, and fails when one breaks them:
+the sign to upgrade.
 
 Journal payloads are encoded with `SchemaBinary`, and the
 [codec fixtures](packages/core/test/journal/codec.test.ts) check bytes captured from an earlier
