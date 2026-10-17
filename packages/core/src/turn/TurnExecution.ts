@@ -503,7 +503,7 @@ export const make = Effect.gen(function* () {
     const notificationIds = accepted.map(({ id }) => id)
     if (!Array.isReadonlyArrayNonEmpty(notificationIds)) return undefined
     const created = Turn.queued({
-      id: TurnId.TurnId.make(yield* crypto.randomUUIDv4),
+      id: TurnId.TurnId.make(yield* crypto.randomUUIDv4()),
       workspaceId,
       groupId: thread.value.groupId,
       threadId,
@@ -754,7 +754,7 @@ export const make = Effect.gen(function* () {
         const text = Schema.decodeOption(ThreadMessage.Text)(reply)
         if (Option.isNone(text)) return yield* closeFailed(turn, "The agent's reply could not be posted.")
         const published = yield* threadCommand.publishMessage({
-          messageId: ThreadMessageId.ThreadMessageId.make(yield* crypto.randomUUIDv4),
+          messageId: ThreadMessageId.ThreadMessageId.make(yield* crypto.randomUUIDv4()),
           threadId: turn.threadId,
           author: ThreadMessage.Author.cases.Member.make({ memberId: turn.memberId }),
           text: text.value,

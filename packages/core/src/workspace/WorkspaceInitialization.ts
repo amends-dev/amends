@@ -79,7 +79,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   return yield* journal.commit(
     Effect.gen(function* () {
       if (Option.isSome(yield* workspaceStore.get)) return yield* new AlreadyInitialized({ workspaceId })
-      const ownerMemberId = MemberId.MemberId.make(yield* crypto.randomUUIDv4)
+      const ownerMemberId = MemberId.MemberId.make(yield* crypto.randomUUIDv4())
       const record = Workspace.Workspace.make({
         id: workspaceId,
         name,

@@ -161,17 +161,19 @@ export const make = Effect.fnUntraced(function* (options: Options) {
       const id =
         createOptions.id ??
         Sandbox.SandboxId.make(
-          yield* crypto.randomUUIDv4.pipe(
-            Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message })))
-          )
+          yield* crypto
+            .randomUUIDv4()
+            .pipe(
+              Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message })))
+            )
         )
       if ((yield* findSandboxes(id)).length > 0) {
         return yield* sandboxError(new SandboxError.AlreadyExistsError({ description: `Sandbox ${id} already exists` }))
       }
       const template = providerOptions.template ?? options.template
-      const creation = yield* crypto.randomUUIDv4.pipe(
-        Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message })))
-      )
+      const creation = yield* crypto
+        .randomUUIDv4()
+        .pipe(Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message }))))
       return yield* Effect.acquireUseRelease(
         call(() =>
           E2bSandbox.create({

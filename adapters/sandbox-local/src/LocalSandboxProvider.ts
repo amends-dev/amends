@@ -194,7 +194,7 @@ export const make = Effect.fnUntraced(function* (options: Options) {
     createOptions: SandboxProvider.CreateOptions<E> = {}
   ) {
     const id =
-      createOptions.id ?? Sandbox.SandboxId.make(yield* crypto.randomUUIDv4.pipe(Effect.mapError(fromPlatformError)))
+      createOptions.id ?? Sandbox.SandboxId.make(yield* crypto.randomUUIDv4().pipe(Effect.mapError(fromPlatformError)))
     const ports = createOptions.ports ?? []
     const paths = pathsOf(id)
     if (createOptions.networkPolicy !== undefined) yield* allowAllOnly(createOptions.networkPolicy)

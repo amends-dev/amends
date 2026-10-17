@@ -75,7 +75,7 @@ export const make = Effect.gen(function* () {
     roleId: Role.RoleId
   ) {
     const assignment = Assignment.Assignment.make({
-      id: Assignment.AssignmentId.make(yield* crypto.randomUUIDv4),
+      id: Assignment.AssignmentId.make(yield* crypto.randomUUIDv4()),
       workspaceId,
       memberId,
       status: "active",

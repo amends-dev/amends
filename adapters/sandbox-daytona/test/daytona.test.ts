@@ -37,7 +37,7 @@ const useTemplate = <E>(prepare: Template.Template<E>["prepare"]) =>
     const daytona = yield* useDaytona
     const template = {
       name: Template.TemplateName.make("daytona-test"),
-      identity: yield* crypto.randomUUIDv4,
+      identity: yield* crypto.randomUUIDv4(),
       prepare
     }
     const snapshot = yield* snapshotNameOf(template, undefined)

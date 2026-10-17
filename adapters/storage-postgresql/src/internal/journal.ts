@@ -333,7 +333,7 @@ export const make = Effect.gen(function* () {
     if (request.entries.length === 0) return []
     // Named before anything is staged, so a failure leaves the commit as it was.
     const named = yield* Effect.forEach(request.entries, (content) =>
-      Effect.map(crypto.randomUUIDv4, (id) => ({ id: Entry.EntryId.make(id), content }))
+      Effect.map(crypto.randomUUIDv4(), (id) => ({ id: Entry.EntryId.make(id), content }))
     ).pipe(Effect.mapError(StoreError.failed("Store", "append")))
     const batch =
       opened ??

@@ -116,7 +116,7 @@ package.
 
 The root manifest's `workspaces.catalog` pins every Effect package, and `repos/effect` holds the
 matching source as a squashed Git subtree of [Effect-TS/effect](https://github.com/Effect-TS/effect),
-at tag `effect@4.0.0`, commit `67ba4e46a11ccda0b6761578bfd22c04ae00167d`. Upgrade both together:
+at tag `effect@4.0.5`, commit `7f524e25cfb49a71ac39b0f44278d08d40dda5de`. Upgrade both together:
 
 1. Set the new version for every Effect package in the catalog, and run `bun install`.
 2. Commit, then pull the matching tag, replacing `<version>` with the catalog's version:

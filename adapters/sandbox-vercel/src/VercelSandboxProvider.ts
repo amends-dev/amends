@@ -135,15 +135,15 @@ export const make = Effect.fnUntraced(function* (options: Options) {
     const id =
       createOptions.id ??
       Sandbox.SandboxId.make(
-        yield* crypto.randomUUIDv4.pipe(
-          Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message })))
-        )
+        yield* crypto
+          .randomUUIDv4()
+          .pipe(Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message }))))
       )
     const image = providerOptions.image ?? options.image
     const policy = networkPolicyOf(createOptions.networkPolicy ?? Network.NetworkPolicy.cases.AllowAll.make({}))
-    const attempt = yield* crypto.randomUUIDv4.pipe(
-      Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message })))
-    )
+    const attempt = yield* crypto
+      .randomUUIDv4()
+      .pipe(Effect.mapError((error) => sandboxError(new SandboxError.UnknownError({ description: error.message }))))
     // Vercel atomically rejects duplicate project-scoped names; never get-or-create here.
     return yield* Effect.acquireUseRelease(
       call(() =>

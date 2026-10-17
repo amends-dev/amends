@@ -247,7 +247,7 @@ export const make = Effect.fnUntraced(function* (workspaceId: WorkspaceId.Worksp
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* StoreError.failed("Store", "transaction")("Native transactions cannot nest; use journal.commit")
     const commitId = Commit.CommitId.make(
-      yield* crypto.randomUUIDv4.pipe(Effect.mapError(StoreError.failed("Store", "transaction")))
+      yield* crypto.randomUUIDv4().pipe(Effect.mapError(StoreError.failed("Store", "transaction")))
     )
     const standalone = options.log !== undefined
     const held = standalone ? "log" : "workspace"

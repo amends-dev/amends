@@ -433,7 +433,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
     promptTurn: (turnOptions) =>
       Stream.unwrap(
         Effect.gen(function* () {
-          const id = Bridge.TurnId.make(yield* Effect.orDie(crypto.randomUUIDv4))
+          const id = Bridge.TurnId.make(yield* Effect.orDie(crypto.randomUUIDv4()))
           const turn = yield* startTurn(id, turnOptions)
           if (turn === undefined) return Stream.empty
           const agentState = yield* send((client) => client.ReadState({ session }))

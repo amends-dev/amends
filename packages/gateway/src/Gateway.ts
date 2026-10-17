@@ -228,7 +228,7 @@ export const make = Effect.fnUntraced(function* (
     const key = options.requestKey
     const id =
       key === undefined
-        ? WorkspaceId.WorkspaceId.make(yield* Effect.orDie(crypto.randomUUIDv4))
+        ? WorkspaceId.WorkspaceId.make(yield* Effect.orDie(crypto.randomUUIDv4()))
         : yield* workspaceIdForKey(creator, key)
     if (key !== undefined) {
       // A completed first attempt answers its retry without preparing the workspace.

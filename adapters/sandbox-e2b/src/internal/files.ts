@@ -225,16 +225,16 @@ const fileInfoOf = (printed: string): FileSystem.File.Info => {
     mtime: dateOf(mtime),
     atime: dateOf(atime),
     birthtime: dateOf(birthtime),
-    dev: Number(dev),
-    ino: Option.some(Number(ino)),
+    dev: BigInt(dev ?? "0"),
+    ino: Option.some(BigInt(ino ?? "0")),
     mode: modeBits,
-    nlink: Option.some(Number(nlink)),
+    nlink: Option.some(BigInt(nlink ?? "0")),
     uid: Option.some(Number(uid)),
     gid: Option.some(Number(gid)),
-    rdev: Option.some(Number(rdev)),
+    rdev: Option.some(BigInt(rdev ?? "0")),
     size: ByteSize.bytes(BigInt(size ?? "0")),
     blksize: Option.some(ByteSize.bytes(BigInt(blksize ?? "0"))),
-    blocks: Option.some(Number(blocks))
+    blocks: Option.some(BigInt(blocks ?? "0"))
   }
 }
 

@@ -304,9 +304,13 @@ export const make = Effect.fnUntraced(function* (options: Options) {
     const id =
       createOptions.id ??
       Sandbox.SandboxId.make(
-        yield* crypto.randomUUIDv4.pipe(
-          Effect.mapError((cause) => sandboxError(new SandboxError.UnknownError({ description: cause.message }), cause))
-        )
+        yield* crypto
+          .randomUUIDv4()
+          .pipe(
+            Effect.mapError((cause) =>
+              sandboxError(new SandboxError.UnknownError({ description: cause.message }), cause)
+            )
+          )
       )
     const ports = createOptions.ports ?? []
     const { template, networkPolicy } = createOptions

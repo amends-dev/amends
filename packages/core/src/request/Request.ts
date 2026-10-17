@@ -71,6 +71,6 @@ export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<strin
  * @since 0.1.0
  */
 export const idFor = Effect.fnUntraced(function* (key: Key | undefined, parts: ReadonlyArray<string>) {
-  if (key === undefined) return yield* (yield* Crypto.Crypto).randomUUIDv4
+  if (key === undefined) return yield* (yield* Crypto.Crypto).randomUUIDv4()
   return yield* derivedId([...parts, key])
 })

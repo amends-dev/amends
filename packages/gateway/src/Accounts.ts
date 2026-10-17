@@ -90,7 +90,7 @@ const makeMemory = Effect.fn("Accounts.makeMemory")(function* () {
   })
   return Accounts.of({
     findOrCreate: Effect.fn("Accounts.memory.findOrCreate")(function* (email) {
-      const issued = yield* crypto.randomUUIDv4
+      const issued = yield* crypto.randomUUIDv4()
       return yield* Effect.sync(() => {
         for (const [id, address] of accounts) if (address === email) return accountOf(id, address)
         accounts.set(issued, email)

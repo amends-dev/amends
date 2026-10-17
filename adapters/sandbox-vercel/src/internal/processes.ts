@@ -40,7 +40,7 @@ export const makeChildProcessSpawner = Effect.fnUntraced(function* (sandbox: Ses
     if (unsupported !== undefined) {
       return yield* PlatformError.badArgument({ module: "ChildProcess", method: "spawn", description: unsupported })
     }
-    const directory = `/tmp/amends-process-${yield* crypto.randomUUIDv4}`
+    const directory = `/tmp/amends-process-${yield* crypto.randomUUIDv4()}`
     const referenced = yield* Ref.make(true)
     const killed = yield* Ref.make(false)
     const execute = (method: string, script: string) =>

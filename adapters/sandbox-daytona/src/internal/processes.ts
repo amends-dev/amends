@@ -72,7 +72,7 @@ export const makeChildProcessSpawner = Effect.fnUntraced(function* (sandbox: Day
         description: unsupported
       })
     }
-    const session = `amends-process-${yield* crypto.randomUUIDv4}`
+    const session = `amends-process-${yield* crypto.randomUUIDv4()}`
     const outputDirectory = `/tmp/${session}`
     const referenced = yield* Ref.make(true)
     yield* Effect.acquireRelease(
