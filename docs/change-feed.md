@@ -62,8 +62,11 @@ and cache invalidation; apps mount it once per workspace view; features show its
    groups, streams, inbox, and pending counts, since the signals missed meanwhile are never
    replayed.
 
-A write that commits still refreshes the reads it changed before reporting success, so its result
-appears at once; the feed then delivers the same commit and refreshes those reads again. Read
+A post waits for the commit that delivers its message before reporting success, so it shows once
+the post completes without reading anything again; while the feed is not live, or when the commit
+does not arrive within three seconds, it refreshes the reads it changed instead. Other writes that
+commit still refresh the reads they changed before reporting success, so their result appears at
+once, and the feed then delivers the same commit. Read
 marks and marking notifications seen write private state rather than a commit, and refresh nothing
 themselves: the signal the server publishes for them reaches every session of the reader, the one
 that wrote included, and refreshes what it changed, once. A `ThreadRead` signal carries the

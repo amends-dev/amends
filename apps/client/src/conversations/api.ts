@@ -24,6 +24,7 @@ import { perClient, type ApiClient, type WorkspaceApi } from "../api/client.ts"
 import { command } from "../api/failures.ts"
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "../api/keys.ts"
 import type { RequestKey } from "../api/mutation.ts"
+import { awaitMessage } from "../live/arrivals.ts"
 
 export {
   Group,
@@ -853,9 +854,10 @@ export interface Posted {
   readonly threadId: string
 }
 /**
- * Post one message, then invalidate the reads it changes, as the change feed would when the
- * commit arrives, so it shows even while the feed is away. A retry with the same key returns the
- * first attempt's result.
+ * Post one message, then wait for the change feed to deliver it, which shows it in place, so it
+ * shows once the post completes without reading anything again. While the feed is away, or when
+ * the commit does not come soon, it invalidates the reads it changes instead. A retry with the
+ * same key returns the first attempt's result.
  */
 export const postMessage = (workspace: string) => (api: WorkspaceApi, post: Post) =>
   Effect.gen(function* () {
@@ -872,7 +874,11 @@ export const postMessage = (workspace: string) => (api: WorkspaceApi, post: Post
           headers,
           payload
         })
-        yield* Reactivity.invalidate([itemKey(workspace, "streams", groupId), workspaceKey(workspace, "groups")])
+        yield* awaitMessage(
+          workspace,
+          started.message.id,
+          Reactivity.invalidate([itemKey(workspace, "streams", groupId), workspaceKey(workspace, "groups")])
+        )
         return { groupId, threadId: started.thread.id }
       }
       case "direct": {
@@ -884,14 +890,22 @@ export const postMessage = (workspace: string) => (api: WorkspaceApi, post: Post
           }
         })
         const groupId = started.thread.groupId
-        yield* Reactivity.invalidate([itemKey(workspace, "streams", groupId), workspaceKey(workspace, "groups")])
+        yield* awaitMessage(
+          workspace,
+          started.message.id,
+          Reactivity.invalidate([itemKey(workspace, "streams", groupId), workspaceKey(workspace, "groups")])
+        )
         return { groupId, threadId: started.thread.id }
       }
       case "reply": {
         const threadId = yield* command(ThreadId.ThreadId)(post.threadId)
-        yield* api.threads.publish({ params: { threadId }, headers, payload })
+        const published = yield* api.threads.publish({ params: { threadId }, headers, payload })
         // A reply changes its group's stream, whichever group that is.
-        yield* Reactivity.invalidate([itemKey(workspace, "timelines", threadId), collectionKey(workspace, "streams")])
+        yield* awaitMessage(
+          workspace,
+          published.id,
+          Reactivity.invalidate([itemKey(workspace, "timelines", threadId), collectionKey(workspace, "streams")])
+        )
         return { threadId }
       }
     }

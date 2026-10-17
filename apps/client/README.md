@@ -49,7 +49,8 @@ a member's endpoint through the session's client fails to compile.
 Reads are atoms over a generated client, `client.query` or `client.runtime.atom`, shared by every
 consumer of that client and live while mounted; a workspace's reads go through its client. Each registers an invalidation key
 from `api/keys.ts`: the directory, a workspace resource such as `members` or `agents`, or one
-group's stream, one thread's timeline, and so on. Writes invalidate the keys they change, and the
+group's stream, one thread's timeline, and so on. Writes invalidate the keys they change, except
+that a post waits for the commit that delivers its message (`awaitMessage`), and the
 [change feed](../../docs/change-feed.md) invalidates the keys each commit affects, so whatever is
 mounted refreshes, or delivers what the commit changed, which shows in place: a timeline shows each
 delivered item in place of the one it read, and those that follow it after (`withDeliveredItems`),

@@ -41,6 +41,7 @@ import {
 } from "../conversations/api.ts"
 import { posted, typing, typistsAtom } from "../conversations/typing.ts"
 import { deliverTurn } from "../turns/api.ts"
+import { recordLive, recordMessages } from "./arrivals.ts"
 import { watchWake } from "./wake.ts"
 
 export { Signal }
@@ -305,6 +306,7 @@ const run = Effect.fnUntraced(function* (
           const resumed = cursor !== undefined
           if (message.cursor !== null) cursor = message.cursor
           Queue.offerUnsafe(states, ChangeFeedState.Live())
+          recordLive(registry, workspaceId, true)
           if (!message.reset) return resumed ? reactivity.invalidate(readState) : Effect.void
           // What was missed may have changed what was delivered: read everything again.
           forgetDeliveredItems(registry, delivered.timelines)
@@ -332,6 +334,16 @@ const run = Effect.fnUntraced(function* (
             GroupLatest: ({ latest }) => deliverGroupLatest(registry, workspaceId, latest),
             Turn: ({ turn }) => deliverTurn(registry, workspaceId, turn)
           })
+        // Writes that posted a message wait for the commit that delivers it.
+        recordMessages(
+          registry,
+          workspaceId,
+          message.changes.flatMap((change) =>
+            ChangeFeed.Change.isAnyOf(["TimelineItem"])(change) && "message" in change.item
+              ? [change.item.message.id]
+              : []
+          )
+        )
         // A notification for the reader shows in their inbox with the timeline item it tells of,
         // when the commit delivered that too, and changes their pending counts.
         for (const notification of message.notifications) {
@@ -357,7 +369,10 @@ const run = Effect.fnUntraced(function* (
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void
       }
     })
+  // Writes stop waiting for commits once the feed is down or gone.
+  yield* Effect.addFinalizer(() => Effect.sync(() => recordLive(registry, workspaceId, false)))
   while (true) {
+    recordLive(registry, workspaceId, false)
     Queue.offerUnsafe(
       states,
       connected || attempt > 0

@@ -1131,6 +1131,20 @@ it("drafts a first message to someone new and opens the conversation it starts",
   const composer = await screen.findByRole("combobox", { name: /^Message / })
   await userEvent.setup().type(composer, "Are you free?")
   fireEvent.click(screen.getByRole("button", { name: "Send" }))
+  // The message shows, and the conversation opens, once the commit that delivers it arrives.
+  await waitFor(() => expect(started).toHaveLength(1))
+  feed.streams[0]!.send({
+    ...committed("one", "2", []),
+    changes: [
+      {
+        _tag: "TimelineItem",
+        item: {
+          ...item(1, "m9", "Are you free?"),
+          activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" }
+        }
+      }
+    ]
+  })
   await waitFor(() => expect(history.get()).toBe("/workspaces/one/groups/g9"))
   expect(started).toEqual([{ memberIds: ["ada-one"], text: "Are you free?", mentions: [] }])
 })

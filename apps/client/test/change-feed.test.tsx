@@ -8,6 +8,7 @@ import {
   ClientProvider,
   DirectoryProvider,
   useGroups,
+  useReply,
   useInboxPending,
   useMarkThreadRead,
   useWorkspaceSettings,
@@ -470,6 +471,39 @@ it("shows the timeline items a commit delivers in place, without reading the tim
   stream.send(ready("5", true))
   await waitFor(() => expect(texts()).toMatchObject([{ text: "Opening, read again" }, { text: "Reply" }]))
   expect(f.count("/threads/thread/timeline")).toBe(reads + 1)
+})
+
+it("a reply completes once the commit that delivers it arrives, reading nothing again", async () => {
+  let timeline!: ReturnType<typeof useThreadTimeline>
+  let reply!: ReturnType<typeof useReply>
+  const f = fixture({
+    respond: (request, path) =>
+      path === "/threads/thread/timeline"
+        ? Promise.resolve(json([timelineItem(1, "Opening")]))
+        : request.method === "POST" && path === "/threads/thread/messages"
+          ? Promise.resolve(json(timelineItem(2, "Reply").message, 201))
+          : undefined,
+    mount: () => {
+      timeline = useThreadTimeline("one", "thread")
+      reply = useReply("one", "thread")
+    }
+  })
+  const stream = await f.connected(0)
+  stream.send(ready("1", false))
+  await waitFor(() => expect(timeline.value()).toHaveLength(1))
+  const reads = f.reads.length
+  reply.setDraft("Reply")
+  reply.send()
+  await waitFor(() => expect(f.count("/threads/thread/messages")).toBe(1))
+  // Posted, but not yet shown: the reply waits for its commit.
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(reply.pending()).toBe(true)
+  stream.send({ ...committed("2"), changes: [{ _tag: "TimelineItem", item: timelineItem(2, "Reply") }] })
+  await waitFor(() => expect(reply.pending()).toBe(false))
+  expect(reply.draft()).toBe("")
+  expect(timeline.value()).toHaveLength(2)
+  // Only the post itself was sent.
+  expect(f.reads.slice(reads).filter((path) => !path.endsWith("/typing"))).toEqual(["/threads/thread/messages"])
 })
 
 /** A thread of the group that started at `minute`, as its preview shows it to every reader. */
